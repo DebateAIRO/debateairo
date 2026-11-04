@@ -207,6 +207,7 @@ apps/api/src/staff/threat-reports.ts
 apps/api/src/staff/webauthn-codec.ts
 apps/api/src/staff/webauthn-verifier.ts
 apps/api/src/staff/webauthn.ts
+apps/api/src/start-paths-at-ask.ts
 apps/api/src/start-step/charge.ts
 apps/api/src/start-step/seats.ts
 apps/api/src/start-step/signing.ts

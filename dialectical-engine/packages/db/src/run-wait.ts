@@ -65,6 +65,8 @@ export type WaitingRun = Readonly<{
   /**
    * Debate shape (spec 2026-10-12 §3.6): the run's stored shape settings and receipt plan, raw — present only for a
    * run asked under the register's debateShapePolicy row. Read carefully by the estimate (`waitingShapeClassOf`).
+   * V4 start step, Task 37: with the receipt's paths (`paths`, a path debate's); a run whose receipt names none has no
+   * `paths` member at all, so its settings read exactly as before the start step.
    */
   shapeSettings?: Readonly<Record<string, unknown>>;
 }>;
@@ -90,7 +92,8 @@ const WAITING_COLUMNS = `run_id, waiting_since, owner_ref::text AS owner_ref, le
   plan_tier, composition_budget_tier, depth, maker_count, waits_for, person_recheck_at, reason_at,
   (SELECT CASE WHEN shape_run.depth_params ? 'depthMode' THEN jsonb_build_object(
       'depthMode', shape_run.depth_params->'depthMode', 'scrutiny', shape_run.depth_params->'scrutiny',
-      'answerLength', shape_run.depth_params->'answerLength', 'plan', shape_run.envelope_basis->'shape'->'plan') END
+      'answerLength', shape_run.depth_params->'answerLength', 'plan', shape_run.envelope_basis->'shape'->'plan')
+      || jsonb_strip_nulls(jsonb_build_object('paths', shape_run.envelope_basis->'shape'->'paths')) END
    FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings,
   (SELECT key_run.release_key FROM core.run AS key_run WHERE key_run.run_id = line.run_id) AS release_key,
   (SELECT settings_run.register_version FROM core.run AS settings_run WHERE settings_run.run_id = line.run_id)::integer

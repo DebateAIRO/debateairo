@@ -4,18 +4,21 @@ import type { PoolClient } from "pg";
 import { PostgresAskApplication, type Dispatcher, type RunCreationSettings } from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
 import { PostgresModelSpendStore } from "@debateai/budget";
-import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
+import { PLAN_TIER_ROSTERS, type AskRequest, type PathId, type PurposeLines, type Session } from "@debateai/contract";
 import {
-  EntitlementRepository, RunRepository, RunWaitRepository, type ReadmissionPrincipal, type RunOwnershipAccess, type StartRunInput
+  EntitlementRepository, PostgresStartPathsStore, RunRepository, RunWaitRepository, type ReadmissionPrincipal, type RunOwnershipAccess,
+  type StartRunInput, type StoredStartPathSet
 } from "@debateai/db";
 import { ServeRepository } from "@debateai/serve";
 import {
-  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, debateShapePolicyStartValues, parseDebateShapePolicy,
-  parseRegisterVersionText, registerVersionToSafeLegacyNumber
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis, debateShapePolicyStartValues,
+  debateShapeStartStepStartValues, engineVersionPolicyStartValues, isShapeReceiptV2, lengthGuidancePolicyStartValues,
+  parseDebateShapePolicy, parseRegisterVersionText, registerVersionToSafeLegacyNumber
 } from "@debateai/register";
 import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "../../apps/api/src/active-settings-version.js";
 import type { AdmissionRunMembers } from "../../apps/api/src/admission-settings.js";
 import { AskRoom, type AskRoomOptions } from "../../apps/api/src/ask-room.js";
+import { postgresPurposeLines, readPurposeLinesOf } from "../../apps/api/src/purpose-lines.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { importHistoricalRegisterFixture, publishReplacementRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
@@ -175,8 +178,8 @@ function applicationOf(input: Readonly<{
   probes?: { count: number }; extra?: Partial<RunCreationSettings>;
 }>): PostgresAskApplication {
   const dispatcher: Dispatcher = { dispatch: async ({ runId }) => { input.dispatched?.push(runId); } };
+  // `extra`: the members a case adds, or replaces (V4 start step, Task 39: a basis that mints shape receipt v2).
   const settings: RunCreationSettings = {
-    ...input.extra,
     strangerSampleRate: 0,
     registerVersion: input.registerVersion,
     releaseKey: input.releaseKey,
@@ -195,7 +198,8 @@ function applicationOf(input: Readonly<{
       effectiveRiskTier, tierSource: tierSource as "ASKER" | "MACHINE_DEFAULT" | "DEPLOYMENT_POLICY", tierProvenanceRef
     }),
     room: input.room,
-    waitingLine: input.room
+    waitingLine: input.room,
+    ...input.extra
   };
   return new PostgresAskApplication(
     fixture.database.pool, dispatcher, settings, undefined, fixture.database.pool,
@@ -686,6 +690,119 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(await supersessionCount()).toBe(edges);
     expect(await jobsOf(waiting.run_ref)).toEqual([{ command_key: `S00:${waiting.run_ref}:Q1`, state: "READY", terminal_reason: null }]);
     expect(probes.count).toBe(0);
+  });
+});
+
+/**
+ * V4 start step, Task 39 (spec 2026-11-03 §4.2) — A WAITING PATH DEBATE IS RE-ADMITTED WITH ITS PATHS AND LINES. An owner's
+ * debate r16 placed in line with two chosen paths (sealed under its key, migration 0156) and its purpose lines (0138) is
+ * started by r17's waker, whose version runs the start step, as a NEW run admitted with shape receipt v2 for those two
+ * paths: the set sealed again under the new run's own key, the same lines recorded for it, the carry-on box kept. r17 is
+ * current (above); the activation case below comes after this one. Made-up question, paths and lines.
+ */
+describe("V4 start step, Task 39: a waiting path debate keeps its chosen paths and lines when it is re-admitted", () => {
+  const CEILING_TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1,
+    finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
+    synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5 });
+  const LINES: PurposeLines = Object.freeze({ place: "A village by the lake", time: "Before the spring fair" });
+  const setOf = (runId: string): StoredStartPathSet => Object.freeze({
+    runId, source: "MENU", width: 3, chosenBy: "PERSON", carryOnToReport: true, menu: null,
+    paths: Object.freeze([1, 2].map((no) => Object.freeze({
+      pathId: `b${String(no)}` as PathId, pathNo: no, author: "AI_SUGGESTION" as const, title: `Path ${String(no)}`,
+      question: `What does path ${String(no)} weigh for the fair?`, ownWords: Object.freeze([]),
+      viewpoints: Object.freeze([{ viewpointId: `pt1${String(no)}`, pickNo: null, title: `Path ${String(no)}`,
+        question: `What does path ${String(no)} weigh for the fair?`, own: false }])
+    })))
+  });
+  /** r17's version: the start step on, engine 2 and the length row in force, a basis that mints what admission resolves. */
+  const pathVersion = (): Partial<RunCreationSettings> => ({
+    debateShapePolicy: { ...debateShapePolicyStartValues(), startStep: debateShapeStartStepStartValues() },
+    lengthGuidancePolicy: lengthGuidancePolicyStartValues(),
+    engineVersionPolicy: engineVersionPolicyStartValues(),
+    resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape, shapeV2, length, engine, web }) =>
+      computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned,
+        ...(shape === null ? {} : { shape }), ...(shapeV2 == null ? {} : { shapeV2 }), ...(length === null ? {} : { length }),
+        ...(engine === null ? {} : { engine }), ...(web === null ? {} : { web }) }),
+    startPaths: new PostgresStartPathsStore(fixture.database.pool),
+    purposeLines: postgresPurposeLines(fixture.database.pool)
+  });
+  const sealedOf = async (table: "core.start_path_set" | "core.start_path", runId: string) =>
+    (await fixture.database.pool.query<{ content: unknown }>(
+      `SELECT content_ciphertext AS content FROM ${table} WHERE run_id = $1 ORDER BY content_ciphertext::text`, [runId]
+    )).rows.map((row) => row.content);
+
+  beforeEach(async () => {
+    await fixture.database.pool.query(
+      "UPDATE core.work_item SET state='DONE', claimed_by=NULL, claim_deadline=NULL WHERE state IN ('READY','CLAIMED')"
+    );
+    await fixture.database.pool.query(
+      "INSERT INTO core.run_wait_start (run_id, started_at) SELECT run_id, clock_timestamp() FROM core.run_waiting_v"
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Review of Task 37 (the waker's class of a waiting run, `settingsClassOfWaitingRun`): the waiting line reads a path
+  // debate's receipt paths beside its shape settings, and a run whose receipt names none exactly as before, with no
+  // `paths` member at all (tests/integration/b3-holds-waiting-line.test.ts reads that object with toEqual).
+  it("the waiting line reads a path debate's paths beside its shape settings, and a run that names none as before", async () => {
+    now = new Date("2034-05-10T09:00:00.000Z");
+    const shaped = { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
+    const principal = { kind: "server" as const, userId: fixture.userId, ownerRef: fixture.ownerRef };
+    const today = await storedWaiting({ principal, sessionId: fixture.authSessionId, depthParams: shaped,
+      envelopeBasis: { ...fixtureStructuralCeiling(4), shape: { plan: "free" } } });
+    const path = await storedWaiting({ principal, sessionId: fixture.authSessionId, depthParams: shaped,
+      envelopeBasis: { ...fixtureStructuralCeiling(4), shape: { plan: "free", paths: 2 } } });
+    const waits = new RunWaitRepository(fixture.database.pool);
+    const settings = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard", plan: "free" };
+    expect((await waits.readWaiting(today))?.shapeSettings).toEqual(settings);
+    expect((await waits.readWaiting(path))?.shapeSettings).toEqual({ ...settings, paths: 2 });
+  });
+
+  it("the new run's paths are the old run's, sealed again under its own key, and its purpose lines are the old run's", async () => {
+    now = new Date("2034-05-10T10:00:00.000Z");
+    const pool = fixture.database.pool;
+    const store = new PostgresStartPathsStore(pool);
+    const old = await storedWaiting({
+      questionLine: "Should the village keep its spring fair by the lake?",
+      principal: { kind: "server", userId: fixture.userId, ownerRef: fixture.ownerRef }, sessionId: fixture.authSessionId,
+      askContract: { decision_scope: "side-by-side C11 integration test", steering_presets: [], steering_annotations: [], carry_on_to_report: true }
+    });
+    expect(await store.recordStartPaths(setOf(old))).toBe("RECORDED");
+    expect(await postgresPurposeLines(pool).record(fixture.ownerRef, old, LINES)).toBe("RECORDED");
+
+    now = new Date("2034-05-10T10:01:00.000Z");
+    const dispatched: string[] = [];
+    await expect(newApplication(roomOf({ releaseKey: NEW_RELEASE, ceiling: RAISED_DAY }), { dispatched, extra: pathVersion() })
+      .wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
+    const edges = await supersessionOf(old);
+    expect(edges).toHaveLength(1);
+    const created = edges[0]!.new_run_id;
+    expect(dispatched).toEqual([created]);
+
+    // Admitted as a path debate of the two chosen paths, with the carry-on box the waiting run asked for.
+    const basis = (await pool.query<{ envelope_basis: Readonly<Record<string, unknown>> }>(
+      "SELECT envelope_basis FROM core.run WHERE run_id = $1", [created]
+    )).rows[0]!.envelope_basis;
+    expect(isShapeReceiptV2(basis)).toBe(true);
+    expect(basis).toMatchObject({ shape: { plan: "free", paths: 2, paths_source: "MENU" } });
+    expect((await new RunRepository(pool).readStoredAsk(created))?.askContract).toMatchObject({ carry_on_to_report: true });
+
+    // The paths: the old run's, read back under the new run's key; the old run's set untouched; every envelope sealed anew.
+    expect(await store.readStartPaths(created)).toEqual(setOf(created));
+    expect(await store.readStartPaths(old)).toEqual(setOf(old));
+    for (const table of ["core.start_path_set", "core.start_path"] as const) {
+      const before = await sealedOf(table, old);
+      const after = await sealedOf(table, created);
+      expect(after, table).toHaveLength(before.length);
+      for (const envelope of after) expect(before, table).not.toContainEqual(envelope);
+    }
+
+    // The purpose lines: the old run's, recorded for the new run.
+    expect(await readPurposeLinesOf(pool, fixture.ownerRef, created)).toEqual(LINES);
+    expect(await readPurposeLinesOf(pool, fixture.ownerRef, old)).toEqual(LINES);
   });
 });
 

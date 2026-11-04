@@ -13,10 +13,10 @@ const admissionLoader = await readFile(new URL("../../apps/api/src/admission-set
 const runbook = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
 
 describe("the setup step B8 adds, beside B6b's and B7b's (budget spec §2.9)", () => {
-  it("keeps every earlier step in the union and appends COST_RECORD, then the scorecard's MODEL_ASSIGNMENT (paid plans S1a), then ROLE_ROTATION (spec 2026-10-11)", () => {
+  it("keeps every earlier step in the union and appends COST_RECORD, then the scorecard's MODEL_ASSIGNMENT (paid plans S1a), then ROLE_ROTATION (spec 2026-10-11), then START_PATHS (V4 start step, Task 35)", () => {
     expect(api).toContain(
       '  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"\n'
-      + '  | "COST_RECORD" | "MODEL_ASSIGNMENT" | "ROLE_ROTATION";'
+      + '  | "COST_RECORD" | "MODEL_ASSIGNMENT" | "ROLE_ROTATION" | "START_PATHS";'
     );
   });
 

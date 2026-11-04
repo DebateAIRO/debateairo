@@ -78,6 +78,12 @@ export type RoomQuestion = Readonly<{
    * of a new question's.
    */
   dig?: Readonly<{ parentRunId: string; mode: DigLinkMode; picks: number | null; level?: number }>;
+  /**
+   * V4 start step, Task 38 (spec 2026-11-03 §2.6): a room read for a new question whose start step runs (GET /v1/asks/room,
+   * `startStepWidthsFor`): How wide's widest choice, and the web depth each chosen path would search at (null: no web
+   * part, as on Free or with no search gate). The answer then carries the share of today for each path count up to it.
+   */
+  start?: Readonly<{ maxPaths: number; web: "QUICK" | "THOROUGH" | null }>;
 }>;
 export type RoomDecision = Extract<Admission, { kind: "START" | "WAIT" }>;
 export type RoomDecisionContext = Readonly<{
@@ -282,6 +288,12 @@ export type AskRoomAnswer = Readonly<{
   startSharePercent?: number;
   digSharePercent?: number;
   reserve?: "KEPT";
+  /**
+   * V4 start step, Task 38: on a new question's read with a start (`RoomQuestion.start`), under the money rule and on
+   * neither a dig nor an internal grant: entry i - 1 is a debate of i paths' estimate (its arguing and, with a web depth,
+   * its web part) as a whole share of today (`wholeSharePercent`), for i from 1 to the widest choice.
+   */
+  startShareByPaths?: readonly number[];
 }>;
 
 export interface AskRoomReader {
@@ -394,6 +406,28 @@ export function isMoneyRuleWindow(window: PersonWindow): boolean {
   return window.borrows === true || window.keepsReserveMicros !== undefined;
 }
 
+/** The money rule's "today" (W3-2): the person's day, or Free's month (its only window); undefined with neither. */
+function todayOf(evaluation: Pick<RoomEvaluation, "personUses">): RoomWindowUse | undefined {
+  return evaluation.personUses.find((use) => use.scope === "PERSON_DAY")
+    ?? evaluation.personUses.find((use) => use.scope === "PERSON_MONTH");
+}
+
+/**
+ * V4 start step, Task 38 (spec 2026-11-03 §2.6, "+4% for 7 paths"): an estimate as a WHOLE share of today, so one path
+ * more or less always shows (the share of today in steps of 5, `digSharePercent`, would hide it). 0 for nothing; else
+ * rounded half up, at least 1 and at most 100, in integers.
+ */
+export function wholeSharePercent(estimateMicros: number, limitMicros: number): number {
+  if (!Number.isSafeInteger(estimateMicros) || estimateMicros < 0 || !Number.isSafeInteger(limitMicros) || limitMicros <= 0) {
+    throw new RangeError("WHOLE_SHARE_INPUT_INVALID");
+  }
+  if (estimateMicros === 0) return 0;
+  if (estimateMicros >= limitMicros) return 100;
+  // round(estimate * 100 / limit), half up: floor((estimate * 200 + limit) / (limit * 2)).
+  const percent = Math.floor((estimateMicros * 200 + limitMicros) / (limitMicros * 2));
+  return Math.min(100, Math.max(1, percent));
+}
+
 /**
  * The money rule's members of a room read (W3-2): the estimate as a share of today — the person's day, or Free's month
  * (its only window) — on a dig's read as `digSharePercent`, else as `startSharePercent`; and the reserve, always kept.
@@ -402,8 +436,7 @@ export function isMoneyRuleWindow(window: PersonWindow): boolean {
 function moneyRuleMembers(question: RoomQuestion, evaluation: RoomEvaluation, digWebPartMicros: number = 0): Pick<AskRoomAnswer,
   "startSharePercent" | "digSharePercent" | "reserve"> {
   if (!evaluation.moneyRule) return {};
-  const today = evaluation.personUses.find((use) => use.scope === "PERSON_DAY")
-    ?? evaluation.personUses.find((use) => use.scope === "PERSON_MONTH");
+  const today = todayOf(evaluation);
   if (today === undefined) return { reserve: "KEPT" };
   // A dig's share counts its web part (R22 decision 9: up to 4 searches per chosen path, so more picks read as more of today) and the
   // automatic updates that follow it (the owner's ruling, 31 Oct), passed in together by the caller.
@@ -556,13 +589,15 @@ export function nextUtcMidnight(now: Date): Date {
  * The settings class of a new ask (budget spec §2.5): its plan tier, composition
  * tier, the number of MODELS on the plan's roster (the panel it will be probed
  * for; a stored run counts its panel's models the same way, B2) and its depth.
+ * V4 start step, Task 37: `paths`, the start's number of paths (a path debate's, 1 to 8), joins its shape class.
  */
 export function runSettingsClassOfAsk(
   ask: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">,
   previewConfig?: PreviewProviderTestConfig,
-  shapePlan?: DebateShapePlanKey
+  shapePlan?: DebateShapePlanKey,
+  paths?: number
 ): RunSettingsClass {
-  const shape = runShapeClassOf(ask.depth_params, shapePlan ?? debateShapePlanKeyOf(null, ask.plan_tier));
+  const shape = runShapeClassOf(ask.depth_params, shapePlan ?? debateShapePlanKeyOf(null, ask.plan_tier), paths);
   // Debate shape: the optional member is built before the class so no conditional sits beside the roster pick.
   const shapeMember = shape === null ? {} : { shape };
   return Object.freeze({
@@ -781,7 +816,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const planId = grant !== null || this.#options.entitlements === null || ownerRef === null ? null
       : (await this.#options.entitlements.current(ownerRef, now)).planId;
     const funding = grant === null ? {} : {funding: Object.freeze({kind:"INTERNAL" as const, expiresAt:grant.expiresAt})};
-    const money = grant === null ? moneyRuleMembers(question, evaluation, await this.#digWebPartMicros(question) + await this.#digUpdatesPartMicros(question)) : {};
+    const money = grant === null ? {
+      ...moneyRuleMembers(question, evaluation, await this.#digWebPartMicros(question) + await this.#digUpdatesPartMicros(question)),
+      ...await this.#startShareByPaths(question, evaluation)
+    } : {};
     const admission = evaluation.admission;
     switch (admission.kind) {
       case "REFUSE_ALREADY_WAITING":
@@ -1089,6 +1127,29 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     if (question.dig === undefined) return 0;
     const estimator = await this.#estimatorFor(question.registerVersion);
     return estimator.digUpdatesPartMicros?.({ level: question.dig.level ?? 1, free: question.settingsClass.planTier === "free" }) ?? 0;
+  }
+
+  /**
+   * V4 start step, Task 38: the share of today for each path count, 1 to `start.maxPaths`, on a new question's read with a
+   * start (never a dig's; the caller asks only without an internal grant), under the money rule, for a shaped class: each
+   * count's estimate (the class with that many paths, at the question's own version) plus, with a web depth, its web part
+   * (`pathsWebPartMicros`; 0 when the estimator cannot say). One estimate per count, in turn. Only the line reads it: the
+   * room is measured, held and walled by the question's own class alone. Nothing otherwise.
+   */
+  async #startShareByPaths(question: RoomQuestion, evaluation: RoomEvaluation): Promise<Pick<AskRoomAnswer, "startShareByPaths">> {
+    const start = question.start;
+    const shape = question.settingsClass.shape;
+    if (start === undefined || question.dig !== undefined || !evaluation.moneyRule || shape === undefined) return {};
+    const today = todayOf(evaluation);
+    if (today === undefined) return {};
+    const estimator = await this.#estimatorFor(question.registerVersion);
+    const shares: number[] = [];
+    for (let paths = 1; paths <= start.maxPaths; paths += 1) {
+      const arguing = await estimator.estimateMicros(Object.freeze({ ...question.settingsClass, shape: Object.freeze({ ...shape, paths }) }));
+      const web = start.web === null ? 0 : estimator.pathsWebPartMicros?.({ depth: start.web, paths }) ?? 0;
+      shares.push(wholeSharePercent(arguing + web, today.limitMicros));
+    }
+    return { startShareByPaths: Object.freeze(shares) };
   }
 
   /** The site's live debates at its cap, counted under `SITE_CONCURRENT_DEBATES_LOCK` on the decision's own transaction. */

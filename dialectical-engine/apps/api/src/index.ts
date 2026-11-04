@@ -188,6 +188,7 @@ import {
   type OwnerAskAdmissionLease,
   type ReadmissionPrincipal,
   type RunOwnershipAccess,
+  type StartPathsStore,
   type StoredAsk,
   type WaitingRun,
   type WaitingRunCursor
@@ -303,10 +304,11 @@ import {
   type AskRoomReader,
   type AskWaitingLinePort,
   type RoomPreview,
+  type RoomQuestion,
   type WaitingStart
 } from "./ask-room.js";
 import {
-  keepsEveryStoredChoice, planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan
+  keepStartForReadmission, keepsEveryStoredChoice, planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan
 } from "./readmission.js";
 import {
   ASK_SIGN_IN_REQUIRED,
@@ -318,17 +320,24 @@ import {
 } from "./ask-billing.js";
 import {
   debateShapePlanKeyOf,
+  isShapeReceiptV2,
   structuralBasisProvisionsBackup,
   type DebateShapeCeilingInput,
   type DebateShapePlanKey,
   type DebateShapePolicy,
+  type DebateShapeV2Input,
   type EngineSettings,
   type EngineVersionPolicy,
   type LengthGuidance,
   type LengthGuidancePolicy
 } from "@debateai/register";
 import type { AdmissionRunMembers } from "./admission-settings.js";
-import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
+import {
+  askShapesForPanel, normaliseAskForDebateShape, roomDepthParams, startRunBuiltPaths, startStepWidthsFor, type AskStartShape
+} from "./debate-shape-ask.js";
+import {
+  sealStartPathsAtSetup, startAskContractMember, startOfAsk, type AskStart, type AskStartHandOver
+} from "./start-paths-at-ask.js";
 import { engineForAsk, webSitesForAsk } from "./engine-ask.js";
 import type { WebSites } from "@debateai/register";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
@@ -1749,7 +1758,11 @@ declare module "fastify" {
 
 export interface AskApplication {
   withContentLease<T>(runId: string, use: () => Promise<T>): Promise<T>;
-  submit(ask: AskRequest, session: Session, principal: AskPrincipal): Promise<AskAccepted>;
+  /**
+   * V4 start step, Task 35: `startHandOver` is the route's hand-over of the paths and the check verified at Start (Task 36),
+   * bound to the plan and settings version they were signed for; absent, the ask is today's (or RUN_BUILT on a v2 version).
+   */
+  submit(ask: AskRequest, session: Session, principal: AskPrincipal, startHandOver?: AskStartHandOver): Promise<AskAccepted>;
   readAnswer(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null>;
   readRunAnswer(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<Answer | null>;
   /** Decision 12: what the AIs found on a debate set aside; asked only after that debate's owner-gated read. */
@@ -2044,6 +2057,12 @@ export interface ApiOptions {
    * = an empty list, which the page reads as "every reviewed company".
    */
   readonly aiProviderCompanies?: readonly string[];
+  // V4 start step
+  /**
+   * V4 start step, Task 38 (the member Task 30 composes as its `StartStepPort`): the pre-Start step's route. GET
+   * /v1/asks/room says the lists run before Start (`start_step.lists` ON) only on "PREVIEW"; "NONE" or absent: OFF.
+   */
+  readonly startStep?: Readonly<{ route: "PREVIEW" | "NONE" }>;
 }
 
 /**
@@ -2057,6 +2076,8 @@ export type AdmissionView = Readonly<{
   registerVersion: number;
   debateShapePolicy?: DebateShapePolicy;
   lengthGuidancePolicy?: LengthGuidancePolicy;
+  /** V4 start step, Task 34: the version's engine-2 row in force (absent: none), which the start step needs (`startStepWidthsFor`). */
+  engineVersionPolicy?: EngineVersionPolicy;
   modelScorecardInForce: boolean;
   previewProviderTestConfig?: PreviewProviderTestConfig;
 }>;
@@ -4301,27 +4322,44 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // words; without a room reader, the query's own tier.
     let roomPlanKey: DebateShapePlanKey = "free";
     if (options.askRoom === undefined) roomPlanKey = debateShapePlanKeyOf(null, query.data.plan_tier);
-    const answer: AskRoomAnswer = options.askRoom === undefined
+    // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
+    // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
+    // V4 start step, Task 38: decided before the room is asked (the same calls, in the same order: the view, this, the
+    // room), so the start step below is read for the room's own plan key.
+    const decided = options.askRoom === undefined ? null : await decideRoomSettingsAndPlan({
+      plan_tier: query.data.plan_tier,
+      composition_budget_tier: query.data.composition_budget_tier,
+      depth_params: roomDepthParams(query.data)
+    }, access.ownerRef, options.askBilling);
+    if (decided !== null) roomPlanKey = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
+    // V4 start step, Task 38 (spec 2026-11-03 §2.6): a new question's read (never a dig's) gets How wide's widths when the
+    // start step runs for this person on the view's version (`startStepWidthsFor`, the one v2 predicate submit reads), the
+    // room estimates the debate an ask without chosen paths would run (`startRunBuiltPaths`: the default width), and the
+    // room is asked for the share of each path count up to the widest, with the web part the ask itself would price
+    // (`webSitesForAsk`: a search gate on a paid plan, QUICK below depth 2). Null: today's read, byte for byte.
+    const startWidths = digParent !== undefined ? null : startStepWidthsFor({ policy: view.debateShapePolicy ?? null,
+      engineInForce: view.engineVersionPolicy !== undefined, scorecardInForce: view.modelScorecardInForce,
+      serverPrincipal: access.ownerRef !== null }, roomPlanKey);
+    const startMember = ((): Pick<RoomQuestion, "start"> => {
+      if (startWidths === null) return {};
+      const maxPaths = Math.max(...startWidths.options);
+      const config = view.previewProviderTestConfig;
+      const web = webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape: null,
+        shapeV2: { plan: roomPlanKey, paths: maxPaths }, engine: view.engineVersionPolicy ?? null, depth: query.data.depth, parent: undefined });
+      return { start: Object.freeze({ maxPaths, web: web?.depth ?? null }) };
+    })();
+    const answer: AskRoomAnswer = options.askRoom === undefined || decided === null
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
           access,
           ...versionMember,
           ...digMember,
-          settingsClass: await (async () => {
-            // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
-            // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
-            const decided = await decideRoomSettingsAndPlan({
-              plan_tier: query.data.plan_tier,
-              composition_budget_tier: query.data.composition_budget_tier,
-              depth_params: roomDepthParams(query.data)
-            }, access.ownerRef, options.askBilling);
-            const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
-            roomPlanKey = roomPlan;
-            // Addition D16 (Task SA6): the class counts the roster of the version the view names (its composed preview
-            // configuration), the one the next ask is admitted on; the team rule above tests presence only.
-            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
-              view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan);
-          })()
+          ...startMember,
+          // Addition D16 (Task SA6): the class counts the roster of the version the view names (its composed preview
+          // configuration), the one the next ask is admitted on; the team rule above tests presence only.
+          settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlanKey,
+            view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlanKey,
+            startWidths === null ? undefined : startRunBuiltPaths(startWidths, roomPlanKey))
         });
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
@@ -4357,7 +4395,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         if (view.previewProviderTestConfig === undefined) return {};
         const lineUp = previewLineUpOfConfig(view.previewProviderTestConfig);
         return { preview_rosters: { free: [...lineUp.free_model_ids], premium: [...lineUp.premium_model_ids] } };
-      })()
+      })(),
+      // V4 start step, Task 38 (spec 2026-11-03 §2.6): whether the lists run before Start (the preview route only), How
+      // wide's widths, and the share of today for each path count when the room gave it (none: no money-rule window, an
+      // internal grant, no room). Without widths the member is never written: today's body, byte for byte.
+      ...(startWidths === null ? {} : { start_step: {
+        lists: options.startStep?.route === "PREVIEW" ? "ON" as const : "OFF" as const,
+        widths: { options: [...startWidths.options], default: startWidths.default },
+        ...(answer.startShareByPaths === undefined ? {} : { share_by_paths: [...answer.startShareByPaths] })
+      } })
     }));
   });
 
@@ -4472,15 +4518,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   // Debate shape P2c (spec 2026-10-12 §3.3 step 8, §3.4): the debate page's map view.
   // Ruling C-MAPREAD: the page asks on every load and most debates have no map, so the first
-  // gate is `findMapRun` — one owner query that names the answer's run, then one lookup of the
-  // map choice — and a debate with no map answers 404 before the full answer read or any
-  // content lease. A caller who does not own the answer gets the same 404 after the owner
-  // query alone. Only then is the answer read (owner-scoped, for its nodes), and the
-  // application checks again (core.run_is_owned_by) before it reads the map (pre-flight PF-C16).
-  // "Not yours", "malformed", "no reader" and "no map choice" (incl. an erased run) are one
-  // closed 404. Titles land on the nodes the map recorded (C-ROOTS), kept only when the
-  // answer holds them, so a title never names a node the page cannot show. A corrupt map
-  // row stays the closed 500 (PF-C19).
+  // gate is `findMapRun` — one owner query that names the answer's run, then (V4 start step,
+  // Task 59) one code-only question whether that run has chosen paths
+  // (core.read_start_path_ids, no lease, no decryption; a path run has no classic map and
+  // answers 404 here, its map choice never read), then one lookup of the map choice — and a
+  // debate with no map answers 404 before the full answer read or any content lease. A caller
+  // who does not own the answer gets the same 404 after the owner query alone. Only then is the
+  // answer read (owner-scoped, for its nodes), and the application checks again
+  // (core.run_is_owned_by) before it reads the map (pre-flight PF-C16); `readMapView` then asks
+  // the path-run question again, so a run whose map opened the debate costs two of those
+  // questions per load. "Not yours", "malformed", "no reader", "a path run" and "no map
+  // choice" (incl. an erased run) are one closed 404. Titles land on the nodes the map
+  // recorded (C-ROOTS), kept only when the answer holds them, so a title never names a node
+  // the page cannot show. A corrupt map row stays the closed 500 (PF-C19).
   api.get<{ Params: { id: string } }>("/v1/answers/:id/map", routePolicy("GET /v1/answers/{id}/map"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     const mapViews = options.mapViews;
@@ -5282,6 +5332,11 @@ export interface RunCreationSettings {
     readonly backupSequencesProvisioned: 0 | 1;
     /** Debate shape (spec 2026-10-12 §3.6): the sizes this panel runs (`resolveDebateShape`), or null for today's shape. */
     readonly shape: DebateShapeCeilingInput | null;
+    /**
+     * V4 start step, Task 34: a path debate's sizes (`askShapesForPanel`: shape receipt v2), never with `shape`; null or
+     * absent for every other debate (today's receipt, byte for byte).
+     */
+    readonly shapeV2?: DebateShapeV2Input | null;
     /** Length guidance (spec 2026-10-15 §3.1): the debate's numbers (`lengthGuidanceForAsk`), or null without the row. */
     readonly length: LengthGuidance | null;
     /** W2-2 (R22): the web part (`webSitesForAsk`), or null where the debate cannot search. */
@@ -5341,6 +5396,17 @@ export interface RunCreationSettings {
    * tests hand their own. A process member, never a version's.
    */
   readonly activeVersionAlarm?: ActiveVersionAlarm;
+  /**
+   * V4 start step, Task 35 (spec 2026-11-03 §4.2): the chosen paths' store (0156), where a debate admitted with shape
+   * receipt v2 seals the paths the person chose before its first job (RUN_SETUP_FAILED:START_PATHS). Absent: such a debate
+   * is refused at that step (START_PATHS_STORE_UNAVAILABLE). A process member, never a version's.
+   */
+  readonly startPaths?: StartPathsStore;
+  /**
+   * V4 start step, Task 35: where a v2 debate's purpose lines are kept at that same step (a dig with none of its own keeps
+   * its first debate's); a failure is logged and the debate goes on. Absent: none are kept there. A process member.
+   */
+  readonly purposeLines?: PurposeLinesPort;
 }
 
 /**
@@ -5607,7 +5673,9 @@ async function admitWithScorecard(input: Readonly<{
   ): Promise<Readonly<Record<string, unknown>>> => {
     try {
       // Debate shape (spec 2026-10-12 §3.6): on this path each debater is a distinct maker (debaterSeatCount).
-      const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers);
+      // V4 start step, Task 34: never a path debate here. A VALID scorecard keeps the start step off (`startStepWidthsFor`),
+      // since receipt v2 pins backup 0 and this picker may seat a runner-up; so no start is read on this path.
+      const { shape, shapeV2 } = askShapesForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers, null);
       // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
       const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, input.shapePlan);
       const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null });
@@ -5617,11 +5685,12 @@ async function admitWithScorecard(input: Readonly<{
         panelSize,
         backupSequencesProvisioned,
         shape,
+        shapeV2,
         length,
         // Engine redesign (R1d; INTERFACE §1.4): engine 2's settings for this panel's makers, frozen on the receipt; null
         // without the row in force (engine 1, today's receipt). The answer check is a site only when the map opens the debate.
         engine,
-        web: webOfAsk(settings, ask, shape, engine)
+        web: webOfAsk(settings, ask, shape, shapeV2, engine)
       });
     } catch (error) {
       return markAskRefusal(error);
@@ -5806,12 +5875,18 @@ function busyModelsSitOut(
 /** Role rotation: how long a refused ask whose counts could not be read is asked to wait (spec: one minute). */
 const ROLE_ROTATION_UNAVAILABLE_RETRY_MS = 60_000;
 
+/**
+ * V4 start step, Task 34: `start` is the ask's start shape (`askStartShapeOf` over `startStepWidthsFor`), null when the start
+ * step does not run for it. With a start and two makers or more on the admitted panel, the receipt is shape receipt v2
+ * (`askShapesForPanel`); otherwise today's. The picker's path (a VALID scorecard) never reads it.
+ */
 export async function evaluateAskAdmission(
   settings: RunCreationSettings,
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null,
   previewAdmissionLock?: PreviewAdmissionLock,
-  shapePlanKey: DebateShapePlanKey | null = null
+  shapePlanKey: DebateShapePlanKey | null = null,
+  start: AskStartShape | null = null
 ): Promise<AskAdmission> {
   const previewConfig=validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
   if(previewConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")
@@ -5907,7 +5982,9 @@ export async function evaluateAskAdmission(
   let envelopeBasis: Readonly<Record<string, unknown>>;
   try {
     const makers = new Set(filteredPanel.map((entry) => entry.maker)).size;
-    const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan, makers);
+    // V4 start step, Task 34: with a start and two makers or more, shape receipt v2 (no v1 shape, so engine 2's answer
+    // check is 0: the map no longer opens the debate); otherwise today's shape.
+    const { shape, shapeV2 } = askShapesForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan, makers, start);
     // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
     const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, shapePlan);
     const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null });
@@ -5915,13 +5992,14 @@ export async function evaluateAskAdmission(
       depthParams: ask.depth_params,
       riskTier: risk.effectiveRiskTier,
       panelSize: filteredPanel.length,
-      // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today.
+      // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today (and receipt v2's backup 0).
       backupSequencesProvisioned: 0,
       shape,
+      shapeV2,
       length,
       // Engine redesign (R1d; INTERFACE §1.4): as admitWithScorecard's resolveBasis.
       engine,
-      web: webOfAsk(settings, ask, shape, engine)
+      web: webOfAsk(settings, ask, shape, shapeV2, engine)
     });
   } catch (error) {
     markAskRefusal(error);
@@ -5977,11 +6055,13 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
  * pinned model assignment (A20, paid plans S1a): `MODEL_ASSIGNMENT`, on either
  * path after `COST_RECORD` and before the memory question. And the role rotation pin
  * (spec 2026-10-11 Part 4): `ROLE_ROTATION`, on either path next to `MODEL_ASSIGNMENT`
- * (a debate has one or the other, never both) and before the memory question.
+ * (a debate has one or the other, never both) and before the memory question. And the
+ * chosen paths (V4 start step, Task 35): `START_PATHS`, on either path after the pins
+ * and before the memory question, only for a debate admitted with shape receipt v2.
  */
 type RunSetupStep =
   | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"
-  | "COST_RECORD" | "MODEL_ASSIGNMENT" | "ROLE_ROTATION";
+  | "COST_RECORD" | "MODEL_ASSIGNMENT" | "ROLE_ROTATION" | "START_PATHS";
 
 /**
  * What `evaluateAskAdmission` admits an ask with. B8 keeps two inside
@@ -5993,15 +6073,17 @@ type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 /**
  * An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. Side-by-side C10:
  * exported as the re-admission plan's `evaluate` (apps/api/src/readmission.ts), which the waker passes in C11.
+ * V4 start step, Task 34: `start` as `evaluateAskAdmission`'s (null: today's receipt).
  */
 export async function evaluationOrRefusal(
   settings: RunCreationSettings,
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null,
-  shapePlan: DebateShapePlanKey | null = null
+  shapePlan: DebateShapePlanKey | null = null,
+  start: AskStartShape | null = null
 ): Promise<AskEvaluation | AskRefusal> {
   try {
-    return await evaluateAskAdmission(settings, ask, personRoom, undefined, shapePlan);
+    return await evaluateAskAdmission(settings, ask, personRoom, undefined, shapePlan, start);
   } catch (error) {
     if (error instanceof AskRefusal) return error;
     throw error;
@@ -6148,7 +6230,8 @@ export class PostgresAskApplication implements AskApplication {
   async submit(
     requestedAsk: AskRequest,
     session: Session,
-    principal: AskPrincipal
+    principal: AskPrincipal,
+    startHandOver?: AskStartHandOver
   ): Promise<AskAccepted> {
     // Side-by-side spec §13 (S10): the active settings version, read ONCE, first, before anything is decided; every
     // step of this ask, and everything frozen at its admission, reads `settings` (that version over the process members).
@@ -6208,8 +6291,11 @@ export class PostgresAskApplication implements AskApplication {
     // after the daily guard), in today's order. So the decider is not asked for it (no fast call, no offer). With
     // billing on the server decides the tier from the person's plan, so the decider is asked as for any ask.
     const tierRefusedLater = settings.billing === undefined && !Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string);
-    const questionLanguageLock: QuestionLanguageLock | null = shapePolicy === null || settings.questionLanguage === undefined
-      || tierRefusedLater
+    // V4 start step, Task 35: the lock the line checked at Next carried (the route's hand-over) is this ask's; the decider
+    // is not asked again. Its binding to the plan and version is checked with the paths' (`startOfAsk`, below).
+    const handOverLock = startHandOver?.lock ?? null;
+    const questionLanguageLock: QuestionLanguageLock | null = handOverLock !== null ? handOverLock
+      : shapePolicy === null || settings.questionLanguage === undefined || tierRefusedLater
       ? null
       : await settings.questionLanguage.decide({ ask: requestedAsk, ownerScope: ownerScopeOf(principal),
         fastCheckAllowed: principal.kind === "server" })
@@ -6251,6 +6337,20 @@ export class PostgresAskApplication implements AskApplication {
         substitutedAt = now;
       }
     }
+    // V4 start step, Task 35 (spec 2026-11-03 §4.2): the ask's start, once its plan key is final: the chosen paths handed
+    // over by the route (or none: the run builds its own list) when the start step runs for this ask (`startStepWidthsFor`,
+    // the one v2 predicate); paths signed for another plan or version, or carried where the step is off, are STALE, before
+    // anything is written. Null: today's ask. Admission prices it as receipt v2 only on a panel of two makers or more.
+    let start: AskStart | null;
+    try {
+      start = startOfAsk({
+        widths: startStepWidthsFor({ policy: shapePolicy, engineInForce: settings.engineVersionPolicy !== undefined,
+          scorecardInForce: settings.modelPicker?.scorecard.state === "VALID", serverPrincipal: principal.kind === "server" }, shapePlan),
+        plan: shapePlan, registerVersion: settings.registerVersion, ask, handOver: startHandOver ?? null
+      });
+    } catch (error) {
+      markAskRefusal(error);
+    }
     const appliedField = applied === null ? {} : { applied };
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
@@ -6262,7 +6362,7 @@ export class PostgresAskApplication implements AskApplication {
     if (settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
         settings, ask, plannedAsk, session, principal, ownership, settings.room, substitutedAt, shapePlan, questionLanguageLock,
-        settingsUnavailable, fundingBasis
+        settingsUnavailable, start, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -6272,7 +6372,7 @@ export class PostgresAskApplication implements AskApplication {
     const previewAdmissionLock = validatePreviewProviderTestConfig(settings.previewProviderTestConfig) === undefined
       ? undefined : settings.previewBudgetGate?.openAdmissionLock?.();
     try {
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(settings, ask, null, previewAdmissionLock, shapePlan);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(settings, ask, null, previewAdmissionLock, shapePlan, start?.shape ?? null);
     // Ruling L-SHAPED-ONLY (final review I2): the lock is the run's only when admission minted a shape receipt, the
     // receipt the runner locks by. A run with no shape (one maker) stores today's guess and today's ask contract.
     const storedLanguageLock = (envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
@@ -6316,7 +6416,9 @@ export class PostgresAskApplication implements AskApplication {
             steering_presets: ask.steering_presets,
             steering_annotations: ask.steering_annotations,
             critic_unavailable_cap: criticUnavailableCap,
-            ...questionLanguageAskContractMember(storedLanguageLock)
+            ...questionLanguageAskContractMember(storedLanguageLock),
+            // V4 start step, Task 35: the carry-on box, on receipt v2 only, when asked (never on a dig).
+            ...startAskContractMember(start, envelopeBasis)
           },
           batteryRows: createInitialBatteryRows({ settlementWatchHandle: settings.settlementWatchHandle })
         },lease.client);
@@ -6373,6 +6475,15 @@ export class PostgresAskApplication implements AskApplication {
       if (roleRotation !== undefined) {
         setupStep = "ROLE_ROTATION";
         await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(roleRotation) });
+        setupStep = "MEMORY_QUESTION";
+      }
+      // V4 start step, Task 35 (spec 2026-11-03 §4.2): a debate admitted with shape receipt v2 seals the paths the person
+      // chose BEFORE its work is queued, so no runner claims it without them (a failure records the run FAILED:
+      // RUN_SETUP_FAILED:START_PATHS), then keeps its purpose lines (logged, never failing it). Otherwise nothing here.
+      if (start !== null && principal.kind === "server" && isShapeReceiptV2(envelopeBasis)) {
+        setupStep = "START_PATHS";
+        await sealStartPathsAtSetup({ runId, ownerRef: principal.ownerRef, start, store: settings.startPaths,
+          purposeLines: settings.purposeLines, pool: this.pool });
         setupStep = "MEMORY_QUESTION";
       }
       await this.#serve.recordMemoryQuestion({
@@ -6498,6 +6609,8 @@ export class PostgresAskApplication implements AskApplication {
    * the debate would start; a question previewed to WAIT is also planned for NOW,
    * and a locked START pins that plan. A START's hold opens with the pinned
    * plan's figure.
+   * V4 start step, Task 35: `start` is `submit`'s (`startOfAsk`); both evaluations price it, and a run admitted with shape
+   * receipt v2 seals its paths and lines (START_PATHS) on START and WAIT alike, before the memory question.
    */
   async #submitWithRoom(
     settings: RunCreationSettings,
@@ -6511,6 +6624,7 @@ export class PostgresAskApplication implements AskApplication {
     shapePlan: DebateShapePlanKey,
     questionLanguageLock: QuestionLanguageLock | null,
     settingsUnavailable: boolean,
+    start: AskStart | null,
     fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
@@ -6520,7 +6634,8 @@ export class PostgresAskApplication implements AskApplication {
     // locked decision re-checks that this release has passed that version (SWITCHING if not); a version this API could
     // not load (`settingsUnavailable`, ruling R47) is held SWITCHING, so the ask waits in line on the site version.
     const unavailable = settingsUnavailable ? { settingsUnavailable: true as const } : {};
-    const question = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(ask,settings.previewProviderTestConfig,shapePlan), ...unavailable, ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+    // V4 start step, Task 37: the room estimates a path debate for the start's paths (the person's, or the default width).
+    const question = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(ask,settings.previewProviderTestConfig,shapePlan,start?.shape.paths), ...unavailable, ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
     let createdRunId: string | undefined;
@@ -6548,16 +6663,16 @@ export class PostgresAskApplication implements AskApplication {
         let startAsk = ask;
         let swappedAt = substitutedAt;
         let decisionQuestion = question;
-        let swappedEvaluation = await evaluationOrRefusal(settings, ask, personRoomOf(preview), shapePlan);
+        let swappedEvaluation = await evaluationOrRefusal(settings, ask, personRoomOf(preview), shapePlan, start?.shape ?? null);
         const plannedEvaluation = substitutedAt === null
           ? swappedEvaluation
-          : await evaluationOrRefusal(settings, plannedAsk, null, shapePlan);
+          : await evaluationOrRefusal(settings, plannedAsk, null, shapePlan, start?.shape ?? null);
         if (swappedAt !== null && swappedEvaluation instanceof AskRefusal && !(plannedEvaluation instanceof AskRefusal)) {
           // Important 2: the cheaper roster cannot run, the plan's own can. Drop the swap.
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(plannedAsk,settings.previewProviderTestConfig,shapePlan), ...unavailable, ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+          decisionQuestion = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(plannedAsk,settings.previewProviderTestConfig,shapePlan,start?.shape.paths), ...unavailable, ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
@@ -6607,7 +6722,9 @@ export class PostgresAskApplication implements AskApplication {
               steering_presets: runAsk.steering_presets,
               steering_annotations: runAsk.steering_annotations,
               critic_unavailable_cap: evaluated.criticUnavailableCap,
-              ...questionLanguageAskContractMember(storedLanguageLock)
+              ...questionLanguageAskContractMember(storedLanguageLock),
+              // V4 start step, Task 35: the carry-on box, on receipt v2 only, when asked (never on a dig).
+              ...startAskContractMember(start, evaluated.envelopeBasis)
             },
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: settings.settlementWatchHandle })
           }, lease.client);
@@ -6641,6 +6758,14 @@ export class PostgresAskApplication implements AskApplication {
           if (evaluated.roleRotation !== undefined) {
             setupStep = "ROLE_ROTATION";
             await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(evaluated.roleRotation) });
+          }
+          // V4 start step, Task 35: the chosen paths and the purpose lines, for START and WAIT alike, as on today's path
+          // (`sealStartPathsAtSetup`). Never on `tx`: the run committed on the lease client and the seal writes through its
+          // own pool, so nothing here holds the run's row before the memory question (preview incident 2026-10-22, above).
+          if (start !== null && principal.kind === "server" && isShapeReceiptV2(evaluated.envelopeBasis)) {
+            setupStep = "START_PATHS";
+            await sealStartPathsAtSetup({ runId, ownerRef: principal.ownerRef, start, store: settings.startPaths,
+              purposeLines: settings.purposeLines, pool: this.pool });
           }
           pinned.personRoomTight = admission.kind === "START" && evaluated.personRoomTight === true;
           setupStep = "MEMORY_QUESTION";
@@ -6963,9 +7088,17 @@ export class PostgresAskApplication implements AskApplication {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: ADMISSION_SETTINGS_UNSUPPORTED })));
       return null;
     }
+    // V4 start step, Task 39 (spec 2026-11-03 §4.2): the paths the waiting run's person chose (null: none, or no store
+    // composed) are planned with it, the start priced only where the start step runs for that person on this version
+    // (`startStepWidthsFor`, submit's one v2 predicate; an owner's encrypted run is the signed-in person's).
+    const startPaths = settings.startPaths === undefined ? null : await settings.startPaths.readStartPaths(run.runId);
     const plan = await planReadmission({
       stored, planId: first.planId, settings,
-      evaluate: (ask, shapePlan) => evaluationOrRefusal(settings, ask, personRoom, shapePlan)
+      evaluate: (ask, shapePlan, start) => evaluationOrRefusal(settings, ask, personRoom, shapePlan, start ?? null),
+      startPaths,
+      startWidths: (shapePlan) => startStepWidthsFor({ policy: settings.debateShapePolicy ?? null,
+        engineInForce: settings.engineVersionPolicy !== undefined, scorecardInForce: settings.modelPicker?.scorecard.state === "VALID",
+        serverPrincipal: stored.contentEncrypted && run.ownerRef !== null }, shapePlan)
     });
     if (plan.kind === "NOT_NOW") {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: plan.code })));
@@ -7078,6 +7211,13 @@ export class PostgresAskApplication implements AskApplication {
     }
     if (evaluation.roleRotation !== undefined) {
       await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(evaluation.roleRotation) });
+    }
+    // V4 start step, Task 39: a path debate (receipt v2) keeps the waiting run's chosen paths, sealed again under the new
+    // run's key, then its purpose lines, both before the memory question, through the store's and the API's own pools
+    // (never the room's transaction). A copy that does not find what the plan read throws: the new run FAILED (READMISSION).
+    if (plan.start !== null && principal.kind === "readmitted-owner" && isShapeReceiptV2(evaluation.envelopeBasis)) {
+      await keepStartForReadmission({ plan, fromRunId: run.runId, toRunId: runId, ownerRef: principal.ownerRef,
+        store: settings.startPaths, purposeLines: settings.purposeLines, pool: this.pool });
     }
     await this.#serve.recordMemoryQuestion({
       runId,
@@ -7488,10 +7628,14 @@ export class PostgresAskApplication implements AskApplication {
   }
 }
 
-/** W2-2 (R22): the web part an ask's receipt carries (`webSitesForAsk`): the search gate is this site's own, the rest the ask's. */
+/**
+ * W2-2 (R22): the web part an ask's receipt carries (`webSitesForAsk`): the search gate is this site's own, the rest the ask's.
+ * V4 start step, Task 34: a path debate's (`shapeV2`) is a pack per chosen path (PATHS, receipt v2).
+ */
 function webOfAsk(settings: Pick<RunCreationSettings, "previewProviderTestConfig">, ask: Pick<AskRequest, "depth_params" | "parent">,
-  shape: Readonly<{ plan: string; answers: number }> | null, engine: unknown): WebSites | null {
+  shape: Readonly<{ plan: string; answers: number }> | null, shapeV2: Readonly<{ plan: string; paths: number }> | null,
+  engine: unknown): WebSites | null {
   const config = settings.previewProviderTestConfig;
-  return webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape, engine,
-    depth: Number(ask.depth_params.depth), parent: ask.parent });
+  return webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape, shapeV2,
+    engine, depth: Number(ask.depth_params.depth), parent: ask.parent });
 }

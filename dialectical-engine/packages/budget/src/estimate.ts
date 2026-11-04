@@ -1,6 +1,8 @@
 import type { Pool } from "pg";
 import { crossAccount } from "@debateai/db";
-import { AnswerLengthSchema, DepthModeSchema, ScrutinySchema, type AnswerLength, type DepthMode, type Scrutiny } from "@debateai/contract";
+import {
+  AnswerLengthSchema, DepthModeSchema, ScrutinySchema, START_STEP_LIMITS, type AnswerLength, type DepthMode, type Scrutiny
+} from "@debateai/contract";
 import { DEBATE_SHAPE_PLAN_KEYS, webSitesOf, type CostEstimateStartPolicy, type DebateShapePlanKey, type WebSiteInput } from "@debateai/register";
 import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.js";
 import { WEB_SEARCH_REQUEST_MICROS, isWebSearchProviderRef } from "./web-charge.js";
@@ -31,6 +33,10 @@ import { estimateDigUpdatesMicros, estimateWebPartMicros, type WebRolePrices } f
  *    and prices a sample's searches per search at today's price (they carry no tokens). While a web class is short of
  *    samples (no web run has settled yet), its answer is the start figure of its depth PLUS its web part at the caps
  *    (`estimateWebPartMicros`), still capped at the maximum; with no web prices to price it with, the maximum.
+ *  - V4 start step, Task 37 (spec 2026-11-03 §5): a path debate (shape receipt v2) is its own class for each number of
+ *    paths, and samples only runs admitted with that many. Short of samples, its depth's start figure stands for a debate
+ *    of `V2_START_FIGURE_PATHS_BASIS` (3) paths, so it is scaled to the debate's paths (rounded up), still capped at the
+ *    maximum.
  * The estimate is never sent to a client (I6): the room read returns a word.
  */
 export type RunSettingsClass = Readonly<{
@@ -52,13 +58,29 @@ export type RunSettingsClass = Readonly<{
 /**
  * Debate shape (spec 2026-10-12 §3.6): what a shaped run's cost depends on beyond today's class — its plan's sizes and
  * its three settings. A run asked without the register's row has none, and is sampled only among runs that had none.
+ * V4 start step, Task 37: `paths`, a path debate's (shape receipt v2) number of chosen paths, 1 to 8; absent on every
+ * other run, which is then sampled only among runs whose receipt names no paths.
  */
-export type RunShapeClass = Readonly<{ plan: DebateShapePlanKey; depthMode: DepthMode; scrutiny: Scrutiny; answerLength: AnswerLength }>;
+export type RunShapeClass = Readonly<{
+  plan: DebateShapePlanKey; depthMode: DepthMode; scrutiny: Scrutiny; answerLength: AnswerLength; paths?: number;
+}>;
+
+/**
+ * V4 start step, Task 37: the paths a depth's start figure stands for. A path debate short of samples starts at
+ * ceil(figure x paths / 3), capped at the run's maximum. Module-local: the source-purity law refuses an exported numeric
+ * literal (as Task 27's busy book); the start figures in tests/unit/start-step-estimate-class.test.ts pin it.
+ */
+const V2_START_FIGURE_PATHS_BASIS = 3;
 
 export interface CostEstimator {
   estimateMicros(settings: RunSettingsClass): Promise<number>;
   /** R22 decision 9: a dig's web part at its most, for the share shown before it; absent or null: not known. */
   digWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null;
+  /**
+   * V4 start step, Task 37: a path debate's web part at its most (every chosen path a pack of its own, at a debate's
+   * start), for the share shown before Start; absent or null: not known.
+   */
+  pathsWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; paths: number }>): number | null;
   /** The owner's ruling (31 Oct): what follows a dig at this level, for the same share; absent or null: not known. */
   digUpdatesPartMicros?(dig: Readonly<{ level: number; free: boolean }>): number | null;
 }
@@ -88,10 +110,18 @@ export function settingsClassKey(settings: RunSettingsClass): string {
   const shape = settings.shape;
   if (shape === undefined) return `${base}${webClassKey(settings.web)}`;
   if (!(DEBATE_SHAPE_PLAN_KEYS as readonly string[]).includes(shape?.plan) || !DepthModeSchema.safeParse(shape.depthMode).success
-    || !ScrutinySchema.safeParse(shape.scrutiny).success || !AnswerLengthSchema.safeParse(shape.answerLength).success) {
+    || !ScrutinySchema.safeParse(shape.scrutiny).success || !AnswerLengthSchema.safeParse(shape.answerLength).success
+    || (shape.paths !== undefined && !isPathCount(shape.paths))) {
     throw new TypeError("COST_ESTIMATE_SETTINGS_INVALID");
   }
-  return `${base}|${shape.plan}|${shape.depthMode}|${shape.scrutiny}|${shape.answerLength}${webClassKey(settings.web)}`;
+  // V4 start step, Task 37: a path debate's paths, before the web part (empty without, so every key minted before stays the same).
+  const paths = shape.paths === undefined ? "" : `|paths:${shape.paths}`;
+  return `${base}|${shape.plan}|${shape.depthMode}|${shape.scrutiny}|${shape.answerLength}${paths}${webClassKey(settings.web)}`;
+}
+
+/** V4 start step, Task 37: a path debate's number of paths, 1 to 8 (b1..b8). */
+function isPathCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= START_STEP_LIMITS.storedPathsMax;
 }
 
 /** W2-2: the web part's place in the class key (empty without one, so every class key minted before stays the same). */
@@ -107,18 +137,22 @@ function webClassKey(web: WebSiteInput | undefined): string {
  * reads as the dearest one, so one odd row can never stop the whole waiting line (the reason migration 0085's trigger
  * exists for the depth cast); the dearest class is the careful side (with fewer than the sample size of its own runs it
  * is estimated at the run's maximum). No settings (a run asked without the row) is null. A shaped run with no plan on
- * its receipt (one maker) takes `fallbackPlan`.
+ * its receipt (one maker) takes `fallbackPlan`. V4 start step, Task 37: the receipt's paths (a path debate's) are kept
+ * from 1 to 8; none (null, or not read) is no paths; any other value reads as the most, 8.
  */
 export function waitingShapeClassOf(raw: unknown, fallbackPlan: DebateShapePlanKey): RunShapeClass | null {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
   const known = <T extends string>(options: readonly T[], found: unknown, dearest: T): T =>
     (options as readonly unknown[]).includes(found) ? found as T : dearest;
+  const paths = value.paths === null || value.paths === undefined ? {}
+    : { paths: isPathCount(value.paths) ? value.paths : START_STEP_LIMITS.storedPathsMax };
   return Object.freeze({
     plan: value.plan === null || value.plan === undefined ? fallbackPlan : known(DEBATE_SHAPE_PLAN_KEYS, value.plan, "max"),
     depthMode: known(DepthModeSchema.options, value.depthMode, "fixed"),
     scrutiny: known(ScrutinySchema.options, value.scrutiny, "exhaustive"),
-    answerLength: known(AnswerLengthSchema.options, value.answerLength, "detailed")
+    answerLength: known(AnswerLengthSchema.options, value.answerLength, "detailed"),
+    ...paths
   });
 }
 
@@ -250,6 +284,16 @@ export class RecentRunsCostEstimator implements CostEstimator {
     return estimateWebPartMicros(webSitesOf({ kind: "DIG", depth: web.depth, digPicks: web.digPicks }), this.#webPrices).totalMicros;
   }
 
+  /**
+   * V4 start step, Task 37: a path debate's web part at the most it can do (every chosen path its own planner, up to 4
+   * searches on a Quick look, 8 on a Thorough one, its readers and its pick; every path's arguing reading every path's
+   * pack), for the share shown before Start. Null with no web prices. Like a dig's, only the share reads it.
+   */
+  pathsWebPartMicros(web: Readonly<{ depth: "QUICK" | "THOROUGH"; paths: number }>): number | null {
+    if (this.#webPrices === null) return null;
+    return estimateWebPartMicros(webSitesOf({ kind: "PATHS", depth: web.depth, paths: web.paths, origin: "START" }), this.#webPrices).totalMicros;
+  }
+
   /** What follows a dig: its rewrite, the climb and the main answer's update. Null with no web prices. Like the web part, only the line reads it. */
   digUpdatesPartMicros(dig: Readonly<{ level: number; free: boolean }>): number | null {
     return this.#webPrices === null ? null : estimateDigUpdatesMicros(dig, this.#webPrices);
@@ -270,7 +314,11 @@ export class RecentRunsCostEstimator implements CostEstimator {
       for (const run of runs) costs.push(priceRecentRun(run, this.#prices) ?? this.#maximumMicros);
     }
     // With nothing to price with, the starting figure is not used either: the careful side, the maximum.
-    const depthStart = this.#start === null ? null : this.#start.startMicrosByDepth.get(settings.depth) ?? null;
+    const depthFigure = this.#start === null ? null : this.#start.startMicrosByDepth.get(settings.depth) ?? null;
+    // V4 start step, Task 37: a path debate's figure counts its paths (the depth's figure stands for 3), rounded up.
+    const paths = settings.shape?.paths;
+    const depthStart = depthFigure === null || paths === undefined ? depthFigure
+      : Math.ceil((depthFigure * paths) / V2_START_FIGURE_PATHS_BASIS);
     // W2-2: a web class starts at its depth's figure plus its web part at the caps; without web prices, the maximum.
     const startMicros = depthStart === null || settings.web === undefined ? depthStart
       : this.#webPrices === null ? null
@@ -311,6 +359,8 @@ function countedTokens(text: string): number {
  * Debate shape (M1): a shaped class samples only runs whose RECEIPT carries that plan's shape, so a one-maker run (the
  * four settings stored, no shape minted) never joins it; a one-maker shaped ask then samples nothing and is estimated
  * at the run's maximum, the careful side. An unshaped class still samples only runs with no settings and no shape.
+ * V4 start step, Task 37: a class with paths samples only runs whose receipt names that many paths ($15); a class without
+ * them, only runs whose receipt names none.
  */
 export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
   constructor(private readonly pool: Pool) {}
@@ -348,6 +398,7 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
              AND ($12 = '' OR COALESCE(run.envelope_basis->'web'->>'depth', '') = $12)
              AND ($13 = '' OR COALESCE(run.envelope_basis->'web'->>'packs', '') = $13)
              AND ($14 = '' OR COALESCE(run.envelope_basis->'web'->>'searches', '') = $14)
+             AND COALESCE(run.envelope_basis->'shape'->>'paths', '') = $15
              AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
              AND NOT EXISTS (
                SELECT 1 FROM core.work_item AS work
@@ -375,7 +426,8 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
           input.settings.shape?.scrutiny ?? "",
           input.settings.shape?.answerLength ?? "",
           input.settings.shape?.plan ?? "",
-          ...webSampleParams(input.settings.web)
+          ...webSampleParams(input.settings.web),
+          input.settings.shape?.paths === undefined ? "" : String(input.settings.shape.paths)
         ]
       );
       const runs = new Map<string, RecentRunCharge[]>();
