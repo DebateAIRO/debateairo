@@ -222,6 +222,8 @@ const SESSION = Object.freeze({
   ownership_provenance: "server_session",
   provisional_identity_model: false
 });
+/** ask-d6 A: the account's address, read by the V4 header for the round button's initial ("M"). */
+const ACCOUNT_EMAIL = Object.freeze({ email: "maria@example.com", recovery_email: null, pending: null });
 const ENGLISH = Object.freeze({ tag: "en", name: "English" });
 /** The premium roster, read from the contract (the same ids the fixture's makers use). */
 const MODELS: readonly string[] = Object.freeze([...C.PLAN_TIER_ROSTERS.premium]);
@@ -876,6 +878,7 @@ function startupCheck(): number {
     count += 1;
   };
   check("GET /v1/session", C.SessionSchema, SESSION);
+  check("GET /v1/account/email", C.AccountEmailSchema, ACCOUNT_EMAIL);
   check("GET /v1/auth/age-confirmation", C.AgeConfirmationStatusSchema, { status: "confirmed" });
   check("GET /v1/account/sensitive-data-consent", C.SensitiveDataConsentStatusSchema, { status: "given" });
   check("GET /v1/account/legal-status", C.LegalStatusResponseSchema, { must_accept: [] });
@@ -1421,6 +1424,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   // SESSION_REQUIRED), so a page opened while signed in shows "Please sign in again to see your question." on its next read.
   if (sessionOut && isGet && (parts[1] === "runs" || parts[1] === "answers")) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
   if (path === "/v1/session" && isGet) return sendJson(req, res, 200, SESSION, C.SessionSchema);
+  // ask-d6 A: the V4 header's round account button shows the address's first letter (refused as the session is, signed out).
+  if (path === "/v1/account/email" && isGet) {
+    return sessionOut ? sendJson(req, res, 401, { error: "SESSION_REQUIRED" }) : sendJson(req, res, 200, ACCOUNT_EMAIL, C.AccountEmailSchema);
+  }
   if (path === "/v1/auth/age-confirmation" && isGet) return sendJson(req, res, 200, { status: "confirmed" }, C.AgeConfirmationStatusSchema);
   if (path === "/v1/account/sensitive-data-consent" && (isGet || method === "POST")) {
     return sendJson(req, res, 200, { status: "given" }, C.SensitiveDataConsentStatusSchema);

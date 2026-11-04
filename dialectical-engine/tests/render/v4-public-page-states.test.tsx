@@ -21,6 +21,8 @@ vi.mock("@/lib/serverApi", async (importOriginal) => ({
   createServerContractClient: () => ({ readPublicDebate: mocks.readPublicDebate })
 }));
 vi.mock("@/lib/billing/usage", () => ({ readBillingUsage: async () => null }));
+// ask-d6 A: the V4 header's account button reads the session; its own test is v4-header-account.
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => null }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const V4 = v4English as Record<string, string>;

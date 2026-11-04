@@ -203,7 +203,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.checkAgain",
   "v4.investigation.writeAgain",
   "v4.investigation.digMore",
-  "v4.web.freeOnPaper"
+  "v4.web.freeOnPaper",
+  // ask-d6 A (owner's screen review, 3 Nov): the round account button's name for screen readers (and its menu's). The menu's
+  // own words ("My maps", "Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not.
+  "v4.header.account"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

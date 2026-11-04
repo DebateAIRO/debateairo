@@ -113,6 +113,8 @@ function must(condition: boolean, message: string): void {
 }
 
 await step("session", () => client.readSession(), (s: { asker_id: string }) => s.asker_id);
+// ask-d6 A: the V4 header's round account button reads the account's address for its initial.
+await step("account address (the header's initial)", () => client.readAccountEmail(), (a: { email: string }) => a.email.slice(0, 1).toUpperCase());
 await step("age confirmation", () => client.readAgeConfirmation(), (s: { status: string }) => s.status);
 await step("sensitive-data consent", () => client.readSensitiveDataConsent(), (s: { status: string }) => s.status);
 await step("legal status", () => client.getLegalStatus("en"), (s: { must_accept: unknown[] }) => `must_accept=${s.must_accept.length}`);

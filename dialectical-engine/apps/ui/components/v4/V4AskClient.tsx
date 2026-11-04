@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { askQuestionMaxBytes, type ClarifyQuestion } from "@debateai/contract";
@@ -311,7 +310,6 @@ function V4AskForm({
   );
   // ask-d1 D: the seed of the map, for a first visit only (signed out, or an account with no debate yet).
   const firstVisit = session === "OUT" || (session === "IN" && shelf.load.status === "READ" && !shelf.load.read.anyRows);
-  const signInHref = `/login?next=${encodeURIComponent(levelHref("/v4", savedLevel))}`;
 
   // Changing step moves focus to the new step's heading or the question, and back to the top.
   useEffect(() => {
@@ -415,12 +413,9 @@ function V4AskForm({
     addAngle();
   }
 
-  // ask-d1: a signed-out visitor reads "Sign in" at the end of the header (the way back is this page).
-  const header = (
-    <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} classicHref="/new">
-      {session === "OUT" ? <Link className="v4Link v4HdrSignIn" href={signInHref}>{t(catalog, "v4.ask.signIn")}</Link> : null}
-    </V4Header>
-  );
+  // ask-d1 / ask-d6 A: the header knows the session from this page, so a signed-out visitor reads "Sign in" at its end (the
+  // way back is this page) and a signed-in person the round account button. ask-f6 / journey-f19: no classic link here.
+  const header = <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} session={session} />;
   const refusalAlert = refusal === null ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
 
   // One tree for both steps, so the consent / crisis / language pop-ups stay mounted in one place.

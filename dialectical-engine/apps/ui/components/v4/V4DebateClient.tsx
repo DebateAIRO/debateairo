@@ -1386,9 +1386,9 @@ function V4Debate({
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice); the report
   // link is made above, with the ready moments.
   const askHref = levelHref("/v4", chosenLevel);
-  // wait-f23 (owner's screen review): while the question waits, "Open in the classic view" shows once, at the bottom of
-  // the waiting card, and not in the header too.
-  const waitingCard = map === null && load?.kind === "RUN" && load.run.state !== "FAILED";
+  // wait-f23 / ask-f6 / journey-f19 (owner's screen review): "Open in the classic view" shows once. While the question
+  // waits, is paused or did not finish, it is at the bottom of that screen; otherwise in the header's account menu.
+  const classicInBody = map === null && load?.kind === "RUN";
   // map-f6: no reading level shows until the saved one is known; the map waits for it behind its outline (not forever).
   const levelSettled = useLevelSettled(levelKnown, map !== null);
   const header = (
@@ -1397,7 +1397,7 @@ function V4Debate({
       readingLevel={levelSettled ? readingLevel : null}
       linkLevel={chosenLevel}
       onReadingLevel={chooseLevel}
-      classicHref={waitingCard ? null : classicHref}
+      classicHref={classicInBody ? null : classicHref}
     >
       {served !== null ? (
         // W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).

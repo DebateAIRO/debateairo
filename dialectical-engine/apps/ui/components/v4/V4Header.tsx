@@ -7,12 +7,16 @@ import { readBillingUsage, type BillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { levelHref } from "@/lib/v4/storage";
 import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
+import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
 
 /*
  * V4 initial (spec "/v4", header everywhere): brand + badge to /v4, the reading level as a small menu (changing it
- * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A), the classic-view
- * link and the page's own extras. The quota is shown only as "N% used" of one window (no prices, no other numbers) and
- * only when the usage read succeeds.
+ * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A) and the page's own
+ * extras. The quota is shown only as "N% used" of one window (no prices, no other numbers) and only when the usage read
+ * succeeds.
+ * V4 screen review (3 Nov 2026), ask-d6 A / ask-f5 / journey-f19: this is the V4 pages' one header row (the site's old top
+ * bar steps back on them). It ends in the round account button (V4AccountMenu), whose menu also holds the classic-view
+ * link, once; the header itself shows no classic link any more.
  */
 
 type QuotaScope = BillingUsage["windows"][number]["scope"];
@@ -130,7 +134,7 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
   );
 }
 
-export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, children }: Readonly<{
+export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, session, children }: Readonly<{
   catalog: MessageCatalog;
   /** The level the menu shows (a page may show its default when none was chosen). */
   readingLevel: ReadingLevel | null;
@@ -140,8 +144,11 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
    */
   linkLevel?: ReadingLevel | null;
   onReadingLevel?: (level: ReadingLevel) => void;
+  /** journey-f19 / ask-f6: this page's classic view, offered once, in the account menu (null: none, or the page shows it). */
   classicHref?: string | null;
-  /** Right-side extras (e.g. the Report button). */
+  /** The page's own knowledge of the session (the ask page learns it beside the page); absent: the menu reads it. */
+  session?: V4HeaderSession;
+  /** Extras before the account button (e.g. the Report button). */
   children?: ReactNode;
 }>) {
   const quota = useTightestWindow();
@@ -161,10 +168,14 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
         {quota === null ? null : (
           <span className="v4HdrAllowance">{t(catalog, `v4.header.used.${quota.scope}`, { percent: quota.percent })}</span>
         )}
-        {classicHref === null ? null : (
-          <Link href={classicHref} className="v4Link v4HdrClassic">{t(catalog, "v4.common.classicView")}</Link>
-        )}
         {children}
+        {/* ask-d6 A: the round account button ends the row; its links carry the level the brand link carries. */}
+        <V4AccountMenu
+          catalog={catalog}
+          level={linkLevel === undefined ? readingLevel : linkLevel}
+          classicHref={classicHref}
+          {...(session === undefined ? {} : { session })}
+        />
       </div>
     </header>
   );
