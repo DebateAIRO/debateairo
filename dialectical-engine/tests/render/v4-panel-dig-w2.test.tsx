@@ -330,6 +330,11 @@ describe("the browser check (4 Nov): focus follows the wording and own-view boxe
     await typeInto(own, "Grid links between countries matter more than batteries.");
     await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
     expect(document.activeElement).toBe(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    // The second browser check (4 Nov): Remove is named with what it removes, the shown word first (WCAG 2.5.3).
+    const remove = buttonNamed(CATALOG["v4.suggest.remove"]!, panel());
+    const named = remove.getAttribute("aria-labelledby")!.split(" ").map((id) => document.getElementById(id)!.textContent).join(" ");
+    expect(named.startsWith(CATALOG["v4.suggest.remove"]!)).toBe(true);
+    expect(named).toContain("Grid links between countries matter more than batteries.");
     // Remove takes its own row away: focus goes on to "Add your own view", never to the page.
     await click(buttonNamed(CATALOG["v4.suggest.remove"]!, panel()));
     expect(panel().querySelector(".v4SugRowPlain")).toBeNull();

@@ -75,6 +75,9 @@ describe("dig-f5: each dig button carries its own share", () => {
     expect(buttonsNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(6)}`, panel())).toHaveLength(1);
     await openPath(PATHS.smr);
     expect(buttonsNamed(`${CATALOG["v4.panel.dig"]} · ${share(4)}`, panel())).toHaveLength(1);
+    // CODE-4 (the wave-2 checks, P3): the panel's reused button moved from renew's 6% to smr's 4%; another place's share is
+    // not a change of this one, so no grey mark shows (the panel passes its place as `subject`).
+    expect(panel().querySelector(".v4ShareChange")).toBeNull();
     // dig-f4: one pick has no tray; this other path's panel says where the picks wait, with [Go to them] (dig-f5, below).
     expect(tray()).toBeNull();
     expect(buttonsNamed(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(6)}`, panel())).toHaveLength(0);

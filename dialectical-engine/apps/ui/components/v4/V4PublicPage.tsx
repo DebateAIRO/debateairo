@@ -469,7 +469,9 @@ export function V4PublicTopMenu({ catalog, children }: Readonly<{ catalog: Messa
   }, [open]);
   const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
     const next = event.relatedTarget;
-    if (open && next instanceof Node && root.current !== null && !root.current.contains(next)) setOpen(false);
+    // The second browser check (4 Nov): a click on plain text gives focus to the page's <main> (it can take focus for the
+    // skip link), which holds the menu: that is a click, left to the mousedown rule, not focus moving out by the keyboard.
+    if (open && next instanceof Node && root.current !== null && !root.current.contains(next) && !next.contains(root.current)) setOpen(false);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     // A form inside closes first on Escape (it says so with preventDefault); the menu closes on the next one.

@@ -11,7 +11,7 @@ import type { DigRetry } from "../../apps/ui/lib/v4/digRetry.js";
 import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
-import type { RunProjection } from "../../packages/contract/src/index.js";
+import { InvestigationReportsSchema, type RunProjection } from "../../packages/contract/src/index.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, harness, mountMap, page, panel, PATHS, resetHarness, seededAnswer,
   seededStory, text, unmountMap
@@ -60,6 +60,14 @@ function pathDigQuestion(runId: string, pathId: string): string {
   const answer = seededAnswer(runId);
   const map = buildV4Map({ runId, answer, story: seededStory() });
   return digQuestion({ kind: "path", path: map.paths.find((path) => path.id === pathId)! }, answer.question_line, CATALOG, "en");
+}
+
+/** A report of `runId` being written (report-d2: digging rests meanwhile). */
+function writingReport(runId: string) {
+  return InvestigationReportsSchema.parse({
+    investigation_id: "4e000000-0000-4000-8000-0000000000aa", root_run_id: runId, state: "CLOSED", digs: 1, current: null,
+    versions: [{ report_version: 1, closed_at: "2026-11-04T10:00:00.000Z", state: "WRITING", waiting_for_digs: 0 }]
+  });
 }
 
 function failedDig(link: DigLink, extra: Partial<DigView> = {}): DigView {
@@ -199,6 +207,47 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     host.remove();
   });
 
+  it("ACCESS-9 on the map (the wave-2 checks, P2): while the report is written, the panel's 'Try this dig again' rests and names the visible reason", async () => {
+    const runId = crypto.randomUUID();
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"], "thorough");
+    harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix") });
+    harness.investigation = writingReport(runId);
+    await mountMap(1600, runId);
+    await openDig(PATHS.mix);
+    const retry = panel().querySelector<HTMLButtonElement>(".v4DigFailedRetry")!;
+    // The panel passes the report's rest down: focusable, never natively disabled, pointing at the line that says why.
+    expect(retry.disabled).toBe(false);
+    expect(retry.getAttribute("aria-disabled")).toBe("true");
+    const line = document.getElementById(retry.getAttribute("aria-describedby")!)!;
+    expect(line.textContent).toBe(CATALOG["v4.reportWait.digsRest"]);
+    expect(panel().contains(line)).toBe(true);
+    await click(retry);
+    await advance(11_000);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("the second browser check (item 5): with the tray docked beside a failed dig while the report is written, the reason is said once", async () => {
+    const runId = crypto.randomUUID();
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"], "thorough");
+    harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix") });
+    harness.investigation = writingReport(runId);
+    await mountMap(1600, runId);
+    await click(branch(PATHS.renew).querySelector<HTMLButtonElement>(".v4MapPath")!);
+    const boxes = [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+    await click(boxes[0]!);
+    await click(boxes[1]!);
+    await openDig(PATHS.mix);
+    const tray = page().querySelector<HTMLElement>(".v4DebTrayDock")!;
+    const trayDig = tray.querySelector<HTMLButtonElement>(".v4DebTrayActions .v4BtnPrimary")!;
+    expect(trayDig.getAttribute("aria-disabled")).toBe("true");
+    const rest = panel().querySelector<HTMLElement>(".v4DigFailed [data-dig-rest]")!;
+    expect(rest.textContent).toBe(CATALOG["v4.reportWait.digsRest"]);
+    expect(trayDig.getAttribute("aria-describedby")).toBe(rest.id);
+    expect(tray.querySelector("[data-dig-rest]")).toBeNull();
+    const said = [...page().querySelectorAll(".v4DebPanelCol p")].filter((element) => element.textContent === CATALOG["v4.reportWait.digsRest"]);
+    expect(said).toHaveLength(1);
+  });
+
   it("after a second failure: 'This keeps failing…', with no button", async () => {
     const runId = crypto.randomUUID();
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
@@ -248,6 +297,10 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     expect(panel().textContent).toContain(CATALOG["v4.money.pausedReady"]);
     await click(buttonNamed(CATALOG["v4.money.continue"]!, panel()));
     expect(harness.continueRun).toHaveBeenCalledWith(child);
-    expect(buttonNamed(CATALOG["v4.money.continuing"]!, panel()).disabled).toBe(true);
+    // W2L-4 (the wave-2 checks): it keeps its focus while the dig continues (aria-disabled and aria-busy, never native).
+    const continuing = buttonNamed(CATALOG["v4.money.continuing"]!, panel());
+    expect(continuing.disabled).toBe(false);
+    expect(continuing.getAttribute("aria-disabled")).toBe("true");
+    expect(continuing.getAttribute("aria-busy")).toBe("true");
   });
 });

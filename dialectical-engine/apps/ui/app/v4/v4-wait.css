@@ -54,7 +54,7 @@
 .v4DigLive { display: flex; flex-direction: column; gap: 14px; min-width: 0; margin-block-end: 8px; }
 .v4DigSteps { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; font-size: var(--t-ui); }
 .v4DigStep { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); border-radius: var(--r-btn); padding-inline: 4px; }
-.v4DigStep + .v4DigStep::before { content: "›"; color: var(--text-3); padding-inline: 2px 6px; }
+.v4DigStep + .v4DigStep::before { content: "›"; content: "›" / ""; color: var(--text-3); padding-inline: 2px 6px; }
 .v4DigStep-DONE { color: var(--text); }
 .v4DigStep-NOW { color: var(--text-strong); font-weight: 700; }
 .v4DigStepTick { color: var(--accent); font-weight: 700; }

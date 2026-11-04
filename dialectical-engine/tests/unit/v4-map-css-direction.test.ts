@@ -53,13 +53,17 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     expect(looks.indexOf(".v4AnswerMore[open] > summary::before")).toBeGreaterThan(looks.indexOf(".v4AnswerMore > summary:dir(rtl)::before"));
   });
 
-  it("the wave-2 checks: every fold arrow drawn as CSS text is hidden from screen readers (empty alt text, the arrow first)", () => {
+  it("the wave-2 checks: every fold arrow and breadcrumb mark drawn as CSS text is hidden from screen readers (empty alt text, the mark first)", () => {
     for (const file of ["v4-map.css", "v4-map-looks.css", "v4-wait.css"]) {
       const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4", file), "utf8");
-      const arrows = [...css.matchAll(/content: "([▸◂▾])";(?! content: "\1" \/ "";)/gu)].map((match) => match[0]);
+      // W2L-11: the phone where-bar's and a dig's step line's "›" between items too.
+      const arrows = [...css.matchAll(/content: "([▸◂▾›])";(?! content: "\1" \/ "";)/gu)].map((match) => match[0]);
       expect({ file, arrows }).toEqual({ file, arrows: [] });
       expect(css).toMatch(/content: "▸"; content: "▸" \/ "";/u);
     }
+    // The level trail's own separators, in the page shell's styles.
+    const shell = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-debate.css"), "utf8");
+    expect([...shell.matchAll(/content: "([▸◂▾›])";(?! content: "\1" \/ "";)/gu)].map((match) => match[0])).toEqual([]);
   });
 
   it("break and hyphenate long words inside every map card and the phone outline, in the page's language", () => {
@@ -161,6 +165,16 @@ describe("the wave-2 review's layout rules (4 Nov)", () => {
     expect(css).toMatch(rule);
     expect(css.search(rule)).toBeLessThan(css.indexOf(".appShell:has(.consentBar) .v4DebLayout-desktop .v4DebPanelCol"));
   });
+  it("the second browser check (WCAG 2.4.11): while the cookie bar shows on a map page, the window keeps room at its foot too", () => {
+    expect(read("v4-debate.css")).toMatch(/html:has\(\.appShell \.consentBar\):has\(\.v4DebPage\) \{ scroll-padding-block-end: 188px; \}/u);
+  });
+  it("W2L-5: on a phone whose bar carries the greyed button's reason, the panel's dig block keeps it for screen readers only", () => {
+    expect(read("v4-debate.css")).toMatch(/\.v4DebLayout-phone:has\(\[data-bar-why\]\) \.v4PanelDig :is\(\[data-dig-rest\], \.v4DigWaitLine\) \{\s*position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect\(0 0 0 0\); white-space: nowrap;\s*\}/u);
+  });
+  it("the wave-2 checks (P4): a report press on its way looks greyed (the disabled .v4Btn's opacity) while it keeps its focus", () => {
+    expect(read("v4-base.css")).toMatch(/\.v4Btn\[disabled\] \{ cursor: not-allowed; opacity: \.55; \}/u);
+    expect(read("v4-report-map.css")).toMatch(/\.v4DebReportLink\[aria-busy="true"\], \.v4RepStripWrite\[aria-busy="true"\], \.v4RepStripNotYet\[aria-disabled="true"\] \{\s*cursor: progress; opacity: \.55;\s*\}/u);
+  });
   it("ACCESS-1: the phone's stack grows while the report's strip is open in it, so its lines show before Write it", () => {
     expect(read("v4-undo.css")).toMatch(/\.v4StackPhone:has\(\.v4RepStrip-bottom\) \{ max-height: 85vh; max-height: 85dvh; \}/u);
   });
@@ -170,7 +184,9 @@ describe("the wave-2 review's layout rules (4 Nov)", () => {
     expect(css).toMatch(/\.v4RepStrip-top \{\s*flex: 1 1 100%; contain: inline-size; width: min\(30rem, 100%\); max-width: 30rem; margin-inline-start: auto;\s*\}/u);
     // The wave-2 checks (WCAG 2.4.3): the strip follows the account button in the page itself, never by `order`.
     expect(css).not.toMatch(/\.v4RepStrip[^{]*\{[^}]*\border\s*:/u);
-    expect(css).toMatch(/\.v4HdrRight:has\(> \.v4RepStrip-top\) \{ justify-content: flex-end; \}/u);
-    expect(css).toMatch(/\.v4Hdr:has\(> \.v4HdrRight > \.v4RepStrip-top\) \{ align-items: flex-start; \}/u);
+    // The second browser check (4 Nov): the strip is a row of the bar itself, so nothing realigns the bar's controls
+    // when it opens (on a phone they jumped from the start side to the end side).
+    expect(css).not.toMatch(/\.v4HdrRight:has\(/u);
+    expect(css).not.toMatch(/\.v4Hdr:has\(/u);
   });
 });

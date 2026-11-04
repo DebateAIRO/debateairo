@@ -1344,14 +1344,15 @@ function V4Debate({
   // journey-d3 / dig-f31: the bar's dig job (the record's two states: "Choose what to dig ›" on a whole path, "Dig into
   // your pick · up to 3%" with picks; mapDigHelpers.ts). journey-f14 / dig-f11 / report-d2: while new digs wait for a reset
   // or the report waits or is written, a dig button stays where it is, greyed, with the visible line that says why, and
-  // pressing it shows the panel's line. A whole path keeps "Choose what to dig ›", so while the report is written its bar
-  // says the report's state (report-d2), as a screen with no dig button does. A paused dig open in the panel gives the bar
-  // its Continue.
+  // pressing it shows the panel's line. A whole path keeps dig-f31's "Choose what to dig ›" while the report is written too
+  // (report-d2 rests the dig buttons; this one only leads to the choices, their greyed buttons and "Add to tray"); the
+  // report's state stays on the rail and its waiting card (the wave-2 checks, P3; an owner question). A screen with no dig
+  // job says the report's state in the bar. A paused dig open in the panel gives the bar its Continue.
   const digRest = report.digsRest ? report.restReason : null;
   const phoneDig: V4BarJob | null = phoneTarget !== null && waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
     ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
     : null;
-  const phoneJob: V4BarJob = digRest !== null && phoneDig !== null && phoneDig.kind === "dig"
+  const phoneJob: V4BarJob = digRest !== null && phoneDig !== null
     ? phoneDig
     : report.barStatus !== null
       ? { kind: "status", ...report.barStatus }

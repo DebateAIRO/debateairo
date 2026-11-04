@@ -99,9 +99,11 @@ function useQuotaUsage(wanted: boolean): Readonly<{ usage: BillingUsage | null; 
 
 /**
  * The pill itself; nothing when the usage cannot be read (billing off, a local site). `wanted` false: the page shows no
- * quota and nothing is read (journey-f19: the report page and public pages).
+ * quota and nothing is read (journey-f19: the report page and public pages). `hold` (ask-f16 with the wave-2 checks, 4
+ * Nov): the page does not know yet whether the person is signed in, so the pill's place is held, empty and hidden, while
+ * nothing is read; once they are (`wanted`), the same place waits for the read; signed out, it closes at once.
  */
-export function V4QuotaPill({ catalog, wanted = true }: Readonly<{ catalog: MessageCatalog; wanted?: boolean }>) {
+export function V4QuotaPill({ catalog, wanted = true, hold = false }: Readonly<{ catalog: MessageCatalog; wanted?: boolean; hold?: boolean }>) {
   const { usage, answered } = useQuotaUsage(wanted);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -117,7 +119,7 @@ export function V4QuotaPill({ catalog, wanted = true }: Readonly<{ catalog: Mess
   const shown = pillWindow(usage);
   // ask-f16 (first frame = the real page, nothing moves): until the first read answers, the pill's place is held, empty and
   // hidden, so the header row does not shift when it comes.
-  if (shown === null) return wanted && !answered ? <span className="v4HdrQuotaHold" aria-hidden="true" data-quota-hold="" /> : null;
+  if (shown === null) return (wanted && !answered) || (hold && !wanted) ? <span className="v4HdrQuotaHold" aria-hidden="true" data-quota-hold="" /> : null;
   const text = pillText(shown, catalog);
   const details = pillDetails(usage);
   // One window only (a Free read names just its month): nothing more to show, so the pill is plain text.

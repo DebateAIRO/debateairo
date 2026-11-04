@@ -143,7 +143,8 @@ describe("Report a problem: where it sits and how its form opens (public-f4)", (
   it("the form is a window held to its link on a computer and a sheet from the bottom on a phone, styled, never loose lines", async () => {
     await mount(true);
     const panel = host!.querySelector(".v4PubFlagPanel")!;
-    expect(panel.getAttribute("role")).toBe("group");
+    // ACCESS-12: a dialog, named, with the page behind covered (its own test is below).
+    expect(panel.getAttribute("role")).toBe("dialog");
     expect(panel.querySelector("form.v4PubFlagForm")).not.toBeNull();
     expect(panel.querySelectorAll(".v4PubText")).toHaveLength(2);
     expect(css).toMatch(/\.v4PubFlagPanel \{[^}]*position: absolute;[^}]*box-shadow: var\(--shadow-pop\);/u);
@@ -180,6 +181,101 @@ describe("Report a problem: where it sits and how its form opens (public-f4)", (
     const phone = css.slice(css.indexOf("@media (max-width: 767px)"));
     expect(phone).toMatch(/\.v4PubTopMenuItems \{ display: none; \}/u);
     expect(phone).toMatch(/\.v4PubTopMenu\[data-open="true"\] \.v4PubTopMenuItems \{/u);
+  });
+
+  describe("ACCESS-12 (the wave-2 checks): the form is a dialog, in the top bar's menu and at the foot of a question", () => {
+    const cases = [
+      ["top", (flag: React.ReactElement) => <V4PublicTopMenu catalog={V4}>{flag}</V4PublicTopMenu>],
+      ["foot", (flag: React.ReactElement) => <div className="v4PubFoot">{flag}</div>]
+    ] as const;
+    async function open(placement: "top" | "foot"): Promise<HTMLElement> {
+      host = document.body.appendChild(document.createElement("div"));
+      root = createRoot(host);
+      const wrap = cases.find(([name]) => name === placement)![1];
+      await act(async () => {
+        root!.render(<>
+          <button type="button" data-before="">Before</button>
+          {wrap(<V4PublicFlag publicRef={REF} catalog={V4} placement={placement} where="The first path" readSession={async () => undefined} />)}
+          <button type="button" data-after="">After</button>
+        </>);
+      });
+      const menuButton = host.querySelector<HTMLButtonElement>(".v4PubTopMenuButton");
+      if (menuButton !== null) await act(async () => { menuButton.click(); });
+      toggle().focus();
+      await act(async () => { toggle().click(); });
+      await act(async () => { for (let turn = 0; turn < 4; turn += 1) await Promise.resolve(); });
+      return host.querySelector<HTMLElement>(".v4PubFlagPanel")!;
+    }
+    const tab = async (shift = false): Promise<void> => {
+      await act(async () => {
+        (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: shift, bubbles: true, cancelable: true }));
+      });
+    };
+
+    for (const [placement] of cases) {
+      it(`${placement}: named, modal, focus inside; Tab and Shift+Tab wrap; the page behind is hidden from screen readers`, async () => {
+        const panel = await open(placement);
+        expect(panel.getAttribute("role")).toBe("dialog");
+        expect(panel.getAttribute("aria-modal")).toBe("true");
+        expect(panel.getAttribute("aria-label")).toBe(V4["v4.public.report"]);
+        const where = panel.querySelector<HTMLInputElement>("input[name=where]")!;
+        expect(document.activeElement).toBe(where);
+        // The page behind is hidden from screen readers while it is open.
+        expect(host!.querySelector("[data-before]")!.getAttribute("aria-hidden")).toBe("true");
+        expect(host!.querySelector("[data-after]")!.getAttribute("aria-hidden")).toBe("true");
+        // Tab past Cancel comes back to the first box; Shift+Tab from it goes to Cancel: focus never leaves the form.
+        const cancel = [...panel.querySelectorAll("button")].find((one) => one.textContent === V4["v4.public.flag.cancel"])!;
+        cancel.focus();
+        await tab();
+        expect(document.activeElement).toBe(where);
+        await tab(true);
+        expect(document.activeElement).toBe(cancel);
+        expect(panel.contains(document.activeElement)).toBe(true);
+      });
+
+      it(`${placement}: Escape, Cancel or a click on the cover beside it closes it and gives focus back to the link; the page comes back`, async () => {
+        let panel = await open(placement);
+        await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); });
+        expect(host!.querySelector(".v4PubFlagPanel")).toBeNull();
+        expect(document.activeElement).toBe(toggle());
+        expect(toggle().getAttribute("aria-expanded")).toBe("false");
+        expect(host!.querySelector("[data-before]")!.hasAttribute("aria-hidden")).toBe(false);
+        // A click on the cover beside it (the page behind cannot be pressed while it is open).
+        toggle().focus();
+        await act(async () => { toggle().click(); });
+        panel = host!.querySelector<HTMLElement>(".v4PubFlagPanel")!;
+        expect(panel).not.toBeNull();
+        const scrim = host!.querySelector<HTMLElement>("[data-public-flag-scrim]")!;
+        await act(async () => { scrim.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); scrim.click(); });
+        expect(host!.querySelector(".v4PubFlagPanel")).toBeNull();
+        expect(document.activeElement).toBe(toggle());
+        // In the top bar's menu the cover is inside the menu, so the menu stays open with focus on the link.
+        const menu = host!.querySelector("[data-public-top-menu]");
+        if (menu !== null) expect(menu.getAttribute("data-open")).toBe("true");
+      });
+    }
+
+    it("the second browser check: a press on the cover keeps focus in the form until the click, and focus going to the page's <main> keeps the menu open", async () => {
+      await open("top");
+      const scrim = host!.querySelector<HTMLElement>("[data-public-flag-scrim]")!;
+      const press = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+      await act(async () => { scrim.dispatchEvent(press); });
+      expect(press.defaultPrevented).toBe(true);
+      const menu = host!.querySelector<HTMLElement>("[data-public-top-menu]")!;
+      await act(async () => { scrim.click(); });
+      expect(document.activeElement).toBe(toggle());
+      // A click on plain text gives focus to the page's <main> (it can take focus for the skip link), which holds the menu.
+      const main = host!;
+      main.tabIndex = -1;
+      await act(async () => { main.focus(); });
+      expect(menu.getAttribute("data-open")).toBe("true");
+    });
+
+    it("the cover dims the page behind the phone's sheet and is clear beside the computer's window; nothing moves", () => {
+      expect(css).toMatch(/\.v4PubFlagScrim \{ position: fixed; inset: 0; z-index: 59; background: transparent; \}/u);
+      const phone = css.slice(css.indexOf("@media (max-width: 767px)"));
+      expect(phone).toMatch(/\.v4PubFlagScrim \{ background: var\(--scrim\); \}/u);
+    });
   });
 
   it("ACCESS-12 (the wave-2 checks): the bar's menu also closes on a click outside it and when focus moves out of it", async () => {

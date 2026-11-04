@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { V4ShareChange } from "@/components/v4/V4ShareChange";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 
 /*
  * V4 UX fixes (owner picks 3 Nov: journey-d3 A, dig-f16, dig-f17): the bottom of the map page is ONE stack that measures
@@ -132,6 +133,12 @@ export function V4BottomStack(props: Readonly<{
   const [goodTimeClosed, setGoodTimeClosed] = useState(false);
   const reasonId = useId();
   const job = props.job ?? { kind: "none" };
+  // W2L-4 (the wave-2 checks, 4 Nov): "Paused · Continue" goes once the dig continues. Where its Continue held focus, focus
+  // goes to the bar's next job (else the Map button), without scrolling, never to the page's body.
+  const { jobRef, mapButtonRef } = props;
+  const pausedHandOff = useFocusHandOff(job.kind === "paused", () => focusInPlace(jobRef?.current ?? mapButtonRef?.current ?? null));
+  // W2L-5: pressing the greyed dig button gives its visible reason, right above the bar, the shared highlight again.
+  const [whyReplay, setWhyReplay] = useState(0);
 
   if (!phone) {
     return (
@@ -187,7 +194,9 @@ export function V4BottomStack(props: Readonly<{
       {/* journey-f14 (the wave-2 checks, 4 Nov): the greyed button's reason is a visible line right above it, never only
           for screen readers. */}
       {job.kind === "dig" && job.waiting === true && job.reason !== undefined ? (
-        <p id={reasonId} className="v4PanelHint v4Muted v4DebPhoneWhy" data-bar-why="">{job.reason}</p>
+        <p key={whyReplay} id={reasonId} className={`v4PanelHint v4Muted v4DebPhoneWhy${whyReplay > 0 ? " v4Highlight" : ""}`} data-bar-why="">
+          {job.reason}
+        </p>
       ) : null}
       <div className="v4DebPhoneBar">
         <button ref={props.mapButtonRef} type="button" className="v4Btn v4DebPhoneMap" onClick={props.onMap} aria-haspopup="dialog">
@@ -201,7 +210,10 @@ export function V4BottomStack(props: Readonly<{
               className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.waiting === true ? " v4DigWaiting" : ""}`}
               aria-disabled={job.waiting === true ? "true" : undefined}
               aria-describedby={job.waiting === true && job.reason !== undefined ? reasonId : undefined}
-              onClick={job.onDig}
+              onClick={() => {
+                if (job.waiting === true) setWhyReplay((count) => count + 1);
+                job.onDig();
+              }}
             >
               {job.label}
             </button>
@@ -219,9 +231,12 @@ export function V4BottomStack(props: Readonly<{
                   ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
                   type="button"
                   className="v4Btn v4BtnPrimary v4DebPhoneDig"
-                  disabled={job.busy}
-                  aria-busy={job.busy}
-                  onClick={job.onContinue}
+                  // W2L-4: it keeps its focus while the press is on its way (never natively disabled); a press then does nothing.
+                  aria-disabled={job.busy ? "true" : undefined}
+                  aria-busy={job.busy ? "true" : undefined}
+                  onClick={() => { if (!job.busy) job.onContinue(); }}
+                  onFocus={pausedHandOff.onFocus}
+                  onBlur={pausedHandOff.onBlur}
                 >
                   {job.continueLabel}
                 </button>

@@ -101,7 +101,7 @@ describe("the V4 header's quota line", () => {
     expect(server.reads).toBe(0);
   });
 
-  describe("ask-f16 with the wave-2 checks: the pill's place is held only for a signed-in person", () => {
+  describe("ask-f16 with the wave-2 checks: the pill's place is held for a person who is, or may be, signed in", () => {
     async function mountWith(session: "CHECKING" | "IN" | "OUT" | undefined, answer: Promise<unknown>): Promise<HTMLDivElement> {
       const host = document.createElement("div");
       document.body.append(host);
@@ -133,18 +133,46 @@ describe("the V4 header's quota line", () => {
       }
     });
 
-    it("signed out, or still checking: no held place and no usage read (they never get a pill, so nothing jumps)", async () => {
-      for (const session of ["OUT", "CHECKING"] as const) {
-        server.reads = 0;
-        const host = await mountWith(session, Promise.resolve(free(60)));
-        await flush();
-        expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-        expect(host.querySelector(".v4HdrAllowance")).toBeNull();
-        expect(server.reads).toBe(0);
-        await act(async () => root!.unmount());
-        root = null;
-        host.remove();
-      }
+    it("signed out: no held place and no usage read (they never get a pill, so nothing jumps)", async () => {
+      const host = await mountWith("OUT", Promise.resolve(free(60)));
+      await flush();
+      expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
+      expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+      expect(server.reads).toBe(0);
+    });
+
+    const render = async (session: "CHECKING" | "IN" | "OUT"): Promise<void> => {
+      await act(async () => root!.render(<V4Header catalog={CATALOG} readingLevel={null} session={session} />));
+    };
+
+    it("the wave-2 checks (P2 / W2L-1): still checking, the place is held from the first frame and nothing is read; signed in, the same place waits for the read", async () => {
+      let answer: (usage: unknown) => void = () => undefined;
+      const host = await mountWith("CHECKING", new Promise((resolve) => { answer = resolve; }));
+      await flush();
+      const held = host.querySelector(".v4HdrQuotaHold");
+      expect(held).not.toBeNull();
+      expect(held!.getAttribute("aria-hidden")).toBe("true");
+      expect(server.reads).toBe(0);
+      // The session answers IN: the very same held place stays (nothing moves), and only now is the usage read.
+      await render("IN");
+      await flush();
+      expect(host.querySelector(".v4HdrQuotaHold")).toBe(held);
+      expect(server.reads).toBe(1);
+      await act(async () => answer(free(60)));
+      await flush();
+      expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
+      expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("This month: 60% of your quota used");
+    });
+
+    it("the wave-2 checks (P2): still checking and then signed out, the held place closes at once and nothing was read", async () => {
+      const host = await mountWith("CHECKING", Promise.resolve(free(60)));
+      await flush();
+      expect(host.querySelector(".v4HdrQuotaHold")).not.toBeNull();
+      await render("OUT");
+      await flush();
+      expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
+      expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+      expect(server.reads).toBe(0);
     });
 
     it("a read that fails lets the held place go (billing off): nothing is left behind", async () => {

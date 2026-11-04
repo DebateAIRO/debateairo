@@ -555,7 +555,9 @@ function usePinRoom(block: RefObject<HTMLElement | null>, shown: boolean): void 
     const set = (): void => column.style.setProperty("--v4-pin-room", `${Math.ceil(element.getBoundingClientRect().height)}px`);
     set();
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
-    observer?.observe(element);
+    // The second browser check (4 Nov): its border box, so a change of its padding alone (the cookie bar going, which puts
+    // the block back in its pinned place with its foot padding) is measured too, and nothing is left behind it.
+    observer?.observe(element, { box: "border-box" });
     return () => {
       observer?.disconnect();
       column.style.removeProperty("--v4-pin-room");
@@ -952,7 +954,8 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
         {pause !== null ? (
           <>
-            <V4MonthPause runId={dig.link.childRunId} pause={pause} catalog={panel.catalog} locale={panel.locale} className="v4PanelPause" />
+            <V4MonthPause runId={dig.link.childRunId} pause={pause} catalog={panel.catalog} locale={panel.locale} className="v4PanelPause"
+              focusAfter={() => panel.headingRef.current} />
             {dig.link.mode !== null && panel.showDigModes !== false ? <p className="v4PanelText"><span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></p> : null}
           </>
         ) : (

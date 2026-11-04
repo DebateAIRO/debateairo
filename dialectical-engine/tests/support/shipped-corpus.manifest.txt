@@ -1012,6 +1012,7 @@ apps/ui/lib/v4/useDigQueue.tsx
 apps/ui/lib/v4/useDigQuota.ts
 apps/ui/lib/v4/useDigsBelow.ts
 apps/ui/lib/v4/useFailedDigs.ts
+apps/ui/lib/v4/useFocusHandOff.ts
 apps/ui/lib/v4/useLeaveGuard.ts
 apps/ui/lib/v4/useLevelSettled.ts
 apps/ui/lib/v4/useMapKeys.ts

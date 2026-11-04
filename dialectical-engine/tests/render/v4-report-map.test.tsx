@@ -140,6 +140,8 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     await click(topButton()!);
     const opened = strip()!;
     expect(opened.closest(".v4StandInHeader")).not.toBeNull();
+    // The wave-2 checks (P4): the map hands the strip to the header's `after`, so it comes after the account button.
+    expect(header().querySelector("[data-stand-in-account]")!.compareDocumentPosition(opened) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(topButton()).toBeNull();
     // No dig yet: the report will mostly restate the first answer. No share line until the server says one.
     expect(flat(opened)).toContain(CATALOG["v4.reportStrip.coversNoDigs"]);
@@ -297,6 +299,71 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(document.activeElement).toBe(header().querySelector("a.v4DebReportLink"));
   });
 
+  it("the second browser check (item 7): a dig started on this page counts as a dig, though the investigation was read before it", async () => {
+    const runId = crypto.randomUUID();
+    // Read once when the page opened: no digs yet (it is not read again until a report is asked for).
+    reports.load = async () => investigation(runId, "OPEN", [], 0);
+    await mountMap(1600, runId);
+    await openPath(PATHS.renew);
+    await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
+    await advance(10_100);
+    await settle(50);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    await click(topButton()!);
+    // The strip says the report brings what the digs found together, never that nothing was dug.
+    expect(flat(strip())).toContain(CATALOG["v4.reportStrip.covers"]);
+    expect(flat(strip())).not.toContain(CATALOG["v4.reportStrip.coversNoDigs"]);
+  });
+
+  it("the wave-2 checks (P1): the hand-off does not scroll the page, and a click on plain text since the press means nothing is moved", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "OPEN", [], 1);
+    reports.write = async () => {
+      reports.load = async () => investigation(runId, "CLOSED", [writing(1, new Date().toISOString())], 1);
+      return { kind: "WRITING", reportVersion: 1, waitingForDigs: 0 } satisfies WriteReportResult;
+    };
+    await mountMap(1600, runId);
+    await click(topButton()!);
+    await click(buttonNamed(CATALOG["v4.reportStrip.write"]!, strip()!));
+    expect(document.activeElement).toBe(waitCard());
+    // The person clicks on the answer's text: the card loses focus to the page itself (a blur with nothing next).
+    await act(async () => { waitCard()!.blur(); });
+    await settle(5);
+    expect(document.activeElement).toBe(document.body);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    reports.load = async () => investigation(runId, "CLOSED", [finished(1)], 1);
+    await advance(15_100);
+    await settle(200);
+    expect(waitCard()).toBeNull();
+    // journey-f17: focus kept where it was; the page does not jump to the header.
+    expect(focus.mock.instances.filter((element) => element instanceof HTMLElement && element.matches(".v4DebReportLink"))).toEqual([]);
+    expect(document.activeElement).toBe(document.body);
+    focus.mockRestore();
+  });
+
+  it("the wave-2 checks (P1): when the card held focus, focus goes on without scrolling; on the phone to the pinned bar, always in view", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "OPEN", [], 1);
+    reports.write = async () => {
+      reports.load = async () => investigation(runId, "CLOSED", [writing(1, new Date().toISOString())], 1);
+      return { kind: "WRITING", reportVersion: 1, waitingForDigs: 0 } satisfies WriteReportResult;
+    };
+    await mountMap(375, runId, "n-renew");
+    await click(topButton()!);
+    await click(buttonNamed(CATALOG["v4.reportStrip.write"]!, strip()!));
+    expect(document.activeElement).toBe(waitCard());
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    reports.load = async () => investigation(runId, "CLOSED", [finished(1)], 1);
+    await advance(15_100);
+    await settle(200);
+    expect(waitCard()).toBeNull();
+    const bar = page().querySelector<HTMLElement>(".v4DebPhoneBar .v4DebPhoneChoose")!;
+    expect(document.activeElement).toBe(bar);
+    const call = focus.mock.calls[focus.mock.instances.indexOf(bar)];
+    expect(call).toEqual([{ preventScroll: true }]);
+    focus.mockRestore();
+  });
+
   it("a press that cannot be confirmed says so and checks the versions: writing found shows the wait, else Try again", async () => {
     const runId = crypto.randomUUID();
     reports.load = async () => investigation(runId, "OPEN", [], 1);
@@ -445,13 +512,17 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
-  it("journey-f14 on the phone: while it is written, picks keep their greyed button with a visible reason; a whole path says the report's state", async () => {
+  it("journey-f14 on the phone: while it is written, picks keep their greyed button with a visible reason; a whole path keeps \"Choose what to dig ›\"", async () => {
     const runId = crypto.randomUUID();
     reports.load = async () => investigation(runId, "CLOSED", [writing(1, "2026-11-04T10:00:00.000Z")], 1);
     await mountMap(375, runId, "n-renew");
     const bar = (): HTMLElement => page().querySelector<HTMLElement>(".v4DebPhoneBar")!;
-    // A whole path: the bar says where the report stands (report-d2), and nothing there digs.
-    expect(flat(bar().querySelector("[data-bar-status]"))).toContain(CATALOG["v4.state.BEING_WRITTEN"]);
+    // A whole path (the wave-2 checks, P3): dig-f31's "Choose what to dig ›" still leads to the choices, their greyed
+    // buttons and "Add to tray"; nothing there digs, and the report's state is on the waiting card.
+    const choose = bar().querySelector<HTMLButtonElement>(".v4DebPhoneChoose")!;
+    expect(flat(choose)).toBe(CATALOG["v4.dig.chooseWhat"]);
+    expect(bar().querySelector("[data-bar-status]")).toBeNull();
+    expect(waitCard()!.dataset.reportWait).toBe("WRITING");
     expect(page().querySelector("[data-bar-why]")).toBeNull();
     // With a pick, the bar's dig button stays where it is, greyed, with the reason as a visible line right above it.
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
@@ -462,7 +533,61 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(why.classList.contains("v4SrOnly")).toBe(false);
     expect(dig.getAttribute("aria-describedby")).toBe(why.id);
     await click(dig);
+    // W2L-5: the press gives the bar's own visible line the highlight (the panel's copy is hidden on screen on a phone).
+    expect(page().querySelector<HTMLElement>("[data-bar-why]")!.classList.contains("v4Highlight")).toBe(true);
     await advance(11_000);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+});
+
+describe("the wave-2 checks (P5 / W2L-10): Write it pressed while a dig counts its 10 seconds", () => {
+  /** Every aria-describedby in the panel names a line that is drawn. */
+  const describedLinesDrawn = (): void => {
+    for (const element of panel().querySelectorAll("[aria-describedby]")) {
+      for (const id of element.getAttribute("aria-describedby")!.split(/\s+/u).filter(Boolean)) expect(document.getElementById(id), id).not.toBeNull();
+    }
+  };
+
+  it("digging rests at once (the press waits for the dig), and the counting dig's button names only a line that is drawn", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "OPEN", [], 0);
+    reports.write = () => new Promise(() => undefined);
+    await mountMap(1600, runId);
+    await openPath(PATHS.renew);
+    await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
+    expect(page().querySelector(".v4Undo-counting")).not.toBeNull();
+    await click(topButton()!);
+    await click(buttonNamed(CATALOG["v4.reportStrip.write"]!, strip()!));
+    const dig = panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!;
+    expect(dig.getAttribute("aria-disabled")).toBe("true");
+    describedLinesDrawn();
+    // Nothing more is sent from a press meanwhile.
+    await click(dig);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("picks elsewhere: the docked tray's dig button rests at once too, greyed, naming a line that is drawn", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "OPEN", [], 0);
+    reports.write = () => new Promise(() => undefined);
+    await mountMap(1600, runId);
+    await openPath(PATHS.renew);
+    const boxes = [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+    await click(boxes[0]!);
+    await click(boxes[1]!);
+    // On smr, its whole-path dig starts its 10 seconds; the picks on renew dock in the tray with their own button.
+    await openPath(PATHS.smr);
+    await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
+    const trayDig = (): HTMLButtonElement => page().querySelector<HTMLButtonElement>(".v4DebTrayDock .v4DebTrayActions .v4BtnPrimary")!;
+    expect(trayDig().getAttribute("aria-disabled")).toBeNull();
+    await click(topButton()!);
+    await click(buttonNamed(CATALOG["v4.reportStrip.write"]!, strip()!));
+    // The press waits for the counting dig (start.busy): digging rests already.
+    expect(trayDig().getAttribute("aria-disabled")).toBe("true");
+    const named = trayDig().getAttribute("aria-describedby")!;
+    expect(document.getElementById(named)?.textContent).toBe(CATALOG["v4.reportWait.digsRest"]);
+    describedLinesDrawn();
+    await click(trayDig());
     expect(harness.submit).not.toHaveBeenCalled();
   });
 });

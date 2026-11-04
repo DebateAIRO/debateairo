@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { continueRun, type ContinueOutcome } from "@/lib/v4/money";
 import { pauseDate, pauseDay, pauseSentence, type PauseState } from "@/lib/v4/monthPause";
+import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 
 /*
  * Owner review 3 Nov 2026: the ONE pause block (wait-f2), the same on the waiting card, in a paused dig's panel and on a
@@ -20,13 +21,18 @@ import { pauseDate, pauseDay, pauseSentence, type PauseState } from "@/lib/v4/mo
 /** journey-d1 A: how long the soft highlight stays on a block that just changed. */
 const CHANGED_HIGHLIGHT_MS = 1_000;
 
-export function V4MonthPause({ runId, pause, catalog, locale, className }: Readonly<{
+export function V4MonthPause({ runId, pause, catalog, locale, className, focusAfter }: Readonly<{
   /** The paused run (the debate, or the dig's own run): Continue resumes it. */
   runId: string;
   pause: PauseState;
   catalog: MessageCatalog;
   locale: string;
   className?: string;
+  /**
+   * W2L-4 (the wave-2 checks, 4 Nov): the block goes once the run continues. Where Continue held focus, it goes here then
+   * (the panel's heading, the progress screen's question), without scrolling. Absent: nothing is moved.
+   */
+  focusAfter?: () => HTMLElement | null;
 }>) {
   const [pressing, setPressing] = useState(false);
   const [outcome, setOutcome] = useState<ContinueOutcome | null>(null);
@@ -57,6 +63,9 @@ export function V4MonthPause({ runId, pause, catalog, locale, className }: Reado
     setPressing(false);
   };
   const continuing = pressing || outcome?.kind === "CONTINUING";
+  // W2L-4: Continue keeps its focus while the press is on its way (aria-disabled and aria-busy, never native disabled), and
+  // when the block goes with it, focus is handed on (lib/v4/useFocusHandOff.ts).
+  const handOff = useFocusHandOff(true, () => focusInPlace(focusAfter?.() ?? null));
   return (
     <div className={`v4Pause${highlight ? " v4Highlight" : ""}${className === undefined ? "" : ` ${className}`}`}>
       <p className="v4PauseLine" role="status">
@@ -64,7 +73,15 @@ export function V4MonthPause({ runId, pause, catalog, locale, className }: Reado
         <span>{pauseSentence(pause, catalog, locale)}</span>
       </p>
       {pause.canContinue ? (
-        <button type="button" className="v4Btn v4BtnPrimary v4PauseContinue" disabled={continuing} onClick={() => void press()}>
+        <button
+          type="button"
+          className="v4Btn v4BtnPrimary v4PauseContinue"
+          aria-disabled={continuing ? "true" : undefined}
+          aria-busy={continuing ? "true" : undefined}
+          onClick={() => { if (!continuing) void press(); }}
+          onFocus={handOff.onFocus}
+          onBlur={handOff.onBlur}
+        >
           {continuing ? t(catalog, "v4.money.continuing") : t(catalog, "v4.money.continue")}
         </button>
       ) : (

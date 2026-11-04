@@ -23,6 +23,9 @@ const server = vi.hoisted(() => ({
   pageReads: 0
 }));
 vi.mock("@/lib/api", () => ({
+  // The public lane's ask hook (a whole public page, W2L-8) imports these; a press would use them, and no test presses.
+  COOKIE_SESSION_MARKER: "cookie-session",
+  createDebate: async () => { throw new Error("not in this test"); },
   // public-f13: the public page's one session read (V4PublicSessionProvider).
   validateSession: async () => {
     server.pageReads += 1;
@@ -49,6 +52,8 @@ import { V4Header } from "../../apps/ui/components/v4/V4Header.js";
 import { initialOf } from "../../apps/ui/components/v4/V4AccountMenu.js";
 import { TopBar } from "../../apps/ui/components/TopBar.js";
 import { V4PublicHeader, V4PublicSessionProvider } from "../../apps/ui/components/v4/V4PublicSession.js";
+import { PublicDebatePageClient } from "../../apps/ui/app/public/debate/[id]/PublicDebatePageClient.js";
+import { PublicDebateSchema } from "@debateai/contract";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
@@ -119,8 +124,11 @@ describe("ask-d6 A: the round account button", () => {
     }));
     const row = page.querySelector(".v4HdrRight")!;
     const account = row.querySelector(".v4HdrAccount")!;
-    const strip = row.querySelector(".v4RepStrip-top")!;
-    expect(row.lastElementChild).toBe(strip);
+    const strip = page.querySelector(".v4RepStrip-top")!;
+    // A row of the header itself, after the controls (the second browser check: opening it moves none of them).
+    expect(row.lastElementChild!.className).toBe("v4HdrAccount");
+    expect(page.querySelector(".v4Hdr")!.lastElementChild).toBe(strip);
+    expect(row.contains(strip)).toBe(false);
     expect(account.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(row.querySelector(".v4ExtraBefore")!.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
@@ -208,6 +216,36 @@ describe("ask-d6 A: the round account button", () => {
   });
 });
 
+describe("W2L-8 (the wave-2 checks): a whole public page with the real account menu reads the session once", () => {
+  const messages = (name: string) => JSON.parse(readFileSync(resolve(import.meta.dirname, `../../apps/ui/messages/en/${name}.json`), "utf8")) as Record<string, string>;
+  const debate = PublicDebateSchema.parse({
+    public_ref: "22222222-2222-4222-8222-222222222222",
+    author_pseudonym: "Stable Public Author",
+    question: "Should public readers receive the complete answer surface?",
+    published_at: "2026-08-24T00:00:00.000Z",
+    answer: {
+      terminal: "SERVED", verdict: "SUPPORTED", verdict_available: true, confidence_band: "moderate",
+      summary_segments: [{ text: "The public summary remains readable." }], badges: ["Evidence checked"],
+      residual_objections: ["A later primary source could change the result."], reversal_point: "A replicated contrary result.",
+      as_of: "2026-08-24T00:00:00.000Z"
+    }
+  });
+  it.each([["IN", 1], ["OUT", 0]] as const)("signed %s: the page's one session read, no read of the menu's own, and %i email read", async (session, emails) => {
+    server.session = session;
+    window.history.replaceState(null, "", `/public/debate/${debate.public_ref}`);
+    await mount(
+      <PublicDebatePageClient debate={debate} locale="en" storyLocale="en" storyCatalog={messages("public")} publicCatalog={messages("public")}
+        homeCatalog={{}} timeCatalog={messages("time")} debateChromeCatalog={messages("debateChrome")} v4Catalog={CATALOG} />
+    );
+    expect(server.pageReads).toBe(1);
+    expect(server.sessionReads).toBe(0);
+    expect(server.emailReads).toBe(emails);
+    if (session === "IN") expect(accountButton()!.textContent).toBe("M");
+    else expect(document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!.textContent).toBe(CATALOG["v4.ask.signIn"]);
+    expect(document.querySelector(".v4HdrQuotaHold, .v4HdrAllowance")).toBeNull();
+  });
+});
+
 describe("public-f13 with ask-d6 A: a public page reads the session once", () => {
   it.each([["IN"], ["OUT"]] as const)("signed %s, the header's account button takes the page's one answer and reads no session of its own", async (session) => {
     server.session = session;
@@ -236,18 +274,9 @@ describe("ask-d6 A: signed out, and while the page still checks", () => {
     expect(server.emailReads).toBe(0);
   });
 
-  it("WHOLE-14: on the ask page's address its Sign in carries exactly the way back the step-1 buttons carry", async () => {
-    // tests/render/v4-ask-step-one.test.tsx pins the step-1 buttons' `wayBack` for this very address; the page builds both
-    // links with the same expression (signInHrefFor(levelHref(currentReturnPath(), level))).
-    window.history.replaceState(null, "", "/v4?level=plain&topic=trams");
-    await mount(header({ session: "OUT" }));
-    const wayBack = `/login?next=${encodeURIComponent("/v4?level=plain&topic=trams")}`;
-    expect(document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!.getAttribute("href")).toBe(wayBack);
-    const askPage = readFileSync(resolve(import.meta.dirname, "../../apps/ui/components/v4/V4AskClient.tsx"), "utf8");
-    expect(askPage).toContain("signInHrefFor(levelHref(currentReturnPath(), savedLevel))");
-    const menu = readFileSync(resolve(import.meta.dirname, "../../apps/ui/components/v4/V4AccountMenu.tsx"), "utf8");
-    expect(menu).toContain("signInHrefFor(levelHref(currentReturnPath(), level))");
-  });
+  // WHOLE-14 (the wave-2 checks, W2L-7): the header's Sign in against the step-1 buttons is now checked on one render of the
+  // real ask page with its real header (tests/render/v4-ask-header-way-back.test.tsx), never through a copied address or
+  // the source text.
 
   it("a page with no session answer of its own reads it: signed out, Sign in", async () => {
     server.session = "OUT";

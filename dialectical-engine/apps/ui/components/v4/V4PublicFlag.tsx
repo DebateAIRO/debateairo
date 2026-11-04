@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { PublicFlagRequestSchema, type PublicFlagAnswer } from "@debateai/contract";
+import { useModalSurface } from "@/components/consent/modalSemantics";
+import { useHideOutside } from "@/components/dialogSurface";
 import { contractClient, validateSession } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { usePublicSignedIn } from "@/components/v4/V4PublicSession";
@@ -15,7 +17,33 @@ import { usePublicSignedIn } from "@/components/v4/V4PublicSession";
  * public-f4 (owner review, 3 Nov): the link sits in the page's top bar and at the foot of each question, where the form already knows which question is
  * meant (`where`). The form opens as a small window under the link on a computer and as a sheet from the bottom on a phone (public-lane.css), never as
  * loose lines above the page.
+ * ACCESS-12 (the wave-2 checks, 4 Nov): the form is a real dialog, through the site's one dialog helper (components/dialogSurface.ts: the shared modal
+ * semantics): named "Report a problem", focus goes into it and Tab and Shift+Tab stay inside it, the page behind is hidden from screen readers and covered,
+ * so a tap or click beside it closes it (on a phone the sheet's page cannot be reached), and Escape, Cancel or that tap give focus back to the link.
  */
+
+/**
+ * The open form's dialog: the site's shared modal helpers (useHideOutside and useModalSurface, as useDialogSurface combines
+ * them), and the cover beside it that closes it (it holds the page behind). Focus goes into the form's first box when the
+ * form is there (public-f5), else onto the dialog itself, which says its name.
+ */
+function FlagDialog({ id, label, onClose, toggle, initialFocus, children }: Readonly<{
+  id: string; label: string; onClose: () => void; toggle: RefObject<HTMLButtonElement | null>;
+  initialFocus: RefObject<HTMLElement | null> | null; children: ReactNode;
+}>) {
+  const dialog = useRef<HTMLDivElement | null>(null);
+  useHideOutside(dialog);
+  useModalSurface(true, { containerRef: dialog, initialFocusRef: initialFocus ?? dialog, onClose, returnFocusRef: toggle });
+  return (
+    <>
+      {/* A press on the cover keeps focus where it is until the click closes the form (the page's <main> would take it). */}
+      <div className="v4PubFlagScrim" data-public-flag-scrim="" onMouseDown={(event) => event.preventDefault()} onClick={onClose} />
+      <div ref={dialog} className="v4PubFlagPanel" id={id} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
+        {children}
+      </div>
+    </>
+  );
+}
 export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement = "top", send = (ref, body) => contractClient.flagPublicDebate(ref, body),
   readSession = validateSession }: Readonly<{
   publicRef: string; catalog: MessageCatalog;
@@ -91,7 +119,8 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
       {" "}
       <span className="v4PubFlagLine" role="status" data-public-flag-line>{line ?? ""}</span>
       {!open ? null : (
-        <div className="v4PubFlagPanel" id={`${ids}-panel`} role="group" aria-label={t(catalog, "v4.public.report")}>
+        <FlagDialog id={`${ids}-panel`} label={t(catalog, "v4.public.report")} onClose={close} toggle={toggle}
+          initialFocus={signedIn === true ? whereField : null}>
           {signedIn === false ? (
             <p data-public-flag-signed-out>{t(catalog, "v4.public.flag.signedOut")} <Link className="v4Link" href={signIn}>{t(catalog, "v4.public.flag.signIn")}</Link></p>
           ) : signedIn === null ? (
@@ -118,7 +147,7 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
               </div>
             </form>
           )}
-        </div>
+        </FlagDialog>
       )}
     </div>
   );

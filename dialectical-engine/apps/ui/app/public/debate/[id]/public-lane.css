@@ -135,6 +135,9 @@
 .v4PubReportCard { min-width: 0; }
 .v4PubReady { margin: 0; color: var(--text); font-weight: 600; }
 .v4PubReady:empty { position: absolute; }
+/* W2L-4 (the wave-2 checks): a press on its way keeps its focus (aria-busy, never natively disabled), with the disabled
+   .v4Btn's greyed look (v4-base.css) and the wait cursor. */
+[data-public-report-check][aria-busy="true"], .v4PubRetry[aria-busy="true"] { cursor: progress; opacity: .55; }
 .v4PubReportFailed { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--con); background: var(--surface-2); color: var(--text); font-size: 13.5px; }
 
 /* ---------- public-f4: "Report a problem" in the top bar (a phone: in the bar's menu) and at the foot of each path ---------- */
@@ -144,6 +147,15 @@
 /* public-f26: "Copy link" at the top of the public page (V4CopyLink), with its quiet "Link copied." line. */
 .v4PubCopyLink { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; }
 .v4PubCopyLink > .v4Link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
+/* The second browser check (4 Nov): in the computer's top bar, "Link copied." sits just under the link instead of beside
+   it, so the bar's items do not move when it shows (it pushed Copy link about 100 px toward the brand). In the phone's
+   menu it stays in the list's flow. */
+@media (min-width: 768px) {
+  .v4PubCopyLink { position: relative; }
+  .v4PubCopyLink > .v4PublicMarkCopied {
+    position: absolute; top: calc(100% - 8px); inset-inline-start: 0; margin: 0; white-space: nowrap; font-size: 13px;
+  }
+}
 .v4PubFlag { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
 .v4PubFlagToggle { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
 .v4PubFlag-top .v4PubFlagLine { max-width: 320px; }
@@ -155,17 +167,24 @@
   color: var(--text); font-size: var(--t-ui);
 }
 .v4PubFlag-foot .v4PubFlagPanel { inset-inline-end: auto; inset-inline-start: 0; }
+/* ACCESS-12 (the wave-2 checks, 4 Nov): the form is a dialog. While it is open the page behind it is covered, so a click
+   beside it closes it and nothing behind can be pressed; on a computer the cover is clear, on a phone it dims the page
+   behind the sheet. It shows at once (no move). */
+.v4PubFlagScrim { position: fixed; inset: 0; z-index: 59; background: transparent; }
 .v4PubFlagPanel > p { margin: 0; }
 .v4PubFlagForm { display: flex; flex-direction: column; gap: 6px; }
 @media (max-width: 767px) {
   .v4PubTitle { font-size: 24px; }
   .v4PubTopMenuButton { display: inline-flex; padding: 0 14px; }
   .v4PubTopMenuItems { display: none; }
+  /* The second browser check (4 Nov): the Menu button sits at the start of the bar's second row, so the box opens from its
+     start edge toward the end side (it went off the screen's start edge, out of reach, in either direction). */
   .v4PubTopMenu[data-open="true"] .v4PubTopMenuItems {
-    position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-end: 0; display: flex; flex-direction: column; align-items: stretch;
+    position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-start: 0; display: flex; flex-direction: column; align-items: stretch;
     min-width: 220px; max-width: calc(100vw - 32px); padding: 6px 12px;
     background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
   }
+  .v4PubFlagScrim { background: var(--scrim); }
   /* The form: a sheet from the bottom on a phone. */
   .v4PubFlagPanel, .v4PubFlag-foot .v4PubFlagPanel {
     position: fixed; inset-inline: 0; top: auto; bottom: 0; width: auto; max-height: 85vh; overflow-y: auto;

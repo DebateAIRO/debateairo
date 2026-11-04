@@ -647,9 +647,10 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await openRows();
     await click(firstOpen());
     // journey-f8 / public-d3 A: the share on the button, the period once by the switch (read-f19: the server's window).
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.public.dig.period.PERSON_DAY"]);
-    // Someone else's public page: no "you can still finish your report" (the person has no report to finish there).
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).not.toContain("report");
+    // W2L-9 (the wave-2 checks): the record's own line, with public-d3 A's approved reassurance, until the owner answers
+    // whether someone else's public page says the period alone (the drafted v4.public.dig.period.* lines).
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.dig.period.PERSON_DAY"]);
+    expect(V4["v4.dig.period.PERSON_DAY"]).toBe("of today · you can still finish your report");
     expect(startButtons()[0]!.textContent).toBe("Dig into your pick · up to 5%");
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
@@ -662,7 +663,7 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await mount(debate());
     await openRows();
     await click(firstOpen());
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.public.dig.period.PERSON_MONTH"]);
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.dig.period.PERSON_MONTH"]);
     // public-f14: the site's one note names the share's own window, so on Free it says the month too, never "of today".
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
@@ -849,14 +850,51 @@ describe("Write a report", () => {
     expect(card()).toBeNull();
     expect(readyLine().textContent).toBe(V4["v4.ready.report"]);
     expect(readyLine().classList.contains("v4Highlight")).toBe(true);
-    // The wave-2 checks: the card held focus and went, so focus goes on to the ready line, never to the page's body.
-    expect(document.activeElement).toBe(readyLine());
+    // The wave-2 checks: the card held focus and went, so focus goes on to the Reports heading (never the page's body, and
+    // never the ready line itself, a status region that would be read twice), without scrolling the page.
+    expect(document.activeElement).toBe(host!.querySelector("#public-reports-title"));
+    expect(readyLine().hasAttribute("tabindex")).toBe(false);
     await act(async () => root!.render(overview(withVersion(page, 2))));
     expect(press()).toBeTruthy();
     // No more checks once it is there.
     await advance(120_000);
     expect(lane.readPublicDebate).toHaveBeenCalledTimes(1);
     expect(lane.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("the wave-2 checks (P1 / W2L-2): focus goes on without scrolling, and a click on plain text since the press means focus stays where the person put it", async () => {
+    vi.useFakeTimers();
+    const page = debate();
+    await mount(page);
+    await click(press());
+    expect(document.activeElement).toBe(card());
+    // The person clicks on the debate's text higher up: the card loses focus to the page itself (nothing next).
+    await act(async () => { card()!.blur(); });
+    expect(document.activeElement).toBe(document.body);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    lane.readPublicDebate = vi.fn(async () => withVersion(page, 2));
+    await advance(15_000);
+    expect(card()).toBeNull();
+    expect(readyLine().textContent).toBe(V4["v4.ready.report"]);
+    // The card no longer held focus, so nothing is moved (journey-f17: focus kept where it was).
+    expect(document.activeElement).toBe(document.body);
+    expect(focus).not.toHaveBeenCalled();
+    focus.mockRestore();
+  });
+
+  it("the wave-2 checks (P1): when the card held focus, the hand-off to the Reports heading does not scroll the page", async () => {
+    vi.useFakeTimers();
+    const page = debate();
+    await mount(page);
+    await click(press());
+    expect(document.activeElement).toBe(card());
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    lane.readPublicDebate = vi.fn(async () => withVersion(page, 2));
+    await advance(15_000);
+    expect(document.activeElement).toBe(host!.querySelector("#public-reports-title"));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
   });
 
   it("the checks slow down over time and pause while the tab is hidden; after ten minutes the card says it is taking longer and keeps checking, with Check again", async () => {

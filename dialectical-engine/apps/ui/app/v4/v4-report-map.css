@@ -17,16 +17,21 @@
 .v4RepStripActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 2px; }
 .v4RepStripNotYet { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
 .v4RepStrip .v4RepDigWait { margin: 0; }
+/* The wave-2 checks (P4): a press on its way (aria-busy; with the carry-on box, up to a dig's 10 seconds) keeps its focus,
+   so the button is never natively disabled; it takes the shared greyed look of a disabled .v4Btn (v4-base.css) and the
+   wait cursor, so a press is seen to be on its way. It changes at once (no move). */
+.v4DebReportLink[aria-busy="true"], .v4RepStripWrite[aria-busy="true"], .v4RepStripNotYet[aria-disabled="true"] {
+  cursor: progress; opacity: .55;
+}
 /* In the top bar: its own row at the end side, as wide as a short paragraph. The browser check (4 Nov): its long lines
    made the bar's right side as wide as all of them together, so the level menu, the share and the account button left the
-   brand's row and the strip sat between them. Its own width no longer counts (contain), so they keep their row, and it comes
-   after them, under them at the end side; the bar's items keep to its top. It is after the account button in the page too
-   (V4Header's `after`), so no `order` is needed and the keyboard meets it where it is seen (the wave-2 checks). */
+   brand's row and the strip sat between them. Its own width no longer counts (contain), and it is a row of the bar itself,
+   after the brand and the controls (V4Header's `after`): opening it moves none of them, on a phone either (the second
+   browser check: they jumped from the start side to the end side). It is after the account button in the page too, so no
+   `order` is needed and the keyboard meets it where it is seen (the wave-2 checks). */
 .v4RepStrip-top {
   flex: 1 1 100%; contain: inline-size; width: min(30rem, 100%); max-width: 30rem; margin-inline-start: auto;
 }
-.v4Hdr:has(> .v4HdrRight > .v4RepStrip-top) { align-items: flex-start; }
-.v4HdrRight:has(> .v4RepStrip-top) { justify-content: flex-end; }
 /* In the phone's pinned bar: full width, "Write it" 48 px tall across it, "Not yet" under it. */
 .v4RepStrip-bottom { width: 100%; }
 .v4RepStrip-bottom .v4RepStripActions { flex-direction: column; align-items: stretch; gap: 4px; }

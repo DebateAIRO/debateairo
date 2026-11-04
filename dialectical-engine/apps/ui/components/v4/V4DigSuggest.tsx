@@ -307,6 +307,10 @@ function useBoxFocus(row?: RefObject<HTMLElement | null>, section?: RefObject<HT
       ? box.current
       : opener.current ?? row?.current?.querySelector<HTMLInputElement>("input[type=checkbox]") ?? sectionFallback(section?.current ?? null);
     target?.focus();
+    // The second browser check (4 Nov): the box opened under the pinned dig block, its lower half and its buttons behind it.
+    // The whole editor is brought into view (the panel column's scroll padding keeps it clear of the pinned block).
+    const editor = request.to === "box" ? box.current?.closest<HTMLElement>(".v4SugEditor") ?? null : null;
+    if (editor !== null && typeof editor.scrollIntoView === "function") editor.scrollIntoView({ block: "nearest" });
   }, [request, row, section]);
   const focusBox = useCallback((): void => setRequest((last) => ({ to: "box", count: (last?.count ?? 0) + 1 })), []);
   const focusOpener = useCallback((): void => setRequest((last) => ({ to: "opener", count: (last?.count ?? 0) + 1 })), []);
@@ -492,6 +496,9 @@ function OtherPicks(props: Readonly<{
 }>) {
   const { catalog, section } = props;
   const list = useRef<HTMLUListElement | null>(null);
+  // The second browser check (4 Nov): each Remove is named with what it removes ("Remove" then the row's own words), so two
+  // Remove buttons are told apart; the shown word comes first (WCAG 2.5.3) and no new words are needed.
+  const rowIds = useId();
   // The browser check (4 Nov): Remove takes its own row away, so focus fell to the page. It goes to the next pick's Remove
   // (or the one before), else to "Add your own view", else to the first pick box that can be pressed.
   const [removed, setRemoved] = useState<Readonly<{ index: number; count: number }> | null>(null);
@@ -510,7 +517,7 @@ function OtherPicks(props: Readonly<{
     <ul ref={list} className="v4SugList">
       {shown.map((pick, index) => (
         <li key={pick.key} className="v4SugRow v4SugRowPlain v4SugPicked">
-          <p className="v4SugRowText">
+          <p className="v4SugRowText" id={`${rowIds}-text-${index}`}>
             {pick.kind === "OWN_VIEW"
               // dig-f21: the person's own words follow the direction they were typed in.
               ? <><span className="v4SugTag">{t(catalog, "v4.suggest.ownViewTag")}</span> <span dir="auto">{pick.text}</span></>
@@ -518,10 +525,11 @@ function OtherPicks(props: Readonly<{
                 ? <><span className="v4SugTag">{t(catalog, "v4.suggest.openTag")}</span> <span data-ai-generated="true">{shortLine(pick.question.text, 120)}</span></>
                 : null}
           </p>
-          <button type="button" className="v4Link" onClick={() => {
-            props.choice.onRemovePick(pick.key);
-            setRemoved((last) => ({ index, count: (last?.count ?? 0) + 1 }));
-          }}>
+          <button type="button" className="v4Link" id={`${rowIds}-remove-${index}`}
+            aria-labelledby={`${rowIds}-remove-${index} ${rowIds}-text-${index}`} onClick={() => {
+              props.choice.onRemovePick(pick.key);
+              setRemoved((last) => ({ index, count: (last?.count ?? 0) + 1 }));
+            }}>
             {t(catalog, "v4.suggest.remove")}
           </button>
         </li>

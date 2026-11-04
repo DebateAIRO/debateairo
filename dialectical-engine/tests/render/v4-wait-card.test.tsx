@@ -234,6 +234,32 @@ describe("lost touch, the way back and the classic link", () => {
     expect(host!.querySelector("[data-wait-reconnecting]")).toBeNull();
   });
 
+  it("W2L-3 (the wave-2 checks): pressing [Try now] brings the connection back and the button goes; its focus stays in the card, never on the page", async () => {
+    const onTryNow = vi.fn();
+    await mount({ reconnecting: true, onTryNow });
+    const button = host!.querySelector<HTMLButtonElement>("[data-wait-reconnecting] button")!;
+    button.focus();
+    await act(async () => { button.click(); });
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    await mount({ reconnecting: false, onTryNow });
+    expect(host!.querySelector("[data-wait-reconnecting]")).toBeNull();
+    expect(document.activeElement).toBe(card());
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
+  });
+
+  it("W2L-3: a line that goes while focus is elsewhere moves nothing", async () => {
+    const elsewhere = document.body.appendChild(document.createElement("button"));
+    try {
+      await mount({ reconnecting: true, onTryNow: vi.fn() });
+      elsewhere.focus();
+      await mount({ reconnecting: false, onTryNow: vi.fn() });
+      expect(document.activeElement).toBe(elsewhere);
+    } finally {
+      elsewhere.remove();
+    }
+  });
+
   it("a running dig's own page: 'Back to: …' and the level trail above the card (wait-f12)", async () => {
     await mount({
       back: { href: "/v4/debate/parent-1?path=n-mix", question: "Should Romania build new nuclear plants?" },

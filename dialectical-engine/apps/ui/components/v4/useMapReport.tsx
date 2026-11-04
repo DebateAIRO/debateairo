@@ -10,6 +10,7 @@ import {
 import { stateWordText, whenText } from "@/lib/v4/stateWords";
 import { quotaChanged } from "@/lib/v4/quotaPulse";
 import { levelHref } from "@/lib/v4/storage";
+import { focusInPlace } from "@/lib/v4/useFocusHandOff";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { useReportWatch, type ReportAnswer } from "@/lib/v4/useReportVersions";
 import type { V4RailReport } from "./V4Rail";
@@ -140,7 +141,9 @@ export function useMapReport(input: MapReportInput): MapReport {
     <V4ReportStrip
       id={`v4-report-strip-${place}`}
       place={place}
-      hasDigs={(watch.read?.digs ?? 0) > 0}
+      // The browser check (4 Nov): the investigation is read when the page opens, so a dig started on this page since then
+      // is known from the page's own digs (`digsKey`), and the strip never says nothing was dug.
+      hasDigs={(watch.read?.digs ?? 0) > 0 || input.digsKey !== ""}
       sharePercent={sharePercent}
       publicLine={publicLine}
       rootRunId={root}
@@ -188,6 +191,12 @@ export function useMapReport(input: MapReportInput): MapReport {
     );
   };
 
+  // The wave-2 checks (4 Nov, journey-f17's "focus kept where it was"): when the waiting card goes while it holds focus,
+  // focus goes on without scrolling the page: to the phone's pinned bar (always in view), else to the header's report link.
+  const focusAfterWait = (): void => {
+    const bar = input.barJobRef.current;
+    focusInPlace(bar !== null && bar.isConnected ? bar : headerRef.current);
+  };
   const rail = railOf(stage, watch.writingSince, catalog, locale);
   const barStatus = digsRestFor(stage) && rail !== undefined
     ? { text: `${t(catalog, "v4.rail.stepReport")} · ${rail.text}`, working: rail.working }
@@ -211,7 +220,7 @@ export function useMapReport(input: MapReportInput): MapReport {
         onTryNow={watch.tryNow}
         focusPending={start.focusCard}
         onFocused={start.cardFocused}
-        onFocusGone={() => (headerRef.current ?? input.barJobRef.current)?.focus()}
+        onFocusGone={focusAfterWait}
         catalog={catalog}
         locale={locale}
       />

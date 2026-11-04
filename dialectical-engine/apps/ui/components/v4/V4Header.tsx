@@ -147,13 +147,17 @@ export function V4Header({
   /**
    * What comes after the account button, on its own row at the end side (the map's report strip, report-d1 A). It is
    * after the button in the page too, so the keyboard meets it in the order it is seen (WCAG 2.4.3; the wave-2 checks).
+   * It is a row of the header itself, not of the controls beside the brand, so opening it moves none of them (the browser
+   * check, 4 Nov: on a phone they jumped from the start side to the end side).
    */
   after?: ReactNode;
 }>) {
-  // ask-f16 with the wave-2 checks (4 Nov): the usage is read, and the pill's place held, only for a signed-in person. A
-  // page that knows the person is signed out reads nothing and holds nothing (they never get a pill), and nothing is held
-  // while it is still checking (the account button's place is held then too).
+  // ask-f16 with the wave-2 checks (4 Nov): the usage is read only for a signed-in person, and a page that knows the person
+  // is signed out reads nothing and holds nothing (they never get a pill). While the page is still checking, the pill's
+  // place is held from the first frame without reading, so a person who turns out signed in sees nothing jump; it closes
+  // at once if they are signed out (ask-f16: "close it quickly if that part does not come").
   const quotaWanted = showQuota && (session === undefined || session === "IN");
+  const quotaHeld = showQuota && session === "CHECKING";
   return (
     <header className="v4Hdr">
       <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
@@ -167,7 +171,7 @@ export function V4Header({
         ) : (
           <ReadingLevelMenu catalog={catalog} level={readingLevel} onLevel={onReadingLevel} />
         )}
-        <V4QuotaPill catalog={catalog} wanted={quotaWanted} />
+        <V4QuotaPill catalog={catalog} wanted={quotaWanted} hold={quotaHeld} />
         {children}
         {/* ask-d6 A: the round account button ends the row; its links carry the level the brand link carries. */}
         <V4AccountMenu
@@ -176,8 +180,8 @@ export function V4Header({
           classicHref={classicHref}
           {...(session === undefined ? {} : { session })}
         />
-        {after}
       </div>
+      {after}
     </header>
   );
 }

@@ -254,7 +254,7 @@
 }
 .v4WhereLine li { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; flex: 0 3 auto; }
 /* "›" is a mirrored character: a right-to-left page draws it pointing the other way by itself. */
-.v4WhereLine li + li::before { content: "›"; margin-inline-end: 6px; color: var(--text-3); flex: none; }
+.v4WhereLine li + li::before { content: "›"; content: "›" / ""; margin-inline-end: 6px; color: var(--text-3); flex: none; }
 .v4WhereLine li:not(.v4WhereLast) { max-width: 34%; }
 .v4WhereLast { font-weight: 700; color: var(--text); flex: 0 1 auto; }
 .v4WhereLast > span, .v4WherePart { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

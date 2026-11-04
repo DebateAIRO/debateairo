@@ -42,7 +42,8 @@ function useDockRoom(ref: RefObject<HTMLElement | null>): void {
     const set = (): void => column.style.setProperty("--v4-dock-room", `${Math.ceil(element.getBoundingClientRect().height)}px`);
     set();
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
-    observer?.observe(element);
+    // Its border box, so a change of its padding alone is measured too (as the panel's pinned block, V4Panel.tsx).
+    observer?.observe(element, { box: "border-box" });
     return () => {
       observer?.disconnect();
       column.style.removeProperty("--v4-dock-room");
@@ -66,7 +67,9 @@ function useReasonAbove(ref: RefObject<HTMLElement | null>, reason: string | nul
   useBrowserLayoutEffect(() => {
     const column = ref.current?.parentElement ?? null;
     const line = reason === null || column === null ? undefined
-      : [...column.querySelectorAll<HTMLElement>(".v4PanelDig > p[id]")].find((element) => element.textContent === reason);
+      // The second browser check (4 Nov): a failed dig's "Try this dig again" carries the same line under it (V4DigFailed).
+      : [...column.querySelectorAll<HTMLElement>(".v4PanelDig > p[id], .v4DigFailed > p[id][data-dig-rest]")]
+        .find((element) => element.textContent === reason);
     const id = line?.id ?? null;
     setAbove((previous) => (previous === id ? previous : id));
   });

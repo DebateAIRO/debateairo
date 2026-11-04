@@ -6,6 +6,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigTrail } from "@/lib/v4/load";
 import { clockText, isWorking, keepsGoing, stateWordText, waitDotOf, whenText, type WaitState } from "@/lib/v4/stateWords";
 import type { ReadingLevel } from "@/lib/v4/types";
+import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 import { V4ChoiceChips } from "./V4ChoiceChips";
 import { V4LevelTrail } from "./V4LevelTrail";
 
@@ -149,6 +150,14 @@ export function V4WaitCard(props: V4WaitCardProps) {
   const question = props.question?.trim() ?? "";
   const Heading = `h${String(props.headingLevel ?? 1)}` as "h1" | "h2" | "h3";
   const inline = props.variant === "inline";
+  // W2L-3 (the wave-2 checks, 4 Nov): [Try now] goes once the connection is back, which is what pressing it does. Where it
+  // held focus, focus stays in the card (its own section), never on the page's body, and the page does not scroll.
+  const card = useRef<HTMLElement | null>(null);
+  const tryNowHandOff = useFocusHandOff(props.reconnecting === true, () => {
+    // The card takes focus only now (it is not a stop for Tab, and a click on its words does not focus it).
+    if (card.current !== null && !card.current.hasAttribute("tabindex")) card.current.setAttribute("tabindex", "-1");
+    focusInPlace(card.current);
+  });
 
   return (
     <div className="v4WaitBlock" data-wait-block="">
@@ -161,7 +170,7 @@ export function V4WaitCard(props: V4WaitCardProps) {
           catalog={catalog}
         />
       )}
-      <section className={inline ? "v4WaitCard v4WaitCardInline" : "v4Card v4WaitCard"} data-wait-state={state.kind}>
+      <section ref={card} className={inline ? "v4WaitCard v4WaitCardInline" : "v4Card v4WaitCard"} data-wait-state={state.kind}>
         {question.length === 0 ? null : (
           <>
             {inline ? null : <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>}
@@ -203,7 +212,8 @@ export function V4WaitCard(props: V4WaitCardProps) {
           <p className="v4WaitReconnect v4Muted" data-wait-reconnecting="">
             <span>{t(catalog, "v4.debate.reconnecting")}</span>
             {props.onTryNow === undefined ? null : (
-              <button type="button" className="v4Link v4WaitTryNow" onClick={props.onTryNow}>{t(catalog, "v4.wait.tryNow")}</button>
+              <button type="button" className="v4Link v4WaitTryNow" onClick={props.onTryNow} onFocus={tryNowHandOff.onFocus}
+                onBlur={tryNowHandOff.onBlur}>{t(catalog, "v4.wait.tryNow")}</button>
             )}
           </p>
         ) : null}

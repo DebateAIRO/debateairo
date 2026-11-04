@@ -156,8 +156,12 @@ export const authGateMock = {
   AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("token")
 };
 export const headerMock = {
-  // `after` (the report strip, after the account button in the real header) follows the extras, as there.
-  V4Header: ({ children, after }: { children?: ReactNode; after?: ReactNode }) => <header className="v4StandInHeader">{children}{after}</header>
+  // `after` (the report strip, after the account button in the real header) follows the extras, as there. The marker
+  // stands where the real header draws its account button, so a test can see that the strip comes after it (the wave-2
+  // checks, P4: the map's own wiring of `after`, not only V4Header's).
+  V4Header: ({ children, after }: { children?: ReactNode; after?: ReactNode }) => (
+    <header className="v4StandInHeader">{children}<span data-stand-in-account="" />{after}</header>
+  )
 };
 export const roomNoticeMock = { RoomNotice: () => null };
 export const useV4AskMock = {

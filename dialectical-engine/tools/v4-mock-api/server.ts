@@ -190,6 +190,15 @@ function mockReviewPage(ref: string, debate: any, row: MockReview) {
 let publicMode: PublicMode = choice("MOCK_PUBLIC", process.env.MOCK_PUBLIC, PUBLIC_MODES, "OPEN");
 /** Owner screen review (public-f26): where the asker's debates are on their way to a public page (the click-test's switch). */
 let publicState: PublicState = choice("MOCK_PUBLIC_STATE", process.env.MOCK_PUBLIC_STATE, PUBLIC_STATES, "PRIVATE");
+/**
+ * The wave-2 checks (W2L-9, public-d3 A / public-f11): `ON` makes a room read that names no dig parent carry a dig's share
+ * (`dig_share_percent`, the quick dig's) instead of a new question's, so a public page's dig box shows its share and its
+ * period line in the click-test. The real API does not yet work a dig's share out for someone else's public debate (the
+ * server need: the public room read must carry `dig_share_percent`). While it is `ON` the ask page shows no start share
+ * (the contract allows one estimate per read).
+ */
+const PUBLIC_DIG_SHARE_MODES = ["OFF", "ON"] as const;
+let publicDigShareMode: (typeof PUBLIC_DIG_SHARE_MODES)[number] = choice("MOCK_PUBLIC_DIG_SHARE", process.env.MOCK_PUBLIC_DIG_SHARE, PUBLIC_DIG_SHARE_MODES, "OFF");
 let sessionOut = false;
 const PUBLIC_CHECK_MS = 10_000;
 const PUBLIC_REPORT_MS = 8_000;
@@ -706,7 +715,8 @@ function roomRead(
   // Draft words: the person's one reserve is KEPT while an investigation is open; BLOCKED is a FULL day until its reset.
   const reserve = mode === "BLOCKED" ? { reserve: "BLOCKED" as const } : reserveKept ? { reserve: "KEPT" as const } : {};
   // W2-7 (money rule): a read for a new question carries its estimate too, as a share of today.
-  const share = digMode === null ? { start_share_percent: START_SHARE_PERCENT } : { dig_share_percent: DIG_SHARE_PERCENT[digMode] };
+  const share = digMode !== null ? { dig_share_percent: DIG_SHARE_PERCENT[digMode] }
+    : publicDigShareMode === "ON" ? { dig_share_percent: DIG_SHARE_PERCENT.quick } : { start_share_percent: START_SHARE_PERCENT };
   const plan = {
     plan_id,
     // shape_settings is left out on purpose: the contract allows only `true` or absent, and absent means "off".
@@ -1516,6 +1526,7 @@ function mockState() {
     climb_played_at: climbPlayedAt === null ? null : iso(climbPlayedAt),
     public: publicMode,
     public_state: publicState,
+    public_dig_share: publicDigShareMode,
     report: reportMode,
     session: sessionOut ? "OUT" : "IN",
     free_notices: freeNotices,
@@ -1613,6 +1624,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (url.searchParams.get("subscription") === "RESET") withdrawnAt = null;
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
         if (publicStateSetting !== null) publicState = choice("publicstate", publicStateSetting, PUBLIC_STATES, publicState);
+        const publicDigShareSetting = url.searchParams.get("publicdigshare");
+        if (publicDigShareSetting !== null) {
+          publicDigShareMode = choice("publicdigshare", publicDigShareSetting, PUBLIC_DIG_SHARE_MODES, publicDigShareMode);
+        }
         const sessionSetting = url.searchParams.get("session");
         if (sessionSetting !== null) sessionOut = choice("session", sessionSetting, ["IN", "OUT"] as const, sessionOut ? "OUT" : "IN") === "OUT";
         if (pause !== null) {
@@ -1623,7 +1638,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate or session; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate, publicdigshare or session; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1633,7 +1648,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&live=&climb=&session=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&publicdigshare=&live=&climb=&session=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----

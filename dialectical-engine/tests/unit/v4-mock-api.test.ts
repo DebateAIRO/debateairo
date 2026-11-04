@@ -619,3 +619,25 @@ describe("the public dig flow and the public state (owner screen review, 3 Nov: 
     }
   });
 });
+
+describe("V4 mock API: every switch is named where people look for it (the wave-2 checks)", () => {
+  const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
+  const readme = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/README.md"), "utf8");
+  const handler = server.slice(server.indexOf('if (parts[1] === "set"'), server.indexOf('if (parts[1] === "sign-in"'));
+  const switches = [...handler.matchAll(/url\.searchParams\.get\("([a-z]+)"\)/gu)].map((match) => match[1]!);
+
+  it("the set handler reads the switches the click-test uses, the public dig share among them (W2L-9)", () => {
+    expect(switches).toEqual(expect.arrayContaining(["room", "ask", "plan", "usage", "pause", "public", "publicstate", "publicdigshare", "report", "dig", "live", "climb", "session"]));
+  });
+
+  it("the Known line, the refusal message and the README's Switches table name each one", () => {
+    const known = /Known: ([^"]+)"/u.exec(server)![1]!;
+    const refused = /"Unknown value for ([^;]+);/u.exec(server)![1]!;
+    for (const name of switches.filter((name) => name !== "subscription")) {
+      expect(known, name).toContain(`${name}=`);
+      expect(refused, name).toMatch(new RegExp(`\\b${name}\\b`, "u"));
+      expect(readme, name).toContain(`\`${name}=\``);
+    }
+    expect(known).toContain("subscription=RESET");
+  });
+});

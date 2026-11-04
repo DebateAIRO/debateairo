@@ -7,6 +7,7 @@ import { writeReport } from "@/lib/v4/load";
 import { loadRunPublished, REPORT_SLOW_MS, type ReportStage } from "@/lib/v4/reportWriting";
 import { quotaChanged } from "@/lib/v4/quotaPulse";
 import type { WaitState } from "@/lib/v4/stateWords";
+import { useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 import type { ReportWatch } from "@/lib/v4/useReportVersions";
 import { V4ReportDigWait } from "./V4DigUndo";
 import { V4WaitCard } from "./V4WaitCard";
@@ -317,7 +318,8 @@ export type V4ReportWaitProps = Readonly<{
   onFocused?: () => void;
   /**
    * The wave-2 checks (4 Nov): the card goes once the report is written. Where it held focus, this gives focus a place to
-   * go (the header's report link on the map), never the page's body. Absent: nothing is moved.
+   * go (on the map: the phone's pinned bar, else the header's report link, without scrolling), never the page's body.
+   * Absent: nothing is moved.
    */
   onFocusGone?: () => void;
   catalog: MessageCatalog;
@@ -337,14 +339,9 @@ export function V4ReportWait(props: V4ReportWaitProps) {
     ref.current?.focus();
     onFocused?.();
   }, [focusPending, onFocused, shown]);
-  // Whether focus is in the card, from its own focus events (a node taken away while focused sends none).
-  const held = useRef(false);
-  useEffect(() => {
-    if (shown || !held.current) return;
-    held.current = false;
-    const active = document.activeElement;
-    if (active === null || active === document.body) onFocusGone?.();
-  }, [shown, onFocusGone]);
+  // Whether focus is in the card, from its own focus events (lib/v4/useFocusHandOff.ts): once it goes while it holds
+  // focus, focus is handed on (never to the page's body); a click on plain text meanwhile means it no longer holds it.
+  const handOff = useFocusHandOff(shown, onFocusGone);
   if (state === null) return null;
   const rests = stage.kind === "WAITING_DIGS" || stage.kind === "WRITING";
   return (
@@ -354,13 +351,8 @@ export function V4ReportWait(props: V4ReportWaitProps) {
       aria-labelledby="v4-deb-report-wait"
       tabIndex={-1}
       data-report-wait={stage.kind}
-      onFocus={() => {
-        held.current = true;
-      }}
-      onBlur={(event) => {
-        const next = event.relatedTarget;
-        if (next instanceof Node && !event.currentTarget.contains(next)) held.current = false;
-      }}
+      onFocus={handOff.onFocus}
+      onBlur={handOff.onBlur}
     >
       <p id="v4-deb-report-wait" className="v4Eyebrow">{t(catalog, "v4.rail.stepReport")}</p>
       <V4WaitCard

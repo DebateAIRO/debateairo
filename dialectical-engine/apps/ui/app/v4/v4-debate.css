@@ -137,6 +137,12 @@
 /* dig-f4 / map-f14 (3 Nov): "Your question" digs the picks it lists with its own button on a computer; on the phone the
    pinned bar carries the picks, so that button is left out there too. */
 .v4DebLayout-phone .v4Panel-root .v4PanelDigBtn { display: none; }
+/* W2L-5 (the wave-2 checks, 4 Nov): while the pinned bar's greyed dig button carries its reason as a visible line right above
+   it, the panel's dig block (whose own button the phone leaves out) does not show the same sentence again; it stays for
+   screen readers, so focus brought to the block still hears why. */
+.v4DebLayout-phone:has([data-bar-why]) .v4PanelDig :is([data-dig-rest], .v4DigWaitLine) {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
 
 /* map-d4 A (3 Nov): in the panel column's own scroll (computer, laptop and tablet) the dig block stays pinned to the
    panel's foot, so the evidence comes first and the button never needs a scroll; the page's background behind it so
@@ -182,6 +188,10 @@
 .appShell:has(.consentBar) .v4DebLayout-mid .v4DebPanelCol {
   padding-bottom: calc(180px + var(--v4-stack-room, 0px)); scroll-padding-block-end: 188px;
 }
+/* The second browser check (4 Nov, WCAG 2.4.11): the panel column's own room could not help while the window itself was not
+   scrolled (the column's foot was still below the window's), so the window scrolled a control only just into view, under the
+   cookie bar. The window keeps the same room at its foot while the cookie bar shows on a map page. */
+html:has(.appShell .consentBar):has(.v4DebPage) { scroll-padding-block-end: 188px; }
 
 /* ---------- the phone map sheet (D7) ---------- */
 .v4DebSheet {
@@ -229,6 +239,9 @@
   border: 1px dashed var(--line-strong); color: var(--text-2); font-weight: 600; font-size: var(--t-ui);
 }
 .v4PauseContinue { min-height: 44px; }
+/* W2L-4 (the wave-2 checks): a Continue on its way keeps its focus (aria-busy, never natively disabled), with the disabled
+   .v4Btn's greyed look (v4-base.css) and the wait cursor; the phone bar's Continue too. */
+.v4PauseContinue[aria-busy="true"], .v4DebPhonePaused .v4DebPhoneDig[aria-busy="true"] { cursor: progress; opacity: .55; }
 /* Owner review 3 Nov (wait-f11, map-f30): the failed page's way on: "Ask this again" with its grey line, then small links. */
 .v4DebFailedAgain { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 4px; }
 .v4DebFailedNote { font-size: var(--t-meta); max-width: 52ch; }
@@ -260,7 +273,7 @@
 .v4Trail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; font-size: var(--t-ui); }
 .v4TrailParts { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .v4TrailParts li { display: inline-flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
-.v4TrailParts li + li::before { content: "›"; margin-inline-end: 6px; color: var(--text-2); }
+.v4TrailParts li + li::before { content: "›"; content: "›" / ""; margin-inline-end: 6px; color: var(--text-2); }
 .v4TrailParts .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
 .v4TrailLevel { margin: 0; font-weight: 700; color: var(--text); }
 .v4DebChangesRewrites { flex: 1 1 100%; margin: 0; padding-inline-start: 1.2em; min-width: 0; overflow-wrap: anywhere; }
@@ -300,8 +313,11 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; width: max-content; max-width: min(560px, 100%);
   background: var(--ink); color: var(--surface); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; box-shadow: var(--shadow-pop);
 }
-/* journey-d3: on a phone the note sits in the bottom stack, above the pinned bar (V4BottomStack). */
-.v4StackPhone .v4ReadyNote { width: 100%; max-width: none; box-shadow: none; }
+/* journey-d3: on a phone the note sits in the bottom stack, above the pinned bar (V4BottomStack). The second browser check
+   (4 Nov): its words, "See it" and ✕ share one row there (the words wrap within it), so ✕ never sits alone on a second
+   row of a box that is mostly empty, which the stack's short top could cut. */
+.v4StackPhone .v4ReadyNote { width: 100%; max-width: none; box-shadow: none; flex-wrap: nowrap; }
+.v4StackPhone .v4ReadyNoteText { flex: 1 1 0; }
 .v4DebSheetFoot .v4ReadyNote { margin: 8px var(--v4-gutter); }
 .v4ReadyNoteText { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
 .v4ReadyNoteAct {

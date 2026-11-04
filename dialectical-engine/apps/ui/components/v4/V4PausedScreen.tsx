@@ -18,6 +18,16 @@ import { pauseOfRun } from "@/lib/v4/monthPause";
  * belongs inside that view in place of its state line; the switch then goes.
  */
 
+/**
+ * W2L-4 (the wave-2 checks, 4 Nov): once the run continues, the progress screen takes this card's place. Where Continue held
+ * focus, it goes to that screen's question (its heading), found on the page, so the progress screen itself is untouched.
+ */
+function progressHeading(): HTMLElement | null {
+  const heading = document.querySelector<HTMLElement>(".v4DebProgress .v4DebStatusQuestion");
+  if (heading !== null && !heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+  return heading;
+}
+
 export function V4PausedScreen({ run, runId, reconnecting, classicHref, catalog, locale }: Readonly<{
   run: RunProjection;
   runId: string;
@@ -33,7 +43,7 @@ export function V4PausedScreen({ run, runId, reconnecting, classicHref, catalog,
       <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
       {/* The person's own words (the tab title follows this heading); the added lines are not a title. */}
       <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</h1>
-      <V4MonthPause runId={runId} pause={pause} catalog={catalog} locale={locale} />
+      <V4MonthPause runId={runId} pause={pause} catalog={catalog} locale={locale} focusAfter={progressHeading} />
       {reconnecting ? <p className="v4Muted">{t(catalog, "v4.debate.reconnecting")}</p> : null}
       <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
     </section>

@@ -7,7 +7,7 @@ import type * as Money from "../../apps/ui/lib/v4/money.js";
 import { DIG_LEVEL_MAX, type RunProjection } from "../../packages/contract/src/index.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS,
-  resetHarness, seededAnswer, text, tray, unmountMap
+  resetHarness, seededAnswer, settle, text, tray, unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -238,9 +238,24 @@ describe("a debate paused at the month wall", () => {
     harness.run = paused(runId, true);
     await mountMap(1600, runId);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
-    await click(buttonNamed(CATALOG["v4.money.continue"]!));
+    const press = buttonNamed(CATALOG["v4.money.continue"]!);
+    press.focus();
+    await click(press);
     expect(harness.continueRun).toHaveBeenCalledWith(runId);
-    expect(buttonNamed(CATALOG["v4.money.continuing"]!).disabled).toBe(true);
+    // W2L-4 (the wave-2 checks): it keeps its focus while the run continues (aria-disabled and aria-busy, never native).
+    const continuing = buttonNamed(CATALOG["v4.money.continuing"]!);
+    expect(continuing.disabled).toBe(false);
+    expect(continuing.getAttribute("aria-disabled")).toBe("true");
+    expect(continuing.getAttribute("aria-busy")).toBe("true");
+    expect(document.activeElement).toBe(continuing);
+    await click(continuing);
+    expect(harness.continueRun).toHaveBeenCalledTimes(1);
+    // The run reads as running again: the pause card goes, and focus goes on to the progress screen's question.
+    harness.run = { ...paused(runId, true), month_pause: undefined } as typeof harness.run;
+    await advance(5_000);
+    await settle(10);
+    expect(page().querySelector(".v4Pause")).toBeNull();
+    expect(document.activeElement).toBe(page().querySelector(".v4DebProgress .v4DebStatusQuestion"));
   });
 
   it("a Continue the server still refuses as too early says from when, and nothing changed", async () => {

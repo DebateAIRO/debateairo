@@ -162,8 +162,12 @@ describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {
     // journey-f22 / journey-f15 (the wave-2 checks): one date form for the month pause, in a sentence and on a label alike.
     const date = new Intl.DateTimeFormat("en", { day: "numeric", month: "long" }).format(new Date(NEXT_MONTH));
     const day = date;
-    // No year: the record's "Paused until 1 December".
-    expect(date).not.toMatch(/2026/u);
+    // No year: the record's "Paused until 1 December" (the wave-2 checks, P6: asserted on what the code says, any year).
+    for (const line of [
+      pauseSentence({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en"),
+      digPauseCardLine({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en"),
+      pausePhoneBar({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en").untilLabel ?? ""
+    ]) expect(line).not.toMatch(/\b\d{4}\b/u);
     expect(pauseSentence({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en"))
       .toBe(`Paused: this month's quota is used up. You can continue from ${date}.`);
     expect(pauseSentence({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toBe("Your new month has started.");
