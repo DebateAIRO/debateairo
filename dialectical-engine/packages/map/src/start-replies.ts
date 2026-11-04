@@ -15,8 +15,8 @@ import { mapWrongLanguage } from "./text.js";
 import type { MapAngle, MapStep } from "./types.js";
 
 /**
- * The step before Start's reply readers (V4 start step, spec 2026-11-03 §2, §4) and the specs of its list, merge and late-merge calls (the
- * combine and the fit get theirs with the combine step). Every reply is read as the engine reads its map (`mapClassifyReply`, exact
+ * The step before Start's reply readers (V4 start step, spec 2026-11-03 §2, §4) and the specs of its list, merge, late-merge, combine and
+ * fit calls (Task 25: the combine and the fit, at the end). Every reply is read as the engine reads its map (`mapClassifyReply`, exact
  * limits). A well-formed reply is salvaged in code first (the owners' slip recovery order): what breaks a rule is left out whole, never
  * edited, and what is left must still pass the strict schema and the check, or the reply is refused as written. A reply that is not
  * well formed is not salvaged before the schema; when the reply fixer repairs its form, the same salvage runs on the repaired value, so no
@@ -342,4 +342,104 @@ export function startMergeLateSpec(ctx: StartSpecContext, input: Readonly<{ said
   startMergeLateReplySchema as z.ZodType<StartMergeLateReply>, mergeLateCheck(ctx.replyLanguage),
   mergeLateSalvage(new Set(input.viewpoints.map((one) => one.viewpoint_id)), new Set(listed.map((one) => one.viewpoint_id)),
     new Set(input.prior.paths.map((path) => path.path_ref)), shownFor));
+}
+
+// V4 start step, Task 25: the combine and the fit. The word-edge cut lives here, beside the combine's reader that cuts with it; the lists
+// run (start-step.ts) imports it from here, so the two files never import each other's values.
+const START_WORD_SEGMENTER = new Intl.Segmenter("und", { granularity: "word" });
+
+/**
+ * `text` in at most `max` UTF-16 code units, cut after its last whole word (Intl.Segmenter's word edges, so scripts written without
+ * spaces cut too); with no word edge inside the limit, a hard cut that never splits a surrogate pair.
+ */
+export function startCutAtWordEdge(text: string, max: number): string {
+  if (text.length <= max) return text;
+  if (max <= 0) return "";
+  let edge = 0;
+  for (const segment of START_WORD_SEGMENTER.segment(text)) {
+    const end = segment.index + segment.segment.length;
+    if (end > max) break;
+    if (segment.isWordLike === true) edge = end;
+  }
+  if (edge > 0) return text.slice(0, edge);
+  const last = text.charCodeAt(max - 1);
+  return text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max);
+}
+
+/**
+ * The combined question never restates the main question (spec §6 item 3, the known fault; code checks it too). A word is a word-like
+ * segment of three characters or more, lower-cased in the question's language; a main question of fewer than three such words is never
+ * restated; a question restates it when it holds 60% or more of the main question's distinct words.
+ */
+export const START_COMBINE_OVERLAP = Object.freeze({ share: 0.6, minWordChars: 3, minWords: 3 });
+
+/** A segmenter in the question's language; a tag Intl does not take falls back to the root locale. */
+function segmenterFor(languageTag: string, granularity: "word" | "sentence"): Intl.Segmenter {
+  try { return new Intl.Segmenter(languageTag, { granularity }); } catch { return new Intl.Segmenter("und", { granularity }); }
+}
+function lowerIn(text: string, languageTag: string): string {
+  try { return text.toLocaleLowerCase(languageTag); } catch { return text.toLowerCase(); }
+}
+function distinctWords(text: string, languageTag: string): ReadonlySet<string> {
+  const words = new Set<string>();
+  for (const segment of segmenterFor(languageTag, "word").segment(text.normalize("NFKC"))) {
+    if (segment.isWordLike !== true) continue;
+    const word = lowerIn(segment.segment, languageTag);
+    if ([...word].length >= START_COMBINE_OVERLAP.minWordChars) words.add(word);
+  }
+  return words;
+}
+
+export function startRestatesMainQuestion(question: string, mainQuestion: string, languageTag: string): boolean {
+  const main = distinctWords(mainQuestion, languageTag);
+  if (main.size < START_COMBINE_OVERLAP.minWords) return false;
+  const asked = distinctWords(question, languageTag);
+  return [...main].filter((word) => asked.has(word)).length / main.size >= START_COMBINE_OVERLAP.share;
+}
+
+const CombineShape = z.object({ title: z.string(), question: z.string() }).strict();
+
+/** Before the schema: the sentences that restate the main question left out (when one does not), and an over-long text cut at a word edge. */
+function combineSalvage(mainQuestion: string, languageTag: string): MapReplySalvage<StartCombineReply> {
+  return bothWays((value) => {
+    const shape = CombineShape.safeParse(value);
+    if (!shape.success) return { value, repairs: [] };
+    const title = shape.data.title.trim();
+    let question = shape.data.question.trim();
+    if (startRestatesMainQuestion(question, mainQuestion, languageTag)) {
+      const kept = [...segmenterFor(languageTag, "sentence").segment(question)].filter((sentence) => sentence.segment.trim() !== ""
+        && !startRestatesMainQuestion(sentence.segment, mainQuestion, languageTag));
+      if (kept.length > 0) question = kept.map((sentence) => sentence.segment).join("").trim();
+    }
+    const salvaged = { title: startCutAtWordEdge(title, L.pathTitleMaxChars), question: startCutAtWordEdge(question, L.pathQuestionMaxChars) };
+    return salvaged.title === title && salvaged.question === shape.data.question.trim() ? { value, repairs: [] }
+      : { value: salvaged, repairs: ["MAP_TEXT_TRIMMED"] };
+  });
+}
+
+const combineCheck = (mainQuestion: string, languageTag: string, expected: ReplyLanguageExpectation): MapReplyCheck<StartCombineReply> => (reply) => [
+  ...(startRestatesMainQuestion(reply.question, mainQuestion, languageTag) ? [issue(["question"], "START_COMBINE_RESTATES_MAIN_QUESTION")] : []),
+  ...languageIssues([reply.title, reply.question], expected, ["question"])
+];
+
+const fitCheck = (keys: ReadonlySet<string>): MapReplyCheck<StartFitReply> => (reply) =>
+  reply.fits !== null && !keys.has(reply.fits) ? [issue(["fits"], "START_FIT_UNKNOWN_KEY")] : [];
+
+/** The combine: the main question (only so the writer knows what the path is for), the points the person put together. */
+export function startCombineSpec(ctx: StartSpecContext, members: readonly Readonly<{ title: string | null; question: string }>[]):
+  MapStepSpec<StartCombineReply> {
+  if (members.length < 2 || members.length > L.viewpointsPerPathMax) throw refused("START_COMBINE_INVALID", "a combine is given 2 to 4 points");
+  return startSpecOf("START_COMBINE", ctx, "combine", [field("main_question", ctx.questionLine),
+    field("points", members.map((member) => ({ title: member.title, question: member.question })))],
+  startCombineReplySchema as z.ZodType<StartCombineReply>, combineCheck(ctx.questionLine, ctx.languageTag, ctx.replyLanguage),
+  combineSalvage(ctx.questionLine, ctx.languageTag));
+}
+
+/** The own-path fit: the question, the person's own point of view, the chosen paths with their keys; never a reader (it writes no prose). */
+export function startFitSpec(ctx: MapSpecContext, input: Readonly<{ ownText: string; paths: readonly Readonly<{ key: string; title: string; question: string }>[] }>):
+  MapStepSpec<StartFitReply> {
+  if (input.paths.length < 1 || input.paths.length > L.pathsMax) throw refused("START_FIT_INVALID", "a fit is given 1 to 7 paths");
+  return startSpecOf("START_FIT", { ...ctx, readingLevel: null }, "fit", [field("question_line", ctx.questionLine), field("own_view", input.ownText),
+    field("paths", input.paths.map((path) => ({ key: path.key, title: path.title, question: path.question })))],
+  startFitReplySchema as z.ZodType<StartFitReply>, fitCheck(new Set(input.paths.map((path) => path.key))), {});
 }

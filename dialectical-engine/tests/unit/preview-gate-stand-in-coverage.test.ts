@@ -7,6 +7,9 @@ import {
 } from "@debateai/judgement";
 import { mapContractNameOf, mapEngineContractNameOf, startCombineReplySchema, startFitReplySchema, startListSpec, startMergeLateSpec, startMergeSpec,
   type StartSpecContext } from "@debateai/map";
+// V4 start step (Task 23): the step before Start's call sites, and the map's engine-2 angle planner its own planner asks.
+import { START_CALL_SITES, mapEnginePromptContracts, startListCallSiteKey } from "@debateai/map";
+import { engineMapScriptedContent } from "../support/engine-map-script.js";
 import { lockedReplyLanguageExpectation, questionLanguageFromRun, replyLanguageExpectation } from "@debateai/kernel";
 import type { StartMenu } from "@debateai/contract";
 import { buildFramedPrompt, type FramedMaterialField, type PromptContract } from "@debateai/providers";
@@ -60,7 +63,10 @@ const NOT_ANSWERED_BY_DEFAULT: Readonly<Record<string, string>> = Object.freeze(
   "support.chat-answer.v3": "the support chat is not part of a debate", "support.case-summary.v1": "the support chat is not part of a debate",
   "support.case-summary.v2": "the support chat is not part of a debate", "support.no-source-judgement.v1": "the support chat is not part of a debate",
   "evaluator.blind-judge-grade.v1": "the dormant evaluator lane's add-on", "evaluator.domain-tagger.v1": "the dormant evaluator lane's add-on",
-  "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on"
+  "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on",
+  // V4 start step (Task 47 review): until Task 52 gives the stand-in its PATH_GAP kind. Task 52 removes this line: the no-stale-row
+  // check below fails while a name here is one the stand-in answers.
+  "map.gap-paths.v1": "the gap round after Start: a draft no runner asks yet (Task 53 wires it); Task 52 adds its PATH_GAP kind"
 });
 
 const chatOf = (contract: PromptContract, material: readonly FramedMaterialField[]): string =>
@@ -201,19 +207,29 @@ const SITES: readonly (readonly [string, string, LaterGateKind | null])[] = [
   ["CONTRIBUTION_CHECK:CHECKER:1", "CONTRIBUTION_CHECK", "CONTRIBUTION_CHECK"],
   ["WEB:plan", "WEB", "WEB_PLAN"], ["WEB:plan:seat:runnerUp", "WEB", "WEB_PLAN"], ["WEB:plan:2", "WEB", "WEB_DIG_PLAN"],
   ["WEB:read1:0:0", "WEB", "WEB_READ_ALL"], ["WEB:pick:0", "WEB", "WEB_PICK"], ["WEB:read-top:0:2", "WEB", "WEB_READ_TOP"],
-  ["WEB_RESEARCHED:read1", "WEB_RESEARCHED", "WEB_READ_ALL"], ["WEB_RESEARCHED:read-top:2", "WEB_RESEARCHED", "WEB_READ_TOP"]
+  ["WEB_RESEARCHED:read1", "WEB_RESEARCHED", "WEB_READ_ALL"], ["WEB_RESEARCHED:read-top:2", "WEB_RESEARCHED", "WEB_READ_TOP"],
+  // V4 start step (Task 23): the step before Start's six call sites. The angle planner asks map.angles.v2, so it has no later-step kind (null):
+  // its default reply is the map's own.
+  [START_CALL_SITES.angles, "START", null], [startListCallSiteKey(1), "START", "START_LIST"], [START_CALL_SITES.merge, "START", "START_MERGE"],
+  [START_CALL_SITES.mergeLate, "START", "START_MERGE_LATE"], [START_CALL_SITES.combine, "START", "START_COMBINE"], [START_CALL_SITES.fit, "START", "START_FIT"]
 ];
 const SITE_CHAT = (kind: LaterGateKind): string => {
   const row = ROWS.find((candidate) => candidate.kind === kind)!;
   return chatOf(contractOf(row.id), [...row.material, field("question_line", "Q")]);
 };
+/** A site with no later-step kind (the start step's angle planner) is answered as the map's engine-2 angle planner is. */
+const SITE_REPLY = (kind: LaterGateKind | null): string => kind === null
+  ? engineMapScriptedContent(mapEnginePromptContracts().angles.contractId, [field("question_line", "Q")])!
+  : laterStepContent(kind, SITE_CHAT(kind), "en");
 
 describe("the practice's report names every call site", () => {
   const prefixes = allOf(/\b[A-Z_]*CALL_SITE_PREFIX\b[^=\n]*=\s*"([A-Z_]+:)"/gu);
   const patterns = allOf(/\b[A-Z_]*CALL_SITE\b[^=\n]*=\s*\/\^([A-Z_]+:)/gu);
 
   it("found the code's call-site families (a scan that finds nothing would prove nothing)", () => {
-    expect(prefixes).toEqual(expect.arrayContaining(["ANSWER_UPDATE:", "CONTRIBUTION_CHECK:", "INVESTIGATION_REPORT:", "PATH_CLIMB:", "PATH_REWRITE:", "PUBLIC_REPORT:", "WEB_RESEARCHED:"]));
+    expect(prefixes).toEqual(expect.arrayContaining(["ANSWER_UPDATE:", "CONTRIBUTION_CHECK:", "INVESTIGATION_REPORT:", "PATH_CLIMB:", "PATH_REWRITE:", "PUBLIC_REPORT:", "WEB_RESEARCHED:",
+      // V4 start step (Task 23).
+      "START:"]));
     expect(patterns).toEqual(expect.arrayContaining(["PATH_REWRITE:", "PUBLIC_REPORT:"]));
   });
 
@@ -226,7 +242,7 @@ describe("the practice's report names every call site", () => {
   it.each(SITES.map((site) => [site[0], site] as const))("%s has its family and step, and its reply is re-checked by its own form", (key, [, family, kind]) => {
     expect(callFamilyOf(key)).toBe(family);
     expect(practiceStepOf(key)).not.toBe("UNMAPPED");
-    const reply = laterStepContent(kind!, SITE_CHAT(kind!), "en");
+    const reply = SITE_REPLY(kind);
     expect(recheckReply(key, reply)).toEqual({ family, issues: [] });
     // A try that repairs it is read as the step it repairs, its own family staying STRUCTURE_REPAIR.
     expect(recheckReply(`REPAIR:STRUCTURE:${key}`, reply)).toEqual({ family: "STRUCTURE_REPAIR", issues: [] });

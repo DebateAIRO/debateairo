@@ -17,10 +17,11 @@ const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
 describe("the thinking-level table", () => {
   // Web search (W1-5, 2026-10-30): the web step's four after today's ten (tests/unit/web-prompts.test.ts maps their call sites).
   // Dig-model revision W3-7: the path rewrite's two after them (packages/register PATH_REWRITE_THINKING).
-  it("names the sixteen steps", () => {
+  // V4 start step (Task 23): the step before Start's calls (START:*) last.
+  it("names the seventeen steps", () => {
     expect(PREVIEW_THINKING_STEPS).toEqual(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
       "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix",
-      "web_planner", "web_reader", "web_pick", "web_reader_top", "path_rewrite_writer", "path_rewrite_checker"]);
+      "web_planner", "web_reader", "web_pick", "web_reader_top", "path_rewrite_writer", "path_rewrite_checker", "start_step"]);
   });
   it("parses a valid table", () => {
     expect(parsePreviewThinkingLevels({ [QWEN]: { level: "low", steps: { story_writer: "medium" } }, [HAIKU]: { level: "medium" } }))
