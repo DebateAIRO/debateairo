@@ -37,6 +37,7 @@ import { V4PathList, V4SkipToAnswer, V4WhereBar } from "@/components/v4/V4MapPla
 import { V4PausedScreen } from "@/components/v4/V4PausedScreen";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { useMapView } from "@/components/v4/useMapView";
+import { V4Steps } from "@/components/v4/V4Steps";
 import { useV4Ready } from "@/components/v4/useV4Ready";
 import { isNotFound } from "@/lib/api";
 import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
@@ -1214,9 +1215,9 @@ function V4Debate({
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice); the report
   // link is made above, with the ready moments.
   const askHref = levelHref("/v4", chosenLevel);
-  // wait-f23 (owner's screen review): while the question waits, "Open in the classic view" shows once, at the bottom of
-  // the waiting card, and not in the header too. The same for the paused and the failed screens, which carry it as well.
-  const waitingCard = map === null && load?.kind === "RUN";
+  // wait-f23 / ask-f6 / journey-f19 (owner's screen review): "Open in the classic view" shows once. While the question
+  // waits, is paused or did not finish, it is at the bottom of that screen; otherwise in the header's account menu.
+  const classicInBody = map === null && load?.kind === "RUN";
   // map-f6: no reading level shows until the saved one is known; the map waits for it behind its outline (not forever).
   const levelSettled = useLevelSettled(levelKnown, map !== null);
   // journey-d3 / dig-f16: this page draws the dig notes in its own bottom stack once its map shows (and not while the
@@ -1230,7 +1231,7 @@ function V4Debate({
       readingLevel={levelSettled ? readingLevel : null}
       linkLevel={chosenLevel}
       onReadingLevel={chooseLevel}
-      classicHref={waitingCard ? null : classicHref}
+      classicHref={classicInBody ? null : classicHref}
     >
       {served !== null ? (
         // W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
@@ -1275,6 +1276,8 @@ function V4Debate({
       <div className="v4DebPage" {...tabPrefix}>
         {ready.announcer}
         {header}
+        {/* journey-f18 / read-f25: the waiting, paused and failed screens are on the map's step of the four. */}
+        {load?.kind === "RUN" ? <div className="v4StepsTop"><V4Steps current="map" shape="line" catalog={catalog} /></div> : null}
         {/* UI-4: the layout already holds the page's one <main>. */}
         <div className="v4DebCentre">
           {load === null || load.kind !== "RUN" ? (
@@ -1370,7 +1373,6 @@ function V4Debate({
     <V4Rail
       runId={runId}
       level={chosenLevel}
-      showReadStep={!isDigPage && recordParent === null}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
@@ -1487,6 +1489,8 @@ function V4Debate({
             onSelect={select}
             onOpenMap={openSheet}
             position={position}
+            // journey-f18: on a phone the four steps are small dots in the pinned top, beside the breadcrumb.
+            steps={<V4Steps current="map" shape="dots" hrefs={{ report: reportHref }} catalog={catalog} />}
             catalog={catalog}
           />
         ) : null}

@@ -202,6 +202,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | Endpoint | Reply |
 |---|---|
 | `GET /v1/session` | Signed in. |
+| `GET /v1/account/email` | `maria@example.com`: the V4 header's round account button shows "M" (401 with `session=OUT`). |
 | `GET /v1/auth/age-confirmation` | `confirmed` (the age check is not asked). |
 | `GET`/`POST /v1/account/sensitive-data-consent` | `given` (no consent pop-up). |
 | `GET /v1/account/legal-status`, `POST /v1/account/legal-accept` | Nothing to accept / 204. |

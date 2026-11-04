@@ -7,6 +7,7 @@ import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
+import { V4Steps } from "@/components/v4/V4Steps";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -440,13 +441,9 @@ function V4AskForm({
     addAngle();
   }
 
-  // ask-d1: a signed-out visitor reads "Sign in" at the end of the header (the way back is this page). A plain link (W11):
-  // /login may send a signed-in visitor on as a full page load, and the browser's own "Leave site?" guards typed words.
-  const header = (
-    <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} classicHref="/new">
-      {signedOut ? <a className="v4Link v4HdrSignIn" href={signInHref}>{t(catalog, "v4.ask.signIn")}</a> : null}
-    </V4Header>
-  );
+  // ask-d1 / ask-d6 A: the header knows the session from this page, so a signed-out visitor reads "Sign in" at its end (the
+  // way back is this page) and a signed-in person the round account button. ask-f6 / journey-f19: no classic link here.
+  const header = <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} session={session} />;
   const refusalAlert = refusal === null ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
 
   // One tree for both steps, so the consent / crisis / language pop-ups stay mounted in one place.
@@ -455,6 +452,8 @@ function V4AskForm({
       {header}
       {step === "ask" ? (
         <div className="v4AskMain">
+          {/* journey-f18 / read-f25: the four steps, this one marked. */}
+          <V4Steps current="question" shape="line" catalog={catalog} />
           <div className="v4AskQuestion">
             <h1 id={`${ids}-title`} className="v4AskTitle v4Serif">
               <label htmlFor={`${ids}-q`}>{t(catalog, "v4.ask.title")}</label>

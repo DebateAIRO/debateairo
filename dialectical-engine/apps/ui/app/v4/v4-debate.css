@@ -287,3 +287,38 @@
 .v4ChangedSinceLead, .v4ChangedSinceWait { margin: 0; font-size: var(--t-ui); }
 .v4ChangedSinceWait { flex: 1 1 100%; }
 .v4ChangedSinceList { margin: 4px 0 0; padding-inline-start: 1.2em; overflow-wrap: anywhere; font-size: var(--t-ui); }
+
+/* ---------- journey-f18 / read-f25: the one step marker (V4Steps.tsx), small shapes ----------
+   "line": the four names in one small line at the top of a page (on a phone, four dots); "dots": the dots alone, beside
+   the phone map's breadcrumb. The step the person is on is filled with the accent, the ones behind with ink. Nothing moves. */
+.v4StepsTop { width: 100%; max-width: 820px; margin: 0 auto; padding: 14px var(--v4-gutter) 0; }
+.v4Steps { min-width: 0; }
+.v4StepsList {
+  list-style: none; margin: 0; padding: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 0;
+  font-size: var(--t-meta); color: var(--text-3);
+}
+.v4StepsStep { display: inline-flex; align-items: center; }
+.v4StepsStep + .v4StepsStep::before {
+  content: ""; flex: none; width: 16px; height: 1px; margin-inline: 8px; background: var(--line-strong);
+}
+.v4StepsPlace { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 24px; color: inherit; }
+.v4StepsLink { min-width: 24px; color: var(--link); text-decoration: underline; text-underline-offset: 3px; }
+.v4StepsDot {
+  flex: none; width: 8px; height: 8px; border-radius: var(--r-dot);
+  border: 1.5px solid var(--line-strong); background: var(--surface);
+}
+.v4StepsDone { color: var(--text-2); }
+.v4StepsDone .v4StepsDot { background: var(--ink); border-color: var(--ink); }
+.v4StepsHere { color: var(--text-strong); font-weight: 700; }
+.v4StepsHere .v4StepsDot { background: var(--accent); border-color: var(--accent); }
+/* The dots shape, and the line on a phone: the names stay for screen readers only. */
+.v4Steps-dots .v4StepsName { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.v4Steps-dots .v4StepsStep + .v4StepsStep::before { width: 6px; margin-inline: 2px; }
+@media (max-width: 767px) {
+  .v4Steps-line .v4StepsName { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .v4Steps-line .v4StepsStep + .v4StepsStep::before { width: 10px; margin-inline: 3px; }
+}
+/* The phone map's pinned top: the breadcrumb takes the room, the step dots sit at its end. */
+.v4WhereHead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.v4WhereHead > .v4WhereLine { flex: 1 1 auto; min-width: 0; }
+.v4WhereHead > .v4Steps { flex: none; }

@@ -22,6 +22,8 @@ vi.mock("@/lib/serverApi", async (importOriginal) => ({
 }));
 // journey-f19 (review F8): a signed-in visitor has a quota to show, but a public page's note never shows it nor reads it.
 vi.mock("@/lib/billing/usage", () => ({ readBillingUsage: mocks.readBillingUsage }));
+// ask-d6 A: the V4 header's account button reads the session; its own test is v4-header-account.
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => null }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const V4 = v4English as Record<string, string>;

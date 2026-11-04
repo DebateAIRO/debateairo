@@ -9,7 +9,8 @@ import { askQuestionMaxBytes } from "@debateai/contract";
 
 /*
  * The ask page's step 1 after the owner's screen review (3 Nov 2026): ask-d1 D (a signed-out visitor sees the real page,
- * "Sign in" at the end of the header, the promise line, the seed of the map on a first visit), ask-f14 / read-f18 (a
+ * "Sign in" at the end of the header (drawn by the header itself since ask-d6 A), the promise line, the seed of the map on
+ * a first visit), journey-f18 / read-f25 (the four steps above the title), ask-f14 / read-f18 (a
  * visible reason, read out with both buttons, and the red line cleared by new words), ask-f15 (one choice of three),
  * ask-f16 (the level's place held), ask-f18 / ask-d4 C (the used-up line above the box) and ask-d5 B (the "Your maps"
  * shelf with its state words and digs). The session, the ask hook and the server are stood in.
@@ -27,7 +28,13 @@ const server = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
-vi.mock("@/components/v4/V4Header", () => ({ V4Header: ({ children }: { children?: ReactNode }) => <header className="v4Hdr">{children}</header> }));
+// ask-d6 A: the header draws "Sign in" or the round account button itself (tests/render/v4-header-account.test.tsx); the
+// stand-in shows what the page hands it: the session it learnt and any classic link.
+vi.mock("@/components/v4/V4Header", () => ({
+  V4Header: ({ children, session, classicHref = null }: { children?: ReactNode; session?: string; classicHref?: string | null }) => (
+    <header className="v4Hdr" data-session={session ?? "absent"} data-classic={classicHref ?? "none"}>{children}</header>
+  )
+}));
 vi.mock("@/lib/v4/useV4Ask", () => ({
   useV4Ask: () => ({
     planTier: "premium", freePublicNotice: false, room: ask.room, submitting: false, dialogs: null,
@@ -129,18 +136,33 @@ afterEach(async () => {
 });
 
 describe("a signed-out visitor (ask-d1 D)", () => {
-  it("sees the real page: the title, the promise line, the box, and Sign in at the end of the header", async () => {
+  it("sees the real page: the title, the promise line, the box, and a header told the visitor is signed out", async () => {
     gate.session = "OUT";
     await mount();
     expect(host!.querySelector("h1")?.textContent).toBe(CATALOG["v4.ask.title"]);
     expect(host!.querySelector(".v4AskPromise")?.textContent).toBe(
       "Several AIs from different companies argue it from all sides. You choose what they look into. You get a plain answer and see what holds up and what doesn't.");
     expect(field().value).toBe(QUESTION);
-    const signIn = host!.querySelector<HTMLAnchorElement>(".v4Hdr a");
-    expect(signIn?.textContent).toBe("Sign in");
-    expect(signIn?.getAttribute("href")).toBe(`/login?next=${encodeURIComponent("/v4?level=plain")}`);
+    // ask-d6 A: the header puts "Sign in" in its account button's place, with the way back to this page.
+    expect(host!.querySelector(".v4Hdr")?.getAttribute("data-session")).toBe("OUT");
+    // ask-f6 / journey-f19: the ask page has no classic link, in the header or its menu.
+    expect(host!.querySelector(".v4Hdr")?.getAttribute("data-classic")).toBe("none");
+    expect(host!.querySelector(".v4Hdr a")).toBeNull();
     // Nothing of the account is read for a stranger.
     expect(server.readAnswerIndex).not.toHaveBeenCalled();
+  });
+
+  it("journey-f18 / read-f25: step 1 shows the four steps, with Your question marked", async () => {
+    await mount();
+    const steps = host!.querySelector("nav.v4Steps-line")!;
+    expect(steps.getAttribute("aria-label")).toBe(CATALOG["v4.rail.label"]);
+    expect([...steps.querySelectorAll(".v4StepsName")].map((name) => name.textContent)).toEqual(
+      ["Your question", "What we'll look into", "The map", "Your report"]);
+    expect(steps.querySelector("[aria-current=step]")?.textContent).toBe("Your question");
+    // Nothing ahead of step 1 is a link: the steps after it are not open yet.
+    expect(steps.querySelector("a")).toBeNull();
+    // It sits above the title, on step 1 only.
+    expect(steps.compareDocumentPosition(host!.querySelector("h1")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("gets the seed of the map, whose solid card mirrors the words as they are typed", async () => {
@@ -159,6 +181,8 @@ describe("a signed-out visitor (ask-d1 D)", () => {
   it("a signed-in person's header has no Sign in; while the session is still unknown neither shows", async () => {
     gate.session = "CHECKING";
     await mount();
+    // The header holds the account button's place empty while the page still checks (tests/render/v4-header-account.test.tsx).
+    expect(host!.querySelector(".v4Hdr")?.getAttribute("data-session")).toBe("CHECKING");
     expect(host!.querySelector(".v4Hdr a")).toBeNull();
     expect(host!.querySelector(".v4Seed")).toBeNull();
     expect(field()).not.toBeNull();

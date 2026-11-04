@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigView, V4Map, V4Path, V4Selection } from "@/lib/v4/types";
 import { isRightToLeft } from "@/lib/v4/useMapKeys";
@@ -81,6 +81,8 @@ export function V4WhereBar(props: Readonly<{
   onOpenMap: () => void;
   /** "3 of 5" after a swipe (null: nothing to say). */
   position: Readonly<{ n: number; total: number }> | null;
+  /** journey-f18: the four steps as small dots, beside the breadcrumb (absent: none). */
+  steps?: ReactNode;
   catalog: MessageCatalog;
 }>) {
   const { map, digs, catalog } = props;
@@ -95,24 +97,27 @@ export function V4WhereBar(props: Readonly<{
       <p className="v4SrOnly" role="status">
         {t(catalog, "v4.phone.youAreIn", { place: last.title.text, n: level, total })}
       </p>
-      <nav className="v4WhereLine" aria-label={t(catalog, "v4.panel.crumbsLabel")}>
-        <ol>
-          {parts.map((part, index) => {
-            const isLast = index === parts.length - 1;
-            return (
-              <li key={part.id} className={isLast ? "v4WhereLast" : undefined}>
-                {isLast
-                  ? <span aria-current="location"><TitleText title={part.title} catalog={catalog} /></span>
-                  : (
-                    <button type="button" className="v4Link v4WherePart" onClick={() => props.onSelect(part.id, false)}>
-                      <TitleText title={part.title} catalog={catalog} />
-                    </button>
-                  )}
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+      <div className="v4WhereHead">
+        <nav className="v4WhereLine" aria-label={t(catalog, "v4.panel.crumbsLabel")}>
+          <ol>
+            {parts.map((part, index) => {
+              const isLast = index === parts.length - 1;
+              return (
+                <li key={part.id} className={isLast ? "v4WhereLast" : undefined}>
+                  {isLast
+                    ? <span aria-current="location"><TitleText title={part.title} catalog={catalog} /></span>
+                    : (
+                      <button type="button" className="v4Link v4WherePart" onClick={() => props.onSelect(part.id, false)}>
+                        <TitleText title={part.title} catalog={catalog} />
+                      </button>
+                    )}
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+        {props.steps}
+      </div>
       <div className="v4WhereRow">
         {shown.length > 0 ? (
           <button type="button" className="v4Mini" onClick={props.onOpenMap} aria-label={t(catalog, "v4.phone.openMap")} aria-haspopup="dialog">

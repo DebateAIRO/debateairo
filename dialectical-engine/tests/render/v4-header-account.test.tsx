@@ -1,0 +1,234 @@
+// @vitest-environment jsdom
+
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setPathname } from "next/navigation";
+
+/*
+ * V4 screen review (owner's picks, 3 Nov 2026, OWNER-PICKS-2026-11-03.md):
+ *   ask-d6 A    one V4 header: brand, level menu, quota share, and one round account button with the person's initial. Its
+ *               menu: "My maps" (ask-d5 B's All my maps), "Language", "Light or dark", "Settings", "Sign out". Signed out:
+ *               "Sign in" in place of the round button.
+ *   ask-f5      only one header row on the V4 pages: the site's old top bar steps back there.
+ *   journey-f19 / ask-f6  "Open in the classic view" moves into the account menu, once; the header shows no classic link.
+ */
+const server = vi.hoisted(() => ({
+  session: "IN" as "IN" | "OUT",
+  email: "maria@example.com" as string | null,
+  sessionReads: 0,
+  emailReads: 0
+}));
+vi.mock("@/lib/api", () => ({
+  contractClient: {
+    readSession: async () => {
+      server.sessionReads += 1;
+      if (server.session === "OUT") throw new Error("SESSION_REQUIRED");
+      return { session_id: "synthetic" };
+    },
+    readAccountEmail: async () => {
+      server.emailReads += 1;
+      if (server.email === null) throw new Error("503: EMAIL_CHANGE_UNAVAILABLE");
+      return { email: server.email, recovery_email: null, pending: null };
+    },
+    getBillingUsage: async () => { throw new Error("404: billing off"); },
+    logout: async () => undefined,
+    revokeAllSessions: async () => ({ revoked: 0 })
+  }
+}));
+
+import { V4Header } from "../../apps/ui/components/v4/V4Header.js";
+import { initialOf } from "../../apps/ui/components/v4/V4AccountMenu.js";
+import { TopBar } from "../../apps/ui/components/TopBar.js";
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
+
+let root: Root | null = null;
+let host: HTMLDivElement | null = null;
+beforeEach(() => {
+  server.session = "IN";
+  server.email = "maria@example.com";
+  server.sessionReads = 0;
+  server.emailReads = 0;
+  window.history.replaceState(null, "", "/v4/debate/11111111-1111-4111-8111-111111111111?level=plain");
+  delete document.documentElement.dataset.mode;
+});
+afterEach(async () => {
+  if (root !== null) await act(async () => root!.unmount());
+  host?.remove();
+  root = null;
+  host = null;
+  document.body.replaceChildren();
+  delete document.documentElement.dataset.mode;
+});
+
+async function settle(): Promise<void> {
+  await act(async () => {
+    for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+  });
+}
+
+async function mount(element: React.ReactElement): Promise<HTMLDivElement> {
+  host = document.createElement("div");
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => root!.render(element));
+  await settle();
+  return host;
+}
+
+const header = (props: Partial<Parameters<typeof V4Header>[0]> = {}) => (
+  <V4Header catalog={CATALOG} readingLevel="plain" {...props} />
+);
+const accountButton = (): HTMLButtonElement | null => document.querySelector<HTMLButtonElement>(".v4HdrAccountButton");
+const menu = (): HTMLElement | null => document.querySelector<HTMLElement>("[role=menu]");
+const items = (): HTMLElement[] => [...(menu()?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
+
+async function openMenu(): Promise<void> {
+  await act(async () => accountButton()!.click());
+  expect(menu()).not.toBeNull();
+}
+
+describe("ask-d6 A: the round account button", () => {
+  it("ends the header row and shows the person's initial; its name says what it is", async () => {
+    const page = await mount(header());
+    const row = page.querySelector(".v4HdrRight")!;
+    expect(row.lastElementChild!.className).toBe("v4HdrAccount");
+    const button = accountButton()!;
+    expect(button.textContent).toBe("M");
+    expect(button.getAttribute("aria-label")).toBe(CATALOG["v4.header.account"]);
+    expect(button.getAttribute("aria-haspopup")).toBe("menu");
+    expect(server.emailReads).toBe(1);
+  });
+
+  it("an address that cannot be read shows a plain person mark, never a guess", async () => {
+    server.email = null;
+    await mount(header());
+    expect(accountButton()!.textContent).toBe("");
+    expect(accountButton()!.querySelector(".v4HdrAccountMark")).not.toBeNull();
+  });
+
+  it("the initial is the first letter or digit of the address's name part, as a capital", () => {
+    expect(initialOf("maria@example.com")).toBe("M");
+    expect(initialOf("_.4you@example.com")).toBe("4");
+    expect(initialOf("ștefan@example.ro")).toBe("Ș");
+    expect(initialOf("@example.com")).toBeNull();
+  });
+
+  it("the menu holds My maps, Language, Light or dark, Settings, the classic view once, then Sign out", async () => {
+    await mount(header({ classicHref: "/debate/11111111-1111-4111-8111-111111111111" }));
+    // journey-f19: the header itself shows no classic link.
+    expect(document.querySelector(".v4Hdr a[href^='/debate/']")).toBeNull();
+    await openMenu();
+    expect(items().map((item) => item.textContent)).toEqual([
+      CATALOG["v4.maps.menu"],
+      CATALOG["v4.header.menu.language"],
+      CATALOG["v4.header.menu.theme"],
+      CATALOG["v4.header.menu.settings"],
+      CATALOG["v4.common.classicView"],
+      CATALOG["v4.header.menu.signOut"]
+    ]);
+    expect(["My maps", "Language", "Light or dark", "Settings", "Sign out"].every((word) => items().some((item) => item.textContent === word))).toBe(true);
+    expect(menu()!.getAttribute("aria-label")).toBe(CATALOG["v4.header.account"]);
+    // ask-d5 B: "My maps" is All my maps, carrying the level the page's links carry.
+    expect(items()[0]!.getAttribute("href")).toBe("/v4?maps=all&level=plain");
+    expect(items()[3]!.getAttribute("href")).toBe("/settings");
+    expect(items()[4]!.getAttribute("href")).toBe("/debate/11111111-1111-4111-8111-111111111111");
+    expect(document.querySelectorAll("[data-v4-menu=classic]")).toHaveLength(1);
+  });
+
+  it("a page that shows the classic view elsewhere passes none, so the menu has no classic item", async () => {
+    await mount(header({ classicHref: null }));
+    await openMenu();
+    expect(items().map((item) => item.textContent)).not.toContain(CATALOG["v4.common.classicView"]);
+    expect(items()).toHaveLength(5);
+  });
+
+  it("Language closes the menu and opens the site's language list under the button; Escape gives focus back to it", async () => {
+    await mount(header());
+    await openMenu();
+    await act(async () => items()[1]!.click());
+    expect(menu()).toBeNull();
+    await act(async () => { await new Promise((done) => setTimeout(done, 5)); });
+    const list = document.querySelector<HTMLElement>("[role=dialog]")!;
+    expect(list).not.toBeNull();
+    const search = list.querySelector<HTMLInputElement>("[role=combobox]")!;
+    expect(document.activeElement).toBe(search);
+    await act(async () => { search.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); });
+    expect(document.querySelector("[role=dialog]")).toBeNull();
+    expect(document.activeElement).toBe(accountButton());
+  });
+
+  it("Light or dark switches the site's mode at once (no reveal: V4 moves only its six moves) and keeps the choice", async () => {
+    await mount(header());
+    const transition = vi.fn();
+    (document as Document & { startViewTransition?: unknown }).startViewTransition = transition;
+    try {
+      await openMenu();
+      await act(async () => items()[2]!.click());
+      expect(document.documentElement.dataset.mode).toBe("chamber");
+      expect(localStorage.getItem("debateai.mode")).toBe("chamber");
+      expect(transition).not.toHaveBeenCalled();
+      expect(menu()).toBeNull();
+      await openMenu();
+      await act(async () => items()[2]!.click());
+      expect(document.documentElement.dataset.mode).toBe("terracotta");
+    } finally {
+      delete (document as Document & { startViewTransition?: unknown }).startViewTransition;
+      localStorage.removeItem("debateai.mode");
+    }
+  });
+});
+
+describe("ask-d6 A: signed out, and while the page still checks", () => {
+  it("a page that knows the visitor is signed out shows Sign in in the button's place, with the way back to this page and its level", async () => {
+    window.history.replaceState(null, "", "/v4?topic=nuclear");
+    await mount(header({ session: "OUT" }));
+    expect(accountButton()).toBeNull();
+    const signIn = document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!;
+    expect(signIn.textContent).toBe(CATALOG["v4.ask.signIn"]);
+    expect(signIn.className).toBe("v4Link v4HdrSignIn");
+    expect(signIn.getAttribute("href")).toBe(`/login?next=${encodeURIComponent("/v4?topic=nuclear&level=plain")}`);
+    // Nothing of the account is read for a stranger, and the page's own session answer is used.
+    expect(server.sessionReads).toBe(0);
+    expect(server.emailReads).toBe(0);
+  });
+
+  it("a page with no session answer of its own reads it: signed out, Sign in", async () => {
+    server.session = "OUT";
+    await mount(header());
+    expect(server.sessionReads).toBe(1);
+    expect(document.querySelector(".v4HdrAccount a")!.textContent).toBe(CATALOG["v4.ask.signIn"]);
+  });
+
+  it("while the page still checks the session, the button's place is held empty and nothing is read", async () => {
+    await mount(header({ session: "CHECKING" }));
+    const slot = document.querySelector(".v4HdrAccount")!;
+    expect(slot.querySelector("a, button")).toBeNull();
+    expect(server.sessionReads).toBe(0);
+  });
+});
+
+describe("ask-f5: one header row on the V4 pages", () => {
+  it("the site's old top bar steps back on /v4 and every page under it, and stays on the others", async () => {
+    for (const path of ["/v4", "/v4/debate/11111111-1111-4111-8111-111111111111", "/v4/debate/11111111-1111-4111-8111-111111111111/report"]) {
+      setPathname(path);
+      const page = await mount(<TopBar />);
+      expect(page.innerHTML, path).toBe("");
+      await act(async () => root!.unmount());
+      root = null;
+      host?.remove();
+    }
+    setPathname("/pricing");
+    const page = await mount(<TopBar />);
+    expect(page.querySelector("header.topBar")).not.toBeNull();
+    // A path that only starts with the same letters is not a V4 page.
+    setPathname("/v4x");
+    await act(async () => root!.render(<TopBar />));
+    expect(page.querySelector("header.topBar")).not.toBeNull();
+    setPathname("/");
+  });
+});

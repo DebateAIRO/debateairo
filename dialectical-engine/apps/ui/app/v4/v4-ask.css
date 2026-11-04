@@ -23,7 +23,21 @@
   font-size: var(--t-meta); color: var(--text-2); background: var(--surface-2);
   border: 1px solid var(--line-2); border-radius: var(--r-pill); padding: 6px 12px;
 }
-.v4HdrClassic { font-size: var(--t-ui); display: inline-flex; align-items: center; min-height: 44px; }
+/* ask-d6 A: the round account button ends the row. Its place is held from the first paint (44 px), so nothing moves when
+   the session is known; signed out, "Sign in" takes it. The menu itself is the site's account menu (globals.css). */
+.v4HdrAccount { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 44px; min-height: 44px; }
+.v4HdrAccountButton {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--r-dot); background: var(--surface-2); cursor: pointer;
+  color: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1;
+}
+.v4HdrAccountButton:hover { background: var(--surface-sunken); }
+.v4HdrAccountButton[aria-expanded="true"] { border-color: var(--accent); }
+/* No initial to show (the address could not be read): a plain head-and-shoulders mark. */
+.v4HdrAccountMark { position: relative; width: 18px; height: 18px; }
+.v4HdrAccountMark::before, .v4HdrAccountMark::after { content: ""; position: absolute; inset-inline: 0; margin-inline: auto; background: currentColor; }
+.v4HdrAccountMark::before { top: 0; width: 8px; height: 8px; border-radius: var(--r-dot); }
+.v4HdrAccountMark::after { bottom: 0; width: 16px; height: 8px; border-radius: 8px 8px 2px 2px; }
 .v4HdrLevel { position: relative; }
 .v4HdrLevelButton {
   display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px;

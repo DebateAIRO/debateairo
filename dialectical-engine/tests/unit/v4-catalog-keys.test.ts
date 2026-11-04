@@ -252,7 +252,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.map.scrollHint",
   // The browser check of the fix branch (4 Nov): the report header's short "Map" on phones, where the record's
   // "← Back to the map" (report-f12) was cut off; the record gives no short form.
-  "v4.report.backToMapShort"
+  "v4.report.backToMapShort",
+  // ask-d6 A (owner's screen review, 3 Nov): the round account button's name for screen readers (and its menu's). The menu's
+  // own words ("My maps", "Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not.
+  "v4.header.account"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

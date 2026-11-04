@@ -29,6 +29,8 @@ const reports = vi.hoisted(() => ({
 }));
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
 vi.mock("@/components/v4/V4Header", async () => (await import("./v4-debate-harness.js")).headerMock);
+// ask-d6 A: the report row's account button reads the session; its own test is v4-header-account.
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => <span className="v4HdrAccount" /> }));
 vi.mock("@/components/billing/RoomNotice", async () => (await import("./v4-debate-harness.js")).roomNoticeMock);
 vi.mock("@/lib/v4/useV4Ask", async () => (await import("./v4-debate-harness.js")).useV4AskMock);
 vi.mock("@/lib/v4/load", async (original) => {
@@ -616,7 +618,8 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     reports.load = vi.fn(async () => noInvestigation(runId));
     const node = await mountReport(runId);
     const row = node.querySelector(".v4RepHdr")!;
-    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepLevel", "v4RepMenu v4RepShare"]);
+    // ask-d6 A / journey-f19: the row ends in the V4 header's round account button (no classic link in its menu here).
+    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepLevel", "v4RepMenu v4RepShare", "v4HdrAccount"]);
     // Browser check (4 Nov): the full words, and the short word a phone shows instead; the name is the full sentence.
     expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`←${CATALOG["v4.report.backToMap"]}${CATALOG["v4.report.backToMapShort"]}`);
     expect(row.querySelector(".v4RepHdrBack")!.getAttribute("aria-label")).toBe(CATALOG["v4.report.backToMap"]);

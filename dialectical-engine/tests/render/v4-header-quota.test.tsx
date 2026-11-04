@@ -28,6 +28,8 @@ vi.mock("@/lib/api", () => ({
   }
 }));
 
+// ask-d6 A: the header's account button has its own test (v4-header-account); this one is about the quota line.
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => null }));
 import { V4Header, tightestWindow } from "../../apps/ui/components/v4/V4Header.js";
 import { pillDetails, pillText, pillWindow } from "../../apps/ui/components/v4/V4QuotaPill.js";
 import { quotaChanged } from "../../apps/ui/lib/v4/quotaPulse.js";

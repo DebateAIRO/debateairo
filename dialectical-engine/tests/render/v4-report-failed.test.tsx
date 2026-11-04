@@ -8,6 +8,8 @@ import { CATALOG, harness, resetHarness, settle } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
 vi.mock("@/components/v4/V4Header", async () => (await import("./v4-debate-harness.js")).headerMock);
+// ask-d6 A: the report row's account button reads the session; its own test is v4-header-account.
+vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => <span className="v4HdrAccount" /> }));
 vi.mock("@/components/billing/RoomNotice", async () => (await import("./v4-debate-harness.js")).roomNoticeMock);
 vi.mock("@/lib/v4/useV4Ask", async () => (await import("./v4-debate-harness.js")).useV4AskMock);
 vi.mock("@/lib/v4/load", async (original) => (await import("./v4-debate-harness.js")).loadMock(await original()));
