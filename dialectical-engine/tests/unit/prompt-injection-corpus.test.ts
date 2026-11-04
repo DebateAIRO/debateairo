@@ -51,18 +51,26 @@ import {
   assertQuestionLanguageInstructionFrameable,
   framedQuestionLanguageCheck
 } from "../../apps/api/src/question-language/fast-check.js";
-import type { StoryBody } from "@debateai/contract";
+import type { StartListViewpoint, StartMenu, StoryBody } from "@debateai/contract";
 import { LENGTH_GUIDANCE_START, replyLanguageExpectation } from "@debateai/kernel";
 import {
   mapChooseSpec,
   mapGapSpec,
   mapMergeSpec,
+  mapProviderPieces,
   mapSnowballSpec,
+  startCombineSpec,
+  startFitSpec,
+  startListSpec,
+  startMergeLateSpec,
+  startMergeSpec,
+  type MapAngle,
   type MapAnswerItem,
   type MapKeyPoint,
   type MapMergedAnswer,
   type MapPointItem,
-  type MapSpecContext
+  type MapSpecContext,
+  type StartSpecContext
 } from "@debateai/map";
 import {
   buildStoryCheckerContract,
@@ -272,6 +280,23 @@ const mapMergedAnswer = (answer: string): MapMergedAnswer => ({
 const MAP_CLEAN_ANSWER = "Yes, fund it in two phases.";
 const mapPacket = (spec: Readonly<{ contract: PromptContract; material: readonly FramedMaterialField[] }>): PromptPacket =>
   buildFramedPrompt({ contract: spec.contract, material: spec.material }).packet;
+
+/**
+ * V4 start step (Task 32): the step before Start hands the asker's question, other models' list text and the person's own
+ * words to the next AI. Each row renders the packet the API sends, `mapProviderPieces(spec).framed.packet`, from the shipped
+ * spec builders (@debateai/map start-replies.ts); the list and the merges are told a reading level, so the reader field and
+ * the reader sentence are in their frames too.
+ */
+const START_CONTEXT: StartSpecContext = { ...MAP_CONTEXT, readingLevel: "plain" };
+const START_ANGLE: MapAngle = { angleId: "g1", kind: "OPPOSITE_CASE", label: "The case against", focus: "Why the extension could be a mistake." };
+const startViewpoint = (id: string, question: string): StartListViewpoint => ({ viewpoint_id: id, title: "Running costs", question,
+  why: "It decides whether the tram is worth it.", angle_id: "g1" });
+const START_PRIOR: StartMenu = {
+  menu_id: "A".repeat(22), revision: 1, language: { code: "en", name: "English" }, angles: [{ angle_id: "g1", kind: "OPPOSITE_CASE", label: "The case against" }],
+  viewpoints: [{ ...startViewpoint("pt11", CLEAN_STATEMENT), repeat_ids: [] }], repeats: [],
+  paths: [{ path_ref: "kp00", title: "Running costs", question: CLEAN_STATEMENT, viewpoint_ids: ["pt11"], put_together: false, is_new: false }],
+  cards: [], suggestions: []
+};
 
 /**
  * FW-B / B-I1 + D-I3 — the support chat's fixtures.
@@ -849,6 +874,36 @@ const HAND_OFFS = [
     name: "map:choose (answers — the merged answers)",
     payloadIn: "answers",
     render: (attack: string): readonly PromptPacket[] => [mapPacket(mapChooseSpec(MAP_CONTEXT, [mapKeyPoint(CLEAN_STATEMENT)], [mapMergedAnswer(attack)]))]
+  },
+  // V4 start step (Task 32): the step before Start's five hand-offs (see START_CONTEXT above).
+  {
+    name: "start:list (question_line)",
+    payloadIn: "question_line",
+    render: (attack: string): readonly PromptPacket[] => [mapProviderPieces(startListSpec({ ...START_CONTEXT, questionLine: attack }, [START_ANGLE], 1)).framed.packet]
+  },
+  {
+    name: "start:merge (suggestions — other models' list text)",
+    payloadIn: "suggestions",
+    render: (attack: string): readonly PromptPacket[] => [mapProviderPieces(startMergeSpec(START_CONTEXT, { said: [],
+      viewpoints: [startViewpoint("pt11", attack), startViewpoint("pt21", CLEAN_STATEMENT)] })).framed.packet]
+  },
+  {
+    name: "start:merge-late (new_suggestions — other models' late list text)",
+    payloadIn: "new_suggestions",
+    render: (attack: string): readonly PromptPacket[] => [mapProviderPieces(startMergeLateSpec(START_CONTEXT, { said: [], prior: START_PRIOR,
+      viewpoints: [startViewpoint("pt21", attack)] })).framed.packet]
+  },
+  {
+    name: "start:combine (points — the person's own text)",
+    payloadIn: "points",
+    render: (attack: string): readonly PromptPacket[] => [mapProviderPieces(startCombineSpec(START_CONTEXT, [{ title: null, question: attack },
+      { title: "Running costs", question: CLEAN_STATEMENT }])).framed.packet]
+  },
+  {
+    name: "start:fit (own_view — the person's own text)",
+    payloadIn: "own_view",
+    render: (attack: string): readonly PromptPacket[] => [mapProviderPieces(startFitSpec(MAP_CONTEXT, { ownText: attack,
+      paths: [{ key: "k1", title: "Running costs", question: CLEAN_STATEMENT }] })).framed.packet]
   }
 ] as const;
 
@@ -917,14 +972,18 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // (points_so_far, candidate_answers, key_points and answers are new field names; points is the story's too).
     // Engine redesign R3 Task 12: +2 rows, the v2 position leg's points_raised and assumptions (33 -> 35 and 24 -> 26:
     // neither field name is any other row's payloadIn).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(36);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(26);
+    // V4 start step (Task 32): 36 -> 41 and 26 -> 29, with the step before Start's five hand-offs: the list writer's
+    // question_line, the merge's suggestions, the late merge's new_suggestions, the combine's points and the fit's own_view
+    // (question_line and points exist; suggestions, new_suggestions and own_view are new).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(41);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(29);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(4);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(5);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("language:"))).toHaveLength(1);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("map:"))).toHaveLength(7);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("start:"))).toHaveLength(5);
   });
 
   /**
@@ -1029,7 +1088,7 @@ for (const row of HAND_OFFS) {
  * redesign R3's two v2 position rows) drive a gateway, and
  * only a gateway calls `buildRepairPacket`.
  * The other rows (nine when this was found; twenty-two of the thirty-five since
- * R3) render one packet each, so `packets.slice(1)` was empty for them and the
+ * R3; twenty-eight of forty-one since the V4 start step's five) render one packet each, so `packets.slice(1)` was empty for them and the
  * loop asserted nothing at all — nine rows of silent pass then.
  *
  * The count is asserted now, so the row states its own extent and a render that
