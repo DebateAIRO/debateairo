@@ -44,6 +44,28 @@ export function shapeSpareForRefusedRoot(input: Readonly<{ makers: readonly stri
 }
 
 /**
+ * V4 start step, Task 45 (spec 2026-11-03 §4.3; Review Focus 3) — WHO TAKES A PATH'S ROOT WHEN ITS ANSWER WAS REFUSED: the
+ * first seat, scanning the seats no root uses (rootCount onwards), then the other roots' seats in turn after this one,
+ * that does not sit out, may take it (`takes`), and whose maker is neither a refused one's (`refusedMakers`) nor the
+ * root's own seat's. Unlike `shapeSpareForRefusedRoot`, a seat arguing another root may take it: a run can have more
+ * paths than makers. Null when none may: the path then ends without its root.
+ */
+export function pathsRootHandOver(input: Readonly<{ makers: readonly string[]; rootCount: number; rootIndex: number;
+  sitsOut: (index: number) => boolean; refusedMakers: readonly string[]; takes: (index: number) => boolean }>): number | null {
+  const ownMaker = input.makers[input.rootIndex];
+  const open = (index: number): boolean => !input.sitsOut(index) && input.takes(index)
+    && !input.refusedMakers.includes(input.makers[index]!) && input.makers[index] !== ownMaker;
+  for (let index = input.rootCount; index < input.makers.length; index += 1) {
+    if (open(index)) return index;
+  }
+  for (let step = 1; step < input.rootCount; step += 1) {
+    const index = (input.rootIndex + step) % input.rootCount;
+    if (open(index)) return index;
+  }
+  return null;
+}
+
+/**
  * R22 (owner ruling 2026-10-30) — A RESUMED RUN KEEPS ITS SPARE: the seat no position uses whose member answered root
  * `rootIndex`'s site on an earlier pass (`answeredBy`, the replay book's routes), when no member of the root's own seat
  * did; null otherwise. The root is handed to it before any call, so the refused member is never asked again and the

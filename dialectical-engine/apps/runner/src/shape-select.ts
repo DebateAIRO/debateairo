@@ -25,6 +25,21 @@ export function shapeSelectChains(input: Readonly<{ chainsByRoot: ReadonlyMap<nu
   return selected;
 }
 
+/**
+ * V4 start step, Task 45 (spec 2026-11-03 §4.3: each path argued both ways) — A PATH DEBATE'S ADAPTIVE CHOICE: the chains
+ * `shapeSelectChains` keeps, and on every root (path) it kept none for, its one chain with the smallest plan position among
+ * those that are not frozen and have a leverage. A root whose chains are all frozen or unscored keeps none.
+ */
+export function pathsSelectChains(input: Parameters<typeof shapeSelectChains>[0]): ReadonlySet<number> {
+  const selected = new Set(shapeSelectChains(input));
+  for (const chains of input.chainsByRoot.values()) {
+    if (chains.some((position) => selected.has(position))) continue;
+    const open = chains.filter((position) => !input.frozen.has(position) && input.leverageOf(position) !== null);
+    if (open.length > 0) selected.add(Math.min(...open));
+  }
+  return selected;
+}
+
 export type ScrutinyCandidate = Readonly<{ position: number; rootIndex: number; dispersion: number | null; disputed: boolean;
   rootLeverage: number | null; baseTau: number }>;
 

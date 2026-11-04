@@ -425,6 +425,7 @@ apps/runner/src/passage-record.ts
 apps/runner/src/passage-sweep.ts
 apps/runner/src/path-climb-sources.ts
 apps/runner/src/path-climb.ts
+apps/runner/src/path-plan.ts
 apps/runner/src/path-rewrite-composition.ts
 apps/runner/src/path-rewrite-material.ts
 apps/runner/src/path-rewrite-scope.ts
