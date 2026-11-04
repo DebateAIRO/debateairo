@@ -254,14 +254,15 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
 });
 
 /**
- * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026, and Tennessee, which
- * the Terms exclude (section 2, Annex A.2; the owner's amendment of 8 October 2026), spelled out here on purpose
- * (never derived from the code), so a changed code row fails this test.
+ * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026 without New Jersey,
+ * which the owner opened on 4 November 2026, and Tennessee, which the Terms exclude (section 2, Annex A.2; the owner's
+ * amendment of 8 October 2026), spelled out here on purpose (never derived from the code), so a changed code row
+ * fails this test.
  */
 const CLOSED = { pay: false, reason: "TAX_NOT_READY" } as const;
 const LAUNCH_REGIONS = {
   "CA-SK": CLOSED, "CA-MB": CLOSED,
-  "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED, "US-NJ": CLOSED,
+  "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED,
   "US-OH": { pay: false, reason: "TAX_NOT_READY", buyers: "business" },
   "US-TN": { pay: false, reason: "TERMS_EXCLUDED" },
   "ES-CN": CLOSED, "ES-CE": CLOSED, "ES-ML": CLOSED,
@@ -276,7 +277,7 @@ function invalidRegions(regions: unknown): string | undefined {
 describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", () => {
   it("carries exactly the owner's launch list of 20 October 2026 and Tennessee, every id a known region", () => {
     expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.regions).toEqual(LAUNCH_REGIONS);
-    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(25);
+    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(24);
     for (const id of Object.keys(LAUNCH_REGIONS)) expect(PAYMENT_REGION_IDS, id).toContain(id);
   });
 
@@ -291,6 +292,8 @@ describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", (
     expect(regionRule(policy, "US-TN")).toEqual({ pay: false, reason: "TERMS_EXCLUDED", buyers: "all" });
     // An open region, and a string that is no region id at all, have no rule: the country's rule decides.
     expect(regionRule(policy, "US-TX")).toBeNull();
+    // New Jersey (the owner's amendment of 4 November 2026) is open again, so the US rule decides there too.
+    expect(regionRule(policy, "US-NJ")).toBeNull();
     expect(regionRule(policy, "CA-ON")).toBeNull();
     expect(regionRule(policy, "toString")).toBeNull();
     // A pay switch that is on is a valid rule too (nothing refuses it), and is read back as written.

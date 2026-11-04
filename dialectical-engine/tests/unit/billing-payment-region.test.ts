@@ -62,6 +62,12 @@ describe("decidePaymentRegion (ruling R1: a refusing region first, then a postco
     expect(decide(at("US", "02903", "MD"))).toEqual(refuse("US-MD"));
   });
 
+  it("lets a New Jersey billing address pay, by its ZIP or its state (the owner opened it on 4 November 2026)", () => {
+    expect(decide(at("US", "07102", null))).toEqual({ kind: "ALLOW" });
+    expect(decide(at("US", "07102", "New Jersey"))).toEqual({ kind: "ALLOW" });
+    expect(decide(at("US", "08608", "NJ"))).toEqual({ kind: "ALLOW" });
+  });
+
   it("leaves Romania, mainland Germany and Ireland alone", () => {
     expect(decide(at("RO", "010011", null))).toEqual({ kind: "ALLOW" });
     expect(decide(at("DE", "10115", null))).toEqual({ kind: "ALLOW" });
