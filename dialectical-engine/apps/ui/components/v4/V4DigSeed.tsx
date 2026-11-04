@@ -31,12 +31,20 @@ function SeedLeaf(props: Readonly<{ entry: DigUndoEntry; catalog: MessageCatalog
   );
 }
 
-/** The seeds of one group (a path id, or "root") on this debate's map, while their digs wait or were just undone. */
-export function V4DigSeedLeaves(props: Readonly<{ runId: string; groupKey: string; catalog: MessageCatalog }>) {
+/** The digs of one group (a path id, or "root") on this debate's map whose seed shows: waiting, or just undone. */
+export function useDigSeeds(runId: string, groupKey: string): readonly DigUndoEntry[] {
   const entries = useDigUndo();
-  const seeds = entries.filter((entry) => entry.parentRunId === props.runId
+  return entries.filter((entry) => entry.parentRunId === runId
     && (entry.phase === "COUNTING" || entry.phase === "SENDING" || entry.phase === "CANCELLED")
-    && digGroupOf(entry.dig.target) === props.groupKey);
+    && digGroupOf(entry.dig.target) === groupKey);
+}
+
+/**
+ * The seeds of one group (a path id, or "root") on this debate's map, while their digs wait or were just undone: on the
+ * drawn map and in the outline (the tablet's list and the phone's Map sheet) alike.
+ */
+export function V4DigSeedLeaves(props: Readonly<{ runId: string; groupKey: string; catalog: MessageCatalog }>) {
+  const seeds = useDigSeeds(props.runId, props.groupKey);
   if (seeds.length === 0) return null;
   return <>{seeds.map((entry) => <SeedLeaf key={entry.id} entry={entry} catalog={props.catalog} />)}</>;
 }

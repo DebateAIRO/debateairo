@@ -32,6 +32,7 @@ import {
   viaKeyboard,
   type MapPiecesProps
 } from "./V4MapTree";
+import { useDigSeeds, V4DigSeedLeaves } from "./V4DigSeed";
 import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -43,8 +44,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * V4 screen review (3 Nov): the same looks as the tree (journey-f2: open ground hatched with "Open", a dig at work with a
  * slow pulse, the paths a dig opened dashed "New", the rest solid with its bar), each path's one trust word and its result
  * tag (r2-20 A, journey-f11), no counts (map-f28). map-f10: the real tree promised for screen readers: one keyboard stop
- * moved with the arrow keys, every row says its level, a path folds (Right and Left, or its own button), and "What the
- * shades mean" is one folded line at the top. map-d3 shows it beside the panel on tablets too.
+ * moved with the arrow keys, every row says its level, a path folds (Right and Left, or its own fold button beside it,
+ * which alone says whether it is open: the row itself opens the path in the panel), and "What the shades mean" is one
+ * folded line at the top. map-d3 shows it beside the panel on tablets too.
  */
 
 function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesProps; selectedId: V4Selection; group: string; level: number }>) {
@@ -155,7 +157,9 @@ function Children(props: Readonly<{
   extra?: ReactNode;
 }>) {
   const extra = props.extra ?? null;
-  if (props.open.length === 0 && props.digs.length === 0 && extra === null) return null;
+  // dig-d3 B: a dig in its 10 seconds grows its seed in the outline too (the tablet's list, the phone's Map sheet).
+  const seeds = useDigSeeds(props.pieces.map.runId, props.groupKey);
+  if (props.open.length === 0 && props.digs.length === 0 && extra === null && seeds.length === 0) return null;
   return (
     <ul className="v4OutGroup v4OutLeaves" data-group={props.group}>
       {props.open.map((question) => (
@@ -172,6 +176,7 @@ function Children(props: Readonly<{
         <DigRow key={dig.link.childRunId} dig={dig} pieces={props.pieces} selectedId={props.selectedId} group={props.group} level={props.level} />
       ))}
       {extra}
+      <V4DigSeedLeaves runId={props.pieces.map.runId} groupKey={props.groupKey} catalog={props.pieces.catalog} />
     </ul>
   );
 }
@@ -239,14 +244,15 @@ export function V4Outline(props: MapPiecesProps) {
                   const isFolded = folded.has(path.id);
                   return (
                     <li key={path.id} className="v4OutRow">
+                      <div className="v4OutPathLine">
                       <button
                         type="button"
                         className={`v4OutPath ${groundClass("SETTLED")}${selected ? " v4OutSelected" : ""}${props.reveal?.has(id) === true ? " v4Reveal" : ""}`}
                         data-rove=""
                         data-row={id}
                         data-parent="root"
+                        data-expanded={hasChildren ? String(!isFolded) : undefined}
                         aria-current={selected ? "true" : undefined}
-                        aria-expanded={hasChildren ? !isFolded : undefined}
                         onClick={(event) => props.onSelect(id, viaKeyboard(event))}
                       >
                         {marks.tag !== null ? <ResultTag result={marks.tag} catalog={catalog} /> : null}
@@ -261,6 +267,20 @@ export function V4Outline(props: MapPiecesProps) {
                         <V4RewriteCardNote path={path} catalog={catalog} locale={props.locale ?? "en"} digs={digs} />
                         <LevelWords level={2} catalog={catalog} />
                       </button>
+                      {hasChildren ? (
+                        // map-f10: the path's own fold button, for a pointer or a finger (the arrow keys reach it from the row).
+                        <button
+                          type="button"
+                          className="v4OutFold"
+                          data-no-rove=""
+                          aria-expanded={!isFolded}
+                          aria-label={t(catalog, isFolded ? "v4.outline.unfold" : "v4.outline.fold")}
+                          onClick={() => setFold(id, !isFolded)}
+                        >
+                          <span className="v4OutFoldMark" aria-hidden="true">▾</span>
+                        </button>
+                      ) : null}
+                      </div>
                       {hasChildren && isFolded ? (
                         <span className="v4MapGroundMark v4OutFoldedMark">
                           <span className="v4MapGroundKey" aria-hidden="true" />

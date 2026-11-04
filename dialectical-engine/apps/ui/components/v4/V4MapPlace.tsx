@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigView, V4Map, V4Path, V4Selection } from "@/lib/v4/types";
+import { isRightToLeft } from "@/lib/v4/useMapKeys";
 import { digTitle, pathTitle, resolveSelection, shortText, TitleText, type ResolvedSelection, type Title } from "./V4MapTree";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -207,8 +208,9 @@ export function useSideSwipe(onSwipe: (step: 1 | -1) => void): Readonly<{
     const dx = touch.clientX - from.x;
     const dy = touch.clientY - from.y;
     if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dy) > SWIPE_MAX_DRIFT_PX) return;
-    // A swipe to the left moves on to the next path, as a page turns.
-    onSwipe(dx < 0 ? 1 : -1);
+    // A swipe to the left moves on to the next path, as a page turns; a right-to-left page turns the other way.
+    const forward = isRightToLeft(event.currentTarget) ? dx > 0 : dx < 0;
+    onSwipe(forward ? 1 : -1);
   }, [onSwipe]);
   return { onTouchStart, onTouchEnd };
 }
@@ -236,4 +238,20 @@ export function useShortWindow(): boolean {
     return () => query.removeEventListener("change", update);
   }, []);
   return short;
+}
+
+/** map-f10: past the map in one step, to the answer of the question open in the panel (shown once it has focus). */
+export function V4SkipToAnswer(props: Readonly<{ onSkip: () => void; catalog: MessageCatalog }>) {
+  return (
+    <a
+      className="v4SkipLink"
+      href="#v4-deb-panel"
+      onClick={(event) => {
+        event.preventDefault();
+        props.onSkip();
+      }}
+    >
+      {t(props.catalog, "v4.map.skipToAnswer")}
+    </a>
+  );
 }

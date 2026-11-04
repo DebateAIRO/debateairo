@@ -32,6 +32,8 @@
   animation: v4LookPulse 2.4s ease-in-out infinite;
 }
 @keyframes v4LookPulse { 0%, 100% { opacity: .2; } 50% { opacity: .75; } }
+/* journey-d1: one slow pulse per working place: the ring pulses, the working dot inside it stands still. */
+.v4GroundLOOKING .v4MapPulse { animation: none; }
 /* New: a dashed terracotta outline and its "New · your dig opened this" tag (dig-f27). */
 .v4GroundNEW, .v4MapSprout.v4GroundNEW, .v4OutMain.v4GroundNEW { border: 1.5px dashed var(--accent); background: var(--surface); }
 .v4GroundNewTag { display: inline-block; font-size: var(--t-micro); font-weight: 700; color: var(--con-text); }
@@ -94,26 +96,27 @@
   /* The shared 1-second highlight (v4-base.css) in place of the turn-over. */
   .v4Reveal { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
   .v4MapDig.v4Reveal::before, .v4OutMain.v4Reveal::before { animation: none; opacity: 0; }
-  .v4MapSprout.v4GroundNEW { animation: none; }
+  /* The chat answer on movement: instant, with the 1-second highlight (the shared v4Highlight of v4-base.css). */
+  .v4MapSprout.v4GroundNEW { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
   .v4MapPath .v4BarSeg, .v4MapPath .v4BarSlot, .v4OutPath .v4BarSeg, .v4OutPath .v4BarSlot,
   .v4MiniBar .v4BarSeg, .v4MiniBar .v4BarSlot { transition: none; }
   .v4AnswerFold { transition: none; }
 }
 
 /* ---------- dig-f27: the paths a dig opened, under its card ---------- */
-.v4MapSprouts { list-style: none; margin: 6px 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.v4MapSprouts { list-style: none; margin-block: 6px 0; margin-inline: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .v4MapSprout {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 36px; text-align: left;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 36px; text-align: start;
   font: inherit; font-size: var(--t-meta); color: var(--text); background: var(--surface); border: 1px solid var(--line-2);
   border-radius: 10px; padding: 6px 10px; cursor: pointer; overflow-wrap: anywhere;
 }
 .v4MapSproutTitle { font-weight: 600; }
-.v4OutSprouts { margin-left: 12px; }
+.v4OutSprouts { margin-inline-start: 12px; }
 
 /* ---------- map-f10: pick boxes, the skip link, the outline's folded legend ---------- */
 .v4MapPick input, .v4OutPick input, .v4PanelPick input { width: 24px; height: 24px; }
 .v4SkipLink {
-  position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;
+  position: absolute; inset-inline-start: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;
 }
 .v4SkipLink:focus, .v4SkipLink:focus-visible {
   position: static; width: auto; height: auto; display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 8px;
@@ -125,10 +128,22 @@
   font-weight: 600; color: var(--text-2);
 }
 .v4OutLegend { padding: 4px 12px 12px; }
-.v4OutFoldedMark { margin: 4px 0 0 14px; }
+.v4OutFoldedMark { margin-block: 4px 0; margin-inline: 14px 0; }
+/* map-f10: a path's own fold button in the outline, beside its row. */
+.v4OutPathLine { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.v4OutPathLine > .v4OutPath { flex: 1; }
+.v4OutFold {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+  border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); color: var(--text-2); cursor: pointer;
+}
+.v4OutFoldMark { display: inline-block; transition: transform var(--v4-move-fold) var(--v4-ease-move); }
+.v4OutFold[aria-expanded="false"] .v4OutFoldMark { transform: rotate(-90deg); }
+[dir="rtl"] .v4OutFold[aria-expanded="false"] .v4OutFoldMark { transform: rotate(90deg); }
 
 /* ---------- map-f22: nothing hidden without a visible sign ---------- */
 .v4MapScrollMore { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+/* A right-to-left map runs on to the left: the fade sits at that end. */
+[dir="rtl"] .v4MapScrollMore { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
 .v4MapScrollHint { margin: 0; font-size: var(--t-meta); }
 .v4MapLeafMore .v4MapMore[aria-expanded="true"] { border-style: solid; }
 .v4MapGroundMark { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); font-weight: 600; color: var(--gold-text); }
@@ -142,7 +157,7 @@
 .v4MapFold .v4MapBranch { flex-direction: column; align-items: stretch; gap: 8px; }
 .v4MapFold .v4MapBranch > .v4MapPath { width: min(280px, 100%); }
 .v4MapFold .v4MapBranch > .v4MapLeaves {
-  width: auto; max-width: 300px; margin-left: 20px; padding-left: 14px; border-left: 2px solid var(--line-strong);
+  width: auto; max-width: 300px; margin-inline-start: 20px; padding-inline-start: 14px; border-inline-start: 2px solid var(--line-strong);
 }
 .v4MapFold .v4MapBranch > .v4MapLeaves::before,
 .v4MapFold .v4MapBranch > .v4MapLeaves > .v4MapLeaf::before,
@@ -178,12 +193,12 @@
 
 /* ---------- map-d1 / map-f2: the answer card ---------- */
 .v4AnswerCard {
-  min-width: 0; border: 1px solid var(--line-2); border-left: 4px solid var(--accent); border-radius: var(--r-card);
+  min-width: 0; border: 1px solid var(--line-2); border-inline-start: 4px solid var(--accent); border-radius: var(--r-card);
   background: var(--surface);
 }
 .v4AnswerFoldLine {
   display: flex; align-items: center; gap: 6px; width: 100%; min-height: 48px; padding: 0 14px; background: none; border: 0;
-  text-align: left; cursor: pointer; font-size: var(--t-ui); color: var(--text);
+  text-align: start; cursor: pointer; font-size: var(--t-ui); color: var(--text);
 }
 .v4AnswerFoldLine[hidden] { display: none; }
 .v4AnswerFoldLabel { font-weight: 700; flex: none; }
@@ -221,7 +236,8 @@
   overflow: hidden; min-width: 0; font-size: var(--t-meta);
 }
 .v4WhereLine li { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; flex: 0 3 auto; }
-.v4WhereLine li + li::before { content: "›"; margin-right: 6px; color: var(--text-3); flex: none; }
+/* "›" is a mirrored character: a right-to-left page draws it pointing the other way by itself. */
+.v4WhereLine li + li::before { content: "›"; margin-inline-end: 6px; color: var(--text-3); flex: none; }
 .v4WhereLine li:not(.v4WhereLast) { max-width: 34%; }
 .v4WhereLast { font-weight: 700; color: var(--text); flex: 0 1 auto; }
 .v4WhereLast > span, .v4WherePart { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -248,7 +264,7 @@
 }
 .v4PathListRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .v4PathListRow {
-  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px; text-align: left;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px; text-align: start;
   background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: 12px; padding: 8px 12px; cursor: pointer;
   font: inherit; font-size: var(--t-ui); color: var(--text);
 }

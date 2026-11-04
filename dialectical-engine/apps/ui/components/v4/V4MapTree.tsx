@@ -21,7 +21,7 @@ import { useMapKeys } from "@/lib/v4/useMapKeys";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import type { PickRefusal } from "@/lib/v4/suggestions";
 import { DigHereTooLeaf, refusalLine, SuggestionLeaves, type V4DigChoice } from "./V4DigSuggest";
-import { V4DigSeedLeaves } from "./V4DigSeed";
+import { useDigSeeds, V4DigSeedLeaves } from "./V4DigSeed";
 import { V4RewriteCardNote } from "./V4PathRewrite";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -636,7 +636,9 @@ function Leaves(props: Readonly<{
   const shown = plan.leaves.filter((leaf) => plan.shown.has(leaf.key));
   const extra = plan.showExtras ? plan.extras : null;
   const toggle = plan.expanded || (!plan.folded && plan.hidden > 0);
-  if (shown.length === 0 && extra === null && !toggle) return null;
+  // dig-d3 B: a whole-path dig on a path with nothing else under it still grows its seed here.
+  const seeds = useDigSeeds(pieces.map.runId, plan.key);
+  if (shown.length === 0 && extra === null && !toggle && seeds.length === 0) return null;
   return (
     <ul className={`v4MapLeaves${plan.folded ? " v4MapLeavesFolded" : ""}`} data-group={plan.row}>
       {shown.map((leaf) => leaf.kind === "open"
@@ -693,7 +695,7 @@ export function pathExtras(path: V4Path, pieces: MapPiecesProps, variant: "tree"
   return (
     <>
       <SuggestionLeaves path={path} choice={choice} onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} />
-      {again ? <DigHereTooLeaf onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} /> : null}
+      {again ? <DigHereTooLeaf onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} pathId={path.id} /> : null}
     </>
   );
 }

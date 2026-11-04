@@ -288,15 +288,36 @@ describe("map-f10: one keyboard stop, moved with the arrow keys", () => {
     expect(shades.querySelector("summary")!.textContent).toBe(t(catalog, "v4.outline.shades"));
     expect(root.querySelector(".v4Out")!.firstElementChild).toBe(shades);
     const pathA = root.querySelector<HTMLButtonElement>(".v4OutPath")!;
-    expect(pathA.getAttribute("aria-expanded")).toBe("true");
+    // The row opens the path in the panel; its own fold button (for a pointer or a finger) says whether it is open.
+    expect(pathA.hasAttribute("aria-expanded")).toBe(false);
+    const fold = (): HTMLButtonElement => root.querySelector<HTMLButtonElement>(".v4OutFold")!;
+    expect(fold().getAttribute("aria-expanded")).toBe("true");
+    expect(fold().getAttribute("aria-label")).toBe(t(catalog, "v4.outline.fold"));
     pathA.focus();
     await key(pathA, "ArrowLeft");
-    expect(root.querySelector(".v4OutPath")!.getAttribute("aria-expanded")).toBe("false");
+    expect(fold().getAttribute("aria-expanded")).toBe("false");
     expect(root.querySelector(".v4OutFoldedMark")).not.toBeNull();
     await key(root.querySelector(".v4OutPath")!, "ArrowRight");
-    expect(root.querySelector(".v4OutPath")!.getAttribute("aria-expanded")).toBe("true");
+    expect(fold().getAttribute("aria-expanded")).toBe("true");
+    // A tap on the fold button folds and unfolds too.
+    await act(async () => fold().click());
+    expect(fold().getAttribute("aria-expanded")).toBe("false");
+    expect(fold().getAttribute("aria-label")).toBe(t(catalog, "v4.outline.unfold"));
+    await act(async () => fold().click());
+    expect(fold().getAttribute("aria-expanded")).toBe("true");
     const stops = [...root.querySelectorAll<HTMLElement>(".v4OutTree button, .v4OutTree input")].filter((element) => element.tabIndex === 0);
     expect(stops).toHaveLength(1);
+  });
+
+  it("on a right-to-left page the side keys are mirrored: Right folds a path and Left unfolds it", async () => {
+    const root = await mount(<div dir="rtl"><V4Outline {...props()} /></div>);
+    const fold = (): HTMLButtonElement => root.querySelector<HTMLButtonElement>(".v4OutFold")!;
+    const pathA = root.querySelector<HTMLButtonElement>(".v4OutPath")!;
+    pathA.focus();
+    await key(pathA, "ArrowRight");
+    expect(fold().getAttribute("aria-expanded")).toBe("false");
+    await key(root.querySelector(".v4OutPath")!, "ArrowLeft");
+    expect(fold().getAttribute("aria-expanded")).toBe("true");
   });
 });
 

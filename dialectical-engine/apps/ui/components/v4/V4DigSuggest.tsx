@@ -133,7 +133,7 @@ export function SuggestionLeaves(props: Readonly<{
           className={tree ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}
         >
           <div className={`v4Sug${picked.has(suggestion.suggestion_id) ? " v4SugPicked" : ""}`}>
-            <button type="button" className="v4SugMain" onClick={props.onOpenPath}>
+            <button type="button" className="v4SugMain" data-row={`suggestion:${suggestion.suggestion_id}@path:${path.id}`} onClick={props.onOpenPath}>
               <KindTag suggestion={suggestion} catalog={catalog} />
               <span className="v4SugText" data-ai-generated="true">{shortLine(suggestion.text)}</span>
             </button>
@@ -143,7 +143,7 @@ export function SuggestionLeaves(props: Readonly<{
       ))}
       {more > 0 ? (
         <li className={tree ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}>
-          <button type="button" className="v4MapMore" onClick={props.onOpenPath}>
+          <button type="button" className="v4MapMore" data-row={`suggestions-more@path:${path.id}`} onClick={props.onOpenPath}>
             {t(catalog, "v4.suggest.more", { count: more })}
           </button>
         </li>
@@ -153,10 +153,21 @@ export function SuggestionLeaves(props: Readonly<{
 }
 
 /** "Dig here too" on the tree and the outline: opens the path in the panel, where the person chooses what to dig. */
-export function DigHereTooLeaf(props: Readonly<{ onOpenPath: () => void; variant: "tree" | "outline"; catalog: MessageCatalog }>) {
+export function DigHereTooLeaf(props: Readonly<{
+  onOpenPath: () => void;
+  variant: "tree" | "outline";
+  catalog: MessageCatalog;
+  /** The path it hangs under: its row keeps one id on the map's arrow keys (map-f10). */
+  pathId?: string;
+}>) {
   return (
     <li className={props.variant === "tree" ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}>
-      <button type="button" className="v4MapMore v4SugAgain" onClick={props.onOpenPath}>
+      <button
+        type="button"
+        className="v4MapMore v4SugAgain"
+        {...(props.pathId === undefined ? {} : { "data-row": `dig-here-too@path:${props.pathId}` })}
+        onClick={props.onOpenPath}
+      >
         {t(props.catalog, "v4.nest.digHereToo")}
       </button>
     </li>

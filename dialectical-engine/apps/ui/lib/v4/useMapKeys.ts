@@ -8,8 +8,20 @@ import { useEffect, useRef, type FocusEvent, type KeyboardEvent, type RefObject 
  * (or, once it is open, goes to its first row), Left folds an open branch (or goes to the row it hangs under), Enter opens
  * the question, and Space ticks the row's pick box. Each row is a control marked `data-rove` with its own `data-row` id and
  * the id of the row it hangs under (`data-parent`, else the nearest `data-group` around it); a branch says whether it is
- * open with aria-expanded. Every other control inside leaves the tab order: its row reaches it. Nothing is stored.
+ * open with aria-expanded (or `data-expanded`, when a separate fold button owns aria-expanded). Every other control inside
+ * leaves the tab order: its row reaches it (`data-no-rove` keeps a control out of the rows: a row's own fold button). On a
+ * right-to-left page the two side keys swap, as the page is mirrored: Left unfolds or goes in, Right folds or goes out.
+ * A row the page does not name gets its place in reading order as its id, worked out again on every pass. Nothing is stored.
  */
+
+/** Whether the map is laid out right to left (the page's language, app/layout.tsx; or a `dir` around the map). */
+export function isRightToLeft(element: Element): boolean {
+  const direction = typeof window !== "undefined" && typeof window.getComputedStyle === "function"
+    ? window.getComputedStyle(element).direction : "";
+  if (direction === "rtl" || direction === "ltr") return direction === "rtl";
+  const marked = element.closest("[dir]:not([dir='auto'])");
+  return (marked?.getAttribute("dir") ?? document.documentElement.getAttribute("dir") ?? "").toLowerCase() === "rtl";
+}
 
 const ROW = "[data-rove]";
 /** Every button and link is a row (a suggestion's, a "more" link); the pick boxes are reached from their row with Space. */
@@ -22,12 +34,16 @@ type Handlers = Readonly<{ onExpand?: (row: string) => boolean; onCollapse?: (ro
 /** The rows a person can reach now, in reading order (a folded part is inert, so its rows are not). */
 function rowsOf(box: HTMLElement): HTMLElement[] {
   for (const control of box.querySelectorAll<HTMLElement>(ROW_CONTROLS)) {
-    if (control.dataset.rove === undefined) control.dataset.rove = "";
+    if (control.dataset.rove === undefined && control.dataset.noRove === undefined) control.dataset.rove = "";
   }
   const rows = [...box.querySelectorAll<HTMLElement>(ROW)]
     .filter((row) => !row.hasAttribute("disabled") && row.closest("[inert], [hidden]") === null);
   rows.forEach((row, index) => {
-    if (row.dataset.row === undefined || row.dataset.row.length === 0) row.dataset.row = `row:${index}`;
+    // A row the page names keeps its id; any other gets its place now (never an old place another row may hold since).
+    if (row.dataset.row === undefined || row.dataset.row.length === 0 || row.dataset.rowAuto !== undefined) {
+      row.dataset.row = `row:${index}`;
+      row.dataset.rowAuto = "";
+    }
     if (row.dataset.parent === undefined) {
       const group = row.parentElement?.closest<HTMLElement>("[data-group]");
       if (group !== null && group !== undefined && box.contains(group)) row.dataset.parent = group.dataset.group ?? "";
@@ -89,8 +105,12 @@ export function useMapKeys(ref: RefObject<HTMLElement | null>, handlers: Handler
     if (event.target instanceof HTMLElement && event.target !== row) return;
     const rows = rowsOf(box);
     const at = rows.indexOf(row);
-    const expanded = row.getAttribute("aria-expanded");
-    switch (event.key) {
+    const expanded = row.dataset.expanded ?? row.getAttribute("aria-expanded");
+    // map-f10 on a right-to-left page: the side keys are mirrored.
+    const rtl = isRightToLeft(box);
+    const key = event.key === "ArrowRight" ? (rtl ? "ArrowLeft" : "ArrowRight")
+      : event.key === "ArrowLeft" ? (rtl ? "ArrowRight" : "ArrowLeft") : event.key;
+    switch (key) {
       case "ArrowDown":
         event.preventDefault();
         focusRow(box, rows[at + 1]);
