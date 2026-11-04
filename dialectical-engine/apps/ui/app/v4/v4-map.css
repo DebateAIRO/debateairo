@@ -260,9 +260,11 @@
   display: flex; align-items: center;
 }
 .v4PanelSent > summary::-webkit-details-marker, .v4PanelFirstAnswer > summary::-webkit-details-marker { display: none; }
-.v4PanelSent > summary::before, .v4PanelFirstAnswer > summary::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
-.v4PanelSent > summary:dir(rtl)::before, .v4PanelFirstAnswer > summary:dir(rtl)::before { content: "◂"; }
-.v4PanelSent[open] > summary::before, .v4PanelFirstAnswer[open] > summary::before { content: "▾"; }
+/* The wave-2 checks (4 Nov): every fold arrow drawn as CSS text has empty alt text (after the slash; the plain arrow comes
+   first for older browsers), so a screen reader names a fold by its words alone; the fold itself says open or closed. */
+.v4PanelSent > summary::before, .v4PanelFirstAnswer > summary::before { content: "▸"; content: "▸" / ""; margin-inline-end: 8px; color: var(--text-3); }
+.v4PanelSent > summary:dir(rtl)::before, .v4PanelFirstAnswer > summary:dir(rtl)::before { content: "◂"; content: "◂" / ""; }
+.v4PanelSent[open] > summary::before, .v4PanelFirstAnswer[open] > summary::before { content: "▾"; content: "▾" / ""; }
 /* R22 W5-1 (owner Q-D11): under the report's answer, the first debate's answer, one click away. */
 .v4PanelFirstAnswerBody { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
 .v4PanelSentText { margin: 0; padding: 0 14px 12px; white-space: pre-wrap; font-size: var(--t-ui); color: var(--text); }
@@ -275,9 +277,9 @@
   display: flex; align-items: center;
 }
 .v4PanelGroup > summary::-webkit-details-marker { display: none; }
-.v4PanelGroup > summary::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
-.v4PanelGroup > summary:dir(rtl)::before { content: "◂"; }
-.v4PanelGroup[open] > summary::before { content: "▾"; }
+.v4PanelGroup > summary::before { content: "▸"; content: "▸" / ""; margin-inline-end: 8px; color: var(--text-3); }
+.v4PanelGroup > summary:dir(rtl)::before { content: "◂"; content: "◂" / ""; }
+.v4PanelGroup[open] > summary::before { content: "▾"; content: "▾" / ""; }
 .v4PanelPoints { list-style: none; margin: 0; padding: 0 14px 12px; display: flex; flex-direction: column; gap: 10px; }
 .v4PanelPoint { display: flex; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .v4PanelMark { flex: none; width: 5px; border-radius: 2px; align-self: stretch; }
@@ -347,9 +349,9 @@
   font-size: var(--t-ui); color: var(--text-2); overflow-wrap: anywhere;
 }
 .v4SourcesFoldLine::-webkit-details-marker { display: none; }
-.v4SourcesFoldLine::after { content: "▸"; color: var(--text-3); }
-.v4SourcesFoldLine:dir(rtl)::after { content: "◂"; }
-.v4SourcesFold[open] > .v4SourcesFoldLine::after { content: "▾"; }
+.v4SourcesFoldLine::after { content: "▸"; content: "▸" / ""; color: var(--text-3); }
+.v4SourcesFoldLine:dir(rtl)::after { content: "◂"; content: "◂" / ""; }
+.v4SourcesFold[open] > .v4SourcesFoldLine::after { content: "▾"; content: "▾" / ""; }
 /* map-d4 A: "Other pages found ▸", folded after the findings. */
 .v4PanelOtherPages { min-width: 0; }
 .v4PanelOtherPages > .v4OtherPages { margin-top: 4px; }
@@ -358,9 +360,9 @@
   font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase; color: var(--con-text);
 }
 .v4PanelOtherPagesHead::-webkit-details-marker { display: none; }
-.v4PanelOtherPagesHead::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
-.v4PanelOtherPagesHead:dir(rtl)::before { content: "◂"; }
-.v4PanelOtherPages[open] > .v4PanelOtherPagesHead::before { content: "▾"; }
+.v4PanelOtherPagesHead::before { content: "▸"; content: "▸" / ""; margin-inline-end: 8px; color: var(--text-3); }
+.v4PanelOtherPagesHead:dir(rtl)::before { content: "◂"; content: "◂" / ""; }
+.v4PanelOtherPages[open] > .v4PanelOtherPagesHead::before { content: "▾"; content: "▾" / ""; }
 .v4OtherPages { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .v4OtherPage { background: var(--surface); }
 .v4OtherPageAdd { align-self: flex-start; min-height: 44px; }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { PublicDebate } from "@debateai/contract";
 import { AlsoRaisedList } from "@/components/AlsoRaisedList";
 import { FloorAnswer } from "@/components/FloorAnswer";
@@ -455,6 +455,22 @@ export function V4PublicTopMenu({ catalog, children }: Readonly<{ catalog: Messa
   const [open, setOpen] = useState(false);
   const itemsId = useId();
   const button = useRef<HTMLButtonElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  // ACCESS-12 (the wave-2 checks, 4 Nov): like any menu (the header's level menu), it also closes on a click outside it
+  // and when keyboard focus moves out of it. A blur with no new target is left to the click (Safari blurs without
+  // focusing what is clicked).
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event: MouseEvent): void => {
+      if (root.current !== null && event.target instanceof Node && !root.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
+    const next = event.relatedTarget;
+    if (open && next instanceof Node && root.current !== null && !root.current.contains(next)) setOpen(false);
+  };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     // A form inside closes first on Escape (it says so with preventDefault); the menu closes on the next one.
     if (event.key !== "Escape" || !open || event.defaultPrevented) return;
@@ -463,7 +479,7 @@ export function V4PublicTopMenu({ catalog, children }: Readonly<{ catalog: Messa
     button.current?.focus();
   };
   return (
-    <div className="v4PubTopMenu" data-open={open ? "true" : "false"} onKeyDown={onKeyDown} data-public-top-menu>
+    <div ref={root} className="v4PubTopMenu" data-open={open ? "true" : "false"} onKeyDown={onKeyDown} onBlur={onBlur} data-public-top-menu>
       <button
         type="button"
         ref={button}

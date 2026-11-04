@@ -192,6 +192,9 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_DIG` / `dig=` | `SETTLE` (default), `FAIL`, `PAUSE` | How a NEW dig ends (owner review 3 Nov): it finishes; it runs its time and then fails "stopped partway" (its draft view says `quota_used: "SOME"`), so "Try this dig again" and, after a second failure, "This keeps failing" can be seen; or it pauses at the month wall at once (its card reads "Dig · paused until …", and once `pause=CAN_CONTINUE` its panel's Continue lets it finish). |
 | `MOCK_LIVE` / `live=` | `OFF` (default), `ON` | Draft (owner review 3 Nov, dig-d1 B): `ON` serves a running dig's steps and checked findings at `GET /v1/runs/:id/progress` (`live-seed.ts`), so a dig's panel shows "Finding sources › Reading › Checking › Writing what changed" and each finding as it passes; `OFF` answers 404 there, as today's API does, and the panel shows the one calm line. |
 | `MOCK_CLIMB` / `climb=` | `SEED` (default), `PLAY` | Draft (owner review 3 Nov, dig-f2; `climb-seed.ts`): `PLAY` plays, from that moment, the rest of the climb of the seeded level-3 dig `d300…` up to the first debate (each level 10 s: d300's own rewrite, then 8888's path, then 1111's `n-renew`). The first debate's map shows the change without a reload, and stops reading again once it has landed. Setting `PLAY` again plays it again from now. |
+| `MOCK_PUBLIC` / `public=` | `OPEN` (default), `ONGOING`, `REPORT_WRITING`, `TOO_DEEP`, `REPORT_STUCK` | What a public debate's presses get: see "Public debates" (Refusals, and "A report that never arrives"). |
+| `MOCK_PUBLIC_STATE` / `publicstate=` | `PRIVATE` (default), `WILL_BE_PUBLIC`, `BEING_CHECKED`, `PUBLISHED`, `KEPT_PRIVATE` | Every question's public state (its visibility read): see "Public debates" ("The globe line on your own map"). |
+| `session=` | `IN` (default), `OUT` | A stranger (`OUT`): see "Public debates" ("A stranger", and "A sign-in that ended during a wait"). |
 | `subscription=RESET` | | Puts the Plus subscription back inside its 14 days after a withdrawal, so the withdrawal can be clicked again. |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
@@ -208,7 +211,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 
 ## Tax from Quaderno
 
-Without a key, the pricing page's tax comes from the mock's own table: each EU country's standard VAT and Texas's sales tax, and "No tax added" everywhere else. With a Quaderno key, every country the page asks for is priced by Quaderno itself, exactly as the real API does it: the API's own tax reader (`apps/api/src/billing/displayed-tax.ts`) over the production Quaderno client (`packages/tax-quaderno`), once per paid plan, in that country's currency, with the postal code in the US and Canada. An answer is kept for six hours; a place Quaderno cannot price shows no price ("The plans can't be shown right now") and is asked again after a minute.
+Without a key, the pricing page's tax comes from the mock's own table: each EU country's standard VAT and Texas's sales tax, and "No tax added" everywhere else. With a Quaderno key, every country the page asks for is priced by Quaderno itself, exactly as the real API does it: the API's own tax reader (`apps/api/src/billing/displayed-tax.ts`) over the production Quaderno client (`packages/tax-quaderno`), once per paid plan, in that country's currency, with the postal code in the US and Canada. An answer is kept for six hours; a place Quaderno cannot price shows the price before tax with "+ tax where it applies" and is asked again after a minute.
 
 1. In your Quaderno **sandbox** account, copy the private API key (Settings, API keys).
 2. Put it in a file of its own, kept as the API keeps its keys (one line, the file `0600`, its folder `0700`, both yours):
@@ -240,7 +243,7 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 | `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
-| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
+| `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so the paid cards show the price before tax and ask for the country. With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
 | `GET /v1/billing/subscription`, `GET /v1/billing/invoices` | Plus in euro, subscribed four days ago, inside its 14-day withdrawal window (none on `plan=FREE`); no invoices. After a withdrawal it reads WITHDRAWN. |
 | `POST /v1/billing/subscription/withdraw` | The signed-in session withdraws with an empty body, no step-up (OUG 34/2014 art. 11^1, owner ruling 2026-11-04): a €18.00 refund, once; again, 409 `NOT_SUBSCRIBED`. A body with anything in it gets 400 `MALFORMED_REQUEST`. |
 | `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). Draft: the shelf's row parts (see "Draft fields"). |
@@ -262,7 +265,7 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 
 An unknown run id gets 404 on every run route, as the real API answers a debate that is not yours.
 
-Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] GET /v1/billing/subscription 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
+Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] POST /v1/billing/checkout 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
 
 ## Public debates (decisions 13, 16 and 22)
 

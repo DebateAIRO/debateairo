@@ -354,8 +354,9 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
       "Is a four-day week good for workers?", "Will AI tutors replace homework help?", "Should countries build new nuclear power?"
     ]);
     expect(cards.map((card) => card.querySelector(".v4ShelfState")?.textContent)).toEqual([
-      // journey-f22: one list of state words everywhere (the waiting card's lib/v4/stateWords.ts list).
-      "Looking into it · started 14:00", "Didn't finish", "Ready"
+      // journey-f22: one list of state words everywhere (the waiting card's lib/v4/stateWords.ts list); journey-f16: its
+      // "Started 14:00" too (WHOLE-12).
+      "Looking into it · Started 14:00", "Didn't finish", "Ready"
     ]);
     expect(cards[0]!.querySelector(".v4ShelfPulse")).not.toBeNull();
     expect(cards[2]!.querySelector(".v4Bar")).not.toBeNull();

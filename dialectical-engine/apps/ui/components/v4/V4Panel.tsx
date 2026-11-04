@@ -468,7 +468,9 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
   const starting = panel.digStarting?.(props.target) ?? null;
   // public-d3 A: the period by the switch, only where this button names a share.
   const period = quota === undefined || quota.share(props.target) === null ? null : quota.periodLine;
-  const describedBy = resting ? restId : waiting ? waitId : undefined;
+  // The button names only a line that is drawn: while a dig of this place counts its 10 seconds, its note takes the rest
+  // line's slot, so the button names none (the wave-2 owner check, 4 Nov).
+  const describedBy = resting ? (starting === null ? restId : undefined) : waiting ? waitId : undefined;
   // journey-f8: the change mark is for this place's share only (another place's button is not a change of this one).
   const subject = placeOf(props.target);
   return (
@@ -968,7 +970,7 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
           </p>
         )}
         {panel.failedDigs !== undefined
-          ? <V4DigFailed dig={dig} failed={panel.failedDigs} digBusy={panel.digBusy || (panel.digRest ?? null) !== null} catalog={panel.catalog} />
+          ? <V4DigFailed dig={dig} failed={panel.failedDigs} digBusy={panel.digBusy} rest={panel.digRest ?? null} catalog={panel.catalog} />
           : null}
         {dig.state === "DONE" && rewrite === undefined
           ? (headline.length > 0

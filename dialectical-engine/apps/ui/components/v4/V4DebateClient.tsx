@@ -48,7 +48,7 @@ import { digAboutLine } from "@/components/v4/digAbout";
 import { phoneBarJob, picksPlaceOf, showChoices, type PhoneTarget } from "@/components/v4/mapDigHelpers";
 import { isNotFound } from "@/lib/api";
 import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
-import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { mergeDigLinks, readDigRecords, storableItems } from "@/lib/v4/accountMemory";
 import { diffSnapshots, isRewriteWord, selectionForChange, snapshotItems } from "@/lib/v4/changes";
@@ -82,7 +82,7 @@ import type { V4DigQuota } from "@/lib/v4/digQuota";
 import { useBorrowed } from "@/lib/v4/useBorrowed";
 import { useDigQuota } from "@/lib/v4/useDigQuota";
 import { useQuotaMoments } from "@/lib/v4/useQuotaMoments";
-import { pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
+import { pauseDate, pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
 import {
   addPick,
   draftTarget,
@@ -1222,10 +1222,11 @@ function V4Debate({
       linkLevel={chosenLevel}
       onReadingLevel={chooseLevel}
       classicHref={classicInBody ? null : classicHref}
+      after={served !== null ? report.headerStrip : null}
     >
       {/* W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
           map-f15: it is the page's one report button; dig-f29's "Good time" is a small mark on it, with the words.
-          report-d1: while a report can be asked for, it opens the short strip in its place. */}
+          report-d1: while a report can be asked for, it opens the short strip, drawn after the account button. */}
       {served !== null ? report.headerItem(moment === "GOOD") : null}
     </V4Header>
   );
@@ -1342,13 +1343,15 @@ function V4Debate({
   // journey-d3: the pinned bar's one job. A place whose dig waits has its Undo in the note above the bar instead.
   // journey-d3 / dig-f31: the bar's dig job (the record's two states: "Choose what to dig ›" on a whole path, "Dig into
   // your pick · up to 3%" with picks; mapDigHelpers.ts). journey-f14 / dig-f11 / report-d2: while new digs wait for a reset
-  // or the report waits or is written, the dig button stays where it is, greyed, and pressing it shows the line that says
-  // why. A paused dig open in the panel gives the bar its Continue; a screen with no dig button says the report's state.
+  // or the report waits or is written, a dig button stays where it is, greyed, with the visible line that says why, and
+  // pressing it shows the panel's line. A whole path keeps "Choose what to dig ›", so while the report is written its bar
+  // says the report's state (report-d2), as a screen with no dig button does. A paused dig open in the panel gives the bar
+  // its Continue.
   const digRest = report.digsRest ? report.restReason : null;
   const phoneDig: V4BarJob | null = phoneTarget !== null && waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
     ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
     : null;
-  const phoneJob: V4BarJob = digRest !== null && phoneDig !== null
+  const phoneJob: V4BarJob = digRest !== null && phoneDig !== null && phoneDig.kind === "dig"
     ? phoneDig
     : report.barStatus !== null
       ? { kind: "status", ...report.barStatus }
@@ -1707,7 +1710,8 @@ function StatusScreen({ problem, onRetry, askHref, catalog }: Readonly<{
 function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string): string {
   // W3-4 (the money rule): at the month wall the debate's planned calls and searches pause until the month resets.
   const pause = monthPauseOf(run);
-  if (pause !== null) return t(catalog, "v4.debate.state.PAUSED_MONTH", { date: formatDate(locale, pause.until, { dateStyle: "medium" }) });
+  // journey-f22 / journey-f15: the month pause's one date form (lib/v4/monthPause.ts pauseDate).
+  if (pause !== null) return t(catalog, "v4.debate.state.PAUSED_MONTH", { date: pauseDate(pause.until, locale) });
   switch (run.state) {
     case "WAITING": {
       const time = clockTime(run.waits_until, locale);
@@ -1739,7 +1743,7 @@ function MonthPaused({ run, runId, catalog, locale }: Readonly<{
   const [pressing, setPressing] = useState(false);
   const [outcome, setOutcome] = useState<ContinueOutcome | null>(null);
   if (pause === null) return null;
-  const date = (iso: string): string => formatDate(locale, iso, { dateStyle: "medium" });
+  const date = (iso: string): string => pauseDate(iso, locale);
   const press = async (): Promise<void> => {
     setPressing(true);
     const next = await continueRun(runId);

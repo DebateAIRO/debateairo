@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type Ref, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref, type RefObject } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { V4DigQuota } from "@/lib/v4/digQuota";
 import type { MoneyLine } from "@/lib/v4/money";
@@ -57,9 +57,13 @@ function useDockRoom(ref: RefObject<HTMLElement | null>): void {
  * why). Null: no such line above (the panel shows a dig, or the deepest level), so the tray shows its own. Read again after
  * each of the tray's renders: the page draws the panel and the tray together, so a change of panel redraws the tray too.
  */
+/** useLayoutEffect in the browser, useEffect on the server (which has no layout), as V4AskClient.tsx does. */
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 function useReasonAbove(ref: RefObject<HTMLElement | null>, reason: string | null): string | null {
   const [above, setAbove] = useState<string | null>(null);
-  useEffect(() => {
+  // Before the browser paints (WHOLE NEW-5, the wave-2 checks): no frame shows the reason twice while this looks.
+  useBrowserLayoutEffect(() => {
     const column = ref.current?.parentElement ?? null;
     const line = reason === null || column === null ? undefined
       : [...column.querySelectorAll<HTMLElement>(".v4PanelDig > p[id]")].find((element) => element.textContent === reason);

@@ -647,7 +647,9 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await openRows();
     await click(firstOpen());
     // journey-f8 / public-d3 A: the share on the button, the period once by the switch (read-f19: the server's window).
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.dig.period.PERSON_DAY"]);
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.public.dig.period.PERSON_DAY"]);
+    // Someone else's public page: no "you can still finish your report" (the person has no report to finish there).
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).not.toContain("report");
     expect(startButtons()[0]!.textContent).toBe("Dig into your pick · up to 5%");
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
@@ -660,7 +662,7 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await mount(debate());
     await openRows();
     await click(firstOpen());
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.dig.period.PERSON_MONTH"]);
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.public.dig.period.PERSON_MONTH"]);
     // public-f14: the site's one note names the share's own window, so on Free it says the month too, never "of today".
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
@@ -847,6 +849,8 @@ describe("Write a report", () => {
     expect(card()).toBeNull();
     expect(readyLine().textContent).toBe(V4["v4.ready.report"]);
     expect(readyLine().classList.contains("v4Highlight")).toBe(true);
+    // The wave-2 checks: the card held focus and went, so focus goes on to the ready line, never to the page's body.
+    expect(document.activeElement).toBe(readyLine());
     await act(async () => root!.render(overview(withVersion(page, 2))));
     expect(press()).toBeTruthy();
     // No more checks once it is there.
@@ -915,6 +919,8 @@ describe("Write a report", () => {
     expect(failed.textContent).toBe(V4["v4.investigation.failed"]);
     expect(failed.getAttribute("role")).toBe("alert");
     expect(lane.refresh).not.toHaveBeenCalled();
+    // The wave-2 checks: the card held focus and went, so focus goes on to "Write it again", never to the page's body.
+    expect(document.activeElement).toBe(buttons(V4["v4.investigation.writeAgain"]!)[0]);
     lane.writePublicReport = vi.fn(async () => ({ state: "WRITING", report_version: 3 }));
     await click(buttons(V4["v4.investigation.writeAgain"]!)[0]!);
     expect(lane.writePublicReport).toHaveBeenCalledTimes(1);

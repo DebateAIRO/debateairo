@@ -58,8 +58,13 @@ export type MapReport = Readonly<{
   /** The first question's report page (report-f9). */
   href: string;
   stage: ReportStage;
-  /** The top bar's report button (with dig-f29's mark when `good`), or the strip in its place. */
+  /** The top bar's report button (with dig-f29's mark when `good`); nothing while the strip is open there. */
   headerItem: (good: boolean) => ReactNode;
+  /**
+   * The strip, once "Write my report" in the top bar opened it (null otherwise). The header draws it after its account
+   * button (V4Header's `after`), so the keyboard meets it where it is seen.
+   */
+  headerStrip: ReactNode;
   /** Phone: the strip when "Write my report" was pressed in the pinned bar (null otherwise). */
   bottomStrip: ReactNode;
   /** Phone: "Write my report" in the pinned bar opens the strip there; absent while it cannot (it links, as before). */
@@ -149,7 +154,7 @@ export function useMapReport(input: MapReportInput): MapReport {
   const label = t(catalog, stage.kind === "FAILED" ? "v4.investigation.writeAgain" : "v4.rail.writeReport");
 
   const headerItem = (good: boolean): ReactNode => {
-    if (start.at === "top") return strip("top");
+    if (start.at === "top") return null;
     const mark = good ? <span className="v4DebReportMark" aria-hidden="true" /> : null;
     const goodWords = good ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null;
     const className = `v4Btn v4BtnPrimary v4DebReportLink${good ? " v4DebReportGood" : ""}`;
@@ -159,8 +164,13 @@ export function useMapReport(input: MapReportInput): MapReport {
           ref={headerRef as RefObject<HTMLButtonElement | null>}
           type="button"
           className={className}
-          disabled={start.busy}
-          onClick={() => start.open("top")}
+          // The wave-2 checks (ACCESS-6's rule on this button): with the start step's carry-on box a press sends at once and
+          // may wait for a dig's 10 seconds; the button keeps its focus (aria-disabled, never native) and ignores presses.
+          aria-disabled={start.busy ? "true" : undefined}
+          aria-busy={start.busy ? "true" : undefined}
+          onClick={() => {
+            if (!start.busy) start.open("top");
+          }}
         >
           {mark}
           {label}
@@ -187,6 +197,7 @@ export function useMapReport(input: MapReportInput): MapReport {
     href,
     stage,
     headerItem,
+    headerStrip: start.at === "top" ? strip("top") : null,
     bottomStrip: start.at === "bottom" ? strip("bottom") : null,
     writeFromBar: canAsk && start.at === null ? () => start.open("bottom") : undefined,
     barStatus,
@@ -200,6 +211,7 @@ export function useMapReport(input: MapReportInput): MapReport {
         onTryNow={watch.tryNow}
         focusPending={start.focusCard}
         onFocused={start.cardFocused}
+        onFocusGone={() => (headerRef.current ?? input.barJobRef.current)?.focus()}
         catalog={catalog}
         locale={locale}
       />

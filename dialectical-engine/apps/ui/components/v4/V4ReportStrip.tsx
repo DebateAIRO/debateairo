@@ -315,6 +315,11 @@ export type V4ReportWaitProps = Readonly<{
   /** Focus moves here once, after this page asked for the report (`onFocused` says it is done). */
   focusPending?: boolean;
   onFocused?: () => void;
+  /**
+   * The wave-2 checks (4 Nov): the card goes once the report is written. Where it held focus, this gives focus a place to
+   * go (the header's report link on the map), never the page's body. Absent: nothing is moved.
+   */
+  onFocusGone?: () => void;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -325,13 +330,21 @@ export function V4ReportWait(props: V4ReportWaitProps) {
   const state = reportWaitStateOf(stage);
   const slow = useLater(props.slowFrom, REPORT_SLOW_MS);
   const ref = useRef<HTMLElement | null>(null);
-  const { focusPending, onFocused } = props;
+  const { focusPending, onFocused, onFocusGone } = props;
   const shown = state !== null;
   useEffect(() => {
     if (focusPending !== true || !shown) return;
     ref.current?.focus();
     onFocused?.();
   }, [focusPending, onFocused, shown]);
+  // Whether focus is in the card, from its own focus events (a node taken away while focused sends none).
+  const held = useRef(false);
+  useEffect(() => {
+    if (shown || !held.current) return;
+    held.current = false;
+    const active = document.activeElement;
+    if (active === null || active === document.body) onFocusGone?.();
+  }, [shown, onFocusGone]);
   if (state === null) return null;
   const rests = stage.kind === "WAITING_DIGS" || stage.kind === "WRITING";
   return (
@@ -341,6 +354,13 @@ export function V4ReportWait(props: V4ReportWaitProps) {
       aria-labelledby="v4-deb-report-wait"
       tabIndex={-1}
       data-report-wait={stage.kind}
+      onFocus={() => {
+        held.current = true;
+      }}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && !event.currentTarget.contains(next)) held.current = false;
+      }}
     >
       <p id="v4-deb-report-wait" className="v4Eyebrow">{t(catalog, "v4.rail.stepReport")}</p>
       <V4WaitCard

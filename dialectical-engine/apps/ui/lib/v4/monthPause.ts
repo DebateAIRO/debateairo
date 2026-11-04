@@ -25,14 +25,18 @@ export function pauseOfDig(dig: DigView): PauseState | null {
   return Object.freeze({ until: dig.pausedUntil, canContinue: dig.canContinue === true });
 }
 
-/** The date in a sentence: "1 Dec 2026" (the page language's medium date). */
+/**
+ * The month pause's date, in one form everywhere (journey-f22's "Paused until 1 December", journey-f15: every page writes
+ * the reset the same way; the wave-2 checks, 4 Nov): the day and the month's name in the page's language, no year, in a
+ * sentence and on a card alike (the same form as lib/v4/stateWords.ts dayText and the month's reset in money.ts).
+ */
 export function pauseDate(until: string, locale: string): string {
-  return formatDate(locale, until, { dateStyle: "medium" });
+  return formatDate(locale, until, { day: "numeric", month: "long" });
 }
 
-/** The date on a card or label: "1 Dec" (day and month only). */
+/** The date on a card or label: the same one form as in a sentence (pauseDate). */
 export function pauseDay(until: string, locale: string): string {
-  return formatDate(locale, until, { day: "numeric", month: "short" });
+  return pauseDate(until, locale);
 }
 
 /** The pause's one sentence: before the reset, until when; after it, that the new month has started. */

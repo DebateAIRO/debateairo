@@ -50,8 +50,29 @@ async function shareOrCopy(url: string): Promise<CopyState | "SHARED"> {
   }
 }
 
-export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage | null; catalog: MessageCatalog }>) {
+/**
+ * "Copy link" for a public page's address (on a phone, the phone's own share sheet), with its quiet "Link copied." line.
+ * public-f26 (owner's screen review): the same button on the debate's own pages (in the line below) and at the top of the
+ * public page itself. The link is the public page's own address; nothing is kept.
+ */
+export function V4CopyLink({ href, catalog, className = "v4Link" }: Readonly<{ href: string; catalog: MessageCatalog; className?: string }>) {
   const [copy, setCopy] = useState<CopyState>("IDLE");
+  const press = async (): Promise<void> => {
+    const url = new URL(href, window.location.origin).toString();
+    const outcome = await shareOrCopy(url);
+    setCopy(outcome === "SHARED" ? "IDLE" : outcome);
+  };
+  return (
+    <>
+      <button type="button" className={className} data-public-copy-link="" onClick={() => void press()}>{t(catalog, "v4.publicMark.copyLink")}</button>
+      <span className="v4PublicMarkCopied" role="status">
+        {copy === "COPIED" ? t(catalog, "v4.publicMark.linkCopied") : copy === "FAILED" ? t(catalog, "v4.publicMark.copyFailed") : ""}
+      </span>
+    </>
+  );
+}
+
+export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage | null; catalog: MessageCatalog }>) {
   // A stage after another one on this page gets the 1-second highlight (the first one does not). The line is keyed by
   // its stage, so each change plays it once.
   const shown = useRef<string | null>(null);
@@ -83,11 +104,6 @@ export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage |
     );
   }
   const href = publicPageHref(stage.publicRef);
-  const press = async (): Promise<void> => {
-    const url = new URL(href, window.location.origin).toString();
-    const outcome = await shareOrCopy(url);
-    setCopy(outcome === "SHARED" ? "IDLE" : outcome);
-  };
   return (
     <>
     <p key={stage.kind} className={className} data-public-stage="PUBLIC">
@@ -96,10 +112,7 @@ export function V4PublicMark({ stage, catalog }: Readonly<{ stage: PublicStage |
       <span aria-hidden="true"> · </span>
       <Link className="v4Link" href={href}>{t(catalog, "v4.publicMark.seePage")}</Link>
       <span aria-hidden="true"> · </span>
-      <button type="button" className="v4Link" onClick={() => void press()}>{t(catalog, "v4.publicMark.copyLink")}</button>
-      <span className="v4PublicMarkCopied" role="status">
-        {copy === "COPIED" ? t(catalog, "v4.publicMark.linkCopied") : copy === "FAILED" ? t(catalog, "v4.publicMark.copyFailed") : ""}
-      </span>
+      <V4CopyLink href={href} catalog={catalog} />
     </p>
     {live}
     </>

@@ -54,6 +54,14 @@ const APPROVED_REPORT_LINES: Readonly<Record<string, string>> = Object.freeze({
 
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
 const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
+  // The wave-2 checks (4 Nov): a public dig's period line without the map's "you can still finish your report" (journey-f8's
+  // own "of today" / "of this month"; the week's form follows them). Owner question.
+  "v4.public.dig.period.PERSON_DAY",
+  "v4.public.dig.period.PERSON_WEEK",
+  "v4.public.dig.period.PERSON_MONTH",
+  // ACCESS-13 (the wave-2 checks): "Light or dark"'s name also says what a press does. Owner question.
+  "v4.header.menu.themeToDark",
+  "v4.header.menu.themeToLight",
   "v4.web.noSearch",
   "v4.web.noSearch.noReason",
   "v4.web.switchedOff",

@@ -164,6 +164,13 @@
 .v4DebLayout-mid .v4DebPanelCol {
   scroll-padding-block-end: calc(var(--v4-pin-room, 0px) + var(--v4-dock-room, 0px) + 8px);
 }
+/* The wave-2 checks (4 Nov; reasoned from the code, to be seen in a browser): a control inside the pinned block or the
+   docked tray is in view already (they stay pinned), but the padding above counts their own place as out of view, so each
+   Tab within them could scroll the column on to its end. While focus is inside them the padding is not used. (With the
+   cookie bar they sit in the flow, and its rule below, later and as specific, wins.) */
+.v4DebLayout-desktop .v4DebPanelCol:has(.v4PanelDig :focus, > .v4DebTrayDock :focus),
+.v4DebLayout-laptop .v4DebPanelCol:has(.v4PanelDig :focus, > .v4DebTrayDock :focus),
+.v4DebLayout-mid .v4DebPanelCol:has(.v4PanelDig :focus, > .v4DebTrayDock :focus) { scroll-padding-block-end: 0; }
 /* The browser check (4 Nov): the site's cookie bar (.consentBar, fixed at the bottom, above this page) covered the pinned
    dig block and the docked tray, so Dig could not be pressed. While it shows, both sit in the panel's flow instead (as the
    ask bar and the phone stack do: v4-ask.css C4, v4-undo.css journey-d3), and the panel column gets room at its end so the

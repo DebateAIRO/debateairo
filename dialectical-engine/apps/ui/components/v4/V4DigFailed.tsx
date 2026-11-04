@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, useState } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigRetry } from "@/lib/v4/digRetry";
 import { sayNothingTaken } from "@/lib/v4/failedRun";
@@ -23,13 +24,21 @@ export type V4FailedDigs = Readonly<{
   reasonText: (reason: string | null | undefined) => string;
 }>;
 
-export function V4DigFailed({ dig, failed, digBusy, catalog }: Readonly<{
+export function V4DigFailed({ dig, failed, digBusy, rest = null, catalog }: Readonly<{
   dig: DigView;
   failed: V4FailedDigs;
   /** Another dig is in its Undo window or being sent: the button waits. */
   digBusy: boolean;
+  /**
+   * ACCESS-9 / journey-f14 (the wave-2 checks, 4 Nov): digging rests while the report is written, with this reason. The
+   * button stays where it is and focusable (aria-disabled), names the visible line under it, and a press gives that line
+   * the shared 1-second highlight again. Null: no rest.
+   */
+  rest?: string | null;
   catalog: MessageCatalog;
 }>) {
+  const restId = useId();
+  const [replay, setReplay] = useState(0);
   if (dig.state !== "FAILED") return null;
   const retry = failed.retryOf(dig);
   // A dig whose run could not be read has no reason of its own: the fixed "stopped partway" sentence is not said for it.
@@ -41,9 +50,22 @@ export function V4DigFailed({ dig, failed, digBusy, catalog }: Readonly<{
         ? <p className="v4PanelText">{t(catalog, "v4.digFailed.nothingTaken")}</p>
         : null}
       {retry.kind === "OFFER" ? (
-        <button type="button" className="v4Btn v4BtnPrimary v4DigFailedRetry" disabled={digBusy} onClick={() => failed.onRetry(dig)}>
+        <button
+          type="button"
+          className={`v4Btn v4BtnPrimary v4DigFailedRetry${rest === null ? "" : " v4DigWaiting"}`}
+          disabled={digBusy && rest === null}
+          aria-disabled={rest === null ? undefined : "true"}
+          aria-describedby={rest === null ? undefined : restId}
+          onClick={() => {
+            if (rest !== null) setReplay((count) => count + 1);
+            else failed.onRetry(dig);
+          }}
+        >
           {t(catalog, "v4.digFailed.retry")}
         </button>
+      ) : null}
+      {retry.kind === "OFFER" && rest !== null ? (
+        <p key={replay} id={restId} className={`v4PanelHint v4Muted${replay > 0 ? " v4Highlight" : ""}`} data-dig-rest="">{rest}</p>
       ) : null}
       {retry.kind === "KEEPS_FAILING" ? <p className="v4PanelText v4DigFailedAgain">{t(catalog, "v4.digFailed.keepsFailing")}</p> : null}
     </div>

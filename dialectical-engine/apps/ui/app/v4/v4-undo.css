@@ -123,6 +123,8 @@
 .appShell:has(.consentBar) .v4StackPhone { position: static; max-height: none; }
 .appShell:has(.consentBar):has(.v4StackPhone) { padding-bottom: 0; }
 .v4DebPhoneReport { text-decoration: none; }
+/* journey-f14 (the wave-2 checks): the greyed bar button's reason, one visible line right above the bar. */
+.v4DebPhoneWhy { margin: 0; padding: 6px var(--v4-gutter) 0; overflow-wrap: anywhere; }
 
 /* ---------- the place being dug (panel), the report's wait line ---------- */
 .v4DigStarting { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; color: var(--text); }

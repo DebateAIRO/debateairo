@@ -156,7 +156,8 @@ export const authGateMock = {
   AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("token")
 };
 export const headerMock = {
-  V4Header: ({ children }: { children?: ReactNode }) => <header className="v4StandInHeader">{children}</header>
+  // `after` (the report strip, after the account button in the real header) follows the extras, as there.
+  V4Header: ({ children, after }: { children?: ReactNode; after?: ReactNode }) => <header className="v4StandInHeader">{children}{after}</header>
 };
 export const roomNoticeMock = { RoomNotice: () => null };
 export const useV4AskMock = {

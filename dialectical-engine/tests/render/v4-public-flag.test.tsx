@@ -181,4 +181,31 @@ describe("Report a problem: where it sits and how its form opens (public-f4)", (
     expect(phone).toMatch(/\.v4PubTopMenuItems \{ display: none; \}/u);
     expect(phone).toMatch(/\.v4PubTopMenu\[data-open="true"\] \.v4PubTopMenuItems \{/u);
   });
+
+  it("ACCESS-12 (the wave-2 checks): the bar's menu also closes on a click outside it and when focus moves out of it", async () => {
+    host = document.body.appendChild(document.createElement("div"));
+    root = createRoot(host);
+    const outside = document.body.appendChild(document.createElement("button"));
+    try {
+      await act(async () => {
+        root!.render(<V4PublicTopMenu catalog={V4}><V4PublicFlag publicRef={REF} catalog={V4} placement="top" readSession={async () => undefined} /></V4PublicTopMenu>);
+      });
+      const menu = host.querySelector("[data-public-top-menu]")!;
+      const button = menu.querySelector<HTMLButtonElement>(".v4PubTopMenuButton")!;
+      await act(async () => { button.click(); });
+      expect(menu.getAttribute("data-open")).toBe("true");
+      // A click inside keeps it open; one outside closes it.
+      await act(async () => { toggle().dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); });
+      expect(menu.getAttribute("data-open")).toBe("true");
+      await act(async () => { outside.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); });
+      expect(menu.getAttribute("data-open")).toBe("false");
+      // Focus moving out of it closes it too.
+      await act(async () => { button.click(); });
+      button.focus();
+      await act(async () => { outside.focus(); });
+      expect(menu.getAttribute("data-open")).toBe("false");
+    } finally {
+      outside.remove();
+    }
+  });
 });

@@ -49,6 +49,8 @@ describe("journey-f15: one clock and one way to write a reset", () => {
     expect(resetText(DAY_RESET, "PERSON_DAY", "en")).toMatch(/^\d{2}:\d{2}$/u);
     expect(resetText(WEEK_RESET, "PERSON_WEEK", "en")).toMatch(/^[A-Z][a-z]+day,? \d{2}:\d{2}$/u);
     expect(resetText(MONTH_RESET, "PERSON_MONTH", "en")).toMatch(/^[A-Z][a-z]+ \d{1,2}$/u);
+    // journey-f22 / journey-f15 (the wave-2 checks): a month pause is written the same way as the month's reset.
+    expect(resetText(MONTH_RESET, "MONTH_PAUSE", "en")).toBe(resetText(MONTH_RESET, "PERSON_MONTH", "en"));
   });
 
   it("a day and a week wait 'after' a time, a month 'on' its date, on the line and on the button", () => {

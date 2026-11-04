@@ -529,7 +529,7 @@ describe("W4-6: dig cards and rewritten paths", () => {
   it("a paused dig's panel says until when; a new-model dig never waits for a short answer", () => {
     const paused: DigView = { ...dig("c-run", "RUNNING", ["w"]), pausedUntil: "2026-11-01T12:00:00.000Z" };
     expect(panel(buildMap(), "dig:c-run", "plain", { digs: [paused] }).textContent)
-      .toContain(t(catalog, "v4.money.paused", { date: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(paused.pausedUntil!)) }));
+      .toContain(t(catalog, "v4.money.paused", { date: new Intl.DateTimeFormat("en", { day: "numeric", month: "long" }).format(new Date(paused.pausedUntil!)) }));
     const done: DigView = { ...dig("c-new", "DONE", ["w"]), headline: null, rewrite: rewritten(true) };
     const root = panel(buildMap(), "dig:c-new", "plain", { digs: [done] });
     expect(root.textContent).not.toContain(t(catalog, "v4.panel.digNoHeadline"));

@@ -808,7 +808,8 @@ const QUADERNO = quadernoPricingFromKeyFile({
 /**
  * Terms §12, as GET /v1/billing/plans answers: the plans priced for the place asked (?country=, and in the US and
  * Canada ?postal_code=, checked by the kernel's own format as the API does), in that place's currency, each with its
- * total including that place's tax, and no price at all until the place is known.
+ * total including that place's tax. Until the place is known no total is sent, and the pricing page shows each paid
+ * plan's price before tax and asks for the country (Terms 2.15: price + VAT).
  */
 function billingPlans(countryParam: string | null, postalParam: string | null, quaderno?: QuadernoPriced | null) {
   const country = (countryParam ?? "").trim().toUpperCase();
@@ -1622,7 +1623,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, dig, live, climb, public or publicstate; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate or session; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1632,7 +1633,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=&publicstate=&live=&climb=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&live=&climb=&session=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----

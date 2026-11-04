@@ -4,12 +4,14 @@ import type { PublicDebate } from "@debateai/contract";
 import { AiNotice } from "@/components/AiNotice";
 import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
 import { V4PublicFlag } from "@/components/v4/V4PublicFlag";
+import { V4CopyLink } from "@/components/v4/V4PublicMark";
 import { V4PublicTopMenu } from "@/components/v4/V4PublicPage";
 import { V4PublicHeader, V4PublicSessionProvider } from "@/components/v4/V4PublicSession";
 import { PublicDebateOverview } from "@/components/PublicDebateOverview";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { publicPageHref } from "@/lib/v4/publicState";
 import chromeEnglish from "@/messages/en/chrome.json";
 import v4English from "@/messages/en/v4.json";
 
@@ -68,6 +70,8 @@ export function PublicDebatePageClient({
         {/* journey-f19 (review F8): the quota shows only on the ask, choosing and map pages; a public page shows none and reads none. */}
         <V4PublicHeader catalog={v4Catalog}>
           <V4PublicTopMenu catalog={v4Catalog}>
+            {/* public-f26 (owner's screen review): "Copy link" at the top of the public page too (the phone's share sheet there). */}
+            <span className="v4PubCopyLink"><V4CopyLink href={publicPageHref(debate.public_ref)} catalog={v4Catalog} /></span>
             <V4PublicFlag publicRef={debate.public_ref} catalog={v4Catalog} placement="top" />
           </V4PublicTopMenu>
         </V4PublicHeader>

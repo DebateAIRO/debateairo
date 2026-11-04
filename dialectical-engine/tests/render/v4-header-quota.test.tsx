@@ -15,11 +15,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * read again after each quota moment and when the tab is shown again (wait-f22, public-f15, map-f9). Nothing shows
  * without a read.
  */
-const server = vi.hoisted(() => ({ usage: null as unknown, reads: 0 }));
+const server = vi.hoisted(() => ({ usage: null as unknown, reads: 0, answer: null as Promise<unknown> | null }));
 vi.mock("@/lib/api", () => ({
   contractClient: {
     getBillingUsage: async () => {
       server.reads += 1;
+      // A test that holds the answer back (ask-f16's held place) hands its own promise.
+      if (server.answer !== null) return server.answer;
       if (server.usage === null) throw new Error("404: billing off");
       return server.usage;
     },
@@ -44,7 +46,7 @@ const free = (percent: number) => ({ plan_id: "FREE", windows: [window_("PERSON_
 const team = (...windows: ReturnType<typeof window_>[]) => ({ plan_id: null, funding: { kind: "INTERNAL", expires_at: RESET }, windows });
 
 let root: Root | null = null;
-beforeEach(() => { server.usage = null; server.reads = 0; });
+beforeEach(() => { server.usage = null; server.reads = 0; server.answer = null; });
 afterEach(async () => {
   if (root !== null) await act(async () => root!.unmount());
   root = null;
@@ -97,6 +99,60 @@ describe("the V4 header's quota line", () => {
     server.usage = paid(window_("PERSON_DAY", 15));
     expect(await headerQuota(false)).toBeNull();
     expect(server.reads).toBe(0);
+  });
+
+  describe("ask-f16 with the wave-2 checks: the pill's place is held only for a signed-in person", () => {
+    async function mountWith(session: "CHECKING" | "IN" | "OUT" | undefined, answer: Promise<unknown>): Promise<HTMLDivElement> {
+      const host = document.createElement("div");
+      document.body.append(host);
+      root = createRoot(host);
+      server.answer = answer;
+      await act(async () => {
+        root!.render(session === undefined
+          ? <V4Header catalog={CATALOG} readingLevel={null} />
+          : <V4Header catalog={CATALOG} readingLevel={null} session={session} />);
+      });
+      return host;
+    }
+
+    it("signed in (or a signed-in-only page): an empty, hidden place until the read answers, then the pill in it", async () => {
+      for (const session of ["IN", undefined] as const) {
+        let answer: (usage: unknown) => void = () => undefined;
+        const host = await mountWith(session, new Promise((resolve) => { answer = resolve; }));
+        const hold = host.querySelector(".v4HdrQuotaHold");
+        expect(hold).not.toBeNull();
+        expect(hold!.getAttribute("aria-hidden")).toBe("true");
+        expect(hold!.textContent).toBe("");
+        await act(async () => answer(free(60)));
+        await flush();
+        expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
+        expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("This month: 60% of your quota used");
+        await act(async () => root!.unmount());
+        root = null;
+        host.remove();
+      }
+    });
+
+    it("signed out, or still checking: no held place and no usage read (they never get a pill, so nothing jumps)", async () => {
+      for (const session of ["OUT", "CHECKING"] as const) {
+        server.reads = 0;
+        const host = await mountWith(session, Promise.resolve(free(60)));
+        await flush();
+        expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
+        expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+        expect(server.reads).toBe(0);
+        await act(async () => root!.unmount());
+        root = null;
+        host.remove();
+      }
+    });
+
+    it("a read that fails lets the held place go (billing off): nothing is left behind", async () => {
+      const host = await mountWith("IN", Promise.reject(new Error("404: billing off")));
+      await flush();
+      expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
+      expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+    });
   });
 
   it("shows nothing when the usage read fails (billing off, a local site)", async () => {

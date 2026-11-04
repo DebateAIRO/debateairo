@@ -112,6 +112,19 @@ describe("ask-d6 A: the round account button", () => {
     expect(server.emailReads).toBe(1);
   });
 
+  it("the report strip (`after`) comes after the account button in the page, so the keyboard meets it where it is seen", async () => {
+    const page = await mount(header({
+      children: <button type="button" className="v4ExtraBefore">Extra</button>,
+      after: <section className="v4RepStrip v4RepStrip-top"><button type="button">Write it</button></section>
+    }));
+    const row = page.querySelector(".v4HdrRight")!;
+    const account = row.querySelector(".v4HdrAccount")!;
+    const strip = row.querySelector(".v4RepStrip-top")!;
+    expect(row.lastElementChild).toBe(strip);
+    expect(account.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(row.querySelector(".v4ExtraBefore")!.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
   it("an address that cannot be read shows a plain person mark, never a guess", async () => {
     server.email = null;
     await mount(header());
@@ -176,12 +189,16 @@ describe("ask-d6 A: the round account button", () => {
     (document as Document & { startViewTransition?: unknown }).startViewTransition = transition;
     try {
       await openMenu();
+      // ACCESS-13: its name says what a press does, after the words it shows.
+      expect(items()[2]!.getAttribute("aria-label")).toBe(CATALOG["v4.header.menu.themeToDark"]);
+      expect(items()[2]!.getAttribute("aria-label")!.startsWith(items()[2]!.textContent!)).toBe(true);
       await act(async () => items()[2]!.click());
       expect(document.documentElement.dataset.mode).toBe("chamber");
       expect(localStorage.getItem("debateai.mode")).toBe("chamber");
       expect(transition).not.toHaveBeenCalled();
       expect(menu()).toBeNull();
       await openMenu();
+      expect(items()[2]!.getAttribute("aria-label")).toBe(CATALOG["v4.header.menu.themeToLight"]);
       await act(async () => items()[2]!.click());
       expect(document.documentElement.dataset.mode).toBe("terracotta");
     } finally {

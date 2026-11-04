@@ -141,6 +141,9 @@
 .v4PubTopMenu { position: relative; display: flex; align-items: center; }
 .v4PubTopMenuButton { display: none; }
 .v4PubTopMenuItems { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+/* public-f26: "Copy link" at the top of the public page (V4CopyLink), with its quiet "Link copied." line. */
+.v4PubCopyLink { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; }
+.v4PubCopyLink > .v4Link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
 .v4PubFlag { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
 .v4PubFlagToggle { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
 .v4PubFlag-top .v4PubFlagLine { max-width: 320px; }

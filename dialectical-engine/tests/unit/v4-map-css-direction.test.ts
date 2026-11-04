@@ -37,8 +37,8 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
   });
 
   it("turn the closed disclosure arrows around on a right-to-left page", () => {
-    expect(rules).toMatch(/\.v4PanelGroup > summary:dir\(rtl\)::before \{ content: "◂"; \}/u);
-    expect(rules).toMatch(/\.v4PanelSent > summary:dir\(rtl\)::before, \.v4PanelFirstAnswer > summary:dir\(rtl\)::before \{ content: "◂"; \}/u);
+    expect(rules).toMatch(/\.v4PanelGroup > summary:dir\(rtl\)::before \{ content: "◂"; content: "◂" \/ ""; \}/u);
+    expect(rules).toMatch(/\.v4PanelSent > summary:dir\(rtl\)::before, \.v4PanelFirstAnswer > summary:dir\(rtl\)::before \{ content: "◂"; content: "◂" \/ ""; \}/u);
     // The open arrow still wins once a group is open: its rule comes after the right-to-left one.
     expect(rules.indexOf(".v4PanelGroup[open] > summary::before")).toBeGreaterThan(rules.indexOf(".v4PanelGroup > summary:dir(rtl)::before"));
   });
@@ -48,9 +48,18 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     expect(looks).toMatch(/\.v4AnswerMore > summary \{[^}]*display: flex;/u);
     expect(looks).toMatch(/\.v4AnswerMore > summary::-webkit-details-marker \{ display: none; \}/u);
     expect(looks).toMatch(/\.v4AnswerMore > summary::before \{ content: "▸";/u);
-    expect(looks).toMatch(/\.v4AnswerMore > summary:dir\(rtl\)::before \{ content: "◂"; \}/u);
-    expect(looks).toMatch(/\.v4AnswerMore\[open\] > summary::before \{ content: "▾"; \}/u);
+    expect(looks).toMatch(/\.v4AnswerMore > summary:dir\(rtl\)::before \{ content: "◂"; content: "◂" \/ ""; \}/u);
+    expect(looks).toMatch(/\.v4AnswerMore\[open\] > summary::before \{ content: "▾"; content: "▾" \/ ""; \}/u);
     expect(looks.indexOf(".v4AnswerMore[open] > summary::before")).toBeGreaterThan(looks.indexOf(".v4AnswerMore > summary:dir(rtl)::before"));
+  });
+
+  it("the wave-2 checks: every fold arrow drawn as CSS text is hidden from screen readers (empty alt text, the arrow first)", () => {
+    for (const file of ["v4-map.css", "v4-map-looks.css", "v4-wait.css"]) {
+      const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4", file), "utf8");
+      const arrows = [...css.matchAll(/content: "([▸◂▾])";(?! content: "\1" \/ "";)/gu)].map((match) => match[0]);
+      expect({ file, arrows }).toEqual({ file, arrows: [] });
+      expect(css).toMatch(/content: "▸"; content: "▸" \/ "";/u);
+    }
   });
 
   it("break and hyphenate long words inside every map card and the phone outline, in the page's language", () => {
@@ -146,13 +155,21 @@ describe("the wave-2 review's layout rules (4 Nov)", () => {
   it("ACCESS-2: a control the keyboard reaches in the panel column scrolls clear of the pinned dig block and the docked tray", () => {
     expect(read("v4-debate.css")).toMatch(/\.v4DebLayout-mid \.v4DebPanelCol \{\s*scroll-padding-block-end: calc\(var\(--v4-pin-room, 0px\) \+ var\(--v4-dock-room, 0px\) \+ 8px\);/u);
   });
+  it("the wave-2 checks: focus inside the pinned dig block or the docked tray uses no scroll padding (they are in view), before the cookie-bar rule", () => {
+    const css = read("v4-debate.css");
+    const rule = /\.v4DebLayout-mid \.v4DebPanelCol:has\(\.v4PanelDig :focus, > \.v4DebTrayDock :focus\) \{ scroll-padding-block-end: 0; \}/u;
+    expect(css).toMatch(rule);
+    expect(css.search(rule)).toBeLessThan(css.indexOf(".appShell:has(.consentBar) .v4DebLayout-desktop .v4DebPanelCol"));
+  });
   it("ACCESS-1: the phone's stack grows while the report's strip is open in it, so its lines show before Write it", () => {
     expect(read("v4-undo.css")).toMatch(/\.v4StackPhone:has\(\.v4RepStrip-bottom\) \{ max-height: 85vh; max-height: 85dvh; \}/u);
   });
   it("the browser check: the top bar's strip takes its own row at the end side, and the bar's other items keep theirs", () => {
     const css = read("v4-report-map.css");
-    // Its long lines no longer widen the bar's right side (contain), and it comes after the account button (order).
-    expect(css).toMatch(/\.v4RepStrip-top \{\s*flex: 1 1 100%; order: 1; contain: inline-size; width: min\(30rem, 100%\); max-width: 30rem; margin-inline-start: auto;\s*\}/u);
+    // Its long lines no longer widen the bar's right side (contain); it comes after the account button.
+    expect(css).toMatch(/\.v4RepStrip-top \{\s*flex: 1 1 100%; contain: inline-size; width: min\(30rem, 100%\); max-width: 30rem; margin-inline-start: auto;\s*\}/u);
+    // The wave-2 checks (WCAG 2.4.3): the strip follows the account button in the page itself, never by `order`.
+    expect(css).not.toMatch(/\.v4RepStrip[^{]*\{[^}]*\border\s*:/u);
     expect(css).toMatch(/\.v4HdrRight:has\(> \.v4RepStrip-top\) \{ justify-content: flex-end; \}/u);
     expect(css).toMatch(/\.v4Hdr:has\(> \.v4HdrRight > \.v4RepStrip-top\) \{ align-items: flex-start; \}/u);
   });

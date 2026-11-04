@@ -122,7 +122,7 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
 }
 
 export function V4Header({
-  catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, session, children
+  catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, session, children, after
 }: Readonly<{
   catalog: MessageCatalog;
   /** The level the menu shows (a page may show its default when none was chosen). */
@@ -144,7 +144,16 @@ export function V4Header({
   session?: V4HeaderSession;
   /** Extras before the account button (e.g. the Report button). */
   children?: ReactNode;
+  /**
+   * What comes after the account button, on its own row at the end side (the map's report strip, report-d1 A). It is
+   * after the button in the page too, so the keyboard meets it in the order it is seen (WCAG 2.4.3; the wave-2 checks).
+   */
+  after?: ReactNode;
 }>) {
+  // ask-f16 with the wave-2 checks (4 Nov): the usage is read, and the pill's place held, only for a signed-in person. A
+  // page that knows the person is signed out reads nothing and holds nothing (they never get a pill), and nothing is held
+  // while it is still checking (the account button's place is held then too).
+  const quotaWanted = showQuota && (session === undefined || session === "IN");
   return (
     <header className="v4Hdr">
       <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
@@ -158,7 +167,7 @@ export function V4Header({
         ) : (
           <ReadingLevelMenu catalog={catalog} level={readingLevel} onLevel={onReadingLevel} />
         )}
-        <V4QuotaPill catalog={catalog} wanted={showQuota} />
+        <V4QuotaPill catalog={catalog} wanted={quotaWanted} />
         {children}
         {/* ask-d6 A: the round account button ends the row; its links carry the level the brand link carries. */}
         <V4AccountMenu
@@ -167,6 +176,7 @@ export function V4Header({
           classicHref={classicHref}
           {...(session === undefined ? {} : { session })}
         />
+        {after}
       </div>
     </header>
   );

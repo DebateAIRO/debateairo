@@ -288,8 +288,11 @@ function WaitingOn(props: Readonly<{ title: Readonly<{ text: string; ai: boolean
  * The browser check (4 Nov): "Change the wording" and "Add your own view" go away when pressed, and so do the box's own
  * buttons when it closes, so focus fell to the page. It now moves into the box when it opens and back to the button that
  * opened it when it closes (or, where that button is not shown, to the pick box in `row`). Nothing is kept anywhere.
+ * The wave-2 checks (4 Nov): where neither is shown (an own view that fills the plan's pick cap takes "Add your own view"
+ * away), focus goes to the last picked row's Remove in `section` (the view just added), else to its first pick box that
+ * can be pressed, else to the section itself, never to the page.
  */
-function useBoxFocus(row?: RefObject<HTMLElement | null>): Readonly<{
+function useBoxFocus(row?: RefObject<HTMLElement | null>, section?: RefObject<HTMLElement | null>): Readonly<{
   box: RefObject<HTMLTextAreaElement | null>;
   opener: RefObject<HTMLButtonElement | null>;
   focusBox: () => void;
@@ -302,12 +305,24 @@ function useBoxFocus(row?: RefObject<HTMLElement | null>): Readonly<{
     if (request === null) return;
     const target = request.to === "box"
       ? box.current
-      : opener.current ?? row?.current?.querySelector<HTMLInputElement>("input[type=checkbox]") ?? null;
+      : opener.current ?? row?.current?.querySelector<HTMLInputElement>("input[type=checkbox]") ?? sectionFallback(section?.current ?? null);
     target?.focus();
-  }, [request, row]);
+  }, [request, row, section]);
   const focusBox = useCallback((): void => setRequest((last) => ({ to: "box", count: (last?.count ?? 0) + 1 })), []);
   const focusOpener = useCallback((): void => setRequest((last) => ({ to: "opener", count: (last?.count ?? 0) + 1 })), []);
   return { box, opener, focusBox, focusOpener };
+}
+
+/** Where focus goes in the choosing section when the button that opened a box is gone (see useBoxFocus). */
+function sectionFallback(section: HTMLElement | null): HTMLElement | null {
+  if (section === null) return null;
+  const removes = section.querySelectorAll<HTMLButtonElement>(".v4SugRowPlain button");
+  const last = removes.item(removes.length - 1) as HTMLButtonElement | null;
+  if (last !== null) return last;
+  const box = section.querySelector<HTMLInputElement>("input[type=checkbox]:not(:disabled)");
+  if (box !== null) return box;
+  if (!section.hasAttribute("tabindex")) section.setAttribute("tabindex", "-1");
+  return section;
 }
 
 /** One suggestion in the panel: its pick box, its text (or the person's wording), and "Edit this path". */
@@ -410,8 +425,8 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
 }
 
 /** "Add your own view": the person's words, added to this path's dig as their own (never as a finding). */
-function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: MessageCatalog }>) {
-  const { path, choice, catalog } = props;
+function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; section: RefObject<HTMLElement | null>; catalog: MessageCatalog }>) {
+  const { path, choice, catalog, section } = props;
   const id = useId();
   // dig-f23: an own view typed but not added yet stays in the page while the person looks at another question.
   const typedKey = `own:${path.id}`;
@@ -422,7 +437,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; catalog: M
   };
   const [problem, setProblem] = useState<PickRefusal | null>(null);
   const refusal = choice.refusalFor(path.id);
-  const focus = useBoxFocus();
+  const focus = useBoxFocus(undefined, section);
   if (text === null) {
     return refusal === null ? (
       <button ref={focus.opener} type="button" className="v4Btn v4SugOwnOpen" onClick={() => { setProblem(null); setText(""); focus.focusBox(); }}>
@@ -585,7 +600,7 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
           </div>
         ))}
       <OtherPicks picks={mine} choice={choice} section={section} catalog={catalog} />
-      {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} catalog={catalog} />}
+      {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} section={section} catalog={catalog} />}
       {/* journey-f23 (owner's screen review): no "N picked" count; the picks are marked above and shown as chips in the tray. */}
     </section>
   );

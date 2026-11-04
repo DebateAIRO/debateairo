@@ -81,7 +81,8 @@ describe("the public page's words", () => {
     "v4.public.digCard.onPage": "On the public page",
     "v4.public.digCard.seeOnPage": "See it on the page",
     "v4.public.digCard.keptPrivate": "Kept with you: the public page is unchanged.",
-    "v4.public.digCard.confirmed": "Confirmed: the answer holds.",
+    // journey-f10: the public dig's win sentence is the map's own "What your digs did" line, one key (WHOLE-8).
+    "v4.digsDid.holds": "Confirmed: the answer holds.",
     "v4.publicMark.public": "Public",
     "v4.publicMark.seePage": "See its page",
     "v4.publicMark.copyLink": "Copy link",

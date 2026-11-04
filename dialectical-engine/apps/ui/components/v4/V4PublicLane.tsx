@@ -15,7 +15,7 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { crisisWordsOf, digTargetQuestions } from "@/lib/v4/askText";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { addDig, DIG_UNDO_MS, digTargetKey, dismissDig, readDigUndo, undoDig, useDigUndo, type DigUndoResult } from "@/lib/v4/digUndo";
-import { digPeriodLine, picksButtonLabel } from "@/lib/v4/digQuota";
+import { picksButtonLabel } from "@/lib/v4/digQuota";
 import { placeAboutLine } from "@/components/v4/digAbout";
 import { cardLabel, firstByOf } from "@/lib/v4/mapLooks";
 import { sharePeriodOf } from "@/lib/v4/money";
@@ -151,7 +151,9 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   // dig-f9: the crisis help and the one-time consent at the click, with the map's own piece (no second copy).
   const clickCheck = useDigClickCheck({ ensureConsent: ask.ensureConsent, offerCrisisHelp: ask.offerCrisisHelp });
   const share = useMemo(() => publicDigShare(room), [room]);
-  const periodLine = share === null ? null : digPeriodLine(room, catalog);
+  // public-d3 A / journey-f8: the period, named once by the switch. Someone else's public page has no report of the person's
+  // to finish, so its line is the period alone ("of today", "of this month" on Free; the wave-2 checks, 4 Nov).
+  const periodLine = share === null ? null : t(catalog, `v4.public.dig.period.${sharePeriodOf(room)}`);
   const publicRef = debate.public_ref;
   const question = debate.question;
   const startDig = useCallback(async (path: PublicPathView, press: DigPress): Promise<number | DigRefused | null> => {
@@ -747,18 +749,42 @@ export function V4PublicReports({ debate, catalog, locale }: Readonly<{ debate: 
     if (!writingMine) return;
     section.current?.querySelector<HTMLElement>("[data-public-report-writing]")?.focus();
   }, [writingMine]);
+  // The wave-2 checks (4 Nov): the card goes when the report is there or did not finish. Where it held focus, focus goes on
+  // to the ready line (READY) or to "Write it again" (FAILED), never to the page's body. Whether the card held it is told by
+  // the section's focus events, since a node that is taken away while focused sends none.
+  const cardHeld = useRef(false);
+  useEffect(() => {
+    if ((state.kind !== "READY" && state.kind !== "FAILED") || !cardHeld.current) return;
+    cardHeld.current = false;
+    const active = document.activeElement;
+    if (active !== null && active !== document.body) return;
+    const next = state.kind === "FAILED" ? "[data-public-report-press]" : "[data-public-report-ready]";
+    section.current?.querySelector<HTMLElement>(next)?.focus();
+  }, [state.kind]);
   // A page with no way to press (a publication review) and nothing written has no section.
   if (current === undefined && actions === null) return null;
   // public-f9: the "ready" line. Its status region is always there, so the line is read out once when it appears; it shows at once with the shared
   // 1-second soft highlight. Someone else's report (known only from the server) is not called "yours".
   const ready = state.kind === "READY" ? t(catalog, state.mine ? "v4.ready.report" : "v4.public.report.ready") : "";
   return (
-    <section ref={section} id={REPORTS_ANCHOR} className="v4Root v4PublicLane v4PubReports" aria-labelledby="public-reports-title">
+    <section
+      ref={section}
+      id={REPORTS_ANCHOR}
+      className="v4Root v4PublicLane v4PubReports"
+      aria-labelledby="public-reports-title"
+      onFocus={(event) => {
+        cardHeld.current = event.target instanceof Element && event.target.closest("[data-public-report-writing]") !== null;
+      }}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && !event.currentTarget.contains(next)) cardHeld.current = false;
+      }}
+    >
       <h2 id="public-reports-title" className="v4PubHeading">{t(catalog, "v4.public.reports")}</h2>
       {state.kind === "WRITING" ? (
         <ReportWriting debate={debate} version={state.version} startedAt={state.startedAt} catalog={catalog} locale={locale} onSettled={press.settle} />
       ) : null}
-      <p className={`v4PubReady${ready === "" ? "" : " v4Highlight"}`} role="status" data-public-report-ready>{ready}</p>
+      <p className={`v4PubReady${ready === "" ? "" : " v4Highlight"}`} role="status" tabIndex={-1} data-public-report-ready>{ready}</p>
       {state.kind === "FAILED" ? (
         <p className="v4PubReportFailed" role="alert" data-public-report-failed>{t(catalog, "v4.investigation.failed")}</p>
       ) : null}

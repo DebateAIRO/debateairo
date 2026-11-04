@@ -159,8 +159,11 @@ describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {
   });
 
   it("says it once, in the owner's words, before and after the reset", () => {
-    const date = new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(NEXT_MONTH));
-    const day = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(new Date(NEXT_MONTH));
+    // journey-f22 / journey-f15 (the wave-2 checks): one date form for the month pause, in a sentence and on a label alike.
+    const date = new Intl.DateTimeFormat("en", { day: "numeric", month: "long" }).format(new Date(NEXT_MONTH));
+    const day = date;
+    // No year: the record's "Paused until 1 December".
+    expect(date).not.toMatch(/2026/u);
     expect(pauseSentence({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en"))
       .toBe(`Paused: this month's quota is used up. You can continue from ${date}.`);
     expect(pauseSentence({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toBe("Your new month has started.");

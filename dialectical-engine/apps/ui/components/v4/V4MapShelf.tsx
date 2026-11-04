@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { readMapShelf, type DigLinkCache, type ShelfDig, type ShelfMap, type ShelfPause, type ShelfRead, type ShelfState } from "@/lib/v4/mapShelf";
-import { dayText, whenText } from "@/lib/v4/stateWords";
+import { stateWordText, whenText } from "@/lib/v4/stateWords";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 
@@ -68,28 +68,30 @@ function startedText(iso: string, locale: string): string {
 }
 
 /**
- * The one state word (wait-f13, map-f34, journey-f22): "Looking into it · started 14:00", "Waiting", "Paused until
- * 1 December" (the month wall; "Ready to continue" once the new month has started), "Ready", "Didn't finish".
+ * The one state word (wait-f13, map-f34, journey-f22): "Looking into it · Started 14:00", "Waiting", "Paused until
+ * 1 December" (the month wall; "Ready to continue" once the new month has started), "Ready", "Didn't finish". WHOLE-12
+ * (the wave-2 checks, 4 Nov): from the shared list itself (lib/v4/stateWords.ts) and the waiting card's "Started 14:00"
+ * (journey-f16), so the shelf keeps no words of its own.
  */
 export function shelfStateText(
   state: ShelfState, startedAt: string | null, catalog: MessageCatalog, locale: string, pause: ShelfPause | null = null
 ): string {
   switch (state) {
-    case "PAUSED": {
-      if (pause?.canContinue === true) return t(catalog, "v4.state.PAUSED.canContinue");
-      const date = pause === null ? null : dayText(pause.until, locale);
-      return date === null ? t(catalog, "v4.state.PAUSED.noDate") : t(catalog, "v4.state.PAUSED", { date });
+    case "PAUSED":
+      return pause === null
+        ? t(catalog, "v4.state.PAUSED.noDate")
+        : stateWordText({ kind: "PAUSED", until: pause.until, canContinue: pause.canContinue }, catalog, locale);
+    case "WORKING": {
+      const word = stateWordText({ kind: "LOOKING" }, catalog, locale);
+      const since = startedAt === null ? "" : startedText(startedAt, locale);
+      return since === "" ? word : `${word} · ${t(catalog, "v4.wait.started", { time: since })}`;
     }
-    case "WORKING":
-      return startedAt === null
-        ? t(catalog, "v4.maps.state.working")
-        : t(catalog, "v4.maps.state.workingSince", { time: startedText(startedAt, locale) });
     case "WAITING":
-      return t(catalog, "v4.maps.state.waiting");
+      return stateWordText({ kind: "WAITING", startsAfter: null }, catalog, locale);
     case "READY":
-      return t(catalog, "v4.maps.state.ready");
+      return stateWordText({ kind: "READY" }, catalog, locale);
     case "FAILED":
-      return t(catalog, "v4.maps.state.failed");
+      return stateWordText({ kind: "DIDNT_FINISH" }, catalog, locale);
   }
 }
 

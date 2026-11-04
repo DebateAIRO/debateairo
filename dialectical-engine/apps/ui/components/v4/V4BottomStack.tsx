@@ -22,8 +22,9 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 export type V4BarJob =
   /**
    * `waiting` (dig-f11, owner's screen review 3 Nov): new digs wait for a reset (or rest while the report is written,
-   * journey-f14), so the button stays where it is, greyed; `reason` is the line that says why, for screen readers, and
-   * pressing it shows that line in the panel. `share` (journey-f8): the button's share, for its grey change mark.
+   * journey-f14), so the button stays where it is, greyed; `reason` is the line that says why, shown right above the bar
+   * (journey-f14: a visible line next to it), and pressing the button shows the panel's same line. `share` (journey-f8):
+   * the button's share, for its grey change mark.
    */
   | Readonly<{ kind: "dig"; label: string; onDig: () => void; waiting?: boolean; reason?: string; share?: number | null; place?: string }>
   /** dig-f31: with nothing picked, "Choose what to dig ›" takes the person to the choices instead of digging at once. */
@@ -183,6 +184,11 @@ export function V4BottomStack(props: Readonly<{
       </div>
       {props.pinned ?? null}
       {props.status ?? null}
+      {/* journey-f14 (the wave-2 checks, 4 Nov): the greyed button's reason is a visible line right above it, never only
+          for screen readers. */}
+      {job.kind === "dig" && job.waiting === true && job.reason !== undefined ? (
+        <p id={reasonId} className="v4PanelHint v4Muted v4DebPhoneWhy" data-bar-why="">{job.reason}</p>
+      ) : null}
       <div className="v4DebPhoneBar">
         <button ref={props.mapButtonRef} type="button" className="v4Btn v4DebPhoneMap" onClick={props.onMap} aria-haspopup="dialog">
           {t(catalog, "v4.debate.mapButton")}
@@ -201,7 +207,6 @@ export function V4BottomStack(props: Readonly<{
             </button>
             {/* journey-f8: a changed share in grey for 2 seconds, here too (the panel's own mark is hidden on a phone). */}
             {job.waiting === true ? null : <V4ShareChange share={job.share ?? null} subject={job.place ?? null} />}
-            {job.waiting === true && job.reason !== undefined ? <span id={reasonId} className="v4SrOnly">{job.reason}</span> : null}
           </>
         ) : null}
         {job.kind === "paused" ? (

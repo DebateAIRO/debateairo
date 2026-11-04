@@ -38,13 +38,14 @@ export { CLOCK_24H };
 /**
  * A reset as people read it (journey-f15, owner's screen review 3 Nov): the clock time for a day's reset ("08:00", never
  * "02:00 AM"), the weekday and the clock time for a week's ("Monday 09:00", public-d3), and the day for a month's
- * ("December 1": a month resets as it starts, so its lines say "on"). A month pause keeps its medium date.
+ * ("December 1": a month resets as it starts, so its lines say "on"). A month pause is written the same way (journey-f22,
+ * "Paused until 1 December"; the wave-2 checks, 4 Nov).
  */
 export function resetText(iso: string, scope: PersonScope | "MONTH_PAUSE", locale: string): string {
   return scope === "PERSON_DAY"
     ? formatDate(locale, iso, CLOCK_24H)
     : scope === "MONTH_PAUSE"
-      ? formatDate(locale, iso, { dateStyle: "medium" })
+      ? formatDate(locale, iso, { day: "numeric", month: "long" })
       : scope === "PERSON_WEEK"
         ? formatDate(locale, iso, { weekday: "long", ...CLOCK_24H })
         : formatDate(locale, iso, { day: "numeric", month: "long" });

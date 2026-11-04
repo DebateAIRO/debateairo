@@ -2,8 +2,12 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { V4DigFailed, type V4FailedDigs } from "../../apps/ui/components/v4/V4DigFailed.js";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
+import type { DigRetry } from "../../apps/ui/lib/v4/digRetry.js";
 import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
@@ -168,6 +172,33 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
   });
 
+  it("ACCESS-9 / journey-f14: while digging rests for the report, 'Try this dig again' stays focusable and names the visible reason", async () => {
+    const onRetry = vi.fn();
+    const failed: V4FailedDigs = { retryOf: () => ({ kind: "OFFER" }) as DigRetry, onRetry, reasonText: () => "" };
+    const dig = { state: "FAILED" } as unknown as DigView;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const rest = CATALOG["v4.reportWait.digsRest"]!;
+    await act(async () => root.render(<V4DigFailed dig={dig} failed={failed} digBusy={false} rest={rest} catalog={CATALOG} />));
+    const button = host.querySelector<HTMLButtonElement>(".v4DigFailedRetry")!;
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    const line = host.querySelector<HTMLElement>("[data-dig-rest]")!;
+    expect(line.textContent).toBe(rest);
+    expect(button.getAttribute("aria-describedby")).toBe(line.id);
+    await act(async () => button.click());
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(host.querySelector("[data-dig-rest]")!.classList.contains("v4Highlight")).toBe(true);
+    // Once digging opens again it digs, and no rest line is left.
+    await act(async () => root.render(<V4DigFailed dig={dig} failed={failed} digBusy={false} rest={null} catalog={CATALOG} />));
+    expect(host.querySelector("[data-dig-rest]")).toBeNull();
+    await act(async () => host.querySelector<HTMLButtonElement>(".v4DigFailedRetry")!.click());
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
   it("after a second failure: 'This keeps failing…', with no button", async () => {
     const runId = crypto.randomUUID();
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
@@ -181,8 +212,9 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
 });
 
 describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () => {
-  const day = formatDate("en", NEXT_MONTH, { day: "numeric", month: "short" });
-  const date = formatDate("en", NEXT_MONTH, { dateStyle: "medium" });
+  // journey-f22 / journey-f15 (the wave-2 checks): the month pause's one date form, in a sentence and on a label alike.
+  const day = formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" });
+  const date = day;
   const pausedDig = (canContinue: boolean) => (link: DigLink): DigView =>
     ({ link, state: "RUNNING", headline: null, counts: null, pausedUntil: NEXT_MONTH, canContinue });
 

@@ -220,8 +220,9 @@ describe("a debate paused at the month wall", () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
     await mountMap(1600, runId);
-    const date = formatDate("en", NEXT_MONTH, { dateStyle: "medium" });
-    const day = formatDate("en", NEXT_MONTH, { day: "numeric", month: "short" });
+    // journey-f22 / journey-f15 (the wave-2 checks): the month pause's one date form, in a sentence and on a label alike.
+    const date = formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" });
+    const day = date;
     expect(text()).toContain(word("v4.money.paused", { date }));
     expect(text()).not.toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
     expect(text()).toContain(word("v4.pause.continuesOn", { date: day }));
@@ -248,7 +249,7 @@ describe("a debate paused at the month wall", () => {
     harness.continueRun = vi.fn(async () => ({ kind: "TOO_EARLY" as const, until: NEXT_MONTH }));
     await mountMap(1600, runId);
     await click(buttonNamed(CATALOG["v4.money.continue"]!));
-    expect(text()).toContain(word("v4.money.continueTooEarly", { date: formatDate("en", NEXT_MONTH, { dateStyle: "medium" }) }));
+    expect(text()).toContain(word("v4.money.continueTooEarly", { date: formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" }) }));
     expect(buttonNamed(CATALOG["v4.money.continue"]!).disabled).toBe(false);
   });
 

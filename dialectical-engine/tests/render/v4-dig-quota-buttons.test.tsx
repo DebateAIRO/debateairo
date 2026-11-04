@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { V4ShareChange } from "../../apps/ui/components/v4/V4ShareChange.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import { quotaChanged } from "../../apps/ui/lib/v4/quotaPulse.js";
@@ -125,8 +127,24 @@ describe("journey-f8: a changed share in grey for 2 seconds", () => {
     const mark = panel().querySelector<HTMLElement>(".v4ShareChange")!;
     expect(mark.textContent).toBe("+15%");
     expect(mark.classList.contains("v4Highlight")).toBe(true);
+    // ACCESS-14: the sign stays before the number on right-to-left pages too.
+    expect(mark.getAttribute("dir")).toBe("ltr");
     await advance(2_100);
     expect(panel().querySelector(".v4ShareChange")).toBeNull();
+  });
+
+  it("CODE-4: a share of another place is never shown as a change (path A at 6%, then path B at 4%: no '−2%')", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => root.render(<V4ShareChange share={6} subject="path:a" />));
+    await act(async () => root.render(<V4ShareChange share={4} subject="path:b" />));
+    expect(host.querySelector(".v4ShareChange")).toBeNull();
+    // On the same place a change shows again.
+    await act(async () => root.render(<V4ShareChange share={9} subject="path:b" />));
+    expect(host.querySelector(".v4ShareChange")?.textContent).toBe("+5%");
+    await act(async () => root.unmount());
+    host.remove();
   });
 
   it("read-f20: one short hint under each choice, whichever is chosen", async () => {
@@ -200,9 +218,49 @@ describe("dig-f31: the phone's pinned bar", () => {
     const time = formatDate("en", RESET, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
     expect(phoneJob().textContent).toBe(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.dig.after", { time })}`);
     expect(phoneJob().getAttribute("aria-disabled")).toBe("true");
+    // journey-f14 (the wave-2 checks): the reason is a visible line right above the bar, and the button names it.
+    const why = stack()!.querySelector<HTMLElement>("[data-bar-why]")!;
+    expect(why.textContent).toBe(word("v4.dig.quotaDayUsed", { time }));
+    expect(why.classList.contains("v4SrOnly")).toBe(false);
+    expect(phoneJob().getAttribute("aria-describedby")).toBe(why.id);
     await click(phoneJob());
     await advance(11_000);
     expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("while new digs wait on a whole path, the bar still reads 'Choose what to dig ›' and leads to the choices (dig-f31)", async () => {
+    harness.room = room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, new_starts: "BLOCKED_UNTIL_RESET" });
+    await mountMap(375, crypto.randomUUID(), "n-renew");
+    expect(phoneJob().textContent).toBe(CATALOG["v4.dig.chooseWhat"]);
+    expect(phoneJob().getAttribute("aria-disabled")).toBeNull();
+    expect(stack()!.querySelector("[data-bar-why]")).toBeNull();
+    // ACCESS-11: the where-bar is pinned at the top, so the choices stop just under it (its height + 8 px), not behind it.
+    const where = page().querySelector<HTMLElement>(".v4WhereBar")!;
+    where.getBoundingClientRect = () => ({ height: 52, width: 375, top: 0, left: 0, bottom: 52, right: 375, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    await click(phoneJob());
+    // The choices take focus; there the greyed button says why and offers nothing that digs at once.
+    expect(document.activeElement).toBe(panel().querySelector(".v4Sugs"));
+    expect(panel().querySelector<HTMLElement>(".v4Sugs")!.style.scrollMarginTop).toBe("60px");
+    await advance(11_000);
+    expect(harness.submit).not.toHaveBeenCalled();
+  });
+
+  it("journey-f8 on the phone (OWNER-5): the bar's own change mark when the same picks' share changes, gone after 2 seconds", async () => {
+    harness.room = room({ dig_share_percent: 3 });
+    await mountMap(375, crypto.randomUUID(), "n-renew");
+    await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
+    expect(phoneJob().textContent).toBe(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(3)}`);
+    expect(stack()!.querySelector(".v4ShareChange")).toBeNull();
+    // The room is read again after a quota moment and says more for the same picks: the bar shows the change.
+    harness.roomAgain = room({ dig_share_percent: 7 });
+    await act(async () => quotaChanged());
+    await settle();
+    expect(phoneJob().textContent).toBe(`${CATALOG["v4.dig.yourPicks.one"]} · ${share(7)}`);
+    const mark = stack()!.querySelector<HTMLElement>(".v4DebPhoneBar .v4ShareChange")!;
+    expect(mark.textContent).toBe("+4%");
+    expect(mark.getAttribute("dir")).toBe("ltr");
+    await advance(2_100);
+    expect(stack()!.querySelector(".v4ShareChange")).toBeNull();
   });
 });
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountMenu } from "@/components/AccountMenu";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { switchMode } from "@/components/ModeToggle";
+import { currentMode, switchMode } from "@/components/ModeToggle";
 import { contractClient } from "@/lib/api";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -106,6 +106,10 @@ export function V4AccountMenu({ catalog, level, classicHref, session }: Readonly
                   role="menuitem"
                   type="button"
                   data-v4-menu="mode"
+                  // ACCESS-13 (the wave-2 checks, 4 Nov): its name also says what a press does ("Light or dark: switch to
+                  // dark"), keeping the words it shows first (WCAG 2.5.3). The menu draws its items only when open, so the
+                  // page's mode is read then.
+                  aria-label={t(catalog, currentMode() === "chamber" ? "v4.header.menu.themeToLight" : "v4.header.menu.themeToDark")}
                   onClick={(event) => {
                     const source = event.currentTarget;
                     close();

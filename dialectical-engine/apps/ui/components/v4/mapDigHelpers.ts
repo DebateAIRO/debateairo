@@ -21,17 +21,19 @@ export type PhoneTarget = Readonly<{ target: DigTarget; again: boolean }>;
  * nothing picked, "Choose what to dig ›" takes the person to the path's choices (a whole path is never dug from the bar
  * before they have seen them and the share; whether the bar may then dig the whole path is an owner question). With
  * picks, it digs them ("Dig into your pick · up to 3%"); an open question's own screen digs that one question.
- * dig-f11 / journey-f14: while new digs wait for a reset, or while the report is written (report-d2, `rest`), the button
- * stays where it is, greyed, its reason given to screen readers, and pressing it shows the panel's line that says why.
+ * dig-f11 / journey-f14: while new digs wait for a reset, or while the report is written (report-d2, `rest`), a button
+ * that would dig stays where it is, greyed, with the visible line that says why (V4BottomStack), and pressing it shows
+ * the panel's same line. A whole path keeps "Choose what to dig ›" then too (the wave-2 checks, 4 Nov): the choices show
+ * the greyed button, its reason and "Add to tray", so the bar still leads there.
  */
 export function phoneBarJob(phone: PhoneTarget, quota: V4DigQuota, catalog: MessageCatalog, onDig: () => void,
   show: (place: "choices" | "dig") => void, rest: string | null): V4BarJob {
+  if (phone.target.kind === "path") return { kind: "choose", label: t(catalog, "v4.dig.chooseWhat"), onChoose: () => show("choices") };
   const share = quota.share(phone.target);
   if (rest !== null) return { kind: "dig", label: quota.label(phone.target), onDig: () => show("dig"), waiting: true, reason: rest };
   if (quota.waitLine !== null) {
     return { kind: "dig", label: quota.label(phone.target), onDig: () => show("dig"), waiting: true, reason: quota.waitLine };
   }
-  if (phone.target.kind === "path") return { kind: "choose", label: t(catalog, "v4.dig.chooseWhat"), onChoose: () => show("choices") };
   return { kind: "dig", label: quota.label(phone.target), onDig, share, place: placeOf(phone.target) };
 }
 

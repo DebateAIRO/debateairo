@@ -78,3 +78,31 @@ describe("S02 public debate answer surface", () => {
     }
   });
 });
+
+/*
+ * Owner's screen review, 3 Nov 2026 (public-f26): "Copy link" also appears at the top of the public page, in its top bar (on a phone, in the bar's
+ * menu), the same button as on the debate's own pages (V4CopyLink): it copies the public page's own address and says so quietly.
+ */
+describe("public-f26: Copy link at the top of the public page", () => {
+  it("sits in the top bar before 'Report a problem' and copies this page's address", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const copied: string[] = [];
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: async (url: string) => { copied.push(url); } } });
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(
+      <PublicDebatePageClient debate={publicDebate} locale="en" storyLocale="en" storyCatalog={publicEnglish} publicCatalog={publicEnglish}
+        homeCatalog={{}} timeCatalog={timeEnglish} debateChromeCatalog={debateChromeEnglish} />
+    ));
+    const menu = container.querySelector("[data-public-top-menu]")!;
+    const copy = menu.querySelector<HTMLButtonElement>("[data-public-copy-link]")!;
+    expect(copy.textContent).toBe("Copy link");
+    const flag = menu.querySelector("[data-public-report]")!;
+    expect(copy.compareDocumentPosition(flag) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    await act(async () => copy.click());
+    await act(async () => { await Promise.resolve(); });
+    expect(copied).toEqual([new URL(`/public/debate/${publicDebate.public_ref}`, window.location.origin).toString()]);
+    expect(menu.querySelector(".v4PublicMarkCopied")!.textContent).toBe("Link copied.");
+  });
+});

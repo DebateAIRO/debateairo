@@ -73,7 +73,7 @@
 /* dig-d1 B: "This path says now ▾" shows that it folds (a flex summary draws no marker of its own); the same arrow as
    the panel's other folds (v4-map.css .v4PanelGroup). */
 .v4DigPathNow > summary::-webkit-details-marker { display: none; }
-.v4DigPathNow > summary::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
-.v4DigPathNow > summary:dir(rtl)::before { content: "◂"; }
-.v4DigPathNow[open] > summary::before { content: "▾"; }
+.v4DigPathNow > summary::before { content: "▸"; content: "▸" / ""; margin-inline-end: 8px; color: var(--text-3); }
+.v4DigPathNow > summary:dir(rtl)::before { content: "◂"; content: "◂" / ""; }
+.v4DigPathNow[open] > summary::before { content: "▾"; content: "▾" / ""; }
 .v4DigPathNow > p { margin: 0; overflow-wrap: anywhere; }

@@ -201,7 +201,8 @@ export function PublicDigCard({ dig, openHref, catalog, locale }: Readonly<{
       </button>
     </>
   ) : progress.kind === "CONFIRMED" ? (
-    <p className="v4PubDigOutcome">{t(catalog, "v4.public.digCard.confirmed")}</p>
+    // journey-f10 (WHOLE-8, the wave-2 checks): the one win sentence, from "What your digs did" (V4ChangesBar), never a copy.
+    <p className="v4PubDigOutcome">{t(catalog, "v4.digsDid.holds")}</p>
   ) : progress.kind === "KEPT_PRIVATE" ? (
     <p className="v4PubHint">{t(catalog, "v4.public.digCard.keptPrivate")}</p>
   ) : progress.kind === "REMOVED" ? (

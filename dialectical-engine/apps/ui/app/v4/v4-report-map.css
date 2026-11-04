@@ -20,9 +20,10 @@
 /* In the top bar: its own row at the end side, as wide as a short paragraph. The browser check (4 Nov): its long lines
    made the bar's right side as wide as all of them together, so the level menu, the share and the account button left the
    brand's row and the strip sat between them. Its own width no longer counts (contain), so they keep their row, and it comes
-   after them (order), under them at the end side; the bar's items keep to its top. */
+   after them, under them at the end side; the bar's items keep to its top. It is after the account button in the page too
+   (V4Header's `after`), so no `order` is needed and the keyboard meets it where it is seen (the wave-2 checks). */
 .v4RepStrip-top {
-  flex: 1 1 100%; order: 1; contain: inline-size; width: min(30rem, 100%); max-width: 30rem; margin-inline-start: auto;
+  flex: 1 1 100%; contain: inline-size; width: min(30rem, 100%); max-width: 30rem; margin-inline-start: auto;
 }
 .v4Hdr:has(> .v4HdrRight > .v4RepStrip-top) { align-items: flex-start; }
 .v4HdrRight:has(> .v4RepStrip-top) { justify-content: flex-end; }

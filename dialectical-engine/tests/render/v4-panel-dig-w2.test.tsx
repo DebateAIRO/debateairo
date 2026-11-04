@@ -338,6 +338,23 @@ describe("the browser check (4 Nov): focus follows the wording and own-view boxe
     await click(buttonNamed(CATALOG["v4.suggest.cancel"]!, panel()));
     expect(document.activeElement).toBe(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
   });
+
+  it("an own view that fills Free's pick cap: 'Add your own view' goes, so focus goes to the view's Remove", async () => {
+    harness.planTier = "free";
+    await mountMap();
+    await openPath(PATHS.renew);
+    await click(panelBoxes()[0]!);
+    await click(panelBoxes()[1]!);
+    await click(buttonNamed(CATALOG["v4.suggest.ownView"]!, panel()));
+    await typeInto(panel().querySelector<HTMLTextAreaElement>(".v4SugEditor textarea")!, "Grid links matter more than batteries.");
+    await click(buttonNamed(CATALOG["v4.suggest.ownViewAdd"]!, panel()));
+    // The cap (3 on Free) is reached: no "Add your own view" any more.
+    expect(buttonsNamed(CATALOG["v4.suggest.ownView"]!, panel())).toHaveLength(0);
+    const row = panel().querySelector<HTMLElement>(".v4SugRowPlain:last-of-type")!;
+    expect(row.textContent).toContain("Grid links matter more than batteries.");
+    expect(document.activeElement).toBe(row.querySelector("button"));
+    expect(document.activeElement).not.toBe(document.body);
+  });
 });
 
 describe("dig-f21: the person's words keep the direction they were typed in", () => {
