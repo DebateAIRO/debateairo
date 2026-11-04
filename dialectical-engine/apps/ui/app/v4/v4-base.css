@@ -15,6 +15,38 @@
   font-size: var(--t-body);
   line-height: 1.5;
 }
+/* journey-d1, owner chat answer "Six moves" (3 Nov): the shared motion base. Only six things move: fold (the question
+   card into the map at Start), clear (open ground turns solid), snap (paths join on Combine, part on Split), fly-in (a
+   tapped answer's sentence into the question box, read-d3 B), roll (read-d5 B) and turn-over (a dig's card, dig-d4 B).
+   Each takes its own token below, every one under 0.5 s, with --v4-ease-move; nothing makes a sound. Everything else
+   changes at once and takes .v4Highlight: a soft terracotta wash that fades over 1 s (put the class on again, or re-key
+   the element, to play it again), always next to a line of text that says what changed. Under prefers-reduced-motion
+   every move token is 0.01ms, so each move is instant and transitionend / animationend still fire; the highlight is
+   colour only, so it stays. A move uses only these tokens, e.g. transition: transform var(--v4-move-fold) var(--v4-ease-move). */
+.v4Root {
+  --v4-move-fold: 420ms;
+  --v4-move-clear: 360ms;
+  --v4-move-snap: 260ms;
+  --v4-move-fly: 320ms;
+  --v4-move-roll: 280ms;
+  --v4-move-turn: 480ms;
+  --v4-ease-move: cubic-bezier(.2, .7, .2, 1);
+  --v4-highlight: var(--con-bg);
+  --v4-highlight-time: 1s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v4Root {
+    --v4-move-fold: 0.01ms;
+    --v4-move-clear: 0.01ms;
+    --v4-move-snap: 0.01ms;
+    --v4-move-fly: 0.01ms;
+    --v4-move-roll: 0.01ms;
+    --v4-move-turn: 0.01ms;
+  }
+}
+.v4Highlight { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
+/* Only a `from`: the wash fades into the element's own background and shadow, and nothing is left behind after 1 s. */
+@keyframes v4Highlight { from { background-color: var(--v4-highlight); box-shadow: 0 0 0 4px var(--v4-highlight); } }
 .v4Root *, .v4Root *::before, .v4Root *::after { box-sizing: border-box; }
 .v4Root :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* :where keeps this reset at element weight, so every class below (.v4BtnPrimary's light text included) wins over it. */

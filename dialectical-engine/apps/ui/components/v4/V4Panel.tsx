@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode, RefObject } from "react";
+import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
@@ -57,6 +57,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * Dig model revision W4-6: a path a dig rewrote shows its rewrite under its new text (V4PathRewrite.tsx); a dig's own page
  * says what it looked into and the path it rewrote in place of a short answer (a dig writes no story, owner Q-D13), then its
  * answer text and its points as usual; a dig's panel says what became of its rewrite, or that it is paused at the month wall.
+ * Screen review fixes (owner picks, 3 Nov): the first group with points opens (map-f1); a long suggestion list gets "Skip
+ * to the dig button" (dig-f24); "Nothing is open here" goes when suggestions follow (dig-f33); a dig's way back to its path
+ * names the path and waits until the dig is done (dig-f13); a waiting dig says so only after 10 seconds (dig-f28).
  */
 
 type PanelProps = Readonly<{
@@ -144,15 +147,20 @@ function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: Rea
   );
 }
 
-/** The points in the four trust words, as folded groups; only groups with points; Sure is open at first. */
+/**
+ * The points in the four trust words, as folded groups; only groups with points. map-f1: the first group that has points
+ * is open at first, in the words' order (Sure, then Sure for the case named, then Still argued), so a debate with no
+ * "Sure" (every Free one, older ones) never opens on folded headings only; "Didn't hold" always starts folded.
+ */
 function PointGroups(props: Readonly<{ points: readonly V4Point[]; level: ReadingLevel; catalog: MessageCatalog; locale: string }>) {
   const groups = TRUST_WORDS.map((word) => ({ word, points: props.points.filter((point) => point.trust === word) }))
     .filter((group) => group.points.length > 0);
   if (groups.length === 0) return null;
+  const opened = groups.find((group) => group.word !== "DIDNT_HOLD")?.word ?? null;
   return (
     <div className="v4PanelGroups">
       {groups.map((group) => (
-        <details key={group.word} className={`v4PanelGroup v4PanelGroup${group.word}`} open={group.word === "SURE"}>
+        <details key={group.word} className={`v4PanelGroup v4PanelGroup${group.word}`} open={group.word === opened}>
           <summary>
             {t(props.catalog, "v4.panel.group", {
               word: t(props.catalog, `v4.trust.${group.word}`),
@@ -249,18 +257,23 @@ function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSele
   );
 }
 
-/** "Where to dig from here": the open questions under this selection (pick box + a button that opens it), then digs. */
+/**
+ * "Where to dig from here": the open questions under this selection (pick box + a button that opens it), then digs.
+ * dig-f33: `emptyKey` null says nothing when nothing is open (the path's own suggestions follow, under "Choose what to
+ * dig"); with no digs either, the section is left out rather than shown as a bare heading.
+ */
 function WhereToDig(props: Readonly<{
   open: readonly V4OpenQuestion[];
   digs: readonly DigView[];
-  emptyKey: "v4.panel.noOpenRoot" | "v4.panel.noOpenPath";
+  emptyKey: "v4.panel.noOpenRoot" | "v4.panel.noOpenPath" | null;
   panel: PanelProps;
 }>) {
-  const { panel } = props;
+  const { panel, emptyKey } = props;
+  if (props.open.length === 0 && props.digs.length === 0 && emptyKey === null) return null;
   return (
     <Section title={t(panel.catalog, "v4.panel.whereToDig")}>
       {props.open.length === 0
-        ? <p className="v4Muted">{t(panel.catalog, props.emptyKey)}</p>
+        ? (emptyKey === null ? null : <p className="v4Muted">{t(panel.catalog, emptyKey)}</p>)
         : (
           <ul className="v4PanelRows">
             {props.open.map((question) => {
@@ -315,12 +328,35 @@ function DeepestLine(props: Readonly<{ catalog: MessageCatalog }>) {
   return <p className="v4PanelHint v4PanelDeepest" role="note">{t(props.catalog, "v4.nest.deepest")}</p>;
 }
 
+/** dig-f24: from this many suggestions on (each a pick box and a wording link), the list gets "Skip to the dig button". */
+const SKIP_TO_DIG_FROM = 3;
+
+/**
+ * dig-f24: "Skip to the dig button" above a long suggestion list, so a keyboard user need not Tab through every pick box
+ * and wording link. It moves focus only (never the address): to the dig button, or to its block when the button cannot
+ * take focus (busy, or hidden on the phone, where the pinned bar carries it; map-f18). Seen only while it has focus.
+ */
+function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }>) {
+  const jump = (): void => {
+    const block = document.getElementById(props.targetId);
+    if (block === null) return;
+    const button = block.querySelector<HTMLButtonElement>(".v4PanelDigBtn");
+    const usable = button !== null && !button.disabled && window.getComputedStyle(button).display !== "none";
+    (usable ? button : block).focus();
+  };
+  return (
+    <button type="button" className="v4Link v4PanelSkip" onClick={jump}>
+      {t(props.catalog, "v4.panel.skipToDig")}
+    </button>
+  );
+}
+
 /**
  * Quick look / Thorough, then "Dig deeper here" (row D decisions 1 and 5). W3-4: "Dig here too" where a dig already
  * exists (and on every path of a dig's own map); the person's picks name how many they are; the money lines before the
  * dig; at the deepest level the "deepest level" line instead of all of it.
  */
-function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean }>) {
+function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string }>) {
   const { panel } = props;
   if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
   // Several picks: "Dig into {count} together" (today's tray words); one, or a whole path: as before, or "Dig here too".
@@ -328,7 +364,8 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
     ? tPlural(panel.catalog, "v4.dig.trayDig", props.target.picks.length, panel.locale)
     : t(panel.catalog, props.again === true ? "v4.nest.digHereToo" : "v4.panel.dig");
   return (
-    <section className="v4PanelDig">
+    // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
+    <section className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
       {panel.showDigModes === false ? null : (
         <>
           <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
@@ -490,6 +527,13 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   // The heading shows the short title; the full line is repeated here only when the title had to be cut.
   const cut = line.length > 0 && shortText(line) !== line;
   const addResearched = panel.onAddResearched;
+  const digId = useId();
+  // The suggestions "Choose what to dig" lists (none at the deepest level, where it is not shown).
+  const suggestions = panel.choice?.canDig === true ? path.suggestions ?? [] : [];
+  // dig-f33: "Nothing is open here. You can still dig deeper…" only when no suggestion follows it; at the deepest level
+  // nothing can be dug, so the plain "nothing is left" line.
+  const emptyKey = suggestions.length > 0 ? null : panel.choice?.canDig === false ? "v4.panel.noOpenRoot" : "v4.panel.noOpenPath";
+  const skip = suggestions.length >= SKIP_TO_DIG_FROM;
   return (
     <>
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
@@ -528,11 +572,17 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
       <WhereToDig
         open={undugOpen(path.open, panel.digs)}
         digs={digsUnder(panel.map, panel.digs, path.id)}
-        emptyKey="v4.panel.noOpenPath"
+        emptyKey={emptyKey}
         panel={panel}
       />
+      {skip ? <SkipToDig targetId={digId} catalog={panel.catalog} /> : null}
       {panel.choice !== undefined ? <V4DigCompose path={path} choice={panel.choice} catalog={panel.catalog} locale={panel.locale} /> : null}
-      <DigBlock target={pathTarget(path, panel)} panel={panel} again={panel.choice?.digHereToo(path.id) === true} />
+      <DigBlock
+        target={pathTarget(path, panel)}
+        panel={panel}
+        again={panel.choice?.digHereToo(path.id) === true}
+        {...(skip ? { id: digId } : {})}
+      />
     </>
   );
 }
@@ -588,21 +638,32 @@ function OpenBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   );
 }
 
+/** Stands in for the path's title while the sentence around it is read from the catalogue (the title is AI text). */
+const PATH_MARK = "\u0000path\u0000";
+
 /**
- * W3-4: "Dig here too" under a dig: a dig of a path opens that path, where the person chooses what to dig again; a dig of
- * open questions digs the ones still on the map. Nothing at the deepest level but its line; nothing for a dig that failed.
+ * W3-4: digging again from a dig's panel: a dig of a path offers a way back to that path, where the person chooses what
+ * to dig again; a dig of open questions digs the ones still on the map ("Dig here too"). Nothing at the deepest level but
+ * its line; nothing for a dig that failed. dig-f13: the way back says where it goes ("Go to “Mostly renewables” to dig
+ * again"), because everywhere else "Dig here too" starts a dig; and nothing is offered while the dig is still at work.
  */
 function DigAgain(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "dig" }> }>) {
   const { panel } = props;
   const { dig, home } = props.resolved;
-  if (panel.choice === undefined || dig.state === "FAILED") return null;
+  if (panel.choice === undefined || dig.state === "FAILED" || digWorking(dig)) return null;
   if (!panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
   const pathPlace = dig.link.openQuestionIds.find((id) => id.startsWith("path:"));
   if (pathPlace !== undefined && home.path !== null) {
     const pathId = home.path.id;
+    const title = pathTitle(home.path, panel.catalog, 40);
+    const [before = "", after = ""] = t(panel.catalog, "v4.nest.goDigAgain", { path: PATH_MARK }).split(PATH_MARK);
     return (
-      <button type="button" className="v4Btn" onClick={(event) => panel.onSelect(`path:${pathId}`, viaKeyboard(event))}>
-        {t(panel.catalog, "v4.nest.digHereToo")}
+      <button type="button" className="v4Btn v4PanelGoDig" onClick={(event) => panel.onSelect(`path:${pathId}`, viaKeyboard(event))}>
+        <span>
+          {before}
+          <span data-ai-generated={title.ai ? "true" : undefined}>{title.text}</span>
+          {after}
+        </span>
       </button>
     );
   }
@@ -611,6 +672,33 @@ function DigAgain(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
     return question === null ? [] : [question];
   });
   return questions.length === 0 ? null : <DigBlock target={{ kind: "open", questions }} panel={panel} again />;
+}
+
+/** dig-f28: a dig sent this long ago that still waits for a free spot is told so; until then it is only starting. */
+const WAITING_TOLD_AFTER_MS = 10_000;
+
+/** How much longer until a dig sent at `startedAt` has waited long enough to be told so (0: now; unknown start: now). */
+function waitLeft(startedAt: string | null, now: number): number {
+  const sent = startedAt === null ? Number.NaN : Date.parse(startedAt);
+  if (Number.isNaN(sent)) return 0;
+  // A start "in the future" (this device's clock is behind) waits the 10 seconds from now, never longer.
+  return Math.min(WAITING_TOLD_AFTER_MS, Math.max(0, sent + WAITING_TOLD_AFTER_MS - now));
+}
+
+/**
+ * dig-f28: a waiting dig's line. In its first 10 seconds "Starting your dig…"; after that "Waiting for a free spot. It
+ * starts on its own. You can close this page." (no "usually within a minute" until the waits are measured). One timer,
+ * for this dig only (the caller keys it by the dig).
+ */
+function WaitingLine(props: Readonly<{ startedAt: string | null; catalog: MessageCatalog }>) {
+  const { startedAt } = props;
+  const [waited, setWaited] = useState(() => waitLeft(startedAt, Date.now()) === 0);
+  useEffect(() => {
+    if (waited) return undefined;
+    const timer = window.setTimeout(() => setWaited(true), waitLeft(startedAt, Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [waited, startedAt]);
+  return <>{t(props.catalog, waited ? "v4.panel.digState.WAITING" : "v4.panel.digStarting")}</>;
 }
 
 function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "dig" }> }>) {
@@ -642,7 +730,9 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
             ? t(panel.catalog, "v4.money.paused", { date: formatDate(panel.locale, paused, { dateStyle: "medium" }) })
             : rewrite !== undefined && dig.state === "DONE"
               ? digNote(dig, panel.catalog)
-              : t(panel.catalog, `v4.panel.digState.${dig.state}`)}
+              : dig.state === "WAITING"
+                ? <WaitingLine key={dig.link.childRunId} startedAt={dig.link.startedAt} catalog={panel.catalog} />
+                : t(panel.catalog, `v4.panel.digState.${dig.state}`)}
           {dig.link.mode !== null
             ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
             : null}
