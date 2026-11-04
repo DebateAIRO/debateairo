@@ -6,8 +6,9 @@ import type { BillingAudit } from "./audit.js";
 import { taxRefusalDetail } from "./quote.js";
 
 /**
- * Terms §12: "Prices include VAT, GST or sales tax, which depends on where you live". The tax one place adds to every
- * plan, priced in that place's currency, as the plans list shows it before any address is given.
+ * Terms §12: "Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live)". The
+ * tax one place adds to every plan, priced in that place's currency, as the plans list names it (and the total it makes)
+ * before any address is given.
  */
 export type DisplayedTax = Readonly<{
   country: string;

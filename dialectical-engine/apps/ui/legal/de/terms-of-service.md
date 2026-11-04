@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.14 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.15 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.14
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.15
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.14 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.15 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -225,7 +225,7 @@ Dialectical Engine bietet einen kostenlosen Tarif an. Ein kostenpflichtiger **Pr
 
 **Fehlgeschlagene Zahlungen.** Wenn eine Zahlung fehlschlägt, versuchen wir sie 7 Tage lang erneut und warnen Sie per E-Mail, bevor wir Ihr Konto auf den kostenlosen Tarif herabstufen. Wir löschen Ihre Debatten nicht wegen einer fehlgeschlagenen Zahlung.
 
-**Steuern und Zahlungsempfänger.** Die Preise enthalten Mehrwertsteuer, GST oder Umsatzsteuer; dies hängt von Ihrem Wohnort ab und wird vor der Zahlung angezeigt. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt.
+**Steuern und Zahlungsempfänger.** Unsere Preise werden ohne Steuern angezeigt, als Preis + MwSt. (oder GST oder Umsatzsteuer, je nach Ihrem Wohnort). Die Steuer für Ihre Rechnungsadresse wird beim Bezahlvorgang aufgeschlagen, und vor der Zahlung zeigt Ihnen der Bezahlvorgang den Gesamtbetrag, den Sie zahlen, einschließlich Steuern. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt.
 
 **Zahlungsarten.** Sie bezahlen per Karte. Wir akzeptieren Visa und Mastercard; American Express akzeptieren wir nicht. Kartenzahlungen werden von NETOPIA Payments (netopia-payments.com) abgewickelt, und Ihre vollständige Kartennummer erreicht uns nie.
 
@@ -250,6 +250,8 @@ Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls gelte
 Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von **30 Tagen** nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge.
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
+
+Version 2.15 ersetzte Version 2.14: Abschnitt 12 besagt, dass unsere Preise ohne Steuern angezeigt werden, als Preis + MwSt., und dass die Steuer beim Bezahlvorgang aufgeschlagen wird.
 
 Version 2.14 ersetzte Version 2.13: Abschnitt 18 und Anhang A nennen ANPC (SAL) als Weg zur alternativen Streitbeilegung.
 

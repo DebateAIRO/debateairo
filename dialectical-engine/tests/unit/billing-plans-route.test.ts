@@ -72,7 +72,7 @@ describe("P8a GET /v1/billing/plans", () => {
     };
     const geo: GeoLookup = { lookup: (ip) => PLACES[ip] ?? { country: "XX", tor: false }, close: () => undefined };
     const api = buildApi({ application: unusedAskApplication(), billing: { ...billing(), plans: testRegionalPlans, geo } });
-    // With no tax reader composed, a known place is TAX_UNAVAILABLE: no price, never one before tax.
+    // With no tax reader composed, a known place is TAX_UNAVAILABLE: no tax and no total, only the net prices.
     const answers: Array<[string, string, string]> = [
       ["198.51.100.10", "RON", "TAX_UNAVAILABLE"], ["198.51.100.20", "EUR", "TAX_UNAVAILABLE"],
       ["198.51.100.30", "USD", "POSTAL_CODE_NEEDED"],
@@ -137,10 +137,10 @@ describe("P8a GET /v1/billing/plans", () => {
 });
 
 /**
- * Terms §12: "Prices include VAT, GST or sales tax, which depends on where you live". The list prices every plan for a
- * place, from the tax engine the quote asks (FakeTaxEngine's rates: RO 21 %, DE 19 %, FR 20 %, Texas 6.25 % by its
- * postal code; elsewhere none): the country the visitor chose, else the connection's, and in the US and Canada the
- * postal code. A place it cannot price yet gets no price at all, never one before tax.
+ * Terms §12: "Our prices are shown before tax, as price + VAT". The list names, for a place, the tax it adds to every
+ * plan and each plan's total with it, from the tax engine the quote asks (FakeTaxEngine's rates: RO 21 %, DE 19 %, FR
+ * 20 %, Texas 6.25 % by its postal code; elsewhere none): the country the visitor chose, else the connection's, and in
+ * the US and Canada the postal code. A place it cannot price yet gets no tax and no total, only the net prices.
  */
 describe("Terms §12 GET /v1/billing/plans prices each place with its own tax", () => {
   const PLACES: Readonly<Record<string, Readonly<{ country: string; tor: boolean }>>> = {
