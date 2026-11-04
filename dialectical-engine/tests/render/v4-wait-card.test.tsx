@@ -21,7 +21,8 @@ vi.mock("next/link", () => ({
 const V4 = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
 const word = (key: string, values: Record<string, string> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replace(`{${name}}`, value), V4[key]!);
-const clock = (at: number | string): string => new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(new Date(at));
+// journey-f15 (owner's screen review): one 24-hour clock on every V4 page ("14:31", never "02:31 PM").
+const clock = (at: number | string): string => new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(at));
 const STARTED = "2026-11-04T09:31:00.000Z";
 const STARTED_MS = Date.parse(STARTED);
 const LOOKING: WaitState = { kind: "LOOKING" };

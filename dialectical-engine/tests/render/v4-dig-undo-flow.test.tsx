@@ -121,14 +121,15 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
-  it("names the share of today, and on Free leaves the mode word out of the note and the tray", async () => {
+  it("names the share of its window (Free: this month, public-f14), and on Free leaves the mode word out of the note and the tray", async () => {
     harness.planTier = "free";
-    harness.room = room({ dig_share_percent: 4 });
+    harness.room = room({ plan_id: "FREE", dig_share_percent: 4 });
     await mountMap();
     await openPath(PATHS.smr);
-    await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
+    // journey-f13: the button carries its share; the note repeats it (dig-f5).
+    await press(buttonNamed(`${CATALOG["v4.panel.dig"]} · ${word("v4.undo.barShare", { percent: 4 })}`, panel()));
     const note = notes()[0]!.textContent ?? "";
-    expect(note).toContain(word("v4.undo.digShare", { percent: 4 }));
+    expect(note).toContain(word("v4.undo.digShare.PERSON_MONTH", { percent: 4 }));
     expect(note).not.toContain(CATALOG["v4.digMode.quick"]);
     // No ticking number: the countdown is the line.
     expect(note).not.toMatch(/\(\d+\)/u);
@@ -244,8 +245,14 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     harness.room = room({ dig_share_percent: 3 });
     await mountMap(375, crypto.randomUUID(), "n-smr");
     const bar = page().querySelector<HTMLElement>(".v4StackPhone .v4DebPhoneBar")!;
+    // dig-f31 (owner's screen review): on a path with nothing picked, the bar first shows the choices; nothing is dug.
+    const choose = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
+    expect(choose.textContent).toBe(CATALOG["v4.dig.chooseWhat"]);
+    await press(choose);
+    expect(harness.submit).not.toHaveBeenCalled();
+    expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
     const job = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
-    expect(job.textContent).toBe(`${CATALOG["v4.debate.digHere"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
+    expect(job.textContent).toBe(`${CATALOG["v4.panel.dig"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
     await press(job);
     // The note sits inside the stack, above the bar; the bar's dig button steps back for the note's Undo.
     const note = stack()!.querySelector(".v4StackTop .v4Undo");
@@ -277,12 +284,15 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect(tray.querySelectorAll(".v4ChoiceChip")).toHaveLength(1);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!, tray)).toHaveLength(0);
     expect(buttonsNamed(CATALOG["v4.dig.trayClear"]!, tray)).toHaveLength(1);
-    expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.debate.digHere"]);
+    // dig-f5 / dig-f31: with one pick on this path, the bar digs it: "Dig into your pick" (no share known here).
+    expect(stack()!.querySelector(".v4DebPhoneDig")?.textContent).toBe(CATALOG["v4.dig.yourPicks.one"]);
   });
 
   it("after a single dig of a path the slim line does not claim a good time (dig-f29, the map track's report rule)", async () => {
     await mountMap(375, crypto.randomUUID(), "n-smr");
     expect(stack()!.querySelector(".v4StackGoodTime")).toBeNull();
+    // dig-f31: the first press shows the path's choices, the second digs the whole path.
+    await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
     await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
     await advance(10_100);
     await settle(16_000);

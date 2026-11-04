@@ -392,7 +392,7 @@ describe("V4 mock API: the new dig model and the money rule", () => {
       "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
       // V4 screen review (3 Nov 2026): the first debate's report is older than its map (dig-f19), and its main answer is rewritten (dig-f1).
       "v4.rewrite.reportOlder", "v4.rewrite.updateReport", "v4.rewrite.changedSinceYourReport", "v4.mainAnswer.writing", "v4.digsDid.news.ANSWER",
-      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.nest.digHereToo", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
+      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.dig.chooseWhat", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
       "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);

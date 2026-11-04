@@ -179,7 +179,7 @@ describe("dig-f13: a dig's way back to its path", () => {
     expect(button).toBeDefined();
     expect(others).toHaveLength(0);
     expect(button!.querySelector("[data-ai-generated]")?.textContent).toBe("Mostly renewables, path a");
-    expect(buttonsNamed(page, t(catalog, "v4.nest.digHereToo"))).toHaveLength(0);
+    expect(buttonsNamed(page, t(catalog, "v4.panel.dig"))).toHaveLength(0);
     await act(async () => button!.click());
     expect(selected).toEqual(["path:a"]);
   });
@@ -191,14 +191,14 @@ describe("dig-f13: a dig's way back to its path", () => {
     for (const working of [dig("d1", "WAITING", ["path:a"]), dig("d2", "RUNNING", ["path:a"]), rewriting]) {
       const page = render(map, `dig:${working.link.childRunId}`, { digs: [working] });
       expect(page.textContent, working.link.childRunId).not.toContain(goWords("Mostly renewables, path a"));
-      expect(buttonsNamed(page, t(catalog, "v4.nest.digHereToo")), working.link.childRunId).toHaveLength(0);
+      expect(buttonsNamed(page, t(catalog, "v4.panel.dig")), working.link.childRunId).toHaveLength(0);
     }
   });
 
-  it("a dig of open questions keeps \"Dig here too\" (it starts a dig, as everywhere) once it is done, not while it runs", () => {
+  it("a dig of open questions keeps its dig button (\"Dig here\", journey-f13) once it is done, not while it runs", () => {
     const map = mapWith([], [path("a", { open: [open("p:x", "a")] })]);
-    expect(buttonsNamed(render(map, "dig:d1", { digs: [dig("d1", "DONE", ["p:x"])] }), t(catalog, "v4.nest.digHereToo"))).toHaveLength(1);
-    expect(buttonsNamed(render(map, "dig:d2", { digs: [dig("d2", "RUNNING", ["p:x"])] }), t(catalog, "v4.nest.digHereToo"))).toHaveLength(0);
+    expect(buttonsNamed(render(map, "dig:d1", { digs: [dig("d1", "DONE", ["p:x"])] }), t(catalog, "v4.panel.dig"))).toHaveLength(1);
+    expect(buttonsNamed(render(map, "dig:d2", { digs: [dig("d2", "RUNNING", ["p:x"])] }), t(catalog, "v4.panel.dig"))).toHaveLength(0);
   });
 });
 

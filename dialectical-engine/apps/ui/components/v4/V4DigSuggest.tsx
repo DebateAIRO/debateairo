@@ -47,6 +47,11 @@ export type V4DigChoice = Readonly<{
    * page while the person moves between questions. Left out: they last only while this part is on screen, as before.
    */
   typed?: TypedWords;
+  /**
+   * dig-f5 (owner's screen review, 3 Nov): where the person's picks wait, named, and a way there: "Your picks are waiting
+   * on “Mostly renewables”. [Go to them] [Clear them]". Left out: the older one-line warning and "Clear".
+   */
+  picksPlace?: Readonly<{ title: Readonly<{ text: string; ai: boolean }>; onGo: () => void }>;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -152,14 +157,33 @@ export function SuggestionLeaves(props: Readonly<{
   );
 }
 
-/** "Dig here too" on the tree and the outline: opens the path in the panel, where the person chooses what to dig. */
+/**
+ * On the tree and the outline, under a path that already has a dig (and every path of a dig's own map): opens the path in
+ * the panel, where the person chooses what to dig. journey-f13 (owner's screen review, 3 Nov): it no longer says "Dig
+ * here too", which promised a dig it did not start; it says where it goes, "Choose what to dig ›" (dig-f31's words).
+ */
 export function DigHereTooLeaf(props: Readonly<{ onOpenPath: () => void; variant: "tree" | "outline"; catalog: MessageCatalog }>) {
   return (
     <li className={props.variant === "tree" ? "v4MapLeaf v4MapLeafSuggestion" : "v4OutRow v4OutSuggestion"}>
       <button type="button" className="v4MapMore v4SugAgain" onClick={props.onOpenPath}>
-        {t(props.catalog, "v4.nest.digHereToo")}
+        {t(props.catalog, "v4.dig.chooseWhat")}
       </button>
     </li>
+  );
+}
+
+/** Stands in for the picks' path title while the sentence around it is read from the catalogue (the title is AI text). */
+const PLACE_MARK = "\u0000place\u0000";
+
+/** dig-f5: "Your picks are waiting on “Mostly renewables”." with the title marked as the AI's words when it is. */
+function WaitingOn(props: Readonly<{ title: Readonly<{ text: string; ai: boolean }>; catalog: MessageCatalog }>) {
+  const [before = "", after = ""] = t(props.catalog, "v4.suggest.waitingOn", { path: PLACE_MARK }).split(PLACE_MARK);
+  return (
+    <p className="v4PanelText">
+      {before}
+      <span data-ai-generated={props.title.ai ? "true" : undefined}>{props.title.text}</span>
+      {after}
+    </p>
   );
 }
 
@@ -332,8 +356,20 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
       ) : null}
       {elsewhere ? (
         <div className="v4SugElsewhere" role="status">
-          <p className="v4PanelText">{t(catalog, "v4.suggest.otherPath")}</p>
-          <button type="button" className="v4Btn" onClick={choice.onClear}>{t(catalog, "v4.dig.trayClear")}</button>
+          {choice.picksPlace === undefined ? (
+            <>
+              <p className="v4PanelText">{t(catalog, "v4.suggest.otherPath")}</p>
+              <button type="button" className="v4Btn" onClick={choice.onClear}>{t(catalog, "v4.dig.trayClear")}</button>
+            </>
+          ) : (
+            <>
+              <WaitingOn title={choice.picksPlace.title} catalog={catalog} />
+              <div className="v4SugElsewhereActions">
+                <button type="button" className="v4Btn" onClick={choice.picksPlace.onGo}>{t(catalog, "v4.suggest.goToPicks")}</button>
+                <button type="button" className="v4Btn" onClick={choice.onClear}>{t(catalog, "v4.suggest.clearPicks")}</button>
+              </div>
+            </>
+          )}
         </div>
       ) : null}
       {suggestions.length === 0

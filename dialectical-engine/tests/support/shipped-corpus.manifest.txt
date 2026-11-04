@@ -724,10 +724,13 @@ apps/ui/components/v4/V4PicksClearedNote.tsx
 apps/ui/components/v4/V4PublicFlag.tsx
 apps/ui/components/v4/V4PublicLane.tsx
 apps/ui/components/v4/V4PublicSession.tsx
+apps/ui/components/v4/V4QuestionShare.tsx
+apps/ui/components/v4/V4QuotaPill.tsx
 apps/ui/components/v4/V4Rail.tsx
 apps/ui/components/v4/V4ReadyNote.tsx
 apps/ui/components/v4/V4ReportClient.tsx
 apps/ui/components/v4/V4ReportHeader.tsx
+apps/ui/components/v4/V4ShareChange.tsx
 apps/ui/components/v4/V4Sources.tsx
 apps/ui/components/v4/V4TourBar.tsx
 apps/ui/components/v4/V4TrustBar.tsx
@@ -958,7 +961,9 @@ apps/ui/lib/v4/accountMemory.ts
 apps/ui/lib/v4/askConfig.ts
 apps/ui/lib/v4/askText.ts
 apps/ui/lib/v4/changes.ts
+apps/ui/lib/v4/clock.ts
 apps/ui/lib/v4/digIndex.ts
+apps/ui/lib/v4/digQuota.ts
 apps/ui/lib/v4/digRetry.ts
 apps/ui/lib/v4/digUndo.ts
 apps/ui/lib/v4/failedRun.ts
@@ -970,6 +975,7 @@ apps/ui/lib/v4/money.ts
 apps/ui/lib/v4/monthPause.ts
 apps/ui/lib/v4/publicPage.ts
 apps/ui/lib/v4/questionAddress.ts
+apps/ui/lib/v4/quotaPulse.ts
 apps/ui/lib/v4/readyMoment.ts
 apps/ui/lib/v4/stateWords.ts
 apps/ui/lib/v4/storage.ts
@@ -978,11 +984,13 @@ apps/ui/lib/v4/trust.ts
 apps/ui/lib/v4/types.ts
 apps/ui/lib/v4/useAskAgain.ts
 apps/ui/lib/v4/useAskClarify.ts
+apps/ui/lib/v4/useDigQuota.ts
 apps/ui/lib/v4/useLeaveGuard.ts
 apps/ui/lib/v4/useLevelSettled.ts
 apps/ui/lib/v4/useMapKeys.ts
 apps/ui/lib/v4/usePicksUndo.ts
 apps/ui/lib/v4/useQuestionAddress.ts
+apps/ui/lib/v4/useQuotaMoments.ts
 apps/ui/lib/v4/useReadingLevel.ts
 apps/ui/lib/v4/useReportVersions.ts
 apps/ui/lib/v4/useReveal.ts

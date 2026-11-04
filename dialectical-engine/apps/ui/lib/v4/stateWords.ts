@@ -1,5 +1,6 @@
 import type { RunProjection } from "@debateai/contract";
 import { formatDate, t, type MessageCatalog } from "../i18n/translate.js";
+import { CLOCK_24H } from "./clock.js";
 import type { DigState } from "./types.js";
 
 /*
@@ -72,10 +73,13 @@ function validDate(value: string | number | Date): Date | null {
   return Number.isNaN(when.getTime()) ? null : when;
 }
 
-/** "14:31" in the page's language (the same form as the reset times of lib/v4/money.ts), or null when unreadable. */
+/**
+ * "14:31" in the page's language, on the 24-hour clock of every V4 page (journey-f15, lib/v4/clock.ts: the same form as
+ * the reset times of lib/v4/money.ts), or null when unreadable.
+ */
 export function clockText(value: string | number | Date, locale: string): string | null {
   const when = validDate(value);
-  return when === null ? null : formatDate(locale, when, { hour: "2-digit", minute: "2-digit" });
+  return when === null ? null : formatDate(locale, when, CLOCK_24H);
 }
 
 /**
@@ -86,7 +90,7 @@ export function whenText(value: string | number | Date, locale: string, now: num
   const when = validDate(value);
   if (when === null) return null;
   if (when.toDateString() === new Date(now).toDateString()) return clockText(when, locale);
-  return formatDate(locale, when, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return formatDate(locale, when, { day: "numeric", month: "short", ...CLOCK_24H });
 }
 
 /** "1 December": the day the month's pause ends, in the page's language. */

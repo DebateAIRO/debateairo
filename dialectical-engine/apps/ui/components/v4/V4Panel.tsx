@@ -5,6 +5,7 @@ import { useEffect, useId, useState, type ReactNode, type RefObject } from "reac
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords } from "@/lib/v4/askText";
 import { findOpenQuestion, isFinishedRewrite, openQuestionsOf } from "@/lib/v4/mapModel";
+import { digWords, type V4DigQuota } from "@/lib/v4/digQuota";
 import type { MoneyLine } from "@/lib/v4/money";
 import { pauseOfDig } from "@/lib/v4/monthPause";
 import { draftTarget } from "@/lib/v4/suggestions";
@@ -50,6 +51,7 @@ import { V4FullAnswerFold } from "./V4AnswerCard";
 import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
 import { V4DigCompose, V4MoneyLines, type V4DigChoice } from "./V4DigSuggest";
 import { V4MonthPause } from "./V4MonthPause";
+import { V4ShareChange } from "./V4ShareChange";
 import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
@@ -109,6 +111,11 @@ type PanelProps = Readonly<{
   choice?: V4DigChoice;
   /** W3-4: the money lines before a dig (its share of today; new starts waiting for the reset). Never a price. */
   money?: readonly MoneyLine[];
+  /**
+   * Owner's screen review (3 Nov): the dig buttons' quota words (lib/v4/digQuota.ts): each button's own share or, while
+   * new digs wait for a reset, its reset time and the line saying why; the period by the switch. Absent: the words alone.
+   */
+  digQuota?: V4DigQuota;
   /** W4-6: on a dig's own map, the line of the path it dug, on the map above (null: not known yet, or no path). */
   digPathLine?: string | null;
   /**
@@ -387,28 +394,40 @@ function SkipToDig(props: Readonly<{ targetId: string; catalog: MessageCatalog }
 }
 
 /**
- * Quick look / Thorough, then "Dig deeper here" (row D decisions 1 and 5). W3-4: "Dig here too" where a dig already
- * exists (and on every path of a dig's own map); the person's picks name how many they are; the money lines before the
- * dig; at the deepest level the "deepest level" line instead of all of it.
+ * Quick look / Thorough, then the dig button (row D decisions 1 and 5). W3-4: the person's picks name how many they are;
+ * the money lines before the dig; at the deepest level the "deepest level" line instead of all of it.
+ * Owner's screen review (3 Nov), with `digQuota` (lib/v4/digQuota.ts): one dig button, "Dig here · up to 3%" or "Dig into
+ * your picks · up to 6%", its share from its own check (journey-f13, dig-f5; `again` no longer changes the words: "Dig
+ * here too" is gone); the period named once, by the switch (public-d3 A); one hint under each choice (read-f20); a changed
+ * share in grey for 2 seconds (journey-f8). While new digs wait for a reset the button stays, greyed, with the reset time
+ * on it, the line beside it says why and from when, and an open question offers "Add to tray" (dig-f11, journey-f14).
  */
 function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?: boolean; id?: string; startingAbove?: boolean }>) {
   const { panel } = props;
+  const waitId = useId();
+  const [replay, setReplay] = useState(0);
   if (panel.choice !== undefined && !panel.choice.canDig) return <DeepestLine catalog={panel.catalog} />;
-  // Several picks: "Dig into {count} together" (today's tray words); one, or a whole path: as before, or "Dig here too".
-  const label = props.target.kind === "picks" && props.target.picks.length >= 2
-    ? tPlural(panel.catalog, "v4.dig.trayDig", props.target.picks.length, panel.locale)
-    : t(panel.catalog, props.again === true ? "v4.nest.digHereToo" : "v4.panel.dig");
+  const quota = panel.digQuota;
+  const label = quota === undefined ? digWords(props.target, panel.catalog, panel.locale) : quota.label(props.target);
+  const waitLine = quota?.waitLine ?? null;
+  const waiting = waitLine !== null;
+  // dig-f11: the line beside the greyed button says the same as the reset line, so that one is not said twice here.
+  const money = waiting ? (panel.money ?? []).filter((line) => !/^v4\.money\.startsWait\./u.test(line.key)) : panel.money ?? [];
+  // journey-f14: an open question that cannot be dug now can still be kept, in the tray (the person's picks).
+  const keep = waiting && props.target.kind === "open" && props.target.questions.length === 1
+    && !panel.picked.has(props.target.questions[0]!.id) ? props.target.questions[0]! : null;
   // dig-f7: a place whose dig waits keeps its button focusable (aria-disabled), so focus can come back to it after Undo.
   const starting = panel.digStarting?.(props.target) ?? null;
+  // public-d3 A: the period by the switch, only where this button names a share.
+  const period = quota === undefined || quota.share(props.target) === null ? null : quota.periodLine;
   return (
     // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
     <section className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
       {panel.showDigModes === false ? null : (
-        <>
-          <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
-            {DIG_MODES.map((mode) => (
+        <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
+          {DIG_MODES.map((mode) => (
+            <div key={mode} className="v4PanelMode">
               <button
-                key={mode}
                 type="button"
                 className="v4Chip"
                 aria-pressed={panel.digMode === mode}
@@ -416,26 +435,42 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
               >
                 {t(panel.catalog, `v4.digMode.${mode}`)}
               </button>
-            ))}
-          </div>
-          <p className="v4PanelHint v4Muted">{t(panel.catalog, `v4.panel.modeHint.${panel.digMode}`)}</p>
-        </>
+              {/* read-f20: one short hint under each choice, so what Thorough adds is said before it is chosen. */}
+              <p className="v4PanelHint v4PanelModeHint v4Muted">{t(panel.catalog, `v4.panel.modeHint.${mode}`)}</p>
+            </div>
+          ))}
+        </div>
       )}
-      <button
-        type="button"
-        className="v4Btn v4BtnPrimary v4PanelDigBtn"
-        disabled={panel.digBusy}
-        aria-disabled={starting !== null ? "true" : undefined}
-        onClick={() => {
-          if (starting === null) panel.onDig(props.target);
-        }}
-      >
-        {label}
-      </button>
+      {period === null ? null : <p className="v4PanelHint v4DigPeriod v4Muted">{period}</p>}
+      <div className="v4DigBtnRow">
+        <button
+          type="button"
+          className={`v4Btn v4BtnPrimary v4PanelDigBtn${waiting ? " v4DigWaiting" : ""}`}
+          disabled={panel.digBusy}
+          aria-disabled={starting !== null || waiting ? "true" : undefined}
+          aria-describedby={waiting ? waitId : undefined}
+          onClick={() => {
+            // public-d4 A: pressing a greyed button explains the wait: its line takes the highlight again.
+            if (waiting) setReplay((count) => count + 1);
+            else if (starting === null) panel.onDig(props.target);
+          }}
+        >
+          {label}
+        </button>
+        <V4ShareChange share={quota?.share(props.target) ?? null} />
+      </div>
+      {waiting ? (
+        <p key={replay} id={waitId} className={`v4PanelHint v4DigWaitLine${replay > 0 ? " v4Highlight" : ""}`} role="note">{waitLine}</p>
+      ) : null}
+      {keep === null ? null : (
+        <button type="button" className="v4Btn v4DigAddTray" onClick={() => panel.onTogglePick(keep.id)}>
+          {t(panel.catalog, "v4.dig.addToTray")}
+        </button>
+      )}
       {starting !== null
         ? (props.startingAbove === true ? null : starting)
         : panel.digBusy ? <p className="v4PanelHint v4Muted">{t(panel.catalog, "v4.panel.digBusy")}</p> : null}
-      <V4MoneyLines lines={panel.money ?? []} catalog={panel.catalog} />
+      <V4MoneyLines lines={money} catalog={panel.catalog} />
       {panel.roomNotice ?? null}
     </section>
   );

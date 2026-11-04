@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { digTargetQuestions } from "@/lib/v4/askText";
+import { clock24 } from "@/lib/v4/clock";
 import {
   digGroupOf,
   dismissDig,
@@ -61,13 +62,9 @@ function withQuestion(sentence: string, target: DigTarget): ReactNode {
   return <>{before}<DigFirstQuestion target={target} />{after}</>;
 }
 
+/** journey-f15: "14:31", on the 24-hour clock of every V4 page (lib/v4/clock.ts). */
 function clock(iso: string, locale: string): string {
-  const when = new Date(iso);
-  try {
-    return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(when);
-  } catch {
-    return new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(when);
-  }
+  return clock24(iso, locale) ?? "";
 }
 
 /** "Digging into “…” and 1 more · Thorough · up to 4% of today". */
@@ -80,7 +77,8 @@ function digLabel(entry: DigUndoEntry, catalog: MessageCatalog, locale: string):
       {more > 0 ? <>{" "}{tPlural(catalog, "v4.dig.andMore", more, locale)}</> : null}
       {entry.showMode ? <span className="v4UndoMode">{" · "}{t(catalog, `v4.digMode.${mode}`)}</span> : null}
       {entry.sharePercent !== null && entry.sharePercent > 0
-        ? <>{" · "}{t(catalog, "v4.undo.digShare", { percent: entry.sharePercent })}</>
+        ? <>{" · "}{t(catalog, entry.sharePeriod === undefined || entry.sharePeriod === "PERSON_DAY"
+          ? "v4.undo.digShare" : `v4.undo.digShare.${entry.sharePeriod}`, { percent: entry.sharePercent })}</>
         : null}
     </>
   );

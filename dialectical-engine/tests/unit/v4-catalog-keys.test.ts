@@ -111,7 +111,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.rewrite.hideDigPoints",
   "v4.rewrite.digPointsElsewhere",
   "v4.nest.trailLabel",
-  "v4.nest.digHereToo",
   "v4.nest.trailRoot",
   "v4.nest.level",
   "v4.nest.deepest",
@@ -119,6 +118,27 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // R22 W3-8: the two dig refusals with their own codes (DIG_PICKS_ONE_PATH, DIG_FREE_PICKS_MAX), drafted for the click-test.
   "v4.nest.picksOnePath",
   "v4.nest.freePicksMax",
+  // The owner's screen review (3 Nov), the quota track (C2a, C2b): lines written beyond the record's own words, for the
+  // click-test. The header past 100% (map-f9 says "more than today's quota", not the pill's words) and the name of its
+  // detail list (public-d3 A); the week's and the month's forms of the record's "of today" lines (read-f19 names "of this
+  // week" and "of this month" and leaves the words to the owner); the month's "on {date}" for a dig button that waits
+  // (journey-f15 writes only "after 08:00"); the two Quick look / Thorough hints (read-f20: the wording is the owner's;
+  // Thorough's no longer names today, the period is said once by the switch).
+  "v4.header.over.PERSON_DAY",
+  "v4.header.over.PERSON_WEEK",
+  "v4.header.over.PERSON_MONTH",
+  "v4.header.over.PERSON_GRANT",
+  "v4.header.quotaDetails",
+  "v4.room.startShare.PERSON_WEEK",
+  "v4.room.startShare.PERSON_MONTH",
+  "v4.dig.period.PERSON_WEEK",
+  "v4.dig.on",
+  "v4.undo.digShare.PERSON_WEEK",
+  "v4.undo.digShare.PERSON_MONTH",
+  "v4.debate.questionShare.PERSON_WEEK",
+  "v4.debate.questionShare.PERSON_MONTH",
+  "v4.panel.modeHint.quick",
+  "v4.panel.modeHint.thorough",
   "v4.digPage.lookedInto",
   "v4.digPage.rewrote",
   "v4.digPage.backToPath",
@@ -371,7 +391,41 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`
 });
 
+/**
+ * The owner's screen review (OWNER-PICKS-2026-11-03.md), the quota track: the record's own words for the dig buttons, the
+ * period by the switch, the can't-start states and "This question" (journey-f13, dig-f5, dig-f31, public-d3 A,
+ * journey-f14, journey-f15, map-f9), word for word.
+ */
+const QUOTA_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.panel.dig": "Dig here",
+  "v4.undo.barShare": "up to {percent}%",
+  "v4.dig.yourPicks.one": "Dig into your pick",
+  "v4.dig.yourPicks.other": "Dig into your picks",
+  "v4.dig.trayDigThese": "Dig into these",
+  "v4.dig.chooseWhat": "Choose what to dig ›",
+  "v4.dig.after": "after {time}",
+  "v4.dig.addToTray": "Add to tray",
+  "v4.dig.period.PERSON_DAY": "of today · you can still finish your report",
+  "v4.dig.period.PERSON_MONTH": "of this month · you can still finish your report",
+  "v4.suggest.waitingOn": "Your picks are waiting on “{path}”.",
+  "v4.suggest.goToPicks": "Go to them",
+  "v4.suggest.clearPicks": "Clear them",
+  "v4.debate.questionShare.PERSON_DAY": "This question: {percent}% of today"
+});
+
 describe("the owner's 3 Nov screen review", () => {
+  it("the quota track's dig, period and can't-start lines are the record's words, and 'Dig here too' is gone", () => {
+    expect(Object.fromEntries(Object.keys(QUOTA_RECORD_LINES).map((key) => [key, catalog[key]]))).toEqual(QUOTA_RECORD_LINES);
+    // journey-f13: one dig button everywhere; "Dig here too" and "Dig deeper here" are on no page.
+    expect(Object.entries(catalog).filter(([, value]) => /Dig here too|Dig deeper here/u.test(value))).toEqual([]);
+    // journey-f8 / r2-2 A: nothing says what is left.
+    expect(Object.entries(catalog).filter(([key, value]) => (key.startsWith("v4.dig.") || key.startsWith("v4.header.")) && /\bleft\b/u.test(value)))
+      .toEqual([]);
+    // journey-f15: a month waits "on" its date ({date}); a day and a week wait "after" a time ({time}).
+    expect(catalog["v4.money.startsWait.PERSON_MONTH"]).toContain("on {date}");
+    for (const key of ["v4.money.startsWait.PERSON_DAY", "v4.money.startsWait.PERSON_WEEK", "v4.dig.quotaDayUsed"]) expect(catalog[key], key).toContain("after {time}");
+  });
+
   it("the first button reads Next, and the dig, wait and missing-answer lines are the review's words", () => {
     expect(Object.fromEntries(Object.keys(REVIEW_LINES).map((key) => [key, catalog[key]]))).toEqual(REVIEW_LINES);
   });

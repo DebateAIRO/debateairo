@@ -206,6 +206,16 @@ describe("the used-up line above the box (ask-f18, ask-d4 C)", () => {
   it("says nothing while new questions can start", () => {
     expect(usedUpLine(null, "en")).toBeNull();
     expect(usedUpLine({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "PLUS" } as never, "en")).toBeNull();
-    expect(usedUpLine({ room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS" } as never, "en")).toBeNull();
+    // Only the person's own running debates fill the window: no reset to name, nothing used up.
+    expect(usedUpLine({
+      room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS", waits_for: "OWN_DEBATES"
+    } as never, "en")).toBeNull();
+    expect(usedUpLine({ room: "FULL", scope: "SITE_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS" } as never, "en")).toBeNull();
+  });
+
+  it("public-f24 (owner's screen review): a full person window reads the same line under the older server switch", () => {
+    const full = { room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS" };
+    expect(usedUpLine(full as never, "en")).toEqual(usedUpLine({ ...full, new_starts: "BLOCKED_UNTIL_RESET" } as never, "en"));
+    expect(usedUpLine(full as never, "en")?.key).toBe("v4.ask.usedUp.PERSON_DAY");
   });
 });
