@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { BillingJobQueries, BillingRepository, createPool, EntitlementRepository, migrate, type OutboxJob } from "@debateai/db";
 import { foldSubscription, microsToDecimal, withdrawalRefundPerPaymentMicros } from "@debateai/billing-core";
@@ -11,7 +10,6 @@ import {
   recordingAudit,
   seedNetopiaSubscription,
   seedPaidUpgrade,
-  seedWithdrawalGrant,
   subscriptionDeps
 } from "../support/billingSubscriptionFixtures.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
@@ -33,9 +31,6 @@ async function start(label: string, input: Readonly<{ activatedDaysAgo: number; 
     ownerRef: identity.authenticated.ownerRef, planId: "PLUS",
     activatedAt: new Date(now.getTime() - input.activatedDaysAgo * DAY), taxCountry: input.taxCountry
   });
-  // A fresh 43-character token per test: step_up_grant.token_hash is UNIQUE (0039:12).
-  const grant = randomBytes(32).toString("base64url");
-  await seedWithdrawalGrant(database.pool, identity, grant);
   const audit = recordingAudit();
   const kick = vi.fn();
   const billing = new BillingRepository(database.pool);
@@ -45,11 +40,12 @@ async function start(label: string, input: Readonly<{ activatedDaysAgo: number; 
     clock: () => now
   });
   const api = await mountSubscriptionRoutes(deps, identity);
-  const withdraw = (token = grant) => api.inject({
+  // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws with an empty body, no step-up.
+  const withdraw = (payload: Record<string, unknown> = {}) => api.inject({
     method: "POST", url: "/v1/billing/subscription/withdraw",
-    headers: { "x-test-session": identity.rawSessionToken }, payload: { step_up_grant: token }
+    headers: { "x-test-session": identity.rawSessionToken }, payload
   });
-  return { identity, now, seeded, grant, audit, kick, billing, deps, api, withdraw };
+  return { identity, now, seeded, audit, kick, billing, deps, api, withdraw };
 }
 
 const refundRequests = async (billing: BillingRepository, chargeId: string) =>
@@ -223,11 +219,11 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
-  it("refuses without a valid grant and writes nothing", async () => {
+  it("needs no step-up grant, and refuses a body that still carries one without writing anything", async () => {
     const run = await start("p12d-grant", { activatedDaysAgo: 2, taxCountry: "DE" });
-    const refused = await run.withdraw("x".repeat(43));
-    expect(refused.statusCode).toBe(403);
-    expect(refused.json().error).toBe("STEP_UP_REQUIRED");
+    const refused = await run.withdraw({ step_up_grant: "x".repeat(43) });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json().error).toBe("MALFORMED_REQUEST");
     expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("ACTIVE");
     expect(await refundRequests(run.billing, run.seeded.initialChargeId)).toEqual([]);
     expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([]);
@@ -260,7 +256,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
-  it("refuses, without spending the grant, when the plan changed between the reads and the lock", async () => {
+  it("refuses when the plan changed between the reads and the lock, and withdraws on the next try", async () => {
     const run = await start("p12d-raced", { activatedDaysAgo: 1, taxCountry: "RO" });
     // An upgrade settles while the withdrawal is reading the spend: the owner lock then sees PRO, not PLUS.
     const raced = subscriptionDeps(database.pool, {
@@ -275,7 +271,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
         }
       }
     });
-    await expect(withdraw(raced, { authenticated: run.identity.authenticated, grantToken: run.grant }))
+    await expect(withdraw(raced, { authenticated: run.identity.authenticated }))
       .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
     expect((await run.withdraw()).statusCode).toBe(200);
     await run.api.close();
@@ -426,7 +422,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
       const deps = subscriptionDeps(small, {
         ownerSpend: { readOwnerSpentMicros: async () => 1_000_000 }, clock: () => run.now
       });
-      expect(await withdraw(deps, { authenticated: run.identity.authenticated, grantToken: run.grant }))
+      expect(await withdraw(deps, { authenticated: run.identity.authenticated }))
         .toMatchObject({ refundMicros: expect.any(Number) });
       await run.api.close();
     } finally {

@@ -126,6 +126,8 @@ let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, 
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
 let usageMode: UsageMode = choice("MOCK_USAGE", process.env.MOCK_USAGE, USAGE_MODES, "NORMAL");
+/** When Settings withdrew the Plus subscription (OUG 34/2014 art. 11^1); null while it is inside its 14 days. */
+let withdrawnAt: number | null = null;
 /** Decision 33: the mock's review of a public debate, in memory. One dig to take out and any first-snapshot text to replace. */
 type MockReview = { hidden: boolean; removed: boolean; corrected: Map<string, string>; log: { revision: number; action: string; piece_kind: null; actor_staff_id: string; at: string }[] };
 const mockReview = new Map<string, MockReview>();
@@ -601,6 +603,25 @@ function roomRead(
   return rooms[mode]();
 }
 
+/** GET /v1/billing/subscription: Plus, subscribed four days ago, inside its 14 days until withdrawn; none on Free. */
+function billingSubscription(now = Date.now()) {
+  if (planMode === "FREE") return { subscription: null };
+  const day = 86_400_000;
+  const started = now - 4 * day;
+  const open = withdrawnAt === null;
+  return {
+    subscription: {
+      plan_id: "PLUS", status: open ? "ACTIVE" : "WITHDRAWN", cancel_requested: false,
+      current_period_end: open ? iso(started + 30 * day) : null, renews_on: open ? iso(started + 30 * day) : null,
+      renewal_total: open ? "24.20" : null, currency: "EUR", scheduled_downgrade_plan_id: null,
+      withdrawal_open_until: open ? iso(started + 14 * day) : null,
+      withdrawal_last_day: open ? iso(started + 13 * day).slice(0, 10) : null,
+      can_upgrade: open, can_change_card: open, can_revoke_cancel: false
+    }
+  };
+}
+
+
 function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: UsageMode = usageMode) {
   const date = new Date(now);
   const daysToMonday = ((8 - date.getUTCDay()) % 7) || 7;
@@ -848,6 +869,9 @@ function startupCheck(): number {
     }
   }
   check("GET /v1/billing/plans", C.BillingPlansResponseSchema, BILLING_PLANS);
+  check("GET /v1/billing/subscription", C.BillingSubscriptionResponseSchema, billingSubscription());
+  check("GET /v1/billing/invoices", C.BillingInvoicesResponseSchema, { invoices: [] });
+  check("POST /v1/billing/subscription/withdraw", C.BillingWithdrawResponseSchema, { refund: "18.00", currency: "EUR" });
   for (const [country, postal] of [["DE", null], ["RO", null], ["US", "75201"], ["US", null], ["CA", "D1A 1A1"], ["JP", null]] as const) {
     check(`GET /v1/billing/plans?country=${country}`, C.BillingPlansResponseSchema, billingPlans(country, postal));
   }
@@ -1212,6 +1236,7 @@ function mockState() {
     ask: askMode,
     plan: planMode,
     usage: usageMode,
+    withdrawn_at: withdrawnAt === null ? null : iso(withdrawnAt),
     pause: pauseMode,
     public: publicMode,
     report: reportMode,
@@ -1298,6 +1323,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (ask !== null) askMode = choice("ask", ask, ASK_MODES, askMode);
         if (plan !== null) planMode = choice("plan", plan, PLAN_MODES, planMode);
         if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
+        // The withdrawal can be clicked again: subscription=RESET puts the Plus subscription back inside its 14 days.
+        if (url.searchParams.get("subscription") === "RESET") withdrawnAt = null;
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
         const sessionSetting = url.searchParams.get("session");
         if (sessionSetting !== null) sessionOut = choice("session", sessionSetting, ["IN", "OUT"] as const, sessionOut ? "OUT" : "IN") === "OUT";
@@ -1319,7 +1346,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&public=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -1453,6 +1480,19 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const priced = await QUADERNO(place).catch(() => null);
     return sendJson(req, res, 200, billingPlans(countryParam, postalParam, priced), C.BillingPlansResponseSchema);
   }
+  if (path === "/v1/billing/subscription" && isGet) return sendJson(req, res, 200, billingSubscription(), C.BillingSubscriptionResponseSchema);
+  if (path === "/v1/billing/invoices" && isGet) return sendJson(req, res, 200, { invoices: [] }, C.BillingInvoicesResponseSchema);
+  if (path === "/v1/billing/subscription/withdraw" && method === "POST") {
+    // As the API (owner ruling 2026-11-04): the signed-in session withdraws with an empty body, no step-up.
+    const body = await readJsonBody(req).catch(() => null);
+    if (body !== null && (typeof body !== "object" || Object.keys(body).length > 0)) {
+      return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    if (planMode === "FREE" || withdrawnAt !== null) return sendJson(req, res, 409, { error: "NOT_SUBSCRIBED", message: "NOT_SUBSCRIBED" });
+    withdrawnAt = Date.now();
+    return sendJson(req, res, 200, { refund: "18.00", currency: "EUR" }, C.BillingWithdrawResponseSchema);
+  }
+
 
   // ---- answers ----
   if (path === "/v1/answers" && isGet) {

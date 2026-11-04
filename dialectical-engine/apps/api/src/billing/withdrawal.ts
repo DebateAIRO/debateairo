@@ -1,5 +1,4 @@
 import type { PoolClient } from "pg";
-import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   microsToDecimal, withdrawalRefundDeadline, withdrawalRefundPerPaymentMicros, type PriceCurrency, type WithdrawalPayment
@@ -27,7 +26,7 @@ export type WithdrawalRequest = Readonly<{
    */
   withdrewAt: Date;
   source: "SETTINGS" | "OWNER";
-  /** Runs under the owner lock before anything is written; the route spends the step-up grant here. */
+  /** Runs under the owner lock before anything is written. Neither Settings nor the owner's command adds a check here. */
   authorize: (client: PoolClient) => Promise<void>;
   /**
    * S01-C13 (R-17): the MLV of the withdraw request, the language of M8 and M8_RECEIVED. The owner's command (P14c)
@@ -217,20 +216,17 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
   return Object.freeze({ refundMicros: decided.refundMicros, currency: decided.currency });
 }
 
-/** The Settings route: now, with the step-up grant (P12a) spent under the owner lock. */
+/**
+ * The Settings route: now, for the signed-in session alone. OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a,
+ * recital 37; owner ruling 2026-11-04): a person already signed in withdraws without identifying again, so no
+ * password, authenticator code or step-up grant is asked; the page's "Confirmați retragerea" is the confirmation.
+ */
 export async function withdraw(deps: WithdrawalDeps, input: Readonly<{
-  authenticated: AuthenticatedSession; grantToken: string; mailLocale?: string;
+  authenticated: AuthenticatedSession; mailLocale?: string;
 }>): Promise<WithdrawalOutcome> {
   return recordWithdrawal(deps, {
     ownerRef: input.authenticated.ownerRef, withdrewAt: deps.clock(), source: "SETTINGS",
     ...(input.mailLocale === undefined ? {} : { mailLocale: input.mailLocale }),
-    authorize: async (client) => {
-      const consumed = await deps.billing.consumeWithdrawalGrant(client, {
-        userId: input.authenticated.userId, ownerRef: input.authenticated.ownerRef,
-        sessionId: input.authenticated.session.session_id,
-        grantTokenHash: hashToken("step-up-grant", input.grantToken)
-      });
-      if (!consumed) refuse(403, "STEP_UP_REQUIRED");
-    }
+    authorize: async () => undefined
   });
 }

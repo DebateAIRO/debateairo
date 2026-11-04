@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
 import {
@@ -15,7 +15,6 @@ import {
   recordingAudit,
   seedNetopiaSubscription,
   seedPaidUpgrade,
-  seedWithdrawalGrant,
   subscriptionDeps,
   type SeededNetopiaSubscription
 } from "../support/billingSubscriptionFixtures.js";
@@ -363,14 +362,12 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
   /** The spend a withdrawal reads, the same for both paths. */
   const spending = (spentMicros: number) => ({ readOwnerSpentMicros: async () => spentMicros });
 
-  /** P12d's Settings route at `at`, with a fresh step-up grant (the grant's own expiry runs on the database clock). */
+  /** P12d's Settings route at `at`: the signed-in session alone, no step-up (owner ruling 2026-11-04). */
   async function viaSettings(label: string, seed: (ownerRef: string) => Promise<SeededNetopiaSubscription>, at: Date, spentMicros: number) {
     const identity = testHttpIdentity(label);
     const seeded = await seed(identity.authenticated.ownerRef);
-    const grant = randomBytes(32).toString("base64url");
-    await seedWithdrawalGrant(database.pool, identity, grant);
     const deps = subscriptionDeps(database.pool, { clock: () => at, ownerSpend: spending(spentMicros) });
-    return { seeded, run: () => withdraw(deps, { authenticated: identity.authenticated, grantToken: grant }) };
+    return { seeded, run: () => withdraw(deps, { authenticated: identity.authenticated }) };
   }
 
   /** The owner's command for a statement that arrived at `at`. */

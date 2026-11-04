@@ -173,6 +173,7 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_PAUSE` / `pause=` | `UNTIL_RESET` (default), `CAN_CONTINUE` | Whether the paused debate `e100…` may continue yet (W2-7). Setting it pauses that debate again. |
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL, BLOCKED or WAIT_RESET makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_REPORT` / `report=` | `OK` (default), `FAIL` | Whether the next report written comes out finished or failed. |
+| `subscription=RESET` | | Puts the Plus subscription back inside its 14 days after a withdrawal, so the withdrawal can be clicked again. |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
@@ -219,6 +220,8 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 | `POST /v1/asks` | See above. |
 | `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
 | `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so no paid price is shown (the page asks for the country). With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
+| `GET /v1/billing/subscription`, `GET /v1/billing/invoices` | Plus in euro, subscribed four days ago, inside its 14-day withdrawal window (none on `plan=FREE`); no invoices. After a withdrawal it reads WITHDRAWN. |
+| `POST /v1/billing/subscription/withdraw` | The signed-in session withdraws with an empty body, no step-up (OUG 34/2014 art. 11^1, owner ruling 2026-11-04): a €18.00 refund, once; again, 409 `NOT_SUBSCRIBED`. A body with anything in it gets 400 `MALFORMED_REQUEST`. |
 | `GET /v1/answers?limit=&offset=` | Finished debates, plus the open runs (running, waiting, failed). |
 | `GET /v1/answers/:id[?version=1]` | The answer (version 1 only). Draft: sources and path research. |
 | `GET /v1/answers/:id/story` | WRITING or READY, as described above. |
@@ -260,7 +263,7 @@ Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The
 
 ## Not mocked (the website may call these)
 
-- **Billing pages**: subscription, invoices, charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel, withdraw (`/settings`, `/pricing` buying, `/checkout`, `/settings/card`, `/cancel`, `/withdraw`).
+- **Billing pages**: charge status, card details and card change, checkout, quote, upgrade, downgrade, cancel (`/pricing` buying, `/checkout`, `/settings/card`, `/cancel`). The subscription, invoices and the withdrawal in Settings are mocked.
 - **Account and security settings**: sessions list, sign-in methods, social links, email change, recovery email, phone, data export, account erasure (`/settings`, `/settings/security`, `/export`).
 - **Signing in and up for real**: login, register, password reset, MFA, social sign-in, age check (`/login`, `/sign-up`, `/recover`, …). The mock just says "signed in"; use `/api/__mock/sign-in` for the cookie.
 - **Publishing**: publish, the list of public debates, deleting a private debate. The public debate page itself is mocked (see "Public debates").
