@@ -197,7 +197,7 @@ describe('check <label> <version>', () => {
     const h = host();
     const r = await checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps });
     expect(r).toEqual({ event: 'PREVIEW_SETTINGS_CHECKED', label: NEW, releaseKey: NEW_KEY, version: '21', verdict: 'PASS', digest: 'd'.repeat(64), codes: [], hints: [],
-      receipt: `${CURRENT_NEW}/settings-check-21-${STAMP}.json` });
+      warnings: [], receipt: `${CURRENT_NEW}/settings-check-21-${STAMP}.json` });
     const [runner, api] = h.calls.filter(call => call.argv[0] === LAYOUT.setpriv);
     for (const [call, half] of [[runner!, 'runner'], [api!, 'api']] as const) {
       expect(call.argv.slice(1, 3)).toEqual([`--reuid=${IDS[half]!.uid}`, `--regid=${IDS[half]!.gid}`]);
@@ -212,7 +212,8 @@ describe('check <label> <version>', () => {
     ]);
     const receipt = JSON.parse(h.files[r.receipt]!);
     expect(receipt).toEqual({ schema: RECEIPT_SCHEMA, label: NEW, releaseKey: NEW_KEY, version: 21, recordedAt: '2026-10-23T01:46:00.123Z',
-      runner: { half: 'runner', exitCode: 0, lines: [checkLine('runner')], unavailable: null }, api: { half: 'api', exitCode: 0, lines: [checkLine('api')], unavailable: null } });
+      runner: { half: 'runner', exitCode: 0, lines: [checkLine('runner')], warnings: [], unavailable: null },
+      api: { half: 'api', exitCode: 0, lines: [checkLine('api')], warnings: [], unavailable: null } });
     expect(h.files[`${CURRENT_NEW}/settings-check-21-${STAMP}-runner.txt`]).toBe(`${checkLine('runner')}\n`);
     expect(h.files[`${CURRENT_NEW}/settings-check-21-${STAMP}-api.txt`]).toBe(`${checkLine('api')}\n`);
     const [verdict] = operatorCalls(h.calls);
@@ -254,6 +255,28 @@ describe('check <label> <version>', () => {
     ]);
     expect(hintFor('SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:preview:x')).toBe('the release\'s environment would have to change: that needs an upload');
     expect(hintFor('DEFAULT')).toBe(CHECK_HINTS.DEFAULT);
+  });
+
+  it('V4 start step, Task 42: keeps a half\'s notes with their hints; the verdict stays PASS, the receipt keeps them, the operator never sees them', async () => {
+    const note = (code: unknown) => `DEBATEAI_SETTINGS_WARNING ${JSON.stringify({ half: 'api', code })}`;
+    const spent = 'GATE_POT_SPENT_TODAY:deepinfra';
+    const apiOut = [note(spent), note('not a code'), note(7), 'DEBATEAI_SETTINGS_WARNING {not json', 'DEBATEAI_SETTINGS_WARNING null',
+      note('GATE_POT_SPENT_TODAY:anthropic'), note(spent), checkLine('api')].join('\n');
+    const h = host({ halves: { runner: result(`${checkLine('runner')}\n`, 0), api: result(`${apiOut}\n`, 0) } });
+    const r = await checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps });
+    expect(r).toMatchObject({ verdict: 'PASS', codes: [], hints: [], warnings: [
+      { code: spent, hint: CHECK_HINTS.GATE_POT_SPENT_TODAY }, { code: 'GATE_POT_SPENT_TODAY:anthropic', hint: CHECK_HINTS.GATE_POT_SPENT_TODAY }] });
+    const receipt = JSON.parse(h.files[r.receipt]!);
+    expect(receipt.api).toEqual({ half: 'api', exitCode: 0, lines: [checkLine('api')], warnings: [spent, 'GATE_POT_SPENT_TODAY:anthropic'], unavailable: null });
+    expect(receipt.runner.warnings).toEqual([]);
+    // The operator's verdict reads the report lines only.
+    expect(h.files[`${CURRENT_NEW}/settings-check-21-${STAMP}-api.txt`]).toBe(`${checkLine('api')}\n`);
+    // The command's one line carries them; a PASS with notes still exits 0.
+    const printed: string[] = [];
+    const out = await main(['check', NEW, '21'], { platform: 'linux', uid: 0, layout: LAYOUT, deps: host({ halves: { runner: result(`${checkLine('runner')}\n`, 0),
+      api: result(`${apiOut}\n`, 0) } }).deps, stdout: { write: (text: string) => { printed.push(text); return true; } }, stderr: { write: () => true } });
+    expect(out).toBe(0);
+    expect(JSON.parse(printed.join('')).warnings).toEqual(r.warnings);
   });
 
   it('no database write when a half could not run: the receipt says why, the operator is never asked', async () => {
@@ -495,11 +518,24 @@ describe('the gate-code fingerprint and the live check for a switch (addition D2
       'SETTINGS_GATE_MODEL_DISABLED:deepinfra:zai-org/GLM-5.3-Flash', 'SETTINGS_GATE_UNANSWERED:anthropic', 'SETTINGS_GATE_LIVE_CHECK_FAILED',
       // Final fix wave S6: the loaders' line-up and thinking codes the API half reports as they are.
       'PREVIEW_THINKING_LEVELS_INVALID:level:Qwen/Qwen3.8-Flash', 'PREVIEW_LINE_UP_POLICY_INVALID:maker_rule', 'PREVIEW_LINE_UP_ENV_CONFLICT',
-      'PREVIEW_SCORECARD_CONFLICT']) {
+      'PREVIEW_SCORECARD_CONFLICT',
+      // V4 start step, Task 42: the pot guard's four codes and the start step that would never run.
+      'GATE_POT_BELOW_ONE_DEBATE:anthropic:plus:question:d2:p7:web', 'GATE_POT_SPENT_TODAY:deepinfra', 'GATE_POT_UNREPORTED:anthropic',
+      'GATE_POT_UNANSWERED:perplexity', 'START_STEP_UNREACHABLE:plus:SCORECARD']) {
       const hint = hintFor(code);
       expect(hint, code).not.toBe(CHECK_HINTS.DEFAULT);
       expect(hint, code).toMatch(/^[a-z][^\n]*[a-z)]$/u);
+      // No figure in any hint (a pot or a price never reaches the operator's text).
+      expect(hint, code).not.toMatch(/\$|\d[.,]\d/u);
     }
+    expect([CHECK_HINTS.GATE_POT_BELOW_ONE_DEBATE, CHECK_HINTS.GATE_POT_SPENT_TODAY, CHECK_HINTS.GATE_POT_UNREPORTED, CHECK_HINTS.GATE_POT_UNANSWERED,
+      CHECK_HINTS.START_STEP_UNREACHABLE]).toEqual([
+      'one debate at this choice does not fit that spending gate\'s daily pot: raise that pot, or narrow How wide for that plan (the owner decides)',
+      'a note, not a failure: that spending gate has already spent too much of today\'s pot for one more debate at the widest choice; it resets at midnight',
+      'a spending gate does not report its daily pot: install this release\'s gate code there first (the release guide\'s same-helper steps), then check again',
+      'a spending gate did not answer the pot question: check it runs this release\'s gate code, then check again',
+      'the start step is switched on for this plan but would not run: the owner decides whether to clear the scorecard, switch engine 2 on, or turn the step off for that plan'
+    ]);
     expect(hintFor('SETTINGS_NEEDS_ENV_CHANGE:TARGET:claude-haiku-5-5')).toBe(CHECK_HINTS.SETTINGS_NEEDS_ENV_CHANGE);
     expect(hintFor('SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic')).toBe(CHECK_HINTS.SETTINGS_NEEDS_ENV_CHANGE);
   });

@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
-  PERPLEXITY_SEARCH_VENDOR, type PreviewGateName, type PreviewGateRemaining, type PreviewGateSettings, type PreviewLineUp
+  PERPLEXITY_SEARCH_VENDOR, PREVIEW_REMAINING_TIMEOUT_MS, createPreviewRemainingRpcPort, previewGateSocket, previewModelRow,
+  type PreviewGateName, type PreviewGateRemaining, type PreviewGateSettings, type PreviewLineUp
 } from "@debateai/providers";
 import {
   DEBATE_SHAPE_PLAN_KEYS,
@@ -10,6 +11,8 @@ import {
   assertHostedSupportAdmissionSealed,
   compareSiteSettings,
   debateShapeStartStepOf,
+  isSettingsCheckCode,
+  normaliseDepthParamsForShape,
   readAdmissionPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -36,9 +39,15 @@ import {
   type SettingsVersionFacts
 } from "@debateai/register";
 import {
-  buildAdmissionSiteContext, decideAskRoomReadiness, loadAdmissionSettings, type AdmissionSiteContext
+  buildAdmissionSiteContext, decideAskRoomReadiness, loadAdmissionSettings, type AdmissionSiteContext, type AdmissionVersionSettings
 } from "./admission-settings.js";
-import { previewGateEstimateNanoUsd, type PreviewGateNeed } from "./preview-budget-estimate.js";
+import { askShapesForPanel } from "./debate-shape-ask.js";
+import { engineForAsk, webSitesForAsk } from "./engine-ask.js";
+import { lengthGuidanceForAsk } from "./length-guidance-ask.js";
+import {
+  estimatePreviewGateNeeds, previewGateEstimateNanoUsd, previewWebSearchNeed, previewWebSitesOf, type PreviewGateNeed,
+  type PreviewPanelMember
+} from "./preview-budget-estimate.js";
 import { parseDeclaredProviderTargets } from "./provider-discovery.js";
 import { questionLanguageSiteRoute, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import { newQuestionLanguageReferenceKey } from "./question-language/reference.js";
@@ -72,6 +81,9 @@ import { newQuestionLanguageReferenceKey } from "./question-language/reference.j
  *    model's company on the providers page, which lists the companies of exactly these targets) and
  *    SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider> (its gate has no socket here). No website input: the page asks
  *    this API (D24 item 5). Condition 6's code copy (reviewed rows, menus, ceilings) is the runner half's.
+ *  - V4 start step, Task 42, on the preview only, last: the start step is never switched on where it would not run
+ *    (START_STEP_UNREACHABLE:<plan>:<reason>), and one debate at the widest choice fits each spending gate's daily pot
+ *    (the GATE_POT_* refusals; a pot already spent today is a note, handed to `onWarning`, never a report code).
  * The condition codes are REPORT codes
  * (returned, never thrown); SETTINGS_CHECK_NO_AI_CALL, thrown by the check's never-sending fetch, is in both
  * KNOWN_DOMAIN_CODES lists (ruling R57b).
@@ -179,6 +191,11 @@ export type AdmissionCheckReaders = Readonly<{
   readLineUp: (pool: Pool, version: number) => Promise<SealedPreviewLineUp | null>;
   /** SA10: the four seat refs the version names, by the register's own readers (`readSettingsSeatRefs`). */
   readSeatRefs: (pool: Pool, version: number) => Promise<readonly string[]>;
+  /**
+   * V4 start step, Task 42: the pot guard over the loaded version (`readGatePotFindings`: it asks each gate it needs
+   * once, read-only). Absent: the guard is not run (a test that checks other steps).
+   */
+  checkGatePots?: typeof readGatePotFindings;
 }>;
 
 export const ADMISSION_CHECK_READERS: AdmissionCheckReaders = Object.freeze({
@@ -190,13 +207,16 @@ export const ADMISSION_CHECK_READERS: AdmissionCheckReaders = Object.freeze({
   readVersionFacts: readSettingsVersionFacts,
   readComparisonRows: readSettingsComparisonRows,
   readLineUp: readSealedPreviewLineUp,
-  readSeatRefs: readSettingsSeatRefs
+  readSeatRefs: readSettingsSeatRefs,
+  checkGatePots: readGatePotFindings
 });
 
 /**
- * The API half's steps, in order (SA10 added the two preview line-up steps last). The loader step is skipped (no code
- * of its own) when the site reads refused (their code already fails the half); the loader, condition 2 and the line-up
- * steps are skipped when the version is not a sealed GENERAL one (SETTINGS_VERSION_KIND_INVALID already fails it).
+ * The API half's steps, in order (SA10 added the two preview line-up steps; V4 start step, Task 42, the start step's
+ * reach and the pot guard, last). The loader step is skipped (no code of its own) when the site reads refused (their
+ * code already fails the half); the loader, condition 2 and the line-up steps are skipped when the version is not a
+ * sealed GENERAL one (SETTINGS_VERSION_KIND_INVALID already fails it); Task 42's two steps need the loaded version, so
+ * they are skipped when the loader refused it (its code already fails the half). `onWarning` receives the guard's notes.
  */
 export function admissionSettingsCheckSteps(input: Readonly<{
   pool: Pool;
@@ -204,10 +224,13 @@ export function admissionSettingsCheckSteps(input: Readonly<{
   version: number;
   readers: AdmissionCheckReaders;
   onSnapshot: (snapshotSha256: string | null) => void;
+  onWarning?: (code: string) => void;
 }>): readonly SettingsCheckStep[] {
   const { pool, environment, version, readers } = input;
   let site: AdmissionSiteContext | undefined;
   let checkable = false;
+  // Task 42: the version as the loader admitted it (undefined: not loaded, or refused).
+  let loaded: unknown;
   const previewGate = environment.PREVIEW_GATE_SETTINGS;
   // SA10: the version's line-up (its row, else the env's; null = neither), read once for both line-up steps.
   let lineUpRead: Promise<SealedPreviewLineUp | null> | undefined;
@@ -237,7 +260,7 @@ export function admissionSettingsCheckSteps(input: Readonly<{
     {
       name: "admission-settings",
       run: async () => {
-        if (site !== undefined && checkable) await readers.loadVersion(pool, version, site);
+        if (site !== undefined && checkable) loaded = await readers.loadVersion(pool, version, site);
         return [];
       }
     },
@@ -267,25 +290,57 @@ export function admissionSettingsCheckSteps(input: Readonly<{
         });
         return settingsLineUpEnvironmentCodes({ seatable, declaredModels, gate: previewGate });
       }
+    },
+    {
+      // V4 start step, Task 42: a plan whose start step is switched on but would not run for a signed-in person here.
+      name: "start-step-reachable",
+      run: async () => {
+        if (previewGate === undefined || loaded === undefined) return [];
+        const lineUp = await lineUpOf();
+        if (lineUp === null) return [];
+        const facts = loaded as Partial<AdmissionVersionSettings>;
+        return startStepUnreachableCodes({
+          policy: facts.debateShapePolicy ?? null,
+          engineInForce: (facts.engineVersionPolicy ?? null) !== null,
+          scorecardInForce: facts.modelPicker?.scorecard.state === "VALID",
+          makersOf: (plan) => lineUpMakersOf(lineUp, plan)
+        });
+      }
+    },
+    {
+      // V4 start step, Task 42 (spec 2026-11-03 §5 "Before upload"): one debate at the widest choice fits each gate's pot.
+      name: "gate-pots",
+      run: async () => {
+        const check = readers.checkGatePots;
+        if (previewGate === undefined || loaded === undefined || site === undefined || check === undefined) return [];
+        const lineUp = await lineUpOf();
+        if (lineUp === null) return [];
+        const findings = await check({ loaded, site, lineUp, environment });
+        for (const code of findings.warnings) input.onWarning?.(code);
+        return findings.refusals;
+      }
     }
   ]);
 }
 
 /**
  * Side-by-side spec §13 (S14): the API half's report. A typed refusal of any step is a code in it; an untyped error (a
- * database failure included) propagates: the half could not check (the CLI's exit 2, no report line).
+ * database failure included) propagates: the half could not check (the CLI's exit 2, no report line). V4 start step,
+ * Task 42: a note (GATE_POT_SPENT_TODAY:<gate>) is never in the report; it goes to `onWarning` (the CLI prints it).
  */
 export async function checkAdmissionSettingsVersion(input: Readonly<{
   pool: Pool;
   environment: ApiCheckEnvironment;
   version: number;
   readers?: AdmissionCheckReaders;
+  onWarning?: (code: string) => void;
 }>): Promise<SettingsCheckReport> {
   let snapshotSha256: string | null = null;
   const codes = await runSettingsCheckSteps(admissionSettingsCheckSteps({
     pool: input.pool, environment: input.environment, version: input.version,
     readers: input.readers ?? ADMISSION_CHECK_READERS,
-    onSnapshot: (digest) => { snapshotSha256 = digest; }
+    onSnapshot: (digest) => { snapshotSha256 = digest; },
+    ...(input.onWarning === undefined ? {} : { onWarning: input.onWarning })
   }));
   return settingsCheckReport({
     half: "api", releaseKey: input.environment.RELEASE_KEY, version: input.version, codes, snapshotSha256
@@ -293,9 +348,10 @@ export async function checkAdmissionSettingsVersion(input: Readonly<{
 }
 
 /**
- * V4 start step, Task 41 (spec 2026-11-03 §8 "Before upload"): one debate must fit each spending gate's daily pot. The
- * pure half of the guard; Task 42 builds each case's needs from the checked version and asks each gate's `/remaining`
- * once with its pot. Refusals are report codes; a SPENT_TODAY finding is a note only (the pot resets at midnight).
+ * V4 start step, Task 41 (spec 2026-11-03 §5 "Money", its "Before upload" line): one debate must fit each spending
+ * gate's daily pot. The pure half of the guard; Task 42 builds each case's needs from the checked version and asks each
+ * gate's `/remaining` once with its pot. Refusals are report codes; a SPENT_TODAY finding is a note only (the pot resets
+ * at midnight).
  */
 export const GATE_POT_CODES = Object.freeze({
   BELOW: "GATE_POT_BELOW_ONE_DEBATE",
@@ -367,4 +423,150 @@ export function checkGatePotsFitOneDebate(input: Readonly<{
     if (searchNanoUsd !== null) weigh(PERPLEXITY_SEARCH_VENDOR, { callsNanoUsd: searchNanoUsd } as PreviewGateNeed, choice);
   }
   return Object.freeze({ refusals: Object.freeze([...refusals].sort()), warnings: Object.freeze([...warnings].sort()) });
+}
+
+/**
+ * V4 start step, Task 42: the line a half prints for one note (a finding that is not a failure), beside its one report
+ * line: `DEBATEAI_SETTINGS_WARNING {"half":"api","code":"GATE_POT_SPENT_TODAY:deepinfra"}`. Root's settings-version.mjs
+ * keeps it in the receipt and shows it with its hint; the verdict never reads it.
+ */
+export const SETTINGS_WARNING_LINE = "DEBATEAI_SETTINGS_WARNING " as const;
+
+/** One note's line (a code in the report's own alphabet, `isSettingsCheckCode`; anything else is refused). */
+export function settingsWarningLine(half: "api", code: string): string {
+  if (!isSettingsCheckCode(code)) throw new TypeError("SETTINGS_WARNING_CODE_INVALID");
+  return `${SETTINGS_WARNING_LINE}${JSON.stringify({ half, code })}\n`;
+}
+
+/**
+ * V4 start step, Task 42 (plan call 6; the owner's rule that a switched-on step never switches itself off unseen): a
+ * plan whose start step is switched on while Task 34's v2 rule would keep it off for a signed-in person on the preview.
+ */
+export const START_STEP_UNREACHABLE = "START_STEP_UNREACHABLE" as const;
+
+/**
+ * For every plan whose switch is on (`debateShapeStartStepOf`), the first reason Task 34's v2 rule would be off:
+ * SCORECARD (a VALID model scorecard, `startStepWidthsFor`), then ENGINE_OFF (engine 2 not in force, the same predicate),
+ * then ONE_MAKER (fewer than two makers on the plan's line-up: the rule's second half, `askShapesForPanel`). As
+ * `START_STEP_UNREACHABLE:<plan>:<reason>`, sorted. With the switch absent, or the row's `enabled: false`: nothing.
+ */
+export function startStepUnreachableCodes(input: Readonly<{
+  policy: DebateShapePolicy | null;
+  engineInForce: boolean;
+  scorecardInForce: boolean;
+  makersOf(plan: DebateShapePlanKey): number;
+}>): readonly string[] {
+  const codes: string[] = [];
+  for (const plan of DEBATE_SHAPE_PLAN_KEYS) {
+    if (debateShapeStartStepOf(input.policy, plan) === null) continue;
+    const reason = input.scorecardInForce ? "SCORECARD" : !input.engineInForce ? "ENGINE_OFF" : input.makersOf(plan) < 2 ? "ONE_MAKER" : null;
+    if (reason !== null) codes.push(`${START_STEP_UNREACHABLE}:${plan}:${reason}`);
+  }
+  return Object.freeze(codes.sort());
+}
+
+/** The two rosters of a version's line-up (its row, else the env's), as the guard reads them. */
+export type GatePotLineUp = Readonly<{ free_model_ids: readonly string[]; premium_model_ids: readonly string[] }>;
+
+/** A plan's roster on the preview, as admission seats it (`previewPlanTierRosters`): Free's on Free, else the premium one. */
+function lineUpRosterOf(lineUp: GatePotLineUp, plan: DebateShapePlanKey): readonly string[] {
+  return plan === "free" ? lineUp.free_model_ids : lineUp.premium_model_ids;
+}
+
+/** The distinct makers of a plan's roster (a model the reviewed rows do not hold counts as its own maker). */
+function lineUpMakersOf(lineUp: GatePotLineUp, plan: DebateShapePlanKey): number {
+  return new Set(lineUpRosterOf(lineUp, plan).map((model) => previewModelRow(model)?.maker ?? model)).size;
+}
+
+/**
+ * V4 start step, Task 42: one case's needs, priced as the checked version would admit that ask on the preview: its
+ * settings `{depth, adaptive, deep at depth 2 else standard, detailed}` normalised for the plan; the plan's roster as the
+ * panel (each model on its declared target); the widest paths as the run's own list (RUN_BUILT) for a question or a
+ * dig's picks (DIG_PICKS); the shapes (`askShapesForPanel`), length, engine 2 and web part as admission resolves them
+ * (a dig searches in its own look: thorough at depth 2); the basis minted by the version's own `resolveEnvelopeBasis`;
+ * the needs by `estimatePreviewGateNeeds` at the version's gate terms, rotated as admission rotates (the row on and two
+ * makers or more), at the active mode's worst case (the largest story); the searches' money from the minted web part.
+ */
+export async function gatePotCaseNeeds(input: Readonly<{
+  settings: AdmissionVersionSettings;
+  site: AdmissionSiteContext;
+  lineUp: GatePotLineUp;
+  choice: GatePotCase;
+}>): Promise<GatePotCaseNeeds> {
+  const { settings, site, lineUp, choice } = input;
+  const terms = settings.previewBudgetGate;
+  if (terms === undefined) throw new TypeError("PREVIEW_VERSION_TERMS_UNAVAILABLE");
+  const plan = choice.plan;
+  const depthParams = normaliseDepthParamsForShape({ depth: choice.depth, depthMode: "adaptive",
+    scrutiny: choice.depth === 2 ? "deep" : "standard", answerLength: "detailed" }, settings.debateShapePolicy, plan, settings.lengthGuidancePolicy);
+  const panel: readonly PreviewPanelMember[] = lineUpRosterOf(lineUp, plan).map((model) => Object.freeze({
+    provider_ref: site.declaredProviderTargets.find((target) => target.model === model)?.providerRef ?? model, model_id: model }));
+  const makers = lineUpMakersOf(lineUp, plan);
+  const { shape, shapeV2 } = askShapesForPanel(settings.debateShapePolicy, depthParams, plan, makers,
+    { paths: choice.paths, pathsSource: choice.kind === "QUESTION" ? "RUN_BUILT" : "DIG_PICKS" });
+  const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy ?? undefined, depthParams, plan);
+  const engine = engineForAsk({ policy: settings.engineVersionPolicy ?? undefined, length, makers, mapOpening: shape !== null });
+  const web = webSitesForAsk({ searchGate: choice.web, shape, shapeV2, engine, depth: depthParams.depth,
+    parent: choice.kind === "DIG" ? { mode: choice.depth === 2 ? "thorough" : "quick" } : undefined });
+  const basis = await settings.resolveEnvelopeBasis({
+    depthParams,
+    // The loaded version's resolver reads no risk tier; the basis is the same for every tier.
+    riskTier: "standard",
+    panelSize: panel.length,
+    // No pinned assignment on the preview (a VALID scorecard is refused there): no runner-up, as admission.
+    backupSequencesProvisioned: 0,
+    shape, shapeV2, length, engine, web
+  });
+  const needs = estimatePreviewGateNeeds({ ...terms, basis, panel,
+    ...(settings.roleRotation !== null && makers >= 2 ? { rotated: true } : {}) });
+  const sites = previewWebSitesOf(basis);
+  return Object.freeze({ choice, needs, searchNanoUsd: sites === null ? null : previewWebSearchNeed(sites).nanoUsd });
+}
+
+/** How the guard asks one gate its `/remaining` with the day's pot (tests inject it). */
+export type GatePotRemainingReader = (gate: PreviewGateName, socket: string, scopeId: string) => Promise<PreviewGateRemaining>;
+
+/** The default: the app's own strict reader on the gate's socket, asking for the pot (`{ dailyPot: true }`), read-only. */
+const READ_REMAINING_WITH_POT: GatePotRemainingReader = (_gate, socket, scopeId) =>
+  createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: scopeId }, PREVIEW_REMAINING_TIMEOUT_MS, { dailyPot: true }).remaining();
+
+/** The gates in the order they are asked. */
+const GATE_POT_GATES: readonly PreviewGateName[] = Object.freeze(["deepinfra", "anthropic", PERPLEXITY_SEARCH_VENDOR]);
+const NO_GATE_POT_FINDINGS: GatePotFindings = Object.freeze({ refusals: Object.freeze([]), warnings: Object.freeze([]) });
+
+/**
+ * V4 start step, Task 42 — THE POT GUARD IN CHECK-VERSION (spec 2026-11-03 §5 "Before upload"). On the preview only, for
+ * the loaded version: its cases (`gatePotCases`: every switched-on plan, web where the site has the search gate), each
+ * priced by `gatePotCaseNeeds`; then each gate a case needs is asked its `/remaining` once, with its pot. A gate without
+ * a socket here, or one whose answer is refused, is unanswered (null). The findings are `checkGatePotsFitOneDebate`'s.
+ * Off the preview, with no shape row in force, without the switch or without a loaded version: nothing is asked.
+ */
+export async function readGatePotFindings(input: Readonly<{
+  loaded: unknown;
+  site: AdmissionSiteContext;
+  lineUp: GatePotLineUp;
+  environment: ApiCheckEnvironment;
+  readRemaining?: GatePotRemainingReader;
+}>): Promise<GatePotFindings> {
+  const gate = input.environment.PREVIEW_GATE_SETTINGS;
+  const settings = input.loaded as AdmissionVersionSettings | undefined;
+  const policy = settings?.debateShapePolicy ?? null;
+  if (gate === undefined || settings === undefined || policy === null) return NO_GATE_POT_FINDINGS;
+  const cases = gatePotCases(policy, { searchGate: previewGateSocket(gate, PERPLEXITY_SEARCH_VENDOR) !== undefined });
+  if (cases.length === 0) return NO_GATE_POT_FINDINGS;
+  const caseNeeds: GatePotCaseNeeds[] = [];
+  for (const choice of cases) caseNeeds.push(await gatePotCaseNeeds({ settings, site: input.site, lineUp: input.lineUp, choice }));
+  const needed = new Set<PreviewGateName>();
+  for (const { needs, searchNanoUsd } of caseNeeds) {
+    for (const need of needs) needed.add(need.gate);
+    if (searchNanoUsd !== null) needed.add(PERPLEXITY_SEARCH_VENDOR);
+  }
+  const read = input.readRemaining ?? READ_REMAINING_WITH_POT;
+  const remaining: Partial<Record<PreviewGateName, PreviewGateRemaining | null>> = {};
+  for (const name of GATE_POT_GATES) {
+    if (!needed.has(name)) continue;
+    const socket = previewGateSocket(gate, name);
+    remaining[name] = socket === undefined ? null : await read(name, socket, gate.scope_id).catch(() => null);
+  }
+  return checkGatePotsFitOneDebate({ cases: caseNeeds, remaining });
 }

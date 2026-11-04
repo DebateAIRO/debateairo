@@ -11,7 +11,9 @@
 //                               folder with api-<label>.env. Each half prints one DEBATEAI_SETTINGS_CHECK line; both are kept
 //                               as a receipt, lifecycle-current-<label>/settings-check-<v>-<UTC>.json, and the operator
 //                               records the verdict (tools/settings-version/cli.ts verdict). A FAIL lists every code with one
-//                               plain hint. A half that could not run writes nothing to the database; nor does a FAIL of the
+//                               plain hint. A half's notes (V4 start step, Task 42: DEBATEAI_SETTINGS_WARNING lines, never a
+//                               finding) are kept in the receipt and shown with their hints, whatever the verdict.
+//                               A half that could not run writes nothing to the database; nor does a FAIL of the
 //                               current release's ACTIVE version (ruling R77): the operator refuses SETTINGS_VERDICT_ACTIVE_PAIR,
 //                               and this tool prints its codes with their hints, then one loud plain line;
 //   - activate <version> --by <owner> --reason <text>
@@ -123,6 +125,13 @@ export const CHECK_HINTS = Object.freeze({
   SETTINGS_ROW_UNCLASSIFIED: 'the version has a row this code does not know: the code must learn it first (an upload)',
   SETTINGS_VERSION_KIND_INVALID: 'only a sealed general settings version can be checked',
   STORY_DAILY_CEILING_INSUFFICIENT: 'the day\'s money cannot hold one full debate with its story: lower the per-debate ceiling',
+  // V4 start step, Task 42: the pot guard (one debate at the widest choice fits each spending gate's daily pot) and a start
+  // step switched on where it would not run. SPENT_TODAY is a note: it never fails the check.
+  GATE_POT_BELOW_ONE_DEBATE: 'one debate at this choice does not fit that spending gate\'s daily pot: raise that pot, or narrow How wide for that plan (the owner decides)',
+  GATE_POT_SPENT_TODAY: 'a note, not a failure: that spending gate has already spent too much of today\'s pot for one more debate at the widest choice; it resets at midnight',
+  GATE_POT_UNREPORTED: 'a spending gate does not report its daily pot: install this release\'s gate code there first (the release guide\'s same-helper steps), then check again',
+  GATE_POT_UNANSWERED: 'a spending gate did not answer the pot question: check it runs this release\'s gate code, then check again',
+  START_STEP_UNREACHABLE: 'the start step is switched on for this plan but would not run: the owner decides whether to clear the scorecard, switch engine 2 on, or turn the step off for that plan',
   DEFAULT: 'the dry boot refused this version: read the code in the receipt and ask'
 });
 export const hintFor = code => {
@@ -131,6 +140,13 @@ export const hintFor = code => {
 };
 
 const CHECK_LINE = 'DEBATEAI_SETTINGS_CHECK ';
+/**
+ * V4 start step, Task 42: a half's note line (apps/api/src/settings-check.ts SETTINGS_WARNING_LINE, word for word: this
+ * file loads no TypeScript), `DEBATEAI_SETTINGS_WARNING {"half":"api","code":"…"}`. A note is never a finding: the verdict
+ * never reads it; the receipt keeps it and the owner reads it with its hint. Only a code in the report's own alphabet is kept.
+ */
+const WARNING_LINE = 'DEBATEAI_SETTINGS_WARNING ';
+const WARNING_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/;
 const VERSION = /^[1-9][0-9]{0,15}$/;
 const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const SOCKET = /^\/[A-Za-z0-9._/-]{1,200}\.sock$/;
@@ -369,21 +385,37 @@ async function currentRelease(io) {
   return { label: labels[0], releaseKey: current.releaseKey, api: await io.loadPinned({ service: 'api', label: labels[0] }) };
 }
 
-/** One half: run it, keep its DEBATEAI_SETTINGS_CHECK lines; `unavailable` names why it could not report (content-free). */
+/** A half's notes (Task 42): each well-formed note line's code, once, in the order printed; anything else is dropped. */
+function warningsOf(stdoutLines) {
+  const codes = stdoutLines.filter(line => line.startsWith(WARNING_LINE)).flatMap(line => {
+    try {
+      const code = own(JSON.parse(line.slice(WARNING_LINE.length)), 'code');
+      return typeof code === 'string' && WARNING_CODE.test(code) ? [code] : [];
+    } catch { return []; }
+  });
+  return [...new Set(codes)];
+}
+
+/**
+ * One half: run it, keep its DEBATEAI_SETTINGS_CHECK lines and (Task 42) its notes' codes; `unavailable` names why it
+ * could not report (content-free).
+ */
 async function runHalf(io, layout, label, release, half, version) {
   const entry = release.services[half];
   const engine = `${entry.sourceRoot}/dialectical-engine`;
   let values;
-  try { values = await io.readEnvironment(envPathFor(layout, half, label), entry.serviceGid); } catch { return { half, exitCode: null, lines: [], unavailable: 'ENVIRONMENT_UNREADABLE' }; }
+  try { values = await io.readEnvironment(envPathFor(layout, half, label), entry.serviceGid); } catch { return { half, exitCode: null, lines: [], warnings: [], unavailable: 'ENVIRONMENT_UNREADABLE' }; }
   const result = await io.run(checkHalfArgv({ layout, nodePath: io.nodePath, engine, identity: { uid: entry.serviceUid, gid: entry.serviceGid }, half, version }),
     { cwd: engine, env: checkHalfEnvironment(values, io.nodePath), timeoutMs: HALF_TIMEOUT_MS, maxOutputBytes: MAX_OUTPUT_BYTES });
-  const lines = outputLines(result?.stdout).filter(line => line.startsWith(CHECK_LINE));
-  if (!finished(result)) return { half, exitCode: null, lines, unavailable: result?.timedOut ? 'TIMEOUT' : 'NOT_RUN' };
+  const stdout = outputLines(result?.stdout);
+  const lines = stdout.filter(line => line.startsWith(CHECK_LINE));
+  const warnings = warningsOf(stdout);
+  if (!finished(result)) return { half, exitCode: null, lines, warnings, unavailable: result?.timedOut ? 'TIMEOUT' : 'NOT_RUN' };
   // Exit 2 is the half's "could not check" (SETTINGS_CHECK_USAGE / SETTINGS_CHECK_UNAVAILABLE:<reason> on stderr).
   const reason = /^SETTINGS_CHECK_UNAVAILABLE:([A-Z][A-Z0-9_]{0,63})$/.exec(outputLines(result.stderr).find(line => line.startsWith('SETTINGS_CHECK_')) ?? '');
-  if (result.code !== 0 && result.code !== 1) return { half, exitCode: result.code, lines, unavailable: reason ? reason[1] : 'CHECK_UNAVAILABLE' };
-  if (lines.length !== 1) return { half, exitCode: result.code, lines, unavailable: lines.length === 0 ? 'REPORT_LINE_MISSING' : 'REPORT_LINE_COUNT' };
-  return { half, exitCode: result.code, lines, unavailable: null };
+  if (result.code !== 0 && result.code !== 1) return { half, exitCode: result.code, lines, warnings, unavailable: reason ? reason[1] : 'CHECK_UNAVAILABLE' };
+  if (lines.length !== 1) return { half, exitCode: result.code, lines, warnings, unavailable: lines.length === 0 ? 'REPORT_LINE_MISSING' : 'REPORT_LINE_COUNT' };
+  return { half, exitCode: result.code, lines, warnings, unavailable: null };
 }
 
 /**
@@ -425,9 +457,12 @@ export async function checkSettingsVersion({ label, version, layout = LAYOUT, de
     refuse(code, { receipt });
   }
   const codes = Array.isArray(recorded.codes) ? recorded.codes.filter(code => typeof code === 'string') : [];
+  // Task 42: both halves' notes (the receipt keeps them per half), each with its hint; never part of the verdict.
+  const warnings = [...new Set([...runner.warnings, ...api.warnings])];
   return Object.freeze({
     event: 'PREVIEW_SETTINGS_CHECKED', label, releaseKey: recorded.releaseKey, version: recorded.version, verdict: recorded.verdict, digest: recorded.digest,
-    codes, hints: codes.map(code => Object.freeze({ code, hint: hintFor(code) })), receipt
+    codes, hints: codes.map(code => Object.freeze({ code, hint: hintFor(code) })),
+    warnings: warnings.map(code => Object.freeze({ code, hint: hintFor(code) })), receipt
   });
 }
 
