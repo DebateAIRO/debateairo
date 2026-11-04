@@ -22,7 +22,7 @@ import { pathToFileURL } from "node:url";
 import { createSeed, SEED_NODE_IDS, type StoryStatus } from "./seed.js";
 import {
   answerDraftProblems, answerIndexDraftProblems, contractOrDraft, DraftAskParentSchema, DraftInvestigationSchema, DraftMonthPauseSchema, DraftNodeWebSchema,
-  DraftRunQuotaUsedSchema,
+  DraftQuestionShareSchema, DraftRunQuotaUsedSchema,
   DraftRoomPartSchema, DraftRoomQueryPartSchema, DraftRunContinuedSchema, DraftRunContinueRefusedSchema, DraftRunContinueRequestSchema,
   DraftRunStartedAtSchema, DraftUsageBorrowsSchema, splitAsk, splitRoomQuery, stripAnswer, stripNode, stripRoom,
   stripAnswerIndex, stripRun, stripUsage, type DraftAskParent
@@ -554,6 +554,20 @@ function runProjection(run: MockRun, now = Date.now()) {
 }
 
 /**
+ * Draft (owner's screen review 3 Nov, map-f9; web-draft.ts DraftQuestionShareSchema): what this question has used of its
+ * window, for "This question: 11% of today" ("of this month" on Free). Like `started_at`, sent on the draft view, and on
+ * the normal view only once the contract's own (strict) run read accepts it, so it never makes the run read fall back and
+ * lose its month pause.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withQuestionShare(body: any, run: MockRun, draftView: boolean, now = Date.now()) {
+  const state = stateOf(run, now);
+  if (state !== "RUNNING" && state !== "SETTLED") return body;
+  const full = { ...body, question_share: { scope: shareScopeOf(planMode), percent: QUESTION_SHARE_PERCENT } };
+  return draftView || C.RunProjectionSchema.safeParse(full).success ? full : body;
+}
+
+/**
  * Draft (owner's screen review, journey-d2 / journey-f16 / wait-f7): the run read with when the question started, so the
  * waiting card can say "Started 14:31" on any device. Sent on the draft view, and on the normal view only once the
  * contract's own (strict) RunProjection schema accepts it; never while the question waits to start.
@@ -629,6 +643,25 @@ function answerIndex(limit: number, offset: number, now = Date.now()) {
 const DIG_SHARE_PERCENT = Object.freeze({ quick: 20, thorough: 35 });
 /** W2-7 (money rule, draft): what the mock says a new question takes of today. */
 const START_SHARE_PERCENT = 15;
+/** Owner's screen review (3 Nov, map-f9, draft): what the mock says a question has used of its window so far. */
+const QUESTION_SHARE_PERCENT = 11;
+
+/** Owner's screen review (3 Nov, read-f19 / public-f14, draft): the window a share is of: Free's month, else today. */
+function shareScopeOf(plan_id: string | null): "PERSON_DAY" | "PERSON_MONTH" {
+  return plan_id === "FREE" ? "PERSON_MONTH" : "PERSON_DAY";
+}
+
+/**
+ * Draft (owner's screen review 3 Nov: read-f19, public-f14, map-f33; web-draft.ts DraftShareScopeSchema): the window a
+ * room read's share is measured against. Sent on the draft view, and on the normal view only once the contract's own
+ * (strict) room read accepts it, so it never makes the room read fall back and lose its shares.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withShareScope(body: any, draftView: boolean) {
+  if (body.start_share_percent === undefined && body.dig_share_percent === undefined) return body;
+  const full = { ...body, share_scope: shareScopeOf(typeof body.plan_id === "string" ? body.plan_id : null) };
+  return draftView || C.AskRoomResponseSchema.safeParse(full).success ? full : body;
+}
 
 function roomRead(
   mode: RoomMode, now = Date.now(), plan_id: PlanMode = planMode, reserveKept = anyInvestigationOpen(),
@@ -828,11 +861,17 @@ const draftPart = (key: string, schema: { safeParse: (body: unknown) => { succes
 });
 const runPauseDraft = draftPart("month_pause", DraftMonthPauseSchema);
 const runQuotaDraft = draftPart("quota_used", DraftRunQuotaUsedSchema);
-/** A run read's draft parts: its month pause (W2-7) and, on a failed run, its `quota_used` (owner review 3 Nov). */
+const runShareDraft = draftPart("question_share", DraftQuestionShareSchema);
+/**
+ * A run read's draft parts: its month pause (W2-7), on a failed run its `quota_used` (owner review 3 Nov), and this
+ * question's share of its window (map-f9).
+ */
 const runDraftSchema = {
   safeParse: (body: unknown) => {
     const pause = runPauseDraft.safeParse(body);
-    return pause.success ? runQuotaDraft.safeParse(body) : pause;
+    if (!pause.success) return pause;
+    const quota = runQuotaDraft.safeParse(body);
+    return quota.success ? runShareDraft.safeParse(body) : quota;
   }
 };
 const runStartDraftSchema = draftPart("started_at", DraftRunStartedAtSchema);
@@ -894,8 +933,10 @@ function startupCheck(): number {
     for (const mode of ROOM_MODES) {
       for (const reserve of [true, false]) {
         for (const dig of [null, "quick", "thorough"] as const) {
+          const room = roomRead(mode, Date.now(), plan, reserve, dig);
           checkDraft(`GET /v1/asks/room (${plan}, ${mode}, reserve ${reserve}, dig ${dig})`, C.AskRoomResponseSchema,
-            roomRead(mode, Date.now(), plan, reserve, dig), stripRoom, DraftRoomPartSchema);
+            withShareScope(room, true), stripRoom, DraftRoomPartSchema);
+          check(`GET /v1/asks/room (${plan}, ${mode}, reserve ${reserve}, dig ${dig}, normal view)`, C.AskRoomResponseSchema, withShareScope(room, false));
         }
       }
     }
@@ -914,7 +955,8 @@ function startupCheck(): number {
   if (shelfProblems.length > 0) throw new Error(`MOCK_SEED_INVALID: GET /v1/answers draft fields:\n${shelfProblems.join("\n")}`);
   check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
-    checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, runProjection(run), stripRun, runDraftSchema);
+    checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, withQuestionShare(runProjection(run), run, true), stripRun, runDraftSchema);
+    check(`GET /v1/runs/${run.runRef} (normal view)`, C.RunProjectionSchema, withQuestionShare(runProjection(run), run, false));
     check(`GET /v1/runs/${run.runRef}/visibility`, C.PublicationTransitionSchema, { state: "PRIVATE", public_ref: null });
     check(`GET /v1/runs/${run.runRef}/last-visit`, C.LastVisitSchema, { seen_at: null, items: null });
     check(`GET /v1/runs/${run.runRef}/dig-links`, C.DigLinksSchema, digLinksOf(run.runRef));
@@ -1523,7 +1565,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       });
     }
     const digMode = dig.data.dig_parent === undefined ? null : dig.data.dig_mode ?? "quick";
-    return sendDraftable(roomRead(roomMode, Date.now(), planMode, anyInvestigationOpen(), digMode), C.AskRoomResponseSchema, stripRoom, issuesOf(DraftRoomPartSchema));
+    return sendDraftable(withShareScope(roomRead(roomMode, Date.now(), planMode, anyInvestigationOpen(), digMode), draftView),
+      C.AskRoomResponseSchema, stripRoom, issuesOf(DraftRoomPartSchema));
   }
   if (path === "/v1/asks" && method === "POST") return postAsk(req, res);
   if (path === "/v1/asks/clarify" && method === "POST") return postClarify(req, res);
@@ -1677,7 +1720,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // W2-7 (draft): a debate paused at the month wall says so once the contract knows `month_pause`.
     // Draft (journey-d2): the start time rides along on the draft view, and on the normal view once the contract knows it.
     if (sub === "") {
-      return sendDraftable(withStartedAt(runProjection(run), run, draftView), C.RunProjectionSchema, stripRun,
+      return sendDraftable(withQuestionShare(withStartedAt(runProjection(run), run, draftView), run, draftView), C.RunProjectionSchema, stripRun,
         (body: unknown) => [...issuesOf(runDraftSchema)(body), ...issuesOf(runStartDraftSchema)(body)]);
     }
     if (sub === "answer") {

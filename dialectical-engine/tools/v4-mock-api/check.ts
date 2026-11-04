@@ -483,6 +483,18 @@ await step("when a question started (draft started_at)", async () => {
   return `started ${draft.started_at}${today.started_at === undefined ? " (held back from the website until the contract knows it)" : ""}`;
 }, (value: string) => value);
 
+// Owner's screen review, 3 Nov 2026 (read-f19, public-f14, map-f33, map-f9): the window a share is of, and what a question
+// has used of it. DRAFT fields: on the draft view now; the website reads them once the contract's reads know them.
+await step("the quota's windows (draft share_scope and question_share)", async () => {
+  const room: Loose = await mock(`/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=1&answer_length=short&dig_parent=${RUNS.settled}&dig_mode=quick`);
+  must(room.share_scope === "PERSON_DAY" || room.share_scope === "PERSON_MONTH", "a dig's room read names the window of its share");
+  const run: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.settled}`);
+  must(run.question_share !== undefined && Number.isInteger(run.question_share.percent), "a settled run says what it used");
+  const today: Loose = await client.readRun(RUNS.settled);
+  must(today.month_pause === undefined || typeof today.month_pause === "object", "the website's run read stays valid");
+  return `share of ${String(room.share_scope)}; this question ${String(run.question_share.percent)}% of ${String(run.question_share.scope)}`;
+}, (value: string) => value);
+
 // Decision 13: the public-debates lane. It runs last among the asks: it adds two digs and one report to the mock.
 const PUBLIC = { debate: "f1000000-0000-4000-8000-000000000001", authorGone: "f1000000-0000-4000-8000-000000000002", update: "f2000000-0000-4000-8000-000000000001" };
 const CONTRIBUTION_DIGS = { CHECKING: "c1000000-0000-4000-8000-000000000001", ON_THE_PAGE: "c1000000-0000-4000-8000-000000000002", KEPT_PRIVATE: "c1000000-0000-4000-8000-000000000003", REMOVED_AFTER_REVIEW: "c1000000-0000-4000-8000-000000000004" };
