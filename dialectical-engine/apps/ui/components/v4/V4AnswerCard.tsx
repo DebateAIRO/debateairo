@@ -90,13 +90,16 @@ export function V4FullAnswerFold(props: Readonly<{ paragraphs: readonly string[]
 }
 
 /** The first answer's words: the story's short answer, else the whole composed answer (DATA-2). */
-function FirstAnswer(props: Readonly<{ map: V4Map; catalog: MessageCatalog; lead: boolean }>) {
+function FirstAnswer(props: Readonly<{ map: V4Map; catalog: MessageCatalog; lead: boolean; canDigNow: boolean }>) {
   const { map, catalog } = props;
   const headline = map.headline?.trim() ?? "";
   const summary = map.summary?.trim() ?? "";
   const fallback = (map.fallbackText ?? "").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
   const writing = map.storyState === "WRITING";
   const noStory = map.storyState === "NONE";
+  // map-f16 + r2-11 (review F10, as in V4Panel): "You can dig or write your report now." only where a dig can start now;
+  // elsewhere the approved line stops after "You don't need to wait."
+  const missingKey = props.canDigNow ? (fallback.length > 0 ? "v4.panel.fallbackMissing" : "v4.panel.storyMissing") : "v4.panel.noShortAnswerNoDig";
   const words = headline.length > 0 || summary.length > 0
     ? (
       <>
@@ -117,10 +120,10 @@ function FirstAnswer(props: Readonly<{ map: V4Map; catalog: MessageCatalog; lead
             <div className="v4AnswerFallback" data-ai-generated="true">
               {fallback.map((paragraph, index) => <p key={index} className="v4AnswerText">{paragraph}</p>)}
             </div>
-            {noStory ? null : <p className="v4AnswerNote v4Muted">{t(catalog, "v4.panel.fallbackMissing")}</p>}
+            {noStory ? null : <p className="v4AnswerNote v4Muted">{t(catalog, missingKey)}</p>}
           </>
         )
-        : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>;
+        : noStory ? null : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : missingKey)}</p>;
   return (
     <>
       {words}
@@ -148,9 +151,9 @@ function firstWords(version: Version, map: V4Map): string {
 }
 
 function VersionBody(props: Readonly<{ version: Version; map: V4Map; catalog: MessageCatalog; locale: string; lead: boolean;
-  pathName: (positionRef: string) => string | null }>) {
+  pathName: (positionRef: string) => string | null; canDigNow: boolean }>) {
   const { version, catalog } = props;
-  if (version.kind === "FIRST") return <FirstAnswer map={props.map} catalog={catalog} lead={props.lead} />;
+  if (version.kind === "FIRST") return <FirstAnswer map={props.map} catalog={catalog} lead={props.lead} canDigNow={props.canDigNow} />;
   if (version.kind === "REPORT") return <Segments segments={version.segments} lead={props.lead} />;
   const name = props.pathName(version.positionRef);
   const date = formatDate(props.locale, version.at, { dateStyle: "medium" });
@@ -192,10 +195,16 @@ export function V4AnswerCard(props: Readonly<{
   onFold?: () => void;
   catalog: MessageCatalog;
   locale: string;
+  /**
+   * Review F10 (map-f16 + r2-11): false where no dig can start now (the deepest level, or new questions and digs waiting
+   * for the quota's reset), so a missing short answer's line stops after "You don't need to wait.". Absent: true.
+   */
+  canDigNow?: boolean;
   /** Extra lines under the answer (the dig's own page says what it looked into). */
   children?: ReactNode;
 }>) {
   const { map, catalog, locale } = props;
+  const canDigNow = props.canDigNow !== false;
   const bodyId = useId();
   // dig-f7 / map-d1: the control pressed hides itself (the folded line) or goes inert (Fold): focus moves on to the
   // card's eyebrow after unfolding, and back to the folded line after folding, never to the page's top. Only a press of
@@ -256,7 +265,7 @@ export function V4AnswerCard(props: Readonly<{
               </button>
             ) : null}
           </div>
-          <VersionBody version={current} map={map} catalog={catalog} locale={locale} lead pathName={pathName} />
+          <VersionBody version={current} map={map} catalog={catalog} locale={locale} lead pathName={pathName} canDigNow={canDigNow} />
           {props.mainAnswer?.writing === true ? <p className="v4AnswerNote v4Muted" role="status">{t(catalog, "v4.mainAnswer.writing")}</p> : null}
           <div className="v4AnswerSure">
             <V4TrustBar counts={map.counts} unchecked={map.unchecked} catalog={catalog} size="large" showCounts />
@@ -282,7 +291,7 @@ export function V4AnswerCard(props: Readonly<{
                 {earlier.map((version) => (
                   <article key={version.key} className="v4AnswerVersion">
                     <h3 className="v4AnswerSectionTitle">{versionTitle(version, catalog, locale)}</h3>
-                    <VersionBody version={version} map={map} catalog={catalog} locale={locale} lead={false} pathName={pathName} />
+                    <VersionBody version={version} map={map} catalog={catalog} locale={locale} lead={false} pathName={pathName} canDigNow={canDigNow} />
                   </article>
                 ))}
               </div>

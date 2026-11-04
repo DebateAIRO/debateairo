@@ -86,4 +86,26 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     // The fixed heading widths are gone from the grid (the per-row floors above stay for browsers without subgrid).
     expect(block).not.toMatch(/196px 228px 236px/u);
   });
+
+  it("leave the laptop's two folded columns (map-d3) out of that grid, so open questions still hang under their path", () => {
+    // The merge of wave 1 (4 Nov): measured in a browser, the shared grid put a folded map's open questions in a third column
+    // beside the path, and the "Paths" heading off its column. v4-map-looks.css (loaded after v4-map.css) undoes the grid
+    // for .v4MapFold only, back to the per-row layout.
+    const looks = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-map-looks.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    const start = looks.indexOf("@supports (grid-template-columns: subgrid) {");
+    expect(start).toBeGreaterThan(looks.indexOf(".v4MapFold .v4MapBranch {"));
+    const block = looks.slice(start, looks.indexOf("\n}", start));
+    const inBlock = (selector: string): string => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const found = new RegExp(`\\n[ \\t]*${escaped} \\{([^}]*)\\}`, "u").exec(block);
+      expect(found, selector).not.toBeNull();
+      return found![1]!;
+    };
+    expect(inBlock(".v4MapFold .v4MapCanvas")).toMatch(/display: flex;/u);
+    expect(inBlock(".v4MapFold .v4MapHeads")).toMatch(/column-gap: 32px;/u);
+    expect(inBlock(".v4MapFold .v4MapBody")).toMatch(/display: flex;/u);
+    expect(inBlock(".v4MapFold .v4MapRootCol")).toMatch(/width: min-content;/u);
+    expect(inBlock(".v4MapFold .v4MapBranches")).toMatch(/display: flex;[\s\S]*margin-inline-start: 32px;/u);
+    expect(inBlock(".v4MapFold .v4MapBranch")).toMatch(/display: flex;/u);
+  });
 });

@@ -162,6 +162,17 @@
 .v4MapFold .v4MapBranch > .v4MapLeaves::before,
 .v4MapFold .v4MapBranch > .v4MapLeaves > .v4MapLeaf::before,
 .v4MapFold .v4MapBranch > .v4MapLeaves > .v4MapLeaf::after { display: none; }
+/* Review F2's one grid (v4-map.css, subgrid) lines up the three columns of the full map. The laptop's two columns hang
+   each path's open questions under its card instead, so a folded map keeps the per-row layout above: the shared grid
+   would put them in a third column beside the path. */
+@supports (grid-template-columns: subgrid) {
+  .v4MapFold .v4MapCanvas { display: flex; }
+  .v4MapFold .v4MapHeads { column-gap: 32px; }
+  .v4MapFold .v4MapBody { display: flex; align-items: flex-start; }
+  .v4MapFold .v4MapRootCol { width: min-content; }
+  .v4MapFold .v4MapBranches { display: flex; gap: 14px; margin-inline-start: 32px; }
+  .v4MapFold .v4MapBranch { display: flex; }
+}
 /* A folded path keeps only what always shows, one line each. */
 .v4MapLeavesFolded .v4MapOpen .v4MapNote, .v4MapLeavesFolded .v4MapDig .v4Bar, .v4MapLeavesFolded .v4MapDigHeadline,
 .v4MapLeavesFolded .v4MapSprouts { display: none; }

@@ -1324,6 +1324,7 @@ function V4Debate({
       mainAnswer={served?.answer.main_answer}
       reportAnswer={reportAnswer}
       answeredAt={served?.answer.as_of ?? null}
+      canDigNow={canDig && startsWait === null}
       folded={answerFolded}
       onUnfold={() => (layout === "phone" && !rootShown ? select("root", false) : setAnswerUnfolded(true))}
       {...(answerUnfolded ? { onFold: () => setAnswerUnfolded(false) } : {})}

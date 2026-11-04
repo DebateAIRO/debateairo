@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { V4DigChoice } from "../../apps/ui/components/v4/V4DigSuggest.js";
+import { V4AnswerCard } from "../../apps/ui/components/v4/V4AnswerCard.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
 import { t } from "../../apps/ui/lib/i18n/translate.js";
 import type { MoneyLine } from "../../apps/ui/lib/v4/money.js";
@@ -330,6 +331,26 @@ describe("map-f16 + r2-11: the missing short answer's line says only what is tru
         expect(text, `${name} ${fallback}`).toContain(t(catalog, "v4.panel.noShortAnswerNoDig"));
         expect(text, `${name} ${fallback}`).not.toContain(CAN_DIG);
       }
+    }
+  });
+
+  // The merge of wave 1 (4 Nov): the answer card above the map (map-d1) now shows the first answer in place of the panel of
+  // "Your question", so it says the same true line.
+  it("the answer card above the map says the same: the whole line where a dig can start, the short one where none can", () => {
+    const cardText = (map: V4Map, canDigNow?: boolean): string => {
+      const container = document.createElement("div");
+      container.innerHTML = renderToStaticMarkup(
+        <V4AnswerCard map={map} mainAnswer={null} answeredAt={null} folded={false} onUnfold={noop} catalog={catalog} locale="en"
+          {...(canDigNow === undefined ? {} : { canDigNow })} />
+      );
+      return container.textContent ?? "";
+    };
+    expect(cardText(noShort(null))).toContain(t(catalog, "v4.panel.storyMissing"));
+    expect(cardText(noShort("First part.\n\nSecond part."), true)).toContain(t(catalog, "v4.panel.fallbackMissing"));
+    for (const fallback of [null, "First part."]) {
+      const text = cardText(noShort(fallback), false);
+      expect(text, String(fallback)).toContain(t(catalog, "v4.panel.noShortAnswerNoDig"));
+      expect(text, String(fallback)).not.toContain(CAN_DIG);
     }
   });
 });
