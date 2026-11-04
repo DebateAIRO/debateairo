@@ -106,6 +106,10 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   // V4 start step (Task 23): every call of the step before Start (packages/map START_CALL_SITE_PREFIX: the angle planner, the list
   // writers, the merges, the combine and the fit) is one step of its own.
   if (/^START:/u.test(request.callSiteKey)) return "start_step";
+  // V4 start step (Task 52): each path's answer so far (packages/story PATH_OUTCOME_CALL_SITE: path 1-8, round 1-2, on the served lane)
+  // is written and checked like a dig's rewrite, so it runs at the rewrite's two steps, the writer's and the checker's.
+  const outcomeSite = /^PATH_OUTCOME:(WRITER|CHECKER):[1-8]:[1-2]$/u.exec(request.callSiteKey);
+  if (outcomeSite !== null) return outcomeSite[1] === "WRITER" ? "path_rewrite_writer" : "path_rewrite_checker";
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";

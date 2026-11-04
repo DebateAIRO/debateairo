@@ -180,3 +180,5 @@ export * from "./path-rewrite.js";
 export * from "./investigation-report.js";
 // V4 start step, Task 51: story v5, one entry per path (drafts, sealed at Task 92).
 export * from "./path-final.js";
+// V4 start step, Task 49: each path's answer so far, its writer and checker (drafts, sealed at Task 92).
+export * from "./path-outcome.js";

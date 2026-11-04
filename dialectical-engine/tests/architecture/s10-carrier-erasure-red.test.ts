@@ -309,6 +309,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // R22 decisions 2 and 3: the climb and the answer update send their calls as the rewrite does, naming the dig's run; they read no
       // content themselves: their sources and seals open and seal under the lease.
       "apps/runner/src/path-climb.ts",
+      // V4 start step, Task 49: each path's answer so far sends its writer and checker calls through the gateway its job
+      // hands it (Task 54: the run's lane-wrapped, leased gateway), naming the run. It opens no lease and reads no content
+      // of its own; the outcome is stored through the path results store (0158).
+      "apps/runner/src/path-outcomes.ts",
       "apps/runner/src/path-rewrite.ts",
       // The public tree (0147): the AI check on a contribution goes through the gateway the settled dig's snapshot hands it, naming the dig's run.
       "apps/runner/src/public-contribution.ts",

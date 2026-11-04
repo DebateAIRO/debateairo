@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Judge } from "@debateai/judgement";
+// V4 start step (Task 52): the path steps' hand-offs, each rendered by its shipped builder.
+import { framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
+import {
+  STORY_PATHS_PROMPT_CONTRACT, storyContractForReader, storyContractInArgumentLanguage, storyPathsMaterial, type StoryPathsMaterialInput
+} from "@debateai/story";
+import { pathOutcomeMaterial, type PathOutcomesPath } from "../../apps/runner/src/path-outcomes.js";
 import {
   ProviderContentUnacceptedError,
   assertFramedPrompt,
@@ -297,6 +303,41 @@ const START_PRIOR: StartMenu = {
   paths: [{ path_ref: "kp00", title: "Running costs", question: CLEAN_STATEMENT, viewpoint_ids: ["pt11"], put_together: false, is_new: false }],
   cards: [], suggestions: []
 };
+
+/**
+ * V4 start step (Task 52): a path debate hands the person's chosen paths (their questions, the viewpoints other models wrote, the
+ * person's own words) and each path's answer so far (another model's text) on to the next AI. Each row renders the one packet its
+ * shipped builder frames: the path root writer's leg (`framedJudgePromptForTest`, the function `Judge.judge` frames with), the answer
+ * so far's writer (`pathOutcomeMaterial`, apps/runner/src/path-outcomes.ts) and story v5's storyteller (`storyPathsMaterial`). Each is
+ * told a reading level, so the reader field and the reader sentence are in their frames too.
+ */
+const PATH_GUIDE = { words: 120, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord };
+const pathRootLeg = (over: Partial<Pick<Extract<JudgeLeg, { kind: "path-root" }>, "pathQuestion" | "viewpoints">>): JudgeLeg => ({
+  kind: "path-root", pathTitle: "Running costs", pathQuestion: "What would the tram cost to run each year?",
+  viewpoints: "Running costs: what would it cost each year?", pointsRaised: CLEAN_STATEMENT, readingLevel: "plain", ...over
+});
+const pathRootPacket = (leg: JudgeLeg): PromptPacket => framedJudgePromptForTest(leg, QUESTION, "English", "resolved", null, PATH_GUIDE).packet;
+const PATH_OUTCOME_PATH: PathOutcomesPath = {
+  pathId: "b1", pathNo: 1, title: "Running costs", question: "What would the tram cost to run each year?", statement: CLEAN_STATEMENT,
+  viewpoints: ["Running costs: what would it cost each year?"], ownWords: [], rootNodeId: "root-1",
+  points: [{ id: "point:c", text: CLEAN_STATEMENT, onId: null, side: "for", trust: null, disputed: false }], sources: []
+};
+const pathOutcomePacket = (ownWords: readonly string[]): PromptPacket => {
+  const built = pathOutcomeMaterial({ question: { line: QUESTION, place: null, time: null, purpose: null, readingLevel: "plain", language: null },
+    path: { ...PATH_OUTCOME_PATH, ownWords }, readingLevel: "plain", language: { name: "English", tag: "en" } });
+  return buildFramedPrompt({ contract: built.contracts.writer, material: built.fields }).packet;
+};
+const storyPathsInputWith = (line: string): StoryPathsMaterialInput => ({
+  paths: [{ pathId: "b1", title: "Running costs", question: "What would the tram cost to run each year?", author: "AI_SUGGESTION", ownWords: [],
+    outcome: { state: "READY", text: { line, summary: "The running costs fit the budget.", fate: "HELD_UP" }, what_changed: [], view: null,
+      trust: "STILL_ARGUED", rests_on: [] } }],
+  mainAnswer: [MAP_CLEAN_ANSWER], mainTrust: "STILL_ARGUED", alsoRaised: [], points: [{ ref: "P1", text: CLEAN_STATEMENT, disputed: false }],
+  questionLine: QUESTION, length: null, readingLevel: "plain", language: null
+});
+const storyPathsPacket = (line: string): PromptPacket => buildFramedPrompt({
+  contract: storyContractInArgumentLanguage(storyContractForReader(STORY_PATHS_PROMPT_CONTRACT, "plain", "STORYTELLER"), "English", null),
+  material: storyPathsMaterial(storyPathsInputWith(line)).fields
+}).packet;
 
 /**
  * FW-B / B-I1 + D-I3 — the support chat's fixtures.
@@ -904,6 +945,28 @@ const HAND_OFFS = [
     payloadIn: "own_view",
     render: (attack: string): readonly PromptPacket[] => [mapProviderPieces(startFitSpec(MAP_CONTEXT, { ownText: attack,
       paths: [{ key: "k1", title: "Running costs", question: CLEAN_STATEMENT }] })).framed.packet]
+  },
+  // V4 start step (Task 52): the path steps' hand-offs (see PATH_GUIDE above). The main answer's `views` row comes with Task 50, which
+  // builds a path run's dossier: today's dossier puts the person's words in two fields (a card's picks and views).
+  {
+    name: "paths:root-writer (path_question)",
+    payloadIn: "path_question",
+    render: (attack: string): readonly PromptPacket[] => [pathRootPacket(pathRootLeg({ pathQuestion: attack }))]
+  },
+  {
+    name: "paths:root-writer (viewpoints)",
+    payloadIn: "viewpoints",
+    render: (attack: string): readonly PromptPacket[] => [pathRootPacket(pathRootLeg({ viewpoints: attack }))]
+  },
+  {
+    name: "paths:outcome (own_words)",
+    payloadIn: "own_words",
+    render: (attack: string): readonly PromptPacket[] => [pathOutcomePacket([attack])]
+  },
+  {
+    name: "paths:story (paths)",
+    payloadIn: "paths",
+    render: (attack: string): readonly PromptPacket[] => [storyPathsPacket(attack)]
   }
 ] as const;
 
@@ -975,8 +1038,11 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // V4 start step (Task 32): 36 -> 41 and 26 -> 29, with the step before Start's five hand-offs: the list writer's
     // question_line, the merge's suggestions, the late merge's new_suggestions, the combine's points and the fit's own_view
     // (question_line and points exist; suggestions, new_suggestions and own_view are new).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(41);
-    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(29);
+    // V4 start step (Task 52): 41 -> 45 and 29 -> 33, with the path steps' four hand-offs: the path root writer's path_question and
+    // viewpoints, the answer so far's own_words and story v5's paths (all four new field names). Task 50 adds the main answer's
+    // views (45 -> 46 and 33 -> 34, five paths: rows).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(45);
+    expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(33);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(4);
@@ -984,6 +1050,7 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("language:"))).toHaveLength(1);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("map:"))).toHaveLength(7);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("start:"))).toHaveLength(5);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("paths:"))).toHaveLength(4);
   });
 
   /**
@@ -1088,7 +1155,8 @@ for (const row of HAND_OFFS) {
  * redesign R3's two v2 position rows) drive a gateway, and
  * only a gateway calls `buildRepairPacket`.
  * The other rows (nine when this was found; twenty-two of the thirty-five since
- * R3; twenty-eight of forty-one since the V4 start step's five) render one packet each, so `packets.slice(1)` was empty for them and the
+ * R3; twenty-eight of forty-one since the V4 start step's five; thirty-two of forty-five since the path steps' four) render one packet
+ * each, so `packets.slice(1)` was empty for them and the
  * loop asserted nothing at all — nine rows of silent pass then.
  *
  * The count is asserted now, so the row states its own extent and a render that

@@ -304,7 +304,8 @@ describe("practice debate shape: what the run did", () => {
       chosenAnswers: 2, alsoRaised: 7, panelCloseCallExtensions: 3, scrutinyExtensions: 2,
       // R3: the map's answer check step and blocks
       answerCheck: null, mapFallbacks: { merge: 0, choose: 0 },
-      mapCallsByStep: { angles: 1, list: 3, merge: 1, gap: 1, choose: 1, check: 0 }, notExercised: null
+      // V4 start step (Task 52): the gap round after Start (MAP:gap-paths:<k>) is a map step of its own.
+      mapCallsByStep: { angles: 1, list: 3, merge: 1, gap: 1, "gap-paths": 0, choose: 1, check: 0 }, notExercised: null
     });
   });
 
@@ -330,7 +331,7 @@ describe("practice debate shape: what the run did", () => {
       storedDepthParams: null, sizes: null, opening: null, mapMarks: {}, chosenAnswers: null, alsoRaised: null, panelCloseCallExtensions: 0,
       // R3: the map's answer check step and blocks
       answerCheck: null, mapFallbacks: { merge: 0, choose: 0 },
-      scrutinyExtensions: 0, mapCallsByStep: { angles: 0, list: 0, merge: 0, gap: 0, choose: 0, check: 0 }, notExercised: null });
+      scrutinyExtensions: 0, mapCallsByStep: { angles: 0, list: 0, merge: 0, gap: 0, "gap-paths": 0, choose: 0, check: 0 }, notExercised: null });
   });
 
   it("a shape run that did not exercise the shape is NOT_PROVEN, never PASS", () => {
@@ -354,7 +355,7 @@ describe("practice debate shape: what the run did", () => {
       + "{\"depth\":1,\"depthMode\":\"adaptive\",\"scrutiny\":\"standard\",\"answerLength\":\"standard\"}");
     expect(markdown).toContain("- opening used: ANGLE_MAP");
     // R3: the map's answer check step and blocks
-    expect(markdown).toContain("- map calls (every try, as the ledger recorded them): angles 1, list 3, merge 1, gap 1, choose 1, check 0");
+    expect(markdown).toContain("- map calls (every try, as the ledger recorded them): angles 1, list 3, merge 1, gap 1, gap-paths 0, choose 1, check 0");
     expect(markdown).toContain("- chosen answers: 2; also raised, not debated: 7");
     expect(markdown).toContain("- map marks: CHOOSE_QUOTA_FILLED x1");
     // Pre-flight PF-D19 (T14-P): the close call called for extra graders; one that then failed still leaves the mark.

@@ -10,6 +10,8 @@ import {
 import {
   PATH_REWRITE_ROUND_TWO_ROOM_BYTES, buildPathRewriteMaterial, pathRewriteBodyBytes, type PathRewriteMaterial, type PathRewriteMaterialInput
 } from "./path-rewrite-material.js";
+// V4 start step, Task 49: each path's answer-so-far material (path-outcomes.ts calls back into this file; functions only).
+import { PATH_OUTCOME_LADDER, pathOutcomeMaterial } from "./path-outcomes.js";
 
 /**
  * R22 DECISION 28, THE REAL COUNT WHERE MATERIAL IS FITTED. Haiku's calls stay under 100,000 tokens, and bytes are only an estimate. The
@@ -108,6 +110,26 @@ export async function fitStoryPathsToTokenLine(input: Parameters<typeof storyPat
     if (real === null || real + roomTokens(room) < ANTHROPIC_TOKEN_COUNT.line) return built;
     log("STORY_PATHS_OVER_THE_TOKEN_LINE", { ladderStep: built.ladderStep });
     built = storyPathsMaterial(input, { fromStep: built.ladderStep + 1 });
+  }
+  return built;
+}
+
+/**
+ * V4 start step, Task 49: one path's answer-so-far material, on the first ladder step whose writer packet the real count also lets
+ * through with round 2's room (its own draft and the checker's problem), counted with its shared fields first as they are sent.
+ * Modelled on `fitRewriteToTokenLine`. The last step has nothing below it, so it is not counted.
+ */
+export async function fitPathOutcomeToTokenLine(input: Parameters<typeof pathOutcomeMaterial>[0], tokenCount: TokenCounter | undefined,
+  log: Log): Promise<ReturnType<typeof pathOutcomeMaterial>> {
+  let built = pathOutcomeMaterial(input);
+  if (tokenCount === undefined) return built;
+  while (built.ladderStep < PATH_OUTCOME_LADDER.length) {
+    const packet = countedPacket(built.contracts.writer, built.fields);
+    if (packet === null || !looksClose(pathRewriteBodyBytes(packet) + PATH_REWRITE_ROUND_TWO_ROOM_BYTES)) return built;
+    const real = await tokenCount({ packet, sharedFirstFieldCount: built.sharedFieldCount });
+    if (real === null || real + roomTokens(PATH_REWRITE_ROUND_TWO_ROOM_BYTES) < ANTHROPIC_TOKEN_COUNT.line) return built;
+    log("PATH_OUTCOME_OVER_THE_TOKEN_LINE", { ladderStep: built.ladderStep });
+    built = pathOutcomeMaterial(input, { fromStep: built.ladderStep + 1 });
   }
   return built;
 }

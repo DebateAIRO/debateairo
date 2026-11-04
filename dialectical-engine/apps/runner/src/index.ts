@@ -303,7 +303,8 @@ import {
   answerUpdateCallSiteRole, contributionCheckCallSiteRole, publicReportCallSiteRole, isPathRewriteCallSite,
   pathClimbCallSiteRole, pathRewriteCallSiteRole
 } from "./path-rewrite-scope.js";
-import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
+// V4 start step, Task 49: PATH_OUTCOME_CALL_SITE_PREFIX, each path's answer so far, booked on the debate's attempts and never walled.
+import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, PATH_OUTCOME_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
 // debate-member mapping, from its own module so this one never loads the loader.
 import type { RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
@@ -13607,8 +13608,12 @@ export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" |
  * refusal's code.
  */
 export function providerCallCostEnvelopePhase(
-  request: Pick<ProviderCallRequest, "role" | "lane">
+  request: Pick<ProviderCallRequest, "role" | "lane"> & Partial<Pick<ProviderCallRequest, "callSiteKey">>
 ): CostEnvelopePhase {
+  // V4 start step, Task 49 (decided 3 Nov): a path's answer so far is the writer and the checker on the served lane, but it draws on
+  // the debate's attempts (the receipt counts it among the author sites), so the answer's reserve stays whole for the main answer.
+  // LG-A: a structure-repair call is its original's. A request without a key keeps today's answer.
+  if (structureRepairOriginalKey(request.callSiteKey ?? "").startsWith(PATH_OUTCOME_CALL_SITE_PREFIX)) return "BODY";
   return (request.role === "SYNTHESIZER" || request.role === "EVALUATOR") && request.lane === "served"
     ? "SERVE"
     : "BODY";
@@ -13631,6 +13636,10 @@ export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;
 export function providerCallSharedWall(
   request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">
 ): SharedWallApplication {
+  // V4 start step, Task 49 (decided 3 Nov): a path's answer so far is answer writing, never the debate's arguing, so neither the
+  // shared wall nor the person's month ever refuses it mid-debate, while its phase stays BODY (the owner's rule that the budget never
+  // hard-stops a debate), as the dig rewrite's never-walled seam is.
+  if (structureRepairOriginalKey(request.callSiteKey).startsWith(PATH_OUTCOME_CALL_SITE_PREFIX)) return "EXEMPT";
   if (request.lane !== "served" || providerCallCostEnvelopePhase(request) !== "BODY") return "EXEMPT";
   // Paid plans S1a: an assigned run's first call carries its seat marker. LG-A: a structure-repair call is its original's.
   return seatBaseCallSiteKey(structureRepairOriginalKey(request.callSiteKey)) === FIRST_POSITION_CALL_SITE_KEY ? "EXEMPT" : "APPLY";

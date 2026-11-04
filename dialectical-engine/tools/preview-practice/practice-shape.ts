@@ -323,7 +323,8 @@ export function practiceShapeBlock(input: Readonly<{
 }>): PracticeShapeBlock {
   const facts = input.facts;
   const marks = facts?.marks ?? {};
-  const byStep: Record<PracticeMapStep, number> = { angles: 0, list: 0, merge: 0, gap: 0, choose: 0, check: 0 };
+  // V4 start step (Task 52): "gap-paths" is the gap round after Start (MAP:gap-paths:<round>).
+  const byStep: Record<PracticeMapStep, number> = { angles: 0, list: 0, merge: 0, gap: 0, "gap-paths": 0, choose: 0, check: 0 };
   for (const key of facts?.mapCallSiteKeys ?? []) {
     const step = practiceMapStepOf(key);
     if (step !== null) byStep[step] += 1;

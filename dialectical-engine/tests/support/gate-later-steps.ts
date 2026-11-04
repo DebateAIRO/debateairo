@@ -1,19 +1,24 @@
 // What the preview gate stand-in (tests/support/preview-gate-stubs.ts) knows of the calls beyond a debate's own arguing and
 // its story: the story's charts, the suggestions, the web step, a dig's rewrite and climb, the final report, the main-answer
 // update, the public debate's two checks, a public report, the ask page's clarify call and the question check every ask passes
-// (on the preview it goes through the Anthropic gate since 2026-11-02; a healthy question by default). One row per contract id, and one
+// (on the preview it goes through the Anthropic gate since 2026-11-02; a healthy question by default), and the path steps after Start
+// (V4 start step: the gap round, each path's answer so far and its check, story v5 and its check). One row per contract id, and one
 // valid default reply per kind, written from the request's own material, in the language the request names.
 //
 // A contract with no row here (or in the stand-in's own classifier) is "UNKNOWN" at the gate: a billed vendor 500, recorded,
 // and every practice test refuses an UNKNOWN request. tests/unit/preview-gate-stand-in-coverage.test.ts reads the code's own
 // contract ids and call sites, so a new one that nobody told the stand-in fails there first, with its name.
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+// V4 start step (Task 52): story v5's check names its own eight criteria.
+import { STORY_PATHS_CHECK_CRITERIA } from "@debateai/story";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import type { StubLanguage } from "./preview-gate-stubs.js";
 
 export type LaterGateKind = "STORY_CHARTS" | "SUGGESTIONS" | "PATH_REWRITE_WRITER" | "PATH_REWRITE_CHECKER" | "REPORT_ANSWER" | "REPORT_ANSWER_CHECK"
   | "REPORT_STORY" | "REPORT_STORY_CHECK" | "CONTRIBUTION_CHECK" | "PUBLIC_REPORT_CHECK" | "ASK_CLARIFY" | "WEB_PLAN" | "WEB_DIG_PLAN" | "WEB_READ_ALL"
-  | "WEB_PICK" | "WEB_READ_TOP" | "QUESTION_CHECK" | "START_LIST" | "START_MERGE" | "START_MERGE_LATE" | "START_COMBINE" | "START_FIT";
+  | "WEB_PICK" | "WEB_READ_TOP" | "QUESTION_CHECK" | "START_LIST" | "START_MERGE" | "START_MERGE_LATE" | "START_COMBINE" | "START_FIT"
+  // V4 start step (Task 52): the path steps after Start: the gap round, each path's answer so far and its check, and story v5 and its check.
+  | "PATH_GAP" | "PATH_OUTCOME_WRITER" | "PATH_OUTCOME_CHECKER" | "STORY_PATHS" | "STORY_PATHS_CHECK";
 
 /** Every version is a row of its own: a new version may ask for a new form, so it is new to the stand-in until someone looks. */
 export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Object.freeze({
@@ -35,7 +40,11 @@ export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Obj
   "web.read-top.v1": "WEB_READ_TOP", "web.read-top.v2": "WEB_READ_TOP",
   // V4 start step (Task 22): the step before Start's list writers, merge, late merge, combine and fit.
   "start.list.v1": "START_LIST", "start.merge.v1": "START_MERGE", "start.merge-late.v1": "START_MERGE_LATE", "start.combine.v1": "START_COMBINE",
-  "start.fit.v1": "START_FIT"
+  "start.fit.v1": "START_FIT",
+  // V4 start step (Task 52): the path steps after Start (drafts until Task 92 seals them). map.gap-paths.v1 is no map contract name
+  // (the stand-in coverage's stale-row check proves it), so this row, not the debate map's script, answers it.
+  "map.gap-paths.v1": "PATH_GAP", "path.outcome.v1": "PATH_OUTCOME_WRITER", "path.outcome-check.v1": "PATH_OUTCOME_CHECKER",
+  "story.paths.v5": "STORY_PATHS", "story.paths-check.v5": "STORY_PATHS_CHECK"
 });
 
 const LATER_PROSE = Object.freeze({
@@ -53,7 +62,20 @@ const LATER_PROSE = Object.freeze({
     noSearch: "This answer rests on reasoning that needs no outside source.",
     adds: "It adds a figure.",
     note: "The page reports one figure.",
-    pathTitle: "Winter supply"
+    pathTitle: "Winter supply",
+    // V4 start step (Task 52): the path steps after Start.
+    gapPoints: ["Nobody has asked what this would cost to run in its first winter.", "Nobody has asked who pays if the works run late."],
+    outcomeLine: "This path holds up so far.",
+    outcomeSummary: "The arguing on this path supported its answer.",
+    outcomeChanged: "The arguing added a reason for this path.",
+    outcomeView: "The person's words were weighed against the points argued on this path.",
+    storyHeadline: "The paths were argued, and the answer held up.",
+    storySummary: "You asked a question; each path was argued on its own, and the answer weighs them all.",
+    storyConfidence: "Fairly sure, until a sourced objection turns up.",
+    storyPathLine: "This path came out where its answer so far says.",
+    storyReason: "The answer rests on what the paths found.",
+    storySections: ["What you are deciding", "What the paths found", "What would change it"],
+    storyParagraph: "Each path was argued on its own terms."
   }),
   ro: Object.freeze({
     question: "Rezistă dovezile și iarna?",
@@ -69,7 +91,20 @@ const LATER_PROSE = Object.freeze({
     noSearch: "Acest răspuns se sprijină pe un raționament care nu cere o sursă din afară.",
     adds: "Adaugă o cifră.",
     note: "Pagina prezintă o cifră.",
-    pathTitle: "Aprovizionarea iarna"
+    pathTitle: "Aprovizionarea iarna",
+    // V4 start step (Task 52): the path steps after Start.
+    gapPoints: ["Nimeni nu a întrebat cât ar costa funcționarea în prima iarnă.", "Nimeni nu a întrebat cine plătește dacă lucrările întârzie."],
+    outcomeLine: "Această cale rezistă până acum.",
+    outcomeSummary: "Argumentele de pe această cale i-au susținut răspunsul.",
+    outcomeChanged: "Argumentele au adăugat un motiv pentru această cale.",
+    outcomeView: "Cuvintele persoanei au fost cântărite față de argumentele de pe această cale.",
+    storyHeadline: "Căile au fost argumentate, iar răspunsul a rezistat.",
+    storySummary: "Ați pus o întrebare; fiecare cale a fost argumentată separat, iar răspunsul le cântărește pe toate.",
+    storyConfidence: "Destul de sigur, până când apare o obiecție cu sursă.",
+    storyPathLine: "Această cale a ajuns unde spune răspunsul ei de până acum.",
+    storyReason: "Răspunsul se sprijină pe ce au găsit căile.",
+    storySections: ["Ce decideți", "Ce au găsit căile", "Ce l-ar schimba"],
+    storyParagraph: "Fiecare cale a fost argumentată în termenii ei."
   })
 });
 
@@ -134,5 +169,35 @@ export function laterStepContent(kind: LaterGateKind, chat: string, language: St
       paths: list<{ id: string }>("new_suggestions").map((one) => ({ ids: [one.id], title: null, question: null })), fits: [] });
     case "START_COMBINE": return JSON.stringify({ title: prose.pathTitle, question: prose.question });
     case "START_FIT": return JSON.stringify({ fits: null });
+    // V4 start step (Task 52): the path steps after Start. The gap round names one point not raised yet, for the first path given (none
+    // left: nothing missing); each path's answer so far rests on its first point and has its verdict exactly when the person's own words
+    // are there; story v5 gives every path given its line and its own fate, in order, citing only a point given; both checks are satisfied.
+    case "PATH_GAP": {
+      const raised = new Set(list<string>("already_raised"));
+      const text = prose.gapPoints.find((point) => !raised.has(point));
+      return JSON.stringify({ points: text === undefined ? [] : [{ text, path: list<{ id: string }>("paths")[0]?.id ?? null }] });
+    }
+    case "PATH_OUTCOME_WRITER": {
+      const ref = list<{ ref: string }>("points")[0]?.ref;
+      return JSON.stringify({ line: prose.outcomeLine, summary: prose.outcomeSummary, fate: "HELD_UP",
+        what_changed: [{ text: prose.outcomeChanged, rests_on: ref === undefined ? [] : [ref] }],
+        view: list<string>("own_words").length > 0 ? { outcome: "NOT_SETTLED", scope: "PATH", reason: prose.outcomeView } : null });
+    }
+    case "PATH_OUTCOME_CHECKER": return JSON.stringify(satisfied);
+    case "STORY_PATHS": {
+      const cite = list<{ ref: string }>("points").slice(0, 1).map((point) => point.ref);
+      const entry = (body: string) => ({ text: body, node_refs: cite });
+      return JSON.stringify({
+        short: { headline: prose.storyHeadline, summary: prose.storySummary, confidence: prose.storyConfidence,
+          paths: list<{ id: string; fate?: string }>("paths").map((path) => ({ position_ref: path.id, fate: path.fate ?? "SET_ASIDE",
+            line: prose.storyPathLine, node_refs: cite })),
+          change: entry(prose.change) },
+        why: { reasons: [entry(prose.storyReason)] },
+        reviewer_note: null,
+        long: { sections: prose.storySections.map((title) => ({ title, paragraphs: [entry(prose.storyParagraph)] })) }
+      });
+    }
+    case "STORY_PATHS_CHECK": return JSON.stringify({ satisfied: true, misleading: false, objection: null,
+      criteria: Object.fromEntries(STORY_PATHS_CHECK_CRITERIA.map((name) => [name, true])) });
   }
 }
