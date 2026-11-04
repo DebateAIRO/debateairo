@@ -6292,7 +6292,8 @@ export class PostgresAskApplication implements AskApplication {
     // billing on the server decides the tier from the person's plan, so the decider is asked as for any ask.
     const tierRefusedLater = settings.billing === undefined && !Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string);
     // V4 start step, Task 35: the lock the line checked at Next carried (the route's hand-over) is this ask's; the decider
-    // is not asked again. Its binding to the plan and version is checked with the paths' (`startOfAsk`, below).
+    // is not asked again. Its binding to the plan is checked with the paths' (`startOfAsk`, below); under another settings
+    // version it is still this ask's lock (Task 35b, owner answer Q8).
     const handOverLock = startHandOver?.lock ?? null;
     const questionLanguageLock: QuestionLanguageLock | null = handOverLock !== null ? handOverLock
       : shapePolicy === null || settings.questionLanguage === undefined || tierRefusedLater
@@ -6339,8 +6340,10 @@ export class PostgresAskApplication implements AskApplication {
     }
     // V4 start step, Task 35 (spec 2026-11-03 §4.2): the ask's start, once its plan key is final: the chosen paths handed
     // over by the route (or none: the run builds its own list) when the start step runs for this ask (`startStepWidthsFor`,
-    // the one v2 predicate); paths signed for another plan or version, or carried where the step is off, are STALE, before
-    // anything is written. Null: today's ask. Admission prices it as receipt v2 only on a panel of two makers or more.
+    // the one v2 predicate); paths signed for another plan, or carried where the step is off, are STALE, before anything is
+    // written. Task 35b (owner answer Q8): paths signed under another settings version start as chosen, unless the active
+    // version allows fewer (START_PATHS_NARROWED, also before anything is written). Null: today's ask. Admission prices it
+    // as receipt v2 only on a panel of two makers or more.
     let start: AskStart | null;
     try {
       start = startOfAsk({

@@ -5,8 +5,10 @@
  * failure records the run FAILED and queues nothing), then its purpose lines (logged, never failing the run, as today).
  * A run that builds its own list (RUN_BUILT: an old page's ask) has no set yet, only its lines. A dig never carries on to
  * the report, whatever a client sends, and a dig with no lines of its own records its first debate's. The hand-over from
- * the route is bound to the plan and the settings version the paths were signed for: any other is STALE, before anything
- * is written. A hand-over's language lock is used, and the language decider is not asked. Without the start step (the
+ * the route is bound to the plan and the settings version the paths were signed for: another plan is STALE, before
+ * anything is written. Task 35b (owner answer Q8, 4 Nov): another settings version is not stale; the debate argues the
+ * paths as chosen, unless the active version allows fewer than were chosen (START_PATHS_NARROWED, before anything is
+ * written). A hand-over's language lock is used, and the language decider is not asked. Without the start step (the
  * switch absent, or one maker on the panel) the order and the receipt are today's. Harness after role-rotation-submit.
  */
 import { EventEmitter } from "node:events";
@@ -31,7 +33,7 @@ vi.mock("../../apps/api/src/purpose-lines.js", async (importOriginal) => ({
 
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
-import type { AskRequest, PathId, PurposeLines, Session, StartMenu } from "@debateai/contract";
+import { START_PATHS_NARROWED, type AskRequest, type PathId, type PurposeLines, type Session, type StartMenu } from "@debateai/contract";
 import { RunRepository, type DiscoveredPanelMember, type StartPathsStore, type StoredStartPathSet } from "@debateai/db";
 import { LivenessRepository } from "@debateai/liveness";
 import {
@@ -44,7 +46,7 @@ import type { AskRoomPort, RoomDecision } from "../../apps/api/src/ask-room.js";
 import type { PurposeLinesPort } from "../../apps/api/src/purpose-lines.js";
 import type { QuestionLanguageLock, QuestionLanguagePort } from "../../apps/api/src/question-language/decider.js";
 import {
-  startAskContractMember, startOfAsk, storedSetOf, type AskStartHandOver, type VerifiedStartPaths
+  startAskContractMember, startOfAsk, startPathsFit, storedSetOf, type AskStartHandOver, type VerifiedStartPaths
 } from "../../apps/api/src/start-paths-at-ask.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
@@ -111,6 +113,10 @@ const VERIFIED_DIG: VerifiedStartPaths = Object.freeze({
 });
 const handOver = (verified: VerifiedStartPaths | null, extra: Partial<AskStartHandOver> = {}): AskStartHandOver =>
   Object.freeze({ binding: Object.freeze({ planKey: "free" as const, settingsVersion: 1 }), verified, lock: null, ...extra });
+/** The menu's set grown to `count` paths, chosen at How wide `width` under another settings version (made-up paths). */
+const widerMenu = (count: number, width: number): VerifiedStartPaths => Object.freeze({ ...VERIFIED_MENU, width,
+  paths: Object.freeze(Array.from({ length: count }, (_, index) => VERIFIED_MENU.paths[index]
+    ?? Object.freeze({ ...VERIFIED_MENU.paths[0]!, pathId: `b${index + 1}` as PathId, pathNo: index + 1 }))) });
 
 const LOCK: QuestionLanguageLock = Object.freeze({ language: { code: "ro", name: "Romanian" }, source: "ELD_SITE", siteLanguage: "ro",
   rewriteAccepted: false, originalQuestionLine: null, trace: { eld: { code: "ro", reliable: true, confident: true }, fast: null, contractHash: null },
@@ -249,11 +255,63 @@ describe("startOfAsk: the hand-over, the binding and the carry-on box", () => {
     expect(() => of({ widths: null })).toThrow(expect.objectContaining({ code: "START_PATHS_STALE" }));
   });
 
-  it("a hand-over bound to another plan or another settings version is STALE", () => {
+  it("another plan is STALE", () => {
     expect(() => of({ plan: "plus", widths: PAID })).toThrow(expect.objectContaining({ code: "START_PATHS_STALE" }));
-    expect(() => of({ registerVersion: 2 })).toThrow(expect.objectContaining({ code: "START_PATHS_STALE" }));
-    expect(() => of({ handOver: handOver(null, { binding: { planKey: "free", settingsVersion: 2 } }) }))
-      .toThrow(expect.objectContaining({ code: "START_PATHS_STALE" }));
+  });
+
+  // Task 35b (owner answer Q8, 4 Nov): a site update since Next is not stale; the debate argues the paths as chosen.
+  it("another settings version is accepted where the version runs the step and the paths fit", () => {
+    expect(of({ registerVersion: 2 })).toEqual({ shape: { paths: 3, pathsSource: "MENU" }, verified: VERIFIED_MENU, purposeLines: null,
+      carryOnToReport: false, parentRunId: null });
+    expect(of({ handOver: handOver(null, { binding: { planKey: "free", settingsVersion: 2 } }) })).toEqual({
+      shape: { paths: 3, pathsSource: "RUN_BUILT" }, verified: null, purposeLines: null, carryOnToReport: false, parentRunId: null });
+    // A newer binding (a way back after an upload) is the same; the set keeps the width the person chose, even one the
+    // active version no longer offers.
+    expect(of({ handOver: handOver(VERIFIED_MENU, { binding: { planKey: "free", settingsVersion: 2 } }) }))
+      .toMatchObject({ shape: { paths: 3, pathsSource: "MENU" }, verified: VERIFIED_MENU });
+    const five = widerMenu(5, 5);
+    expect(of({ widths: { options: [3, 7], default: 7 }, plan: "premium", registerVersion: 2,
+      handOver: handOver(five, { binding: { planKey: "premium", settingsVersion: 1 } }) }))
+      .toMatchObject({ shape: { paths: 5, pathsSource: "MENU" }, verified: { width: 5, paths: five.paths } });
+  });
+
+  // Review of Task 35b: the paths chosen decide, not the How wide they were chosen at. Four paths chosen at How wide 7
+  // (the AIs found fewer, choose-f22) fit a version whose widest is 5: the debate starts, its width kept.
+  it("another settings version: the count of the chosen paths decides, not the How wide they were chosen at", () => {
+    const fourAtSeven = widerMenu(4, 7);
+    expect(of({ widths: { options: [3, 5], default: 5 }, plan: "premium", registerVersion: 2,
+      handOver: handOver(fourAtSeven, { binding: { planKey: "premium", settingsVersion: 1 } }) }))
+      .toMatchObject({ shape: { paths: 4, pathsSource: "MENU" }, verified: { width: 7, paths: fourAtSeven.paths } });
+  });
+
+  it("another settings version whose widest is below the paths → START_PATHS_NARROWED", () => {
+    expect(START_PATHS_NARROWED).toBe("START_PATHS_NARROWED");
+    const narrowed = (): unknown => of({ widths: { options: [3], default: 3 }, plan: "premium", registerVersion: 2,
+      handOver: handOver(widerMenu(5, 5), { binding: { planKey: "premium", settingsVersion: 1 } }) });
+    expect(narrowed).toThrow(expect.objectContaining({ name: "TypedDomainError", code: "START_PATHS_NARROWED",
+      message: "START_PATHS_NARROWED" }));
+  });
+
+  it("Free with four paths after a version move → START_PATHS_NARROWED", () => {
+    expect(() => of({ registerVersion: 2, handOver: handOver(widerMenu(4, 5)) }))
+      .toThrow(expect.objectContaining({ code: "START_PATHS_NARROWED" }));
+    // Free's cap of 3 holds whatever the widths say.
+    expect(() => of({ widths: PAID, registerVersion: 2, handOver: handOver(widerMenu(4, 5)) }))
+      .toThrow(expect.objectContaining({ code: "START_PATHS_NARROWED" }));
+  });
+
+  it("another version, widths null, paths → STALE (unchanged); no paths → no start", () => {
+    expect(() => of({ widths: null, registerVersion: 2 })).toThrow(expect.objectContaining({ code: "START_PATHS_STALE" }));
+    expect(of({ widths: null, handOver: handOver(null, { binding: { planKey: "free", settingsVersion: 2 } }) })).toBeNull();
+  });
+
+  it.each([
+    [[3, 5, 7], "premium", 7, true],
+    [[3, 5], "premium", 7, false],
+    [[3, 5, 7], "free", 4, false],
+    [[3], "free", 3, true]
+  ] as const)("startPathsFit(%o, %s, %i) is %s", (options, plan, paths, fits) => {
+    expect(startPathsFit({ options, default: options[0] }, plan, paths)).toBe(fits);
   });
 
   it("carries on only a new question that asked; a dig never does, whatever a client sends", () => {
@@ -399,7 +457,6 @@ describe("the hand-over's binding and lock", () => {
 
   it.each([
     ["another plan", handOver(VERIFIED_MENU, { binding: { planKey: "plus", settingsVersion: 1 } }), POLICY_ON],
-    ["another settings version", handOver(VERIFIED_MENU, { binding: { planKey: "free", settingsVersion: 2 }, lock: LOCK }), POLICY_ON],
     ["paths on a version without the switch", handOver(VERIFIED_MENU), POLICY]
   ] as const)("%s: START_PATHS_STALE, with nothing written", async (_name, stale, policy) => {
     const { order, queries, started, decide, submit } = arrange({ policy, decider: true });
@@ -408,6 +465,29 @@ describe("the hand-over's binding and lock", () => {
     expect(queries.count).toBe(0);
     expect(started).toEqual([]);
     if (stale.lock !== null) expect(decide).not.toHaveBeenCalled();
+  });
+
+  // Task 35b (owner answer Q8, 4 Nov): the row "another settings version" was STALE; a site update is no longer stale.
+  it("another settings version: QUEUED, the set sealed as storedSetOf maps it, the hand-over's lock used and the decider not asked", async () => {
+    const { order, sets, started, decide, submit } = arrange({ decider: true });
+    await expect(submit(ask(), handOver(VERIFIED_MENU, { binding: { planKey: "free", settingsVersion: 2 }, lock: LOCK })))
+      .resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(order).toEqual(["startRun", "recordStartPaths", "recordMemoryQuestion", "enqueue", "dispatch"]);
+    expect(sets).toEqual([storedSetOf(RUN_ID, VERIFIED_MENU)]);
+    expect(decide).not.toHaveBeenCalled();
+    expect(started[0]!.argumentLanguageTag).toBe("ro");
+    expect(started[0]!.askContract).toMatchObject({ question_language: { code: "ro", source: "ELD_SITE" } });
+    expect(started[0]!.envelopeBasis).toMatchObject({ formula_version: "DR-185-shape-v2", shape: { paths: 3, paths_source: "MENU" } });
+  });
+
+  it("another settings version with more paths than its widest: START_PATHS_NARROWED, with nothing written", async () => {
+    const { order, queries, started, decide, submit } = arrange({ decider: true });
+    await expect(submit(ask(), handOver(widerMenu(4, 5), { binding: { planKey: "free", settingsVersion: 2 }, lock: LOCK })))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "START_PATHS_NARROWED" });
+    expect(order).toEqual([]);
+    expect(queries.count).toBe(0);
+    expect(started).toEqual([]);
+    expect(decide).not.toHaveBeenCalled();
   });
 });
 

@@ -39,6 +39,8 @@ export const START_PATHS_TOO_MANY = "START_PATHS_TOO_MANY" as const;
 export const START_PATHS_EXPIRED = "START_PATHS_EXPIRED" as const;
 /** 409: the question, the plan or the settings version changed since the lists were written. */
 export const START_PATHS_STALE = "START_PATHS_STALE" as const;
+/** 409: the active settings version allows fewer paths than were chosen (the site was updated since Next); the page asks to combine or remove down to the room's widest. */
+export const START_PATHS_NARROWED = "START_PATHS_NARROWED" as const;
 
 const L = START_STEP_LIMITS;
 const words = (max: number) => z.string().trim().min(1).max(max);

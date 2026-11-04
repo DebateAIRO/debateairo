@@ -1,4 +1,4 @@
-import { START_PATHS_STALE, type AskRequest, type PurposeLines } from "@debateai/contract";
+import { START_PATHS_NARROWED, START_PATHS_STALE, START_STEP_LIMITS, type AskRequest, type PurposeLines } from "@debateai/contract";
 import type { StartPathsStore, StoredStartMenu, StoredStartPath, StoredStartPathSet } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { isShapeReceiptV2, type DebateShapePlanKey, type DebateShapeWidths } from "@debateai/register";
@@ -43,22 +43,37 @@ export type AskStart = Readonly<{ shape: AskStartShape; verified: VerifiedStartP
   carryOnToReport: boolean; parentRunId: string | null }>;
 
 const stale = (): TypedDomainError => new TypedDomainError(START_PATHS_STALE, START_PATHS_STALE);
+const narrowed = (): TypedDomainError => new TypedDomainError(START_PATHS_NARROWED, START_PATHS_NARROWED);
+
+/**
+ * V4 start step, Task 35b (owner answer Q8, 4 Nov): whether `paths` chosen paths fit a version's widths for the plan: at
+ * most its widest option, and on Free at most 3 (the cap in code, whatever the row says). The width the person chose
+ * need not be among the options.
+ */
+export function startPathsFit(widths: DebateShapeWidths, plan: DebateShapePlanKey, paths: number): boolean {
+  return paths <= Math.max(...widths.options) && (plan !== "free" || paths <= START_STEP_LIMITS.freePathsMax);
+}
 
 /**
  * The ask's start, or null when the step does not run for it (`widths` null: `startStepWidthsFor`) and it carried no
- * paths. Paths signed for another plan or settings version, or carried to a version where the step is off, are STALE: the
- * page offers "Read it again", never a debate without the paths the person chose. A dig never carries on to the report
- * (Task 56), whatever a client sends, so the verified set's flag follows the ask's own rule.
+ * paths. Paths signed for another plan, or carried to a version where the step is off, are STALE: the page offers "Read
+ * it again", never a debate without the paths the person chose. Task 35b (owner answer Q8, 4 Nov): paths signed under
+ * another settings version (older or, after a way back, newer) are not stale; the debate argues them as chosen, the set
+ * sealed as handed over (its width kept), unless the active version allows fewer than were chosen (`startPathsFit`):
+ * NARROWED, and the page asks to combine or remove down to its widest. Under the same version nothing changes. A dig
+ * never carries on to the report (Task 56), whatever a client sends, so the verified set's flag follows the ask's own rule.
  */
 export function startOfAsk(input: Readonly<{ widths: DebateShapeWidths | null; plan: DebateShapePlanKey; registerVersion: number;
   ask: AskRequest; handOver: AskStartHandOver | null }>): AskStart | null {
   const { widths, plan, ask, handOver } = input;
-  if (handOver !== null && (handOver.binding.planKey !== plan || handOver.binding.settingsVersion !== input.registerVersion)) throw stale();
+  if (handOver !== null && handOver.binding.planKey !== plan) throw stale();
   const given = handOver?.verified ?? null;
   if (widths === null) {
     if (given !== null) throw stale();
     return null;
   }
+  const versionMoved = handOver !== null && handOver.binding.settingsVersion !== input.registerVersion;
+  if (versionMoved && given !== null && !startPathsFit(widths, plan, given.paths.length)) throw narrowed();
   const carryOnToReport = ask.carry_on_to_report === true && ask.parent === undefined && ask.public_parent === undefined;
   const verified = given === null || given.carryOnToReport === carryOnToReport ? given : Object.freeze({ ...given, carryOnToReport });
   const shape = askStartShapeOf(widths, plan, verified);
