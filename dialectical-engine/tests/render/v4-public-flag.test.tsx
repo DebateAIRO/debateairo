@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { V4PublicFlag } from "../../apps/ui/components/v4/V4PublicFlag.js";
 import { V4PublicSessionProvider } from "../../apps/ui/components/v4/V4PublicSession.js";
+import { V4PublicTopMenu } from "../../apps/ui/components/v4/V4PublicPage.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: unknown; className?: string }) => <a href={href} className={className}>{children as never}</a> }));
@@ -112,5 +113,72 @@ describe("Report a problem on a public page", () => {
     await act(async () => { toggle().click(); });
     expect(own).not.toHaveBeenCalled();
     expect(host!.querySelector("[data-public-flag-signed-out]")).not.toBeNull();
+  });
+});
+
+/*
+ * public-f4 (owner screen review, 3 Nov): the link sits in the page's top bar (on a phone, in the bar's menu) and at the foot of each path, where the
+ * form already names the path; the form opens as a small window on a computer and as a sheet from the bottom on a phone, never as loose lines.
+ */
+describe("Report a problem: where it sits and how its form opens (public-f4)", () => {
+  const css = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/public-lane.css"), "utf8");
+  it("at the foot of a path, the form already names that path, and the person can still change it", async () => {
+    host = document.body.appendChild(document.createElement("div"));
+    root = createRoot(host);
+    const send = vi.fn(async () => ({ state: "WITH_A_PERSON" as const }));
+    await act(async () => { root!.render(<V4PublicFlag publicRef={REF} catalog={V4} where="Better service first" placement="foot" send={send as never} readSession={async () => undefined} />); });
+    expect(host.querySelector("[data-public-flag]")!.getAttribute("data-placement")).toBe("foot");
+    await act(async () => { toggle().click(); });
+    const where = host.querySelector<HTMLInputElement>("input[name=where]")!;
+    expect(where.value).toBe("Better service first");
+    expect(toggle().getAttribute("aria-controls")).toBe(host.querySelector(".v4PubFlagPanel")!.id);
+    await act(async () => { set(host!.querySelector<HTMLTextAreaElement>("textarea[name=claim]")!, "It names a private person's home."); });
+    await act(async () => { host!.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    expect(send).toHaveBeenCalledWith(REF, { where: "Better service first", claim: "It names a private person's home." });
+    // After sending, the next report on this path starts from the path's name again.
+    await act(async () => { toggle().click(); });
+    expect(host.querySelector<HTMLInputElement>("input[name=where]")!.value).toBe("Better service first");
+  });
+
+  it("the form is a window held to its link on a computer and a sheet from the bottom on a phone, styled, never loose lines", async () => {
+    await mount(true);
+    const panel = host!.querySelector(".v4PubFlagPanel")!;
+    expect(panel.getAttribute("role")).toBe("group");
+    expect(panel.querySelector("form.v4PubFlagForm")).not.toBeNull();
+    expect(panel.querySelectorAll(".v4PubText")).toHaveLength(2);
+    expect(css).toMatch(/\.v4PubFlagPanel \{[^}]*position: absolute;[^}]*box-shadow: var\(--shadow-pop\);/u);
+    const phone = css.slice(css.indexOf("@media (max-width: 767px)"));
+    expect(phone).toMatch(/\.v4PubFlagPanel, \.v4PubFlag-foot \.v4PubFlagPanel \{[^}]*position: fixed;[^}]*bottom: 0;/u);
+    // Nothing moves: the window and the sheet appear at once.
+    expect(css.slice(css.indexOf("public-f4: \"Report a problem\" in the top bar"))).not.toMatch(/animation|transition|@keyframes/u);
+  });
+
+  it("in the top bar, a phone folds the link into the bar's menu; Escape closes an open form first, then the menu", async () => {
+    host = document.body.appendChild(document.createElement("div"));
+    root = createRoot(host);
+    await act(async () => {
+      root!.render(<V4PublicTopMenu catalog={V4}><V4PublicFlag publicRef={REF} catalog={V4} placement="top" readSession={async () => undefined} /></V4PublicTopMenu>);
+    });
+    const menu = host.querySelector("[data-public-top-menu]")!;
+    const button = menu.querySelector<HTMLButtonElement>(".v4PubTopMenuButton")!;
+    expect(button.textContent).toContain(V4["v4.public.menu"]);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(menu.querySelector(`#${CSS.escape(button.getAttribute("aria-controls")!)}`)!.contains(toggle())).toBe(true);
+    await act(async () => { button.click(); });
+    expect(menu.getAttribute("data-open")).toBe("true");
+    await act(async () => { toggle().click(); });
+    const field = host.querySelector<HTMLInputElement>("input[name=where]")!;
+    await act(async () => { field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(host.querySelector("form")).toBeNull();
+    expect(menu.getAttribute("data-open")).toBe("true");
+    expect(document.activeElement).toBe(toggle());
+    await act(async () => { toggle().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    expect(menu.getAttribute("data-open")).toBe("false");
+    expect(document.activeElement).toBe(button);
+    // On a computer the button is hidden and the link sits in the bar; on a phone the link waits in the menu.
+    expect(css).toMatch(/\.v4PubTopMenuButton \{ display: none; \}/u);
+    const phone = css.slice(css.indexOf("@media (max-width: 767px)"));
+    expect(phone).toMatch(/\.v4PubTopMenuItems \{ display: none; \}/u);
+    expect(phone).toMatch(/\.v4PubTopMenu\[data-open="true"\] \.v4PubTopMenuItems \{/u);
   });
 });

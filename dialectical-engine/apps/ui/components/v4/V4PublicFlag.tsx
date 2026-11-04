@@ -12,16 +12,24 @@ import { usePublicSignedIn } from "@/components/v4/V4PublicSession";
  * convention. public-f5: the form closes at once with a thank-you, and the check's answer replaces it later in the same quiet line by the link, so nobody
  * watches the check; a box left too short says so under it; focus goes into the form when it opens and back to the link when it closes. The session is the
  * page's one read (public-f13).
+ * public-f4 (owner review, 3 Nov): the link sits in the page's top bar and at the foot of each question, where the form already knows which question is
+ * meant (`where`). The form opens as a small window under the link on a computer and as a sheet from the bottom on a phone (public-lane.css), never as
+ * loose lines above the page.
  */
-export function V4PublicFlag({ publicRef, catalog, send = (ref, body) => contractClient.flagPublicDebate(ref, body), readSession = validateSession }: Readonly<{
+export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement = "top", send = (ref, body) => contractClient.flagPublicDebate(ref, body),
+  readSession = validateSession }: Readonly<{
   publicRef: string; catalog: MessageCatalog;
+  /** At the foot of a question: that question, already written in "Where is the problem?" (the person can still change it). */
+  where?: string;
+  /** "top": in the page's top bar; "foot": at the foot of a question. */
+  placement?: "top" | "foot";
   send?: (publicRef: string, body: Readonly<{ where: string; claim: string }>) => Promise<PublicFlagAnswer>;
   readSession?: () => Promise<unknown>;
 }>) {
   const ids = useId();
   const signedIn = usePublicSignedIn(readSession);
   const [open, setOpen] = useState(false);
-  const [where, setWhere] = useState("");
+  const [where, setWhere] = useState(() => (whereShown ?? "").slice(0, 300));
   const [claim, setClaim] = useState("");
   const [tooShort, setTooShort] = useState<Readonly<{ where: boolean; claim: boolean }>>({ where: false, claim: false });
   const [sending, setSending] = useState(false);
@@ -62,7 +70,7 @@ export function V4PublicFlag({ publicRef, catalog, send = (ref, body) => contrac
     try {
       const answer = await send(publicRef, body.data);
       setLine(t(catalog, `v4.public.flag.${answer.state}`));
-      setWhere("");
+      setWhere((whereShown ?? "").slice(0, 300));
       setClaim("");
     } catch {
       // The words stay in the form, so trying again needs no retyping.
@@ -75,35 +83,42 @@ export function V4PublicFlag({ publicRef, catalog, send = (ref, body) => contrac
   const whereHint = `${ids}-where-more`;
   const claimHint = `${ids}-claim-more`;
   return (
-    <div className="publicReportLink" data-public-flag onKeyDown={onKeyDown}>
-      <button ref={toggle} className="v4Link" type="button" data-public-report aria-expanded={open} onClick={() => (open ? close() : setOpen(true))}>
+    <div className={`v4PubFlag v4PubFlag-${placement}`} data-public-flag data-placement={placement} onKeyDown={onKeyDown}>
+      <button ref={toggle} className="v4Link v4PubFlagToggle" type="button" data-public-report aria-expanded={open} aria-controls={`${ids}-panel`}
+        onClick={() => (open ? close() : setOpen(true))}>
         {t(catalog, "v4.public.report")}
       </button>
       {" "}
       <span className="v4PubFlagLine" role="status" data-public-flag-line>{line ?? ""}</span>
-      {!open ? null : signedIn === false ? (
-        <p data-public-flag-signed-out>{t(catalog, "v4.public.flag.signedOut")} <Link className="v4Link" href={signIn}>{t(catalog, "v4.public.flag.signIn")}</Link></p>
-      ) : signedIn === null ? (
-        <p className="v4PubFlagLine" data-public-flag-waiting>{t(catalog, "v4.public.oneMoment")}</p>
-      ) : (
-        <form noValidate onSubmit={(event) => { void submit(event); }}>
-          <label htmlFor={`${ids}-where`}>{t(catalog, "v4.public.flag.where")}</label>
-          <input
-            ref={whereField} id={`${ids}-where`} name="where" required maxLength={300} autoComplete="off" value={where}
-            aria-invalid={tooShort.where || undefined} aria-describedby={tooShort.where ? whereHint : undefined}
-            onChange={(event) => setWhere(event.target.value)}
-          />
-          {tooShort.where ? <p id={whereHint} className="v4PubFlagMore" data-public-flag-more>{t(catalog, "v4.public.flag.whereMore")}</p> : null}
-          <label htmlFor={`${ids}-claim`}>{t(catalog, "v4.public.flag.claim")}</label>
-          <textarea
-            ref={claimField} id={`${ids}-claim`} name="claim" required maxLength={2000} rows={4} value={claim}
-            aria-invalid={tooShort.claim || undefined} aria-describedby={tooShort.claim ? claimHint : undefined}
-            onChange={(event) => setClaim(event.target.value)}
-          />
-          {tooShort.claim ? <p id={claimHint} className="v4PubFlagMore" data-public-flag-more>{t(catalog, "v4.public.flag.claimMore")}</p> : null}
-          <button className="v4Link" type="submit" disabled={sending}>{t(catalog, "v4.public.flag.send")}</button>
-          <button className="v4Link" type="button" onClick={close}>{t(catalog, "v4.public.flag.cancel")}</button>
-        </form>
+      {!open ? null : (
+        <div className="v4PubFlagPanel" id={`${ids}-panel`} role="group" aria-label={t(catalog, "v4.public.report")}>
+          {signedIn === false ? (
+            <p data-public-flag-signed-out>{t(catalog, "v4.public.flag.signedOut")} <Link className="v4Link" href={signIn}>{t(catalog, "v4.public.flag.signIn")}</Link></p>
+          ) : signedIn === null ? (
+            <p className="v4PubFlagLine" data-public-flag-waiting>{t(catalog, "v4.public.oneMoment")}</p>
+          ) : (
+            <form className="v4PubFlagForm" noValidate onSubmit={(event) => { void submit(event); }}>
+              <label className="v4PubLabel" htmlFor={`${ids}-where`}>{t(catalog, "v4.public.flag.where")}</label>
+              <input
+                ref={whereField} id={`${ids}-where`} className="v4PubText" name="where" dir="auto" required maxLength={300} autoComplete="off" value={where}
+                aria-invalid={tooShort.where || undefined} aria-describedby={tooShort.where ? whereHint : undefined}
+                onChange={(event) => setWhere(event.target.value)}
+              />
+              {tooShort.where ? <p id={whereHint} className="v4PubFlagMore" data-public-flag-more>{t(catalog, "v4.public.flag.whereMore")}</p> : null}
+              <label className="v4PubLabel" htmlFor={`${ids}-claim`}>{t(catalog, "v4.public.flag.claim")}</label>
+              <textarea
+                ref={claimField} id={`${ids}-claim`} className="v4PubText" name="claim" dir="auto" required maxLength={2000} rows={4} value={claim}
+                aria-invalid={tooShort.claim || undefined} aria-describedby={tooShort.claim ? claimHint : undefined}
+                onChange={(event) => setClaim(event.target.value)}
+              />
+              {tooShort.claim ? <p id={claimHint} className="v4PubFlagMore" data-public-flag-more>{t(catalog, "v4.public.flag.claimMore")}</p> : null}
+              <div className="v4PubDigActions">
+                <button className="v4Btn v4BtnPrimary" type="submit" disabled={sending}>{t(catalog, "v4.public.flag.send")}</button>
+                <button className="v4Link" type="button" onClick={close}>{t(catalog, "v4.public.flag.cancel")}</button>
+              </div>
+            </form>
+          )}
+        </div>
       )}
     </div>
   );

@@ -40,8 +40,12 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+/*
+ * Owner's screen review, 3 Nov 2026 (public-f1): the public page shows no scoring chrome at all. The classic workspace's "Scoring · 0/0" and
+ * "COMPLETE" chips, and the diagnostics drawer they opened, went with the old page.
+ */
 describe("S02 public scoring diagnostics", () => {
-  it("opens the owner diagnostics drawer over the same DR-115 unavailable payload", async () => {
+  it("offers a stranger no scoring diagnostics, chip or drawer", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const container = document.createElement("div");
     document.body.append(container);
@@ -49,13 +53,9 @@ describe("S02 public scoring diagnostics", () => {
     await act(async () => root!.render(<PublicDebatePageClient debate={publicDebate} />));
     await settle();
 
-    const scoring = container.querySelector<HTMLButtonElement>('button[aria-label="Open scoring diagnostics"]');
-    expect(scoring).not.toBeNull();
-    await act(async () => scoring!.click());
-    await settle();
-
-    expect(container.querySelector('[role="dialog"][aria-label="Scoring diagnostics"]')).not.toBeNull();
-    expect(container.textContent).toContain("Not exposed by scoring API");
-    expect(container.textContent).toContain("unavailable");
+    expect(container.querySelector('button[aria-label="Open scoring diagnostics"]')).toBeNull();
+    expect(container.querySelector('[role="dialog"][aria-label="Scoring diagnostics"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/Scoring ·|COMPLETE|Not exposed by scoring API/u);
+    expect(container.textContent).toContain("Scoring remains honestly unavailable.");
   });
 });

@@ -54,14 +54,17 @@ function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesPr
   const selected = props.selectedId === id;
   return (
     <li className={`v4OutRow v4OutOpen ${groundClass("OPEN")}${selected ? " v4OutSelected" : ""}`}>
-      <PickBox
-        question={question}
-        picked={picked}
-        onTogglePick={pieces.onTogglePick}
-        catalog={pieces.catalog}
-        className="v4OutPick"
-        {...(pieces.choice === undefined ? {} : { choice: pieces.choice })}
-      />
+      {/* public-d1 A: the read-only map of a public debate has no pick boxes (MapPiecesProps.readOnly). */}
+      {pieces.readOnly === true ? null : (
+        <PickBox
+          question={question}
+          picked={picked}
+          onTogglePick={pieces.onTogglePick}
+          catalog={pieces.catalog}
+          className="v4OutPick"
+          {...(pieces.choice === undefined ? {} : { choice: pieces.choice })}
+        />
+      )}
       <button
         type="button"
         className="v4OutMain"
