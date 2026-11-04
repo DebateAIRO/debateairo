@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { contractClient } from "@/lib/api";
-import { readBillingUsage } from "@/lib/billing/usage";
+import { readBillingUsage, type BillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { levelHref } from "@/lib/v4/storage";
 import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
@@ -11,24 +11,44 @@ import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
 /*
  * V4 initial (spec "/v4", header everywhere): brand + badge to /v4, the reading level as a small menu (changing it
  * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A), the classic-view
- * link and the page's own extras. Today's allowance is
- * shown only as "N% used" (no prices, no other numbers) and only when the usage read succeeds.
+ * link and the page's own extras. The quota is shown only as "N% used" of one window (no prices, no other numbers) and
+ * only when the usage read succeeds.
  */
 
-/** The person's day window, in percent, or null (billing off, local site, read failed). */
-function useDayPercent(): number | null {
-  const [percent, setPercent] = useState<number | null>(null);
+type QuotaScope = BillingUsage["windows"][number]["scope"];
+
+/**
+ * V4 review ask-f4: the window that binds first, named by its own word ("Today", "This week", "This month", or "In
+ * total" for a team grant). That is the fullest one; a tie goes to the longest window, as the server's room sentence
+ * names a tie (packages/budget room.ts SCOPE_PRECEDENCE), so a Free person whose month is used up reads "This month"
+ * here too, never today's share.
+ */
+const LONGEST_FIRST: readonly QuotaScope[] = Object.freeze(["PERSON_GRANT", "PERSON_MONTH", "PERSON_WEEK", "PERSON_DAY"]);
+
+export function tightestWindow(usage: BillingUsage | null): Readonly<{ scope: QuotaScope; percent: number }> | null {
+  if (usage === null) return null;
+  let tightest: Readonly<{ scope: QuotaScope; percent: number }> | null = null;
+  for (const scope of LONGEST_FIRST) {
+    const window = usage.windows.find((candidate) => candidate.scope === scope);
+    if (window === undefined) continue;
+    // Past 100% is a running debate's finish leeway (UsageBars); the person reads "100% used".
+    const percent = Math.min(100, Math.max(0, Math.round(window.percent)));
+    if (tightest === null || percent > tightest.percent) tightest = Object.freeze({ scope, percent });
+  }
+  return tightest;
+}
+
+/** The binding window of the person's quota, or null (billing off, local site, read failed, no window). */
+function useTightestWindow(): ReturnType<typeof tightestWindow> {
+  const [quota, setQuota] = useState<ReturnType<typeof tightestWindow>>(null);
   useEffect(() => {
     let active = true;
     void readBillingUsage(contractClient).then((usage) => {
-      if (!active || usage === null) return;
-      const day = usage.windows.find((window) => window.scope === "PERSON_DAY");
-      // Past 100% is a running debate's finish leeway (UsageBars); the person reads "100% used".
-      setPercent(day === undefined ? null : Math.min(100, Math.max(0, Math.round(day.percent))));
+      if (active) setQuota(tightestWindow(usage));
     });
     return () => { active = false; };
   }, []);
-  return percent;
+  return quota;
 }
 
 function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
@@ -124,7 +144,7 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
   /** Right-side extras (e.g. the Report button). */
   children?: ReactNode;
 }>) {
-  const dayPercent = useDayPercent();
+  const quota = useTightestWindow();
   return (
     <header className="v4Hdr">
       <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
@@ -138,8 +158,8 @@ export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, cla
         ) : (
           <ReadingLevelMenu catalog={catalog} level={readingLevel} onLevel={onReadingLevel} />
         )}
-        {dayPercent === null ? null : (
-          <span className="v4HdrAllowance">{t(catalog, "v4.header.allowance", { percent: dayPercent })}</span>
+        {quota === null ? null : (
+          <span className="v4HdrAllowance">{t(catalog, `v4.header.used.${quota.scope}`, { percent: quota.percent })}</span>
         )}
         {classicHref === null ? null : (
           <Link href={classicHref} className="v4Link v4HdrClassic">{t(catalog, "v4.common.classicView")}</Link>

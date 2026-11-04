@@ -335,7 +335,8 @@ describe("the owner's 3 Nov screen review", () => {
 
   it("the share word is quota: no V4 line says allowance", () => {
     expect(Object.entries(catalog).filter(([, value]) => /allowance/iu.test(value))).toEqual([]);
-    const shares = ["v4.header.allowance", "v4.panel.modeHint.thorough", "v4.money.borrowed.PERSON_DAY", "v4.money.borrowed.PERSON_WEEK",
+    const shares = ["v4.header.used.PERSON_DAY", "v4.header.used.PERSON_WEEK", "v4.header.used.PERSON_MONTH", "v4.header.used.PERSON_GRANT",
+      "v4.panel.modeHint.thorough", "v4.money.borrowed.PERSON_DAY", "v4.money.borrowed.PERSON_WEEK",
       "v4.money.startsWait.PERSON_MONTH", "v4.money.paused", "v4.money.pausedReady"];
     for (const key of shares) expect(catalog[key], key).toMatch(/\bquota\b/u);
   });

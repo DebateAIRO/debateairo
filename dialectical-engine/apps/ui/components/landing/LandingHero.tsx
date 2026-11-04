@@ -20,7 +20,7 @@ export function LandingHero({ catalog }: { catalog: MessageCatalog }): JSX.Eleme
         {t(catalog, "home.heroLede")}
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: "16px", marginTop: "52px", flexWrap: "wrap" }}>
-        <a className="lpCta lpCtaHero" href="/login?next=%2Fnew">
+        <a className="lpCta lpCtaHero" href="/login?next=%2Fv4">
           {t(catalog, "chrome.startRound")}
           <span className="lpArrow" aria-hidden="true">
             →

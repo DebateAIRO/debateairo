@@ -25,26 +25,51 @@ import "./security-confirmation.css";
 import "./data-export.css";
 import { DocumentTitle } from "@/components/DocumentTitle";
 
+/*
+ * V4 review ask-f21: only the faces a first screen paints with are preloaded (the upright display and body faces), so
+ * the browser stops warning "preloaded but not used" on every load. The italic faces and the mono face still load,
+ * when a page first uses them (display: swap). Each italic is its own loader so it can skip the preload: next/font
+ * keeps the family's real name in its @font-face rules (it hashes only class names), so the italic rules join the same
+ * "Fraunces" and "Plus Jakarta Sans" families the variables name, and italic text keeps its true italic.
+ */
 const display = Fraunces({
   subsets: ["latin"],
   axes: ["SOFT", "WONK", "opsz"],
-  style: ["normal", "italic"],
+  style: ["normal"],
   variable: "--font-fraunces",
   display: "swap"
 });
 
+const displayItalic = Fraunces({
+  subsets: ["latin"],
+  axes: ["SOFT", "WONK", "opsz"],
+  style: ["italic"],
+  variable: "--font-fraunces-italic",
+  display: "swap",
+  preload: false
+});
+
 const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  style: ["normal", "italic"],
+  style: ["normal"],
   variable: "--font-jakarta",
   display: "swap"
+});
+
+const sansItalic = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  style: ["italic"],
+  variable: "--font-jakarta-italic",
+  display: "swap",
+  preload: false
 });
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-mono-src",
-  display: "swap"
+  display: "swap",
+  preload: false
 });
 
 async function requestLocale(): Promise<LocaleCode> {
@@ -90,7 +115,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang={locale}
       dir={localeDefinition.dir}
-      className={`${display.variable} ${sans.variable} ${mono.variable}`}
+      className={`${display.variable} ${displayItalic.variable} ${sans.variable} ${sansItalic.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
       <head>

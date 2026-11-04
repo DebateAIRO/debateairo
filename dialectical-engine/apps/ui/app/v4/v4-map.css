@@ -46,19 +46,27 @@
 .v4MapHeads {
   display: grid; grid-template-columns: 196px 228px 236px; column-gap: 32px;
   font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: var(--ls-eyebrow); text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-3); overflow-wrap: break-word; hyphens: auto;
 }
 .v4MapBody { display: flex; align-items: flex-start; }
-.v4MapRootCol { width: 196px; flex: none; display: flex; flex-direction: column; position: relative; }
+/* V4 review map-f13: every column keeps its drawn width as a floor and grows only for a word that cannot break (up to a
+   third wider); long words hyphenate in the page's language (html lang) and break before they would leave a card. Every
+   line, stub and inset is placed by the start and end of the reading direction, so a right-to-left page draws the tree
+   from the right with its lines attached. */
+.v4MapRootCol {
+  width: min-content; min-width: 196px; max-width: 260px; flex: none; display: flex; flex-direction: column;
+  position: relative;
+}
 /* The stub from the question card to the trunk of the paths. */
 .v4MapRootCol::after {
-  content: ""; position: absolute; top: 40px; right: -32px; width: 32px; border-top: 2px solid var(--line-strong);
+  content: ""; position: absolute; top: 40px; inset-inline-end: -32px; width: 32px; border-top: 2px solid var(--line-strong);
 }
 .v4MapRootCol:has(+ .v4MapEmpty)::after { display: none; }
 
 .v4MapRoot, .v4MapPath, .v4MapOpenMain, .v4MapDig {
   display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px;
-  text-align: left; cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35;
+  text-align: start; cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35;
+  overflow-wrap: break-word; hyphens: auto;
 }
 .v4MapRoot {
   background: var(--ink); color: var(--surface); border: 0; border-radius: var(--r-card); padding: 12px 14px;
@@ -91,41 +99,46 @@
 
 /* Trunk and branches: CSS borders, one vertical line per column and a stub into every card. */
 .v4MapBranches, .v4MapLeaves { list-style: none; margin: 0; padding: 0; }
-.v4MapBranches { margin-left: 32px; display: flex; flex-direction: column; gap: 14px; }
-.v4MapBranch { position: relative; display: flex; align-items: flex-start; gap: 32px; padding-left: 0; }
-.v4MapBranch > .v4MapPath { width: 228px; flex: none; }
+.v4MapBranches { margin-inline-start: 32px; display: flex; flex-direction: column; gap: 14px; }
+.v4MapBranch { position: relative; display: flex; align-items: flex-start; gap: 32px; padding-inline-start: 0; }
+.v4MapBranch > .v4MapPath { width: min-content; min-width: 228px; max-width: 300px; flex: none; }
 .v4MapBranch::before, .v4MapLeaf::before {
-  content: ""; position: absolute; left: -16px; top: -7px; bottom: -7px; border-left: 2px solid var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -16px; top: -7px; bottom: -7px;
+  border-inline-start: 2px solid var(--line-strong);
 }
 .v4MapBranch:first-child::before { top: 40px; }
 .v4MapBranch:last-child::before { bottom: auto; height: 47px; }
 .v4MapBranch:first-child:last-child::before { display: none; }
 .v4MapBranch::after {
-  content: ""; position: absolute; left: -16px; top: 40px; width: 16px; border-top: 2px solid var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -16px; top: 40px; width: 16px; border-top: 2px solid var(--line-strong);
 }
-.v4MapBranches > .v4MapBranch:first-child::after { left: -32px; width: 32px; }
-.v4MapBranches > .v4MapBranch:first-child:last-child::after { left: -32px; width: 32px; }
+.v4MapBranches > .v4MapBranch:first-child::after { inset-inline-start: -32px; width: 32px; }
+.v4MapBranches > .v4MapBranch:first-child:last-child::after { inset-inline-start: -32px; width: 32px; }
 
-.v4MapLeaves { position: relative; width: 236px; flex: none; display: flex; flex-direction: column; gap: 10px; }
+.v4MapLeaves {
+  position: relative; width: min-content; min-width: 236px; max-width: 310px; flex: none; display: flex;
+  flex-direction: column; gap: 10px;
+}
 .v4MapBranch > .v4MapLeaves::before {
-  content: ""; position: absolute; left: -32px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -32px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
 }
 .v4MapLeaf { position: relative; }
-.v4MapLeaf::before { border-left-style: dashed; left: -16px; }
+.v4MapLeaf::before { border-inline-start-style: dashed; inset-inline-start: -16px; }
 .v4MapLeaf:first-child::before { top: 30px; }
 .v4MapLeaf:last-child::before { bottom: auto; height: 37px; }
 .v4MapLeaf:first-child:last-child::before { display: none; }
 .v4MapLeaf::after {
-  content: ""; position: absolute; left: -16px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -16px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
 }
 /* The question's own open questions hang under its card in a short column. */
-.v4MapRootLeaves { padding: 14px 0 0 22px; position: relative; }
+.v4MapRootLeaves { padding-block: 14px 0; padding-inline: 22px 0; position: relative; }
 .v4MapRootLeaves:empty { display: none; }
 .v4MapRootLeaves::before {
-  content: ""; position: absolute; left: 10px; top: 0; height: 44px; border-left: 2px dashed var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: 10px; top: 0; height: 44px;
+  border-inline-start: 2px dashed var(--line-strong);
 }
-.v4MapRootLeaves .v4MapLeaves { width: 174px; }
-.v4MapRootLeaves .v4MapLeaf::before, .v4MapRootLeaves .v4MapLeaf::after { left: -12px; }
+.v4MapRootLeaves .v4MapLeaves { min-width: 174px; max-width: 238px; }
+.v4MapRootLeaves .v4MapLeaf::before, .v4MapRootLeaves .v4MapLeaf::after { inset-inline-start: -12px; }
 .v4MapRootLeaves .v4MapLeaf::after { width: 12px; }
 
 .v4MapOpen {
@@ -135,7 +148,7 @@
 .v4MapPicked { border-style: solid; border-color: var(--gold); }
 .v4MapOpenMain {
   flex-direction: row; align-items: flex-start; gap: 8px; background: transparent; border: 0; border-radius: 12px;
-  padding: 8px 4px 8px 12px; color: var(--text); min-width: 0; flex: 1;
+  padding-block: 8px; padding-inline: 12px 4px; color: var(--text); min-width: 0; flex: 1;
 }
 .v4MapOpenBody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .v4MapPick, .v4OutPick, .v4PanelPick {
@@ -167,12 +180,15 @@
 /* ---------- the phone outline (D7) ---------- */
 .v4Out { min-width: 0; }
 .v4OutTree, .v4OutGroup { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.v4OutGroup { margin: 6px 0 0 12px; padding-left: 10px; border-left: 2px solid var(--line-strong); }
-.v4OutLeaves { border-left-style: dashed; }
+.v4OutGroup {
+  margin-block: 6px 0; margin-inline: 12px 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-strong);
+}
+.v4OutLeaves { border-inline-start-style: dashed; }
 .v4OutRow { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 .v4OutRoot, .v4OutPath, .v4OutMain {
-  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px; text-align: left;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px; text-align: start;
   cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35; border-radius: 12px; min-width: 0;
+  hyphens: auto;
 }
 .v4OutRoot { background: var(--ink); color: var(--surface); border: 0; padding: 12px 14px; }
 .v4OutRoot .v4MapNew { color: var(--gold-bg); }
@@ -182,7 +198,7 @@
 .v4OutMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .v4OutHere { font-size: var(--t-meta); font-weight: 600; color: var(--con-text); }
 .v4OutOpen { flex-direction: row; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border); border-radius: 12px; }
-.v4OutOpen .v4OutMain { background: transparent; border: 0; padding: 8px 12px 8px 0; color: var(--text); flex: 1; }
+.v4OutOpen .v4OutMain { background: transparent; border: 0; padding-block: 8px; padding-inline: 0 12px; color: var(--text); flex: 1; }
 .v4OutDig .v4OutMain { background: var(--surface); color: var(--text); border: 1.5px solid var(--accent); padding: 8px 12px; }
 .v4OutSelected.v4OutRoot, .v4OutSelected.v4OutPath { outline: 2.5px solid var(--accent); outline-offset: 2px; }
 .v4OutSelected.v4OutOpen, .v4OutSelected.v4OutDig .v4OutMain { border-color: var(--accent); border-style: solid; }
@@ -213,7 +229,8 @@
   display: flex; align-items: center;
 }
 .v4PanelSent > summary::-webkit-details-marker, .v4PanelFirstAnswer > summary::-webkit-details-marker { display: none; }
-.v4PanelSent > summary::before, .v4PanelFirstAnswer > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
+.v4PanelSent > summary::before, .v4PanelFirstAnswer > summary::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
+.v4PanelSent > summary:dir(rtl)::before, .v4PanelFirstAnswer > summary:dir(rtl)::before { content: "◂"; }
 .v4PanelSent[open] > summary::before, .v4PanelFirstAnswer[open] > summary::before { content: "▾"; }
 /* R22 W5-1 (owner Q-D11): under the report's answer, the first debate's answer, one click away. */
 .v4PanelFirstAnswerBody { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
@@ -227,7 +244,8 @@
   display: flex; align-items: center;
 }
 .v4PanelGroup > summary::-webkit-details-marker { display: none; }
-.v4PanelGroup > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
+.v4PanelGroup > summary::before { content: "▸"; margin-inline-end: 8px; color: var(--text-3); }
+.v4PanelGroup > summary:dir(rtl)::before { content: "◂"; }
 .v4PanelGroup[open] > summary::before { content: "▾"; }
 .v4PanelPoints { list-style: none; margin: 0; padding: 0 14px 12px; display: flex; flex-direction: column; gap: 10px; }
 .v4PanelPoint { display: flex; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
@@ -240,7 +258,7 @@
 .v4PanelPointBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .v4PanelPointText { margin: 0; }
 .v4PanelBasis { margin: 0; font-size: var(--t-ui); color: var(--text-2); }
-.v4PanelReasons ul, .v4PanelWhy { margin: 4px 0 0; padding-left: 18px; font-size: var(--t-ui); color: var(--text-2); }
+.v4PanelReasons ul, .v4PanelWhy { margin: 4px 0 0; padding-inline-start: 18px; font-size: var(--t-ui); color: var(--text-2); }
 .v4PanelWhy { color: var(--text); font-size: var(--t-body); display: flex; flex-direction: column; gap: 4px; }
 .v4PanelSmallHead { margin: 6px 0 0; font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
 .v4PanelUnchecked { margin: 0; font-size: var(--t-ui); }
@@ -248,10 +266,10 @@
 .v4PanelOpenRow { display: flex; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border); border-radius: 12px; }
 .v4PanelRowBtn {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; min-height: 44px;
-  text-align: left; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 12px;
+  text-align: start; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 12px;
   cursor: pointer; font: inherit; font-size: var(--t-ui); color: var(--text); width: 100%;
 }
-.v4PanelOpenRow .v4PanelRowBtn { background: transparent; border: 0; padding-left: 0; }
+.v4PanelOpenRow .v4PanelRowBtn { background: transparent; border: 0; padding-inline-start: 0; }
 .v4PanelRowBtn:hover { background: var(--surface-2); }
 .v4PanelRowTitle { font-weight: 700; }
 .v4PanelModeTag { display: inline-block; font-size: var(--t-meta); color: var(--text-2); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 0 8px; }
@@ -261,7 +279,7 @@
 .v4PanelModes { display: flex; flex-wrap: wrap; gap: 8px; }
 .v4PanelModes .v4Chip { min-height: 44px; }
 .v4PanelDigBtn { width: 100%; }
-.v4Panel .v4MapPulse { margin-right: 6px; vertical-align: middle; }
+.v4Panel .v4MapPulse { margin-inline-end: 6px; vertical-align: middle; }
 /* dig-f24: "Skip to the dig button" stays out of sight until it has the keyboard's focus. */
 .v4PanelSkip { align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; }
 .v4PanelSkip:not(:focus) { position: absolute; width: 1px; height: 1px; min-height: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -270,14 +288,14 @@
 
 /* Perplexity plan W2-6: sources under a point, a path's search note and its other pages (V4Sources.tsx). Phone first:
    nothing here has a fixed width, long titles and addresses wrap, and buttons keep the 44px touch height. */
-.v4WebNote { margin: 0; font-size: var(--t-ui); color: var(--text-2); border-left: 3px solid var(--line-strong); padding: 2px 0 2px 10px; }
+.v4WebNote { margin: 0; font-size: var(--t-ui); color: var(--text-2); border-inline-start: 3px solid var(--line-strong); padding-block: 2px; padding-inline: 10px 0; }
 .v4Sources { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .v4Source {
   display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
 }
 .v4SourceWhy { margin: 0; font-size: var(--t-ui); font-weight: 600; color: var(--text); }
-.v4SourceQuote { margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--line-strong); font-size: var(--t-ui); color: var(--text); }
+.v4SourceQuote { margin: 0; padding: 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-strong); font-size: var(--t-ui); color: var(--text); }
 .v4SourceQuote p { margin: 0; }
 .v4SourceQuote p::before { content: open-quote; }
 .v4SourceQuote p::after { content: close-quote; }
@@ -301,7 +319,7 @@
 .v4SugPicked { border-style: solid; border-color: var(--gold); }
 .v4SugMain {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; min-height: 44px;
-  text-align: left; background: transparent; border: 0; border-radius: 12px; padding: 8px 4px 8px 12px; cursor: pointer;
+  text-align: start; background: transparent; border: 0; border-radius: 12px; padding-block: 8px; padding-inline: 12px 4px; cursor: pointer;
   font: inherit; font-size: var(--t-ui); color: var(--text); overflow-wrap: anywhere;
 }
 .v4SugKind { font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
@@ -311,21 +329,21 @@
 .v4SugGroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .v4SugList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .v4SugRow {
-  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px 10px 8px 0; overflow-wrap: anywhere;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-block: 4px 8px; padding-inline: 0 10px; overflow-wrap: anywhere;
   border: 1.5px dashed var(--line-strong); border-radius: 12px; background: var(--surface);
 }
 .v4SugRow.v4SugPicked { border-style: solid; border-color: var(--gold); }
 .v4SugRowHead { display: flex; align-items: flex-start; gap: 0; min-width: 0; }
 .v4SugRowText { margin: 0; padding-top: 12px; font-size: var(--t-ui); min-width: 0; flex: 1; }
-.v4SugRowPlain { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding-left: 12px; }
+.v4SugRowPlain { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding-inline-start: 12px; }
 .v4SugRowPlain .v4SugRowText { padding-top: 8px; }
 .v4SugRowPlain .v4Link { min-height: 44px; }
 .v4SugTag {
   display: inline-block; font-size: var(--t-meta); color: var(--text-2); border: 1px solid var(--line-strong);
   border-radius: var(--r-pill); padding: 0 8px;
 }
-.v4SugEdit { align-self: flex-start; min-height: 44px; margin-left: 44px; }
-.v4SugEditor { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-left: 12px; }
+.v4SugEdit { align-self: flex-start; min-height: 44px; margin-inline-start: 44px; }
+.v4SugEditor { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-inline-start: 12px; }
 .v4SugLabel { font-size: var(--t-ui); font-weight: 700; }
 .v4SugInput {
   width: 100%; box-sizing: border-box; font: inherit; font-size: var(--t-body); color: var(--text); background: var(--surface);
@@ -336,12 +354,12 @@
 .v4SugOwnOpen { align-self: flex-start; }
 .v4SugProblem { margin: 0; font-size: var(--t-ui); color: var(--text); font-weight: 600; }
 .v4SugElsewhere {
-  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-left: 3px solid var(--gold);
-  background: var(--gold-bg); border-radius: 0 10px 10px 0;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-inline-start: 3px solid var(--gold);
+  background: var(--gold-bg); border-radius: 10px; border-start-start-radius: 0; border-end-start-radius: 0;
 }
 .v4SugElsewhere .v4Btn { align-self: flex-start; min-height: 44px; }
 .v4MoneyLine { margin: 0; color: var(--text); }
-.v4PanelDeepest { margin: 0; padding: 10px 12px; border-left: 3px solid var(--line-strong); color: var(--text); }
+.v4PanelDeepest { margin: 0; padding: 10px 12px; border-inline-start: 3px solid var(--line-strong); color: var(--text); }
 .v4MapPick input:disabled, .v4OutPick input:disabled, .v4PanelPick input:disabled { cursor: not-allowed; opacity: 0.45; }
 
 /* Dig model revision W4-6: what a dig did to a path (V4PathRewrite.tsx). The card carries one line; the panel the rest.
@@ -351,17 +369,18 @@
 .v4RewriteNoteBelow { font-style: italic; }
 .v4Rewrite {
   display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 10px 12px; overflow-wrap: anywhere;
-  border-left: 3px solid var(--line-strong); border-radius: 0 10px 10px 0; background: var(--surface);
+  border-inline-start: 3px solid var(--line-strong); border-radius: 10px; border-start-start-radius: 0; border-end-start-radius: 0;
+  background: var(--surface);
 }
-.v4RewriteREWRITTEN { border-left-color: var(--accent); }
-.v4RewriteFAILED { border-left-color: var(--gold); }
+.v4RewriteREWRITTEN { border-inline-start-color: var(--accent); }
+.v4RewriteFAILED { border-inline-start-color: var(--gold); }
 .v4RewriteState { margin: 0; font-weight: 600; color: var(--text); }
 .v4RewriteWhen { margin: 0; font-size: var(--t-ui); }
 .v4RewriteSentences, .v4RewriteOwnWords, .v4RewriteEarlierList, .v4DigPagePicks {
-  margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  margin: 0; padding-inline-start: 1.2em; display: flex; flex-direction: column; gap: 4px; min-width: 0;
 }
-.v4RewriteOwnWords { list-style: none; padding-left: 0; }
-.v4RewriteOwnWords q { display: block; padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.v4RewriteOwnWords { list-style: none; padding-inline-start: 0; }
+.v4RewriteOwnWords q { display: block; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-strong); }
 .v4RewriteVerdict { margin: 0; font-weight: 700; color: var(--text); }
 .v4RewriteView, .v4RewriteChanged, .v4RewriteEarlier, .v4RewriteDig, .v4DigPage, .v4DigPageLooked {
   display: flex; flex-direction: column; gap: 6px; min-width: 0;
