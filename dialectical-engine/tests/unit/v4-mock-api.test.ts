@@ -5,7 +5,8 @@ import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import {
   AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema,
   AnswerIndexSchema, AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
-  InvestigationReportsSchema, MonthPauseSchema, NodeSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
+  InvestigationReportsSchema, MonthPauseSchema, NodeSchema, PathRewriteSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema,
+  WebSourceSchema
 } from "../../packages/contract/src/index.js";
 import { createSeed, SEED_NODE_IDS } from "../../tools/v4-mock-api/seed.js";
 import {
@@ -20,6 +21,10 @@ import {
   borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
 } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
+import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, LIVE_STEPS_NO_WEB, LIVE_STEPS_WEB } from "../../tools/v4-mock-api/live-seed.js";
+import { climbAt, CLIMB_MODES, CLIMB_STEP_MS } from "../../tools/v4-mock-api/climb-seed.js";
+import { parseDigProgress } from "../../apps/ui/lib/v4/digProgress.js";
+import { belowStateOf, type BelowDig } from "../../apps/ui/lib/v4/digsBelow.js";
 
 /*
  * These checks hold before and after W1-6 merges: they never assert that today's contract refuses a draft field.
@@ -452,5 +457,101 @@ describe("V4 mock API: the shelf's draft parts of the answer list (owner's scree
     expect(DraftShelfRowPartSchema.safeParse({ started_at: "at two" }).success).toBe(false);
     expect(DraftShelfRowPartSchema.safeParse({ dug_from: "not-a-run" }).success).toBe(false);
     expect(answerIndexDraftProblems({ ...full, items: [{ ...item, changed_since_visit: "yes" }] })).toHaveLength(1);
+  });
+});
+
+/*
+ * Owner's screen review, 3 Nov 2026 (dig-d1 B): the stand-in's DRAFT progress read of a running dig (live-seed.ts), read by
+ * the website's own reader (apps/ui/lib/v4/digProgress.ts); and (dig-f2) the played climb of the seeded level-3 dig up to
+ * the first debate (climb-seed.ts), followed by the website's own rule (apps/ui/lib/v4/digsBelow.ts).
+ */
+describe("V4 mock API: a running dig's steps and checked findings (draft, switch live=ON)", () => {
+  const RUN = "d9000000-0000-4000-8000-000000000009";
+  const START = Date.parse("2026-11-04T10:00:00.000Z");
+  const END = START + 100_000;
+  const at = (share: number, extra: Partial<Parameters<typeof digProgressAt>[0]> = {}) =>
+    digProgressAt({ runRef: RUN, startedAt: START, settleAt: END, web: true, free: false, waiting: false, ...extra }, START + share * 100_000);
+
+  it("moves through the web steps, each checked finding listed once it passed, in the order it passed", () => {
+    expect([at(0.1), at(0.3), at(0.6), at(0.9), at(1.2)].map((body) => [body.now, body.findings.length]))
+      .toEqual([["FINDING_SOURCES", 0], ["READING", 0], ["CHECKING", 2], ["WRITING", 3], ["WRITING", 3]]);
+    expect(at(0.5).steps).toEqual([...LIVE_STEPS_WEB]);
+    expect(at(0.5, { waiting: true })).toEqual({ run_ref: RUN, steps: [...LIVE_STEPS_WEB], now: null, findings: [] });
+  });
+
+  it("without a web search argues first, and on Free never says Sure; never Didn't hold, never an unchecked point", () => {
+    const free = at(0.95, { web: false, free: true });
+    expect(free.steps).toEqual([...LIVE_STEPS_NO_WEB]);
+    expect(at(0.1, { web: false }).now).toBe("ARGUING");
+    expect(free.findings.map((finding) => finding.trust)).not.toContain("SURE");
+    for (const body of [at(0.95), free]) expect(body.findings.every((finding) => ["SURE", "SURE_FOR_CASE", "STILL_ARGUED"].includes(finding.trust))).toBe(true);
+  });
+
+  it("every body passes its draft schema, and the website reads exactly what it says", () => {
+    for (const body of [at(0), at(0.4), at(0.8), at(1), at(0.5, { waiting: true }), at(0.9, { web: false, free: true })]) {
+      expect(DraftDigProgressSchema.safeParse(body).success, JSON.stringify(body)).toBe(true);
+      expect(parseDigProgress(body, RUN)).toEqual({
+        steps: body.steps, now: body.now, findings: body.findings.map((finding) => ({ id: finding.finding_id, text: finding.text, trust: finding.trust }))
+      });
+    }
+    expect(DraftDigProgressSchema.safeParse({ ...at(0.5), now: "ARGUING" }).success).toBe(false);
+    expect(DraftDigProgressSchema.safeParse({ ...at(0.5), steps: ["READING", "FINDING_SOURCES"] }).success).toBe(false);
+  });
+
+  it("the switch's words are the mock's own: OFF answers 404 as today's API", () => {
+    expect(LIVE_MODES).toEqual(["OFF", "ON"]);
+  });
+});
+
+describe("V4 mock API: the played climb three levels up (draft, switch climb=PLAY)", () => {
+  const PLAYED = Date.parse("2026-11-04T10:00:00.000Z");
+  const stepAt = (step: number) => climbAt(PLAYED + step * CLIMB_STEP_MS + 1, PLAYED);
+  const d300: BelowDig = {
+    link: { parentRunId: DIG_RUNS.levelTwo, childRunId: DIG_RUNS.levelThree, openQuestionIds: ["path:n-nuclear"], questions: [], mode: "thorough", startedAt: null },
+    depth: 3, above: [DIG_RUNS.levelTwo, DIG_RUNS.levelOne, DIG_RUNS.root]
+  };
+  const stateAt = (step: number): string => {
+    const parts = stepAt(step);
+    const answers: Record<string, unknown> = { [DIG_RUNS.levelOne]: { path_rewrites: parts.levelOnePaths }, [DIG_RUNS.root]: { path_rewrites: parts.rootPaths } };
+    const view = { link: d300.link, state: "DONE" as const, headline: null, counts: null, rewrite: parts.levelThreeRewrite };
+    return belowStateOf(d300, view, (runId) => answers[runId] as never, PLAYED + step * CLIMB_STEP_MS + 1);
+  };
+
+  it("before PLAY is the seed: d300 still rewriting, the trail's answers as seeded", () => {
+    const seeded = climbAt(PLAYED + 60_000, null);
+    expect(seeded.levelThreeRewrite.state).toBe("WRITING");
+    expect(seeded.rootPaths).toBe(PATH_REWRITES[DIG_RUNS.root]);
+    expect(stepAt(0)).toEqual(seeded);
+  });
+
+  it("every step passes the contract, each level's row named by d300, the dig that started the climb", () => {
+    for (let step = 0; step <= 4; step += 1) {
+      const parts = stepAt(step);
+      expect(PathRewriteSchema.safeParse(parts.levelThreeRewrite).success, `d300 step ${String(step)}`).toBe(true);
+      for (const [name, paths] of Object.entries({ two: parts.levelTwoPaths, one: parts.levelOnePaths, root: parts.rootPaths })) {
+        const result = AnswerPathRewritesSchema.safeParse(paths);
+        expect(result.success, `${name} step ${String(step)}: ${JSON.stringify(result.error?.issues)}`).toBe(true);
+      }
+      expect(AnswerDigSchema.safeParse({ ...DIG_ANSWERS[DIG_RUNS.levelThree]!, rewrite: parts.levelThreeRewrite }).success).toBe(true);
+      // As the mock serves them (server.ts withClimb): whole answers the contract takes, so the website gets the rewrites.
+      const whole = (runRef: string, extra: Record<string, unknown>) => AnswerSchema.safeParse({
+        ...seed.answer({ answerId: "aaaa1111-1111-4111-8111-111111111111", runRef, question: "Q?", askedAt: "2026-10-27T15:12:00.000Z",
+          servedAt: "2026-10-27T15:40:00.000Z", web: "PAID" }),
+        ...extra
+      }).success;
+      expect(whole(DIG_RUNS.root, { path_rewrites: parts.rootPaths }), `root step ${String(step)}`).toBe(true);
+      expect(whole(DIG_RUNS.levelOne, { path_rewrites: parts.levelOnePaths, dig: DIG_ANSWERS[DIG_RUNS.levelOne] })).toBe(true);
+      expect(whole(DIG_RUNS.levelTwo, { path_rewrites: parts.levelTwoPaths, dig: DIG_ANSWERS[DIG_RUNS.levelTwo] })).toBe(true);
+      expect(whole(DIG_RUNS.levelThree, { dig: { ...DIG_ANSWERS[DIG_RUNS.levelThree]!, rewrite: parts.levelThreeRewrite } })).toBe(true);
+    }
+    const last = stepAt(3);
+    const renew = last.rootPaths.paths.find((path) => path.position_ref === "n-renew")!;
+    expect(renew.history.at(-1)).toMatchObject({ dig_run_id: DIG_RUNS.levelThree, cause: "CHILD_PATH", state: "READY", changed: true });
+    expect(renew.current).toEqual((renew.history.at(-1) as Extract<typeof renew.history[number], { state: "READY" }>).text);
+  });
+
+  it("the website's own rule sees it climbing at every step until it reaches the first debate, then quiet", () => {
+    expect([0, 1, 2, 3].map(stateAt)).toEqual(["CLIMBING", "CLIMBING", "CLIMBING", "QUIET"]);
+    expect(CLIMB_MODES).toEqual(["SEED", "PLAY"]);
   });
 });

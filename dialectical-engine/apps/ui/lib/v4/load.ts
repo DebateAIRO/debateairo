@@ -9,7 +9,8 @@ import {
   type InvestigationReportVersion,
   type RunProjection
 } from "@debateai/contract";
-import { contractClient, isNotFound } from "../api.js";
+import { API_BASE, contractClient, createSameOriginFetch, isNotFound } from "../api.js";
+import { DIG_PROGRESS_ABSENT, digProgressPath, parseDigProgress, type DigProgressRead } from "./digProgress.js";
 import { quotaUntouched } from "./failedRun.js";
 import { buildV4Map, isFinishedRewrite } from "./mapModel.js";
 import type { DigLink, DigView } from "./types.js";
@@ -191,6 +192,28 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
   const story = await loadStory(answer.answer_id, client, answer.answer_version);
   const map = buildV4Map({ runId: link.childRunId, answer, story });
   return { link, state: "DONE", headline: map.headline, counts: map.counts };
+}
+
+/**
+ * dig-d1 B (owner's screen review, 3 Nov): a running dig's steps and the findings that passed their checks, from the
+ * optional read GET /v1/runs/{id}/progress (lib/v4/digProgress.ts says why it is a read of its own). ABSENT when there is
+ * none: the route is unknown (today's API answers 404), the run is not this person's, or the body makes no sense; the
+ * page then shows the one calm line. Throws only on a failed read (no answer, or the server failed), which is tried again.
+ */
+export async function loadDigProgress(runId: string, fetchImpl?: typeof fetch): Promise<DigProgressRead> {
+  const read = fetchImpl ?? createSameOriginFetch(API_BASE);
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const response = await read(`${origin}${digProgressPath(runId)}`, { headers: { accept: "application/json" }, credentials: "same-origin" });
+  if (response.status >= 500 || response.status === 429 || response.status === 408) throw new Error(`DIG_PROGRESS_READ_${String(response.status)}`);
+  if (!response.ok) return DIG_PROGRESS_ABSENT;
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return DIG_PROGRESS_ABSENT;
+  }
+  const progress = parseDigProgress(body, runId);
+  return progress === null ? DIG_PROGRESS_ABSENT : { kind: "SHOWN", progress };
 }
 
 /** W4-6: one step of a dig's trail: a debate above it, and the path of it that the dig below dug (null: an open question). */

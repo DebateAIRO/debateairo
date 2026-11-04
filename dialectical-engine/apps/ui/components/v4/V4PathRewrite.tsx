@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debateai/contract";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
-import { cardLabel, pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
+import { cardLabel, digOutcome, pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
 import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
 import { servedRewriteWords } from "@/lib/v4/trust";
 import { levelHref } from "@/lib/v4/storage";
@@ -199,8 +199,14 @@ export function V4RewriteResult(props: Readonly<{ path: V4Path; digs: readonly D
   const { path, catalog } = props;
   const outcome = pathOutcome(path, props.digs)?.outcome ?? null;
   if (outcome === null) return null;
+  return <ResultBox outcome={outcome} holds={pathHolds(path)} catalog={catalog} />;
+}
+
+/** The result box itself: its shape and its one sentence (a confirmed path that holds says so). */
+function ResultBox(props: Readonly<{ outcome: DigOutcome; holds: boolean; catalog: MessageCatalog }>) {
+  const { outcome, catalog } = props;
   const key = outcome === "CONFIRMED"
-    ? pathHolds(path) ? "v4.result.box.CONFIRMED_HOLDS" : "v4.result.box.CONFIRMED"
+    ? props.holds ? "v4.result.box.CONFIRMED_HOLDS" : "v4.result.box.CONFIRMED"
     : RESULT_BOX_KEYS[outcome];
   return (
     <p className={`v4RewriteResult v4RewriteResult${outcome}`} role="status">
@@ -208,6 +214,24 @@ export function V4RewriteResult(props: Readonly<{ path: V4Path; digs: readonly D
       {t(catalog, key)}
     </p>
   );
+}
+
+/**
+ * dig-f32 (3 Nov): a finished dig's own panel opens with the same result box as the path it rewrote (dig-d4): what THIS
+ * dig found ("Corrected", "Added to", "Confirmed: this path holds…", or nothing new). Only for a dig whose rewrite of a
+ * path is finished and whose path is on this map; null otherwise (its panel then reads as before).
+ */
+export function V4DigResult(props: Readonly<{ dig: DigView; path: V4Path | null; catalog: MessageCatalog }>) {
+  const outcome = digResultOf(props.dig, props.path);
+  if (outcome === null || props.path === null) return null;
+  return <ResultBox outcome={outcome} holds={pathHolds(props.path)} catalog={props.catalog} />;
+}
+
+/** What V4DigResult shows for a dig (null: no box, as for a dig still at work or one that rewrote no path here). */
+export function digResultOf(dig: DigView, path: V4Path | null): DigOutcome | null {
+  const rewrite = dig.rewrite ?? null;
+  if (dig.state !== "DONE" || path === null || rewrite === null || !isFinishedRewrite(rewrite)) return null;
+  return digOutcome(dig);
 }
 
 const STATE_KEYS: Readonly<Partial<Record<RewriteState, string>>> = Object.freeze({

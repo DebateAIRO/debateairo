@@ -19,6 +19,8 @@
  * with no story, through the website's own map builder.
  *
  * Owner's screen review (3 Nov 2026, journey-d2): it reads the draft start time of a running question (`started_at`).
+ * dig-d1 B and dig-f2: a running dig's draft progress read through the website's own reader (switch live=), and the played
+ * climb of the seeded level-3 dig up to the first debate (switch climb=; it waits 31 s for it).
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -674,6 +676,33 @@ await step("Your maps: digs left out by their dig links and hung under their que
   must(draft.items.some((item: Loose) => item.map_bar !== undefined && typeof item.changed_since_visit === "boolean"), "an answer carries its bar and its New dot");
   must(draft.items.some((item: Loose) => item.run_ref === RUNS.dig && item.dug_from === RUNS.settled), "a dig names the debate it was dug from");
   return shelf.maps.map((map: Loose) => `${map.state}${map.digs.length > 0 ? ` (+digs)` : ""}`).join(", ");
+}, (value: string) => value);
+
+// ---- The owner's screen review (3 Nov): a running dig's progress read (dig-d1 B) and the played climb (dig-f2), drafts ----
+await step("a running dig's steps and findings: none with live=OFF (as today's API), read by the website with live=ON", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loadModule: any = await import(pathToFileURL(join(UI, "lib", "v4", "load.ts")).href);
+  const sent: Loose = await client.submitAsk({
+    ...ask, question_line: "Does this hold up? Pumped hydro could carry a windless week.",
+    parent: { parent_run_id: RUNS.settled, places: ["path:n-renew"], mode: "quick" }
+  });
+  await fetch(`${MOCK}/__mock/set?live=OFF`);
+  must((await loadModule.loadDigProgress(sent.run_ref, viaProxy)).kind === "ABSENT", "no progress read with live=OFF");
+  await fetch(`${MOCK}/__mock/set?live=ON`);
+  const on: Loose = await loadModule.loadDigProgress(sent.run_ref, viaProxy);
+  must(on.kind === "SHOWN" && on.progress.steps[0] === "FINDING_SOURCES" && on.progress.now !== null, "the web steps, one working now");
+  must((await loadModule.loadDigProgress(RUNS.settled, viaProxy)).kind === "ABSENT", "a first debate has none");
+  await fetch(`${MOCK}/__mock/set?live=OFF`);
+  return `${String(on.progress.now)}, ${String(on.progress.findings.length)} finding(s) so far`;
+}, (value: string) => value);
+await step("the played climb of the level-3 dig reaches the first debate (climb=PLAY)", async () => {
+  await fetch(`${MOCK}/__mock/set?climb=PLAY`);
+  await new Promise((done) => setTimeout(done, 31_000));
+  const renew: Loose = (await client.readRunAnswer(RUNS.settled)).path_rewrites.paths.find((path: Loose) => path.position_ref === "n-renew");
+  must(renew.history.at(-1).dig_run_id === RUNS.digLevelThree && renew.history.at(-1).state === "READY", "the climbed row is done on the first debate");
+  must((await client.readRunAnswer(RUNS.digLevelThree)).dig.rewrite.state === "READY", "the level-3 dig's own rewrite is done");
+  await fetch(`${MOCK}/__mock/set?climb=SEED`);
+  return `${String(renew.history.at(-1).cause)} row on n-renew`;
 }, (value: string) => value);
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

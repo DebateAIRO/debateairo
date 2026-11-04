@@ -25,6 +25,8 @@ On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer
 | `web-draft.ts` | The shapes of the web search, dig suggestions and investigations, imported from the contract (W1-6), and how they would be held back from a contract that does not know them. See "Draft fields" below. |
 | `web-seed.ts` | The made-up web pages of the seeded debates (all on `.example` sites; no real article is quoted). |
 | `rewrite-seed.ts` | The new dig model's seeded rewrites, digs and dig trail, and the money rule's paused debate and borrow notice (task W2-7). |
+| `live-seed.ts` | Draft (owner review 3 Nov, dig-d1 B): a running dig's steps and checked findings, for `GET /v1/runs/:id/progress` (switch `live=ON`). |
+| `climb-seed.ts` | Draft (owner review 3 Nov, dig-f2): the played climb of the seeded level-3 dig up to the first debate (switch `climb=PLAY`). |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
 The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything.
@@ -85,7 +87,7 @@ All the answers carry the same English debate: *"Should countries build new nucl
 | `88888888-8888-4888-8888-888888888888` | **Finished dig** of 1111, from the still-argued point `p:n-renew-storage`, quick look. Answer id `aaaa8888-…`. **Level 1**; it rewrote 1111's path n-renew (an AI suggestion, so no verdict). | paid, searched | member of 1111's |
 | `d1000000-0000-4000-8000-000000000001` | **Finished dig** of 1111's path n-mix with the person's **own view** and their **edit** of a suggestion. Level 1. Answer id `aaaad100-…`. Its rewrite carries the verdict "helped this path and the main question". | paid, searched | member of 1111's |
 | `d2000000-0000-4000-8000-000000000002` | **Finished dig of the dig** 8888 (its path n-renew), with the person's own view. **Level 2**. Answer id `aaaad200-…`. Verdict "did not help this path"; 1111's n-renew is marked "a dig further down changed part of this". | paid, searched | member of 1111's |
-| `d3000000-0000-4000-8000-000000000003` | **Finished dig** of d200's path n-nuclear, thorough. **Level 3**. Answer id `aaaad300-…`. Its rewrite is **still writing**. | paid, searched | member of 1111's |
+| `d3000000-0000-4000-8000-000000000003` | **Finished dig** of d200's path n-nuclear, thorough. **Level 3**. Answer id `aaaad300-…`. Its rewrite is **still writing**, so the first debate's map keeps reading its answer every 15 s (dig-f2) until the switch `climb=PLAY` plays the rest of the climb up to it. | paid, searched | member of 1111's |
 | `d4000000-0000-4000-8000-000000000004` | **Finished dig** of 1111's path n-nuclear (task W4-6). Level 1. Answer id `aaaad400-…`. Its rewrite **failed**: the path keeps its text, and the page says the dig's points and sources are below. | paid, searched | member of 1111's |
 | `d5000000-0000-4000-8000-000000000005` | **Finished dig** of 1111's path n-smr (task W4-6). Level 1. Answer id `aaaad500-…`. Its rewrite is ready but **changed nothing** ("The dig didn't change this path."). | paid, searched | member of 1111's |
 | `d1000000-0000-4000-8000-000000000010` | **Finished dig at the deepest level (10)**, hung under d300 (task W3-4). Answer id `aaaad110-…`. The six digs between levels 3 and 10 are not seeded: only its own answer says level 10, so its map offers no dig anywhere and shows the "deepest level" line. | paid, searched | member of 1111's |
@@ -186,6 +188,8 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_ASK` / `ask=` | `AUTO` (default), `ACCEPT`, `WAITING`, `ALREADY_WAITING`, `LANGUAGE_CHOICE` | What a new ask gets. `AUTO` follows the room: FULL, BLOCKED or WAIT_RESET makes asks wait in line, ALREADY_WAITING refuses with 422, anything else accepts. |
 | `MOCK_REPORT` / `report=` | `OK` (default), `FAIL` | Whether the next report written comes out finished or failed. |
 | `MOCK_DIG` / `dig=` | `SETTLE` (default), `FAIL`, `PAUSE` | How a NEW dig ends (owner review 3 Nov): it finishes; it runs its time and then fails "stopped partway" (its draft view says `quota_used: "SOME"`), so "Try this dig again" and, after a second failure, "This keeps failing" can be seen; or it pauses at the month wall at once (its card reads "Dig · paused until …", and once `pause=CAN_CONTINUE` its panel's Continue lets it finish). |
+| `MOCK_LIVE` / `live=` | `OFF` (default), `ON` | Draft (owner review 3 Nov, dig-d1 B): `ON` serves a running dig's steps and checked findings at `GET /v1/runs/:id/progress` (`live-seed.ts`), so a dig's panel shows "Finding sources › Reading › Checking › Writing what changed" and each finding as it passes; `OFF` answers 404 there, as today's API does, and the panel shows the one calm line. |
+| `MOCK_CLIMB` / `climb=` | `SEED` (default), `PLAY` | Draft (owner review 3 Nov, dig-f2; `climb-seed.ts`): `PLAY` plays, from that moment, the rest of the climb of the seeded level-3 dig `d300…` up to the first debate (each level 10 s: d300's own rewrite, then 8888's path, then 1111's `n-renew`). The first debate's map shows the change without a reload, and stops reading again once it has landed. Setting `PLAY` again plays it again from now. |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
 | `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
@@ -222,6 +226,7 @@ A wrong value stops the start with a clear message, for example `MOCK_ROOM_INVAL
 | `GET`/`POST /v1/runs/:id/dig-links` | The dig links (0131): the parent this debate was dug from, and the digs made from it. A child already dug from another debate gets 409 `DIG_LINK_CONFLICT`. |
 | `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". |
 | `POST /v1/runs/:id/continue` | Draft route (W2-7): Continue on the month-paused debate. |
+| `GET /v1/runs/:id/progress` | Draft route (owner review 3 Nov, dig-d1 B): a dig's steps and the findings that passed their checks, `{run_ref, steps, now, findings: [{finding_id, text, trust, passed_at}]}`. Only with `live=ON`, only for a dig, never for one that failed; otherwise 404, as today's API (which has no such route). With a web search: Finding sources, Reading, Checking, Writing what changed; on Free or after a failed search: Arguing for and against, Checking, Writing what changed (and never "Sure" on Free). |
 | `GET /v1/runs/:id/events` | A live event stream. For a finished or failed run it replays three events and closes. For an open run it stays open with a keep-alive every 15 s, and a new debate's stream sends "finished" after 25 s. |
 | `GET /v1/geo/availability`, `/v1/public/ai-providers`, `/v1/public/debates`, `/v1/deployment` | Simple valid replies. |
 | `POST /v1/auth/logout` | 204. The mock still says "signed in" afterwards. |

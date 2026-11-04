@@ -61,7 +61,7 @@ import { useFailedDigs } from "@/lib/v4/useFailedDigs";
 import { useUnseenSaving, useVisitMemory } from "@/lib/v4/useVisitMemory";
 import { selectedDigOf, usePausedBarJob } from "@/lib/v4/usePausedBarJob";
 import {
-  addToResearched, loadAnswer, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
+  addToResearched, loadAnswer, loadDigProgress, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
 } from "@/lib/v4/load";
 import { researchedWaiting } from "@/lib/v4/web";
 import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
@@ -108,6 +108,8 @@ import type {
 } from "@/lib/v4/types";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 import { useWaitPolling } from "@/lib/v4/useWaitPolling";
+import { useDigProgress } from "@/lib/v4/useDigProgress";
+import { useDigsBelow, type DigsBelowReads } from "@/lib/v4/useDigsBelow";
 import { useLeaveLinkGuard, useTypedWords } from "@/lib/v4/useLeaveGuard";
 import { useLevelSettled } from "@/lib/v4/useLevelSettled";
 import { usePicksUndo } from "@/lib/v4/usePicksUndo";
@@ -185,6 +187,9 @@ type DigStatus = Readonly<{
 const NO_STATUS: DigStatus = { view: null, failures: 0, headlessTries: 0 };
 /** RULES-4/TIME-1: a dig not read yet shows as working, never as "waiting for a free spot" and never vanishes. */
 const STAND_IN: NonNullable<DigStatus["view"]> = { state: "RUNNING", headline: null, counts: null };
+
+/** dig-f2: the reads that follow the digs below this map's own (their records, their state, the answers in between). */
+const BELOW_READS: DigsBelowReads = { readDigRecords, loadDigView, loadAnswer };
 
 export type V4DebateClientProps = Readonly<{
   id: string;
@@ -759,7 +764,18 @@ function V4Debate({
   }, [map, servedRunId, servedQuestionLine, visitLinks, index, digRecords, catalog]);
   const linkKey = linkKeyOf(links);
 
+  // ── The digs below this map's own (dig-f2, owner's screen review 3 Nov): while one of them works or its change is
+  // still climbing up, this map's answer is read again every 15 s (with the rewrites, below), so a change made two or
+  // three levels down shows without a reload; once nothing below moves, those reads stop (lib/v4/useDigsBelow.ts).
+  // The digs started in this visit on any V4 page are in module memory; `visitLinks` changes whenever one is added here.
+  const visitAll = useMemo(() => [...startedThisVisit.values()].map((entry) => entry.link), [visitLinks]);
+  const below = useDigsBelow({
+    rootRunId: servedRunId, rootAnswer: served?.answer ?? null, direct: links, index, visit: visitAll, catalog, reads: BELOW_READS
+  });
+
   const [statuses, setStatuses] = useState<ReadonlyMap<string, DigStatus>>(() => new Map());
+  /** When the dig loop's reads last answered (the running dig's reduced-motion "Still working · checked 14:09"). */
+  const [digsCheckedAt, setDigsCheckedAt] = useState<number | null>(null);
   const statusesRef = useRef(statuses);
   const linksRef = useRef(links);
   useEffect(() => {
@@ -775,8 +791,9 @@ function V4Debate({
     [links, statuses, map]
   );
   useEffect(() => {
-    digsLiveRef.current = links.some((link) => !isFinal(statuses.get(link.childRunId)));
-  }, [links, statuses]);
+    // dig-f2: a dig below this map's own that still works counts too (the question list is then read every 20 s).
+    digsLiveRef.current = links.some((link) => !isFinal(statuses.get(link.childRunId))) || below.busy;
+  }, [links, statuses, below.busy]);
   // wait-f22 / map-f9: the answer arriving, a dig starting and a dig finishing are quota moments: the figures read again.
   useQuotaMoments({ running: load?.kind === "RUN" && served === null, served: served !== null, digs });
 
@@ -827,6 +844,7 @@ function V4Debate({
       }
       statusesRef.current = next;
       setStatuses(next);
+      setDigsCheckedAt(Date.now());
       if (again) {
         again = false;
         void tick();
@@ -859,7 +877,8 @@ function V4Debate({
     return onMap === null || onMap.rewrite_id !== own.rewrite_id || onMap.state !== own.state;
   });
   // dig-f1 (V4 screen review, 3 Nov 2026): and while a change is being written into the main answer, so it shows without a reload.
-  const rewriteBehind = map !== null && (behind || rewriteWaiting(map) || mainAnswerWriting(served?.answer));
+  // dig-f2: and while a dig further down still works or climbs (its change reaches this map's paths without a reload).
+  const rewriteBehind = map !== null && (behind || rewriteWaiting(map) || mainAnswerWriting(served?.answer) || below.busy);
   const rewriteBehindRef = useRef(rewriteBehind);
   useEffect(() => {
     rewriteBehindRef.current = rewriteBehind;
@@ -971,6 +990,13 @@ function V4Debate({
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const panelColRef = useRef<HTMLElement | null>(null);
   const shownSelection: V4Selection = map === null ? "root" : selectionIdOf(resolveSelection(map, digs, selected));
+  // dig-d1 B (owner's screen review, 3 Nov): the open dig's steps and checked findings while it works (lib/v4/useDigProgress.ts).
+  const openDig = useMemo(() => {
+    if (map === null) return null;
+    const resolved = resolveSelection(map, digs, selected);
+    return resolved.kind === "dig" ? resolved.dig : null;
+  }, [map, digs, selected]);
+  const openDigLive = useDigProgress(openDig, loadDigProgress);
   const sheetOpen = layout === "phone" && address.sheetOpen;
 
   const select = useCallback((selection: V4Selection, viaKeyboard: boolean): void => {
@@ -1629,6 +1655,8 @@ function V4Debate({
                 {...(failedDigs === undefined ? {} : { failedDigs })}
                 headingRef={headingRef}
                 underCrumbs={ready.underCrumbs}
+                openDigProgress={openDigLive.progress}
+                openDigCheckedAt={openDigLive.progress !== null ? openDigLive.checkedAt : digsCheckedAt}
                 catalog={catalog}
                 locale={locale}
               />

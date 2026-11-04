@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useState, type ReactNode, type RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { addedLines, ownWords } from "@/lib/v4/askText";
+import type { DigProgress } from "@/lib/v4/digProgress";
 import { findOpenQuestion, isFinishedRewrite } from "@/lib/v4/mapModel";
 import { digWords, type V4DigQuota } from "@/lib/v4/digQuota";
 import { rootPicksTarget } from "@/lib/v4/digDock";
@@ -54,7 +55,8 @@ import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
 import { pickReasonPlaces, V4DigCompose, V4MoneyLines, V4PickReason, type V4DigChoice } from "./V4DigSuggest";
 import { V4MonthPause } from "./V4MonthPause";
 import { V4ShareChange } from "./V4ShareChange";
-import { V4DigPageIntro, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
+import { digResultOf, V4DigPageIntro, V4DigResult, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
+import { V4DigRunning } from "./V4DigRunning";
 import { V4OtherPages, V4SearchNote, V4SourcesFold, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -77,6 +79,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * Wave 2 (map-d4 A, map-f14, dig-f22): evidence first, each finding's sources folded into one line and "Other pages found"
  * folded; "Skip to the dig button" near the top; the dig block pinned to the panel's foot on a computer; one pick reads
  * "Dig into your pick", and "Your question" digs the picks it lists; a greyed pick box has its reason right above it.
+ * Owner review 3 Nov (dig-d1 B, dig-f32): a dig at work shows its own running panel (V4DigRunning: the waiting card, the
+ * steps and checked findings when the server reports them, the path's text now); a finished dig opens with the same result
+ * box as the path it rewrote, its bar in words only, "Open this dig's map" below.
  */
 
 type PanelProps = Readonly<{
@@ -144,6 +149,13 @@ type PanelProps = Readonly<{
    * Confirmed" and, on a computer, dig-f18's pinned "Next change › · Done" during the changes tour. Absent: nothing.
    */
   underCrumbs?: ReactNode;
+  /**
+   * dig-d1 B (3 Nov): what the server reported of the OPEN dig's steps and checked findings while it works (the page reads it
+   * for the dig whose panel is open, lib/v4/useDigProgress.ts). Absent or null: the running dig shows the one calm line.
+   */
+  openDigProgress?: DigProgress | null;
+  /** When the open dig was last checked (the waiting card's reduced-motion "Still working · checked 14:09"). Absent: none. */
+  openDigCheckedAt?: number | null;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -841,8 +853,22 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
     : null;
   // Owner review 3 Nov (wait-f2): one pause block, the same as the waiting card's, with Continue once the month has reset.
   const pause = pauseOfDig(dig);
+  // dig-d1 B / dig-f32: a dig at work (running, or rewriting its path) shows the running dig's own panel; a dig still
+  // waiting keeps its line (dig-f28), and one held at the month wall its pause block.
+  const running = pause === null && dig.state !== "WAITING" && digWorking(dig);
+  // dig-f32: a finished dig opens with the same result box as the path it rewrote (its mode word follows the box).
+  const boxed = digResultOf(dig, props.resolved.home.path) !== null;
+  const modeTag = dig.link.mode !== null && panel.showDigModes !== false
+    ? <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span>
+    : null;
   return (
     <>
+      {boxed ? (
+        <>
+          <V4DigResult dig={dig} path={props.resolved.home.path} catalog={panel.catalog} />
+          {modeTag === null ? null : <p className="v4PanelText">{modeTag}</p>}
+        </>
+      ) : null}
       {more.length > 0
         ? (
           <Section title={t(panel.catalog, "v4.panel.digAlso")}>
@@ -852,6 +878,20 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
           </Section>
         )
         : null}
+      {running ? (
+        <V4DigRunning
+          key={dig.link.childRunId}
+          dig={dig}
+          progress={panel.openDigProgress ?? null}
+          pathLine={props.resolved.home.path?.line ?? null}
+          showMode={panel.showDigModes !== false}
+          checkedAt={panel.openDigCheckedAt ?? null}
+          catalog={panel.catalog}
+          locale={panel.locale}
+        />
+      ) : null}
+      {/* A dig waiting, held at the month wall, failed or done without a result box: its state line, as before. */}
+      {running || boxed ? null : (
       <Section title={t(panel.catalog, "v4.panel.answerHere")}>
         {pause !== null ? (
           <>
@@ -881,6 +921,7 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
             : <p className="v4Muted">{t(panel.catalog, "v4.panel.digNoHeadline")}</p>)
           : null}
       </Section>
+      )}
       {dig.state === "DONE" && finished !== null ? <V4WhatChanged sentences={finished.what_changed} catalog={panel.catalog} /> : null}
       {dig.state === "DONE" && dig.counts !== null
         ? (

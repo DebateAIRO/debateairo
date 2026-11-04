@@ -259,7 +259,11 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // V4 screen review (3 Nov), map-d4 A: a point's sources folded into one line. The drawn option said "From 3 pages: …";
   // journey-f23 says nothing counts sources, so the line names the sites only (an owner question until the click-test).
   "v4.web.sourcesFrom",
-  "v4.web.sourcesFromMore"
+  "v4.web.sourcesFromMore",
+  // The owner's screen review of 3 Nov (dig-d1 B): the two words a running dig's steps need that the record does not give,
+  // the list's name for screen readers and the hidden word after a step that is done.
+  "v4.digLive.stepsLabel",
+  "v4.digLive.stepDone"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

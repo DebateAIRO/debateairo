@@ -8,6 +8,7 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import type { ContinueOutcome, QuestionShare } from "../../apps/ui/lib/v4/money.js";
 import { resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTrail } from "../../apps/ui/lib/v4/load.js";
+import type { DigProgressRead } from "../../apps/ui/lib/v4/digProgress.js";
 import type { DigLink, DigView, ReadingLevel, SeenSnapshot } from "../../apps/ui/lib/v4/types.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
 import { detectCrisis, type Answer, type AnswerStory, type AskParent, type DigLinks, type InvestigationReports, type RunProjection, type UsageBorrow } from "../../packages/contract/src/index.js";
@@ -74,6 +75,8 @@ export const harness = {
   ancestors: {} as Record<string, Answer>,
   /** W4-6: how each dig reads (null: done, with a headline and one sure point, as before). */
   digView: null as ((link: DigLink) => DigView) | null,
+  /** dig-d1 B: what the open dig's progress read gives (null: none, as today's API: the one calm line). */
+  digProgress: null as ((runId: string) => DigProgressRead) | null,
   lastVisit: null as SeenSnapshot | null,
   /** R22 W5-1: the investigation's report versions (null: not readable, the first answer stays). */
   investigation: null as InvestigationReports | null,
@@ -127,6 +130,7 @@ export function resetHarness(): void {
   harness.fresh = null;
   harness.ancestors = {};
   harness.digView = null;
+  harness.digProgress = null;
   harness.lastVisit = null;
   harness.investigation = null;
   harness.loadStory = vi.fn(async () => harness.story);
@@ -195,7 +199,9 @@ export function loadMock(original: Record<string, unknown>) {
     }),
     loadDigView: async (link: DigLink): Promise<DigView> => harness.digView?.(link) ?? ({
       link, state: "DONE", headline: "The dig's short answer.", counts: { SURE: 1, SURE_FOR_CASE: 0, STILL_ARGUED: 0, DIDNT_HOLD: 0 }
-    })
+    }),
+    // dig-d1 B: the open dig's progress read; none by default, as today's API (the page never reads the network here).
+    loadDigProgress: async (runId: string): Promise<DigProgressRead> => harness.digProgress?.(runId) ?? { kind: "ABSENT" }
   };
 }
 export function digIndexMock(original: Record<string, unknown>) {
