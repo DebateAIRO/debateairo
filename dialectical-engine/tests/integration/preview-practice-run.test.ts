@@ -16,7 +16,9 @@ import {
   DEBATE_SHAPE_POLICY_ROW_KEY,
   canonicalRegisterJson,
   createPostgresRegisterPublicationPort,
+  debateShapeStartStepStartValues,
   loadBootstrapRegister,
+  parseDebateShapePolicy,
   parseRegisterVersionText
 } from "@debateai/register";
 import { PREVIEW_REVIEWED_PROVIDER_REFS, PREVIEW_GLM_DEADLINE_MS, parsePreviewLineUp, previewTargetJsonRow, type PreviewLineUp } from "@debateai/providers";
@@ -1630,5 +1632,131 @@ describe("engine 2's story (R1d)", () => {
     expect(second.stubs.requests.some((request) => request.model === benched && request.kind === "STORYTELLER")).toBe(false);
     expect(new Set(answered(second.stubs.requests, "STORYTELLER").map((request) => request.model))).toEqual(new Set([backup!.backupModel]));
     expect(report.run.story.outcome).toBe("READY");
+  }, 900_000);
+});
+
+/**
+ * V4 start step, Task 91d (Task 91b's open problem 1): the start step's practice path end to end on the stand-ins, before the sitting
+ * spends real money. Step 4's first command (`--register-next --shape-policy <its file> --question ro --start-step free:3 --digs 1`),
+ * with the engine and length rows this test's export lacks (the release's export carries both): the step before Start through the
+ * step the ask composition built over the real gate ports (the lists, the merge, one combine, each charged to the practice person as
+ * 0156 records it), Start with the menu's top 3 paths and the hand-over on the throwaway database, a v2 run on the real runner (its
+ * paths stored and served with their answers so far), then one dig admitted with its DIG_PICKS hand-over, joined to the
+ * investigation, its picks kept, settled, and the month's lines in --out. Every call is a stand-in's: nothing is paid.
+ */
+describe("preview practice: debate mode, the start step on the stand-ins (V4 Task 91d)", () => {
+  const SHAPE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url));
+  const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
+  const ENGINE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/engine-policy-start.json", import.meta.url));
+  type StartReport = { verdict: string; reasons: string[]; ask: { engine?: { engine: number } }; failures: unknown[];
+    run: { runId: string; workItemOutcome: string; answer: { served: boolean } | null; story: { outcome: string | null } | null };
+    web?: { totals: { searches: number; searchFeeMicros: number } } };
+  type MonthLine = { kind: string; phase?: string; runId?: string | null; calls?: number; costNanoUsd?: string; plan?: string; paths?: number;
+    digs?: number; questionId?: string };
+  type Branch = { path_id: string; order: number; state: string; outcome: { state: string } | null };
+  const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
+  /** The path ids a story v5 request was given (its `paths` field). */
+  const storyPathIds = (request: GateRecord): string[] =>
+    (JSON.parse(framedOf(request).fields.find((field) => field.name === "paths")?.content ?? "[]") as { id: string }[]).map((path) => path.id);
+  const countOf = (requests: readonly GateRecord[], kind: string) => requests.filter((request) => request.kind === kind).length;
+  const pathIds = (count: number) => Array.from({ length: count }, (_, at) => `b${String(at + 1)}`);
+
+  it("--register-next --shape-policy <Step 4's file> --start-step free:3 --digs 1: the step before Start, a v2 run with 3 stored paths and its answer, one dig admitted from its picks (DIG_PICKS) and joined, the month's PRE_START line; stand-ins only", async () => {
+    // Step 4's shape file as writePracticeStartShapeFile writes it from a release's own row (here the owners' start values): the start
+    // step's start values added, premium given the Plus sizes. Checked by the register's own parser.
+    const own = parseDebateShapePolicy(JSON.parse(readFileSync(SHAPE_POLICY_START, "utf8")));
+    const startShape = join(folder, `start-step-shape-${randomUUID()}.json`);
+    await writeFile(startShape, JSON.stringify(parseDebateShapePolicy({ ...own, plans: { ...own.plans, premium: own.plans.plus },
+      startStep: debateShapeStartStepStartValues() })));
+    const { stubs, env, common, quiet, out } = await scenario();
+    const logged: string[] = [];
+    // Where the stand-ins' record stood when the step before Start had ended, and when the dig's run was about to start.
+    const at = { preStart: -1, dig: -1 };
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--register-next", "--depth", "1",
+      "--shape-policy", startShape, "--length-policy", LENGTH_POLICY_START, "--engine-policy", ENGINE_POLICY_START, "--question", "ro",
+      "--start-step", "free:3", "--digs", "1", "--transcript"], env, { ...quiet, log: (line: string) => {
+      logged.push(line);
+      if (line.startsWith("start step: ")) at.preStart = stubs.requests.length;
+      if (line.startsWith("dig 1: run ")) at.dig = stubs.requests.length;
+    } });
+    const report = outcome.report as unknown as StartReport;
+    // Nothing refused, failed or stopped, and no reply refused. PASS itself is not asserted: today the report adds NOT_PROVEN reasons
+    // of its own to a Free start (the premium AIs a Free panel never seats; a v2 receipt's sizes, which the shape block does not read).
+    expect(report.reasons.filter((reason) => /^(HARNESS_|ADMISSION_|FORMAT_|CALL_FAILED|GATE_|UNBILLED_|MODEL_BUSY|PRACTICE_)/u.test(reason)))
+      .toEqual([]);
+    expect(report.failures).toEqual([]);
+
+    // The step before Start: the lists by the cut, one merge, the combine written; Start with the menu's top 3 paths, chosen by the AIs.
+    const listsByCut = Number(/^start step: ([1-9][0-9]*) list\(s\) by the cut, 0 after it, 1 merge\(s\), a menu of [4-9][0-9]* path\(s\); the combine written$/u
+      .exec(logged.find((line) => line.startsWith("start step: ")) ?? "")?.[1]);
+    expect(listsByCut).toBeGreaterThanOrEqual(2);
+    expect(logged).toContain("start: 3 path(s) of the menu's top 3, chosen by the AIs");
+    // What the stand-ins answered before Start: Next's language decision (no 0156 charge), then the step's own calls: the planner, the
+    // lists, the merge and the combine.
+    const preStart = stubs.requests.slice(0, at.preStart).filter((request) => request.kind !== "PROBE");
+    expect({ language: countOf(preStart, "QUESTION_LANGUAGE"), planner: countOf(preStart, "MAP"), lists: countOf(preStart, "START_LIST"),
+      merges: countOf(preStart, "START_MERGE"), late: countOf(preStart, "START_MERGE_LATE"), combines: countOf(preStart, "START_COMBINE"),
+      all: preStart.length }).toEqual({ language: 1, planner: 1, lists: listsByCut, merges: 1, late: 0, combines: 1, all: listsByCut + 4 });
+
+    // The debate: engine 2, settled, its answer served and its story told.
+    expect(report.ask.engine).toEqual({ engine: 2 });
+    expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
+    const transcript = JSON.parse(readFileSync(join(out, "transcript.json"), "utf8")) as { run: { panel: { modelId: string }[] };
+      structure: { answer: { branches?: { source: string; width: number; paths: Branch[]; more: { more_id: string }[] } } | null } };
+    // Free: the Free roster argued it.
+    expect(transcript.run.panel.map((member) => member.modelId).sort()).toEqual([GLM, DEEPSEEK].sort());
+    // A v2 run with 3 stored paths: the served answer's branches as the site reads them (b1..b3 from the menu, each argued, with its
+    // answer so far), and the menu's paths not chosen as "+ N more to explore".
+    const branches = transcript.structure.answer?.branches;
+    expect(branches).toMatchObject({ source: "MENU", width: 3 });
+    expect(branches!.paths.map((path) => [path.path_id, path.order, path.state, path.outcome?.state ?? null]))
+      .toEqual(pathIds(3).map((id, at) => [id, at + 1, "ARGUED", "READY"]));
+    expect(branches!.more.length).toBeGreaterThan(0);
+    // Its main answer, written over the 3 paths and checked (the checker reads only an accepted draft); its story names the 3 paths.
+    const debateCalls = stubs.requests.slice(at.preStart, at.dig);
+    expect(countOf(debateCalls, "PATH_OUTCOME_WRITER")).toBe(3);
+    expect(countOf(debateCalls, "REPORT_ANSWER")).toBe(1);
+    expect(countOf(debateCalls, "REPORT_ANSWER_CHECK")).toBe(1);
+    expect(debateCalls.filter((request) => request.kind === "STORY_PATHS").map(storyPathIds)).toEqual([pathIds(3)]);
+    expect(logged.some((line) => /^paths filled in: 3 paths, the first to the last [0-9]+ s apart$/u.test(line))).toBe(true);
+
+    // The dig: the debate's "+ N more to explore" first (Free digs at most 3 picks), admitted, joined to the investigation, settled.
+    const picks = Math.min(branches!.more.length, 3);
+    const digLine = logged.find((line) => line.startsWith("dig 1: run "));
+    expect(digLine).toMatch(new RegExp(`^dig 1: run [0-9a-f-]{36} admitted with ${String(picks)} pick\\(s\\), joined JOINED; it starts$`, "u"));
+    const digRunId = /^dig 1: run ([0-9a-f-]{36}) /u.exec(digLine!)![1]!;
+    expect(logged).toContain("dig 1: ended COMPLETED");
+    // The join took and its picks were kept (0135): neither step logged a code (each logs one only when it did not).
+    expect(logged.filter((line) => line.includes("DEBATEAI_DIG_JOIN") || line.includes("DEBATEAI_DIG_PICKS"))).toEqual([]);
+    // One path per pick (DIG_PICKS): the dig's own paths are exactly its picks, and it built no list of its own (a dig without the
+    // hand-over would build Free's 3 itself, RUN_BUILT, with the planner and the lists).
+    const digCalls = stubs.requests.slice(at.dig);
+    expect(countOf(digCalls, "PATH_OUTCOME_WRITER")).toBe(picks);
+    expect(digCalls.filter((request) => request.kind === "STORY_PATHS").map(storyPathIds)).toEqual([pathIds(picks)]);
+    expect(digCalls.filter((request) => ["MAP", "START_LIST", "START_MERGE"].includes(request.kind))).toEqual([]);
+    // The dig's own main answer, then the debate's main answer updated by the dig (R22 decisions 3 and 4, paid on the dig's run): each
+    // draft accepted at once, so each is checked (the checker reads only an accepted draft). The update's material names no language
+    // (R22's report design: its question alone), so it is the one main-answer request without the question_language field.
+    expect({ writers: countOf(digCalls, "REPORT_ANSWER"), checkers: countOf(digCalls, "REPORT_ANSWER_CHECK"),
+      updates: digCalls.filter((request) => request.kind === "REPORT_ANSWER" && framedOf(request).fields.at(-1)?.name !== "question_language").length })
+      .toEqual({ writers: 2, checkers: 2, updates: 1 });
+
+    // The month (start-month.jsonl in --out): the run's line, then the calls before Start (no run), the debate, its end, the dig.
+    const month = readFileSync(join(out, "start-month.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line) as MonthLine);
+    expect(month[0]).toEqual({ kind: "START_MONTH_RUN", plan: "free", paths: 3, digs: 1, questionId: "ro" });
+    expect(month.slice(1).map((line) => [line.kind, line.phase, line.runId])).toEqual([["START_MONTH", "PRE_START", null],
+      ["START_MONTH", "DEBATE", report.run.runId], ["START_MONTH", "END_OF_DEBATE", report.run.runId], ["START_MONTH", "DIG", digRunId]]);
+    // The PRE_START line: the step's own calls, one 0156 row each (the planner, the lists, the merge and the combine), at a cost.
+    expect(month[1]!.calls).toBe(listsByCut + 3);
+    expect(BigInt(month[1]!.costNanoUsd!)).toBeGreaterThan(0n);
+    for (const line of month.slice(2)) expect(line.calls).toBeGreaterThan(0);
+
+    // Stand-ins only, nothing paid: every call the month counts is one a stand-in answered (all of them but the probes and the two
+    // language decisions, which no ledger line counts), each answered, nothing unknown; Free searched nothing and paid no search.
+    expect(month.slice(1).reduce((sum, line) => sum + line.calls!, 0))
+      .toBe(stubs.requests.filter((request) => request.kind !== "PROBE" && request.kind !== "QUESTION_LANGUAGE").length);
+    expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(stubs.requests.every((request) => request.answer === "OK")).toBe(true);
+    expect(report.web?.totals).toMatchObject({ searches: 0, searchFeeMicros: 0 });
   }, 900_000);
 });

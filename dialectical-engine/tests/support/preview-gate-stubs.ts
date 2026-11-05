@@ -17,7 +17,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
+import { QUESTION_LANGUAGE_FIELD, argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
 import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
 import { COMPARING_JUDGE_CONTRACT_ID, COMPARING_JUDGE_SOURCES_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
 import { previewModelRow, previewNanoUsdText, previewUsdTextToNano } from "@debateai/providers";
@@ -151,9 +151,48 @@ export type StubLanguage = "en" | "ro";
  */
 const ROMANIAN_DIRECTIVES = Object.freeze([argumentLanguageDirective("Romanian"), questionLanguageSentence({ code: "ro", name: "Romanian" })]);
 export function stubReplyLanguage(chat: string): StubLanguage {
-  return wirePacket(chat).messages.some((message) => typeof message.content === "string"
-    && ROMANIAN_DIRECTIVES.some((directive) => message.content.includes(directive)))
-    ? "ro" : "en";
+  const packet = wirePacket(chat);
+  if (packet.messages.some((message) => typeof message.content === "string"
+    && ROMANIAN_DIRECTIVES.some((directive) => message.content.includes(directive)))) return "ro";
+  // V4 start step (Task 91d): or the locked language field alone. A sealed contract reused under a lock names the language only in
+  // its material's last field (withQuestionLanguageField), never in its instruction: a path run's main answer on report.answer.v4,
+  // whose reply the same check refuses in another language. A model reads it there, so the stand-in does.
+  const locked = lockedFieldLanguageOf(packet);
+  if (locked !== null) return locked === "ro" ? "ro" : "en";
+  // V4 start step (Task 91d review): a request that names no language at all, neither a sentence nor the field: the question's own
+  // language, as a model told "Write natural sentences in the question's language" writes it. The main-answer update a dig triggers
+  // (R22's report design: its material is the question alone, `language: null`) is checked against the question's language.
+  if (packet.messages.some((message) => typeof message.content === "string" && LANGUAGE_SENTENCE_OPENING !== ""
+    && message.content.includes(LANGUAGE_SENTENCE_OPENING))) return "en";
+  return questionFieldLanguageOf(packet) === "ro" ? "ro" : "en";
+}
+/**
+ * V4 start step (Task 91d review): the words every language sentence a request can carry opens with (today's directive, its
+ * fallback form, and the locked sentence), read from the kernel's own sentences; empty if they ever share none.
+ */
+const LANGUAGE_SENTENCE_OPENING = ((sentences: readonly string[]): string => {
+  let opening = sentences[0]!;
+  for (const sentence of sentences) while (!sentence.startsWith(opening)) opening = opening.slice(0, -1);
+  return opening;
+})([...ROMANIAN_DIRECTIVES, argumentLanguageDirective("")]);
+/** V4 start step (Task 91d review): the primary language of a framed request's `question` field, as the kernel's guesser reads it. */
+function questionFieldLanguageOf(packet: ReturnType<typeof wirePacket>): string | null {
+  try {
+    const question = readFramedMaterial(packet).fields.find((one) => one.name === "question")?.content;
+    return question === undefined ? null : detectArgumentLanguage(question).tag.split("-")[0]!.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+/** V4 start step (Task 91d): the primary language a framed request's `question_language` field names; null without one. */
+function lockedFieldLanguageOf(packet: ReturnType<typeof wirePacket>): string | null {
+  try {
+    const field = readFramedMaterial(packet).fields.find((one) => one.name === QUESTION_LANGUAGE_FIELD);
+    const code = field === undefined ? undefined : (JSON.parse(field.content) as { code?: unknown }).code;
+    return typeof code === "string" ? code.split("-")[0]!.toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The stand-in's prose, the same sentences in each language it writes. */
