@@ -57,10 +57,6 @@
   .v4RepHdrStatus:not(:empty) { padding: 8px 32px; }
 }
 
-/* report-f12: the classic view, small, at the page foot. */
-.v4RepFoot { width: min(100%, calc(72ch + 2 * var(--v4-gutter))); margin: 0 auto; padding: 0 var(--v4-gutter) 48px; font-size: var(--t-ui); }
-.v4RepSmallLink { font-size: var(--t-ui); display: inline-flex; align-items: center; min-height: 44px; }
-
 /* report-f16: the report's space is held while it loads. */
 .v4RepLoading {
   min-height: 220px; padding: 24px; border-radius: var(--r-panel); background: var(--surface-2); color: var(--text-2);
