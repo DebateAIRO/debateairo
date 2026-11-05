@@ -118,6 +118,13 @@ const DEFAULT_LEVEL: ReadingLevel = "background";
 type AiProps = Readonly<{ "data-ai-generated": "true"; dir: "auto"; lang?: string }>;
 /** A list holding AI text only follows that text's direction too, so its markers and padding sit on the reading side. */
 type AiListProps = Readonly<{ dir: "auto"; lang?: string }>;
+/**
+ * An item of such a list: marked as AI text, in the debate's language, with no direction of its own. The list's dir="auto"
+ * then reads the items' text and takes their direction, and the items take the list's. With a direction on every item the
+ * list found no text of its own (dir="auto" skips elements that carry dir) and stayed left to right on an English page, so
+ * an Arabic item's bullet went past the page's edge (the w6 browser check, 5 Nov).
+ */
+type AiItemProps = Readonly<{ "data-ai-generated": "true"; lang?: string }>;
 
 const usableTag = (tag: string | null | undefined): string | null =>
   tag === undefined || tag === null || tag.trim().length === 0 || tag === "und" ? null : tag;
@@ -126,6 +133,9 @@ function aiProps(language: string | null): AiProps {
 }
 function aiListProps(language: string | null): AiListProps {
   return language === null ? { dir: "auto" } : { dir: "auto", lang: language };
+}
+function aiItemProps(language: string | null): AiItemProps {
+  return language === null ? { "data-ai-generated": "true" } : { "data-ai-generated": "true", lang: language };
 }
 
 export function V4ReportClient({ id, locale, initialLevel, catalog, newDebateCatalog }: Props) {
@@ -834,7 +844,7 @@ function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs,
         <section className="v4RepSection" aria-labelledby="v4-report-why">
           <h2 id="v4-report-why" className="v4RepH2">{t(catalog, "v4.report.whyHeading")}</h2>
           <ul className="v4RepList" {...aiList}>
-            {map.why.map((reason, at) => <li key={at} {...ai}>{reason}</li>)}
+            {map.why.map((reason, at) => <li key={at} {...aiItemProps(language)}>{reason}</li>)}
           </ul>
         </section>
       ) : null}
@@ -850,7 +860,7 @@ function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs,
         <section className="v4RepSection" aria-labelledby="v4-report-objections">
           <h2 id="v4-report-objections" className="v4RepH2">{t(catalog, "v4.report.objectionsHeading")}</h2>
           <ul className="v4RepList" {...aiList}>
-            {map.objections.map((objection, at) => <li key={at} {...ai}>{objection}</li>)}
+            {map.objections.map((objection, at) => <li key={at} {...aiItemProps(language)}>{objection}</li>)}
           </ul>
         </section>
       ) : null}
@@ -995,7 +1005,7 @@ function ReportDigItem({ dig, level, catalog, language }: Readonly<{
   return (
     <li className="v4RepDig">
       <ul className="v4RepDigQuestions" {...aiListProps(language)}>
-        {dig.link.questions.map((question, at) => <li key={at} {...ai}>{question}</li>)}
+        {dig.link.questions.map((question, at) => <li key={at} {...aiItemProps(language)}>{question}</li>)}
       </ul>
       <p className="v4RepDigMeta">
         {/* A dig found again from the account list has no known mode: then only its state is shown. */}
@@ -1386,7 +1396,7 @@ export function FinishedReportBody({ version, state, catalog, language = null, p
             <>
               <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.stillOpen")}</h3>
               <ul className="v4RepList" {...aiListProps(language)}>
-                {story.still_open.map((open, at) => <li key={at} {...ai}>{open}</li>)}
+                {story.still_open.map((open, at) => <li key={at} {...aiItemProps(language)}>{open}</li>)}
               </ul>
             </>
           ) : null}

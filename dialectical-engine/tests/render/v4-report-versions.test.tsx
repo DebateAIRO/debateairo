@@ -848,8 +848,18 @@ describe("the report on paper and in other languages", () => {
     // The shared web notes and source lists carry their own language (reader 1's) and are not the report's.
     const marked = [...node.querySelectorAll<HTMLElement>("[data-ai-generated]")].filter((element) => element.closest(".v4WebNote, .v4Sources, .v4OtherPages") === null);
     expect(marked.length).toBeGreaterThan(10);
-    expect(marked.filter((element) => element.lang !== "ar" || element.dir !== "auto")).toEqual([]);
-    expect(node.querySelector(".v4RepVersionBody .v4RepList")!.getAttribute("dir")).toBe("auto");
+    // The w6 browser check (5 Nov): an item of a list of AI text carries no direction of its own, so the list's dir="auto"
+    // reads the items' text and takes their direction, and its markers and padding sit on their reading side. With a
+    // direction on every item the list found no text of its own and stayed left to right on an English page, and an
+    // Arabic item's bullet went past the page's right edge (the page scrolled sideways at 375 px).
+    const items = marked.filter((element) => element.matches(".v4RepList > li, .v4RepDigQuestions > li"));
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.filter((element) => element.hasAttribute("dir"))).toEqual([]);
+    expect(marked.filter((element) => element.lang !== "ar" || (!items.includes(element) && element.dir !== "auto"))).toEqual([]);
+    for (const list of node.querySelectorAll<HTMLElement>(".v4RepList, .v4RepDigQuestions")) {
+      expect(list.getAttribute("dir")).toBe("auto");
+      expect(list.lang).toBe("ar");
+    }
     // Padding and rule lines sit on the reading side.
     expect(css).not.toMatch(/padding-left|border-left|margin-left/u);
   });
