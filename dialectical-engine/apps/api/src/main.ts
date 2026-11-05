@@ -1913,6 +1913,10 @@ const api = buildApi({
   ownClosings: new PostgresOwnClosingsReader(pool),
   // V4 start step, Task 39e: the questions not started yet, their five routes and the removal at Start.
   savedQuestions,
+  // V4 start step, Task 56 ("Let the AIs carry on to the report"): the carry-on marks on the same chosen paths store, and the one room
+  // (the same object as `askRoom` below) for the look before each dig; the tick below drives them.
+  carryOn: startPaths,
+  ...(askRoom === undefined ? {} : { carryOnRoom: askRoom }),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
@@ -2034,6 +2038,10 @@ const api = buildApi({
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
 });
+// V4 start step, Task 56 ("Let the AIs carry on to the report"): one carry-on pass at a time (single flight: an overlapping tick is
+// only said, content-free), every whole minute while this release is current (below, beside the ask waker); stopped on close.
+const triggerCarryOn = createSingleFlightErasureReconciler(async () => { await api.carryOnTick(); }, () => console.error("[CARRY_ON_TICK_PENDING]"));
+let carryOnLoop: Readonly<{ stop(): void }> | undefined;
 // Side-by-side spec §4 (plan C7 review): the release listener unsubscribes FIRST on close. Fastify runs onClose hooks
 // last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
 // one-shot pass can start a runtime the hooks below have already stopped.
@@ -2066,6 +2074,7 @@ api.addHook("onClose",async () => providerOnlyJobs?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
+api.addHook("onClose",async () => carryOnLoop?.stop());
 api.addHook("onClose",async () => staffAlerts?.close());
 api.addHook("onClose",async()=>{
  if(passwordResetTimer)clearInterval(passwordResetTimer);
@@ -2150,6 +2159,8 @@ console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELE
 // Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
 // release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.
 if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));
+// V4 start step, Task 56: the carry-on's whole-minute tick, gated the same way (its claims and DONE marks are single in the database).
+carryOnLoop = everyWholeMinute(gatedTrigger(releaseWatcher, triggerCarryOn));
 // Decision 13: what allowed contributions wrote goes on the public page, and a finished Free debate goes public. Single-flight, gated: rows are claimed by what they already say, so an overlap at a
 // switch copies nothing twice.
 if (publications !== undefined) {

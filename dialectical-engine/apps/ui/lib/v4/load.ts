@@ -13,7 +13,7 @@ import { API_BASE, contractClient, createSameOriginFetch, isNotFound } from "../
 import { DIG_PROGRESS_ABSENT, digProgressPath, parseDigProgress, type DigProgressRead } from "./digProgress.js";
 import { quotaUntouched } from "./failedRun.js";
 import { buildV4Map, isFinishedRewrite } from "./mapModel.js";
-import type { DigLink, DigView } from "./types.js";
+import type { DigLink, DigView, ReadingLevel } from "./types.js";
 
 export { storyReadFailed } from "./mapModel.js";
 
@@ -37,6 +37,11 @@ export type V4Load =
      * when unknown: an answer id opened directly, a database without the tag, or "und".
      */
     language?: string;
+    /**
+     * V4 start step, Task 75c (owner answer Q15, 5 Nov): the level the debate was asked at, as its run read says; the map page
+     * shows it whatever the address says. Absent when it was asked without one (or an answer id was opened directly).
+     */
+    level?: ReadingLevel;
   }>;
 
 type StoryClient = Pick<ContractClient, "readAnswerStory">;
@@ -114,7 +119,8 @@ export async function loadV4(id: string, client: LoadClient = contractClient): P
     throw failure;
   }
   const language = argumentLanguage(run);
-  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client), ...(language === null ? {} : { language }) };
+  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client), ...(language === null ? {} : { language }),
+    ...(run.reading_level === undefined ? {} : { level: run.reading_level }) };
 }
 
 /** The run's question language as a usable tag: "und" (detection not confident) and a missing tag are unknown. */

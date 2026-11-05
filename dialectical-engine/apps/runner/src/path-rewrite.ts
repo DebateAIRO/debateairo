@@ -199,6 +199,11 @@ export type PathRewriteRunnerSettings = Readonly<{
   /** R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. */
   afterStored?: (digRunId: string, lease: StepLease) => Promise<unknown>;
   /**
+   * V4 start step, Task 55e (spec §4.4): once a run that got its story is settled (index.ts), a dig under the main question of a path
+   * debate updates the main answer (path-climb.ts `advanceAfterStory`); a first debate and an R22 dig do nothing. Never rejects.
+   */
+  afterStory?: (runId: string, lease: StepLease) => Promise<unknown>;
+  /**
    * Asked once the dig's row is stored and the dig is above level 10 (DIG_LEVEL_MAX): a dig there cannot be dug further.
    */
   afterRewrite?: (settled: PathRewriteSettled) => Promise<void> | void;

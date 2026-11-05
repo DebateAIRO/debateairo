@@ -217,8 +217,8 @@ import {
 import { LivenessRepository, verdictDerivationOfPaths } from "@debateai/serve";
 import { storyLengthField, withoutStoryNodeIds } from "@debateai/story";
 import {
-  PATH_OUTCOME_FAILED, pathCopyStops, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathsFinalSeatsOf, runPathChains,
-  runPathOutcomeFor, type PathOutcomesJob, type PathOutcomesPath, type PathOutcomesSeat
+  PATH_OUTCOME_FAILED, pathCopyStops, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathRunInvestigationsOf, pathsFinalSeatsOf,
+  runPathChains, runPathOutcomeFor, type PathOutcomesJob, type PathOutcomesPath, type PathOutcomesSeat
 } from "./path-outcomes.js";
 import { runPathsMainAnswer, type PathsDossierPath } from "./paths-main-answer.js";
 import { fitStoryPathsToTokenLine } from "./token-line.js";
@@ -694,6 +694,24 @@ export function logPointInvestigation(event: string, detail: Readonly<Record<str
  */
 export function logComparingJudge(event: string, detail: Readonly<Record<string, unknown>>): void {
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_COMPARING_JUDGE", event }));
+}
+
+/**
+ * V4 start step, Task 56 ("Let the AIs carry on to the report"): the story stage of a first debate marks it DUE for the API's
+ * carry-on tick (0157's core.record_carry_on_due: NOT_ASKED for a run with no chosen paths, with the box not ticked or with a dig's
+ * set). NONE without a store. It never rejects: a failure is FAILED with one line holding its code only (no id, no words).
+ */
+export async function recordCarryOnDueSafely(store: Pick<StartPathsStore, "recordCarryOnDue"> | undefined, runId: string,
+  log: (line: string) => void): Promise<"RECORDED" | "ALREADY" | "NOT_ASKED" | "NONE" | "FAILED"> {
+  if (store === undefined) return "NONE";
+  try {
+    return await store.recordCarryOnDue(runId);
+  } catch (error) {
+    const code = error instanceof TypedDomainError ? error.code
+      : error instanceof Error && /^[A-Z][A-Z0-9_]{2,63}$/u.test(error.message) ? error.message : "UNTYPED";
+    log(JSON.stringify({ event: "runner.carry_on.due_failed", code }));
+    return "FAILED";
+  }
 }
 
 /**
@@ -2966,6 +2984,12 @@ export interface WalkingSkeletonSettings {
   readonly startPaths?: StartPathsStore;
   readonly pathResults?: PathResultsStore;
   readonly pathProgress?: PathProgressStore;
+  /**
+   * V4 start step, Task 56 ("Let the AIs carry on to the report"), a process member: where the story stage of a settled first
+   * debate records it DUE for the API's carry-on tick (`recordCarryOnDueSafely`; main.ts hands it the paths store above). Absent:
+   * nothing is marked, so nothing carries on.
+   */
+  readonly carryOn?: Pick<StartPathsStore, "recordCarryOnDue">;
   /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
@@ -10651,8 +10675,12 @@ export class WalkingSkeletonRunner {
         points: Object.freeze(points), sources: Object.freeze(sources)
       });
     };
-    /** Each path's share of the debate's investigations, in the person's order. */
-    const pathShares = pathsRunPaths === null ? [] : pathInvestigationShares(engine.engine === 2 ? engine.investigate.maxPerDebate : 0, pathsRunPaths.length);
+    /**
+     * Each path's share of the debate's investigations, in the person's order. Task 54e (the owner's answer of 5 Nov, "One per path"):
+     * on a paid path debate every path holds at least one, as its receipt priced (`pathRunInvestigationsOf`); Free keeps the cap.
+     */
+    const pathShares = pathsRunPaths === null ? []
+      : pathInvestigationShares(engine.engine === 2 ? pathRunInvestigationsOf(engine, pathsRunPaths.length) : 0, pathsRunPaths.length);
     const pathChains = pathsRunPaths === null || pathsSetStored === null ? null : runPathChains(pathsRunPaths.map((path) => path.pathId), (pathId) => {
       const rootIndex = pathRootIndexOf(pathId);
       const path = pathsRunPaths!.find((candidate) => candidate.pathId === pathId)!;
@@ -13103,7 +13131,10 @@ export class WalkingSkeletonRunner {
           // Dig-model revision W3-5 (owner Q-D13): a dig keeps its points and its answer text, both stored above, and
           // writes NO story: the path it was dug from is rewritten in the story's place (path-rewrite.ts, which never
           // rejects). A first debate, or a runner without the rewrite's settings, gets its story as today.
+          // V4 start step, Task 56: whether this is a first debate (the rewrite ran for no dig), for the carry-on's DUE mark below.
+          let firstDebate = false;
           if (!(await runDigPathRewrite(settings.pathRewrite, settled.input))) {
+            firstDebate = true;
             // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
             // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
             await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
@@ -13111,6 +13142,13 @@ export class WalkingSkeletonRunner {
           // W4-3: what the AI offers to dig into on a debate that got its story, now that it is written. Never rejects.
           // V4 start step, Task 54: a path debate's suggestions are its paths', each read from its root and keyed b<n>.
           await runFirstDebateSuggestions(settings.pathRewrite, settled.input, afterSettle.pathRoots ?? undefined);
+          // V4 start step, Task 55e (spec §4.4): a run that got its story and is a dig under the main question of a path debate (a path
+          // left out before Start) is a new first-level path, so the main answer updates (path-climb.ts); a first debate and an R22 dig
+          // do nothing. Outside the run's lease, as the rewrite's climb; never rejects.
+          if (firstDebate) await settings.pathRewrite?.afterStory?.(settled.input.runId, settled.input.stepLease ?? ((use) => use()));
+          // V4 start step, Task 56: a first debate whose ask ticked "Let the AIs carry on to the report" is now settled with its
+          // suggestions written, so the API's carry-on tick may dig into them (DUE). Before the closing poke; never rejects.
+          if (firstDebate) await recordCarryOnDueSafely(settings.carryOn, settled.input.runId, (line) => { console.error(line); });
           // W5-1 (owner F7 A): a closing waits for its running digs and their rewrites; this member is now settled, so a
           // closing of its investigation may start at once rather than at the next sweep. Never rejects.
           await pokeInvestigationClosing(settings.investigationClose, settled.input.runId);

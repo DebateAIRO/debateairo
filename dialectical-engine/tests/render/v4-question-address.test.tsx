@@ -263,24 +263,22 @@ describe("loading and an ended sign-in (map-f6, wait-f1)", () => {
     expect(page().querySelector(".v4DebLoading")).toBeNull();
   });
 
-  it("keeps the outline until the saved reading level is known, then draws the map", async () => {
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov) changed these two: the map's level is the debate's own, which comes with
+  // the debate's read, so the map no longer waits behind its outline for the account's saved level (map-f6's wait is gone).
+  it("draws the map as soon as the debate is read, without waiting for the account's saved level", async () => {
     let answer: (level: "plain" | null) => void = () => undefined;
     harness.accountLevel = new Promise((done) => { answer = done; });
     await mountMap(1600, crypto.randomUUID(), null, null);
-    expect(page().querySelector(".v4DebOutline")).not.toBeNull();
-    expect(page().querySelector(".v4MapBranch")).toBeNull();
+    expect(page().querySelector(".v4DebOutline")).toBeNull();
+    expect(page().querySelector(".v4MapBranch")).not.toBeNull();
     await act(async () => answer("plain"));
     await settle();
-    expect(page().querySelector(".v4DebOutline")).toBeNull();
     expect(page().querySelector(".v4MapBranch")).not.toBeNull();
   });
 
-  it("does not wait for a level that never comes", async () => {
+  it("an account level that never comes holds nothing back", async () => {
     harness.accountLevel = new Promise(() => undefined);
     await mountMap(1600, crypto.randomUUID(), null, null);
-    expect(page().querySelector(".v4MapBranch")).toBeNull();
-    await advance(4_000);
-    await settle();
     expect(page().querySelector(".v4MapBranch")).not.toBeNull();
   });
 

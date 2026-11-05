@@ -24,7 +24,8 @@ import { fitDossierToTokenLine } from "./token-line.js";
  * THE MATERIAL is the report's dossier (investigation-dossier.ts), built by code from the paths (`pathsDossierInput`): the question
  * (the person's care sentence is inside it, owner answer Q4), then each path in the person's order as a first-debate path: its answer
  * so far (the outcome's line, summary and fate; the path's question and SET_ASIDE when it FAILED or has none), its points and their
- * pages; the person's own words on a path in `views`, marked as theirs, never beside the path; no first-debate answer and no digs. The
+ * pages; the person's own words on a path in `views`, marked as theirs, never beside the path, with the answer so far's verdict on them
+ * when it gave one (Task 55e, as reports since Task 55b); no first-debate answer and no digs. The
  * length line is the receipt's words ("about <answerWords> words"). It is fitted under the 100K line by the dossier's ladder and then
  * by the real count near the line (`fitDossierToTokenLine`, R22 decision 28), and every round of one answer is framed under one fence
  * (`closingRandomBytes` over one seed), so round 2 reads round 1's material from the cache.
@@ -75,6 +76,9 @@ const PATHS_MAIN_ANSWER_SUBJECT = "paths-main-answer";
 
 function dossierPathOf(path: PathsDossierPath): DossierPath {
   const text = path.outcome?.text ?? null;
+  // Task 55e: the answer so far's verdict on the person's own words sits beside them in `views`, as a report's and an answer update's
+  // do since Task 55b (`DossierPath.view`); none: the words alone.
+  const view = path.outcome?.view ?? null;
   return Object.freeze({
     ref: path.pathId,
     storyLine: text?.line ?? path.question,
@@ -82,7 +86,8 @@ function dossierPathOf(path: PathsDossierPath): DossierPath {
     points: path.points,
     sources: path.sources,
     current: text === null ? null : Object.freeze({ line: text.line, summary: text.summary, fate: text.fate }),
-    ownWords: Object.freeze([...path.ownWords])
+    ownWords: Object.freeze([...path.ownWords]),
+    ...(view === null ? {} : { view: Object.freeze({ outcome: view.outcome, scope: view.scope, reason: view.reason }) })
   });
 }
 

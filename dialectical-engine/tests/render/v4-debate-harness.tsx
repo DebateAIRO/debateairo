@@ -94,6 +94,11 @@ export const harness = {
   /** map-f6: the account's reading level (null: none kept); a promise that never settles keeps it unknown. */
   accountLevel: null as Promise<ReadingLevel | null> | null,
   /**
+   * V4 start step, Task 75c (owner answer Q15, 5 Nov): the level the debate was asked at, as its run read says (null: asked
+   * without one). The map page shows it and its links carry it; "background", as the address's level was before.
+   */
+  level: "background" as ReadingLevel | null,
+  /**
    * Owner's screen review (3 Nov, dig-f5): the share the second room read says for a whole dig while picks wait (null:
    * none); every query it was asked with, newest last.
    */
@@ -141,6 +146,7 @@ export function resetHarness(): void {
   harness.loadError = null;
   harness.loadPending = false;
   harness.accountLevel = null;
+  harness.level = "background";
   harness.wholeShare = null;
   harness.digShareReads = [];
   harness.roomAgain = null;
@@ -187,9 +193,11 @@ export function loadMock(original: Record<string, unknown>) {
     loadV4: async (id: string) => {
       if (harness.loadPending) return new Promise(() => undefined);
       if (harness.loadError !== null) throw harness.loadError;
+      // Task 75c: the debate's own level comes with the run read, and loadV4 carries it to the served answer.
+      const level = harness.level;
       return harness.run !== null
-        ? { kind: "RUN", runId: id, run: harness.run }
-        : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story };
+        ? { kind: "RUN", runId: id, run: level === null ? harness.run : { ...harness.run, reading_level: level } }
+        : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story, ...(level === null ? {} : { level }) };
     },
     loadStory: (...args: unknown[]) => harness.loadStory(...args),
     loadAnswer: (runId: string) => harness.loadAnswer(runId),

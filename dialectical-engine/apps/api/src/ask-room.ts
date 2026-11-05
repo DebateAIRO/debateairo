@@ -1110,6 +1110,16 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   }
 
   /**
+   * V4 start step, Task 56 (the carry-on's stop-early rule): a dig's whole share of today, the same sum the room read shows as the
+   * dig's share (`readRoom`): the question's estimate at its own version, plus the dig's web part and the updates that follow it.
+   * Deciding nothing and writing nothing; never the bare estimate `precheck` answers.
+   */
+  async digShareMicros(question: RoomQuestion): Promise<number> {
+    const estimateMicros = await (await this.#estimatorFor(question.registerVersion)).estimateMicros(question.settingsClass);
+    return estimateMicros + await this.#digWebPartMicros(question) + await this.#digUpdatesPartMicros(question);
+  }
+
+  /**
    * R22 decision 9: a dig's web part for the share shown before it, 0 for a question, for Free (which never searches) and with
    * no web prices. Only the line reads it: the room is still measured by `estimateMicros`, so it holds and walls nothing more.
    */

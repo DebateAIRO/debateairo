@@ -19,6 +19,8 @@ import {
   debateShapeSiteCountsV2,
   debateShapeV2OfReceipt,
   webReceiptAnySchema,
+  // V4 start step, Task 54e: a paid path debate's investigations, one per path at least.
+  investigationSitesOf,
   type DebateShapeCeilingInput,
   type DebateShapeV2Input,
   type EngineSettings,
@@ -484,6 +486,22 @@ const costEnvelopeBasisSchema = z.object({
     if (engine.sites.added_model_attempts !== added) {
       ctx.addIssue({ code: "custom", path: ["engine", "sites", "added_model_attempts"],
         message: `engine added attempts ${String(engine.sites.added_model_attempts)} disagree with its sites' ${String(added)}` });
+    }
+    // V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): the investigation sites are the row's cap, and on a
+    // paid path debate (shape receipt v2) one per path at least: the ceiling's rule (`investigationSitesOf`), READ here.
+    // Review of Task 54e: as T4-ABSORB (c)'s site count above, a receipt that already failed a range check (paths or a cap below
+    // 0) reaches here, and the rule throws a plain TypeError there: an ISSUE, never a TypeError escaping the parser.
+    const pathDebate = anyShape !== undefined && anyShape.version === 2 ? { plan: anyShape.plan, paths: anyShape.paths } : null;
+    let investigations: number | null = null;
+    try {
+      investigations = investigationSitesOf(engine.investigate.max_per_debate, pathDebate);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["engine", "sites", "investigations"],
+        message: `investigation sites cannot be counted (${error instanceof Error ? error.message : String(error)})` });
+    }
+    if (investigations !== null && engine.sites.investigations !== investigations) {
+      ctx.addIssue({ code: "custom", path: ["engine", "sites", "investigations"],
+        message: `investigation sites ${String(engine.sites.investigations)} are not ${String(investigations)}` });
     }
   }
 });

@@ -38,6 +38,9 @@ import { stubChatBody, type GateOverride, type GateRecord, type GateRequest } fr
 import { WEB_WRITER_SENTENCES } from "@debateai/kernel";
 import { STORY_BACKUP_USED } from "@debateai/story";
 import { stubJudgement } from "../support/preview-gate-stubs.js";
+// Task 54d: the path story's charts and tables, through the runner.
+import { STORY_CHARTS_CALL_SITE_KEY } from "@debateai/story";
+import { laterStepContent } from "../support/gate-later-steps.js";
 
 let database: TestDatabase;
 let owner: StoryEncryptedOwner | undefined;
@@ -78,6 +81,8 @@ const HAIKU_TELLS: RotatedRoles = Object.freeze({
   storyteller: rotationPick("preview:claude-haiku-5-5"), storyChecker: rotationPick("preview:deepseek-v4-1-flash"),
   opener: rotationPick("preview:deepseek-v4-1-flash"), eligibleModelIds: Object.freeze([DEEPSEEK, MIMO, QWEN, HAIKU])
 });
+/** Task 54d: the same roles, with Haiku in the second seat (b2's root first goes to Haiku, MiMo argues b3, Qwen is the spare). */
+const HAIKU_SECOND: RotatedRoles = Object.freeze({ ...HAIKU_TELLS, eligibleModelIds: Object.freeze([DEEPSEEK, HAIKU, MIMO, QWEN]) });
 
 describe("a path debate argues one branch per stored path (part I)", () => {
   it("three stored paths on Plus: roots b1..b3, no map but the gap round, no comparing judge, no leg by its parent's maker, the web read per path, and its progress", async () => {
@@ -331,18 +336,25 @@ describe("a path debate when companies are busy or refuse, at depth 2, and its r
   }, 900_000);
 
   it("a path root refused after every repair goes to another company; refused by every company, the path ends without a root and the debate answers", async () => {
-    // b2's first company answers its root with a reply that fails the schema, every time (original, repair, re-ask).
-    let refuser: string | null = null;
-    const once = await runPathsDebate(harness, database.pool, { label: "paths-refused-once", owner: own(), before: (request) => {
-      if (!isPathRoot(request) || pathTitleIn(request) !== "T2") return null;
-      refuser ??= request.model;
-      return request.model === refuser ? { content: "{}" } : null;
-    } });
-    expect(refuser).not.toBeNull();
-    const onceRoots = await rootMakersOf(once.debate.runId);
-    expect(onceRoots.map(([pathId]) => pathId)).toEqual(["b1", "b2", "b3"]);
-    expect(onceRoots.find(([pathId]) => pathId === "b2")![1]).not.toBe(makerOfModel(refuser!));
-    expect(await sameMakerLegs(once.debate.runId)).toEqual([]);
+    // Task 54d: b2's first company is pinned (the second seat, `eligibleModelIds[1]`), once on each gate: Haiku, whose full re-ask
+    // the Anthropic wire sends as one turn of two blocks, and MiMo on DeepInfra. Unpinned, the rotation chose it from the question,
+    // and the run failed (MAKER_POSITION_UNAVAILABLE) whenever it chose Haiku: the stand-in could not read that re-ask.
+    for (const [label, pin] of [["paths-refused-once-haiku", HAIKU_SECOND], ["paths-refused-once-mimo", HAIKU_TELLS]] as const) {
+      // b2's first company answers its root with a reply that fails the schema, every time (original, repair, re-ask).
+      let refuser: string | null = null;
+      const once = await runPathsDebate(harness, database.pool, { label, owner: own(), pin, before: (request) => {
+        if (!isPathRoot(request) || pathTitleIn(request) !== "T2") return null;
+        refuser ??= request.model;
+        return request.model === refuser ? { content: "{}" } : null;
+      } });
+      expect(refuser).toBe(pin.eligibleModelIds[1]);
+      // Every request was read as the call it is: the refuser's re-ask too.
+      expect(once.gates.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+      const onceRoots = await rootMakersOf(once.debate.runId);
+      expect(onceRoots.map(([pathId]) => pathId)).toEqual(["b1", "b2", "b3"]);
+      expect(onceRoots.find(([pathId]) => pathId === "b2")![1]).not.toBe(makerOfModel(refuser!));
+      expect(await sameMakerLegs(once.debate.runId)).toEqual([]);
+    }
     // Every company refuses b2's root: b2 has no root, b1 and b3 are argued, and the run completes. Three companies on one gate,
     // so every root seat is a path's and each refusal's repairs are scripted refusals too (no spare to take it).
     const every = await runPathsDebate(harness, database.pool, { label: "paths-refused-all", owner: own(), makers: 3, before: (request) =>
@@ -789,7 +801,7 @@ describe("each path's answer so far as soon as its own checks end, then the main
     expect(new Map(found.map((row) => [String(row.node_id), String(row.trust)]))).toEqual(expected);
   }, 900_000);
 
-  it("investigations: each path's own cannot-assess points, its share of the debate's investigations, before its own answer so far; the settle step asks none", async () => {
+  it("investigations: each path's own cannot-assess points, one investigation per path at least on a paid debate (Task 54e), before its own answer so far; the settle step asks none", async () => {
     // Every point's review (a point sources an edge; a root none) cannot assess it.
     const run = await runFive("paths-investigate", { question: "preview-paths-investigate-5402", before: (request, chat) =>
       request.kind === "REVIEW" && requestedReviewEdges(chat).length > 0
@@ -798,8 +810,11 @@ describe("each path's answer so far as soon as its own checks end, then the main
     const runId = run.debate.runId;
     const tree = await treeOf(runId);
     const investigations = run.called.filter((call) => call.key.startsWith("VERDICT:investigate:"));
-    // The debate's cap (2) shared by path in the person's order: b1 takes VERDICT:investigate:1, b2 :2, b3 none.
-    expect(investigations.map((call) => call.key).sort()).toEqual(["VERDICT:investigate:1", "VERDICT:investigate:2"]);
+    // Task 54e (the owner's answer of 5 Nov, "One per path"): a paid debate's 3 paths hold max(cap 2, 3 paths) = 3 investigations,
+    // one each in the person's order: b1 takes VERDICT:investigate:1, b2 :2, b3 :3; the receipt priced the 3.
+    expect(investigations.map((call) => call.key).sort()).toEqual(["VERDICT:investigate:1", "VERDICT:investigate:2", "VERDICT:investigate:3"]);
+    const basis = parseCostEnvelopeBasis((await q(database.pool, `SELECT envelope_basis FROM core.run WHERE run_id=$1`, runId))[0]!.envelope_basis);
+    expect(basis.engine?.sites.investigations).toBe(3);
     const rows = await q(database.pool, `SELECT node_id::text AS node_id, investigation_order, result FROM ledger.point_investigation WHERE run_id=$1
       ORDER BY investigation_order`, runId);
     const pathOfNode = (nodeId: string): string => [...tree].find(([, nodes]) => nodes.includes(nodeId))?.[0] ?? "none";
@@ -809,17 +824,17 @@ describe("each path's answer so far as soon as its own checks end, then the main
     expect(rowPaths).toEqual([...rowPaths].sort());
     for (const row of rows) expect([...tree.values()].some((nodes) => nodes[0] === String(row.node_id))).toBe(false);
     const called = rows.filter((row) => row.result !== "INVESTIGATION_CAPPED");
-    expect(called.map((row) => pathOfNode(String(row.node_id)))).toEqual(["b1", "b2"]);
-    expect(rows.filter((row) => pathOfNode(String(row.node_id)) === "b3").map((row) => row.result))
-      .toEqual(rows.filter((row) => pathOfNode(String(row.node_id)) === "b3").map(() => "INVESTIGATION_CAPPED"));
+    // Every path is checked: one investigated point under each path's root (the air-quality path too).
+    expect(called.map((row) => pathOfNode(String(row.node_id)))).toEqual(["b1", "b2", "b3"]);
     // Each investigation is asked in its own path's chain, before that path's answer so far; none after the arguing.
     expect(lastAt(run.called, (key) => key === "VERDICT:investigate:1")).toBeLessThan(firstAt(run.called, (key) => key === "PATH_OUTCOME:WRITER:1:1"));
     expect(lastAt(run.called, (key) => key === "VERDICT:investigate:2")).toBeLessThan(firstAt(run.called, (key) => key === "PATH_OUTCOME:WRITER:2:1"));
+    expect(lastAt(run.called, (key) => key === "VERDICT:investigate:3")).toBeLessThan(firstAt(run.called, (key) => key === "PATH_OUTCOME:WRITER:3:1"));
     expect(lastAt(run.called, (key) => key.startsWith("VERDICT:investigate:")))
       .toBeLessThan(lastAt(run.called, (key) => key.startsWith("PATH_OUTCOME:")));
     expect(lastAt(run.called, (key) => key.startsWith("VERDICT:investigate:")))
       .toBeLessThan(firstAt(run.called, (key) => key.startsWith("COMPOSER:")));
-    expect(run.gates.requests.filter((request) => request.kind === "INVESTIGATE")).toHaveLength(2);
+    expect(run.gates.requests.filter((request) => request.kind === "INVESTIGATE")).toHaveLength(3);
     expect(run.result.kind).toBe("COMPLETED");
   }, 900_000);
 
@@ -904,7 +919,8 @@ describe("each path's answer so far as soon as its own checks end, then the main
   /*
    * Task 54c (owner, 4 Nov, "Keep all three"): a path debate's story keeps v4's web quotes (W1-5) and its backup storyteller (R1d),
    * through the runner as main.ts composes it. The third feature, the charts and tables call, is proven on the writer
-   * (tests/unit/story-paths-v5.test.ts): this file's runner composes its story writer without it, as it always has.
+   * (tests/unit/story-paths-v5.test.ts) and, since Task 54d, through the runner too: the last case composes its story writer with
+   * `charts`, as main.ts does; every other case composes it without, as it always has.
    */
   const systemOf = (request: GateRecord): string => wirePacket(stubChatBody(request.provider, request.body)).messages[0]!.content;
   const storyPointsOf = (request: GateRecord) => JSON.parse(materialOf(request).fields.find((field) => field.name === "points")?.content ?? "[]") as
@@ -951,9 +967,8 @@ describe("each path's answer so far as soon as its own checks end, then the main
   }, 900_000);
 
   it("Task 54c: Haiku's path story that cannot be reached goes to one backup storyteller of another company, which writes it on STORY:STORYTELLER:3, under the line", async () => {
-    // The gate cannot reach Haiku's vendor for the story (unbilled, nothing sent): the first storyteller cannot be reached. (An
-    // unusable reply would make the call's repair packet, which this file's gate stand-in cannot read back on a cache-split
-    // story: its request would never be answered.)
+    // The gate cannot reach Haiku's vendor for the story (unbilled, nothing sent): the first storyteller cannot be reached. (Task 54c
+    // chose this signal because the gate stand-in could not read a cache-split story's repair packet; it can since Task 54d.)
     const run = await runFive("paths-story-backup", { question: "preview-paths-story-backup-5404",
       before: (request) => request.kind === "STORY_PATHS" && request.model === HAIKU ? { gateRefuses: "PROVIDER_NOT_REACHED" } : null });
     const tellers = run.gates.requests.filter((request) => request.kind === "STORY_PATHS");
@@ -973,5 +988,68 @@ describe("each path's answer so far as soon as its own checks end, then the main
     expect(story!.storytellerLineage!.provider_ref).not.toMatch(/haiku|glm|fixture-a/iu);
     expect((story?.body as { short?: { paths?: { position_ref: string }[] } } | null | undefined)?.short?.paths?.map((path) => path.position_ref))
       .toEqual(["b1", "b2", "b3"]);
+  }, 900_000);
+
+  it("Task 54d: a path run composed with charts, whose roots' figures compare across paths, stores its charts and tables as v4 stores them, through the runner", async () => {
+    /** What building the line each path's way would cost, and how many riders it would carry. */
+    const FIGURES = new Map([["T1", { cost: 120, riders: "9,000 riders" }], ["T2", { cost: 95, riders: "7,500 riders" }],
+      ["T3", { cost: 80, riders: "6,000 riders" }]]);
+    const TITLES = [...FIGURES.keys()];
+    const claimOf = (title: string): string =>
+      `Building the line this way would cost ${String(FIGURES.get(title)!.cost)} million euros and carry ${FIGURES.get(title)!.riders} a day.`;
+    const listOf = <T>(request: GateRequest, name: string): T[] => JSON.parse(materialOf(request).fields.find((field) => field.name === name)?.content ?? "[]") as T[];
+    const figures = (request: GateRequest, chat: string): GateOverride | null => {
+      // Each path's root states its figures.
+      if (request.kind === "JUDGE" && materialOf(request).contractId.startsWith("judge.path-root.")) {
+        return { content: stubJudgement(claimOf(materialOf(request).fields.find((field) => field.name === "path_title")!.content)) };
+      }
+      // The story's first reason rests on the three roots (the stand-in's own story, its other paragraphs as they are).
+      if (request.kind === "STORY_PATHS") {
+        const story = JSON.parse(laterStepContent("STORY_PATHS", chat, "en")) as { why: { reasons: { node_refs: string[] }[] } };
+        const roots = new Set(TITLES.map(claimOf));
+        story.why.reasons[0]!.node_refs = listOf<{ ref: string; text: string }>(request, "points").filter((point) => roots.has(point.text)).map((point) => point.ref);
+        return { content: JSON.stringify(story) };
+      }
+      // One bar chart of the cost after that reason, and one table comparing cost and riders, every figure copied from its root's claim.
+      if (request.kind === "STORY_CHARTS") {
+        const positions = listOf<{ id: string; claim: string }>(request, "positions");
+        const refOf = (title: string): string | undefined => positions.find((position) => position.claim === claimOf(title))?.id;
+        return { content: JSON.stringify({ question_form: "best-way",
+          charts: [{ after: "why.1", kind: "bar", title: "Cost to build each way", x: null, y: { label: "Cost (million euros)", source: "figure", log: false },
+            items: TITLES.map((title) => ({ label: `The ${title} way`, node_ref: refOf(title), x: null,
+              y: { value: FIGURES.get(title)!.cost, text: `${String(FIGURES.get(title)!.cost)} million` } })) }],
+          tables: [{ after: "long.1.1", kind: "compare", title: "What each way costs and carries", columns: ["Cost to build", "Riders a day"],
+            rows: TITLES.map((title) => ({ label: `The ${title} way`, cells: [{ text: `${String(FIGURES.get(title)!.cost)} million euros`, node_ref: refOf(title) },
+              { text: FIGURES.get(title)!.riders, node_ref: refOf(title) }] })) }] }) };
+      }
+      return null;
+    };
+    // Composed as runPathsDebate composes it (its defaults: Plus, three paths, four companies, no web), with the story writer's charts on.
+    const { debate } = await admittedPathsRun(harness, database.pool, { label: "paths-story-charts", owner: own(), pin: HAIKU_TELLS });
+    const scripted = scriptedShapeAnswers(debate.question);
+    const gates = await harness.startGates({}, undefined, (request, chat) => figures(request, chat) ?? scripted(request, chat));
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY,
+      debateShape: { mapContractHash: mapPromptContractHash() }, engine: { engineContractHash: engineContractHash() }, charts: true });
+    const result = await harness.completedRun(composed, debate, gates);
+    // The chart call went out through the gate, after the story, to the maker that wrote the served draft (Haiku, pinned), and it read
+    // each path's root as a position.
+    const charts = gates.requests.filter((request) => request.kind === "STORY_CHARTS");
+    expect(charts.map((request) => [request.model, request.answer])).toEqual([[HAIKU, "OK"]]);
+    expect(listOf<{ claim: string }>(charts[0]!, "positions").map((position) => position.claim).sort()).toEqual(TITLES.map(claimOf).sort());
+    expect((await harness.modelCalls(debate.runId)).filter((call) => call.call_site_key === STORY_CHARTS_CALL_SITE_KEY).map((call) => call.outcome))
+      .toEqual(["OK"]);
+    // Stored with the roots' node ids, b1's first, as v4 stores them; a path run ranks no path, so code adds no ranking table.
+    const roots = (await q(database.pool, `SELECT root_node_id::text AS id FROM core.path_root WHERE run_id=$1 ORDER BY root_index`, debate.runId))
+      .map((row) => String(row.id));
+    expect(roots).toHaveLength(3);
+    const story = await new StoryRepository(database.pool).readForAnswer({ answerId: result.answerId, answerVersion: null,
+      ownership: { ownerRef: own().ownerRef } });
+    expect(story?.outcome).toBe("READY");
+    expect(story?.charts?.map((chart) => [chart.after, chart.kind, chart.title, chart.items.map((item) => [item.label, item.node_ref, item.y])])).toEqual([
+      ["why.1", "bar", "Cost to build each way", TITLES.map((title, at) => [`The ${title} way`, roots[at],
+        { value: FIGURES.get(title)!.cost, text: `${String(FIGURES.get(title)!.cost)} million` }])]]);
+    expect(story?.tables).toEqual([{ after: "long.1.1", kind: "compare", title: "What each way costs and carries", columns: ["Cost to build", "Riders a day"],
+      rows: TITLES.map((title, at) => ({ label: `The ${title} way`, cells: [{ text: `${String(FIGURES.get(title)!.cost)} million euros`, node_ref: roots[at] },
+        { text: FIGURES.get(title)!.riders, node_ref: roots[at] }] })) }]);
   }, 900_000);
 });

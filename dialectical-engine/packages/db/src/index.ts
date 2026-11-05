@@ -611,6 +611,51 @@ export async function withRunContentLease<T>(
   }
 }
 
+/** V4 start step, Task 55d: how long a read of another run waits for that run's own lease (`withOwnRunContentLease`). */
+const OWN_RUN_CONTENT_LEASE_WAIT_MS = 2_000;
+
+/**
+ * V4 start step, Task 55d: `use` reads `runId`'s content under a lease that covers it, never by widening another. A lease this
+ * context already holds that covers `runId` (on the same pool) is borrowed, as withRunContentLease borrows it. Otherwise `use` runs
+ * OUTSIDE the held lease's scope, under a short lease of `runId` alone on a client of its own: the held lease keeps its runs, and
+ * nothing of `runId` is read under it. How a debate that holds its own lease reads ANOTHER debate (a dig's investigation: what it
+ * already looked into, the pages it already read), one short lease each.
+ * The wait for that lease is bounded (OWN_RUN_CONTENT_LEASE_WAIT_MS): the only exclusive holder is an erasure, which may hold `runId`
+ * while it waits on the held lease, so waiting for ever here would wait on ourselves. Past the bound this throws, and the caller leaves
+ * that run out.
+ */
+export async function withOwnRunContentLease<T>(
+  pool: Pool,
+  runId: string,
+  use: (lease: RunContentLease) => Promise<T>
+): Promise<T> {
+  const current = contentLeaseScope.getStore();
+  if (current?.pool === pool && current.lease.runIds.includes(runId)) {
+    return withRunContentLease(pool, [runId], use);
+  }
+  return contentLeaseScope.exit(async () => {
+    const waited = new AbortController();
+    const timer = setTimeout(() => { waited.abort(); }, OWN_RUN_CONTENT_LEASE_WAIT_MS);
+    let lease: RunContentLease;
+    try {
+      lease = await acquireRunContentLease(pool, [runId], waited.signal);
+    } finally {
+      clearTimeout(timer);
+    }
+    try {
+      await lease.assertLive();
+      const value = await contentLeaseScope.run(
+        Object.freeze({ pool, lease }),
+        () => use(lease)
+      );
+      await lease.assertLive();
+      return value;
+    } finally {
+      await lease.release();
+    }
+  });
+}
+
 export {
   acquirePublicationContentLease,
   withPublicationContentLease,

@@ -440,6 +440,9 @@ export async function startR22World(options: R22WorldOptions = {}) {
     ownClosings: new PostgresOwnClosingsReader(apiPool),
     // Task 39e, as main.ts: the questions not started yet, their five routes and the removal at Start.
     savedQuestions,
+    // Task 56, as main.ts: the carry-on marks on the same chosen paths store, and the world's one room for the look before each dig
+    // (a test calls `world.api.carryOnTick()` where main.ts ticks every whole minute).
+    carryOn: startPaths, carryOnRoom: askRoom,
     continuedRunWake: continuedRunWake({ claimableWorkItemOf: (runId) => new WorkItemRepository(apiPool).claimableWorkItemOfRun(runId), dispatch: (job) => dispatcher.dispatch(job) }),
     runHandover: runHandoverOf({ ownReleaseKey: environment.RELEASE_KEY, readRunReleaseNow: (runId) => new PostgresDigModelRepository(apiPool).readRunReleaseNow(runId),
       versionPassed: (version) => settingsVersionPassed(apiPool, environment.RELEASE_KEY, version), activeVersion: () => readActiveSettingsVersionOn(apiPool, nextVersion),

@@ -1,0 +1,29 @@
+{
+  "version": "main-answer-path-added-forward0162-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0161_carry_on_session_free_digs.sql",
+    "manifestSha256": "1ac1cd438889eb1d335410a8225b5aded06ed32a0b75b542c03b76505e6cb308",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0162_main_answer_path_added.sql",
+    "sha256": "ec097e033ae0dec1eb1bbcfc818e729fecfcd3d339cabf076104a059ba28ac1f"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0138_tree_updates.sql",
+      "relations": [
+        "identity.main_answer_update"
+      ],
+      "constraints": [
+        "main_answer_update_trigger_check"
+      ],
+      "field": "constraint_definition"
+    }
+  ]
+}

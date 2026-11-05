@@ -363,6 +363,8 @@ export async function composePracticeRunner(input: Readonly<{
     });
   }
   const wait = input.wait ?? ((cooldownMs: number) => new Promise<void>((resolve) => setTimeout(resolve, cooldownMs)));
+  // V4 start step, Tasks 53 and 56, as main.ts: the one chosen paths store, read by a path debate and marking a ticked first debate DUE.
+  const startPaths = new PostgresStartPathsStore(pool);
   const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
     workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
     // Side-by-side spec §3, as main.ts: the runner runs only debates of its release (the practice's one key).
@@ -376,9 +378,11 @@ export async function composePracticeRunner(input: Readonly<{
     runSettingsVersions,
     // V4 start step, Task 53, as main.ts: the run → final-writer terms map, and a path debate's stores on the runner's pool.
     runFinalWriterTerms,
-    startPaths: new PostgresStartPathsStore(pool),
+    startPaths,
     pathResults: new PostgresPathResultsRepository(pool),
     pathProgress: new PostgresPathProgressRepository(pool),
+    // V4 start step, Task 56, as main.ts: the same store marks a ticked first debate DUE ("Let the AIs carry on to the report").
+    carryOn: startPaths,
     providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
     ...(providerTopology.critique === undefined
       ? {} : { critique: providerTopology.critique }),

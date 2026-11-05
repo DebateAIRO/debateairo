@@ -96,6 +96,7 @@ apps/api/src/billing/withdraw-cli.ts
 apps/api/src/billing/withdrawal.ts
 apps/api/src/boot-custody.ts
 apps/api/src/carry-on-part.ts
+apps/api/src/carry-on.ts
 apps/api/src/client-ip.ts
 apps/api/src/consumer-recovery.ts
 apps/api/src/consumer-security-notices.ts
@@ -756,6 +757,13 @@ apps/ui/components/v4/V4ReportStrip.tsx
 apps/ui/components/v4/V4RunPaths.tsx
 apps/ui/components/v4/V4ShareChange.tsx
 apps/ui/components/v4/V4Sources.tsx
+apps/ui/components/v4/V4StartBar.tsx
+apps/ui/components/v4/V4StartCard.tsx
+apps/ui/components/v4/V4StartCombineBar.tsx
+apps/ui/components/v4/V4StartMore.tsx
+apps/ui/components/v4/V4StartRow.tsx
+apps/ui/components/v4/V4StartSuggest.tsx
+apps/ui/components/v4/V4StartWays.tsx
 apps/ui/components/v4/V4Steps.tsx
 apps/ui/components/v4/V4TourBar.tsx
 apps/ui/components/v4/V4TrustBar.tsx
@@ -1250,6 +1258,7 @@ packages/db/src/migration-forward0158.ts
 packages/db/src/migration-forward0159.ts
 packages/db/src/migration-forward0160.ts
 packages/db/src/migration-forward0161.ts
+packages/db/src/migration-forward0162.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts

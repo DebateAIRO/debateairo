@@ -295,6 +295,8 @@ describe("the detail level (ask-f15, ask-f16)", () => {
     server.level = new Promise((resolveLevel) => { answer = resolveLevel; });
     await mount({ level: null });
     expect(host!.querySelector(".v4AskLevelsHold")).not.toBeNull();
+    // V4 start step, Task 75b (ask-d2): the held place is the new block's shape, three faint pill outlines in one row.
+    expect(host!.querySelectorAll(".v4AskLevelsHold .v4AskLevelsHoldPill")).toHaveLength(3);
     expect(host!.querySelector(".v4AskLevels")).toBeNull();
     await act(async () => { answer({ reading_level: null }); });
     await settle();

@@ -16,9 +16,13 @@ import {
   PREVIEW_V2_FINAL_SEATS, ProviderContentUnacceptedError, type PromptPacket, type ProviderCallRequest, type ProviderCallResult, type ProviderGateway
 } from "@debateai/providers";
 import {
-  pathCopyStops, pathFoundMarksOf, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathsFinalSeatsOf, runPathChains, runPathOutcomeFor,
-  type PathChainSteps, type PathOutcomesJob, type PathOutcomesPath
+  pathCopyStops, pathFoundMarksOf, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathRunInvestigationsOf, pathsFinalSeatsOf,
+  runPathChains, runPathOutcomeFor, type PathChainSteps, type PathOutcomesJob, type PathOutcomesPath
 } from "../../apps/runner/src/path-outcomes.js";
+import {
+  engineSettingsOf, engineVersionPolicyStartValues, parseEngineVersionPolicy, pathRunInvestigations, withPathDebateInvestigations,
+  type DebateShapePlanKey
+} from "@debateai/register";
 import { engineNodeFactsOf } from "../../apps/runner/src/engine-links.js";
 import type { PathRewritePoint, PathRewriteQuestion } from "../../apps/runner/src/path-rewrite-material.js";
 import { runFirstDebateSuggestions } from "../../apps/runner/src/path-rewrite.js";
@@ -385,6 +389,44 @@ describe("pathInvestigationShares: the debate's investigation cap, shared by pat
     expect(pathInvestigationShares(0, 2)).toEqual([{ first: 0, slots: 0 }, { first: 0, slots: 0 }]);
     expect(pathInvestigationShares(3, 1)).toEqual([{ first: 0, slots: 3 }]);
     expect(pathInvestigationShares(4, 0)).toEqual([]);
+  });
+});
+
+describe("Task 54e (the owner's answer of 5 Nov, \"One per path\"): every path of a paid path debate holds at least one investigation", () => {
+  const START = engineVersionPolicyStartValues();
+  /** A receipt's engine as the ceiling mints it: the row's cap, its investigation sites for this debate (`withPathDebateInvestigations`). */
+  const engineOf = (cap: number, pathDebate: Readonly<{ plan: DebateShapePlanKey; paths: number }> | null) => withPathDebateInvestigations(
+    engineSettingsOf(parseEngineVersionPolicy({ ...START, investigate: { maxPerDebate: cap } }), { makers: 4, mapOpening: false }), pathDebate);
+  const slotsOf = (shares: readonly Readonly<{ first: number; slots: number }>[]) => shares.map((share) => share.slots);
+
+  it("max(cap, paths), shared as before: cap 2 gives 3 paths 1 + 1 + 1, 1 path 2, 7 paths one each; a cap of 0 stays 0", () => {
+    expect(pathInvestigationShares(pathRunInvestigations(2, 3), 3)).toEqual([{ first: 0, slots: 1 }, { first: 1, slots: 1 }, { first: 2, slots: 1 }]);
+    expect(pathInvestigationShares(pathRunInvestigations(2, 1), 1)).toEqual([{ first: 0, slots: 2 }]);
+    expect(pathInvestigationShares(pathRunInvestigations(2, 2), 2)).toEqual([{ first: 0, slots: 1 }, { first: 1, slots: 1 }]);
+    expect(pathInvestigationShares(pathRunInvestigations(0, 3), 3)).toEqual([{ first: 0, slots: 0 }, { first: 0, slots: 0 }, { first: 0, slots: 0 }]);
+    // One numbering per debate: the seven paths take VERDICT:investigate:1 to :7 in the person's order.
+    expect(pathInvestigationShares(pathRunInvestigations(2, 7), 7).map((share) => share.first)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(slotsOf(pathInvestigationShares(pathRunInvestigations(2, 7), 7))).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    // A cap above the paths is kept whole.
+    expect(slotsOf(pathInvestigationShares(pathRunInvestigations(5, 3), 3))).toEqual([2, 2, 1]);
+  });
+
+  it("a run shares what its receipt priced for its own paths: paid 3 paths 3, Free the cap, a smaller set its own count, never above the receipt", () => {
+    expect(pathRunInvestigationsOf(engineOf(2, { plan: "plus", paths: 3 }), 3)).toBe(3);
+    expect(slotsOf(pathInvestigationShares(pathRunInvestigationsOf(engineOf(2, { plan: "plus", paths: 3 }), 3), 3))).toEqual([1, 1, 1]);
+    expect(pathRunInvestigationsOf(engineOf(2, { plan: "max", paths: 7 }), 7)).toBe(7);
+    // Free keeps the debate's cap (its receipt prices the cap): 1 + 1 + 0, as before.
+    expect(slotsOf(pathInvestigationShares(pathRunInvestigationsOf(engineOf(2, { plan: "free", paths: 3 }), 3), 3))).toEqual([1, 1, 0]);
+    // A run that built fewer paths than its receipt priced (the AIs found 3 of 5): one per path, no more.
+    expect(pathRunInvestigationsOf(engineOf(2, { plan: "plus", paths: 5 }), 3)).toBe(3);
+    // A receipt that priced the cap alone is never exceeded.
+    expect(pathRunInvestigationsOf(engineOf(2, null), 3)).toBe(2);
+    expect(pathRunInvestigationsOf(engineOf(0, { plan: "plus", paths: 3 }), 3)).toBe(0);
+  });
+
+  it("the runner's chains share them so", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    expect(source).toContain("pathInvestigationShares(engine.engine === 2 ? pathRunInvestigationsOf(engine, pathsRunPaths.length) : 0, pathsRunPaths.length)");
   });
 });
 

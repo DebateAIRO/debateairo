@@ -11,7 +11,7 @@ import {
   PREVIEW_V2_FINAL_SEATS, buildFramedPrompt, type FramedMaterialField, type PromptContract, type ProviderCallRequest, type ProviderCallResult,
   type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
-import { PATH_REWRITE_POLICY } from "@debateai/register";
+import { PATH_REWRITE_POLICY, pathRunInvestigations, type EngineSettings } from "@debateai/register";
 import {
   PATH_OUTCOME_CHECKER_PROSE, PATH_OUTCOME_PROSE, pathOutcomeContractsFor, pathOutcomeOrdinaryRefWordsOf, writePathOutcome, type PathOutcomeDraft,
   type PathOutcomeIndex
@@ -396,10 +396,20 @@ export function pathFoundMarksOf(path: PathOutcomesPath): readonly Readonly<{ no
 }
 
 /**
- * The debate's investigation cap (`engine.investigate.maxPerDebate`, which the admission priced once per debate), shared out by path
- * in the person's order: each path its even share, the earlier paths one more each while a remainder is left. `first` is how many
- * slots the earlier paths hold, so a path's k-th investigation is the debate's `VERDICT:investigate:<first + k>` whichever path ends
- * first. A path with no slot investigates nothing (its points are recorded capped).
+ * V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path": every path gets one look-up, 3 paths = 3): the
+ * investigations a path run shares out. On a paid path debate every path holds at least one, `pathRunInvestigations(cap, paths)`
+ * for the paths the run argues, as the admission priced it on the receipt (`sites.investigations`); never above what the receipt
+ * priced, so a Free run (priced at the cap) keeps the cap, and a set smaller than the receipt's takes one per path it has.
+ */
+export function pathRunInvestigationsOf(engine: Pick<EngineSettings, "investigate" | "sites">, pathCount: number): number {
+  return Math.min(pathRunInvestigations(engine.investigate.maxPerDebate, pathCount), engine.sites.investigations);
+}
+
+/**
+ * The debate's investigations (`pathRunInvestigationsOf`, which the admission priced once per debate), shared out by path in the
+ * person's order: each path its even share, the earlier paths one more each while a remainder is left. `first` is how many slots
+ * the earlier paths hold, so a path's k-th investigation is the debate's `VERDICT:investigate:<first + k>` whichever path ends
+ * first (one numbering per debate). A path with no slot investigates nothing (its points are recorded capped).
  */
 export function pathInvestigationShares(cap: number, pathCount: number): readonly Readonly<{ first: number; slots: number }>[] {
   if (!Number.isSafeInteger(cap) || cap < 0 || !Number.isSafeInteger(pathCount) || pathCount < 0) throw new TypeError("PATH_INVESTIGATION_SHARES_INVALID");

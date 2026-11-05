@@ -6,7 +6,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway, TokenCounter } from "@debateai/providers";
 import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
 import { firstDebateSuggestionFacts } from "./investigation-digest.js";
-import { advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
+import { advanceAfterStory, advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
 import { postgresTreeUpdatePorts, readRecentTreeDigs } from "./path-climb-sources.js";
 import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { publicDigOnSettle, type PublicTreeRunnerSettings } from "./public-contribution.js";
@@ -26,7 +26,8 @@ import { readReplayBook } from "./run-replay.js";
  *    it on the never-walled PATH_REWRITE seam (`buildPathRewriteCostEnvelopeSeam`, W3-2's `pathRewriteSeam`);
  *  - the sweep's list (0135) and the shared in-flight set, so the sweep never runs a second copy beside a live rewrite;
  *  - R22 decisions 2 and 3 (0138): each dig's turn held to its path's whole line, and once its row is stored the climb and the main
- *    answer (path-climb.ts), with the configured members, on the same in-flight set, with their own sweep.
+ *    answer (path-climb.ts), with the configured members, on the same in-flight set, with their own sweep; V4 start step, Task 55e: and
+ *    once a dig under the main question of a path debate has its story, that main-answer update (`afterStory`), on the same set and sweep.
  * Absent (undefined) when the configured targets hold no Haiku or no GLM: every settled run then writes its story as
  * before, rather than every dig ending FAILED for want of its two roles.
  */
@@ -93,7 +94,9 @@ export function composePathRewrite(input: Readonly<{
     refreshSuggestions,
     firstDebateSuggestions: Object.freeze({ store: postgresPathSuggestionsStore(pool), read: firstDebateSuggestionFacts(pool) }),
     line: new PostgresTreeUpdateRunnerRepository(pool),
-    afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease)
+    afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease),
+    // V4 start step, Task 55e: a dig under the main question of a path debate updates the main answer once its story is written.
+    afterStory: (runId, lease) => advanceAfterStory(tree, runId, lease)
   });
   const picks = new PostgresDigPicksRunnerRepository(pool);
   return Object.freeze({

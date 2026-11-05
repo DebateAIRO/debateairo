@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ENGINE_ONE, engineOfRun, engineReceipt, engineReceiptSchema, engineSettingsOf, engineSettingsOfReceipt,
-  engineVersionPolicyStartValues, parseEngineVersionPolicy, type EngineSettings
+  engineVersionPolicyStartValues, investigationSitesOf, parseEngineVersionPolicy, pathRunInvestigations, withPathDebateInvestigations,
+  type EngineSettings
 } from "@debateai/register";
 
 const START = engineVersionPolicyStartValues();
@@ -140,5 +141,58 @@ describe("the row's accepted boundaries mint a receipt (carried from Task 1's re
     expect(policy).toEqual(value);
     const settings = engineSettingsOf(policy, { makers: 5, mapOpening: true });
     expect(engineSettingsOfReceipt(engineReceipt(settings, 1))).toEqual(settings);
+  });
+});
+
+describe("Task 54e (the owner's answer of 5 Nov, \"One per path\"): a paid path debate's investigations, one per path at least", () => {
+  it("pathRunInvestigations: max(cap, paths); a cap of 0 (no investigation) stays 0", () => {
+    expect([[2, 1], [2, 2], [2, 3], [2, 7], [5, 3], [0, 3], [0, 0], [2, 0]].map(([cap, paths]) => pathRunInvestigations(cap!, paths!)))
+      .toEqual([2, 2, 3, 7, 5, 0, 0, 2]);
+    for (const [cap, paths] of [[-1, 3], [2, -1], [1.5, 3], [2, 2.5], [Number.NaN, 3]] as const) {
+      expect(() => pathRunInvestigations(cap, paths), `${String(cap)}/${String(paths)}`).toThrowError(TypeError);
+    }
+  });
+
+  it("investigationSitesOf: the row's cap on every debate but a paid path debate's", () => {
+    expect(investigationSitesOf(2, null)).toBe(2);
+    expect(investigationSitesOf(2, { plan: "free", paths: 3 })).toBe(2);
+    expect(investigationSitesOf(2, { plan: "plus", paths: 3 })).toBe(3);
+    expect(investigationSitesOf(2, { plan: "plus", paths: 1 })).toBe(2);
+    expect(investigationSitesOf(2, { plan: "max", paths: 7 })).toBe(7);
+    expect(investigationSitesOf(0, { plan: "pro", paths: 5 })).toBe(0);
+  });
+
+  it("withPathDebateInvestigations: the investigation sites raised, nothing else; the very settings when nothing changes", () => {
+    const plus3 = withPathDebateInvestigations(SETTINGS, { plan: "plus", paths: 3 });
+    expect(plus3.sites).toEqual({ comparingJudges: 3, investigations: 3, answerCheck: 1 });
+    expect({ ...plus3, sites: SETTINGS.sites }).toEqual(SETTINGS);
+    expect(plus3.investigate).toEqual({ maxPerDebate: 2 });
+    for (const frozen of [plus3, plus3.sites]) expect(Object.isFrozen(frozen)).toBe(true);
+    expect(withPathDebateInvestigations(SETTINGS, null)).toBe(SETTINGS);
+    expect(withPathDebateInvestigations(SETTINGS, { plan: "free", paths: 3 })).toBe(SETTINGS);
+    expect(withPathDebateInvestigations(SETTINGS, { plan: "plus", paths: 2 })).toBe(SETTINGS);
+  });
+
+  it("the receipt member carries them and reads back: added calls per site, up to one per stored path (8)", () => {
+    const seven = withPathDebateInvestigations(SETTINGS, { plan: "max", paths: 7 });
+    const receipt = engineReceipt(seven, 3);
+    // (3 comparing judges + 7 investigations + 1 answer check) x 3 attempts per site.
+    expect(receipt.sites).toEqual({ comparing_judges: 3, investigations: 7, answer_check: 1, added_model_attempts: 33 });
+    expect(receipt.investigate).toEqual({ max_per_debate: 2 });
+    expect(engineReceiptSchema.parse(receipt)).toEqual(receipt);
+    expect(engineSettingsOfReceipt(receipt)).toEqual(seven);
+    expect(engineReceipt(withPathDebateInvestigations(SETTINGS, { plan: "max", paths: 8 }), 1).sites.investigations).toBe(8);
+  });
+
+  it("refuses investigation sites below the cap, above one per stored path, or any above a cap of 0", () => {
+    const raised = (sites: number, cap = 2) => {
+      const value = JSON.parse(JSON.stringify(engineReceipt(SETTINGS, 1)));
+      value.investigate.max_per_debate = cap;
+      value.sites.investigations = sites;
+      value.sites.added_model_attempts = value.sites.comparing_judges + sites + value.sites.answer_check;
+      return engineReceiptSchema.safeParse(value).success;
+    };
+    expect([raised(2), raised(3), raised(8), raised(0, 0)]).toEqual([true, true, true, true]);
+    expect([raised(1), raised(9), raised(1, 0)]).toEqual([false, false, false]);
   });
 });

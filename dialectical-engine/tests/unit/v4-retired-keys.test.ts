@@ -91,3 +91,28 @@ describe("decision 2: an old debate's angles still read", () => {
       .toBe("Does this hold up, and when? Cheaper storage\n\nThis follows from an earlier question: “Q?”\nPlease also look at: jobs.");
   });
 });
+
+/*
+ * V4 start step, Task 75b (ask-d2; owner answer Q15 of 5 Nov): the level block is one row of pills and one grey line. The
+ * label box over the changing sentence and the note that the level "sits as a small label at the top" retire: the level now
+ * belongs to the question, and no header changes it.
+ */
+describe("Task 75b: the level block's label and old note are retired", () => {
+  const LEVEL_RETIRED = ["v4.ask.levelShowsLabel", "v4.ask.levelNote", "v4.ask.levelChangeLater"] as const;
+  const READS_LEVEL_RETIRED = /v4\.ask\.(levelShowsLabel|levelNote|levelChangeLater)\b/u;
+
+  it("no catalogue keeps them", () => {
+    const kept: string[] = [];
+    for (const locale of readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)) {
+      for (const file of readdirSync(join(messages, locale)).filter((name) => name.endsWith(".json"))) {
+        const catalog = JSON.parse(readFileSync(join(messages, locale, file), "utf8")) as Record<string, unknown>;
+        kept.push(...Object.keys(catalog).filter((key) => (LEVEL_RETIRED as readonly string[]).includes(key)).map((key) => `${locale}/${file}: ${key}`));
+      }
+    }
+    expect(kept).toEqual([]);
+  });
+
+  it("no source of the website reads them", () => {
+    expect(sources().filter(({ text }) => READS_LEVEL_RETIRED.test(text)).map(({ path }) => path)).toEqual([]);
+  });
+});

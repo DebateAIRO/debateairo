@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseCostEnvelopeBasis } from "@debateai/budget";
 import {
-  ENGINE_ONE, computeStructuralCeilingBasis, engineOfRun, engineReceipt, engineSettingsOf, engineVersionPolicyStartValues,
-  lengthGuidancePolicyStartValues, resolveLengthGuidance
+  ENGINE_ONE, computeStructuralCeilingBasis, debateShapePolicyStartValues, engineOfRun, engineReceipt, engineSettingsOf,
+  engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveDebateShapeV2, resolveLengthGuidance, type DebateShapePlanKey
 } from "@debateai/register";
 import { publicCostEnvelopeBasis } from "@debateai/serve"; // pre-flight PF-D2.3
 
@@ -131,5 +131,86 @@ describe("engine row in force: the member rides last (INTERFACE §3.2)", () => {
     expect(Object.hasOwn(stored, "engine")).toBe(true);
     const today = JSON.parse(JSON.stringify(computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2 }))) as Record<string, unknown>;
     expect(publicCostEnvelopeBasis(today)).toBe(today);
+  });
+});
+
+/**
+ * V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path": every path gets one look-up, 3 paths = 3): on a paid path
+ * debate (shape receipt v2) the ceiling counts max(cap, paths) investigation sites, each one call at the panel member's allowance,
+ * so the price never under-counts the look-ups the runner makes; Free keeps the cap; a debate without paths (R22) is unchanged.
+ */
+describe("Task 54e: the ceiling counts a paid path debate's investigations, one per path at least", () => {
+  const POLICY = debateShapePolicyStartValues();
+  const S = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
+  const shapeOf = (plan: DebateShapePlanKey, paths: number) => resolveDebateShapeV2(POLICY, plan, { ...S, paths, pathsSource: "MENU" }, 4);
+  /** Four makers, the map never opening a path debate: 3 comparing judges, the cap of 2, no answer check. */
+  const ENGINE4 = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 4, mapOpening: false });
+  const mint = (plan: DebateShapePlanKey, paths: number, engine = true) => computeStructuralCeilingBasis({ ...TERMS, panelSize: 4, depth: 1,
+    shapeV2: shapeOf(plan, paths), length: GUIDANCE, ...(engine ? { engine: ENGINE4 } : {}) });
+  type Sites = Readonly<{ comparing_judges: number; investigations: number; answer_check: number; added_model_attempts: number }>;
+  const sitesOf = (basis: Readonly<Record<string, unknown>>) => (basis.engine as { sites: Sites }).sites;
+  const panelMember = (basis: Readonly<Record<string, unknown>>) => (basis.per_site_attempts as { panel_member: number }).panel_member;
+
+  it("Plus, 3 paths: 3 investigation sites, each one call at the panel member's allowance in the ceiling", () => {
+    const plus3 = mint("plus", 3);
+    expect(sitesOf(plus3)).toMatchObject({ comparing_judges: 3, investigations: 3, answer_check: 0 });
+    expect(plus3.max_model_attempts - mint("plus", 3, false).max_model_attempts).toBe((3 + 3) * panelMember(plus3));
+    expect((plus3.engine as { investigate: unknown }).investigate).toEqual({ max_per_debate: 2 });
+  });
+
+  it("from 2 paths to 3, the engine's calls rise by one investigation; 1 path keeps the cap; 7 paths count 7", () => {
+    expect(sitesOf(mint("plus", 2)).investigations).toBe(2);
+    expect(sitesOf(mint("plus", 3)).added_model_attempts - sitesOf(mint("plus", 2)).added_model_attempts).toBe(panelMember(mint("plus", 3)));
+    expect(sitesOf(mint("plus", 1)).investigations).toBe(2);
+    expect(sitesOf(mint("max", 7)).investigations).toBe(7);
+  });
+
+  it("Free, 3 paths: the cap, as before", () => {
+    expect(sitesOf(mint("free", 3)).investigations).toBe(2);
+  });
+
+  it("an R22 debate (no paths): the cap, today's receipt byte for byte", () => {
+    const r22 = computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, length: GUIDANCE, engine: ENGINE });
+    expect(r22.max_model_attempts).toBe(414);
+    expect(r22.engine).toEqual(engineReceipt(ENGINE, 3));
+    expect(sitesOf(r22).investigations).toBe(2);
+  });
+
+  it("the strict parser reads them back, and refuses a paid path debate priced at the bare cap or a Free one above it", () => {
+    const plus3 = mint("plus", 3);
+    expect(parseCostEnvelopeBasis(plus3).engine?.sites.investigations).toBe(3);
+    expect(parseCostEnvelopeBasis(JSON.parse(JSON.stringify(plus3))).engine?.sites.investigations).toBe(3);
+    const reSited = (basis: Readonly<Record<string, unknown>>, investigations: number) => {
+      const copy = JSON.parse(JSON.stringify(basis)) as Record<string, unknown> & { engine: { sites: Record<string, number> } };
+      const step = (investigations - copy.engine.sites.investigations!) * panelMember(basis);
+      copy.engine.sites.investigations = investigations;
+      copy.engine.sites.added_model_attempts = copy.engine.sites.added_model_attempts! + step;
+      copy.max_model_attempts = Number(copy.max_model_attempts) + step;
+      return copy;
+    };
+    expect(() => parseCostEnvelopeBasis(reSited(plus3, 2))).toThrowError(unresolved("investigation sites 2 are not 3"));
+    expect(() => parseCostEnvelopeBasis(reSited(mint("free", 3), 3))).toThrowError(unresolved("investigation sites 3 are not 2"));
+    // Review of Task 54e: the engine member alone now lets sites above a non-zero cap through, so only the strict parser keeps an
+    // R22 receipt (no paths) at the cap.
+    const r22 = computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, length: GUIDANCE, engine: ENGINE });
+    expect(() => parseCostEnvelopeBasis(reSited(r22, 3))).toThrowError(unresolved("investigation sites 3 are not 2"));
+  });
+
+  /**
+   * Review of Task 54e: the investigation count runs on a receipt that already failed a non-aborting check (as T4-ABSORB (c)'s
+   * site count does), and `pathRunInvestigations` throws a plain TypeError on a count below 0 (a range check, which does not
+   * stop the refinements). A bad receipt is an ISSUE: the refusal stays RUN_COST_ENVELOPE_UNRESOLVED and never escapes the
+   * parser as a thrown TypeError.
+   */
+  it("a paid path debate's receipt whose paths or cap cannot be counted is refused, never a thrown TypeError", () => {
+    const bent = (change: (copy: Record<string, unknown> & { shape: Record<string, unknown>; engine: { investigate: Record<string, unknown> } }) => void) => {
+      const copy = JSON.parse(JSON.stringify(mint("plus", 3))) as Record<string, unknown> & { shape: Record<string, unknown>;
+        engine: { investigate: Record<string, unknown> } };
+      change(copy);
+      return copy;
+    };
+    expect(() => parseCostEnvelopeBasis(bent((copy) => { copy.shape.paths = -1; }))).toThrowError(unresolved("investigation sites cannot be counted"));
+    expect(() => parseCostEnvelopeBasis(bent((copy) => { copy.engine.investigate.max_per_debate = -1; })))
+      .toThrowError(unresolved("investigation sites cannot be counted"));
   });
 });

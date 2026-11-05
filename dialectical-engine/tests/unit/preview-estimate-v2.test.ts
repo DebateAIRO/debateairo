@@ -128,6 +128,28 @@ describe("a path debate's arguing: the v2 split at each gate's dearest member", 
     expect(debateOf(shares, [GLM, MIMO, DEEPSEEK])).toBe((authored + judge + reviewer) * debate * members);
   });
 
+  // V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): a paid path debate's investigations are one per path at
+  // least, and every one of them is priced in full on each gate (any member may take one).
+  it("Task 54e: Plus, 3 paths prices 3 investigations, each in full on every gate; Free, 3 paths, the cap of 2", () => {
+    const plus3 = pathBasis("plus", 3, "MENU");
+    const roles = expectedCallsByRoleFromBasis(plus3);
+    expect(roles.REVIEWER - (plus3.call_sites as { reviewer: number }).reviewer).toBe(3);
+    const free3 = pathBasis("free", 3, "MENU");
+    expect(expectedCallsByRoleFromBasis(free3).REVIEWER - (free3.call_sites as { reviewer: number }).reviewer).toBe(2);
+    const { denominator, shares } = sharesOf(plus3);
+    const members = 4n;
+    const debate = denominator / members; // PER_STEP: one call per site
+    const investigations = 3n;
+    const comparingJudges = 3n; // min(the row's 3 judges, 4 makers)
+    const authored = BigInt(roles.POSITION + roles.SUPPORT_ATTACK);
+    // The Anthropic gate (Haiku alone): the authored sites, a third of the grading, the others' reviews, then its one judge seat
+    // and every investigation in full.
+    expect(debateOf(shares, [HAIKU])).toBe(authored * debate * members
+      + ceilDiv((BigInt(roles.JUDGE) - comparingJudges) * debate * members, 3n)
+      + (BigInt(roles.REVIEWER) - investigations) * debate * (members - 1n)
+      + (1n + investigations) * debate * members);
+  });
+
   it("the outcomes are the debate's own calls: one per site, each with its unbilled retry", () => {
     const basis = pathBasis("plus", 5, "MENU");
     const roles = expectedCallsByRoleFromBasis(basis);

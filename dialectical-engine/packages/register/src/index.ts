@@ -33,7 +33,7 @@ import {
   type DebateShapeV2Input
 } from "./debate-shape-v2.js";
 import { lengthGuidanceReceipt, type LengthGuidance } from "./length-guidance-policy.js";
-import { engineReceipt, type EngineSettings } from "./engine-version-policy.js";
+import { engineReceipt, withPathDebateInvestigations, type EngineSettings } from "./engine-version-policy.js";
 import { webReceipt, type WebSites } from "./web-sites.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
@@ -484,7 +484,10 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   if (input.engine !== undefined && input.length === undefined) {
     throw new TypedDomainError("STRUCTURAL_CEILING_ENGINE_INVALID", "The engine member needs the length member: engine 2 is always lengthed");
   }
-  const engineMember = input.engine === undefined ? null : engineReceipt(input.engine, panelMemberAttempts);
+  // V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): a paid path debate's engine counts one investigation
+  // per path at least (`withPathDebateInvestigations`); every other debate's engine is minted as given, its bytes unchanged.
+  const engineMember = input.engine === undefined ? null : engineReceipt(withPathDebateInvestigations(input.engine,
+    input.shapeV2 === undefined ? null : { plan: input.shapeV2.plan, paths: input.shapeV2.paths }), panelMemberAttempts);
   const engineAddedAttempts = engineMember === null ? 0 : engineMember.sites.added_model_attempts;
   // Web search (W2-2): the web part's model calls, each one call bounded like a panel member (backup included).
   const webMember = input.web === undefined ? null : webReceipt(input.web, panelMemberAttempts);
@@ -1396,8 +1399,11 @@ export {
   engineSettingsOfReceipt,
   engineVersionPolicyRow,
   engineVersionPolicyStartValues,
+  investigationSitesOf,
   parseEngineVersionPolicy,
+  pathRunInvestigations,
   readEngineVersionPolicy,
+  withPathDebateInvestigations,
   type CompositionMetricName,
   type EngineAnswerCheck,
   type EngineInvestigate,

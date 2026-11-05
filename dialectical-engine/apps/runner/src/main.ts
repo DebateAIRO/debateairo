@@ -434,6 +434,9 @@ const runnerSettingsPreload = await preloadRunnerSettings({
 // retirement stops (claims, then new model calls), both off until this release retires.
 const executions = createTaskExecutionCounter();
 const retirementSignal = createRunnerRetirementSignal();
+// V4 start step, Tasks 53 and 56: the one chosen paths store on the runner's pool, read by a path debate and marking a ticked first
+// debate DUE for the API's carry-on tick.
+const startPaths = new PostgresStartPathsStore(pool);
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   // Side-by-side spec §3: the runner runs only this release's debates; another release's is NO_WORK.
@@ -450,9 +453,11 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   runFinalWriterTerms,
   // V4 start step, Task 53: a path debate's stores on the runner's pool: the paths sealed at Start (0157), each path's root and the gap
   // round (0158), each path's step and points (0159).
-  startPaths: new PostgresStartPathsStore(pool),
+  startPaths,
   pathResults: new PostgresPathResultsRepository(pool),
   pathProgress: new PostgresPathProgressRepository(pool),
+  // V4 start step, Task 56: the same store marks a ticked first debate DUE at its story stage ("Let the AIs carry on to the report").
+  carryOn: startPaths,
   providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
   ...(providerTopology.critique === undefined
     ? {} : { critique: providerTopology.critique }),

@@ -7,6 +7,7 @@ import { alreadyWaitingShown, RoomNotice } from "@/components/billing/RoomNotice
 import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
+import { V4StartBar } from "@/components/v4/V4StartBar";
 import { V4Steps } from "@/components/v4/V4Steps";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
@@ -67,6 +68,23 @@ function byteLength(text: string): number {
 
 /** useLayoutEffect in the browser (no frame at the old height), useEffect on the server (which has no layout). */
 const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** V4 start step, Task 75b (ask-d2 A): a phone's width, where step 1's Next sits in the bottom bar (the card's 600 px rule). */
+const NARROW_QUERY = "(max-width: 600px)";
+
+/** True on a phone's width (read once mounted, and again when it changes; the server render and jsdom assume a computer). */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(NARROW_QUERY);
+    const update = (): void => setNarrow(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+  return narrow;
+}
 
 /**
  * ask-f19: the question box grows with the words, from 3 lines to about 8 (the CSS bounds), then scrolls inside; no
@@ -213,7 +231,7 @@ function V4AskForm({
   // one-time chooser stays hidden, so it never flashes for someone who already chose.
   const [savedLevel, saveLevel, levelKnown] = useReadingLevel(initialLevel);
   // The D1 prototype shows "Plain words" chosen. A chip only changes this draft (so every sample can be compared,
-  // UI-2/TIME-4); it is saved by Continue, "Just answer it" or the header menu.
+  // UI-2/TIME-4); it is saved by Continue or "Just answer it" (Task 75c: the header no longer changes it).
   const [draftLevel, setDraftLevel] = useState<ReadingLevel>(initialLevel ?? "plain");
   const level = savedLevel ?? draftLevel;
   const [step, setStep] = useState<Step>("ask");
@@ -275,6 +293,11 @@ function V4AskForm({
   const [declinedAtNext, setDeclinedAtNext] = useState(false);
   // read-f17: the refusal says one question already waits (shown only while the room notice does not say it).
   const [refusalWaits, setRefusalWaits] = useState(false);
+  // Task 75b (ask-d2 A, "Steps aside"): on a phone step 1's Next sits in the bottom bar, which steps aside while the question
+  // box has focus, so the keyboard never covers the box. The level block's "What does it change?" opens the honest note.
+  const narrow = useNarrow();
+  const [boxFocused, setBoxFocused] = useState(false);
+  const [levelWhatOpen, setLevelWhatOpen] = useState(false);
 
   // Owner 2026-10-29 (Free plan shape): a Free ask carries at most FREE_GOAL_CHOICES_MAX choices; paid plans have no cap.
   // Once Free's cap is reached, only the choices already set can still be changed. What is sent never carries more.
@@ -438,12 +461,6 @@ function V4AskForm({
     if (savedLevel === null && levelKnown) saveLevel(draftLevel);
   }
 
-  /** The header menu saves at once (and so hides the D1 chips). */
-  function chooseLevelNow(next: ReadingLevel) {
-    setDraftLevel(next);
-    saveLevel(next);
-  }
-
   async function start(questionLine: string, askMode: DigMode, which: "start" | "quick", basis: string) {
     if (busy || startFlight.current) return;
     startFlight.current = true;
@@ -565,7 +582,9 @@ function V4AskForm({
 
   // ask-d1 / ask-d6 A: the header knows the session from this page, so a signed-out visitor reads "Sign in" at its end (the
   // way back is this page) and a signed-in person the round account button. ask-f6 / journey-f19: no classic link here.
-  const header = <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} session={session} />;
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level is chosen only here, for this question (the step-1 level block);
+  // the header offers no level change.
+  const header = <V4Header catalog={catalog} readingLevel={savedLevel} session={session} />;
   // read-f17: one line, never both: while the room notice says one question already waits, its refusal adds nothing.
   const refusalAlert = refusal === null || (refusalWaits && waitingShown) ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
 
@@ -606,6 +625,8 @@ function V4AskForm({
                 if (refusal !== null) setRefusal(null);
               }}
               onKeyDown={pressOnEnter}
+              onFocus={() => setBoxFocused(true)}
+              onBlur={() => setBoxFocused(false)}
               placeholder={t(catalog, "v4.ask.questionPlaceholder")}
               aria-labelledby={`${ids}-title`}
               aria-describedby={stepOneWhy}
@@ -618,8 +639,9 @@ function V4AskForm({
           {savedLevel === null && levelKnown ? (
             <fieldset className="v4AskLevels">
               <legend className="v4AskLegend">{t(catalog, "v4.ask.levelLegend")}</legend>
-              {/* ask-f15: one choice of three (native radios: arrow keys move and choose, in either writing direction). */}
-              <div className="v4AskChips">
+              {/* ask-f15: one choice of three (native radios: arrow keys move and choose, in either writing direction); Task 75b
+                  (ask-d2): the three pills in one row. */}
+              <div className="v4AskChips v4AskLevelRow">
                 {READING_LEVELS.map((option) => (
                   <label key={option} className="v4Chip v4AskLevelChip" data-checked={option === draftLevel}>
                     <input
@@ -634,70 +656,79 @@ function V4AskForm({
                   </label>
                 ))}
               </div>
-              <p className="v4AskSample" aria-live="polite">
-                <span className="v4Eyebrow v4AskSampleLabel">{t(catalog, "v4.ask.levelShowsLabel")}</span>
-                {t(catalog, SHOWS_KEYS[draftLevel])}
+              {/* Task 75b (ask-d2): one changing sentence, with no label box. */}
+              <p className="v4AskSample" aria-live="polite">{t(catalog, SHOWS_KEYS[draftLevel])}</p>
+              {/* Task 75b (owner answer Q15, 5 Nov): the level belongs to this question, one grey line says so; "What does it
+                  change?" opens the honest note in place, and closes it again. */}
+              <p className="v4AskHint v4Muted v4AskLevelKept">
+                {t(catalog, "v4.ask.levelKept")}{" "}
+                <button
+                  type="button"
+                  className="v4Link v4AskLevelWhat"
+                  aria-expanded={levelWhatOpen}
+                  aria-controls={`${ids}-honest`}
+                  onClick={() => setLevelWhatOpen((open) => !open)}
+                >
+                  {t(catalog, "v4.ask.levelWhat")}
+                </button>
               </p>
-              <p className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelNote")}</p>
-              <p className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelHonest")}</p>
+              {levelWhatOpen ? <p id={`${ids}-honest`} className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelHonest")}</p> : null}
             </fieldset>
           ) : levelKnown ? null : (
-            // ask-f16: the level choice's place is held (a faint shape) until the account says whether it is needed.
-            <div className="v4AskLevelsHold" aria-hidden="true" />
+            // ask-f16: the level choice's place is held until the account says whether it is needed; Task 75b (ask-d2): in the new
+            // block's shape, a faint legend bar, three faint pill outlines in one row and two faint text lines.
+            <div className="v4AskLevelsHold" aria-hidden="true">
+              <span className="v4AskLevelsHoldBar" />
+              <span className="v4AskLevelsHoldPills">
+                <span className="v4AskLevelsHoldPill" />
+                <span className="v4AskLevelsHoldPill" />
+                <span className="v4AskLevelsHoldPill" />
+              </span>
+              <span className="v4AskLevelsHoldLine" />
+              <span className="v4AskLevelsHoldLine" />
+            </div>
           )}
 
-          {publicNotice}
-          <div className="v4AskActions">
-            {signedOut ? (
-              // ask-d1 A, until the start-step's sign-in panel: both go to sign in, with the way back to this page.
-              <>
-                <a ref={signInNext} className="v4Btn v4BtnPrimary" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
-                  {t(catalog, "v4.ask.continue")}
-                </a>
-                <p id={`${ids}-signin`} className="v4AskHint v4Muted v4AskSignInFirst">{t(catalog, "v4.ask.signInFirst")}</p>
-                <a className="v4Link v4AskJust" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
-                  {t(catalog, "v4.ask.justAnswer")}
-                </a>
-              </>
-            ) : (
-              <>
-                {/* Task 70b: busy and still "Next" while the consent window is open, "Reading…" once it is given. */}
-                <button
-                  type="button"
-                  className="v4Btn v4BtnPrimary"
-                  onClick={() => void goOn()}
-                  disabled={nextGreyed}
-                  aria-busy={nextPress !== "IDLE"}
-                  aria-describedby={stepOneWhy}
-                >
-                  {nextPress === "READING" ? t(catalog, "v4.ask.reading")
-                    : gettingReady ? t(catalog, "v4.ask.gettingReady") : t(catalog, "v4.ask.continue")}
-                </button>
-                {/* ask-f8: after a declined consent, right under Next, in normal text; "Show it again" is a fresh press of Next. */}
-                {declinedAtNext ? (
-                  <p className="v4AskDeclined v4AskUnderNext" role="status">
-                    {t(catalog, "v4.ask.consentDeclined")}{" "}
-                    <button type="button" className="v4Link" onClick={() => void goOn()}>{t(catalog, "v4.ask.consentShowAgain")}</button>
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  className="v4Link v4AskJust"
-                  onClick={justAnswer}
-                  disabled={justGreyed}
-                  aria-busy={pressed === "quick"}
-                  aria-describedby={stepOneWhy}
-                >
-                  {pressed === "quick" ? t(catalog, "v4.ask.starting")
-                    : gettingReady ? t(catalog, "v4.ask.gettingReady") : t(catalog, "v4.ask.justAnswer")}
-                </button>
-                {/* r2-4: the grey quota line under Next, on every visit. */}
-                <p className="v4AskHint v4Muted v4AskQuotaNote v4AskUnderNext">{t(catalog, "v4.ask.readingUsesQuota")}</p>
-              </>
-            )}
-          </div>
-          {stepOneRoomLines}
-          {refusalAlert}
+          {/* Task 75b (ask-d2 A, journey-d3 A): step 1's buttons through the bottom bar. On a phone Next sits pinned at the bottom
+              like Start, with the Free notice and the lines under Next; on a computer it is one plain row under the level block.
+              ask-d1 A, until the start-step's sign-in panel: signed out, both go to sign in, with the way back to this page. */}
+          <V4StartBar
+            job="NEXT"
+            catalog={catalog}
+            locale={locale}
+            freePlan={ask.planIsFree}
+            narrow={narrow}
+            textFocused={boxFocused}
+            helpFirst={!signedOut && helpFirst}
+            publicNotice={publicNotice}
+            next={signedOut
+              ? { label: t(catalog, "v4.ask.continue"), disabled: false, busy: false, describedBy: `${ids}-signin`, href: signInHref,
+                linkRef: signInNext, onPress: (event) => { if (event !== undefined) helpBeforeSignIn(event as MouseEvent<HTMLAnchorElement>); } }
+              // Task 70b: busy and still "Next" while the consent window is open, "Reading…" once it is given.
+              : { label: nextPress === "READING" ? t(catalog, "v4.ask.reading")
+                : gettingReady ? t(catalog, "v4.ask.gettingReady") : t(catalog, "v4.ask.continue"),
+              disabled: nextGreyed, busy: nextPress !== "IDLE", ...(stepOneWhy === undefined ? {} : { describedBy: stepOneWhy }),
+              onPress: () => void goOn() }}
+            justAnswer={signedOut
+              ? { shown: true, ready: true, describedBy: `${ids}-signin`, href: signInHref,
+                onPress: (event) => { if (event !== undefined) helpBeforeSignIn(event as MouseEvent<HTMLAnchorElement>); } }
+              : { shown: true, ready: !justGreyed, busy: pressed === "quick", ...(stepOneWhy === undefined ? {} : { describedBy: stepOneWhy }),
+                label: pressed === "quick" ? t(catalog, "v4.ask.starting")
+                  : gettingReady ? t(catalog, "v4.ask.gettingReady") : t(catalog, "v4.ask.justAnswer"),
+                onPress: justAnswer }}
+            // ask-f8: after a declined consent, right under Next, in normal text; "Show it again" is a fresh press of Next.
+            declined={!signedOut && declinedAtNext ? (
+              <p className="v4AskDeclined v4AskUnderNext" role="status">
+                {t(catalog, "v4.ask.consentDeclined")}{" "}
+                <button type="button" className="v4Link" onClick={() => void goOn()}>{t(catalog, "v4.ask.consentShowAgain")}</button>
+              </p>
+            ) : null}
+            // r2-4: the grey quota line under Next, on every visit; signed out, the sign-in line.
+            under={signedOut
+              ? <p id={`${ids}-signin`} className="v4AskHint v4Muted v4AskSignInFirst">{t(catalog, "v4.ask.signInFirst")}</p>
+              : <p className="v4AskHint v4Muted v4AskQuotaNote v4AskUnderNext">{t(catalog, "v4.ask.readingUsesQuota")}</p>}
+            above={<>{stepOneRoomLines}{refusalAlert}</>}
+          />
 
           {firstVisit ? <V4MapSeed question={question} catalog={catalog} /> : null}
           <V4MapShelf load={shelf.load} catalog={catalog} locale={locale} level={savedLevel} />

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { basisKey, OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
-import { DIG_LEVEL_MAX, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
+import { DIG_LEVEL_MAX, MAIN_ANSWER_TRIGGERS, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
 
 /*
  * V4 initial (2026-10-28): the v4 namespace has no English backstop in t() (only chrome/home/newDebate/support/time
@@ -478,7 +478,159 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.ask.gettingReady",
   "v4.ask.readingUsesQuota",
   "v4.ask.consentDeclined",
-  "v4.ask.consentShowAgain"
+  "v4.ask.consentShowAgain",
+  // V4 start step, Task 75 (read-d5, choose-f16, read-f24, choose-f4, choose-f10, r2-3; the spec's words, shown at the
+  // click-test): the bottom bar's "You'll get", its path count, How wide, Start's words, the carry-on box, the ready note
+  // and the phone's Options sheet.
+  "v4.start.youGet.one",
+  "v4.start.youGet.other",
+  "v4.start.youGetExpert.one",
+  "v4.start.youGetExpert.other",
+  "v4.start.pathCount.one",
+  "v4.start.pathCount.other",
+  "v4.start.howWide",
+  "v4.start.pathsComing",
+  "v4.start.start",
+  "v4.start.writingWait",
+  "v4.start.carryOn",
+  "v4.start.readyNote",
+  "v4.start.options",
+  "v4.start.optionsDone",
+  // V4 start step, Task 75b (ask-d2; the owner's words, record :168, shown at the click-test): the level block's button that
+  // opens the honest note. Its grey line v4.ask.levelKept is not here: the owner approved it on 5 Nov (answer Q15).
+  "v4.ask.levelWhat",
+  // V4 start step, Task 72 (choose-d3, choose-f6, choose-f7, choose-d4; the spec's words and draft wording, shown at the
+  // click-test): the path rows, their chips, tags and ⋯ menus, Rewrite and its question, and the combine line.
+  "v4.start.row.a11y",
+  "v4.start.row.viewpoints.one",
+  "v4.start.row.viewpoints.other",
+  "v4.start.row.notSelected",
+  "v4.start.row.picked",
+  "v4.start.row.together.other",
+  "v4.start.row.more",
+  "v4.start.chip.a11y",
+  "v4.start.tag.PUT_TOGETHER_BY_US",
+  "v4.start.tag.COMBINED_BY_YOU",
+  "v4.start.tag.ADDED_BY_YOU",
+  "v4.start.tag.ADDED_WHEN_WIDENED",
+  "v4.start.tag.new",
+  "v4.start.tag.split",
+  "v4.start.menu.rewrite",
+  "v4.start.menu.combineWith",
+  "v4.start.menu.split",
+  "v4.start.menu.moveUp",
+  "v4.start.menu.moveDown",
+  "v4.start.menu.remove",
+  "v4.start.chipMenu.label",
+  "v4.start.chipMenu.moveTo",
+  "v4.start.chipMenu.ownPath",
+  "v4.start.chipMenu.remove",
+  "v4.start.rewrite.open",
+  "v4.start.rewrite.title",
+  "v4.start.rewrite.wording",
+  "v4.start.rewrite.save",
+  "v4.start.rewrite.cancel",
+  "v4.start.writing",
+  "v4.start.reword.changed",
+  "v4.start.reword.rewrite",
+  "v4.start.reword.keep",
+  "v4.start.combineWith.pick",
+  "v4.start.combineWith.rowA11y",
+  "v4.start.combineWith.cancel",
+  // V4 start step, Task 55e (spec §4.4; draft wording, shown at the click-test): the main answer updated because a dig of a path
+  // left out before Start added it to the question.
+  "v4.mainAnswer.trigger.PATH_ADDED",
+  "v4.answerCard.updated.PATH_ADDED",
+  // V4 start step, Task 73 (read-d4, choose-d1, choose-f2, choose-f4, choose-f5, choose-f7, choose-f8, choose-f11, choose-f15,
+  // choose-f16; the spec's words and draft wording, shown at the click-test; the refusals in the owner's answer "Four per path"
+  // A words): the card's title and lines, the waiting band, why a list is missing, the notices, your own path, the full-list
+  // choice and the refusals.
+  "v4.start.title",
+  "v4.start.freeLine.one",
+  "v4.start.freeLine.other",
+  "v4.start.reloadLine",
+  "v4.start.phase.CHECKING",
+  "v4.start.phase.LANGUAGE_CHOICE",
+  "v4.start.phase.READING",
+  "v4.start.phase.MERGING",
+  "v4.start.answered",
+  "v4.start.morePlaces",
+  "v4.start.readyAnnounce.one",
+  "v4.start.readyAnnounce.other",
+  "v4.start.lateIdeas",
+  "v4.start.lateIdeasAnnounce",
+  "v4.start.none.PASSING",
+  "v4.start.none.NOT_OFFERED",
+  "v4.start.none.TOO_SLOW",
+  "v4.start.none.OFFLINE",
+  "v4.start.none.SIGNED_OUT",
+  "v4.start.none.QUOTA",
+  "v4.start.refused",
+  "v4.start.answersFolded",
+  "v4.start.showQuestions",
+  "v4.start.undo",
+  "v4.start.combinedAnnounce.one",
+  "v4.start.combinedAnnounce.other",
+  "v4.start.combinedAnnounceMonth.one",
+  "v4.start.combinedAnnounceMonth.other",
+  "v4.start.combinedAnnounceNoShare.one",
+  "v4.start.combinedAnnounceNoShare.other",
+  "v4.start.notice.combined",
+  "v4.start.notice.combineFailed",
+  "v4.start.notice.madeRoom.one",
+  "v4.start.notice.madeRoom.other",
+  "v4.start.notice.narrowed.one",
+  "v4.start.notice.narrowed.other",
+  "v4.start.own.label",
+  "v4.start.own.hint",
+  "v4.start.own.add",
+  "v4.start.own.finding",
+  "v4.start.own.fits",
+  "v4.start.own.addThere",
+  "v4.start.own.ownPath",
+  "v4.start.full.wider",
+  "v4.start.full.widest",
+  "v4.start.full.free",
+  "v4.start.full.addTo",
+  "v4.start.full.swap",
+  "v4.start.full.path",
+  "v4.start.full.cancel",
+  "v4.start.refusal.VIEWPOINTS_FULL",
+  "v4.start.refusal.OWN_WORDS_FULL",
+  "v4.start.refusal.EMPTY",
+  "v4.start.refusal.TOO_LONG",
+  "v4.start.refusal.LAST_PATH",
+  // V4 start step, Task 74 (choose-f18, choose-f6, choose-f7; the spec's words and draft wording, shown at the click-test):
+  // "+ N more to explore" and its drawer, "Another way to see it" with its kinds and "Make this my question", the one-tap
+  // suggestions, and the lines that say where a new path went.
+  "v4.start.more.open",
+  "v4.start.more.title",
+  "v4.start.more.done",
+  "v4.start.more.useful",
+  "v4.start.more.directions",
+  "v4.start.more.byArea",
+  "v4.start.more.addedByYou",
+  "v4.start.lookInto",
+  "v4.start.added.to",
+  "v4.start.added.asPath",
+  "v4.start.ways.title",
+  "v4.start.ways.kind.CHOICE_NOT_WEIGHED",
+  "v4.start.ways.kind.EITHER_OR",
+  "v4.start.ways.kind.WHAT_WOULD_CHANGE_IT",
+  "v4.start.ways.kind.OTHER_READING",
+  "v4.start.ways.addTo",
+  "v4.start.ways.addAsPath",
+  "v4.start.ways.makeMine",
+  "v4.start.ways.swapped",
+  "v4.start.ways.swappedNow",
+  "v4.start.ways.noRoom",
+  "v4.start.suggest.label",
+  "v4.start.suggest.combine",
+  "v4.start.suggest.combineButton",
+  "v4.start.suggest.keepApart",
+  "v4.start.suggest.fits",
+  "v4.start.suggest.addTo",
+  "v4.start.suggest.notNow"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -524,7 +676,9 @@ describe("V4 catalogue keys", () => {
       ...TRUST_BASES.map(basisKey),
       ...["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"].map((fate) => `v4.fate.${fate}`),
       ...READING_LEVELS.map((level) => `v4.readingLevel.${level}`),
-      ...DIG_MODES.map((mode) => `v4.digMode.${mode}`)
+      ...DIG_MODES.map((mode) => `v4.digMode.${mode}`),
+      // V4 start step, Task 55e: the main answer's line and the answer card's line for every trigger, PATH_ADDED's included.
+      ...MAIN_ANSWER_TRIGGERS.flatMap((trigger) => [`v4.mainAnswer.trigger.${trigger}`, `v4.answerCard.updated.${trigger}`])
     ];
     expect(built.filter((key) => !(key in catalog))).toEqual([]);
     // Every key built at run time from a literal stem ("v4.x.${…}") has at least one catalogue key under that stem, and a

@@ -425,6 +425,11 @@ export function previewDebateHarness(input: Readonly<{
        * settled run gets its story).
        */
       pathRewrite?: boolean;
+      /**
+       * V4 start step, Task 54d: the story writer's charts and tables call (one call after every accepted story), switched on as
+       * main.ts and the practice runner switch it on; absent, off, as this harness has always composed its story writer.
+       */
+      charts?: boolean;
     }> = {}
   ) {
     const own = await runnerPool();
@@ -541,7 +546,9 @@ export function previewDebateHarness(input: Readonly<{
         const member = [topology.primary, ...(topology.critique === undefined ? [] : [topology.critique]), ...topology.additionalMakers]
           .find((candidate) => candidate.providerRef === roleRef);
         return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
-      }
+      },
+      // Task 54d, as main.ts: one chart call after every accepted story, only when asked.
+      ...(options.charts === true ? { charts: true } : {})
     });
     const observe = (target: ProviderDiscoveryTarget) => claim === "resend"
       ? observeClaimTimeTarget({

@@ -400,6 +400,13 @@ const PROBE_QUESTION = "Reply exactly: OK";
  * turns, so it is put back in front of them (the adapter only lifted it out). Prompt caching (2026-10-12): a system
  * sent as the two cache blocks is their texts joined, which is the system text byte for byte. Length guidance L30
  * (LG-B): a first user turn sent as marked text blocks is their texts joined, the turn byte for byte.
+ *
+ * V4 start step, Task 54d: the Anthropic wire joins consecutive user messages into one turn, so a repair packet's rejection block
+ * (the format repair's full re-ask, a story's repair) travels in the same turn as the material. Each user turn is read back as the
+ * packet's own user messages (`packetUserMessagesOf`), one fenced block each, so the frame reader sees every block, the repair's
+ * included. Before, such a turn was one message of two blocks: the frame reader refused it, so a path root's re-ask on Haiku was an
+ * UNKNOWN request (a billed 500), and a cache-split story's repair threw here, inside the gate's request handler, which then never
+ * answered.
  */
 export function stubChatBody(provider: GateProvider, body: Readonly<Record<string, unknown>>): string {
   if (provider === "deepinfra") return JSON.stringify(body);
@@ -412,16 +419,37 @@ export function stubChatBody(provider: GateProvider, body: Readonly<Record<strin
     // The two fenced parts are one material: one block again, as a frame reader expects.
     const fence = shared!.slice(0, shared!.indexOf("\n"));
     const envelope = (text: string) => JSON.parse(text.slice(text.indexOf(fence) + fence.length, text.lastIndexOf(fence))) as { fields: unknown[] };
+    // Task 54d: the rest of the material, then each user message the wire joined after it (a repair's rejection block), each its own again.
+    const [own, ...later] = packetUserMessagesOf(rest!.trimStart());
     const whole = envelope(shared!);
-    whole.fields.push(...envelope(rest!).fields);
-    return JSON.stringify({ messages: [{ role: "system", content: instructions!.trimStart() }, { role: "user", content: `${fence}\n${JSON.stringify(whole)}\n${fence}` }, ...(body.messages as unknown[]).slice(1)] });
+    whole.fields.push(...envelope(own!.content).fields);
+    return JSON.stringify({ messages: [{ role: "system", content: instructions!.trimStart() }, { role: "user", content: `${fence}\n${JSON.stringify(whole)}\n${fence}` }, ...later, ...(body.messages as unknown[]).slice(1)] });
   }
-  const turns = (Array.isArray(body.messages) ? body.messages : []).map((turn: { role?: unknown; content?: unknown }) =>
-    Array.isArray(turn?.content) ? { role: turn.role, content: joined(turn.content as { text?: unknown }[]) } : turn);
+  const turns = (Array.isArray(body.messages) ? body.messages : []).flatMap((turn: { role?: unknown; content?: unknown }): unknown[] => {
+    const content = Array.isArray(turn?.content) ? joined(turn.content as { text?: unknown }[]) : turn?.content;
+    // Task 54d: a user turn is the packet's own user messages again; any other turn as before.
+    if (turn?.role === "user" && typeof content === "string") return packetUserMessagesOf(content);
+    return [Array.isArray(turn?.content) ? { role: turn.role, content } : turn];
+  });
   const system = typeof body.system === "string" ? body.system
     : Array.isArray(body.system) ? joined(body.system as { text?: unknown }[])
       : undefined;
   return JSON.stringify({ messages: system !== undefined ? [{ role: "system", content: system }, ...turns] : turns });
+}
+
+/**
+ * Task 54d: one user turn of an Anthropic body as the packet's user messages it was joined from. A framed packet's user message is
+ * one fenced block (the fence line, the material's one-line JSON envelope, the fence line again), and the wire joins consecutive
+ * ones with a blank line; so a turn of such blocks is split back into them, one message each. A turn that is not such blocks (the
+ * probe's question), or one block, is one message, as before. Only a split that joins back to the turn byte for byte is taken.
+ */
+function packetUserMessagesOf(text: string): { role: "user"; content: string }[] {
+  const lines = text.split("\n");
+  const fence = lines[0] ?? "";
+  const blocks: string[] = [];
+  for (let at = 0; fence !== "" && lines[at] === fence && lines[at + 2] === fence; at += 4) blocks.push(lines.slice(at, at + 3).join("\n"));
+  const split = blocks.length > 0 && blocks.join("\n\n") === text ? blocks : [text];
+  return split.map((content) => ({ role: "user" as const, content }));
 }
 
 /** Which contract a request is for: the probe by its question, the story by its contract id, the debate by structural keys. */

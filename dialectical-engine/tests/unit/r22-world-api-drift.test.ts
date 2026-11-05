@@ -56,12 +56,15 @@ describe("r22-world composes the step before Start as apps/api/src/main.ts compo
     }
   });
 
-  it("both hand buildApi the step, its key, the chosen paths store and (Task 56b) the person's own closings reader", () => {
+  it("both hand buildApi the step, its key, the chosen paths store, (Task 56b) the person's own closings reader and (Task 56) the carry-on's marks and room", () => {
     for (const [name, source] of [["main.ts", API_MAIN], ["r22-world.ts", R22_WORLD]] as const) {
       const api = objectAfter(source, "buildApi({");
-      for (const key of ["startStep", "startStepKey", "startPaths", "ownClosings"]) expect(api.has(key), `${name}: ${key}`).toBe(true);
+      for (const key of ["startStep", "startStepKey", "startPaths", "ownClosings", "carryOn", "carryOnRoom"]) expect(api.has(key), `${name}: ${key}`).toBe(true);
       // Task 53a's counts, read on the API's own pool (the one login 0159 grants identity.count_public_reports).
       expect(flat(source), name).toContain("ownClosings: new PostgresOwnClosingsReader(");
+      // Task 56: the carry-on's marks are the ONE chosen paths store, and its room the one room the API reads (`askRoom`).
+      expect(flat(source), name).toContain("carryOn: startPaths,");
+      expect(flat(source), name).toMatch(/carryOnRoom: askRoom\b/u);
     }
   });
 

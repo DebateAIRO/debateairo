@@ -115,6 +115,10 @@ describe("side-by-side C7 the API's background loops run only on the current rel
     // The ask waker plus its stalled-start re-send: the whole-minute tick is gated, the waker itself is unchanged.
     expect(main).toContain("everyWholeMinute(gatedTrigger(");
     expect(main).toContain("askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));");
+    // V4 start step, Task 56: the carry-on's whole-minute tick, single flight and gated the same way, stopped on close.
+    expect(main).toContain("carryOnLoop = everyWholeMinute(gatedTrigger(releaseWatcher, triggerCarryOn));");
+    expect(main).toContain("const triggerCarryOn = createSingleFlightErasureReconciler(async () => { await api.carryOnTick(); }, () => console.error(\"[CARRY_ON_TICK_PENDING]\"));");
+    expect(main).toContain("api.addHook(\"onClose\",async () => carryOnLoop?.stop());");
   });
 
   it("hands each runtime's start the watcher as its `when`", () => {

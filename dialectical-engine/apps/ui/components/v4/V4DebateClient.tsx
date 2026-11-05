@@ -97,7 +97,7 @@ import {
   suggestionPick,
   togglePick as toggleDraftPick
 } from "@/lib/v4/suggestions";
-import { levelHref, useReadingLevel } from "@/lib/v4/storage";
+import { levelHref } from "@/lib/v4/storage";
 import type {
   DigLink,
   DigMode,
@@ -209,7 +209,10 @@ export type V4DebateClientProps = Readonly<{
   id: string;
   /** W4-6: the path the address names (`?path=`, a link back from a dig), opened in the panel at first; null: none. */
   initialPath?: string | null;
-  /** The reading level the address names (`?level=`), or null. */
+  /**
+   * The reading level the address names (`?level=`), or null. V4 start step, Task 75c (owner answer Q15, 5 Nov): no longer read;
+   * the page shows the debate's own level, as its run read says.
+   */
   initialLevel: ReadingLevel | null;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -325,7 +328,6 @@ function visitNews(stored: Readonly<Record<string, string>>, now: Readonly<Recor
 function V4Debate({
   id,
   initialPath = null,
-  initialLevel,
   catalog,
   homeCatalog,
   newDebateCatalog,
@@ -334,8 +336,6 @@ function V4Debate({
   crisisCountryHint
 }: V4DebateClientProps) {
   const layout = useLayout();
-  const [chosenLevel, chooseLevel, levelKnown] = useReadingLevel(initialLevel);
-  const readingLevel: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
   const [digMode, setDigMode] = useState<DigMode>("quick");
 
   // ── The debate: poll the run until it is served or failed ─────────────────────────────────────────────────────────
@@ -346,6 +346,13 @@ function V4Debate({
   const [load, setLoad] = useState<V4Load | null>(null);
   const [loadProblem, setLoadProblem] = useState<LoadProblem | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level belongs to the question. The page shows the debate at the level it
+  // was asked at, as its run read says (lib/v4/load.ts); the address's `?level=` and the account's saved level no longer change it,
+  // and nothing on this page changes it. A debate asked without one reads as the default level, as today. Links carry its own level.
+  const debateLevel: ReadingLevel | null = load === null ? null : load.kind === "RUN" ? load.run.reading_level ?? null : load.level ?? null;
+  const readingLevel: ReadingLevel = debateLevel ?? DEFAULT_LEVEL;
+  /** The level is known once the debate was read (map-f6: no level shows before). */
+  const levelKnown = load !== null;
   useWaitPolling(async (stillWanted) => {
     try {
       const next = await loadV4(id);
@@ -1032,7 +1039,7 @@ function V4Debate({
   const report = useMapReport({
     runId, servedRunId, isDig, answer: served?.answer,
     free: map?.webNote === "FREE" || planTier === "free", sharesShown: planTier !== "free",
-    digsKey: linkKey, level: chosenLevel, onReady: () => reportReady.current(), barJobRef, catalog, locale
+    digsKey: linkKey, level: debateLevel, onReady: () => reportReady.current(), barJobRef, catalog, locale
   });
   const reportAnswer = report.answer;
 
@@ -1341,8 +1348,9 @@ function V4Debate({
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice); the report
-  // link is made above, with the ready moments.
-  const askHref = levelHref("/v4", chosenLevel);
+  // link is made above, with the ready moments. Task 75c: the debate's own level is no choice for the next question, so the ask
+  // page's link carries none (step 1 offers the account's level, as before).
+  const askHref = levelHref("/v4", null);
   // wait-f23 / ask-f6 / journey-f19 (owner's screen review): "Open in the classic view" shows once. While the question
   // waits, is paused or did not finish, it is at the bottom of that screen; otherwise in the header's account menu.
   const classicInBody = map === null && load?.kind === "RUN";
@@ -1359,8 +1367,9 @@ function V4Debate({
     <V4Header
       catalog={catalog}
       readingLevel={levelSettled ? readingLevel : null}
-      linkLevel={chosenLevel}
-      onReadingLevel={chooseLevel}
+      // Task 75c review: the header's links (its brand link to the ask page, the account menu's "All my maps") lead to the next
+      // question, so, like askHref, they carry no level: step 1 offers the account's level there, never this debate's.
+      linkLevel={null}
       classicHref={classicInBody ? null : classicHref}
       after={served !== null ? report.headerStrip : null}
     >
@@ -1422,11 +1431,11 @@ function V4Debate({
             // Owner review 3 Nov (wait-f11, map-f30): "Ask this again" fills the ask step from this debate; a dig leads back to its map.
             <V4FailedScreen
               run={load.run}
-              askAgainHref={levelHref(askAgainHref(runId), chosenLevel)}
+              askAgainHref={levelHref(askAgainHref(runId), debateLevel)}
               askHref={askHref}
               classicHref={classicHref}
               dig={isDigPage || recordParent !== null
-                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel) }
+                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, debateLevel) }
                 : null}
               catalog={catalog}
               homeCatalog={homeCatalog}
@@ -1524,7 +1533,7 @@ function V4Debate({
   const rail = (variant: "column" | "strip" | "marks" | "notes" | "steps") => (
     <V4Rail
       runId={runId}
-      level={chosenLevel}
+      level={debateLevel}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
@@ -1721,7 +1730,7 @@ function V4Debate({
         ) : null}
         <div className="v4DebMain">
           {parent !== null ? (
-            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel)}>
+            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, debateLevel)}>
               <span aria-hidden="true">‹</span>{" "}
               {parent.question.length > 0 ? (
                 <>
@@ -1733,7 +1742,7 @@ function V4Debate({
           ) : null}
           {/* W4-6: a dig's map says where it sits; the top of every map, how many paths changed since the answer. */}
           {view.dig !== null && view.dig !== undefined ? (
-            <V4LevelTrail level={view.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
+            <V4LevelTrail level={view.dig.level} trail={trail} linkLevel={debateLevel} catalog={catalog} />
           ) : null}
           <V4PublicMark stage={publicStage} catalog={catalog} />
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
@@ -1820,7 +1829,7 @@ function V4Debate({
                 digs={digs}
                 selected={shownSelection}
                 readingLevel={readingLevel}
-                linkLevel={chosenLevel}
+                linkLevel={debateLevel}
                 picked={picked}
                 onTogglePick={togglePick}
                 onSelect={select}

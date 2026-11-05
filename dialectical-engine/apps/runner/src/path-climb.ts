@@ -35,6 +35,11 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *  3. At the first debate a change means the main answer is next (`updateMainAnswer`): the report's own answer step and check, on the
  *     report's own prompts (packages/story `writeOverallAnswer`), the whole tree as material, the version before it as the earlier
  *     answer; one version per trigger, sealed under the ROOT's key (0138's `record_main_answer_update`). A FAILED version changes nothing.
+ *  4. V4 start step, Task 55e (spec §4.4): a dig under the main question of a path debate (a path left out before Start, "+ N more") is
+ *     a new first-level path once each of its paths has its answer so far (`addedPathOf`). It writes no rewrite, so it updates the main
+ *     answer itself, its trigger the dig (0162's PATH_ADDED), once its story is written (`advanceTree` with no rewrite of its own); and a
+ *     change of one of its paths is a first-level change: a climb that reaches it updates the main answer instead of stopping there.
+ *     A first debate, an R22 dig under the question and a runner without the read do as before.
  *
  * MONEY: every call names the run of the dig that started the climb, whoever dug it: `digRunId` is the only thing that says who pays
  * (PATH_CLIMB and ANSWER_UPDATE, charged on the story lane, never walled: a dig that started always gets its rewrites).
@@ -107,7 +112,13 @@ function uuidOf(seed: string): string {
 export type ClimbChild = Readonly<{ picks: readonly PathRewritePick[]; digPaths: readonly PathRewriteDigPath[] }>;
 
 /** What a main-answer version seals, under the root's key. */
-export type MainAnswerContent = Readonly<{ v: 1; segments: readonly string[]; position_ref: string; trigger: "PATH_REWRITE" | "CHILD_PATH" }>;
+export type MainAnswerContent = Readonly<{ v: 1; segments: readonly string[]; position_ref: string; trigger: "PATH_REWRITE" | "CHILD_PATH" | "PATH_ADDED" }>;
+
+/**
+ * V4 start step, Task 55e: a dig under the main question of a path debate, as the first debate's new first-level path. `positionRef`
+ * names the path as the investigation does (the item its pick named, "more-kp07"; else `<b n>@<dig run>`); `free` is the dig's plan.
+ */
+export type AddedPath = Readonly<{ rootRunId: string; positionRef: string; free: boolean }>;
 
 export type TreeUpdatePorts = Readonly<{
   tree: Pick<PostgresTreeUpdateRunnerRepository, "takeTurn" | "readTurn" | "record" | "readLine" | "readClimbNext" | "recordMainAnswer" | "readMainAnswers" | "markDigSettled">;
@@ -129,6 +140,12 @@ export type TreeUpdatePorts = Readonly<{
   /** What this dig has been charged for answer updates (spend source ANSWER_UPDATE). */
   answerSpentMicros: (digRunId: string) => Promise<number>;
   replayBookOf?: (runId: string, subjectItemId: string) => Promise<ReplayBook>;
+  /**
+   * V4 start step, Task 55e: `runId` as a first-level path of its first debate (a private dig under that debate's main question, both
+   * path debates, each of the dig's paths with its answer so far), `pathRef` the dig's own path that changed (null: the dig's first).
+   * Null for anything else. Absent (the public tree's ports): none, as before.
+   */
+  addedPathOf?: (runId: string, pathRef: string | null) => Promise<AddedPath | null>;
 }>;
 
 export type TreeUpdateSettings = Readonly<{
@@ -198,12 +215,16 @@ export type ClimbStart = Readonly<{
   step: number;
 }>;
 
-/** A dig's own rewrite is stored: climb, and update the main answer, as far as the change goes. Never rejects. */
+/**
+ * A dig's own rewrite is stored: climb, and update the main answer, as far as the change goes. V4 start step, Task 55e: a run with no
+ * rewrite of its own that is a first-level path its dig added (`addedPathOf`) updates the main answer itself (`addedPathUpdate`). Never
+ * rejects.
+ */
 export async function advanceTree(settings: TreeUpdateSettings, digRunId: string, lease: StepLease = BARE_STEP): Promise<TreeAdvance> {
   const log = safeLog(settings);
   try {
     const own = await settings.ports.ownRewriteOf(digRunId);
-    if (own === null) return "NOTHING";
+    if (own === null) return await addedPathUpdate(settings, digRunId, lease);
     if (!finishedState(own.entry.state)) {
       // A failed rewrite leaves the path as it was and starts no climb: the dig has ended too.
       if (own.entry.state === "FAILED") await settings.ports.tree.markDigSettled(digRunId);
@@ -218,6 +239,41 @@ export async function advanceTree(settings: TreeUpdateSettings, digRunId: string
     log("PATH_CLIMB_NOT_RECORDED", { runId: digRunId, code: codeOf(error) });
     return "LEFT";
   }
+}
+
+/**
+ * V4 start step, Task 55e: THE HOOK once a run's story is written (index.ts's after-settle branch, through the path rewrite's settings). A
+ * run that gets a story writes no rewrite (a first debate, or a dig under the main question), so only the added path is asked: a dig under
+ * the main question of a path debate updates the main answer; anything else does nothing. Held in the shared in-flight set, so the sweep
+ * never writes the same update beside it (paid twice). Never rejects; logs codes and ids only.
+ */
+export async function advanceAfterStory(settings: TreeUpdateSettings, runId: string, lease: StepLease = BARE_STEP): Promise<TreeAdvance> {
+  const release = settings.inFlight === undefined ? () => undefined : settings.inFlight.begin(runId);
+  if (release === null) return "LEFT";
+  try {
+    return await addedPathUpdate(settings, runId, lease);
+  } catch (error) {
+    safeLog(settings)("MAIN_ANSWER_ADDED_PATH_NOT_RECORDED", { runId, code: codeOf(error) });
+    return "LEFT";
+  } finally {
+    release();
+  }
+}
+
+/**
+ * V4 start step, Task 55e (spec §4.4): a dig under the main question of a path debate added a first-level path, and the main answer
+ * updates as for any first-level change, written by the same Overall-view writer and paid by the dig. Its trigger is the dig itself
+ * (PATH_ADDED, the dig's run id), so a resume, the sweep or a second copy finds the one version and buys nothing. NOTHING for anything
+ * else (a first debate, an R22 dig under the question, a dig whose paths are still argued): the sweep may ask again.
+ */
+async function addedPathUpdate(settings: TreeUpdateSettings, digRunId: string, lease: StepLease): Promise<TreeAdvance> {
+  const added = settings.ports.addedPathOf === undefined ? null : await settings.ports.addedPathOf(digRunId, null);
+  if (added === null) return "NOTHING";
+  const outcome = await updateMainAnswer(settings, { digRunId, rootRunId: added.rootRunId, positionRef: added.positionRef, free: added.free,
+    cause: Object.freeze({ kind: "PATH_ADDED" as const, id: digRunId }), lease });
+  // 0153: nothing more will be bought for this dig's answer update.
+  if (outcome !== "LEFT") await settings.ports.tree.markDigSettled(digRunId);
+  return outcome;
 }
 
 async function advanceFrom(settings: TreeUpdateSettings, digRunId: string, entry: PathRewriteEntry, text: Readonly<{ line: string; summary: string; fate: StoryFate }>,
@@ -268,6 +324,12 @@ export async function climbFrom(settings: TreeUpdateSettings, start: ClimbStart,
       return updateMainAnswer(settings, { digRunId: start.digRunId, rootRunId: debate, positionRef, free: dig.free, cause, lease });
     }
     if (next.position_ref === null) {
+      // V4 start step, Task 55e: a path a dig under the main question added is a first-level path, so its change updates the main answer.
+      const added = ports.addedPathOf === undefined ? null : await ports.addedPathOf(debate, positionRef);
+      if (added !== null) {
+        return updateMainAnswer(settings, { digRunId: start.digRunId, rootRunId: added.rootRunId, positionRef: added.positionRef, free: dig.free,
+          cause, lease });
+      }
       // The debate hangs under the main question: no path above it to rewrite.
       log("PATH_CLIMB_UNDER_THE_QUESTION", { runId: start.digRunId, step });
       return "STOPPED";
@@ -466,8 +528,10 @@ function inRootLine<T>(rootRunId: string, work: () => Promise<T>): Promise<T> {
 }
 
 type AnswerUpdate = Readonly<{
-  digRunId: string; rootRunId: string; positionRef: string; free: boolean; cause: ClimbStart["cause"]; lease: StepLease;
+  digRunId: string; rootRunId: string; positionRef: string; free: boolean; cause: Readonly<{ kind: MainAnswerTriggerKind; id: string }>; lease: StepLease;
 }>;
+/** The page's name for what made a version: 0138's PATH_UPDATE (a climb's level) is CHILD_PATH; the other two keep theirs. */
+const contentTriggerOf = (kind: MainAnswerTriggerKind): MainAnswerContent["trigger"] => kind === "PATH_UPDATE" ? "CHILD_PATH" : kind;
 
 async function updateMainAnswer(settings: TreeUpdateSettings, update: AnswerUpdate): Promise<TreeAdvance> {
   return inRootLine(update.rootRunId, async () => {
@@ -542,7 +606,7 @@ async function composeAnswer(settings: TreeUpdateSettings, update: AnswerUpdate,
     const served = written.rounds.find((round) => round.round === outcome.servedRound)!;
     const sealed = await ports.sealMainAnswer(root, updateId, Object.freeze({ v: 1 as const,
       segments: Object.freeze(outcome.body.segments.map((segment) => segment.text)), position_ref: update.positionRef,
-      trigger: update.cause.kind === "PATH_REWRITE" ? "PATH_REWRITE" as const : "CHILD_PATH" as const }));
+      trigger: contentTriggerOf(update.cause.kind) }));
     return Object.freeze({ ...base, outcome: outcome.outcome, failureCode: null,
       writerLineage: lineageRecord(served.writer.lineage),
       checkerLineage: served.checker === null ? null : lineageRecord(served.checker.lineage),
@@ -564,11 +628,13 @@ async function spentOf(ports: TreeUpdatePorts, runId: string): Promise<number> {
  * THE TREE'S SWEEP. A runner that stops between a dig's row and the top of its climb leaves nothing saying a level is owed, so every few
  * minutes, and once at boot, it goes over the digs whose rewrite or climb called an AI lately and has stood still since (`list`), and runs
  * `advanceTree` for each: the rows already there are walked, free, and it goes on at the first one missing. A dig it finished in this process
- * is not asked again. `paused`: a retiring release starts nothing new.
+ * is not asked again. `paused`: a retiring release starts nothing new. V4 start step, Task 55e: the list also holds each dig under the main
+ * question of a path debate whose paths' answers so far stood still with no main-answer version of its own yet, so an update a runner left
+ * undone (it stopped after the dig's story, or its update was left) is written here.
  */
 export type TreeSweepSettings = Readonly<{
   tree: TreeUpdateSettings;
-  /** Each dig whose rewrite or climb called an AI between the two times. */
+  /** Each dig whose rewrite or climb called an AI between the two times (and, Task 55e, each added path still owed its version). */
   list: (since: Date, before: Date, limit: number) => Promise<readonly string[]>;
   staleMs?: number;
   /** How far back it looks (longer than any stop of the runner a person would not notice). */

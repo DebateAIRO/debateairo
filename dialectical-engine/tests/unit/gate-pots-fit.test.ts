@@ -276,6 +276,19 @@ describe("Task 42: each case priced as the checked version would admit it", () =
       panel: panelOf(FREE_ROSTER) }), searchNanoUsd: null });
   });
 
+  // V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): each paid case is priced with one investigation per path at
+  // least, as the version mints it; Free keeps the debate's cap.
+  it("Task 54e: a paid case prices one investigation per path (7 paths, 7; 3 paths, 3); Free at 3 paths keeps the cap of 2", async () => {
+    const investigationsOf = async (choice: GatePotCase): Promise<number> => {
+      const { settings, minted } = loadedVersion();
+      await gatePotCaseNeeds({ settings, site: SITE, lineUp: LINE_UP, choice });
+      return (minted[0]!.engine as { sites: { investigations: number } }).sites.investigations;
+    };
+    expect(await investigationsOf(Object.freeze({ plan: "plus", kind: "QUESTION", depth: 1, paths: 7, web: true }))).toBe(7);
+    expect(await investigationsOf(Object.freeze({ plan: "plus", kind: "DIG", depth: 2, paths: 3, web: false }))).toBe(3);
+    expect(await investigationsOf(Object.freeze({ plan: "free", kind: "QUESTION", depth: 1, paths: 3, web: false }))).toBe(2);
+  });
+
   it("with role rotation on, priced as admission prices a rotated debate", async () => {
     const { settings, minted } = loadedVersion({ roleRotation: { readCounts: async () => { throw new Error("never read"); } } });
     const choice: GatePotCase = Object.freeze({ plan: "plus", kind: "QUESTION", depth: 1, paths: 7, web: true });

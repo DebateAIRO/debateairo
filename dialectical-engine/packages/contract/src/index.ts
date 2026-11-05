@@ -1014,6 +1014,10 @@ export const RunProjectionSchema = z.object({
   month_pause: MonthPauseSchema.optional(),
   // Decision 12: only on a debate that an update set aside: what the AIs found stays readable.
   found: z.array(RunFoundPageSchema).max(64).optional(),
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov): the reading level the debate was asked at, which its map, digs and report
+  // keep (as its stored depth_params hold it); absent when it was asked without one, so an older reader still parses. Before the
+  // paths, which stay last.
+  reading_level: ReadingLevelSchema.optional(),
   // V4 start step, Task 16: a path debate's paths as they stand while it runs; absent on every R22 run.
   branches: AnswerBranchesSchema.optional(),
   // V4 start step, Task 57a (./run-paths.ts), last: each path's step line, dots and findings, in the paths' order ([] while the AIs

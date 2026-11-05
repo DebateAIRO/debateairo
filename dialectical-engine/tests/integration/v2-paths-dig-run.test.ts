@@ -3,7 +3,7 @@
 // gates, a migrated embedded PostgreSQL, one encrypted owner (tests/support/paths-run-harness.ts). The parent is a path debate on
 // three paths; the dig joins its investigation under the parent's path b2 with three picks combined into two paths ([1, 2] and
 // [3]). Each of the dig's paths is argued as its own branch with its own web search, in dig mode, its planner handed the
-// investigation's digest (which the runner reads empty today: the known-defect case below); no gap round; no story: the parent's
+// investigation's digest (Task 55d: read inside the dig's own lease, each other debate under a lease of its own); no gap round; no story: the parent's
 // path b2 is rewritten in its place, with the dig's own
 // paths named b1 and b2, and the parent's path read without its own root. A Free dig makes no web call and no gap call.
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every name, question and page is made up.
@@ -122,7 +122,7 @@ async function runOnFive(label: string, options: Readonly<{ plan: "plus" | "free
   return { debate, gates, result, calls: await harness.modelCalls(debate.runId), queries: web?.queries ?? [], searchModes };
 }
 
-/** The Plus dig's planner requests, kept for the known-defect case below. */
+/** The Plus dig's planner requests, kept for the digest case below (Task 55d). */
 let plusDigPlanners: readonly GateRecord[] = [];
 
 /** The parent path debate (Plus, three paths, no web), argued once for the whole file. */
@@ -181,6 +181,19 @@ describe("a dig of a path debate argues its picks as paths (Task 55)", () => {
     expect(known?.mode).toBe("quick");
     expect(known?.alreadyInvestigated).not.toBe("[]");
     expect(known?.alreadyInvestigated).toContain(STORY_PATH_LINE);
+    // Review of Task 55d (the b<n> rule, as read): each of the parent's paths b<n> brings the points its story names under it, without
+    // that path's own root (its answer, 0158's root in force), though the story names it there too.
+    const parentRoots = (await new PostgresPathResultsRepository(database.pool).readPathRoots(parentId)).filter((root) => !root.stale);
+    const pointsWithoutOwnRoot: string[] = [];
+    for (const [pathId, refs] of await storyPathRefs(parentId)) {
+      const ownRoot = parentRoots.find((root) => root.pathId === pathId)?.rootNodeId.toLowerCase();
+      expect(ownRoot).toBeDefined();
+      expect(lower(refs)).toContain(ownRoot);
+      pointsWithoutOwnRoot.push(...(await pointsOf(database.pool, parentId, refs.filter((id) => id.toLowerCase() !== ownRoot))).map((point) => point.text));
+    }
+    const digestPoints = (JSON.parse(known!.alreadyInvestigated) as { paths: { points: { text: string }[] }[] }[])
+      .flatMap((debate) => debate.paths.flatMap((path) => path.points.map((point) => point.text)));
+    expect([...digestPoints].sort()).toEqual([...pointsWithoutOwnRoot].sort());
     plusDigPlanners = planners;
     // Its searches are a dig's (five results each), each kept under its own path.
     expect(dig.searchModes.length).toBeGreaterThan(0);
@@ -216,13 +229,12 @@ describe("a dig of a path debate argues its picks as paths (Task 55)", () => {
   }, 1_800_000);
 
   /**
-   * KNOWN DEFECT, left open by Task 55's ruling (it is not a path-debate rule and not in Task 55's files): the runner runs the web
-   * step inside the dig's own content lease, where opening another debate's story is refused (CONTENT_LEASE_SCOPE_EXPANSION_FORBIDDEN,
-   * withRunContentLease) and the digest leaves that debate out, so the planners are told "[]". R22 digs read it the same way. This
-   * case holds the brief's expectation and FAILS today (`it.fails`); once the digest is read where it can be, it passes, `it.fails`
-   * turns red, and it becomes a plain `it`.
+   * Task 55d (the known defect Task 55's ruling left open): the runner runs the web step inside the dig's own content lease, which may
+   * not widen to another debate (CONTENT_LEASE_SCOPE_EXPANSION_FORBIDDEN); the digest now reads each other debate under a lease of its
+   * own, outside the dig's, so every planner the real runner calls is told what the investigation already looked into. R22 digs read
+   * it the same way (tests/integration/dig-digest-in-lease.test.ts).
    */
-  it.fails("each planner of the Plus dig is told what the investigation already looked into (the parent's story)", () => {
+  it("each planner of the Plus dig is told what the investigation already looked into (the parent's story)", () => {
     expect(plusDigPlanners).toHaveLength(2);
     for (const request of plusDigPlanners) {
       const digest = fieldOf(request, "already_investigated") ?? "";

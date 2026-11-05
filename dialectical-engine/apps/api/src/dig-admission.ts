@@ -1,4 +1,6 @@
-import { ACCOUNT_MEMORY_LIMITS, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, type AskParent, type DigPick } from "@debateai/contract";
+import {
+  ACCOUNT_MEMORY_LIMITS, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, ReadingLevelSchema, type AskParent, type DepthParams, type DigPick
+} from "@debateai/contract";
 
 /**
  * Plan 2026-10-30 dig-model revision, task W3-2 — A DIG'S ADMISSION, before anything is charged.
@@ -110,6 +112,20 @@ export type DigPickAuthor = "AI_SUGGESTION" | "PERSON_EDITED" | "PERSON_OWN_VIEW
 export function digPickAuthorOf(pick: DigPick, storedSuggestionText: string | null): DigPickAuthor {
   if (pick.kind === "OWN_VIEW") return "PERSON_OWN_VIEW";
   return storedSuggestionText !== null && storedSuggestionText.trim() === pick.text.trim() ? "AI_SUGGESTION" : "PERSON_EDITED";
+}
+
+/**
+ * V4 start step, Task 75c (owner answer Q15, 5 Nov: the level "should propagate throughout the whole debate and shouldn't be
+ * changed"): a dig is written at its parent debate's reading level, whatever the request names (another is ignored, never
+ * refused). `parent` is the parent's stored depth_params: its level replaces the asked one, and a parent asked without one (or
+ * with a stored value that is not a level) gives the dig none, the default as today. Null (the parent could not be read): the
+ * asked params stay as they are.
+ */
+export function digDepthParamsAtParentLevel(asked: DepthParams, parent: Readonly<Record<string, unknown>> | null): DepthParams {
+  if (parent === null) return asked;
+  const level = ReadingLevelSchema.safeParse(parent.readingLevel);
+  const { readingLevel: _asked, ...rest } = asked;
+  return Object.freeze(level.success ? { ...rest, readingLevel: level.data } : rest);
 }
 
 /** The dig's checks, cheapest first; nothing is written and nothing charged. */

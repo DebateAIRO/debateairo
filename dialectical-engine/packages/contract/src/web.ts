@@ -856,8 +856,12 @@ export const AskClarifyResponseSchema = z.discriminatedUnion("source", [
 ]);
 export type AskClarifyResponse = z.infer<typeof AskClarifyResponseSchema>;
 
-/** Decision 3: what made the main answer change: a first-debate path a dig rewrote, or one a deeper dig's change climbed to. */
-export const MAIN_ANSWER_TRIGGERS = ["PATH_REWRITE", "CHILD_PATH"] as const;
+/**
+ * Decision 3: what made the main answer change: a first-debate path a dig rewrote, or one a deeper dig's change climbed to. V4 start step,
+ * Task 55e (spec §4.4): PATH_ADDED, a dig under the main question of a path debate (a path left out before Start, "+ N more") added a
+ * first-level path; its `position_ref` names that path as the investigation does (the item its pick named, such as "more-kp07").
+ */
+export const MAIN_ANSWER_TRIGGERS = ["PATH_REWRITE", "CHILD_PATH", "PATH_ADDED"] as const;
 const MainAnswerSegmentSchema = z.object({ text: z.string().trim().min(1).max(12_000) }).strict();
 
 /** One automatic version of the main answer. Never a score, a price or who paid. */

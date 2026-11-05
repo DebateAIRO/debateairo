@@ -6,23 +6,28 @@
 // outcome's verdict; each stored version keeps every first-level path's id and trust word, and the own path's words and verdict (the
 // newest dig's once a dig wrote one). A dig under b2 rewrites b2 from b2's answer so far, then the main answer updates over every path.
 // A dig of a path left out before Start ("+ N more") is a new first-level path. An R22 debate's dossier keeps its shape.
+// Task 55e (spec §4.4): that dig updates the main answer (trigger PATH_ADDED), a deeper dig under the new path climbs to the main
+// answer, and the tree's sweep writes the update a runner left undone.
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every name, question and page is made up.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { StoryBodySchema, type PathOutcome } from "@debateai/contract";
 import {
-  PostgresDigPicksRepository, PostgresInvestigationReportRunnerRepository, PostgresInvestigationRepository, PostgresPathResultsRepository,
-  PostgresStartPathsStore, decryptContentForRun, migrate, withRunContentLease, type CryptoEnvelope, type Pool, type StoredPathViewpoint,
-  type StoredStartPathSet
+  MAIN_ANSWER_UPDATE_CARRIER, PostgresDigPicksRepository, PostgresInvestigationReportRunnerRepository, PostgresInvestigationRepository,
+  PostgresPathResultsRepository, PostgresStartPathsStore, PostgresTreeUpdateRunnerRepository, decryptContentForRun, migrate, withRunContentLease,
+  type CryptoEnvelope, type Pool, type StoredPathViewpoint, type StoredStartPathSet
 } from "@debateai/db";
 import { mapPromptContractHash } from "@debateai/map";
 import {
   engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveLengthGuidance
 } from "@debateai/register";
+import { serveMainAnswer } from "@debateai/serve";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { closeInvestigation, type InvestigationReportContent } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose, postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
 import { buildInvestigationDossier, dossierFieldsOf, type DossierInput } from "../../apps/runner/src/investigation-dossier.js";
-import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "../../apps/runner/src/path-rewrite-composition.js";
+import { TREE_SWEEP_DEFAULTS, sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
+import { postgresTreeUpdatePorts, readRecentTreeDigs } from "../../apps/runner/src/path-climb-sources.js";
+import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import { scriptedShapeAnswers, shapeForTest } from "../support/debate-shape-harness.js";
 import { CLOSING_RESERVES, fieldsOf, team } from "../support/investigation-close-world.js";
 import { FIVE_MAKER_REFS, OWNER_CALL_CONCURRENCY, PANEL_REFS, previewDebateHarness } from "../support/preview-debate-harness.js";
@@ -104,6 +109,14 @@ const MORE_PICKS: readonly DigPick[] = Object.freeze([
 const LATER_PICKS: readonly DigPick[] = Object.freeze([
   { kind: "HELPS_MAIN_QUESTION", suggestionId: "more-kp08", place: "more-kp08", author: "AI_SUGGESTION", text: "Q8?" }
 ]);
+/** Task 55e: a dig under the new path more-kp07 (the "+ N more" dig's own path b1): the person's own view there. */
+const DEEPER_PICKS: readonly DigPick[] = Object.freeze([
+  { kind: "OWN_VIEW", suggestionId: null, place: "path:b1", author: "PERSON_OWN_VIEW", text: "Q7 matters most in the winter months." }
+]);
+/** Task 55e: a third path left out before Start, argued by a runner without the tree's hook, so only the sweep updates the answer. */
+const SWEPT_PICKS: readonly DigPick[] = Object.freeze([
+  { kind: "HELPS_MAIN_QUESTION", suggestionId: "more-kp09", place: "more-kp09", author: "AI_SUGGESTION", text: "Q9?" }
+]);
 
 /**
  * One path debate on the five companies (GLM by its writer ref beside the four, so the rewrite's Haiku and GLM are the run's own),
@@ -111,9 +124,12 @@ const LATER_PICKS: readonly DigPick[] = Object.freeze([
  * The runner is composed with the path rewrite (and its climb) switched on.
  */
 async function runOnFive(label: string, options: Readonly<{ count: number; set: (runId: string) => StoredStartPathSet;
-  dig?: Readonly<{ parentRunId: string; positionRef: string | null; places: readonly string[]; picks: readonly DigPick[] }>;
+  /** Task 55e: `level` is the dig's level (absent: 1, a dig of the first debate). */
+  dig?: Readonly<{ parentRunId: string; positionRef: string | null; places: readonly string[]; picks: readonly DigPick[]; level?: number }>;
   /** Review of Task 55b: called once the dig joined and kept its picks, before any of it is argued. */
-  beforeRun?: (debate: Readonly<{ runId: string }>) => Promise<void> }>) {
+  beforeRun?: (debate: Readonly<{ runId: string }>) => Promise<void>;
+  /** Task 55e: false composes the runner without the path rewrite and the tree's hooks (absent: with them, as main.ts on the preview). */
+  pathRewrite?: boolean }>) {
   const source = options.dig === undefined ? "MENU" : "DIG_PICKS";
   const shape = pathsShapeOf("plus", options.count, source, FIVE_MAKER_REFS.length);
   const length = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "plus", answerLength: PATHS_SETTINGS.answerLength });
@@ -123,7 +139,7 @@ async function runOnFive(label: string, options: Readonly<{ count: number; set: 
   expect(await new PostgresStartPathsStore(database.pool).recordStartPaths(options.set(debate.runId))).toBe("RECORDED");
   if (options.dig !== undefined) {
     expect(await new PostgresInvestigationRepository(database.pool).join({ ownerRef: own().ownerRef, parentRunId: options.dig.parentRunId,
-      childRunId: debate.runId, places: options.dig.places, mode: "quick" })).toMatchObject({ outcome: "JOINED", digLevel: 1 });
+      childRunId: debate.runId, places: options.dig.places, mode: "quick" })).toMatchObject({ outcome: "JOINED", digLevel: options.dig.level ?? 1 });
     expect(await new PostgresDigPicksRepository(database.pool).record({ ownerRef: own().ownerRef, runId: debate.runId,
       parentRunId: options.dig.parentRunId, positionRef: options.dig.positionRef, picks: options.dig.picks })).toBe("RECORDED");
   }
@@ -131,10 +147,31 @@ async function runOnFive(label: string, options: Readonly<{ count: number; set: 
   const scripted = scriptedShapeAnswers(debate.question);
   const gates = await harness.startGates({}, { unbilled: [] }, (request, chat) => namedOutcomes(request) ?? scripted(request, chat));
   const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY,
-    debateShape: { mapContractHash: mapPromptContractHash() }, engine: { engineContractHash: engineContractHash() }, pathRewrite: true });
+    debateShape: { mapContractHash: mapPromptContractHash() }, engine: { engineContractHash: engineContractHash() }, pathRewrite: options.pathRewrite ?? true });
   await harness.completedRun(composed, debate, gates);
   return { debate, gates };
 }
+
+/** Task 55e: the root's main-answer versions, oldest first: each row's trigger, the run that triggered it, and its outcome. */
+const versionsOf = (root: string) => q(database.pool, `SELECT trigger_kind, trigger_id::text AS trigger_id, trigger_run_id::text AS trigger_run_id, outcome
+  FROM identity.main_answer_update WHERE run_id=$1 ORDER BY answer_seq`, root);
+
+/** Task 55e: the root's main answer as serve hands it to the page, each version opened under the root's key. */
+async function servedVersions(root: string) {
+  const rows = (await new PostgresTreeUpdateRunnerRepository(database.pool).readMainAnswers(root)) ?? [];
+  const opened: { row: (typeof rows)[number]; opened: unknown }[] = [];
+  await withRunContentLease(database.pool, [root], async () => {
+    for (const row of rows) {
+      opened.push({ row, opened: row.content === null ? null
+        : await decryptContentForRun<unknown>(database.pool, root, MAIN_ANSWER_UPDATE_CARRIER, row.update_id, row.content, null) });
+    }
+  });
+  return serveMainAnswer(opened, false)?.history ?? [];
+}
+
+/** The answer update a dig's run started: the one REPORT_ANSWER whose material has digs to follow (a path run's own main answer has none). */
+const answerUpdateOf = (gates: Readonly<{ requests: readonly GateRecord[] }>) =>
+  gates.requests.find((request) => request.kind === "REPORT_ANSWER" && request.answer === "OK" && fieldOf(request, "follow_ups") !== "[]");
 
 /** "Write my report" (closed already): the real closing over the real sources, Haiku and GLM scripted, the version opened as sealed. */
 async function writeReport(root: string, investigationId: string) {
@@ -170,6 +207,8 @@ const parentDebate = () => parentMade ??= (async () => {
   return { rootId: debate.runId, investigationId, outcomes: await new PostgresPathResultsRepository(database.pool).readPathOutcomes(debate.runId) };
 })();
 const investigations = () => new PostgresInvestigationRepository(database.pool);
+/** Task 55e: the "+ N more" dig of place more-kp07 (its run and its gates), once its case has run. */
+let moreDig: Readonly<{ runId: string; gates: Readonly<{ requests: readonly GateRecord[] }> }> | null = null;
 /** Opens the investigation again when a dig or a report closed it, then closes it: the next report version. */
 async function closeAgain(investigationId: string): Promise<number> {
   await investigations().reopen(own().ownerRef, investigationId);
@@ -236,6 +275,7 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
     const more = await runOnFive("v2-report-more", { count: 1, set: digSetOf(MORE_PICKS, () => "T7"),
       dig: { parentRunId: parent.rootId, positionRef: null, places: ["more-kp07"], picks: MORE_PICKS } });
     const moreId = more.debate.runId;
+    moreDig = Object.freeze({ runId: moreId, gates: more.gates });
     // Under the main question: no rewrite, its own story.
     expect(await q(database.pool, `SELECT run_id FROM identity.path_rewrite_turn WHERE run_id=$1`, moreId)).toEqual([]);
     expect((await q(database.pool, `SELECT story_id FROM serve.answer_story WHERE run_id=$1`, moreId)).length).toBeGreaterThan(0);
@@ -254,15 +294,29 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
   }, 1_800_000);
 
   /**
-   * KNOWN GAP, left open by Task 55b's ruling: a dig under the main question writes no rewrite, so nothing climbs and no main-answer
-   * update is recorded for it (0138's trigger is a rewrite or a climb's level, and the runner starts the climb only after a rewrite).
-   * The spec (§4.4) says the main answer updates. This case holds that expectation and FAILS today (`it.fails`); once the runner starts an
-   * answer update for such a dig, it passes, `it.fails` turns red, and it becomes a plain `it`.
+   * Task 55e (spec §4.4, held by Task 55b as `it.fails`): a dig under the main question writes no rewrite, so nothing climbs; once its
+   * story is written the runner updates the main answer with the dig itself as the trigger (0162's PATH_ADDED), over every path, the new
+   * one named by its place. One version per trigger.
    */
-  it.fails("the dig of more-kp07 records a main-answer update", async () => {
+  it("the dig of more-kp07 records a main-answer update", async () => {
     const parent = await parentDebate();
-    const updates = await q(database.pool, `SELECT trigger_run_id::text AS trigger_run_id FROM identity.main_answer_update WHERE run_id=$1`, parent.rootId);
+    expect(moreDig).not.toBeNull();
+    const moreId = moreDig!.runId.toLowerCase();
+    // 0162: the CHECK on what made a version lists exactly three kinds.
+    const [check] = await q(database.pool, `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+      WHERE conrelid = 'identity.main_answer_update'::regclass AND conname = $1`, "main_answer_update_trigger_check");
+    expect([...String(check?.definition).matchAll(/'([A-Z_]+)'/gu)].map((match) => match[1])).toEqual(["PATH_REWRITE", "PATH_UPDATE", "PATH_ADDED"]);
+    const updates = await versionsOf(parent.rootId);
     expect(updates).toHaveLength(2);
+    expect(updates[1]).toEqual({ trigger_kind: "PATH_ADDED", trigger_id: moreId, trigger_run_id: moreId, outcome: "READY" });
+    // As the page reads it: the dig's version is the newest, named by the new path.
+    expect((await servedVersions(parent.rootId)).map((version) => [version.version, version.trigger, version.position_ref])).toEqual([
+      [1, "PATH_REWRITE", "b2"], [2, "PATH_ADDED", "more-kp07"]]);
+    // Written over every path: the chosen ones at their newest text, then the new one by its answer so far.
+    const update = answerUpdateOf(moreDig!.gates);
+    expect(update).toBeDefined();
+    expect(pathLines(JSON.parse(fieldOf(update!, "first_debate")!) as FirstDebate)).toEqual([
+      ["A1", outcomeLineOf("T1")], ["A2", REWRITE_LINE], ["A3", outcomeLineOf("T3")], ["A4", outcomeLineOf("T7")]]);
   });
 
   it("an R22 debate's dossier is unchanged: its paths by the story's own ids, nothing stored beside them, no path id, trust word or own words in its version", async () => {
@@ -311,6 +365,14 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
       return { paths: read.first.paths.map((path) => [path.ref, path.current?.line ?? path.storyLine]),
         cards: read.digs.map((dig) => dig.runId.toLowerCase()) };
     };
+    // Review of Task 55e: the tree's own read (path-climb-sources.ts addedPathOf, which the hook and the sweep both ask) follows the same
+    // rule, so nothing buys the main-answer update of a dig whose paths are still argued (the sweep lists a dig once one path's answer so
+    // far stood still, while another may still be argued); once each has its answer so far, it is the new path, named by its place.
+    const tree = postgresTreeUpdatePorts(database.pool);
+    const addedNow = async (runId: string) => {
+      const added = await tree.addedPathOf!(runId, null);
+      return added === null ? null : { ...added, rootRunId: added.rootRunId.toLowerCase() };
+    };
     let laterId = "";
     await runOnFive("v2-report-more-later", { count: 1, set: digSetOf(LATER_PICKS, () => "T8"),
       dig: { parentRunId: parent.rootId, positionRef: null, places: ["more-kp08"], picks: LATER_PICKS },
@@ -319,11 +381,85 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
         const before = await readNow();
         expect(before.paths.map(([ref]) => ref)).toEqual(["b1", "b2", "b3", "more-kp07"]);
         expect(before.cards).toContain(laterId);
+        expect(await addedNow(laterId)).toBeNull();
       } });
     expect(laterId).not.toBe("");
     const after = await readNow();
     expect(after.paths).toEqual([["b1", outcomeLineOf("T1")], ["b2", REWRITE_LINE], ["b3", outcomeLineOf("T3")], ["more-kp07", outcomeLineOf("T7")],
       ["more-kp08", outcomeLineOf("T8")]]);
     expect(after.cards).not.toContain(laterId);
+    expect(await addedNow(laterId)).toEqual({ rootRunId: parent.rootId.toLowerCase(), positionRef: "more-kp08", free: false });
+  }, 1_800_000);
+
+  /**
+   * Task 55e (spec §4.4): the path a "+ N more" dig added is a first-level path, so a dig under it is a change one level down: its rewrite
+   * of the new path climbs to the main answer (it used to stop at PATH_CLIMB_UNDER_THE_QUESTION). One more version, on that rewrite.
+   */
+  it("a dig under the new path more-kp07 climbs to the main answer: one more version, on its rewrite, named by the new path", async () => {
+    const parent = await parentDebate();
+    expect(moreDig).not.toBeNull();
+    await investigations().reopen(own().ownerRef, parent.investigationId);
+    const before = await versionsOf(parent.rootId);
+    const deeper = await runOnFive("v2-report-more-deeper", { count: 1, set: digSetOf(DEEPER_PICKS, () => "E1"),
+      dig: { parentRunId: moreDig!.runId, positionRef: "b1", places: ["path:b1"], picks: DEEPER_PICKS, level: 2 } });
+    const deeperId = deeper.debate.runId.toLowerCase();
+    // The new path was rewritten from its answer so far.
+    const writers = deeper.gates.requests.filter((request) => request.kind === "PATH_REWRITE_WRITER" && request.answer === "OK");
+    expect(writers.length).toBeGreaterThan(0);
+    expect((JSON.parse(fieldOf(writers[0]!, "path") ?? "{}") as { line?: string }).line).toBe(outcomeLineOf("T7"));
+    // Then the main answer updated once more, on that rewrite (a first-level path's change), named by the new path.
+    const after = await versionsOf(parent.rootId);
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(after.slice(before.length).map(({ trigger_kind, trigger_run_id, outcome }) => ({ trigger_kind, trigger_run_id, outcome }))).toEqual([
+      { trigger_kind: "PATH_REWRITE", trigger_run_id: deeperId, outcome: "READY" }]);
+    expect((await servedVersions(parent.rootId)).at(-1)).toMatchObject({ version: after.length, trigger: "PATH_REWRITE", position_ref: "more-kp07" });
+    // Written over every path, the new one at its rewritten text.
+    const update = answerUpdateOf(deeper.gates);
+    expect(update).toBeDefined();
+    expect(pathLines(JSON.parse(fieldOf(update!, "first_debate")!) as FirstDebate)).toEqual([["A1", outcomeLineOf("T1")], ["A2", REWRITE_LINE],
+      ["A3", outcomeLineOf("T3")], ["A4", REWRITE_LINE], ["A5", outcomeLineOf("T8")]]);
+  }, 1_800_000);
+
+  /**
+   * Task 55e: an update left undone (here: a runner composed without the tree's hook) is the tree's sweep's. It lists the "+ N more" dig
+   * that has no version yet, though the dig made no rewrite, climb or update call, writes its version once, and lists it no more; a
+   * second pass buys nothing.
+   */
+  it("the sweep writes the update a runner left undone: a '+ N more' dig with no version yet is listed, and gets its version once", async () => {
+    const parent = await parentDebate();
+    await investigations().reopen(own().ownerRef, parent.investigationId);
+    const swept = await runOnFive("v2-report-more-swept", { count: 1, set: digSetOf(SWEPT_PICKS, () => "T9"), pathRewrite: false,
+      dig: { parentRunId: parent.rootId, positionRef: null, places: ["more-kp09"], picks: SWEPT_PICKS } });
+    const sweptId = swept.debate.runId.toLowerCase();
+    const before = await versionsOf(parent.rootId);
+    expect(before.map((row) => row.trigger_run_id)).not.toContain(sweptId);
+    // What the sweep lists once the dig stood still past the sweep's wait: that dig, though it made no rewrite, climb or update call.
+    const now = Date.now() + TREE_SWEEP_DEFAULTS.staleMs + 60_000;
+    const listedNow = async () => (await readRecentTreeDigs(database.pool, new Date(now - TREE_SWEEP_DEFAULTS.windowMs),
+      new Date(now - TREE_SWEEP_DEFAULTS.staleMs), TREE_SWEEP_DEFAULTS.limit)).map((runId) => runId.toLowerCase());
+    expect(await q(database.pool, `SELECT entry.call_site_key FROM ledger.ledger_entry AS entry WHERE entry.run_id=$1 AND (entry.call_site_key LIKE 'PATH\\_REWRITE:%'
+      OR entry.call_site_key LIKE 'PATH\\_CLIMB:%' OR entry.call_site_key LIKE 'ANSWER\\_UPDATE:%')`, sweptId)).toEqual([]);
+    expect(await listedNow()).toContain(sweptId);
+    // The sweep as main.ts composes it (Haiku writes, GLM checks; scripted).
+    const vendors = team();
+    const composed = composePathRewrite({ pool: database.pool,
+      targets: [{ providerRef: "ref-haiku", model: PATH_REWRITE_WRITER_MODEL }, { providerRef: "ref-glm", model: PATH_REWRITE_CHECKER_MODEL }],
+      members: [{ provider: vendors.haiku.provider, providerRef: "ref-haiku", maker: "Anthropic" }, { provider: vendors.glm.provider, providerRef: "ref-glm", maker: "Z.AI" }],
+      log: () => undefined });
+    if (composed === undefined) throw new Error("test: no Haiku or no GLM for the tree's sweep");
+    const sweep = { ...composed.treeSweep, now: () => new Date(now) };
+    expect((await sweepTreeUpdates(sweep)).listed).toBeGreaterThan(0);
+    const after = await versionsOf(parent.rootId);
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(after.slice(before.length)).toEqual([{ trigger_kind: "PATH_ADDED", trigger_id: sweptId, trigger_run_id: sweptId, outcome: "READY" }]);
+    expect((await servedVersions(parent.rootId)).at(-1)).toMatchObject({ trigger: "PATH_ADDED", position_ref: "more-kp09" });
+    // Once its version is written it is not listed again (its update's calls went to the scripted vendors here, never the ledger).
+    expect(await listedNow()).not.toContain(sweptId);
+    // Only that dig's update was bought; a second pass buys nothing and writes nothing.
+    expect(vendors.haiku.requests.map((request) => request.runId?.toLowerCase())).toEqual(vendors.haiku.requests.map(() => sweptId));
+    const calls = vendors.haiku.requests.length + vendors.glm.requests.length;
+    await sweepTreeUpdates(sweep);
+    expect(vendors.haiku.requests.length + vendors.glm.requests.length).toBe(calls);
+    expect(await versionsOf(parent.rootId)).toEqual(after);
   }, 1_800_000);
 });

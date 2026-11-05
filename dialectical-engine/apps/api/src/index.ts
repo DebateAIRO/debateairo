@@ -4,7 +4,8 @@ import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-rou
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
 import {
   digSuggestionTextFromAnswer,
-  admitDig, digPathIndexOf, digPickAuthorOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
+  admitDig, digDepthParamsAtParentLevel, digPathIndexOf, digPickAuthorOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts,
+  type DigJoinPort, type DigPathIndex,
   type DigPicksPort, type DigSuggestionTextReader
 } from "./dig-admission.js";
 import { addToResearched } from "./web-researched.js";
@@ -89,6 +90,8 @@ import {
   PublishDebateRequestSchema,
   RunEventSchema,
   RunProjectionSchema,
+  // V4 start step, Task 75c: the run read's reading level.
+  ReadingLevelSchema,
   type RunFoundPage,
   SessionSchema,
   AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
@@ -209,6 +212,11 @@ import {
 import type { OwnClosingsStore } from "@debateai/db";
 import type { CarryOnPart } from "@debateai/contract";
 import { carryOnPartOf, carryOnReportOfInvestigation, carryOnReportOfPublic, type CarryOnReportState } from "./carry-on-part.js";
+// V4 start step, Task 56 ("Let the AIs carry on to the report"): the carry-on's pure steps, driven here through the routes' own steps.
+import {
+  carryOnDigOf, carryOnTick, type AskAsker, type AskAsOwnerOutcome, type CarryOnAsker, type CarryOnPorts, type CarryOnTick,
+  type WriteReportAsOwnerOutcome
+} from "./carry-on.js";
 import { ServeRepository, SynthesisCheckRepository, readSynthesisTexts, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
 import type { SynthesisVerdict, SynthesisCheckCategory } from "@debateai/contract";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
@@ -315,6 +323,7 @@ import {
   accessOfWaitingRun,
   nextWholeMinute,
   runSettingsClassOfAsk,
+  type AskRoom,
   type AskRoomAnswer,
   type AskRoomPort,
   type AskRoomReader,
@@ -337,6 +346,7 @@ import {
 import {
   debateShapePlanKeyOf,
   isShapeReceiptV2,
+  planById,
   structuralBasisProvisionsBackup,
   type DebateShapeCeilingInput,
   type DebateShapePlanKey,
@@ -1796,6 +1806,12 @@ declare module "fastify" {
     staffAuthentication?: StaffAuthentication;
     cookieRefresh?: Readonly<{ sessionToken: string; csrfToken: string | null }>;
   }
+
+  // V4 start step, Task 56: one pass of the carry-on ("Let the AIs carry on to the report"), decorated by buildApi; main.ts runs it
+  // every whole minute while this release is current. Without ApiOptions.carryOn it answers zeros.
+  interface FastifyInstance {
+    carryOnTick(): Promise<CarryOnTick>;
+  }
 }
 
 export interface AskApplication {
@@ -1844,6 +1860,11 @@ export interface AskApplication {
   readRunReleaseKey?(runId: string): Promise<string | null>;
   /** The same for an answer: the release of the run that answered it (`serve.answer.run_id`), or null. */
   readAnswerReleaseKey?(answerId: string): Promise<string | null>;
+  /**
+   * V4 start step, Task 56: a debate's ask as it was stored (`RunRepository.readStoredAsk`, under its own content lease), null when
+   * no such run. Read only by the carry-on, for the settings each of its digs is asked with. Absent: nothing carries on.
+   */
+  readStoredAsk?(runId: string): Promise<StoredAsk | null>;
 }
 
 /** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
@@ -1852,8 +1873,16 @@ async function resolvedRunId(options: Pick<ApiOptions, "application">, id: strin
 }
 
 
+/**
+ * Who a new run is for. V4 start step, Task 56: a server principal's `carryOn` makes the run a carry-on dig of that debate's path,
+ * passed unchanged to both `startRun` call sites (0161 provisions its key from the debate's own binding, no live session needed);
+ * only the carry-on ports built in buildApi set it, never a route.
+ */
 export type AskPrincipal =
-  | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
+  | Readonly<{
+      readonly kind: "server"; readonly userId: string; readonly ownerRef: string;
+      readonly carryOn?: Readonly<{ parentRunId: string; pathId: string }>;
+    }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
 export interface EmailChangeApplication {
@@ -2180,6 +2209,19 @@ export interface ApiOptions {
    * names one. Absent: the five routes are mounted all the same and answer 503 SAVED_QUESTIONS_UNAVAILABLE; Start removes nothing.
    */
   readonly savedQuestions?: SavedQuestionService;
+  // V4 start step
+  /**
+   * V4 start step, Task 56 ("Let the AIs carry on to the report"; owner ruling 3 Nov, evening): the carry-on marks (0157's DUE →
+   * BEGUN → DONE, `PostgresStartPathsStore`; main.ts passes Task 36's one store, `startPaths` above). With it, `api.carryOnTick()`
+   * digs once into each path's top suggestion of a ticked first debate, through POST /v1/asks's own steps, then presses "Write my
+   * report" through POST /v1/runs/{id}/report's. Absent: the tick answers zeros.
+   */
+  readonly carryOn?: CarryOnPorts["marks"];
+  /**
+   * V4 start step, Task 56: the one room (`AskRoom`, the same object as `askRoom`), for the carry-on's unlocked look before each dig
+   * and the dig's whole share of today (`digShareMicros`). Absent (local mode, billing off): no dig is stopped for room.
+   */
+  readonly carryOnRoom?: Pick<AskRoom, "precheck" | "digShareMicros">;
 }
 
 /**
@@ -2613,6 +2655,19 @@ export function createProcessNetworkPseudonym(): (network: string) => string {
   return (network) => createHmac("sha256", key).update(network, "utf8").digest("hex");
 }
 
+/**
+ * V4 start step, Task 56: who a request's steps act for: its session and, signed in, its account. A route passes its request; the
+ * carry-on passes the person's first-debate session and account (no live sign-in), which is all these steps read.
+ */
+type AskerOfRequest = Readonly<{ session: Session; authenticatedSession?: Pick<AuthenticatedSession, "ownerRef" | "userId"> }>;
+/** V4 start step, Task 56: a route's answer as data, so a step the carry-on shares answers without a reply; the route sends it as is. */
+type RouteAnswer = Readonly<{ status: number; body: Readonly<Record<string, unknown>>; headers?: Readonly<Record<string, string>> }>;
+
+function sendAnswer(reply: FastifyReply, answer: RouteAnswer): FastifyReply {
+  for (const [name, value] of Object.entries(answer.headers ?? {})) reply.header(name, value);
+  return reply.status(answer.status).send(answer.body);
+}
+
 export function buildApi(options: ApiOptions): FastifyInstance {
   const processNetworkPseudonym = createProcessNetworkPseudonym();
   const previewConfig=validatePreviewProviderTestConfig(options.previewProviderTestConfig);
@@ -2816,10 +2871,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return false;
     }
   };
-  const ownershipFor = (request: Readonly<{
-    session: Session;
-    authenticatedSession?: AuthenticatedSession;
-  }>): RunOwnershipAccess => request.authenticatedSession === undefined
+  // V4 start step, Task 56: only the account is read, so the carry-on's person (no live sign-in) is answered as a request is.
+  const ownershipFor = (request: AskerOfRequest): RunOwnershipAccess => request.authenticatedSession === undefined
     ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
     : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
   api.addHook("onSend", async (request, reply, payload) => {
@@ -3614,8 +3667,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // (the level) or per owned debate (a visit, a dig), so it cannot grow past what the account owns.
   // Plan 2026-10-30 dig-model revision W3-2 (owner Q-D1): where the parent map's places hang, read from the parent's
   // story the way the map reads it; null when the parent has no story yet (every point then hangs under the question).
-  const digPathIndexFor = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
-    parentRunId: string): Promise<DigPathIndex | null> => {
+  const digPathIndexFor = async (request: AskerOfRequest, parentRunId: string): Promise<DigPathIndex | null> => {
     if (options.stories === undefined) return null;
     const ownership = ownershipFor(request);
     const answer = await readOwnerRunAnswer(options, parentRunId, request.session, ownership);
@@ -3625,16 +3677,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return paths === undefined ? null : digPathIndexOf(paths);
   };
   // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; the path its places share when the ask may go
-  // on (W3-7: its picks are kept on it), else the refusal sent. Another
+  // on (W3-7: its picks are kept on it), else the refusal to send. Another
   // account's parent is the closed 404; a parent at the deepest level 409 DIG_TOO_DEEP; picks the page never sends
   // (more than Free combines, or from more than one path) a 400 with its own code (W3-8: DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH).
-  const digRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
-    reply: FastifyReply, parent: AskParent, settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
-  ): Promise<Readonly<{ refused: FastifyReply }> | Readonly<{ positionRef: string | null }>> => {
+  // V4 start step, Task 56: the refusal is answered as data (askAsOwner's, shared with the carry-on), never sent here.
+  const digRefusal = async (request: AskerOfRequest, parent: AskParent,
+    settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
+  ): Promise<Readonly<{ refused: RouteAnswer }> | Readonly<{ positionRef: string | null }>> => {
     const digModel = options.digModel;
     if (digModel === undefined) return { positionRef: null };
     const ownerRef = request.authenticatedSession?.ownerRef;
-    if (ownerRef === undefined) return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+    if (ownerRef === undefined) return { refused: { status: 404, body: { error: "RUN_NOT_FOUND" } } };
     const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
     const admission = await admitDig({ ownerRef, parent, free: decided.settings.plan_tier === "free" }, {
       readDigLevel: (owner, runId) => digModel.readDigLevel(owner, runId),
@@ -3642,18 +3695,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
     switch (admission.kind) {
       case "ADMIT": return { positionRef: admission.positionRef };
-      case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+      case "NOT_FOUND": return { refused: { status: 404, body: { error: "RUN_NOT_FOUND" } } };
       case "TOO_DEEP":
-        return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
+        return { refused: { status: 409, body: DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }) } };
       // W3-8: each of the two refusals the page never sends has its own code, so the page can say which one it was.
       case "MALFORMED": return { refused: admission.reason === "FREE_PICKS_OVER"
-        ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
-        : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })) };
+        ? { status: 400, body: DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }) }
+        : { status: 400, body: DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH }) } };
       default: return exhaustive(admission);
     }
   };
   // The person's plan and whether new starts wait for a reset, as a quick look on their own plan (W4-4's read, shared with a public report's press).
-  const roomOfPerson = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>, ownerRef: string): Promise<Readonly<{ planId: string | null; waitsForReset: boolean }>> => {
+  const roomOfPerson = async (request: AskerOfRequest, ownerRef: string): Promise<Readonly<{ planId: string | null; waitsForReset: boolean }>> => {
     if (options.askRoom === undefined) return { planId: null, waitsForReset: false };
     const view = await admissionView();
     const decided = await decideRoomSettingsAndPlan({ plan_tier: "premium", composition_budget_tier: "low",
@@ -3696,28 +3749,29 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return { public_ref: tree.publication_ref, ...(tree.dig_update_id === null ? {} : { dig_ref: tree.dig_update_id }), places: ask.parent.places, mode: ask.parent.mode,
       ...(ask.parent.picks === undefined ? {} : { picks: ask.parent.picks }) };
   };
-  const publicDigRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>, reply: FastifyReply, parent: PublicDigParent,
+  // V4 start step, Task 56: the refusal is answered as data (askAsOwner's, shared with the carry-on), never sent here.
+  const publicDigRefusal = async (request: AskerOfRequest, parent: PublicDigParent,
     settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
-  ): Promise<Readonly<{ refused: FastifyReply }> | Readonly<{ admission: Extract<PublicDigAdmission, { kind: "ADMIT" }> }>> => {
+  ): Promise<Readonly<{ refused: RouteAnswer }> | Readonly<{ admission: Extract<PublicDigAdmission, { kind: "ADMIT" }> }>> => {
     const ownerRef = request.authenticatedSession?.ownerRef;
     const store = options.publicTree;
-    if (ownerRef === undefined || store === undefined) return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+    if (ownerRef === undefined || store === undefined) return { refused: { status: 404, body: { error: "RUN_NOT_FOUND" } } };
     const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
     const admission = await admitPublicDig({ parent, free: decided.settings.plan_tier === "free" }, { tree: store.tree, readPublicDebate: store.readPublicDebate });
     switch (admission.kind) {
       case "ADMIT": {
         // A spent pool starts no dig on someone else's debate: nothing joins and nothing waits in line on their page.
         if ((await roomOfPerson(request, ownerRef)).waitsForReset) {
-          return { refused: reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" })) };
+          return { refused: { status: 409, body: PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }) } };
         }
         return { admission };
       }
-      case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
-      case "TOO_DEEP": return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
-      case "NEEDS_A_PATH": return { refused: reply.status(400).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DIG_NEEDS_A_PATH", message: "PUBLIC_DIG_NEEDS_A_PATH" })) };
+      case "NOT_FOUND": return { refused: { status: 404, body: { error: "RUN_NOT_FOUND" } } };
+      case "TOO_DEEP": return { refused: { status: 409, body: DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }) } };
+      case "NEEDS_A_PATH": return { refused: { status: 400, body: PublicDebateRefusedSchema.parse({ error: "PUBLIC_DIG_NEEDS_A_PATH", message: "PUBLIC_DIG_NEEDS_A_PATH" }) } };
       case "MALFORMED": return { refused: admission.reason === "FREE_PICKS_OVER"
-        ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
-        : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })) };
+        ? { status: 400, body: DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }) }
+        : { status: 400, body: DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH }) } };
       default: return exhaustive(admission);
     }
   };
@@ -4312,6 +4366,39 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   }
 
+  // V4 start step, Task 56 ("Let the AIs carry on to the report"): POST /v1/asks's steps that need only the person, shared by the route
+  // and the carry-on (which acts as the person with no live sign-in), so a carry-on dig is admitted only by the person's own steps.
+  const askAskerOf = (request: Pick<FastifyRequest, "session" | "authenticatedSession" | "headers">): AskAsker => Object.freeze({ session: request.session,
+    owner: request.authenticatedSession === undefined ? null
+      : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, userId: request.authenticatedSession.userId }),
+    edgeCountry: edgeCountry(request.headers) });
+  // The route's three pre-parse checks that need only the person, in its order: the consent, the preview team, the asks budget.
+  // Null: go on; otherwise the answer the route sends (and the carry-on reads as REFUSED).
+  const askPreflight = async (asker: AskAsker): Promise<RouteAnswer | null> => {
+    // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
+    // debate. Checked before admission, so a refusal here spends none of the account's quota.
+    if (asker.owner !== null) {
+      // Fails closed: without the consent store, no debate can be admitted and none is recorded.
+      if (options.sessions?.readSensitiveDataConsent === undefined) {
+        return { status: 503, body: { error: "SENSITIVE_DATA_CONSENT_UNAVAILABLE", message: "SENSITIVE_DATA_CONSENT_UNAVAILABLE" } };
+      }
+      if (await options.sessions.readSensitiveDataConsent(asker.owner) !== "given") {
+        return { status: 403, body: { error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED } };
+      }
+    }
+    // Step 1 (owner, 2026-10-08): the private preview spends the company's money on every
+    // model call, so only its team starts debates there. Third, after the crisis and consent
+    // checks; before the quota, the country rule, admission and its paid discovery probe, so a
+    // refusal here spends nothing. Off the preview there is no team rule.
+    if (!previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.owner?.userId)) {
+      return { status: 403, body: { error: PREVIEW_TEAM_ONLY } };
+    }
+    // B10: the sealed asks budget, as admitOrRefuse answers it.
+    const decision = chargeAdmission("asks", "POST /v1/asks", asker.owner?.ownerRef ?? asker.session.asker_id);
+    if (decision.allowed) return null;
+    return { status: 429, headers: { "retry-after": String(Math.max(1, Math.ceil(decision.retryAfterMs / 1_000))) },
+      body: { error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" } };
+  };
   // V4 start step, Task 36 (decided 3 Nov): this route's own body limit, START_STEP_LIMITS.askBodyMaxBytes (384 KiB), which carries
   // the largest legal Start (seven paths of the person's own words in a 3-byte script, the signed menu and its late lists); it widens
   // F-07's API_BODY_LIMIT_BYTES for this one route, and every other route keeps the server default.
@@ -4340,26 +4427,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         country: edgeCountry(request.headers)
       });
     }
-    // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
-    // debate. Checked before admission, so a refusal here spends none of the account's quota.
-    const asker = request.authenticatedSession;
-    if (asker !== undefined) {
-      if (options.sessions?.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
-      if (await options.sessions.readSensitiveDataConsent(asker) !== "given") {
-        return reply.status(403).send({
-          error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED
-        });
-      }
-    }
-    // Step 1 (owner, 2026-10-08): the private preview spends the company's money on every
-    // model call, so only its team starts debates there. Third, after the crisis and consent
-    // checks; before the quota, the country rule, admission and its paid discovery probe, so a
-    // refusal here spends nothing. Off the preview there is no team rule.
-    if (!previewTeamAdmits(previewConfig, options.previewTeamUserIds, request.authenticatedSession?.userId)) {
-      return reply.status(403).send({ error: PREVIEW_TEAM_ONLY });
-    }
-    if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
-      request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
+    // Steps 2 to 4 (V4 start step, Task 56: askPreflight, shared with the carry-on): the sensitive-data consent, the preview
+    // team, the asks budget.
+    const asker = askAskerOf(request);
+    const preflight = await askPreflight(asker);
+    if (preflight !== null) return sendAnswer(reply, preflight);
     // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
     const countryRefusal = options.countryGate?.ask(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
@@ -4370,6 +4442,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    // V4 start step, Task 56: everything after the body's checks is the person's own question and dig step (askAsOwner, below,
+    // shared with the carry-on); the route sends what it answers.
+    const answered = await askAsOwner(asker, ask, savedQuestionId === undefined ? {} : { savedQuestionId });
+    return reply.status(answered.status).send(answered.body);
+  });
+  /**
+   * V4 start step, Task 56: POST /v1/asks after the body's checks, as one step the route and the carry-on share: the Free notice
+   * lock, Decision 13's public branch, the dig's admission, Task 36's hand-over, the question check, `submit`, the dig's join and
+   * picks, the public join, the Free notice and the purpose lines. It answers the route's reply as data: ACCEPTED (202, its body,
+   * `public_dig_not_joined` included) or REFUSED (the route's refusal; `body.error` is its code). `extras.principal` is set only by
+   * the carry-on ports (a server principal's carry-on dig); `extras.savedQuestionId` only by the route.
+   */
+  const askAsOwner = async (asker: AskAsker, ask: AskRequest, extras: Readonly<{ savedQuestionId?: string;
+    principal?: Pick<Extract<AskPrincipal, { kind: "server" }>, "carryOn"> }> = {}): Promise<AskAsOwnerOutcome> => {
+    const owner = asker.owner;
+    const request: AskerOfRequest = owner === null ? Object.freeze({ session: asker.session }) : Object.freeze({ session: asker.session, authenticatedSession: owner });
+    const refusedWith = (answer: Pick<RouteAnswer, "status" | "body">): AskAsOwnerOutcome => Object.freeze({ kind: "REFUSED", status: answer.status, body: answer.body });
+    const savedQuestionId = extras.savedQuestionId;
     // V4 start step, Task 36: the active version, read once for this ask (the Free notice lock and the hand-over), and the person's
     // plan, decided once (the lock and the Free notice record after submit), each only when asked for.
     let viewRead: ReturnType<typeof admissionView> | null = null;
@@ -4385,11 +4475,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // as today. Digs and public digs are contributions and are never held; an internal grant decides premium; a site with no plans
     // has no plan id.
     const newQuestion = ask.parent === undefined && ask.public_parent === undefined;
-    if (asker !== undefined && newQuestion && startStepOnInView(await viewOnce())) {
-      const decided = await decidedOnce(asker.ownerRef);
+    if (owner !== null && newQuestion && startStepOnInView(await viewOnce())) {
+      const decided = await decidedOnce(owner.ownerRef);
       const switchOn = startWidthsOfView(await viewOnce(), debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier)) !== null;
       if (freeNoticeMissing({ ask, signedIn: true, decided: { planTier: decided.settings.plan_tier, planId: decided.planId }, switchOn })) {
-        return reply.status(403).send({ error: FREE_PUBLIC_NOTICE_REQUIRED, message: FREE_PUBLIC_NOTICE_REQUIRED });
+        return refusedWith({ status: 403, body: { error: FREE_PUBLIC_NOTICE_REQUIRED, message: FREE_PUBLIC_NOTICE_REQUIRED } });
       }
     }
     // Plan 2026-10-30 dig-model revision W3-2: a dig's own checks come before the question check (a paid site call) and
@@ -4399,21 +4489,29 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const publicParentRef = await publicParentOf(ask);
     let publicAdmission: Extract<PublicDigAdmission, { kind: "ADMIT" }> | null = null;
     if (publicParentRef !== null) {
-      const refused = await publicDigRefusal(request, reply, publicParentRef, ask);
-      if ("refused" in refused) return refused.refused;
+      const refused = await publicDigRefusal(request, publicParentRef, ask);
+      if ("refused" in refused) return refusedWith(refused.refused);
       publicAdmission = refused.admission;
     }
     const digParent = options.digModel === undefined || publicAdmission !== null ? undefined : ask.parent;
     let digPositionRef: string | null = null;
     if (digParent !== undefined) {
-      const admitted = await digRefusal(request, reply, digParent, {
+      const admitted = await digRefusal(request, digParent, {
         plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params
       });
-      if ("refused" in admitted) return admitted.refused;
+      if ("refused" in admitted) return refusedWith(admitted.refused);
       digPositionRef = admitted.positionRef;
     }
+    // V4 start step, Task 75c (owner answer Q15, 5 Nov): a dig, own or public, is written at its parent debate's reading level,
+    // whatever this request names (another is ignored, never refused); a parent asked without one gives the dig none. Read from the
+    // parent's stored ask once the dig is admitted; without the reader (or a parent that cannot be read) the ask stays as sent.
+    const levelParentRunId = publicAdmission?.parentRunId ?? ask.parent?.parent_run_id ?? null;
+    if (levelParentRunId !== null && options.application.readStoredAsk !== undefined) {
+      const parentAsk = await options.application.readStoredAsk(levelParentRunId);
+      ask = Object.freeze({ ...ask, depth_params: digDepthParamsAtParentLevel(ask.depth_params, parentAsk?.depthParams ?? null) });
+    }
     if (options.questionCheck === undefined) {
-      return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+      return refusedWith({ status: 503, body: { error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" } });
     }
     // W3-7: what the dig's parent offered, read once for the dig (its picks' authors at Start, then the picks kept after the join).
     const digSuggestionText = options.digSuggestionText ?? digSuggestionTextFromAnswer((parentRunId) =>
@@ -4429,20 +4527,20 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const digOfStart = digParent !== undefined ? { parentRunId: digParent.parent_run_id, picks: digParent.picks ?? [], own: true }
       : publicAdmission === null ? null : { parentRunId: publicAdmission.parentRunId, picks: publicAdmission.picks, own: false };
     let start: StartHandOverAtAsk | null = null;
-    if (asker !== undefined && (ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
+    if (owner !== null && (ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
       const view = await viewOnce();
       // Where the switch is off nothing runs, so no plan is read for a binding (null: a menu is STALE, the rest is today's ask).
       const binding = !startStepOnInView(view) ? null
-        : await startStepBindingOf({ ownerRef: asker.ownerRef, askBilling: options.askBilling, registerVersion: view.registerVersion });
+        : await startStepBindingOf({ ownerRef: owner.ownerRef, askBilling: options.askBilling, registerVersion: view.registerVersion });
       const digRuns = digOfStart !== null && binding !== null && startWidthsOfView(view, binding.planKey) !== null;
       const dig: StartDig | null = digOfStart === null || !digRuns ? null : Object.freeze({ parentRunId: digOfStart.parentRunId, picks: digOfStart.picks,
         pickAuthors: Object.freeze(await Promise.all(digOfStart.picks.map(async (pick) => digPickAuthorOf(pick,
-          pick.suggestion_id === null || !digOfStart.own ? null : await digSuggestionText(asker.ownerRef, digOfStart.parentRunId, pick.suggestion_id))))) });
+          pick.suggestion_id === null || !digOfStart.own ? null : await digSuggestionText(owner.ownerRef, digOfStart.parentRunId, pick.suggestion_id))))) });
       try {
-        start = startHandOverOf({ key: options.startStepKey, ownerRef: asker.ownerRef, ask, binding, view, dig, now: new Date() });
+        start = startHandOverOf({ key: options.startStepKey, ownerRef: owner.ownerRef, ask, binding, view, dig, now: new Date() });
       } catch (error) {
         if (error instanceof TypedDomainError && START_PATHS_REFUSAL_STATUS.has(error.code)) {
-          return reply.status(askRefusalStatus(error.code)).send({ error: error.code, message: error.code });
+          return refusedWith({ status: askRefusalStatus(error.code), body: { error: error.code, message: error.code } });
         }
         throw error;
       }
@@ -4454,35 +4552,34 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ownWords: start.verified?.ownWords ?? [], startCheckVerified: start.lock !== null, questionEdited: start.questionEdited });
     const outcome = start === null ? await options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines))
       : startCheckText === null ? null : await options.questionCheck.check(startCheckText);
-    const answer = outcome === null ? null : answerForOutcome(outcome, edgeCountry(request.headers));
-    if (answer !== null) return reply.status(answer.status).send(answer.body);
+    const answer = outcome === null ? null : answerForOutcome(outcome, asker.edgeCountry);
+    if (answer !== null) return refusedWith(answer);
     // V4 start step, Task 36: `submit` gets the hand-over as its fourth argument, and three arguments without one; the ask keeps its
-    // whole `question_line`, as the person sent it.
+    // whole `question_line`, as the person sent it. Task 56: the carry-on's dig adds its `carryOn` to the server principal.
     const handOver: readonly [] | readonly [AskStartHandOver] = start === null ? []
       : [Object.freeze({ binding: start.binding, verified: start.verified, lock: start.lock })];
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,
-      request.authenticatedSession === undefined
+      owner === null
         ? Object.freeze({ kind: "legacy" as const, legacyAskerId: request.session.asker_id })
-        : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
-          ownerRef: request.authenticatedSession.ownerRef }),
+        : Object.freeze({ kind: "server" as const, userId: owner.userId, ownerRef: owner.ownerRef, ...extras.principal }),
       ...handOver
     ));
     // V4 start step
     // Task 39e (saved questions spec 2026-11-04 §3.7; owner answer S4 A): the debate is accepted and now holds the question, so the
     // question not started yet it came from goes, exactly as Delete removes it (the caller's own only, its key destroyed first). A
     // refusal above removed nothing; a failure here never changes the 202, and its line names no word (the page deletes it too).
-    if (savedQuestionId !== undefined && asker !== undefined && options.savedQuestions !== undefined) {
+    if (savedQuestionId !== undefined && owner !== null && options.savedQuestions !== undefined) {
       try {
-        await options.savedQuestions.remove(Object.freeze({ ownerRef: asker.ownerRef, userId: asker.userId }), savedQuestionId);
+        await options.savedQuestions.remove(Object.freeze({ ownerRef: owner.ownerRef, userId: owner.userId }), savedQuestionId);
       } catch {
         console.error(JSON.stringify(Object.freeze({ event: "api.saved_question.remove_failed", saved_question_id: savedQuestionId })));
       }
     }
     // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
     // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
-    const digOwner = request.authenticatedSession?.ownerRef;
+    const digOwner = owner?.ownerRef;
     if (digParent !== undefined && digOwner !== undefined && options.investigations !== undefined) {
       const joined = await joinAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref }, options.investigations);
       // W3-7: a dig that joined keeps what it was made of (0135), for the rewrite of the path its picks are on.
@@ -4496,7 +4593,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const joined = await joinPublicDigAtStart({ ownerRef: digOwner, childRunId: accepted.run_ref, admission: publicAdmission, now: new Date(), pool: options.publicTree.pool, tree: options.publicTree.tree,
         contributions: options.publicTree.contributions, readPublicDebate: options.publicTree.readPublicDebate });
       // By the rules a join admitted a moment ago cannot be refused now; a store that failed in between can only be said plainly: the debate runs as the person's own, the page is left alone.
-      if (joined !== "JOINED" && joined !== "ALREADY") return reply.status(202).send({ ...accepted, public_dig_not_joined: true });
+      if (joined !== "JOINED" && joined !== "ALREADY") return Object.freeze({ kind: "ACCEPTED", status: 202, body: { ...accepted, public_dig_not_joined: true } });
     }
     // Decision 13: the page showed the Free notice, on the Free plan: this debate goes public when finished, after the AI check. A dig is a contribution instead; a paid plan's flag means nothing.
     // V4 start step, Task 36: the plan the lock decided, when it did (no second call).
@@ -4511,8 +4608,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       && digOwner !== undefined && options.purposeLines !== undefined) {
       await recordPurposeLinesAtAsk({ ownerRef: digOwner, runId: accepted.run_ref, lines: ask.purpose_lines }, options.purposeLines);
     }
-    return reply.status(202).send(accepted);
-  });
+    return Object.freeze({ kind: "ACCEPTED", status: 202, body: accepted });
+  };
 
   /**
    * Decisions 29 and 31: the clarifying questions for step 2, before a debate exists. A signed-in person only. The question reaches the AI only when the
@@ -4728,6 +4825,36 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(read.success ? read.data : { source: "NONE", reason: "TRANSPORT" });
   });
 
+  /**
+   * V4 start step, Task 56: the question GET /v1/asks/room asks the room, built one way for the route and for a carry-on dig's look
+   * (`roomQuestionForDig`): the access, the view's version, a dig's or a start's member, and the class the room estimates (the
+   * settings decided for the person, normalised under the plan key submit would use, on the view's composed roster).
+   */
+  const roomQuestionOf = (input: Readonly<{ access: RunOwnershipAccess; view: Awaited<ReturnType<typeof admissionView>>;
+    settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">; roomPlanKey: DebateShapePlanKey; dig?: RoomQuestion["dig"];
+    start?: RoomQuestion["start"]; paths: Parameters<typeof runSettingsClassOfAsk>[3] }>): RoomQuestion => Object.freeze({
+    access: input.access,
+    ...(input.view.registerVersion === undefined ? {} : { registerVersion: input.view.registerVersion }),
+    ...(input.dig === undefined ? {} : { dig: input.dig }),
+    ...(input.start === undefined ? {} : { start: input.start }),
+    // Addition D16 (Task SA6): the class counts the roster of the version the view names (its composed preview
+    // configuration), the one the next ask is admitted on; the team rule above tests presence only.
+    settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(input.settings, input.view.debateShapePolicy ?? null, input.roomPlanKey,
+      input.view.lengthGuidancePolicy ?? null), input.view.previewProviderTestConfig, input.roomPlanKey, input.paths)
+  });
+  /** V4 start step, Task 56: the room's question for a carry-on dig, as GET /v1/asks/room builds it for a dig of one pick. */
+  const roomQuestionForDig = async (asker: Pick<CarryOnAsker, "ownerRef">, ask: AskRequest): Promise<RoomQuestion> => {
+    const parent = ask.parent;
+    if (parent === undefined) throw new TypedDomainError("CARRY_ON_DIG_INVALID", "A carry-on dig names its debate");
+    const level = options.digModel === undefined ? null : await options.digModel.readDigLevel(asker.ownerRef, parent.parent_run_id);
+    const view = await admissionView();
+    const decided = await decideRoomSettingsAndPlan({ plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier,
+      depth_params: ask.depth_params }, asker.ownerRef, options.askBilling);
+    return roomQuestionOf({ access: Object.freeze({ ownerRef: asker.ownerRef, legacyAskerId: null }), view, settings: decided.settings,
+      roomPlanKey: debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier),
+      dig: Object.freeze({ parentRunId: parent.parent_run_id, mode: parent.mode, picks: parent.picks?.length ?? null,
+        ...(level === null ? {} : { level: level + 1 }) }), paths: undefined });
+  };
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
     // Paid plans P4-G (go-live row 31): the room read is the estimator and the room's reads on every call, so it
     // charges its own owner-keyed budget when the version in force seals one (required with the band, ruling C7).
@@ -4756,7 +4883,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     };
     // Side-by-side spec §13 (S10): the active version's rows, read once for this request; the room estimates with it.
     const view = await admissionView();
-    const versionMember = view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion };
     // Length guidance (spec 2026-10-15 §3.8): the plan key the room's settings were decided for, which names the answer
     // words; without a room reader, the query's own tier.
     let roomPlanKey: DebateShapePlanKey = "free";
@@ -4789,17 +4915,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     })();
     const answer: AskRoomAnswer = options.askRoom === undefined || decided === null
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
-      : await options.askRoom.readRoom({
-          access,
-          ...versionMember,
-          ...digMember,
-          ...startMember,
-          // Addition D16 (Task SA6): the class counts the roster of the version the view names (its composed preview
-          // configuration), the one the next ask is admitted on; the team rule above tests presence only.
-          settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlanKey,
-            view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlanKey,
-            startWidths === null ? undefined : startRunBuiltPaths(startWidths, roomPlanKey))
-        });
+      // V4 start step, Task 56: the question built one way (roomQuestionOf) for this read and for a carry-on dig's look.
+      : await options.askRoom.readRoom(roomQuestionOf({ access, view, settings: decided.settings, roomPlanKey, ...digMember, ...startMember,
+          paths: startWidths === null ? undefined : startRunBuiltPaths(startWidths, roomPlanKey) }));
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
       scope: answer.scope,
@@ -5406,6 +5524,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!InvestigationCloseRequestSchema.safeParse(request.body ?? {}).success) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    // V4 start step, Task 56: the press itself is the person's own report step (writeReportAsOwner, below, shared with the carry-on).
+    return sendAnswer(reply, await writeReportAsOwner(askAskerOf(request), target.runId));
+  });
+  /**
+   * V4 start step, Task 56: POST /v1/runs/{id}/report after its body check, as one step the route and the carry-on share. Decision
+   * 13's public branch (Task 56b's reserve rule: the debate's first report goes ahead while new starts wait, a further one waits for
+   * the reset) or 0133's close of the investigation. It answers the route's reply as data: WRITING (202) or REFUSED (its status and
+   * code: INVESTIGATION_CLOSED, PUBLIC_DEBATE_*, RUN_NOT_FOUND).
+   */
+  const writeReportAsOwner = async (asker: AskAsker, runId: string): Promise<WriteReportAsOwnerOutcome & RouteAnswer> => {
+    const refused = (status: number, body: Readonly<Record<string, unknown>>) =>
+      Object.freeze({ kind: "REFUSED" as const, status, code: String(body.error), body });
+    const writing = (reportVersion: number, waitingForDigs: number) => Object.freeze({ kind: "WRITING" as const, reportVersion, waitingForDigs,
+      status: 202, body: InvestigationReportAcceptedSchema.parse({ state: "WRITING", report_version: reportVersion, waiting_for_digs: waitingForDigs }) });
+    const reports = options.investigationReports;
+    if (asker.owner === null || reports === undefined) return refused(404, { error: "RUN_NOT_FOUND" });
+    const target = Object.freeze({ runId, ownerRef: asker.owner.ownerRef });
+    const request: AskerOfRequest = Object.freeze({ session: asker.session, authenticatedSession: asker.owner });
     // Decision 13: a public debate never closes: its author's press is the same public report as anyone's, on the public copy.
     const publicTree = await options.publicTree?.tree.readTreeOfRun(target.runId);
     if (publicTree !== null && publicTree !== undefined && publicTree.dig_update_id === null && options.publicTree !== undefined) {
@@ -5413,27 +5549,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Task 56b (owner answer Q20 B): the debate's first report uses the kept reserve (charged as today, to the person, on the public
       // report's seam); a further one, after the person's own or a visitor's, waits for the reset like a dig.
       if (room.waitsForReset && !(await ownFirstReportLeft(target.ownerRef, target.runId, publicTree.publication_ref))) {
-        return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+        return refused(409, PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
       }
       const press = await pressPublicReport({ ownerRef: target.ownerRef, publicationRef: publicTree.publication_ref, reportId: randomUUID(), free: room.planId === "FREE", now: new Date(),
         pool: options.publicTree.pool, tree: options.publicTree.tree, readPublicDebate: options.publicTree.readPublicDebate });
       switch (press.kind) {
-        case "WRITING": return reply.status(202).send(InvestigationReportAcceptedSchema.parse({ state: "WRITING", report_version: press.reportVersion, waiting_for_digs: 0 }));
-        case "ONGOING": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_ONGOING", message: "PUBLIC_DEBATE_ONGOING" }));
-        case "NO_CARRIER": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_NO_CARRIER", message: "PUBLIC_DEBATE_NO_CARRIER" }));
-        case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+        case "WRITING": return writing(press.reportVersion, 0);
+        case "ONGOING": return refused(409, PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_ONGOING", message: "PUBLIC_DEBATE_ONGOING" }));
+        case "NO_CARRIER": return refused(409, PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_NO_CARRIER", message: "PUBLIC_DEBATE_NO_CARRIER" }));
+        case "NOT_FOUND": return refused(404, { error: "RUN_NOT_FOUND" });
         default: return exhaustive(press);
       }
     }
-    const outcome = await writeInvestigationReport(target, options.investigationReports);
+    const outcome = await writeInvestigationReport(target, reports);
     switch (outcome.kind) {
-      case "WRITING": return reply.status(202).send(InvestigationReportAcceptedSchema.parse({
-        state: "WRITING", report_version: outcome.reportVersion, waiting_for_digs: outcome.waitingForDigs }));
-      case "CLOSED": return reply.status(409).send({ error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
-      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "WRITING": return writing(outcome.reportVersion, outcome.waitingForDigs);
+      case "CLOSED": return refused(409, { error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
+      case "NOT_FOUND": return refused(404, { error: "RUN_NOT_FOUND" });
       default: return exhaustive(outcome);
     }
-  });
+  };
   api.post<{ Params: { id: string } }>("/v1/runs/:id/reopen", credentialRoutePolicy("POST /v1/runs/{id}/reopen"), async (request, reply) => {
     const target = memoryRunOf(request);
     if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
@@ -5524,6 +5659,61 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
     route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});
+  // V4 start step, Task 56 ("Let the AIs carry on to the report"; owner ruling 3 Nov, evening): the carry-on's ports, over the two
+  // routes' own steps (askPreflight, askAsOwner, writeReportAsOwner) and the room's look; ./carry-on.ts drives them. The person acts
+  // with no live sign-in: the first debate's session, and each dig's server principal carries its carry-on dig (the one place a
+  // principal gets one), so 0161 provisions its key from that debate's binding. Without the marks the tick answers zeros.
+  const carryOnMarks = options.carryOn;
+  if (carryOnMarks === undefined) {
+    api.decorate("carryOnTick", async (): Promise<CarryOnTick> => Object.freeze({ begun: 0, digs: 0, pressed: 0, waiting: 0 }));
+  } else {
+    const carryOnPorts: CarryOnPorts = {
+      marks: carryOnMarks,
+      readStoredAsk: async (runId) => options.application.readStoredAsk === undefined ? null : options.application.readStoredAsk(runId),
+      readAnswer: (asker, runId) => options.application.readRunAnswer(runId, asker.session, Object.freeze({ ownerRef: asker.ownerRef, legacyAskerId: null })),
+      // The plan decided for the person as a room read decides it; the reserve kept inside the day and week is a paid plan's own
+      // (INSIDE_LIMITS); Free's sits on top of its credit, where no dig can take it.
+      planOf: async (asker, stored) => {
+        const decided = await decideRoomSettingsAndPlan({ plan_tier: stored.planTier ?? "free", composition_budget_tier: stored.compositionBudgetTier,
+          depth_params: stored.depthParams as AskRequest["depth_params"] }, asker.ownerRef, options.askBilling);
+        const plans = options.askBilling?.plans;
+        const plan = plans === undefined || decided.planId === null || !plans.plans.some((each) => each.planId === decided.planId) ? null
+          : planById(plans, decided.planId);
+        return Object.freeze({ free: decided.settings.plan_tier === "free",
+          reserveInsideMicros: plan !== null && plan.reserveHeld === "INSIDE_LIMITS" ? plan.reserveMicros ?? 0 : 0 });
+      },
+      roomForDig: async (asker, ask) => {
+        const room = options.carryOnRoom;
+        if (room === undefined) return null;
+        const question = await roomQuestionForDig(asker, ask);
+        const preview = await room.precheck(question);
+        return Object.freeze({ preview, digMicros: await room.digShareMicros(question) });
+      },
+      askPreflight: async (asker) => {
+        const refused = await askPreflight(Object.freeze({ session: asker.session,
+          owner: Object.freeze({ ownerRef: asker.ownerRef, userId: asker.userId }), edgeCountry: null }));
+        return refused === null ? Object.freeze({ allowed: true as const }) : Object.freeze({ allowed: false as const, code: String(refused.body.error) });
+      },
+      askAsOwner: (asker, ask) => askAsOwner(asker, ask, { principal: { carryOn: carryOnDigOf(ask) } }),
+      // Private: 0133's closings, every one the person pressed (a FAILED or reopened one included: the person pressed first, so the
+      // carry-on never starts a second version), and 0136's waiting count; public: the person's own reports of this debate
+      // (ownClosingsCount), waiting 0 (its own press answers ONGOING).
+      readReport: async (asker, runId) => {
+        const reports = options.investigationReports;
+        const publicationRef = await publicRootOf(runId);
+        if (reports === undefined) return Object.freeze({ public: publicationRef !== null, closings: 0, waiting: 0 });
+        if (publicationRef !== null) {
+          const own = await ownClosingsOf({ ownerRef: asker.ownerRef, runId, publicationRef }, { reports: reports.reports, ownClosings: options.ownClosings });
+          return Object.freeze({ public: true, closings: own === null ? 0 : ownClosingsCount(own), waiting: 0 });
+        }
+        const read = await reports.reports.read(asker.ownerRef, runId);
+        return Object.freeze({ public: false, closings: read?.investigation.closings.length ?? 0, waiting: Math.max(0, Math.trunc(read?.waiting ?? 0)) });
+      },
+      writeReportAsOwner: (asker, runId) => writeReportAsOwner(asker, runId),
+      log: (line) => { console.error(line); }
+    };
+    api.decorate("carryOnTick", () => carryOnTick(carryOnPorts, new Date()));
+  }
   return api;
 }
 
@@ -6675,6 +6865,11 @@ export class PostgresAskApplication implements AskApplication {
     return withRunContentLease(this.pool,[runId],async () => use());
   }
 
+  /** V4 start step, Task 56: the carry-on's read of a debate's stored ask (its own lease; null: no such run). */
+  readStoredAsk(runId: string): Promise<StoredAsk | null> {
+    return this.#runs.readStoredAsk(runId);
+  }
+
   async submit(
     requestedAsk: AskRequest,
     session: Session,
@@ -7816,8 +8011,22 @@ export class PostgresAskApplication implements AskApplication {
       ...(waitsUntil === null ? {} : { waits_until: waitsUntil.toISOString() }),
       ...(waitsFor === null ? {} : { waits_for: waitsFor }),
       // V4 start step, Task 58: a path debate's paths, each path's progress and the part a carry-on debate is running; none on R22.
-      ...await this.#runPaths(runId, run.state, ownership)
+      ...await this.#runPaths(runId, run.state, ownership),
+      // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level the debate was asked at, which its map page shows; none when it
+      // was asked without one (the page reads the default, as today).
+      ...await this.#readingLevelOf(runId)
     });
+  }
+
+  /**
+   * Task 75c: the run's own reading level, as its stored depth_params keep it (read after the owner check above; the level is no
+   * content, so no lease). A stored value that is not a level reads as none.
+   */
+  async #readingLevelOf(runId: string): Promise<Pick<RunProjection, "reading_level">> {
+    const result = await this.pool.query<{ reading_level: unknown }>(
+      "SELECT depth_params->>'readingLevel' AS reading_level FROM core.run WHERE run_id = $1", [runId]);
+    const level = ReadingLevelSchema.safeParse(result.rows[0]?.reading_level);
+    return level.success ? { reading_level: level.data } : {};
   }
 
   /**

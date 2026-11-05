@@ -63,6 +63,8 @@ function pathOf(no: number, over: Partial<PathsDossierPath> = {}): PathsDossierP
     ...over
   });
 }
+/** b2's answer so far's verdict on the person's own words, as the material carries it beside them (Task 55e). */
+const B2_VIEW = Object.freeze({ outcome: "DID_NOT_HELP", scope: "PATH", reason: "The ferries run half empty in winter." });
 const PATHS: readonly PathsDossierPath[] = Object.freeze([
   pathOf(1, { outcome: ready(B1_LINE, "HELD_UP") }),
   pathOf(2, { ownWords: [OWN], outcome: ready(B2_LINE, "PARTLY_HELD", { view: { outcome: "DID_NOT_HELP", scope: "PATH",
@@ -150,7 +152,12 @@ describe("pathsDossierInput: a path run's dossier", () => {
   it("puts the person's own words in views, marked as theirs, by their path, and nowhere beside the path", () => {
     const dossier = dossierOf(pathsInput());
     const fields = dossierFieldsOf(dossier);
-    expect(JSON.parse(fieldOf(fields, "views")!)).toEqual([{ path: "A2", words: [OWN], marked: "PERSON" }]);
+    // Task 55e: the outcome's verdict on those words sits beside them, as a report's and an answer update's do (Task 55b).
+    expect(JSON.parse(fieldOf(fields, "views")!)).toEqual([{ path: "A2", words: [OWN], marked: "PERSON", verdict: B2_VIEW }]);
+    // A path whose answer so far keeps no verdict: the words alone.
+    const unweighed = dossierFieldsOf(dossierOf(pathsInput({ paths: PATHS.map((path) => path.pathId !== "b2" ? path
+      : { ...path, outcome: ready(B2_LINE, "PARTLY_HELD") }) })));
+    expect(JSON.parse(fieldOf(unweighed, "views")!)).toEqual([{ path: "A2", words: [OWN], marked: "PERSON" }]);
     expect(fields.filter((entry) => entry.content.includes(OWN)).map((entry) => entry.name)).toEqual(["views"]);
     expect(dossier.material.answerWriter.map((entry) => entry.name)).toEqual(["question", "first_debate", "follow_ups", "views", "sources", "answer_length"]);
     // A path run with no own words has no views field at all.
@@ -231,7 +238,7 @@ describe("runPathsMainAnswer", () => {
     const fields = new Map(frameOf(requests[0]!.packet).fields.map((entry) => [entry.name, entry.content] as const));
     expect(fields.get("question")).toBe(Q);
     expect(fields.get("answer_length")).toBe("about 300 words");
-    expect(JSON.parse(fields.get("views")!)).toEqual([{ path: "A2", words: [OWN], marked: "PERSON" }]);
+    expect(JSON.parse(fields.get("views")!)).toEqual([{ path: "A2", words: [OWN], marked: "PERSON", verdict: B2_VIEW }]);
   });
 
   it("maps the segments back: s1.., the first alone load-bearing, A-refs to the path's root, P-refs to the point, the rest dropped", async () => {

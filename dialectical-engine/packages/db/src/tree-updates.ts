@@ -54,7 +54,8 @@ export type PathLineEntry = Readonly<{
   content: CryptoEnvelope | null;
 }>;
 export type PathClimbNext = Readonly<{ parent_run_id: string; root_run_id: string; position_ref: string | null }>;
-export type MainAnswerTriggerKind = "PATH_REWRITE" | "PATH_UPDATE";
+/** 0162 (V4 start step, Task 55e): PATH_ADDED, a dig under the main question of a path debate; its trigger id is the dig's run id. */
+export type MainAnswerTriggerKind = "PATH_REWRITE" | "PATH_UPDATE" | "PATH_ADDED";
 export type MainAnswerUpdateRecord = Readonly<{
   updateId: string; rootRunId: string; basedOnUpdateId: string | null; triggerKind: MainAnswerTriggerKind; triggerId: string; triggerRunId: string;
   paidByOwnerRef: string | null; outcome: PathUpdateOutcome; failureCode: string | null;
