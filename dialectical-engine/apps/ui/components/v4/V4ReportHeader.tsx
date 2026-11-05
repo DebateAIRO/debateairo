@@ -10,12 +10,13 @@ import { V4Steps } from "./V4Steps";
 /*
  * report-f12 (owner screen review, 3 Nov 2026): the report's own header, ONE row. "← Back to the map" on the start side;
  * on the end side the reading level in its small "Plain words ▾" form and "Share" (Download PDF, Print, Copy link). No quota
- * share on the report (row D cut it), no second brand row, and the classic-view link moves to the page foot. It is built
- * here rather than in the shared V4Header, so every other V4 page keeps its header as it is.
+ * share on the report (row D cut it), and no second brand row. It is built here rather than in the shared V4Header, so every
+ * other V4 page keeps its header as it is.
  * Below the row, one status line says what a Share choice is doing ("Making your PDF…", "Link copied.").
  * ask-d6 A / journey-f19: the row ends in the V4 header's round account button (the site's old top bar steps back on V4
- * pages), with no classic link in its menu: the report keeps that at its foot. journey-f18 / read-f25: under the row, the
- * four steps with "Your report" marked.
+ * pages). journey-f18 / read-f25: under the row, the four steps with "Your report" marked.
+ * Owner's answers, 5 Nov 2026: question 12 B (journey-f19, "nowhere else"): "Open in the classic view" is in that account
+ * menu only, once, just above "Sign out"; the report's foot link went. The level ruling: the menu's links carry no level.
  */
 
 /** One Share choice. */
@@ -90,7 +91,7 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
   );
 }
 
-export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToMap", level, onLevel, share, status }: Readonly<{
+export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToMap", level, onLevel, share, status, classicHref = null }: Readonly<{
   catalog: MessageCatalog;
   /** null: there is no map to go back to (a report that cannot be found). */
   backHref: string | null;
@@ -102,6 +103,8 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
   share: readonly ReportShareItem[];
   /** What a Share choice is doing, or null. */
   status: ReactNode;
+  /** Question 12 B: the debate's classic view, shown once in the account menu; absent or null: none (no such debate). */
+  classicHref?: string | null;
 }>) {
   return (
     <div className="v4RepChrome">
@@ -170,7 +173,7 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
             ))}
           </HeaderMenu>
         )}
-        <V4AccountMenu catalog={catalog} level={level} classicHref={null} />
+        <V4AccountMenu catalog={catalog} level={null} classicHref={classicHref} />
       </header>
       <div className="v4StepsTop">
         <V4Steps current="report" shape="line" {...(backHref === null ? {} : { hrefs: { map: backHref } })} catalog={catalog} />

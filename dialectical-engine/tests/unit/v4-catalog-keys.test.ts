@@ -524,6 +524,8 @@ describe("V4 catalogue keys", () => {
     // Round 2 r2-13 (A): on paper and in the PDF, Free's web line is the first, honest half of the approved E3b line.
     expect(catalog["v4.web.free"]!.startsWith(catalog["v4.web.freeOnPaper"]!.replace(/\.$/u, ""))).toBe(true);
     expect(catalog["v4.web.freeOnPaper"]).toBe("Not checked on the web.");
+    // The level ruling (owner, 5 Nov): the line above the report's title names no level (still a drafted line).
+    expect(catalog["v4.report.eyebrow"]).not.toMatch(/\{level\}/u);
   });
 
   it("W5-1: the final report's approved headings, F13 and N14 lines are in the catalogue word for word", () => {
