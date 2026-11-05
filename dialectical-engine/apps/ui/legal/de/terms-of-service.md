@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.15 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.16 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.15
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.16
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.15 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.16 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -211,9 +211,7 @@ Die Abschnitte 8 (hinsichtlich bereits veröffentlichter Inhalte), 15, 16 und 18
 
 ## 12. Kostenpflichtige Tarife
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine bietet einen kostenlosen Tarif an. Ein kostenpflichtiger **Premium**-Tarif wird verfügbar sein, der die vollständige Modellauswahl freischaltet und Ihnen erlaubt, die Regler der Debatte selbst einzustellen.
+Dialectical Engine bietet einen kostenlosen Tarif an. Drei kostenpflichtige Tarife, **Plus**, **Pro** und **Max**, werden verfügbar sein; jeder davon schaltet die vollständige Modellauswahl frei und erlaubt Ihnen, die Regler der Debatte selbst einzustellen.
 
 **Bevor Sie bezahlen**, zeigen wir Ihnen unmittelbar über der Zahlungsschaltfläche Folgendes: den Tarif; den Gesamtpreis einschließlich der anwendbaren Steuern; den Abrechnungszeitraum; den Hinweis, dass der Tarif bis zur Kündigung automatisch verlängert wird; das Enddatum eines etwaigen kostenlosen Testzeitraums und den anschließend berechneten Betrag; sowie die Kündigungsmöglichkeiten. Sie bestätigen die Verlängerungsbedingungen durch Markieren eines gesonderten Kästchens. Die Schaltfläche trägt die Aufschrift **Kostenpflichtig abonnieren** (auf Rumänisch *Abonați-vă și plătiți*). Wir senden Ihnen eine Bestätigung auf einem dauerhaften Datenträger, die dieselben Informationen, diese Nutzungsbedingungen und das Widerrufsformular enthält.
 
@@ -233,7 +231,7 @@ Dialectical Engine bietet einen kostenlosen Tarif an. Ein kostenpflichtiger **Pr
 
 **Rückbuchungen.** Wenn Sie eine Belastung bei Ihrem Kartenaussteller beanstanden, können wir kostenpflichtige Funktionen aussetzen, solange die Streitigkeit geklärt wird. Hierfür erheben wir keine Gebühren.
 
-**Gesetzliche Rechte gehen vor.** Wenn der Dienst nicht dem entspricht, was wir zugesagt haben, haben Sie nach Maßgabe des Gesetzes Anspruch auf Herstellung der Vertragsmäßigkeit oder auf eine verhältnismäßige Preisminderung oder Erstattung. Darüber hinaus erstatten wir Ihnen, wenn Sie einen kostenpflichtigen Tarif während eines Abrechnungszeitraums kündigen, den Anteil des Preises dieses Zeitraums, den Sie nicht genutzt haben, bemessen nach der Nutzung des Tarifs, unabhängig davon, wie viele Tage vergangen sind: Haben Sie 30 % genutzt, erstatten wir 70 %; haben Sie nichts genutzt, erstatten wir den vollen Preis. Bitten Sie darum unter support@dezbatere.ro; sobald wir erstatten, endet der Tarif. Gilt zusätzlich das Widerrufsrecht nach Abschnitt 13, erhalten Sie die jeweils höhere Erstattung. Die Nutzungslimits beider Tarife werden im Produkt veröffentlicht; wir informieren Sie, bevor wir sie in einer Weise verschärfen, die Sie wesentlich beeinträchtigt.
+**Gesetzliche Rechte gehen vor.** Wenn der Dienst nicht dem entspricht, was wir zugesagt haben, haben Sie nach Maßgabe des Gesetzes Anspruch auf Herstellung der Vertragsmäßigkeit oder auf eine verhältnismäßige Preisminderung oder Erstattung. Darüber hinaus erstatten wir Ihnen, wenn Sie einen kostenpflichtigen Tarif während eines Abrechnungszeitraums kündigen, den Anteil des Preises dieses Zeitraums, den Sie nicht genutzt haben, bemessen nach der Nutzung des Tarifs, unabhängig davon, wie viele Tage vergangen sind: Haben Sie 30 % genutzt, erstatten wir 70 %; haben Sie nichts genutzt, erstatten wir den vollen Preis. Bitten Sie darum unter support@dezbatere.ro; sobald wir erstatten, endet der Tarif. Gilt zusätzlich das Widerrufsrecht nach Abschnitt 13, erhalten Sie die jeweils höhere Erstattung. Die Nutzungslimits aller Tarife werden im Produkt veröffentlicht; wir informieren Sie, bevor wir sie in einer Weise verschärfen, die Sie wesentlich beeinträchtigt.
 
 ## 13. Ihr Widerrufsrecht
 
@@ -250,6 +248,8 @@ Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls gelte
 Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von **30 Tagen** nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge.
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
+
+Version 2.16 ersetzte Version 2.15: Abschnitt 12 nennt die kostenpflichtigen Tarife, Plus, Pro und Max, und die Abschnitte 12 und 15 enthalten keine Entwurfsvermerke mehr; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert.
 
 Version 2.15 ersetzte Version 2.14: Abschnitt 12 besagt, dass unsere Preise ohne Steuern angezeigt werden, als Preis + MwSt., und dass die Steuer beim Bezahlvorgang aufgeschlagen wird.
 
@@ -278,8 +278,6 @@ Version 2.7 ersetzte Version 2.6: Sie ergänzt die Fragenprüfung, die jede Frag
 **Ihre Inhalte und Ihre Nutzung.** Sie sind für das verantwortlich, was Sie übermitteln und veröffentlichen, einschließlich dafür, dass Sie zur Übermittlung berechtigt sind und Abschnitt 7 einhalten.
 
 **Ereignisse außerhalb unserer Kontrolle.** Wir begehen keine Vertragsverletzung, wenn wir durch einen Umstand außerhalb unserer zumutbaren Kontrolle an der Leistung gehindert werden. Ein Ausfall oder Rückzug eines externen Modellanbieters ist nicht automatisch ein solches Ereignis; führt er zur Nichtverfügbarkeit des Dienstes, gilt Abschnitt 14, und Sie können wie dort beschrieben kündigen und eine Erstattung erhalten.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Geistiges Eigentum
 

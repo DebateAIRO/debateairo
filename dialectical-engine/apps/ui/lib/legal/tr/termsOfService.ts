@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ücretli planlar",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir Premium plan sunulacaktır." },
+      { kind: "p", text: "Dialectical Engine ücretsiz bir plan sunar. Plus, Pro ve Max adlı ücretli üç plan sunulacaktır; her biri model listesinin tamamının kilidini açar ve tartışma göstergelerini kendiniz belirlemenize olanak tanır." },
       { kind: "p", text: "Ödeme yapmadan önce size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde Abone ol ve öde (Romence, Abonați-vă și plătiți) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz." },
       { kind: "p", text: "Hatırlatmalar. Ücretsiz denemenin ücretli plana dönüşmesinden en az 5 gün önce; devam eden planlar için yılda en az bir kez ve on iki ay veya daha uzun süreli bir dönemin yenilenmesinden 30 ila 45 gün önce size e-posta göndeririz. Her hatırlatma fiyatı, tarihi ve iptal bağlantısını içerir." },
       { kind: "p", text: "İptal. İstediğiniz zaman Ayarlar → Abonelik bölümünden tek bir teyit tıklamasıyla veya oturum açmanızı gerektirmeyen dezbatere.ro/cancel adresindeki iptal sayfasından iptal edebilirsiniz. İptal, mevcut faturalandırma döneminin sonunda hüküm doğurur ve o zamana kadar erişiminiz sürer. İptal işlemini abone olmaktan daha zor hâle getirmeyiz." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ödeme yöntemleri. Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz." },
       { kind: "p", text: "Teslimat. Dialectical Engine çevrimiçi bir hizmettir; bu nedenle size hiçbir şey gönderilmez. Ücretli planınızın özellikleri, ödemeniz onaylanır onaylanmaz hesabınızda kullanıma açılır." },
       { kind: "p", text: "Ters ibrazlar. Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız." },
-      { kind: "p", text: "Öncelik kanuni haklardadır. Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz." }
+      { kind: "p", text: "Öncelik kanuni haklardadır. Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Tüm planların kullanım sınırları üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Hizmette. Dialectical Engine'i sürekli geliştiririz; rutin iyileştirmeler, düzeltmeler ve model listesi değişiklikleri bildirimsiz yapılır. Hizmeti açıklandığı şekilde çalışır tutmanın ötesine geçen bir değişiklik yaptığımızda bunu yalnızca şu nedenlerden biriyle yaparız: hukuki veya düzenleyici bir gerekliliğe uymak; bir güvenlik veya kötüye kullanım sorununa müdahale etmek; bir model sağlayıcısının bağlı olduğumuz bir modeli veya özelliği değiştirmesi, kısıtlaması veya geri çekmesi; denetlemediğimiz teknik bir ortama uyum sağlamak ya da size ek maliyet getirmeyecek şekilde bir özellik eklemek, iyileştirmek veya kullanımdan kaldırmak." },
       { kind: "p", text: "Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren 30 gün içinde ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz." },
       { kind: "p", text: "Bu Koşullarda. Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az 30 gün önce size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır." },
+      { kind: "p", text: "Sürüm 2.16, sürüm 2.15'in yerine geçmiştir: 12. bölüm ücretli planları, yani Plus, Pro ve Max'i adlarıyla belirtir ve 12. ile 15. bölümler artık taslak notları içermez; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir." },
       { kind: "p", text: "Sürüm 2.15, sürüm 2.14'ün yerine geçmiştir: 12. bölüm, fiyatlarımızın vergi hariç olarak, fiyat + KDV şeklinde gösterildiğini ve verginin ödeme sayfasında eklendiğini söyler." },
       { kind: "p", text: "Sürüm 2.14, sürüm 2.13'ün yerine geçmiştir: 18. bölüm ve Ek A, alternatif uyuşmazlık çözümü yolu olarak ANPC (SAL)'ı belirtir." },
       { kind: "p", text: "Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinin Romence metnini belirtir." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Sınırlandırmadığımız hususlar. Bu Koşullardaki hiçbir hüküm; ihmalimizin neden olduğu ölüm veya bedensel zarar, hile veya hileli yanlış beyan, ağır ihmal veya kasten kötü davranış ya da hukuken sınırlandırılamayacak başka herhangi bir hususa ilişkin sorumluluğumuzu ortadan kaldırmaz veya sınırlandırmaz. Tüketiciyseniz buradaki hiçbir hüküm; uygun olmayan hizmetin uygun hâle getirilmesi, fiyat indirimi veya geri ödeme hakkı ya da yaşadığınız ülkenin hukuku uyarınca geçerli olan herhangi bir güvence dahil kanuni haklarınızı ortadan kaldırmaz." },
       { kind: "p", text: "Üretilen içerik. Hizmet, denetlemeden harekete geçebileceğiniz sonuçlar değil, değerlendirmeniz için materyal üretir ve 5. bölüm bunu açıkça belirtir. Yukarıdaki paragrafa tabi olarak, 5. bölümde açıklanan makul doğrulama adımlarını atmadığınız durumlarda üretilen argümanlara, puanlara veya hükümlere dayanarak aldığınız kararlardan sorumlu değiliz." },
       { kind: "p", text: "İçeriğiniz ve kullanımınız. Gönderme hakkına sahip olmak ve 7. bölüme uymak dahil, gönderdiklerinizden ve yayımladıklarınızdan siz sorumlusunuz." },
-      { kind: "p", text: "Denetimimiz dışındaki olaylar. Makul denetimimiz dışındaki bir hususun ifamızı engellediği durumlarda sözleşmeyi ihlal etmiş sayılmayız. Üçüncü taraf bir model sağlayıcısının başarısız olması veya hizmeti geri çekmesi kendiliğinden böyle bir olay sayılmaz; bu durum hizmeti kullanılamaz hâle getirirse 14. bölüm uygulanır ve orada açıklandığı üzere sözleşmeyi sona erdirip geri ödeme alabilirsiniz." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Denetimimiz dışındaki olaylar. Makul denetimimiz dışındaki bir hususun ifamızı engellediği durumlarda sözleşmeyi ihlal etmiş sayılmayız. Üçüncü taraf bir model sağlayıcısının başarısız olması veya hizmeti geri çekmesi kendiliğinden böyle bir olay sayılmaz; bu durum hizmeti kullanılamaz hâle getirirse 14. bölüm uygulanır ve orada açıklandığı üzere sözleşmeyi sona erdirip geri ödeme alabilirsiniz." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "af15096d907540dbf91fc5cc2665f134d00880e751fdcf2f4a2d55079e8296f3",
-  eyebrow: "HİZMET KOŞULLARI · v2.15 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
+  version: "2.16",
+  sha256: "2557817138a717cb61f3e790252b61195ccdb84a2c5e2c4a79732cc73c349b3f",
+  eyebrow: "HİZMET KOŞULLARI · v2.16 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.15",
+  endMarker: "KOŞULLARIN SONU · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

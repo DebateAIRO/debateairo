@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.15 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.16 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.15
+endMarker: KONIEC WARUNKÓW · v2.16
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.15 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.16 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -211,9 +211,7 @@ Sekcje 8 (w zakresie treści już opublikowanych), 15, 16 i 18 zachowują moc po
 
 ## 12. Plany płatne
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Premium**, który odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
+Dialectical Engine oferuje plan bezpłatny. Dostępne będą trzy płatne plany, **Plus**, **Pro** i **Max**; każdy z nich odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
 
 **Przed dokonaniem płatności** bezpośrednio nad przyciskiem płatności wyświetlamy: plan; łączną cenę z uwzględnieniem należnego podatku; okres rozliczeniowy; informację, że plan odnawia się automatycznie do czasu anulowania; datę zakończenia ewentualnego bezpłatnego okresu próbnego i kwotę, która zostanie następnie pobrana; oraz sposób anulowania. Potwierdzasz warunki odnowienia, zaznaczając odrębne pole. Przycisk ma treść **Subskrybuj i zapłać** (po rumuńsku *Abonați-vă și plătiți*). Przekazujemy Ci na trwałym nośniku potwierdzenie zawierające te same informacje, niniejsze Warunki oraz formularz odstąpienia.
 
@@ -233,7 +231,7 @@ Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Pre
 
 **Obciążenia zwrotne.** Jeżeli zakwestionujesz obciążenie u wystawcy karty, możemy zawiesić funkcje płatne do czasu rozstrzygnięcia sporu. Nie pobieramy z tego tytułu opłat.
 
-**Pierwszeństwo praw ustawowych.** Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto, jeżeli zrezygnujesz z planu płatnego w trakcie okresu rozliczeniowego, zwrócimy Ci tę część ceny za ten okres, która nie została wykorzystana, mierzoną zużyciem planu, niezależnie od tego, ile dni minęło: jeżeli wykorzystano 30%, zwrócimy 70%; jeżeli nic nie wykorzystano, zwrócimy całą cenę. Wniosek o zwrot wyślij na support@dezbatere.ro; po dokonaniu zwrotu plan wygasa. Jeżeli ma zastosowanie także prawo odstąpienia opisane w sekcji 13, otrzymasz wyższy z dwóch zwrotów. Limity korzystania w obu planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ.
+**Pierwszeństwo praw ustawowych.** Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto, jeżeli zrezygnujesz z planu płatnego w trakcie okresu rozliczeniowego, zwrócimy Ci tę część ceny za ten okres, która nie została wykorzystana, mierzoną zużyciem planu, niezależnie od tego, ile dni minęło: jeżeli wykorzystano 30%, zwrócimy 70%; jeżeli nic nie wykorzystano, zwrócimy całą cenę. Wniosek o zwrot wyślij na support@dezbatere.ro; po dokonaniu zwrotu plan wygasa. Jeżeli ma zastosowanie także prawo odstąpienia opisane w sekcji 13, otrzymasz wyższy z dwóch zwrotów. Limity korzystania we wszystkich planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ.
 
 ## 13. Prawo odstąpienia od umowy
 
@@ -250,6 +248,8 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+
+Wersja 2.16 zastąpiła wersję 2.15: sekcja 12 wymienia płatne plany, Plus, Pro i Max, a sekcje 12 i 15 nie zawierają już uwag redakcyjnych; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
 
 Wersja 2.15 zastąpiła wersję 2.14: sekcja 12 mówi, że nasze ceny są podawane bez podatku, jako cena + VAT, oraz że podatek jest doliczany na stronie płatności.
 
@@ -278,8 +278,6 @@ Wersja 2.7 zastąpiła wersję 2.6: dodaje kontrolę pytań, która odczytuje ka
 **Twoje treści i sposób korzystania.** Odpowiadasz za przesyłane i publikowane treści, w tym za posiadanie prawa do ich przesyłania oraz przestrzeganie sekcji 7.
 
 **Zdarzenia pozostające poza naszą kontrolą.** Nie naruszamy umowy, jeżeli wykonanie zobowiązań uniemożliwia nam okoliczność pozostająca poza naszą rozsądną kontrolą. Awaria lub wycofanie się zewnętrznego dostawcy modelu nie jest automatycznie taką okolicznością; jeżeli powoduje niedostępność usługi, zastosowanie ma sekcja 14 i możesz rozwiązać umowę oraz otrzymać zwrot na opisanych w niej zasadach.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Własność intelektualna
 

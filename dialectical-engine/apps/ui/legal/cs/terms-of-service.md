@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.15 · ÚČINNÉ OD 1. LISTOPADU 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.16 · ÚČINNÉ OD 1. LISTOPADU 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v2.15
+endMarker: KONEC PODMÍNEK · v2.16
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.15 · Effective 1. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 2.16 · Effective 1. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. V bezplatném tarifu jsou vaše debaty po dokončení veřejné, po kontrole AI; v placeném tarifu jsou soukromé, dokud je nezveřejníte. Jakmile je debata veřejná, může ji číst kdokoli a zůstává veřejná. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -211,9 +211,7 @@ Oddíly 8 (pokud jde o již zveřejněný obsah), 15, 16 a 18 zůstávají v pla
 
 ## 12. Placené tarify
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **Premium**, který zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
+Dialectical Engine nabízí bezplatný tarif. K dispozici budou tři placené tarify, **Plus**, **Pro** a **Max**; každý z nich zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
 
 **Před zaplacením** vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní **Předplatit a zaplatit** (v rumunštině *Abonați-vă și plătiți*). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení.
 
@@ -233,7 +231,7 @@ Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **
 
 **Reklamace platby.** Pokud platbu zpochybníte u vydavatele karty, můžeme placené funkce po dobu řešení sporu pozastavit. Neúčtujeme za to žádné poplatky.
 
-**Zákonná práva mají přednost.** Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání jednotlivých tarifů jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme.
+**Zákonná práva mají přednost.** Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání každého tarifu jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme.
 
 ## 13. Vaše právo na odstoupení
 
@@ -250,6 +248,8 @@ Pokud jste nás zaškrtnutím políčka při nákupu požádali, abychom službu
 O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li změna více než nepodstatný nepříznivý dopad na váš přístup ke službě nebo její používání, můžete smlouvu bezplatně ukončit do **30 dnů** ode dne, kdy jste byli informováni, nebo ode dne nabytí účinku změny, podle toho, který den nastane později, a vrátíme vám případnou předplacenou částku za nevyužité období.
 
 **Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
+
+Verze 2.16 nahradila verzi 2.15: oddíl 12 uvádí placené tarify, Plus, Pro a Max, a oddíly 12 a 15 už neobsahují poznámky k návrhu; to, za co odpovídáme, ani žádné právo podle těchto Podmínek se nemění.
 
 Verze 2.15 nahradila verzi 2.14: oddíl 12 uvádí, že naše ceny zobrazujeme bez daně, ve tvaru cena + DPH, a že se daň připočítá v pokladně.
 
@@ -278,8 +278,6 @@ Verze 2.7 nahradila verzi 2.6: přidává kontrolu otázky, která čte každou 
 **Váš obsah a vaše užívání.** Odpovídáte za to, co zadáváte a zveřejňujete, včetně toho, že jste oprávněni obsah zadat a že dodržujete oddíl 7.
 
 **Události mimo naši kontrolu.** Nejsme v prodlení, pokud nám plnění znemožní okolnost mimo naši přiměřenou kontrolu. Selhání nebo odstoupení poskytovatele modelu třetí strany nepředstavuje automaticky takovou událost; způsobí-li nedostupnost služby, použije se oddíl 14 a můžete smlouvu ukončit a získat vrácení peněz, jak je v něm popsáno.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Duševní vlastnictví
 

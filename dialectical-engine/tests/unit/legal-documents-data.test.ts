@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildLegalDocument,
+  inlineText,
   LEGAL_DOCUMENT_SOURCES,
   renderLegalModule
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
@@ -69,12 +70,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.15 · EFFECTIVE 1 NOVEMBER 2026");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.16 · EFFECTIVE 1 NOVEMBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.15");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.16");
       expect(TERMS_OF_SERVICE.contact).toBe("support@dezbatere.ro");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -292,11 +293,25 @@ describe("legal documents — generated data", () => {
       expect(support).toContain("the model receives anything else you type in the chat");
     });
 
-    it("decodes the HTML-entity bracket and preserves every placeholder verbatim", () => {
+    it("opens section 12 with the free plan and the three paid plans, no drafting note", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
-        "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]"
+        "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, will be available; each unlocks the full model roster and lets you set the debate gauges yourself."
       );
       expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed"))).toBe(true);
+    });
+
+    it("decodes the HTML-entity bracket of a placeholder verbatim", () => {
+      expect(inlineText("&#91;x\\]")).toBe("[x]");
+    });
+
+    it("carries no bracketed drafting note in any locale's current draft", () => {
+      // Locale folders only: the sealed files under archive/ keep the notes they were published with.
+      const locales = readdirSync(resolve(process.cwd(), "apps/ui/legal")).filter((name) => /^[a-z]{2}$/.test(name));
+      expect(locales).toContain("en");
+      for (const locale of locales) {
+        const draft = readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, "terms-of-service.md"), "utf8");
+        for (const mark of ["&#91;", "&#93;", "\\["]) expect(draft.includes(mark), `${locale}: ${mark}`).toBe(false);
+      }
     });
 
     it("leaves no markdown syntax in any string a reader sees", () => {

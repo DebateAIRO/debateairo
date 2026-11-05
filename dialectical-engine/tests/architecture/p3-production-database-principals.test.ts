@@ -1365,6 +1365,15 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)",
     "EXECUTE ON FUNCTION memory.unlink_owned_memory_link(uuid,uuid,text,text)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0156_moderation_notice.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.claim_moderation_notices(integer)",
+    "EXECUTE ON FUNCTION identity.read_moderation_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_moderation_notice(uuid,uuid,text)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

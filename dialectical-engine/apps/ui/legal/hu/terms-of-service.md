@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.15 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.16 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.15
+endMarker: A FELTÉTELEK VÉGE · v2.16
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.15 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.16 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -211,9 +211,7 @@ A 8. szakasz (a már közzétett tartalom tekintetében), valamint a 15., 16. é
 
 ## 12. Fizetős csomagok
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
+A Dialectical Engine ingyenes csomagot kínál. Három fizetős csomag lesz elérhető, a **Plus**, a **Pro** és a **Max**; mindegyik hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
 
 **Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Abonați-vă și plătiți*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
 
@@ -233,7 +231,7 @@ A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag
 
 **Visszaterhelések.** Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat.
 
-**A törvényes jogok elsőbbsége.** Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően, ha a számlázási időszak közben lemondja a fizetős csomagot, visszatérítjük az időszak díjának azt a részét, amelyet Ön nem használt fel, a csomag használata alapján mérve, függetlenül attól, hogy hány nap telt el: ha a díj 30%-át használta fel, 70%-át térítjük vissza; ha semmit nem használt fel, a teljes díjat visszatérítjük. Kérje a support@dezbatere.ro címen; amint visszatérítjük a díjat, a csomag megszűnik. Ha a 13. szakasz szerinti elállási jog is alkalmazandó, a kettő közül a nagyobb visszatérítést kapja. Mindkét csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat.
+**A törvényes jogok elsőbbsége.** Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően, ha a számlázási időszak közben lemondja a fizetős csomagot, visszatérítjük az időszak díjának azt a részét, amelyet Ön nem használt fel, a csomag használata alapján mérve, függetlenül attól, hogy hány nap telt el: ha a díj 30%-át használta fel, 70%-át térítjük vissza; ha semmit nem használt fel, a teljes díjat visszatérítjük. Kérje a support@dezbatere.ro címen; amint visszatérítjük a díjat, a csomag megszűnik. Ha a 13. szakasz szerinti elállási jog is alkalmazandó, a kettő közül a nagyobb visszatérítést kapja. Valamennyi csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat.
 
 ## 13. Az Ön elállási joga
 
@@ -250,6 +248,8 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+
+A 2.16-os verzió a 2.15-ös verzió helyébe lépett: a 12. szakasz megnevezi a fizetős csomagokat, a Plus, a Pro és a Max csomagot, a 12. és a 15. szakasz pedig már nem tartalmaz szerkesztési megjegyzéseket; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
 
 A 2.15-ös verzió a 2.14-es verzió helyébe lépett: a 12. szakasz kimondja, hogy árainkat adó nélkül, ár + héa formában tüntetjük fel, és hogy az adót a fizetési oldalon adjuk hozzá.
 
@@ -278,8 +278,6 @@ A 2.7-es verzió a 2.6-as verzió helyébe lépett: hozzáadja a kérdésellenő
 **Az Ön tartalma és használata.** Ön felel az általa beküldött és közzétett tartalomért, ideértve azt is, hogy jogosult annak beküldésére, és betartja a 7. szakaszt.
 
 **Ellenőrzési körünkön kívüli események.** Nem követünk el szerződésszegést, ha kötelezettségünk teljesítésében észszerű ellenőrzési körünkön kívüli körülmény akadályoz. Egy harmadik fél modellszolgáltatójának hibája vagy kivonulása nem minősül automatikusan ilyen eseménynek; ha emiatt a szolgáltatás elérhetetlenné válik, a 14. szakasz alkalmazandó, és az ott leírtak szerint Ön megszüntetheti a szerződést és visszatérítést kaphat.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Szellemi tulajdon
 

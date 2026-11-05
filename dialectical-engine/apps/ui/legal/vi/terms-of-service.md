@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.15 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.16 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.15
+endMarker: HẾT ĐIỀU KHOẢN · v2.16
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.15 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.16 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -211,9 +211,7 @@ Các mục 8 (đối với nội dung đã được công khai), 15, 16 và 18 t
 
 ## 12. Gói trả phí
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả phí sẽ được cung cấp, mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
+Dialectical Engine cung cấp một gói miễn phí. Ba gói trả phí, **Plus**, **Pro** và **Max**, sẽ được cung cấp; mỗi gói mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
 
 **Trước khi bạn thanh toán**, ngay phía trên nút thanh toán, chúng tôi hiển thị: gói dịch vụ; tổng giá gồm thuế áp dụng; kỳ thanh toán; thông tin rằng gói dịch vụ tự động gia hạn cho đến khi bị hủy; ngày kết thúc mọi thời gian dùng thử miễn phí và khoản tiền bạn sẽ phải trả sau đó; cùng cách hủy. Bạn xác nhận điều khoản gia hạn bằng cách đánh dấu vào một ô riêng. Nút này ghi **Đăng ký và thanh toán** (bằng tiếng Romania, *Abonați-vă și plătiți*). Chúng tôi gửi cho bạn xác nhận trên một phương tiện bền vững có cùng thông tin, các Điều khoản này và biểu mẫu rút lui.
 
@@ -233,7 +231,7 @@ Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả ph�
 
 **Yêu cầu hoàn tiền qua tổ chức phát hành thẻ.** Nếu bạn tranh chấp một khoản phí với tổ chức phát hành thẻ, chúng tôi có thể đình chỉ các tính năng trả phí trong khi tranh chấp được giải quyết. Chúng tôi không thu phí cho việc này.
 
-**Quyền theo luật định được ưu tiên.** Khi dịch vụ không phù hợp với những gì chúng tôi cam kết, bạn có quyền yêu cầu đưa dịch vụ về trạng thái phù hợp, hoặc được giảm giá tương ứng hay hoàn tiền, theo quy định pháp luật. Ngoài ra, nếu bạn hủy gói trả phí trong một kỳ thanh toán, chúng tôi hoàn lại phần giá của kỳ đó mà bạn chưa dùng, tính theo mức sử dụng gói, dù đã trôi qua bao nhiêu ngày: nếu bạn đã dùng 30% gói, chúng tôi hoàn lại 70%; nếu bạn chưa dùng gì, chúng tôi hoàn lại toàn bộ giá. Hãy yêu cầu tại support@dezbatere.ro; khi chúng tôi đã hoàn tiền, gói sẽ chấm dứt. Nếu quyền rút lui tại mục 13 cũng được áp dụng, bạn nhận khoản hoàn tiền nào lớn hơn. Giới hạn sử dụng của từng gói được công bố trong sản phẩm; chúng tôi sẽ thông báo trước khi siết chặt các giới hạn theo cách ảnh hưởng đáng kể đến bạn.
+**Quyền theo luật định được ưu tiên.** Khi dịch vụ không phù hợp với những gì chúng tôi cam kết, bạn có quyền yêu cầu đưa dịch vụ về trạng thái phù hợp, hoặc được giảm giá tương ứng hay hoàn tiền, theo quy định pháp luật. Ngoài ra, nếu bạn hủy gói trả phí trong một kỳ thanh toán, chúng tôi hoàn lại phần giá của kỳ đó mà bạn chưa dùng, tính theo mức sử dụng gói, dù đã trôi qua bao nhiêu ngày: nếu bạn đã dùng 30% gói, chúng tôi hoàn lại 70%; nếu bạn chưa dùng gì, chúng tôi hoàn lại toàn bộ giá. Hãy yêu cầu tại support@dezbatere.ro; khi chúng tôi đã hoàn tiền, gói sẽ chấm dứt. Nếu quyền rút lui tại mục 13 cũng được áp dụng, bạn nhận khoản hoàn tiền nào lớn hơn. Giới hạn sử dụng của mọi gói được công bố trong sản phẩm; chúng tôi sẽ thông báo trước khi siết chặt các giới hạn theo cách ảnh hưởng đáng kể đến bạn.
 
 ## 13. Quyền rút lui của bạn
 
@@ -250,6 +248,8 @@ Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc
 Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng **30 ngày** kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng.
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
+
+Phiên bản 2.16 thay thế phiên bản 2.15: mục 12 nêu tên các gói trả phí, Plus, Pro và Max, và các mục 12 và 15 không còn chứa ghi chú soạn thảo; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
 
 Phiên bản 2.15 thay thế phiên bản 2.14: mục 12 nêu rằng giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT, và rằng thuế được cộng thêm ở trang thanh toán.
 
@@ -278,8 +278,6 @@ Phiên bản 2.7 thay thế phiên bản 2.6: phiên bản này bổ sung bướ
 **Nội dung và việc sử dụng của bạn.** Bạn chịu trách nhiệm về nội dung mình gửi và công khai, bao gồm việc có quyền gửi nội dung đó và tuân thủ mục 7.
 
 **Sự kiện nằm ngoài sự kiểm soát của chúng tôi.** Chúng tôi không vi phạm hợp đồng khi bị ngăn cản thực hiện nghĩa vụ bởi một sự việc nằm ngoài khả năng kiểm soát hợp lý. Việc một nhà cung cấp mô hình bên thứ ba không thực hiện nghĩa vụ hoặc rút dịch vụ không tự động cấu thành sự việc như vậy; khi việc đó khiến dịch vụ không thể sử dụng, mục 14 được áp dụng và bạn có thể chấm dứt cũng như được hoàn tiền theo mô tả tại mục đó.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Sở hữu trí tuệ
 

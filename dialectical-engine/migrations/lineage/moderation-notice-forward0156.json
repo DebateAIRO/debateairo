@@ -1,0 +1,18 @@
+{
+  "version": "moderation-notice-forward0156-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0155_owner_answer_writes.sql",
+    "manifestSha256": "e3d0a2451b1e25694373586dac55c55de40450fd5759ad97bb7690d62a14147c",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0156_moderation_notice.sql",
+    "sha256": "8f648f41259a454b3e8ad76e45ef09231e74a42a574f7ca0d362c94d0897a2c4"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}
