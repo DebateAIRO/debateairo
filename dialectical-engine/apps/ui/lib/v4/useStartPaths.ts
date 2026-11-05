@@ -13,10 +13,14 @@ import {
   type SignedStartList,
   type SignedStartMenu,
   type SiteLanguage,
+  type StartCombineMember,
+  type StartCombineRequest,
+  type StartCombineResponse,
   type StartFitRequest,
   type StartListsEvent,
   type StartListsRequest,
   type StartMergeRequest,
+  type StartMergeResponse,
   type StartPaths,
   type StartStepNoneReason,
   type StartStepRoom
@@ -24,10 +28,15 @@ import {
 import { contractClient } from "../api.js";
 import { SHARE_DELTA_SHOW_MS, startPathsShare } from "./money.js";
 import {
+  combineMembersKey,
+  isPersonPath,
+  pathPlanChanged,
+  pathPlanCombineMembers,
   pathPlanFromMenu,
   pathPlanOwnWords,
   pathPlanReduce,
   pathPlanToStartPaths,
+  pathPlanWithRevision,
   type PathPlan,
   type PathPlanAction,
   type PathPlanRefusal
@@ -51,7 +60,17 @@ import type { ReadingLevel, V4StartHandOver } from "./types.js";
  *    Start works and the debate chooses its own paths; the card says why the list is missing in one line.
  *  - Never hangs: the page gives up 5 s after the server's own limit (the 215-second line), and a merge that never answers
  *    ends the same way. The suggestions never go out of date by time: there is no lifetime and no timer on them (answer
- *    Q8). STALE comes only from a 409 START_PATHS_STALE (markStale, or a merge or fit answered so).
+ *    Q8). STALE comes only from a 409 START_PATHS_STALE (markStale, or a merge, combine or fit answered so).
+ * Task 71 (read-d2, choose-d2, choose-f4, owner answer Q8, ask-f13, read-f1):
+ *  - Late lists, and lists a CODE fallback left out, are merged in by late merges, one at a time, with the menu so far; their
+ *    new paths go to the end of "+ N more", marked new, and never onto the list. Lists wait while there is no menu yet or a
+ *    late merge runs, and go with Start (late_lists) until merged. A late merge that brings nothing is asked once more with
+ *    the same lists; none after revision 9.
+ *  - Each new path being written gets one combine call; the AI's words are kept in the page's memory for this reading, so
+ *    putting the same viewpoints together again (after Undo, say) asks nothing. No words, a failure or the combine wait:
+ *    the joined words stay (FALLBACK), and the next time asks again.
+ *  - A stale reading starts no new call (the calls already asked finish), and is read again on Back, then Next (read-f1).
+ *  - "Use my words instead" (ask-f13): after an accepted rewrite, the person's own words are read fresh with KEEP_MINE.
  * Every call is the contract client's; nothing is kept in the browser.
  */
 
@@ -100,6 +119,13 @@ export type V4StartCardState = Readonly<{
   lateLists: readonly SignedStartList[];
   lateIdeas: number;
   justLanded: boolean;
+  /**
+   * ask-f13: after chooseLanguage("USE_REWRITE") only, the person's own words (the offer's original line), which the page
+   * then passes as questionLine; they are read fresh with KEEP_MINE (a new reading; the offer does not come back). Else null.
+   */
+  keepMyWords(): string | null;
+  /** The person shaped the list (a change on the Undo stack, or a path of their own): the page's leave rule (Task 76c). */
+  shaped: boolean;
 }>;
 
 /** `questionLine` is the line posted at Next; the page never passes the step-2 box here (Task 76). */
@@ -123,6 +149,10 @@ type Reading = Readonly<{
   checkedLine: string | null;
   /** After USE_REWRITE: the person's own words, sent back as the check's original_question_line. */
   originalLine: string | null;
+  /** After USE_REWRITE: the offer's check and the person's own words, for "Use my words instead" (ask-f13). */
+  rewrite: Readonly<{ checkRef: string; original: string }> | null;
+  /** The language choice is made for this reading: an offer is not shown again. */
+  choiceMade: boolean;
   languageOffer: QuestionLanguageOffer | null;
   refusal: ContractHttpError | null;
   lists: readonly SignedStartList[];
@@ -136,20 +166,70 @@ type Reading = Readonly<{
   noneLine: StartNoneLine | null;
   justLanded: boolean;
 }>;
+type Timer = ReturnType<typeof setTimeout>;
+/** The AI's words for a set of viewpoints put together, with its combine reference (Task 71). */
+type Written = Readonly<{ title: string; question: string; combineRef: string }>;
 /**
  * The running side of a reading: its one AbortController, its timers, and the number of its latest lists post (a reading
- * posts again after the language choice; the earlier stream's last callbacks are then ignored).
+ * posts again after the language choice; the earlier stream's last callbacks are then ignored). Task 71: the late merges
+ * and the combines, each call with its own stop (stopped too with the reading) and its own wait.
  */
-type Run = { readonly controller: AbortController; posts: number; giveUp: ReturnType<typeof setTimeout> | null;
-  merge: ReturnType<typeof setTimeout> | null; landed: ReturnType<typeof setTimeout> | null };
+type Run = {
+  readonly controller: AbortController; posts: number; giveUp: Timer | null; merge: Timer | null; landed: Timer | null;
+  /** The waits of the late merges and combines being asked. */
+  readonly waits: Set<Timer>;
+  /** A late merge is being asked (one at a time). */
+  lateBusy: boolean;
+  /** Lists a late merge was asked about: asked about again only together with a list that came after. */
+  readonly lateAsked: Set<number>;
+  /** The AI's combined words in this reading, by combineMembersKey (AI answers only). */
+  readonly written: Map<string, Written>;
+  /** The combines being asked, by path key: the members they were asked for. */
+  readonly combining: Map<string, Readonly<{ members: string; call: AbortController }>>;
+};
 
 const WAITING: ReadonlySet<ReadingPhase> = new Set(["CHECKING", "READING", "MERGING"]);
 
-function freshReading(line: string): Reading {
+function freshReading(line: string, choiceMade: boolean): Reading {
   return {
-    line, phase: "CHECKING", progress: null, checkRef: null, checkedLine: null, originalLine: null, languageOffer: null, refusal: null,
-    lists: [], late: [], merging: false, menu: null, plan: null, landedKeys: [], noneReason: null, noneLine: null, justLanded: false
+    line, phase: "CHECKING", progress: null, checkRef: null, checkedLine: null, originalLine: null, rewrite: null, choiceMade,
+    languageOffer: null, refusal: null, lists: [], late: [], merging: false, menu: null, plan: null, landedKeys: [], noneReason: null,
+    noneLine: null, justLanded: false
   };
+}
+
+function freshRun(): Run {
+  return { controller: new AbortController(), posts: 0, giveUp: null, merge: null, landed: null, waits: new Set(), lateBusy: false,
+    lateAsked: new Set(), written: new Map(), combining: new Map() };
+}
+
+/** One call's own stop: by its own wait, and with the whole reading. */
+function callOf(run: Run): AbortController {
+  const call = new AbortController();
+  if (run.controller.signal.aborted) call.abort();
+  else run.controller.signal.addEventListener("abort", () => { call.abort(); }, { once: true });
+  return call;
+}
+
+/** One call's wait, cleared with the reading's timers. */
+function waitOn(run: Run, ms: number, then: () => void): Timer {
+  const timer = setTimeout(() => {
+    run.waits.delete(timer);
+    then();
+  }, ms);
+  run.waits.add(timer);
+  return timer;
+}
+
+function clearWait(run: Run, timer: Timer): void {
+  clearTimeout(timer);
+  run.waits.delete(timer);
+}
+
+/** The path being written with this key, on the list or in more, when it still holds the members its call was asked for. */
+function writingWith(plan: PathPlan, key: string, members: string): boolean {
+  const path = [...plan.paths, ...plan.more].find((one) => one.key === key && one.wording === "WRITING");
+  return path !== undefined && combineMembersKey(pathPlanCombineMembers(path)) === members;
 }
 
 /** The server's reason as the card's one line: not offered here, the quota used up, too slow, or a passing fault. */
@@ -258,10 +338,11 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
   }, []);
 
   const stopTimers = useCallback((run: Run): void => {
-    for (const timer of [run.giveUp, run.merge, run.landed]) if (timer !== null) clearTimeout(timer);
+    for (const timer of [run.giveUp, run.merge, run.landed, ...run.waits]) if (timer !== null) clearTimeout(timer);
     run.giveUp = null;
     run.merge = null;
     run.landed = null;
+    run.waits.clear();
   }, []);
 
   const clearGiveUp = useCallback((run: Run): void => {
@@ -296,6 +377,76 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     endNone(run, "TRANSPORT", failureLineOf(error));
   }, [clearGiveUp, commit, endNone, endStale]);
 
+  /** A late merge's menu of this reading (the same menu id, a later revision): its new paths into more, marked new (Task 66). */
+  const applyLate = useCallback((run: Run, menu: SignedStartMenu): boolean => {
+    const current = readingRef.current;
+    if (current === null || runRef.current !== run || current.menu === null || current.plan === null
+      || menu.menu.menu_id !== current.menu.menu.menu_id || menu.menu.revision <= current.menu.menu.revision) return false;
+    let plan: PathPlan;
+    try {
+      plan = pathPlanWithRevision(current.plan, menu.menu);
+    } catch {
+      return false;
+    }
+    commit(run, (now) => ({ ...now, menu, plan }));
+    return true;
+  }, [commit]);
+
+  /**
+   * The next late merge (choose-f4), one at a time, at READY only, never after revision 9: every held list the menu does not
+   * hold (late lists, and lists a CODE fallback left out), with the menu so far, when one of them was not asked about yet.
+   * NONE, a failure or the page's late-merge wait asks once more with the same lists, then the menu stays and those lists go
+   * with Start until a later list brings them into the next late merge. A 409 START_PATHS_STALE makes the card STALE.
+   */
+  const mergeLate = useCallback((run: Run): void => {
+    const current = readingRef.current;
+    if (current === null || runRef.current !== run || run.lateBusy || current.phase !== "READY" || current.menu === null
+      || current.checkRef === null || current.checkedLine === null || current.menu.menu.revision >= START_STEP_LIMITS.menuRevisionsMax) return;
+    const lists = lateListsOf(current);
+    if (lists.every((one) => run.lateAsked.has(one.list.list_no))) return;
+    const answers = latest.current.clarify?.answers;
+    const request: StartMergeRequest = {
+      question_line: current.checkedLine, check_ref: current.checkRef, reading_level: latest.current.readingLevel, lists: [...lists],
+      ...(answers === undefined || answers.length === 0 ? {} : { clarify: { answers: [...answers] } }),
+      prior_menu: current.menu
+    };
+    run.lateBusy = true;
+    const ask = (tries: number): void => {
+      const call = callOf(run);
+      let done = false;
+      const settle = (answer: StartMergeResponse | null): void => {
+        if (done) return;
+        done = true;
+        clearWait(run, wait);
+        if (runRef.current !== run) return;
+        const merged = answer !== null && answer.source !== "NONE" && applyLate(run, answer.menu);
+        if (!merged && tries < 2 && readingRef.current?.phase === "READY") {
+          ask(tries + 1);
+          return;
+        }
+        for (const one of lists) run.lateAsked.add(one.list.list_no);
+        run.lateBusy = false;
+        mergeLate(run);
+      };
+      const wait = waitOn(run, START_PAGE_WAITS.lateMergeMs, () => {
+        call.abort();
+        settle(null);
+      });
+      contractClient.startPathMerge(request, call.signal).then(settle, (error: unknown) => {
+        if (done || runRef.current !== run) return;
+        if (isStale(error)) {
+          done = true;
+          clearWait(run, wait);
+          run.lateBusy = false;
+          endStale(run);
+          return;
+        }
+        settle(null);
+      });
+    };
+    ask(1);
+  }, [applyLate, endStale]);
+
   /** The menu landed: the plan at How wide (the room's default; Free 3), "Your paths are ready ↓" for a few seconds. */
   const land = useCallback((run: Run, menu: SignedStartMenu): void => {
     let plan: PathPlan;
@@ -315,7 +466,9 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
       run.landed = null;
       commit(run, (current) => ({ ...current, justLanded: false }));
     }, START_PAGE_WAITS.readyNoteMs);
-  }, [clearGiveUp, commit, endNone]);
+    // Task 71: lists that came while the first merge ran, or that a CODE fallback left out, merge in now.
+    mergeLate(run);
+  }, [clearGiveUp, commit, endNone, mergeLate]);
 
   /** The one merge, at the cut: the lists in by then and the answers as they are now (never `matters`). */
   const merge = useCallback((run: Run, lists: readonly SignedStartList[]): void => {
@@ -358,6 +511,8 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
       commit(run, (current) => ({ ...current, phase: current.phase === "CHECKING" ? "READING" : current.phase, checkRef: event.data.check_ref,
         checkedLine: posted, originalLine: original, progress: { answered: 0, of: event.data.seats } }));
     } else if (event.event === "language_offer") {
+      // The choice is made (chooseLanguage, or "Use my words instead"): the offer does not come back.
+      if (readingRef.current?.choiceMade === true) return;
       clearGiveUp(run);
       commit(run, (current) => WAITING.has(current.phase) ? { ...current, phase: "LANGUAGE_CHOICE", languageOffer: event.data.offer } : current);
     } else if (event.event === "refused") {
@@ -367,8 +522,11 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
       commit(run, (current) => ({ ...current, progress: { answered: event.data.answered, of: event.data.of } }));
     } else if (event.event === "list") {
       commit(run, (current) => ({ ...current, lists: [...current.lists, event.data.list] }));
+      mergeLate(run);
     } else if (event.event === "late_list") {
+      // Kept until merged; it waits while there is no menu yet or a late merge runs (Task 71).
       commit(run, (current) => ({ ...current, late: [...current.late, event.data.list] }));
+      mergeLate(run);
     } else if (event.event === "cut") {
       const current = readingRef.current;
       if (current === null || current.phase !== "READING" || current.merging || current.lists.length === 0) return;
@@ -382,7 +540,7 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
       if (event.data.reason === "LANGUAGE_CHOICE" || event.data.reason === "REFUSED") return;
       settleEnd(run, event.data.reason === "DRAINING" ? "DRAINING" : "NO_LISTS");
     }
-  }, [clearGiveUp, commit, endNone, merge, settleEnd]);
+  }, [clearGiveUp, commit, endNone, merge, mergeLate, settleEnd]);
 
   /** One lists post; the page gives up after the stream's whole life (the 215-second line), and nothing is asked again by itself. */
   const post = useCallback((run: Run, request: StartListsRequest): void => {
@@ -408,17 +566,19 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     });
   }, [clearGiveUp, endFailed, endNone, onEvent, settleEnd]);
 
-  const begin = useCallback((line: string): void => {
-    const run: Run = { controller: new AbortController(), posts: 0, giveUp: null, merge: null, landed: null };
+  /** A new reading of `line`; with `choice` ("Use my words instead"), the language choice goes with its one lists post. */
+  const begin = useCallback((line: string, choice?: QuestionLanguageChoice): void => {
+    const run = freshRun();
     runRef.current = run;
-    const fresh = freshReading(line);
+    const fresh = freshReading(line, choice !== undefined);
     readingRef.current = fresh;
     setReading(fresh);
     if (browserOffline()) {
       endNone(run, "TRANSPORT", "OFFLINE");
       return;
     }
-    post(run, { question_line: line, site_language: latest.current.siteLanguage, reading_level: latest.current.readingLevel });
+    post(run, { question_line: line, site_language: latest.current.siteLanguage, reading_level: latest.current.readingLevel,
+      ...(choice === undefined ? {} : { question_language_choice: choice }) });
   }, [endNone, post]);
 
   const stop = useCallback((): void => {
@@ -434,12 +594,23 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
   useEffect(() => stop, [stop]);
 
   // Effects read primitives only. A new read line stops the old reading; the line is read once, when active with the step on.
+  // read-f1: a stale reading is read again when the page makes the hook inactive and then active with the same line (Back,
+  // then Next): the only way the same line is read again.
+  const away = useRef(false);
   useEffect(() => {
     if (readingRef.current !== null && readingRef.current.line !== questionLine) {
       stop();
       setReading(null);
     }
-    if (!active || !listsOn || readingRef.current !== null) return;
+    if (!active) {
+      away.current = true;
+      return;
+    }
+    const back = away.current;
+    away.current = false;
+    if (!listsOn) return;
+    if (back && readingRef.current?.phase === "STALE") stop();
+    if (readingRef.current !== null) return;
     begin(questionLine);
   }, [active, questionLine, listsOn, begin, stop]);
 
@@ -492,14 +663,86 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     if (deltaTimer.current !== null) clearTimeout(deltaTimer.current);
   }, []);
 
+  /** COMBINE_FAILED (the joined words stay) for the path still being written with the members its call was asked for. */
+  const failCombine = useCallback((run: Run, key: string, members: string): void => {
+    commit(run, (current) => {
+      if (current.plan === null || !writingWith(current.plan, key, members)) return current;
+      const plan = pathPlanReduce(current.plan, { type: "COMBINE_FAILED", key }).plan;
+      return plan === current.plan ? current : { ...current, plan };
+    });
+  }, [commit]);
+
+  /**
+   * The paths being written (choose-d2, choose-f10): the AI's words already written in this reading for the same members land
+   * at once (COMBINE_WRITTEN, no call); a path on the list with none and no call for its members gets one combine call, with
+   * the read line, the check and the menu id. Its AI words are kept for these members and land; NONE, a failure or the
+   * combine wait (the call stopped first, so a late answer cannot land) keep the joined words (FALLBACK), and the next time
+   * asks again. A stale reading starts no call; a call already asked finishes.
+   */
+  const combine = useCallback((run: Run): void => {
+    const current = readingRef.current;
+    if (current === null || runRef.current !== run || current.plan === null) return;
+    /** One combine call for one path being written. */
+    const ask = (key: string, members: readonly StartCombineMember[], membersKey: string, context: StartCombineRequest["context"]): void => {
+      const call = callOf(run);
+      run.combining.set(key, { members: membersKey, call });
+      let done = false;
+      const settle = (answer: StartCombineResponse | null): void => {
+        if (done) return;
+        done = true;
+        clearWait(run, wait);
+        if (run.combining.get(key)?.call === call) run.combining.delete(key);
+        if (runRef.current !== run) return;
+        if (answer !== null && answer.source === "AI") {
+          run.written.set(membersKey, { title: answer.title, question: answer.question, combineRef: answer.combine_ref });
+          combine(run);
+        } else {
+          failCombine(run, key, membersKey);
+        }
+      };
+      const wait = waitOn(run, START_PAGE_WAITS.combineMs, () => {
+        call.abort();
+        settle(null);
+      });
+      const request: StartCombineRequest = { context, reading_level: latest.current.readingLevel, members: [...members] };
+      contractClient.startPathCombine(request, call.signal).then(settle, (error: unknown) => {
+        if (done || runRef.current !== run) return;
+        if (isStale(error)) endStale(run);
+        settle(null);
+      });
+    };
+    const onList = new Set(current.plan.paths);
+    for (const path of [...current.plan.paths, ...current.plan.more]) {
+      if (path.wording !== "WRITING") continue;
+      const members = pathPlanCombineMembers(path);
+      const membersKey = combineMembersKey(members);
+      const words = run.written.get(membersKey);
+      if (words !== undefined) {
+        commit(run, (now) => {
+          if (now.plan === null || !writingWith(now.plan, path.key, membersKey)) return now;
+          const plan = pathPlanReduce(now.plan, { type: "COMBINE_WRITTEN", key: path.key, ...words }).plan;
+          return plan === now.plan ? now : { ...now, plan };
+        });
+        continue;
+      }
+      const now = readingRef.current;
+      if (!onList.has(path) || run.combining.get(path.key)?.members === membersKey || now === null || now.phase === "STALE"
+        || now.menu === null || now.checkRef === null || now.checkedLine === null) continue;
+      ask(path.key, members, membersKey, { kind: "MENU", question_line: now.checkedLine, check_ref: now.checkRef, menu_id: now.menu.menu.menu_id });
+    }
+  }, [commit, endStale, failCombine]);
+
   const dispatch = useCallback((action: PathPlanAction): PathPlanRefusal | null => {
     const run = runRef.current;
     const current = readingRef.current;
     if (run === null || current === null || current.plan === null || current.line !== latest.current.questionLine) return null;
     const result = pathPlanReduce(current.plan, action);
-    if (result.plan !== current.plan) commit(run, (now) => ({ ...now, plan: result.plan }));
+    if (result.plan !== current.plan) {
+      commit(run, (now) => ({ ...now, plan: result.plan }));
+      combine(run);
+    }
     return result.refusal;
-  }, [commit]);
+  }, [combine, commit]);
 
   const chooseLanguage = useCallback((choice: "USE_REWRITE" | "KEEP_MINE"): void => {
     const run = runRef.current;
@@ -510,10 +753,25 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     const languageChoice: QuestionLanguageChoice = rewrite
       ? { check_ref: offer.check_ref, choice, original_question_line: current.line }
       : { check_ref: offer.check_ref, choice };
-    commit(run, (now) => ({ ...now, phase: "CHECKING", languageOffer: null }));
+    commit(run, (now) => ({ ...now, phase: "CHECKING", languageOffer: null, choiceMade: true,
+      rewrite: rewrite ? { checkRef: offer.check_ref, original: current.line } : null }));
     post(run, { question_line: rewrite ? offer.proposed_question : current.line, site_language: latest.current.siteLanguage,
       reading_level: latest.current.readingLevel, question_language_choice: languageChoice });
   }, [commit, post]);
+
+  /**
+   * ask-f13 ("Use my words instead"): after an accepted rewrite only, the person's own words are read fresh with KEEP_MINE
+   * and the offer's check: a new reading (menu, lists, late lists, plan and progress start again). The page's calls of the
+   * rewrite's reading stop here; the server's run on and count (Calls item 8), as when the line changes.
+   */
+  const keepMyWords = useCallback((): string | null => {
+    const current = readingRef.current;
+    if (current === null || current.rewrite === null || current.line !== latest.current.questionLine) return null;
+    const { checkRef, original } = current.rewrite;
+    stop();
+    begin(original, { check_ref: checkRef, choice: "KEEP_MINE" });
+    return original;
+  }, [begin, stop]);
 
   const markStale = useCallback((): void => {
     const run = runRef.current;
@@ -546,7 +804,10 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     }
   }, [endStale]);
 
-  /** Paths still being written get at most the combine wait, then their joined words (FALLBACK). */
+  /**
+   * Paths still being written get at most the combine wait, then their joined words (FALLBACK). Each one's call (Task 71) is
+   * stopped first, so an answer for its members cannot land on it later.
+   */
   const writtenOrJoined = useCallback(async (run: Run): Promise<void> => {
     const writing = (): boolean => readingRef.current?.plan?.paths.some((path) => path.wording === "WRITING") === true;
     if (writing()) {
@@ -565,6 +826,7 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     for (const key of still) {
       const current = readingRef.current;
       if (current === null || current.plan === null || runRef.current !== run) return;
+      run.combining.get(key)?.call.abort();
       const result = pathPlanReduce(current.plan, { type: "COMBINE_FAILED", key });
       if (result.plan !== current.plan) commit(run, (now) => ({ ...now, plan: result.plan }));
     }
@@ -605,10 +867,12 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     }
     await writtenOrJoined(run);
     const now = readingRef.current;
-    if (now === null || runRef.current !== run || now.plan === null) throw new TypeError("START_HAND_OVER_NOT_READY");
+    if (now === null || runRef.current !== run || now.plan === null || now.menu === null) throw new TypeError("START_HAND_OVER_NOT_READY");
     const plan = now.plan;
+    // Review of Task 71: a late merge may land during the wait, so the menu, the plan and late_lists are all read now, from
+    // one reading: the menu from before the wait with late_lists counted against the newer one would hold a list nowhere.
     const late = lateListsOf(now);
-    const startPaths: StartPaths = { source: "MENU", menu, paths: [...pathPlanToStartPaths(plan)], width: plan.width, chosen_by: "PERSON",
+    const startPaths: StartPaths = { source: "MENU", menu: now.menu, paths: [...pathPlanToStartPaths(plan)], width: plan.width, chosen_by: "PERSON",
       ...(late.length === 0 ? {} : { late_lists: [...late] }),
       ...(plan.questionSwap === null ? {} : { question_swap: { card_id: plan.questionSwap.cardId, original_question_line: plan.questionSwap.original } }) };
     return { questionLine: questionLineOut, ...withCheck, startPaths, ownWords: [...pathPlanOwnWords(plan)] };
@@ -641,6 +905,9 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     narrowedTo,
     lateLists: own === null ? NO_LISTS : lateListsOf(own),
     lateIdeas,
-    justLanded: own?.justLanded ?? false
+    justLanded: own?.justLanded ?? false,
+    keepMyWords,
+    // Task 71: what the page's leave rule reads (Task 76c); the hook itself adds no beforeunload listener.
+    shaped: plan !== null && (pathPlanChanged(plan) || plan.paths.some(isPersonPath))
   };
 }
