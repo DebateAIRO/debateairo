@@ -192,11 +192,14 @@ $$;
 -- Up to p_limit (1..50) debates that are DUE and not BEGUN, oldest DUE first. A Free debate whose public way the sweep has not decided yet
 -- (0137: identity.free_public_ask, outcome IS NULL) waits, so the digs and the report land on the same side of that decision, but never more
 -- than six hours from DUE (CARRY_ON_PRESS_ANYWAY_MS). Each is claimed by writing BEGUN; a debate another caller claimed first is skipped, so
--- two callers at once claim it once. A debate whose owner's account is no longer active, no longer that owner's, or whose run binding is gone
--- gets DONE at once and is left out. [{run_id, owner_ref, user_id, identity_session_id, begun_at}] in claim order: the owner from the run's
--- newest ownership event, the user and identity session from its binding, as 0123's prepare_readmitted_run_key_provision reads them. First it
--- closes (DONE) up to p_limit BEGUN debates whose owner or binding went away after their claim: the BEGUN reader leaves them out, so nothing
--- else would ever end them.
+-- two callers at once claim it once. An erased debate (no owner, no run binding, the account gone, deleted or no longer that owner's, or the
+-- debate deleted: 0040's tombstone) gets DONE at once and is left out. A debate whose account is no longer active (suspended, held, frozen)
+-- stays BEGUN and is left out too (Task 56e, owner answer 11: "If the account is no longer active, the digs stop and the report is still
+-- written"): no dig pass ever takes it, and the BEGUN reader below hands it to "Write my report" once the account is active again, since the
+-- person's own report step writes only for an active account (0131's identity.page_memory_run_owned, 0136's identity.read_unreported_closings).
+-- [{run_id, owner_ref, user_id, identity_session_id, begun_at}] in claim order: the owner from the run's newest ownership event, the user and
+-- identity session from its binding, as 0123's prepare_readmitted_run_key_provision reads them. First it closes (DONE) up to p_limit BEGUN
+-- debates erased after their claim: the BEGUN reader leaves them out, so nothing else would ever end them.
 CREATE OR REPLACE FUNCTION core.claim_carry_on_due(p_limit integer) RETURNS jsonb
 LANGUAGE plpgsql
 VOLATILE
@@ -209,6 +212,7 @@ DECLARE
   v_owner uuid;
   v_user uuid;
   v_session uuid;
+  v_state text;
   v_claimed jsonb := '[]'::jsonb;
 BEGIN
   IF p_limit IS NULL OR p_limit < 1 OR p_limit > 50 THEN
@@ -218,11 +222,12 @@ BEGIN
     SELECT stale.run_id, 'DONE' FROM core.carry_on_mark AS stale
     WHERE stale.mark = 'BEGUN'
       AND NOT EXISTS (SELECT 1 FROM core.carry_on_mark AS done WHERE done.run_id = stale.run_id AND done.mark = 'DONE')
-      AND NOT EXISTS (SELECT 1 FROM identity.run_execution_binding AS binding
-        JOIN identity."user" AS identity_user ON identity_user.user_id = binding.user_id AND identity_user.state = 'active'
-        WHERE binding.run_id = stale.run_id
-          AND identity_user.owner_ref = (SELECT event.owner_ref FROM core.run_ownership_event AS event
-            WHERE event.run_id = stale.run_id ORDER BY event.at_seq DESC LIMIT 1))
+      AND (NOT EXISTS (SELECT 1 FROM identity.run_execution_binding AS binding
+          JOIN identity."user" AS identity_user ON identity_user.user_id = binding.user_id AND identity_user.state <> 'deleted'
+          WHERE binding.run_id = stale.run_id
+            AND identity_user.owner_ref = (SELECT event.owner_ref FROM core.run_ownership_event AS event
+              WHERE event.run_id = stale.run_id ORDER BY event.at_seq DESC LIMIT 1))
+        OR EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone WHERE tombstone.run_id = stale.run_id))
     ORDER BY stale.recorded_at, stale.run_id
     LIMIT p_limit
   ON CONFLICT DO NOTHING;
@@ -241,11 +246,15 @@ BEGIN
     WHERE event.run_id = v_due.run_id ORDER BY event.at_seq DESC LIMIT 1;
     SELECT binding.user_id, binding.identity_session_id INTO v_user, v_session
     FROM identity.run_execution_binding AS binding WHERE binding.run_id = v_due.run_id;
-    IF v_owner IS NULL OR v_user IS NULL OR NOT EXISTS (SELECT 1 FROM identity."user" AS identity_user
-        WHERE identity_user.user_id = v_user AND identity_user.owner_ref = v_owner AND identity_user.state = 'active') THEN
+    SELECT identity_user.state INTO v_state FROM identity."user" AS identity_user
+    WHERE identity_user.user_id = v_user AND identity_user.owner_ref = v_owner;
+    IF v_owner IS NULL OR v_user IS NULL OR v_state IS NULL OR v_state = 'deleted'
+        OR EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone WHERE tombstone.run_id = v_due.run_id) THEN
       INSERT INTO core.carry_on_mark (run_id, mark) VALUES (v_due.run_id, 'DONE') ON CONFLICT DO NOTHING;
       CONTINUE;
     END IF;
+    -- No longer active: BEGUN without a dig; the BEGUN reader presses its report once the account is active again.
+    CONTINUE WHEN v_state <> 'active';
     v_claimed := v_claimed || pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('run_id', v_due.run_id, 'owner_ref', v_owner,
       'user_id', v_user, 'identity_session_id', v_session, 'begun_at', v_begun_at));
   END LOOP;
@@ -254,7 +263,8 @@ END;
 $$;
 
 -- Up to p_limit (1..50) debates that are BEGUN and not DONE, oldest BEGUN first, in the claim's shape. One whose owner or binding went away
--- since its claim is left out before the page is taken, so such debates never crowd out live ones; the claim closes them.
+-- since its claim is left out before the page is taken, so such debates never crowd out live ones: an erased one the claim closes; one whose
+-- account is no longer active comes back here, to have its report pressed, once the account is active again (Task 56e).
 CREATE OR REPLACE FUNCTION core.read_carry_on_begun(p_limit integer) RETURNS jsonb
 LANGUAGE plpgsql
 STABLE

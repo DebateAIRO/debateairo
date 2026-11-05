@@ -145,6 +145,12 @@ describe("Task 56 on the real API: the AIs carry on to the report", () => {
   it("without the box: the debate settles, nothing is marked, the tick does nothing", async () => {
     const ana = await world.account("carry-none", PAID);
     const { runId } = await startPathDebate(ana, "Should Harbour Town paint the ferry blue?", { settings: PREMIUM, width: 5, carryOn: false });
+    // Task 57c (independent review, 5 Nov): on the real API each charge before Start names the question's try, and Start gave every one
+    // of them to this debate (0163), so a failure would give them back. The stand-in answers every list at once: nothing is charged after.
+    const tries = await q<{ run_id: string | null }>(`SELECT t.run_id::text AS run_id FROM identity.pre_start_charge AS c
+      LEFT JOIN identity.pre_start_try AS t USING (charge_id) WHERE c.owner_ref = $1`, [ana.ownerRef]);
+    expect(tries.length).toBeGreaterThan(0);
+    expect(tries.map((row) => row.run_id)).toEqual(tries.map(() => runId));
     await settleAll();
     expect(await markOf(runId)).toBe("NONE");
     const before = await runsOf(ana);
@@ -366,7 +372,7 @@ describe("Task 56 on the real API: the AIs carry on to the report", () => {
     expect(await pauseEventsOf(b2!.run_id)).toEqual([["PAUSED", "MONTH_WALL"]]);
   }, 1_800_000);
 
-  it("signed out: the digs still run, as the person; a suspended account: nothing more is started", async () => {
+  it("signed out: the digs still run, as the person; a suspended account: no dig, and its report once it is active again", async () => {
     const ana = await world.account("carry-signed-out", PAID);
     const { runId: root } = await startPathDebate(ana, "Should Harbour Town ring the harbour bell at noon?", { settings: PREMIUM, width: 3, carryOn: true });
     await settleAll();
@@ -383,11 +389,24 @@ describe("Task 56 on the real API: the AIs carry on to the report", () => {
     await settleAll();
     await world.database.pool.query("UPDATE identity.session SET revoked_at = clock_timestamp() WHERE user_id = $1", [bea.userId]);
     await world.database.pool.query(`UPDATE identity."user" SET state = 'suspended' WHERE user_id = $1`, [bea.userId]);
-    // Task 19's ruling: the claim closes a debate whose account is no longer active (DONE) and leaves it out: no new paid work.
+    // Task 56e (owner answer 11: "If the account is no longer active, the digs stop and the report is still written"): the claim takes
+    // the debate (BEGUN) without handing it to a dig pass, so no dig ever starts for it. The person's own report step writes only for an
+    // active account, so while it is suspended nothing is pressed and nothing is closed.
     expect(await world.api.carryOnTick()).toEqual(ZERO);
-    expect(await markOf(second)).toBe("DONE");
-    expect(await digsOf(second)).toEqual([]);
+    expect(await markOf(second)).toBe("BEGUN");
+    expect(await world.api.carryOnTick()).toEqual(ZERO);
+    expect(await markOf(second)).toBe("BEGUN");
     expect(await closingsOf(second)).toBe(0);
+    // Active again: the report is written, once, on the first debate alone; still no dig.
+    await world.database.pool.query(`UPDATE identity."user" SET state = 'active' WHERE user_id = $1`, [bea.userId]);
+    expect(await world.api.carryOnTick()).toEqual({ begun: 0, digs: 0, pressed: 1, waiting: 0 });
+    expect(await markOf(second)).toBe("DONE");
+    expect(await closingsOf(second)).toBe(1);
+    await settleAll();
+    expect(await reportRowsOf(second)).toBe(1);
+    expect(await world.api.carryOnTick()).toEqual(ZERO);
+    expect(await digsOf(second)).toEqual([]);
+    expect(await closingsOf(second)).toBe(1);
   }, 1_800_000);
 
   it("Free with the public notice: it waits for the public decision, then one public dig, then the debate's first report on the reserve", async () => {

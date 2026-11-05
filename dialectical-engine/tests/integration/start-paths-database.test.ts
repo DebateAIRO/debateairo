@@ -406,6 +406,76 @@ describe("the carry-on marks", () => {
     for (const runId of [refused, published]) expect(await store.recordCarryOnDone(runId)).toBe("RECORDED");
   });
 
+  // Task 56e (owner answer 11: "If the account is no longer active, the digs stop and the report is still written"). The person's own
+  // report step writes only for an active account (0131's page_memory_run_owned), so such a debate waits, BEGUN, outside the page.
+  const markOf = async (runId: string): Promise<string> =>
+    (await database.pool.query<{ mark: string }>("SELECT core.read_carry_on_mark($1) AS mark", [runId])).rows[0]!.mark;
+  const accountState = (state: string) => seeded([[`UPDATE identity."user" SET state = $2 WHERE user_id = $1`, [owner.userId, state]]]);
+
+  it("an account no longer active: a DUE debate is claimed without being handed out, and waits outside the page until it is active again", async () => {
+    const asleep = await withSet({ carryOnToReport: true }, true);
+    await accountState("suspended");
+    try {
+      expect(await store.claimCarryOnDue(10)).toEqual([]);
+      expect(await markOf(asleep)).toBe("BEGUN");
+      expect(await store.readCarryOnBegun(10)).toEqual([]);
+      // Still BEGUN after another claim: never closed while the account is only held.
+      expect(await store.claimCarryOnDue(10)).toEqual([]);
+      expect(await markOf(asleep)).toBe("BEGUN");
+    } finally {
+      await accountState("active");
+    }
+    // Active again: it is BEGUN, so no claim hands it to a dig pass; the BEGUN reader hands it to the press.
+    expect(await store.claimCarryOnDue(10)).toEqual([]);
+    expect(await store.readCarryOnBegun(10)).toMatchObject([{ runId: asleep, ownerRef: owner.ownerRef, userId: owner.userId,
+      identitySessionId: owner.sessionId }]);
+    expect(await store.recordCarryOnDone(asleep)).toBe("RECORDED");
+  });
+
+  it("an account that stops being active after the claim: its BEGUN debate is left out of the page and not closed, and comes back when active", async () => {
+    const claimed = await withSet({ carryOnToReport: true }, true);
+    expect((await store.claimCarryOnDue(10)).map((due) => due.runId)).toEqual([claimed]);
+    for (const state of ["suspended", "age_frozen", "pending_mfa"]) {
+      await accountState(state);
+      try {
+        expect(await store.readCarryOnBegun(10)).toEqual([]);
+        expect(await store.claimCarryOnDue(10)).toEqual([]);
+        expect(await markOf(claimed), state).toBe("BEGUN");
+      } finally {
+        await accountState("active");
+      }
+    }
+    expect((await store.readCarryOnBegun(10)).map((due) => due.runId)).toEqual([claimed]);
+    expect(await store.recordCarryOnDone(claimed)).toBe("RECORDED");
+  });
+
+  it("only an erased debate is closed without its report: the debate deleted, or the account deleted, DUE or BEGUN", async () => {
+    const tombstone = (runId: string) => seeded([[`INSERT INTO serve.private_run_erasure_tombstone (run_id,completed_at,destroyed_key_count,already_absent_key_count)
+      VALUES ($1,clock_timestamp(),1,0)`, [runId]]]);
+    // The debate deleted (0040's tombstone): DUE, the claim closes it at once; BEGUN, the next claim closes it.
+    const dueDeleted = await withSet({ carryOnToReport: true }, true);
+    await tombstone(dueDeleted);
+    expect(await store.claimCarryOnDue(10)).toEqual([]);
+    expect(await markOf(dueDeleted)).toBe("DONE");
+    const begunDeleted = await withSet({ carryOnToReport: true }, true);
+    expect((await store.claimCarryOnDue(10)).map((due) => due.runId)).toEqual([begunDeleted]);
+    await tombstone(begunDeleted);
+    expect(await store.claimCarryOnDue(10)).toEqual([]);
+    expect(await markOf(begunDeleted)).toBe("DONE");
+    // The account deleted: the same, DUE or BEGUN.
+    const begunGone = await withSet({ carryOnToReport: true }, true);
+    const dueGone = await withSet({ carryOnToReport: true }, true);
+    expect(await store.claimCarryOnDue(1)).toMatchObject([{ runId: begunGone }]);
+    await accountState("deleted");
+    try {
+      expect(await store.claimCarryOnDue(10)).toEqual([]);
+      expect([await markOf(dueGone), await markOf(begunGone)]).toEqual(["DONE", "DONE"]);
+    } finally {
+      await accountState("active");
+    }
+    expect(await store.readCarryOnBegun(10)).toEqual([]);
+  });
+
   it("refuses a limit outside 1..50, and no mark is updated or deleted", async () => {
     for (const limit of [0, 51]) {
       await expect(store.claimCarryOnDue(limit)).rejects.toMatchObject({ code: "22023", message: "CARRY_ON_LIMIT_INVALID" });

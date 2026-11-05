@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0159_path_progress.sql",
-    "manifestSha256": "2f149e6161f0ab13aefcba868497a4f78354e959c083d8a465eacf49e8a27eba",
+    "manifestSha256": "fffba77d48593c818cf575b8f15d40cd782b9323a06df903462fcbca1fc83173",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

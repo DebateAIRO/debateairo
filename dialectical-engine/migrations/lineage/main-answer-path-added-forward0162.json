@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0161_carry_on_session_free_digs.sql",
-    "manifestSha256": "1ac1cd438889eb1d335410a8225b5aded06ed32a0b75b542c03b76505e6cb308",
+    "manifestSha256": "4da2c5ccfb4b3cdc712ff8cc3ab014090151f247c1439bcfb1e4d10587a38231",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

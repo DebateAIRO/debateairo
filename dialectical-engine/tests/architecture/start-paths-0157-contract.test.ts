@@ -158,7 +158,7 @@ describe("0157: the chosen paths, sealed per run", () => {
       .toEqual([{ roleName: "debateai_runtime", source: SQL_PATH, grants: DEFINERS.map((signature) => `EXECUTE ON FUNCTION ${signature}`) }]);
   });
 
-  it("C-B: a debate whose owner went away never holds a slot of the BEGUN page, and the claim closes it", () => {
+  it("C-B: a debate whose owner went away never holds a slot of the BEGUN page, and the claim closes an erased one", () => {
     const sql = code(read(SQL_PATH));
     const bodyOf = (name: string): string => {
       const at = sql.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
@@ -168,10 +168,33 @@ describe("0157: the chosen paths, sealed per run", () => {
     const begun = bodyOf("core.read_carry_on_begun");
     expect(begun.indexOf("identity_user.state = 'active'")).toBeGreaterThan(-1);
     expect(begun.indexOf("LIMIT p_limit")).toBeGreaterThan(begun.indexOf("identity_user.state = 'active'"));
-    // The claim (it may write) marks DONE, a bounded number per call, every BEGUN debate whose owner or binding is gone.
+    // The claim (it may write) marks DONE, a bounded number per call, every BEGUN debate that was erased.
     const claim = bodyOf("core.claim_carry_on_due");
     expect(claim).toContain("SELECT stale.run_id, 'DONE'");
     expect(claim.indexOf("LIMIT p_limit")).toBeGreaterThan(claim.indexOf("SELECT stale.run_id, 'DONE'"));
+  });
+
+  it("C-I (Task 56e, owner answer 11): an account no longer active is never dug and its report still comes; only an erased debate is closed", () => {
+    const sql = code(read(SQL_PATH));
+    const claim = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION core.claim_carry_on_due("),
+      sql.indexOf("$$;", sql.indexOf("AS $$", sql.indexOf("CREATE OR REPLACE FUNCTION core.claim_carry_on_due("))));
+    // No DONE of the claim's rests on the account being active: the BEGUN closing and the DUE closing name only an erased debate (no owner,
+    // no binding, the account gone, deleted or another owner's, or 0040's tombstone).
+    expect(claim).not.toContain("state = 'active'");
+    const stale = claim.slice(claim.indexOf("SELECT stale.run_id, 'DONE'"), claim.indexOf("LIMIT p_limit"));
+    for (const needle of ["identity_user.state <> 'deleted'", "serve.private_run_erasure_tombstone"]) expect(stale, needle).toContain(needle);
+    const dueDone = claim.slice(claim.indexOf("IF v_owner IS NULL"), claim.indexOf("CONTINUE;", claim.indexOf("IF v_owner IS NULL")));
+    for (const needle of ["v_user IS NULL", "v_state IS NULL", "v_state = 'deleted'", "serve.private_run_erasure_tombstone", "'DONE'"]) {
+      expect(dueDone, needle).toContain(needle);
+    }
+    // An account no longer active: BEGUN (so no dig pass ever takes it), left out of what the claim hands out, never closed here.
+    const waits = claim.indexOf("CONTINUE WHEN v_state <> 'active';");
+    expect(waits).toBeGreaterThan(claim.indexOf("CONTINUE;", claim.indexOf("IF v_owner IS NULL")));
+    expect(claim.indexOf("v_claimed := v_claimed ||")).toBeGreaterThan(waits);
+    // The BEGUN reader still reads only an active account, so such a debate waits outside the page and comes back to the press when the
+    // account is active again (C-B).
+    const begun = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION core.read_carry_on_begun("));
+    expect(begun.slice(0, begun.indexOf("$$;", begun.indexOf("AS $$")))).toContain("identity_user.state = 'active'");
   });
 
   it("C-C: the carry-on claim waits for an undecided Free publication, at most six hours from DUE", () => {

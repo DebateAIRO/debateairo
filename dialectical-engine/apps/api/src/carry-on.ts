@@ -342,7 +342,10 @@ export type CarryOnTick = Readonly<{ begun: number; digs: number; pressed: numbe
 /**
  * One tick: claims at most CARRY_ON_TICK_LIMITS.due DUE runs and, for each, its digs then its report; then the report of at most
  * CARRY_ON_TICK_LIMITS.begun other BEGUN runs without DONE, oldest first (a run claimed in this tick is pressed once in it). One
- * line of counts. A run whose pass throws is logged by code and left for the next tick.
+ * line of counts. A run whose pass throws is logged by code and left for the next tick. A pass that stops OWNER_GONE is not
+ * pressed after it (Task 56e, owner answer 11: "If the account is no longer active, the digs stop and the report is still
+ * written"): the person's own report step writes only for an active account, so the run stays BEGUN and the BEGUN reader, which
+ * reads only active accounts, hands it to the press once the account is active again; 0157's claim closes an erased one.
  */
 export async function carryOnTick(ports: CarryOnPorts, now: Date): Promise<CarryOnTick> {
   const counts = { begun: 0, digs: 0, pressed: 0, waiting: 0 };
@@ -359,13 +362,15 @@ export async function carryOnTick(ports: CarryOnPorts, now: Date): Promise<Carry
   };
   for (const due of await ports.marks.claimCarryOnDue(CARRY_ON_TICK_LIMITS.due)) {
     counts.begun += 1;
+    let ownerGone = false;
     try {
       const started = await runCarryOnToReport(due, ports);
       if (started.kind === "STARTED") counts.digs += started.digs;
+      ownerGone = started.kind === "STARTED" && started.stop === "OWNER_GONE";
     } catch (error) {
       logLine(ports, "api.carry_on.digs_failed", { code: codeOf(error) });
     }
-    await press(due);
+    if (!ownerGone) await press(due);
   }
   for (const due of await ports.marks.readCarryOnBegun(CARRY_ON_TICK_LIMITS.begun)) {
     if (pressedRuns.has(due.runId.toLowerCase())) continue;

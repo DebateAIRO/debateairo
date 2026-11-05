@@ -433,6 +433,30 @@ describe("carryOnTick: claims what is due, digs, presses, one line of counts", (
     expect(await carryOnTick(ports, NOW)).toEqual({ begun: 1, digs: 0, pressed: 1, waiting: 0 });
     expect(done).toEqual([ROOT]);
   });
+
+  // Task 56e (owner answer 11: "If the account is no longer active, the digs stop and the report is still written"): the person's own
+  // report step writes only for an active account, so a pass that meets OWNER_GONE leaves the run BEGUN, and the BEGUN reader (which
+  // reads only active accounts) hands it to the press once the account is active again.
+  it("an account that stops being active during the pass: no more digs, no press in that tick, the report once it is active again", async () => {
+    for (const code of ["CARRY_ON_DIG_OWNER_GONE", "RUN_OWNER_INVALID"]) {
+      const { ports, named, done } = fakePorts({ claim: [DUE], askAsOwner: (n) => n === 3 ? thrown(code) : ACCEPTED });
+      expect(await carryOnTick(ports, NOW)).toEqual({ begun: 1, digs: 2, pressed: 0, waiting: 0 });
+      expect(named("askAsOwner")).toBe(3);
+      expect(named("writeReportAsOwner")).toBe(0);
+      expect(done).toEqual([]);
+      // Active again: the next tick claims nothing new, and the BEGUN reader's run is pressed once, with no further dig.
+      const later = fakePorts({ begun: [DUE] });
+      expect(await carryOnTick(later.ports, NOW)).toEqual({ begun: 0, digs: 0, pressed: 1, waiting: 0 });
+      expect(later.named("askAsOwner")).toBe(0);
+      expect(later.named("writeReportAsOwner")).toBe(1);
+      expect(later.done).toEqual([ROOT]);
+    }
+    // Read again as BEGUN in the same tick (its account active), it is pressed in that tick, once.
+    const { ports, named, done } = fakePorts({ claim: [DUE], begun: [DUE], askAsOwner: () => thrown("CARRY_ON_DIG_OWNER_GONE") });
+    expect(await carryOnTick(ports, NOW)).toEqual({ begun: 1, digs: 0, pressed: 1, waiting: 0 });
+    expect(named("writeReportAsOwner")).toBe(1);
+    expect(done).toEqual([ROOT]);
+  });
 });
 
 describe("AskRoom.digShareMicros: the dig's share as the room read shows it (estimate, web part, updates)", () => {
