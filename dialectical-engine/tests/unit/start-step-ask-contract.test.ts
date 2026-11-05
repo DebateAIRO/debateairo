@@ -15,7 +15,8 @@ const FITS = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null
 
 describe("the ask's start members", () => {
   it("adds the three keys last, each optional", () => {
-    expect(Object.keys(AskRequestSchema.shape).slice(-3)).toEqual(["start_check", "start_paths", "carry_on_to_report"]);
+    // Task 39c's saved_question_id (tests/unit/saved-questions-contract.test.ts) comes after them.
+    expect(Object.keys(AskRequestSchema.shape).slice(-4, -1)).toEqual(["start_check", "start_paths", "carry_on_to_report"]);
     for (const key of ["start_check", "start_paths", "carry_on_to_report"] as const) {
       expect(AskRequestSchema.shape[key].safeParse(undefined).success).toBe(true);
     }

@@ -28,6 +28,9 @@ import { ANSWER_BRANCH_LIMITS, AnswerBranchesSchema, PublicBranchesSchema } from
 // V4 start step, Task 57a: the run read's progress of each path and the carry-on part.
 export * from "./run-paths.js";
 import { CARRY_ON_PARTS, RunPathProgressSchema } from "./run-paths.js";
+// V4 start step, Task 39c: a question not started yet, as the account keeps it (saved questions spec 2026-11-04).
+export * from "./saved-questions.js";
+import { SavedQuestionIdSchema } from "./saved-questions.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -313,7 +316,10 @@ export const AskRequestSchema = z.object({
   // paths, and the carry-on box ("Let the AIs carry on to the report", owner answer 9; only ever true). Absent: R22's ask.
   start_check: StartCheckSchema.optional(),
   start_paths: StartPathsSchema.optional(),
-  carry_on_to_report: z.literal(true).optional()
+  carry_on_to_report: z.literal(true).optional(),
+  // V4 start step, Task 39c (saved questions spec 2026-11-04 §3.7), last: the question not started yet this ask starts from,
+  // removed once the debate is accepted. Read only by that removal: never stored with the run, sealed, logged or passed to the runner.
+  saved_question_id: SavedQuestionIdSchema.optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
