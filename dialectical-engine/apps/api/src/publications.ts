@@ -4,6 +4,7 @@ import {
   PublicDebateSchema,
   PublicStoryShortSchema,
   StoryLanguageTagSchema,
+  publicBranchesOf,
   type Answer,
   type AnswerFloor,
   type DebateMapView,
@@ -336,7 +337,11 @@ export async function buildPublicDebateBody(input: Readonly<{
     ...(storyShort === null ? {} : { story_short: storyShort }),
     ...(language === null ? {} : { language }),
     ...(floor === null ? {} : { floor }),
-    ...(mapView === null ? {} : { map_view: mapView })
+    ...(mapView === null ? {} : { map_view: mapView }),
+    // V4 start step, Task 63 (spec 2026-11-03 §7): a path debate publishes its paths, the person's own among them, and the publication
+    // check reads them (material.ts). Never the "+ N more" list, the point-of-view line, the carry-on box, the evidence or the root's
+    // node id (publicBranchesOf). An R22 answer has no paths, so its snapshot keeps its bytes.
+    ...(input.answer.branches === undefined ? {} : { branches: publicBranchesOf(input.answer.branches) })
   });
 }
 

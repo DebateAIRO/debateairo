@@ -4,10 +4,13 @@ import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import {
   addPick,
   askParentOf,
+  digSuggestionsWithMore,
   draftTarget,
   editPick,
   EMPTY_DRAFT,
   isEdited,
+  mainQuestionTarget,
+  morePick,
   openPick,
   ownViewPick,
   pathSuggestionsOf,
@@ -23,9 +26,11 @@ import {
 } from "../../apps/ui/lib/v4/suggestions.js";
 import type { V4DigDraft, V4DigPick, V4OpenQuestion } from "../../apps/ui/lib/v4/types.js";
 import {
-  AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, WEB_CONTRACT_LIMITS, type Answer, type DigSuggestion
+  AnswerSchema, AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, startMoreOf, WEB_CONTRACT_LIMITS, type Answer, type AnswerBranch,
+  type DigSuggestion
 } from "../../packages/contract/src/index.js";
 import { createSeed } from "../../tools/v4-mock-api/seed.js";
+import { NUCLEAR_MENU } from "../support/v4-start-menu.js";
 
 /*
  * Perplexity plan W3-4 (2026-10-30) and the dig model revision (31 Oct): choosing what to dig is pure code in
@@ -212,5 +217,75 @@ describe("the ask's parent (AskParentSchema)", () => {
 
   it("an empty draft makes no dig", () => {
     expect(draftTarget(EMPTY_DRAFT, [])).toBeNull();
+  });
+});
+
+/*
+ * V4 start step, Task 62 (spec 2026-11-03 §2.5 "it is offered first when you dig"; wait-d1): the menu paths the person left out
+ * before Start ("+ N more to explore") are the first things the main question offers to dig, each a MORE pick. A MORE pick is
+ * sent as the AIs' own words, at its own place: { kind: HELPS_MAIN_QUESTION, suggestion_id: more id, place: more id, text: its
+ * question }. An R22 parent's list is unchanged. All words are made up.
+ */
+describe("Task 62: the menu paths left out before Start, as MORE picks", () => {
+  const chosen = NUCLEAR_MENU.paths.slice(0, 5);
+  const positions = ["n-mix", "n-renew", "n-nuclear", "n-smr", "n-mix"] as const;
+  const v2 = (): Answer => AnswerSchema.parse({
+    ...answer(),
+    branches: {
+      source: "MENU", width: 5,
+      paths: chosen.map((path, index): AnswerBranch => ({
+        path_id: `b${index + 1}`, order: index + 1, title: path.title, question: path.question, author: "AI_SUGGESTION",
+        viewpoints: [{ title: path.title, question: path.question, own: false }], state: "LOOKING",
+        root_node_id: positions[index]!, outcome: null
+      })),
+      more: [...startMoreOf(NUCLEAR_MENU, new Set(chosen.flatMap((path) => path.viewpoint_ids)))],
+      also_raised: [], main_trust: null, carry_on_to_report: false
+    }
+  });
+  const kp06 = NUCLEAR_MENU.paths.find((path) => path.path_ref === "kp06")!;
+
+  it("on a v2 parent the main question's list starts with the left-out paths, in menu order, before every other pick", () => {
+    const others = [openPick(open("p:n-mix-firm", null)), openPick(open("o:0", null))];
+    const list = digSuggestionsWithMore(v2(), others);
+    expect(list.map((pick) => pick.kind)).toEqual(["MORE", "MORE", "MORE", "MORE", "OPEN", "OPEN"]);
+    expect(list.flatMap((pick) => (pick.kind === "MORE" ? [pick.more.title] : [])))
+      .toEqual(["Falling prices", "Building delays", "Waste for centuries", "Jobs in the regions"]);
+    expect(list.slice(4)).toEqual(others);
+    expect(list[0]).toEqual(morePick({ id: "more-kp06", title: kp06.title, question: kp06.question, isNew: false }));
+  });
+
+  it("an R22 parent's list is unchanged", () => {
+    const others = [openPick(open("o:0", null))];
+    expect(digSuggestionsWithMore(answer(), others)).toBe(others);
+  });
+
+  it("a MORE pick is the main question's, keeps the AIs' words, and is sent at its own place", () => {
+    const pick = morePick({ id: "more-kp06", title: kp06.title, question: kp06.question, isNew: false });
+    expect(pick).toEqual({ kind: "MORE", key: "more:more-kp06", group: null, more: { id: "more-kp06", title: kp06.title, question: kp06.question, isNew: false } });
+    const draft = add(EMPTY_DRAFT, pick).draft;
+    // Its text is never edited (it is the AIs' path, as an open question is).
+    expect(editPick(draft, pick.key, "My own words").draft).toBe(draft);
+    const target = draftTarget(draft, [])!;
+    expect(target).toEqual({ kind: "picks", path: null, picks: [pick] });
+    expect(placesOf(target)).toEqual(["more-kp06"]);
+    const parent = askParentOf(RUN, target, "quick")!;
+    expect(AskParentSchema.safeParse(parent).success).toBe(true);
+    expect(parent).toEqual({
+      parent_run_id: RUN, places: ["more-kp06"], mode: "quick",
+      picks: [{ kind: "HELPS_MAIN_QUESTION", suggestion_id: "more-kp06", place: "more-kp06", text: kp06.question }]
+    });
+  });
+
+  it("the main question's own button digs its picks only when it lists every one of them", () => {
+    const more = digSuggestionsWithMore(v2(), []);
+    const listed = [open("o:0", null)];
+    let draft = add(EMPTY_DRAFT, more[0]!).draft;
+    expect(mainQuestionTarget(listed, more, draft, [])).toEqual({ kind: "picks", path: null, picks: [more[0]] });
+    draft = add(draft, openPick(listed[0]!)).draft;
+    expect(mainQuestionTarget(listed, more, draft, [])?.kind).toBe("picks");
+    // A pick the main question does not list (an open question elsewhere) is dug from the tray instead.
+    expect(mainQuestionTarget([], more, draft, [])).toBeNull();
+    expect(mainQuestionTarget(listed, [], add(EMPTY_DRAFT, more[1]!).draft, [])).toBeNull();
+    expect(mainQuestionTarget(listed, more, EMPTY_DRAFT, [])).toBeNull();
   });
 });

@@ -7,11 +7,10 @@ import { addedLines, ownWords } from "@/lib/v4/askText";
 import type { DigProgress } from "@/lib/v4/digProgress";
 import { findOpenQuestion, isFinishedRewrite } from "@/lib/v4/mapModel";
 import { digWords, type V4DigQuota } from "@/lib/v4/digQuota";
-import { rootPicksTarget } from "@/lib/v4/digDock";
 import { placeOf } from "@/components/v4/mapDigHelpers";
 import type { MoneyLine } from "@/lib/v4/money";
 import { pauseOfDig } from "@/lib/v4/monthPause";
-import { draftTarget } from "@/lib/v4/suggestions";
+import { draftTarget, mainQuestionTarget } from "@/lib/v4/suggestions";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
 import {
@@ -24,7 +23,10 @@ import {
   type ReadingLevel,
   type TrustCounts,
   type TrustWord,
+  type V4Branch,
+  type V4DigPick,
   type V4Map,
+  type V4MoreItem,
   type V4OpenQuestion,
   type V4Path,
   type V4Point,
@@ -32,6 +34,7 @@ import {
 } from "@/lib/v4/types";
 import { cardLabel, groundClass } from "@/lib/v4/mapLooks";
 import {
+  branchIsTheirs,
   digFor,
   DigPauseDot,
   digNote,
@@ -53,10 +56,10 @@ import {
 } from "./V4MapTree";
 import { V4FullAnswerFold } from "./V4AnswerCard";
 import { V4DigFailed, type V4FailedDigs } from "./V4DigFailed";
-import { pickReasonPlaces, V4DigCompose, V4MoneyLines, V4PickReason, type V4DigChoice } from "./V4DigSuggest";
+import { pickReasonPlaces, V4DigCompose, V4MoneyLines, V4MorePickRows, V4PickReason, type V4DigChoice } from "./V4DigSuggest";
 import { V4MonthPause } from "./V4MonthPause";
 import { V4ShareChange } from "./V4ShareChange";
-import { digResultOf, V4DigPageIntro, V4DigResult, V4PathRewrite, V4WhatChanged } from "./V4PathRewrite";
+import { digResultOf, V4DigPageIntro, V4DigResult, V4PathRewrite, V4PointOfView, V4WhatChanged } from "./V4PathRewrite";
 import { V4DigRunning } from "./V4DigRunning";
 import { V4OtherPages, V4SearchNote, V4SourcesFold, V4WebNoteLine, type V4ResearchedPress } from "./V4Sources";
 import { V4TrustBar } from "./V4TrustBar";
@@ -83,6 +86,12 @@ import { V4TrustBar } from "./V4TrustBar";
  * Owner review 3 Nov (dig-d1 B, dig-f32): a dig at work shows its own running panel (V4DigRunning: the waiting card, the
  * steps and checked findings when the server reports them, the path's text now); a finished dig opens with the same result
  * box as the path it rewrote, its bar in words only, "Open this dig's map" below.
+ * V4 start step, Task 61 (wait-d1, journey-f1, map-f4): a chosen path's panel says first what it asks, what it brings
+ * together (every viewpoint) and the person's own words (theirs, never marked as AI text), the same during the wait and after,
+ * so nothing moves when the path fills in; then, while it is looked into, where its findings will show; once filled in, its
+ * answer so far, its trust word, what changed, the point-of-view line and its findings. While the debate runs nothing digs.
+ * "+ N more to explore" lists the menu paths left out, each one to dig into once the answer is ready; the question's panel
+ * lists what the AIs also raised that no path took.
  */
 
 type PanelProps = Readonly<{
@@ -162,6 +171,19 @@ type PanelProps = Readonly<{
   openDigProgress?: DigProgress | null;
   /** When the open dig was last checked (the waiting card's reduced-motion "Still working · checked 14:09"). Absent: none. */
   openDigCheckedAt?: number | null;
+  /**
+   * V4 start step, Task 61: a chosen path's one dig button digs deeper into that path through this (the page's shared Undo
+   * note, Task 62). Absent: that button digs as every path's does (`onDig`).
+   */
+  onDigDeeper?: (pathId: string) => void;
+  /** Task 61: "Dig into this" on a "+ N more to explore" item, once the answer is ready. Absent: the list offers no dig. */
+  onDigMore?: (item: V4MoreItem) => void;
+  /**
+   * V4 start step, Task 62 (wait-d1, journey-d2): what the question's own screen shows first while the debate runs (on a phone,
+   * where the map's first card is this screen: the waiting card, the lines and "Your paths"); after the answer, the carry-on
+   * line. Absent: nothing.
+   */
+  rootExtra?: ReactNode;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -269,6 +291,7 @@ function Crumbs(props: Readonly<{ resolved: ResolvedSelection; map: V4Map; onSel
     }
     parts.push({ id: `dig:${resolved.dig.link.childRunId}`, title: digTitle(resolved.dig, catalog, 40, props.map) });
   }
+  if (resolved.kind === "more") parts.push({ id: "more", title: { text: t(catalog, "v4.paths.moreHeading"), ai: false, more: 0 } });
   return (
     <nav className="v4PanelCrumbs" aria-label={t(catalog, "v4.panel.crumbsLabel")}>
       <ol>
@@ -335,9 +358,16 @@ function WhereToDig(props: Readonly<{
   digs: readonly DigView[];
   emptyKey: "v4.panel.noOpenRoot" | "v4.panel.noOpenPath" | null;
   panel: PanelProps;
+  /** V4 start step, Task 62 (spec §2.5): the main question's "+ N more" picks, listed first; absent: none. */
+  more?: readonly V4DigPick[];
 }>) {
   const { panel, emptyKey } = props;
   if (props.open.length === 0 && props.digs.length === 0 && emptyKey === null) return null;
+  const moreRows = panel.choice === undefined || props.more === undefined
+    ? null
+    : <V4MorePickRows picks={props.more} choice={panel.choice} catalog={panel.catalog} />;
+  const hasMore = moreRows !== null && (props.more ?? []).some((pick) => pick.kind === "MORE") && panel.choice?.canDig === true
+    && panel.choice.onToggleMainPick !== undefined;
   // dig-f22: the visible reason sits right above the first box greyed for it (each question is its own group here, since
   // the main question's list can hold the starred question of a path beside its own).
   const reasons = pickReasonPlaces(
@@ -345,10 +375,11 @@ function WhereToDig(props: Readonly<{
   );
   return (
     <Section title={t(panel.catalog, "v4.panel.whereToDig")}>
-      {props.open.length === 0
+      {props.open.length === 0 && !hasMore
         ? (emptyKey === null ? null : <p className="v4Muted">{t(panel.catalog, emptyKey)}</p>)
         : (
           <ul className="v4PanelRows">
+            {hasMore ? moreRows : null}
             {props.open.flatMap((question) => {
               const picked = panel.picked.has(question.id);
               const reason = reasons.get(question.id);
@@ -591,9 +622,11 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const headline = map.headline?.trim() ?? "";
   const summary = map.summary?.trim() ?? "";
   const open = rootPanelOpen(map, panel.digs);
+  // Task 62 (spec §2.5): on a path debate the menu paths left out come first in its dig list.
+  const more = panel.choice?.mainQuestionPicks ?? [];
   // map-f14 / dig-f4: the tray shows only from two picks, so a pick made here is dug by this panel's own pinned button
-  // ("Dig into your pick"), offered only when the panel lists every pick.
-  const picksTarget = panel.choice?.canDig === true ? rootPicksTarget(open, panel.choice.draft, map.paths) : null;
+  // ("Dig into your pick"), offered only when the panel lists every pick (Task 62: its "+ N more" picks too).
+  const picksTarget = panel.choice?.canDig === true ? mainQuestionTarget(open, more, panel.choice.draft, map.paths) : null;
   const digId = useId();
   // DATA-2: with no short answer yet, the whole composed answer is shown, so there is always an answer to read.
   const fallback = (map.fallbackText ?? "").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
@@ -636,16 +669,30 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
       <V4FullAnswerFold paragraphs={writing ? fallback : []} catalog={catalog} />
     </>
   );
+  const sent = addedLines(map.question).length > 0
+    ? (
+      <details className="v4PanelSent">
+        <summary>{t(catalog, "v4.panel.sentHeading")}</summary>
+        <p className="v4PanelSentText" data-ai-generated="true">{map.question.trim()}</p>
+      </details>
+    )
+    : null;
+  // Task 61: what the AIs raised that no path took (the gap round's points), only when there is something.
+  const alsoRaised = map.alsoRaised ?? [];
+  const raised = alsoRaised.length === 0 ? null : (
+    <Section title={t(catalog, "v4.paths.alsoRaised")}>
+      <ul className="v4PanelWhy" data-ai-generated="true">
+        {alsoRaised.map((point, index) => <li key={index}>{point}</li>)}
+      </ul>
+    </Section>
+  );
+  // Task 61: while the debate runs, the question's answer, bar and findings wait for the main answer, which comes last;
+  // nothing digs yet. Task 62: on a phone the page puts the waiting card, its lines and "Your paths" here, first.
+  if (map.phase === "RUN") return <>{panel.rootExtra}{sent}{raised}</>;
   return (
     <>
-      {addedLines(map.question).length > 0
-        ? (
-          <details className="v4PanelSent">
-            <summary>{t(catalog, "v4.panel.sentHeading")}</summary>
-            <p className="v4PanelSentText" data-ai-generated="true">{map.question.trim()}</p>
-          </details>
-        )
-        : null}
+      {panel.rootExtra}
+      {sent}
       {map.dig !== null && map.dig !== undefined ? (
         <V4DigPageIntro
           map={map}
@@ -685,7 +732,8 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           </Section>
         )
         : null}
-      <WhereToDig open={open} digs={digsUnder(map, panel.digs, null)} emptyKey="v4.panel.noOpenRoot" panel={panel} />
+      {raised}
+      <WhereToDig open={open} digs={digsUnder(map, panel.digs, null)} emptyKey="v4.panel.noOpenRoot" panel={panel} more={more} />
       {picksTarget !== null ? <DigBlock target={picksTarget} panel={panel} id={digId} /> : null}
     </>
   );
@@ -716,6 +764,89 @@ function askedTitle(path: V4Path, panel: PanelProps): ReactNode {
   return <TitleText title={title} catalog={panel.catalog} />;
 }
 
+/**
+ * Task 61: what a chosen path is, said first and the same during the wait and after (nothing moves when it fills in): what it
+ * asks, what it brings together (every viewpoint the AIs suggested, the chips wrap), and the person's own words (theirs).
+ */
+function BranchAbout(props: Readonly<{ branch: V4Branch; catalog: MessageCatalog }>) {
+  const { branch, catalog } = props;
+  const theirs = branchIsTheirs(branch);
+  const suggested = branch.viewpoints.filter((viewpoint) => !viewpoint.own);
+  const own = branch.viewpoints.filter((viewpoint) => viewpoint.own);
+  return (
+    <>
+      <Section title={t(catalog, "v4.paths.asks")}>
+        <p className="v4PanelText" data-ai-generated={theirs ? undefined : "true"}>{branch.question}</p>
+      </Section>
+      {suggested.length === 0 ? null : (
+        <Section title={t(catalog, "v4.paths.viewpoints")}>
+          <ul className="v4PathViews">
+            {suggested.map((viewpoint, index) => (
+              <li key={index} className="v4PathView" data-ai-generated="true">{viewpoint.title ?? viewpoint.question}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {own.length === 0 ? null : (
+        <Section title={t(catalog, "v4.paths.yourWords")}>
+          {/* The person's own words: theirs, not AI text. */}
+          <ul className="v4PathOwnWords">
+            {own.map((viewpoint, index) => <li key={index}>{viewpoint.question}</li>)}
+          </ul>
+        </Section>
+      )}
+    </>
+  );
+}
+
+/**
+ * Task 61: where a chosen path came out. Being looked into: where its findings will show. Filled in: its answer so far (the
+ * line, and its summary until a dig rewrote it), its trust word, what changed and the point-of-view line. Not finished: says so.
+ */
+function BranchAnswer(props: Readonly<{ path: V4Path; branch: V4Branch; startingTop: ReactNode; catalog: MessageCatalog }>) {
+  const { path, branch, catalog } = props;
+  if (branch.state === "LOOKING") {
+    const title = pathTitle(path, catalog, HEADING_MAX);
+    const [before = "", after = ""] = t(catalog, "v4.paths.lookingPanel", { title: PATH_MARK }).split(PATH_MARK);
+    return (
+      <p className="v4PanelText v4PathLookingLine">
+        {before}<span data-ai-generated={title.ai ? "true" : undefined}>{title.text}</span>{after}
+      </p>
+    );
+  }
+  if (branch.state === "FAILED") {
+    return (
+      <Section title={t(catalog, "v4.paths.answerSoFar")}>
+        <p className="v4PanelText">{t(catalog, "v4.paths.failed")}</p>
+        {props.startingTop}
+      </Section>
+    );
+  }
+  const line = path.line.replace(/\s+/gu, " ").trim();
+  const summary = line === branch.answerSoFar ? branch.summary : null;
+  const word = path.trust ?? null;
+  return (
+    <>
+      <Section title={t(catalog, "v4.paths.answerSoFar")}>
+        <p className="v4PanelText" data-ai-generated="true">{line}</p>
+        {summary === null ? null : <p className="v4PanelText" data-ai-generated="true">{summary}</p>}
+        {word === null ? null : (
+          <p className="v4PanelText v4PathTrustWord">{t(catalog, "v4.paths.trustWord", { word: t(catalog, `v4.trust.${word}`) })}</p>
+        )}
+        {props.startingTop}
+      </Section>
+      {branch.whatChanged.length === 0 ? null : (
+        <Section title={t(catalog, "v4.paths.whatChanged")}>
+          <ul className="v4RewriteSentences" data-ai-generated="true">
+            {branch.whatChanged.map((sentence, index) => <li key={index}>{sentence}</li>)}
+          </ul>
+        </Section>
+      )}
+      {branch.view === null ? null : <V4PointOfView view={branch.view} catalog={catalog} />}
+    </>
+  );
+}
+
 function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "path" }> }>) {
   const { panel } = props;
   const { path } = props.resolved;
@@ -732,26 +863,41 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   // map-d4 A (with dig-f24): the way past the findings and the suggestions to the pinned button, wherever there is one.
   const skip = panel.choice === undefined || panel.choice.canDig;
   const startingTop = panel.digStartingAtTop === true ? panel.digStarting?.(pathTarget(path, panel)) ?? null : null;
+  // Task 61: a chosen path. While the debate runs nothing here digs (each part keeps its place, so nothing jumps when the
+  // answer lands); its findings show once it has filled in.
+  const branch = path.branch;
+  const run = panel.map.phase === "RUN";
+  const found = branch === undefined || branch.state === "ARGUED";
+  // journey-f13: the path's one dig button keeps the record's words ("Dig here"); on a chosen path it digs deeper into it.
+  const deeper = branch === undefined ? undefined : panel.onDigDeeper;
+  const digPanel: PanelProps = deeper === undefined
+    ? panel
+    : { ...panel, onDig: (target: DigTarget) => (target.kind === "path" ? deeper(target.path.id) : panel.onDig(target)) };
   return (
     <>
-      <Section title={t(panel.catalog, "v4.panel.answerHere")}>
-        <AnswerSoFar line={more ? line : null} catalog={panel.catalog} />
-        {startingTop}
-      </Section>
-      <V4PathRewrite
-        path={path}
-        digs={panel.digs}
-        linkLevel={panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel}
-        catalog={panel.catalog}
-        locale={panel.locale}
-        asked={askedTitle(path, panel)}
-      />
-      {skip ? <SkipToDig targetId={digId} catalog={panel.catalog} /> : null}
-      {path.web !== undefined
+      {branch === undefined ? null : <BranchAbout branch={branch} catalog={panel.catalog} />}
+      {branch === undefined ? (
+        <Section title={t(panel.catalog, "v4.panel.answerHere")}>
+          <AnswerSoFar line={more ? line : null} catalog={panel.catalog} />
+          {startingTop}
+        </Section>
+      ) : <BranchAnswer path={path} branch={branch} startingTop={startingTop} catalog={panel.catalog} />}
+      {run ? null : (
+        <V4PathRewrite
+          path={path}
+          digs={panel.digs}
+          linkLevel={panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel}
+          catalog={panel.catalog}
+          locale={panel.locale}
+          asked={askedTitle(path, panel)}
+        />
+      )}
+      {skip && !run ? <SkipToDig targetId={digId} catalog={panel.catalog} /> : null}
+      {run ? null : path.web !== undefined
         ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />
         : <V4WebNoteLine note={panel.map.webNote} catalog={panel.catalog} />}
-      <TrustSection counts={path.counts} points={path.points} unchecked={path.unchecked} panel={panel} />
-      {path.web !== undefined && path.web.otherPages.length > 0
+      {found ? <TrustSection counts={path.counts} points={path.points} unchecked={path.unchecked} panel={panel} /> : null}
+      {!run && path.web !== undefined && path.web.otherPages.length > 0
         ? (
           // map-d4 A: "Other pages found ▸", folded, after the findings (paid plans only: Free searches nothing).
           <details className="v4PanelOtherPages">
@@ -768,20 +914,51 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
           </details>
         )
         : null}
-      <WhereToDig
-        open={undugOpen(path.open, panel.digs)}
-        digs={digsUnder(panel.map, panel.digs, path.id)}
-        emptyKey={emptyKey}
-        panel={panel}
-      />
-      {panel.choice !== undefined ? <V4DigCompose path={path} choice={panel.choice} catalog={panel.catalog} locale={panel.locale} /> : null}
-      <DigBlock
-        target={pathTarget(path, panel)}
-        panel={panel}
-        again={panel.choice?.digHereToo(path.id) === true}
-        {...(skip ? { id: digId } : {})}
-        startingAbove={startingTop !== null}
-      />
+      {run ? null : (
+        <WhereToDig
+          open={undugOpen(path.open, panel.digs)}
+          digs={digsUnder(panel.map, panel.digs, path.id)}
+          emptyKey={emptyKey}
+          panel={panel}
+        />
+      )}
+      {!run && panel.choice !== undefined ? <V4DigCompose path={path} choice={panel.choice} catalog={panel.catalog} locale={panel.locale} /> : null}
+      {run ? null : (
+        <DigBlock
+          target={pathTarget(path, panel)}
+          panel={digPanel}
+          again={panel.choice?.digHereToo(path.id) === true}
+          {...(skip ? { id: digId } : {})}
+          startingAbove={startingTop !== null}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Task 61 (wait-d1): "+ N more to explore", the menu paths the person left out before Start (AI text), the new ones marked.
+ * Once the answer is ready each has "Dig into this"; while the debate runs the list says digging opens then, and offers none.
+ */
+function MoreBody(props: Readonly<{ panel: PanelProps; resolved: Extract<ResolvedSelection, { kind: "more" }> }>) {
+  const { panel } = props;
+  const run = panel.map.phase === "RUN";
+  const dig = run ? undefined : panel.onDigMore;
+  return (
+    <>
+      <p className="v4PanelHint">{t(panel.catalog, run ? "v4.paths.moreLater" : "v4.paths.moreHint")}</p>
+      <ul className="v4PanelRows">
+        {props.resolved.items.map((item) => (
+          <li key={item.id} className="v4MoreItem">
+            <span className="v4PanelRowTitle" data-ai-generated="true">{item.title}</span>
+            {item.isNew ? <span className="v4MoreNew">{t(panel.catalog, "v4.paths.moreNew")}</span> : null}
+            <p className="v4PanelText" data-ai-generated="true">{item.question}</p>
+            {dig === undefined ? null : (
+              <button type="button" className="v4Btn v4MoreDig" onClick={() => dig(item)}>{t(panel.catalog, "v4.paths.digThis")}</button>
+            )}
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
@@ -1018,6 +1195,7 @@ function headingOf(resolved: ResolvedSelection, map: V4Map, catalog: MessageCata
   if (resolved.kind === "open") return { text: resolved.question.text, ai: true, more: 0 };
   // map-f29 / dig-f20: what the dig looked into, in its own words, marked as AI text only when an AI wrote them.
   if (resolved.kind === "dig") return { ...digTitle(resolved.dig, catalog, HEADING_MAX, map), more: 0 };
+  if (resolved.kind === "more") return { text: t(catalog, "v4.paths.moreHeading"), ai: false, more: 0 };
   // The person's own words; the lines added from their choices sit in "What we asked the AIs".
   return { text: ownWords(map.question), ai: true, more: 0 };
 }
@@ -1030,7 +1208,8 @@ export function V4Panel(props: PanelProps) {
     <div className={`v4Panel v4Panel-${resolved.kind}`}>
       <Crumbs resolved={resolved} map={map} onSelect={props.onSelect} catalog={catalog} />
       {props.underCrumbs ?? null}
-      <span className="v4Eyebrow">{t(catalog, `v4.panel.kind.${resolved.kind}`)}</span>
+      {/* Task 61: "More to explore" is its own heading, with no kind word over it. */}
+      {resolved.kind === "more" ? null : <span className="v4Eyebrow">{t(catalog, `v4.panel.kind.${resolved.kind}`)}</span>}
       <h2 className="v4PanelH2" ref={props.headingRef} tabIndex={-1} data-ai-generated={heading.ai ? "true" : undefined}>
         {heading.text}
       </h2>
@@ -1038,6 +1217,7 @@ export function V4Panel(props: PanelProps) {
       {resolved.kind === "path" ? <PathBody panel={props} resolved={resolved} /> : null}
       {resolved.kind === "open" ? <OpenBody panel={props} resolved={resolved} /> : null}
       {resolved.kind === "dig" ? <DigBody panel={props} resolved={resolved} /> : null}
+      {resolved.kind === "more" ? <MoreBody panel={props} resolved={resolved} /> : null}
     </div>
   );
 }

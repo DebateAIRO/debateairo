@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { Fragment, useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import type { CarryOnPart, RunPathPointState } from "@debateai/contract";
+import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { ownWords, sameItemText } from "@/lib/v4/askText";
+import { CARRY_ON_BUILT } from "@/lib/v4/carryOn";
 import {
   cardLabel,
   digGround,
@@ -18,7 +20,7 @@ import {
 import { findOpenQuestion, isFinishedRewrite, openQuestionsOf } from "@/lib/v4/mapModel";
 import { digPauseCardLine, pauseOfDig } from "@/lib/v4/monthPause";
 import { useMapKeys } from "@/lib/v4/useMapKeys";
-import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
+import type { DigView, V4Branch, V4Map, V4MoreItem, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import type { PickRefusal } from "@/lib/v4/suggestions";
 import {
   DigHereTooLeaf, pickReasonPlaces, refusalLine, SuggestionLeaves, V4PickReason, type PickGroup, type PickReasonPlace, type V4DigChoice
@@ -47,6 +49,18 @@ import { V4TrustBar } from "./V4TrustBar";
  *     "Open ground" mark; on every width at most about 12 cards show, the star, picks and digs at work first, and nothing
  *     is hidden without a visible sign ("+N more", the mark, the hint that the map goes on to the right).
  *   - map-f10: the map is one keyboard stop, moved with the arrow keys (lib/v4/useMapKeys.ts); each card says its level.
+ * V4 start step, Task 61 (spec 2026-11-03 §2 items 7 and 8):
+ *   - r2-1 A: on the map it is a "path", as on the choosing step ("A path the AIs looked into", "No paths to show yet.");
+ *     each path card still shows what it asks in one line, its title.
+ *   - wait-d1, journey-f1, map-d2: a chosen path has one card (V4PathCard) for the wait and for the answer, on the tree, the
+ *     outline and the phone's rows, so nothing changes look when its answer lands. Being looked into, it wears journey-f2's
+ *     "being looked into" look (its ring pulses only while the AIs work), says "Looking into it" with its step line, and its
+ *     quiet dots (V4PathDots) have their own button beside the card's; filled in, the settled look with its answer so far, its
+ *     bar and its trust word; a path that could not finish says so, with no bar. Its tag says who made it, never "You picked".
+ *   - map-f4: no made-up path: a map with no path draws no path column. "+ N more to explore" sits under the paths.
+ *   - wait-f16: the carry-on line (V4CarryOnLine), shown only once the behaviour is built (lib/v4/carryOn.ts).
+ * V4 start step, Task 62: the first card of a path debate shows its question as it was sent, the answers sentences in it
+ * (r2-8, answer Q17); a selection that left the map opens the part right above it (resolveSelectionNear, map-f4).
  */
 
 /** Titles on cards: AI text cut on a word boundary at about 70 characters; the panel shows the full text. */
@@ -64,7 +78,9 @@ export type ResolvedSelection =
   | Readonly<{ kind: "root" }>
   | Readonly<{ kind: "path"; path: V4Path }>
   | Readonly<{ kind: "open"; question: V4OpenQuestion; path: V4Path | null }>
-  | Readonly<{ kind: "dig"; dig: DigView; home: DigHome }>;
+  | Readonly<{ kind: "dig"; dig: DigView; home: DigHome }>
+  /** Task 61: "+ N more to explore", the menu paths the person left out before Start. */
+  | Readonly<{ kind: "more"; items: readonly V4MoreItem[] }>;
 
 /** Where a dig hangs on the map: under the path its open questions belong to, else under the question. */
 export type DigHome = Readonly<{ path: V4Path | null }>;
@@ -102,8 +118,46 @@ export function resolveSelection(map: V4Map, digs: readonly DigView[], selected:
     const childRunId = selected.slice("dig:".length);
     const dig = digs.find((candidate) => candidate.link.childRunId === childRunId);
     if (dig !== undefined) return { kind: "dig", dig, home: digHome(map, dig) };
+  } else if (selected === "more") {
+    const items = map.more ?? [];
+    if (items.length > 0) return { kind: "more", items };
   }
   return { kind: "root" };
+}
+
+/** The path a resolved selection sits on: the path itself, the path its open question or dig hangs under, else none. */
+export function pathIdOf(resolved: ResolvedSelection): string | null {
+  if (resolved.kind === "path") return resolved.path.id;
+  if (resolved.kind === "open") return resolved.path?.id ?? null;
+  if (resolved.kind === "dig") return resolved.home.path?.id ?? null;
+  return null;
+}
+
+/**
+ * V4 start step, Task 62 (map-f4, "Kept where you were"): what a selection opens on the map as drawn now. A selection still
+ * on the map opens itself. One that left it opens the part right above it: an open question or a dig that is gone opens the
+ * path it was on (`lastPathId`, the path of the last selection that opened) while that path is still drawn, else the question;
+ * anything else that is gone opens the question. `moved` says the selection gave way, so the page can say so once.
+ */
+export function resolveSelectionNear(map: V4Map, digs: readonly DigView[], selected: V4Selection, lastPathId: string | null):
+  Readonly<{ resolved: ResolvedSelection; moved: boolean }> {
+  const resolved = resolveSelection(map, digs, selected);
+  if (resolved.kind !== "root" || selected === "root") return { resolved, moved: false };
+  if ((selected.startsWith("open:") || selected.startsWith("dig:")) && lastPathId !== null) {
+    const path = map.paths.find((candidate) => candidate.id === lastPathId);
+    if (path !== undefined) return { resolved: { kind: "path", path }, moved: true };
+  }
+  return { resolved, moved: true };
+}
+
+/**
+ * V4 start step, Task 62 (r2-8, owner answer Q17): the words of the map's first card. A path debate's question is shown as it
+ * was sent, its answers sentences in it (never chips or pins): the whole line, its blank lines closed up. An R22 map keeps the
+ * person's own words, cut at about 110 characters (a dig's line also names the debate it came from).
+ */
+export function firstCardQuestion(map: V4Map): string {
+  if (map.phase === "RUN" || map.more !== undefined) return map.question.replace(/\s+/gu, " ").trim();
+  return shortText(ownWords(map.question), 110);
 }
 
 /** The selection id a resolved selection stands for (so a stale id highlights the question card). */
@@ -111,6 +165,7 @@ export function selectionIdOf(resolved: ResolvedSelection): V4Selection {
   if (resolved.kind === "path") return `path:${resolved.path.id}`;
   if (resolved.kind === "open") return `open:${resolved.question.id}`;
   if (resolved.kind === "dig") return `dig:${resolved.dig.link.childRunId}`;
+  if (resolved.kind === "more") return "more";
   return "root";
 }
 
@@ -186,6 +241,17 @@ export type MapPiecesProps = Readonly<{
    * boxes (nothing can be ticked or dug from the map itself); the cards still open. Absent or false: the own map.
    */
   readOnly?: boolean;
+  /** V4 start step, Task 61: digging deeper into one chosen path (the path's one dig button, journey-f13's words). */
+  onDigDeeper?: (pathId: string) => void;
+  /** Task 61: digging into a "+ N more to explore" item, once the answer is ready. */
+  onDigMore?: (item: V4MoreItem) => void;
+  /** Task 61 (journey-d2): what the page draws right under the question's card, never inside it (the waiting card, the lines). */
+  rootExtra?: ReactNode;
+  /**
+   * Task 61: the AIs work now, so the paths being looked into pulse; false (or absent) while the run waits, holds or is paused,
+   * and before the send: the rings stand still, the step lines and dots stay as they were.
+   */
+  running?: boolean;
 }>;
 
 /**
@@ -376,8 +442,20 @@ export function digTitle(dig: DigView, catalog: MessageCatalog, max = 70, map?: 
   return { text: t(catalog, "v4.map.digUntitled"), ai: false, more: 0 };
 }
 
-/** map-f25: a path's card title is its own short label, never the outcome words its line may carry ("…: held up."). */
+/**
+ * Task 61: a path the person added or rewrote is theirs whole (its title and its question), and so are the words they wrote
+ * into any path: never marked as AI text (the API's rule, apps/api/src/start-paths-at-ask.ts storedPathOf).
+ */
+export function branchIsTheirs(branch: Pick<V4Branch, "author">): boolean {
+  return branch.author === "PERSON_EDITED" || branch.author === "PERSON_OWN_VIEW";
+}
+
+/**
+ * map-f25: a path's card title is its own short label, never the outcome words its line may carry ("…: held up."). Task 61: a
+ * chosen path's title is the one it had before Start (marked as AI text only when an AI wrote it).
+ */
 export function pathTitle(path: V4Path, catalog: MessageCatalog, max = 70): Title {
+  if (path.branch !== undefined) return { text: shortText(path.branch.title, max), ai: !branchIsTheirs(path.branch), more: 0 };
   const label = cardLabel(path.line);
   return label.length > 0
     ? { text: shortText(label, max), ai: true, more: 0 }
@@ -398,6 +476,211 @@ export function TitleText(props: Readonly<{ title: Title; catalog: MessageCatalo
 /** The word on open ground (journey-f2): "Open", with the star's own words when it carries the star. */
 export function OpenWord(props: Readonly<{ catalog: MessageCatalog }>) {
   return <span className="v4GroundWord">{t(props.catalog, "v4.ground.open")}</span>;
+}
+
+/**
+ * Task 61 (wait-d1 C): a path's quiet dots, one per point the AIs put forward on it, all alike, with no colour for or against
+ * and no number: a dot being checked has a ring that slowly closes, a checked one turns to ink. The dots are one button of
+ * their own, beside the card's (never inside it), that shows or hides what a dot is; focus stays on it. Nothing unchecked is
+ * ever shown. While the run waits (`running` false) the ring stands still. Null with no dot yet.
+ */
+export function V4PathDots(props: Readonly<{ dots: readonly RunPathPointState[]; running: boolean; catalog: MessageCatalog }>) {
+  const [open, setOpen] = useState(false);
+  const noteId = useId();
+  if (props.dots.length === 0) return null;
+  return (
+    <div className={`v4PathDots${props.running ? "" : " v4PathDotsStill"}`}>
+      <button
+        type="button"
+        className="v4PathDotsBtn"
+        aria-label={t(props.catalog, "v4.paths.dots")}
+        aria-expanded={open}
+        aria-controls={noteId}
+        onClick={() => setOpen((was) => !was)}
+      >
+        {props.dots.map((dot, at) => (
+          <span key={at} className={`v4PathDot v4PathDot${dot}${dot === "BEING_CHECKED" ? " v4PathDotRing" : ""}`} aria-hidden="true" />
+        ))}
+      </button>
+      <p id={noteId} className="v4PathDotsNote" hidden={!open}>{t(props.catalog, "v4.paths.dotsNote")}</p>
+    </div>
+  );
+}
+
+/**
+ * Task 61 (wait-d1, journey-f1, journey-f2, map-d2): one card for a chosen path, on the tree (`compact` false) and on the
+ * outline's and the phone's rows (`compact` true), the same during the wait and once the answer is served, so nothing changes
+ * look when the answer lands and the card's button stays the same element (focus never moves by itself).
+ *   - LOOKING: journey-f2's "being looked into" look (its ring pulses while `running`, else stands still), the title, the
+ *     tag, "Looking into it", the step line once the path has one, then its dots; no bar, no star, no number.
+ *   - ARGUED: the settled look, the title, the tag, its answer so far's line, its trust word and its bar with that word.
+ *   - FAILED: the settled look (the other session's look for it is to come), "We couldn't finish looking into this. The rest
+ *     of the debate went on." and no bar.
+ * On the served map (`digs` given) it also carries what digs did to the path, as every path card does. Never "You picked"
+ * (owner answer Q16: every path here is one the person picked).
+ */
+export function V4PathCard(props: Readonly<{
+  path: V4Path;
+  selected: boolean;
+  changed: boolean;
+  phase: "RUN" | "ANSWER";
+  running: boolean;
+  compact: boolean;
+  onSelect(viaKeyboard: boolean): void;
+  catalog: MessageCatalog;
+  locale: string;
+  /** The served map's digs: the path's result tag, its "Holds" seal and its rewrite line (absent: none). */
+  digs?: readonly DigView[];
+  /** dig-d4 B: the card's one-time reveal plays now. */
+  reveal?: boolean;
+  /** map-d3 / map-f10: whether the path's leaves show (the tree says so with aria-expanded, a row with data-expanded). */
+  expanded?: boolean;
+  /** map-d3: a folded path's "Open ground" mark (the tree on a laptop). */
+  groundLeft?: boolean;
+}>) {
+  const { path, catalog, compact } = props;
+  const branch = path.branch ?? null;
+  const state = branch?.state ?? "ARGUED";
+  const looking = state === "LOOKING";
+  const progress = looking ? branch?.progress ?? null : null;
+  const step = progress?.step ?? null;
+  const tag = branch?.tag ?? null;
+  const pulse = looking && props.running;
+  const id: V4Selection = `path:${path.id}`;
+  const digs = props.phase === "ANSWER" ? props.digs ?? null : null;
+  const marks = digs === null ? { tag: null, seal: false } : pathMarks(path, digs, props.changed);
+  const title = pathTitle(path, catalog);
+  const line = path.line.replace(/\s+/gu, " ").trim();
+  const box = [
+    compact ? "v4OutPath v4PathCardCompact" : "v4MapPath",
+    "v4PathCard",
+    groundClass(looking ? "LOOKING" : "SETTLED"),
+    state === "FAILED" ? "v4PathFAILED" : null,
+    pulse ? "v4PathPulse" : null,
+    props.selected ? (compact ? "v4OutSelected" : "v4MapSelected") : null,
+    props.reveal === true ? "v4Reveal" : null
+  ].filter((name) => name !== null).join(" ");
+  return (
+    <div className={box} data-path-card={path.id}>
+      <button
+        type="button"
+        className="v4PathCardMain"
+        data-rove=""
+        data-row={id}
+        data-parent="root"
+        aria-current={props.selected ? "true" : undefined}
+        aria-expanded={compact ? undefined : props.expanded}
+        data-expanded={compact && props.expanded !== undefined ? String(props.expanded) : undefined}
+        onClick={(event) => props.onSelect(viaKeyboard(event))}
+      >
+        {marks.tag !== null ? <ResultTag result={marks.tag} catalog={catalog} /> : null}
+        <TitleText className={compact ? "v4OutTitle" : "v4MapPathTitle"} title={title} catalog={catalog} />
+        {tag === null ? null : <span className="v4PathTag">{t(catalog, `v4.paths.tag.${tag}`)}</span>}
+        {looking ? (
+          <>
+            <span className="v4MapNote">
+              {pulse ? <span className="v4MapPulse" aria-hidden="true" /> : null}
+              {t(catalog, "v4.paths.looking")}
+            </span>
+            {step === null ? null : <span className="v4PathStep">{t(catalog, `v4.paths.step.${step}`)}</span>}
+          </>
+        ) : state === "FAILED" ? (
+          <span className="v4PathCardLine">{t(catalog, "v4.paths.failed")}</span>
+        ) : (
+          <>
+            {line.length > 0 && line !== branch?.title
+              ? <span className="v4PathCardLine" data-ai-generated="true">{line}</span>
+              : null}
+            <span className={compact ? "v4OutMeta" : "v4MapPathMeta"}>
+              <TrustWordTag path={path} catalog={catalog} />
+              {marks.seal ? <HoldsSeal catalog={catalog} /> : null}
+            </span>
+            <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} word={path.trust ?? null} />
+          </>
+        )}
+        {compact && props.selected ? <span className="v4OutHere">{t(catalog, "v4.outline.here")}</span> : null}
+        {digs === null ? null : <V4RewriteCardNote path={path} catalog={catalog} locale={props.locale} digs={digs} />}
+        {props.groundLeft === true ? (
+          <span className="v4MapGroundMark">
+            <span className="v4MapGroundKey" aria-hidden="true" />
+            {t(catalog, "v4.map.openGround")}
+          </span>
+        ) : null}
+        {props.changed && marks.tag === null ? <NewDot catalog={catalog} /> : null}
+        <LevelWords level={2} catalog={catalog} />
+      </button>
+      {progress === null ? null : <V4PathDots dots={progress.dots} running={props.running} catalog={catalog} />}
+    </div>
+  );
+}
+
+/** The separator between the parts of the carry-on line (no words: read the same in every language). */
+const CARRY_ON_GAP = " · ";
+
+/**
+ * Task 61 (wait-f16): one calm line under the question, "Your answer · then a dig on each path · then your report", the part
+ * the server says is running in ink (aria-current), the rest grey, and under it "Nothing to do: your report will be ready by
+ * itself." Free gets one dig in all: "then one dig". Drawn only through V4MapCarryOnLine's rule (or where the page checked it).
+ */
+export function V4CarryOnLine(props: Readonly<{ part: CarryOnPart; free: boolean; catalog: MessageCatalog }>) {
+  const { catalog } = props;
+  const parts: ReadonlyArray<Readonly<{ part: CarryOnPart; key: string }>> = [
+    { part: "ANSWER", key: "v4.paths.carryOn.ANSWER" },
+    { part: "DIGS", key: props.free ? "v4.paths.carryOn.DIGS_FREE" : "v4.paths.carryOn.DIGS" },
+    { part: "REPORT", key: "v4.paths.carryOn.REPORT" }
+  ];
+  return (
+    <div className="v4CarryOn">
+      <p className="v4CarryOnSteps">
+        {parts.map((entry, at) => (
+          <Fragment key={entry.part}>
+            {at > 0 ? <span aria-hidden="true">{CARRY_ON_GAP}</span> : null}
+            <span aria-current={entry.part === props.part ? "step" : undefined}>{t(catalog, entry.key)}</span>
+          </Fragment>
+        ))}
+      </p>
+      <p className="v4CarryOnNote">{t(catalog, "v4.paths.carryOn.nothingToDo")}</p>
+    </div>
+  );
+}
+
+/**
+ * Task 61: the carry-on line where a map shows it: only once the behaviour is built (CARRY_ON_BUILT, Task 56), on a map whose
+ * box "Let the AIs carry on to the report without asking me" was ticked, with the part the server says is running.
+ */
+export function V4MapCarryOnLine(props: Readonly<{ map: V4Map; part: CarryOnPart | null; free: boolean; catalog: MessageCatalog }>) {
+  if (!CARRY_ON_BUILT || props.map.carryOnToReport !== true || props.part === null) return null;
+  return <V4CarryOnLine part={props.part} free={props.free} catalog={props.catalog} />;
+}
+
+/** Task 61: "+ N more to explore" under the paths: it opens the list in the panel (the "more" selection). */
+function MoreToExplore(props: Readonly<{ pieces: MapPiecesProps; selected: boolean; className: string }>) {
+  const { pieces } = props;
+  const items = pieces.map.more ?? [];
+  if (items.length === 0) return null;
+  return (
+    <button
+      type="button"
+      className={props.className}
+      data-rove=""
+      data-row="more"
+      data-parent="root"
+      aria-current={props.selected ? "true" : undefined}
+      onClick={(event) => pieces.onSelect("more", viaKeyboard(event))}
+    >
+      {tPlural(pieces.catalog, "v4.paths.more", items.length, pieces.locale ?? "en")}
+    </button>
+  );
+}
+
+/** Task 61: the outline's "+ N more to explore", under its paths. */
+export function MoreToExploreRow(props: Readonly<{ pieces: MapPiecesProps; selected: boolean }>) {
+  if ((props.pieces.map.more ?? []).length === 0) return null;
+  return (
+    <li className="v4OutRow v4OutMoreRow">
+      <MoreToExplore pieces={props.pieces} selected={props.selected} className="v4MapMore v4MapExplore" />
+    </li>
+  );
 }
 
 function OpenCard(props: Readonly<{
@@ -741,10 +1024,7 @@ export function pathExtras(path: V4Path, pieces: MapPiecesProps, variant: "tree"
 
 /** The path a selection sits on (the path itself, or the path its open question or dig hangs under). */
 function pathOfSelection(resolved: ResolvedSelection): string | null {
-  if (resolved.kind === "path") return resolved.path.id;
-  if (resolved.kind === "open") return resolved.path?.id ?? null;
-  if (resolved.kind === "dig") return resolved.home.path?.id ?? null;
-  return null;
+  return pathIdOf(resolved);
 }
 
 /** map-f22: whether the drawn map is wider than its box (so a hint says it goes on to the right). */
@@ -821,14 +1101,18 @@ export function V4MapTree(props: MapPiecesProps) {
     const place = reasons.get(key);
     return place === undefined ? {} : { reason: place };
   };
+  // Task 61: while the debate runs (the run read's map) the question's bar waits for the main answer, the path column's head
+  // says the AIs are at work, and nothing hangs under the paths yet. map-f4: with no path at all, no path column is drawn.
+  const run = map.phase === "RUN";
+  const hasPaths = map.paths.length > 0;
   return (
     <div className={`v4Map${fold ? " v4MapFold" : ""}`}>
       <div className={`v4MapScroll${overflows ? " v4MapScrollMore" : ""}`} ref={setScrollBox}>
         <div className="v4MapCanvas" ref={treeRef} onKeyDown={keys.onKeyDown} onFocus={keys.onFocus}>
           <div className="v4MapHeads" aria-hidden="true">
             <span>{t(catalog, "v4.map.colQuestion")}</span>
-            <span>{t(catalog, "v4.map.colPaths")}</span>
-            {fold ? null : <span>{t(catalog, "v4.map.colOpen")}</span>}
+            {hasPaths ? <span>{t(catalog, run ? "v4.paths.running" : "v4.map.colPaths")}</span> : null}
+            {fold || run || !hasPaths ? null : <span>{t(catalog, "v4.map.colOpen")}</span>}
           </div>
           <div className="v4MapBody">
             <div className="v4MapRootCol">
@@ -841,17 +1125,18 @@ export function V4MapTree(props: MapPiecesProps) {
                 aria-current={rootSelected ? "true" : undefined}
                 onClick={(event) => props.onSelect("root", viaKeyboard(event))}
               >
-                <span className="v4MapRootTitle v4Serif" data-ai-generated="true">{shortText(ownWords(map.question), 110)}</span>
-                <V4TrustBar counts={map.counts} unchecked={map.unchecked} catalog={catalog} />
+                <span className="v4MapRootTitle v4Serif" data-ai-generated="true">{firstCardQuestion(map)}</span>
+                {run ? null : <V4TrustBar counts={map.counts} unchecked={map.unchecked} catalog={catalog} />}
                 {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
                 <LevelWords level={1} catalog={catalog} />
               </button>
+              {props.rootExtra === undefined ? null : <div className="v4MapRootExtra">{props.rootExtra}</div>}
               <div className="v4MapRootLeaves">
                 <Leaves plan={rootPlan} pieces={props} selectedId={selectedId} level={2} onToggle={() => toggle("root")} {...reasonOf(rootPlan.key)} />
               </div>
             </div>
-            {map.paths.length === 0
-              ? <p className="v4MapEmpty v4Muted">{t(catalog, "v4.map.noPaths")}</p>
+            {!hasPaths
+              ? (run ? null : <p className="v4MapEmpty v4Muted">{t(catalog, "v4.map.noPaths")}</p>)
               : (
                 <ul className="v4MapBranches" data-group="root">
                   {map.paths.map((path, at) => {
@@ -861,6 +1146,29 @@ export function V4MapTree(props: MapPiecesProps) {
                     const news = props.changed.has(id);
                     const marks = pathMarks(path, digs, news);
                     const groundLeft = plan.folded && plan.hidden > 0;
+                    if (path.branch !== undefined) {
+                      // Task 61: a chosen path's one card, the same during the wait and once the answer is served.
+                      return (
+                        <li key={path.id} className={`v4MapBranch${plan.folded ? " v4MapBranchFolded" : ""}`}>
+                          <V4PathCard
+                            path={path}
+                            selected={selected}
+                            changed={news}
+                            phase={run ? "RUN" : "ANSWER"}
+                            running={props.running === true}
+                            compact={false}
+                            onSelect={(keyboard) => props.onSelect(id, keyboard)}
+                            catalog={catalog}
+                            locale={props.locale ?? "en"}
+                            digs={digs}
+                            reveal={props.reveal?.has(id) === true}
+                            {...(fold ? { expanded: !plan.folded } : {})}
+                            groundLeft={groundLeft}
+                          />
+                          <Leaves plan={plan} pieces={props} selectedId={selectedId} level={3} onToggle={() => toggle(path.id)} {...reasonOf(plan.key)} />
+                        </li>
+                      );
+                    }
                     return (
                       <li key={path.id} className={`v4MapBranch${plan.folded ? " v4MapBranchFolded" : ""}`}>
                         <button
@@ -894,6 +1202,11 @@ export function V4MapTree(props: MapPiecesProps) {
                       </li>
                     );
                   })}
+                  {(map.more ?? []).length > 0 ? (
+                    <li className="v4MapMoreRow">
+                      <MoreToExplore pieces={props} selected={selectedId === "more"} className="v4MapMore v4MapExplore" />
+                    </li>
+                  ) : null}
                 </ul>
               )}
           </div>

@@ -300,7 +300,8 @@ describe("loading and an ended sign-in (map-f6, wait-f1)", () => {
       run_ref: runId, question_line: "Should my town build a heat pump network?", state: "RUNNING", terminal_reason: null, hold_until: null
     } as RunProjection;
     await mountMap(1600, runId);
-    expect(text()).toContain(CATALOG["v4.debate.state.RUNNING"]);
+    // V4 start step, Task 62 (journey-d2, journey-f22): the waiting card's one state line, from the shared list.
+    expect(text()).toContain(CATALOG["v4.state.LOOKING"]);
     harness.loadError = new ContractHttpError("SESSION_REQUIRED", 401, "sign in");
     await advance(5_000);
     await settle();

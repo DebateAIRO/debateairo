@@ -12,7 +12,7 @@ import {
   type DigPick,
   type DigSuggestion
 } from "@debateai/contract";
-import type { DigMode, DigTarget, V4DigDraft, V4DigPick, V4OpenQuestion, V4Path } from "./types.js";
+import type { DigMode, DigTarget, V4DigDraft, V4DigPick, V4MoreItem, V4OpenQuestion, V4Path } from "./types.js";
 
 /*
  * Perplexity plan W3-4 and the dig model revision (2026-10-30/31): choosing what to dig, on the map. A path offers its dig
@@ -129,9 +129,11 @@ function withPicks(group: string | null, picks: readonly V4DigPick[]): V4DigDraf
 /** Adds `pick` (refused, the draft unchanged, when pickRefusal or its text says no). The same key twice is one pick. */
 export function addPick(draft: V4DigDraft, pick: V4DigPick, planTier: V4PlanTier): DraftChange {
   if (draft.picks.some((known) => known.key === pick.key)) return changed(draft);
-  const refused = pickRefusal(draft, pick.group, planTier) ?? (pick.kind === "OPEN" ? null : textRefusal(pick.text));
+  // V4 start step, Task 60: a "+ N more" item (MORE) keeps the AIs' words, as an open question does.
+  const refused = pickRefusal(draft, pick.group, planTier)
+    ?? (pick.kind === "OPEN" || pick.kind === "MORE" ? null : textRefusal(pick.text));
   if (refused !== null) return refusedWith(draft, refused);
-  const kept: V4DigPick = pick.kind === "OPEN" ? pick : Object.freeze({ ...pick, text: pick.text.trim() });
+  const kept: V4DigPick = pick.kind === "OPEN" || pick.kind === "MORE" ? pick : Object.freeze({ ...pick, text: pick.text.trim() });
   return changed(withPicks(pick.group, [...draft.picks, kept]));
 }
 
@@ -148,7 +150,8 @@ export function togglePick(draft: V4DigDraft, pick: V4DigPick, planTier: V4PlanT
 export function editPick(draft: V4DigDraft, key: string, text: string): DraftChange {
   const at = draft.picks.findIndex((pick) => pick.key === key);
   const pick = draft.picks[at];
-  if (pick === undefined || pick.kind === "OPEN") return changed(draft);
+  // V4 start step, Task 62: a "+ N more" item (MORE) keeps the AIs' words, as an open question does.
+  if (pick === undefined || pick.kind === "OPEN" || pick.kind === "MORE") return changed(draft);
   const refused = textRefusal(text);
   if (refused !== null) return refusedWith(draft, refused);
   const picks = [...draft.picks];
@@ -169,6 +172,40 @@ export function ownViewPick(pathId: string, text: string, serial: number): V4Dig
   return Object.freeze({ kind: "OWN_VIEW", key: `own:${pathId}:${serial}`, group: pathId, text });
 }
 
+/** V4 start step, Task 62: a "+ N more to explore" item as a pick of the main question (its words are the AIs', never edited). */
+export function morePick(item: V4MoreItem): V4DigPick {
+  return Object.freeze({ kind: "MORE", key: `more:${item.id}`, group: null, more: item });
+}
+
+/**
+ * V4 start step, Task 62 (spec §2.5: "it is offered first when you dig"): what the main question offers to dig. On a path
+ * debate (`answer.branches`) the menu paths the person left out before Start come first, in menu order, each a MORE pick, then
+ * `suggestions` as given; an R22 answer gets `suggestions` back unchanged. A MORE pick already in `suggestions` is listed once.
+ */
+export function digSuggestionsWithMore(answer: Answer, suggestions: readonly V4DigPick[]): readonly V4DigPick[] {
+  const more = answer.branches?.more;
+  if (more === undefined) return suggestions;
+  const given = new Set(suggestions.map((pick) => pick.key));
+  const first = more
+    .map((item) => morePick(Object.freeze({ id: item.more_id, title: item.title, question: item.question, isNew: item.is_new })))
+    .filter((pick) => !given.has(pick.key));
+  return Object.freeze([...first, ...suggestions]);
+}
+
+/**
+ * V4 start step, Task 62: the dig the main question's own button makes of the picks, only when that panel lists every one of
+ * them (its open questions, `listed`, and its MORE picks, `mainPicks`); else null (the tray digs them). As digDock.ts's
+ * rootPicksTarget, with the MORE picks.
+ */
+export function mainQuestionTarget(listed: readonly V4OpenQuestion[], mainPicks: readonly V4DigPick[], draft: V4DigDraft,
+  paths: readonly V4Path[]): DigTarget | null {
+  if (draft.picks.length === 0) return null;
+  const open = new Set(listed.map((question) => question.id));
+  const more = new Set(mainPicks.flatMap((pick) => (pick.kind === "MORE" ? [pick.key] : [])));
+  const all = draft.picks.every((pick) => (pick.kind === "OPEN" && open.has(pick.question.id)) || (pick.kind === "MORE" && more.has(pick.key)));
+  return all ? draftTarget(draft, paths) : null;
+}
+
 /** Whether the person changed a suggestion's text (spaces closed up). */
 export function isEdited(pick: V4DigPick): boolean {
   return pick.kind === "SUGGESTION" && oneLine(pick.text) !== oneLine(pick.suggestion.text);
@@ -183,9 +220,13 @@ export function pickedSuggestionIds(draft: V4DigDraft): ReadonlySet<string> {
   return new Set(draft.picks.flatMap((pick) => (pick.kind === "SUGGESTION" ? [pick.suggestion.suggestion_id] : [])));
 }
 
-/** The place one pick names on the parent's map: the question's id, the suggestion's first place, the own view's path. */
+/**
+ * The place one pick names on the parent's map: the question's id, the suggestion's first place, the own view's path. V4 start
+ * step, Task 62: a "+ N more" item names its own id (`more-<path_ref>`), under the main question.
+ */
 function placeOf(pick: V4DigPick): string {
   if (pick.kind === "OPEN") return pick.question.id;
+  if (pick.kind === "MORE") return pick.more.id;
   if (pick.kind === "SUGGESTION") return pick.suggestion.places[0] ?? `path:${pick.group}`;
   return `path:${pick.group}`;
 }
@@ -206,6 +247,10 @@ export function placesOf(target: DigTarget): readonly string[] {
 /** One pick as the ask sends it: a suggestion with its text as sent (edited or not), or the person's own view. */
 function digPickOf(pick: V4DigPick): DigPick | null {
   if (pick.kind === "OPEN") return null;
+  // V4 start step, Task 62: a "+ N more" item is sent as the AIs' words for the main question, at its own place.
+  if (pick.kind === "MORE") {
+    return { kind: "HELPS_MAIN_QUESTION", suggestion_id: pick.more.id, place: placeOf(pick), text: pick.more.question.trim() };
+  }
   const text = pick.text.trim();
   if (pick.kind === "OWN_VIEW") return { kind: "OWN_VIEW", suggestion_id: null, place: placeOf(pick), text };
   return { kind: pick.suggestion.kind, suggestion_id: pick.suggestion.suggestion_id, place: placeOf(pick), text };

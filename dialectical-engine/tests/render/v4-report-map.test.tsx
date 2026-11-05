@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WriteReportResult } from "../../apps/ui/lib/v4/load.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
-import { InvestigationReportsSchema, type InvestigationReports, type InvestigationReportVersion } from "../../packages/contract/src/index.js";
+import {
+  AnswerSchema, InvestigationReportsSchema, type Answer, type InvestigationReports, type InvestigationReportVersion
+} from "../../packages/contract/src/index.js";
 import {
   advance, buttonNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer, seededStory, settle,
   unmountMap
@@ -90,6 +92,28 @@ const finished = (version: number): InvestigationReportVersion => ({
 } as InvestigationReportVersion);
 const failedVersion = (version: number): InvestigationReportVersion =>
   ({ report_version: version, closed_at: "2026-11-04T10:00:00.000Z", state: "FAILED", written_at: "2026-11-04T10:20:00.000Z" });
+
+/**
+ * V4 start step (review of Tasks 60-62): a served path debate whose "carry on to the report" box was ticked, as the contract
+ * serves it (`Answer.branches` is whole: at least one path; Task 60's map reads its paths). One made-up path on the seeded
+ * answer's first position.
+ */
+function carryOnAnswer(runId: string): Answer {
+  return AnswerSchema.parse({
+    ...seededAnswer(runId),
+    branches: {
+      source: "MENU", width: 1,
+      paths: [{
+        path_id: "b1", order: 1, title: "A made-up path", question: "A made-up question about the mix?", author: "AI_SUGGESTION",
+        viewpoints: [{ title: "A made-up path", question: "A made-up question about the mix?", own: false }], state: "ARGUED",
+        root_node_id: "n-mix",
+        outcome: { state: "READY", text: { line: "A made-up line.", summary: "A made-up summary.", fate: "HELD_UP" }, what_changed: [],
+          view: null, trust: "SURE", rests_on: [] }
+      }],
+      more: [], also_raised: [], main_trust: "SURE", carry_on_to_report: true
+    }
+  });
+}
 
 const header = (): HTMLElement => page().querySelector<HTMLElement>(".v4StandInHeader")!;
 const topButton = (): HTMLButtonElement | null => header().querySelector<HTMLButtonElement>("button.v4DebReportLink");
@@ -389,7 +413,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
 
   it("with the start step's \"carry on to the report\" box there is no strip: the press asks for the report at once", async () => {
     const runId = crypto.randomUUID();
-    harness.answer = { ...seededAnswer(runId), branches: { carry_on_to_report: true } } as unknown as typeof harness.answer;
+    harness.answer = carryOnAnswer(runId);
     reports.load = async () => investigation(runId, "OPEN", [], 1);
     reports.write = async () => {
       reports.load = async () => investigation(runId, "CLOSED", [writing(1, new Date().toISOString())], 1);
@@ -404,7 +428,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
 
   it("with the carry-on box, the pressed header button keeps its focus while the press waits, and a second press sends nothing", async () => {
     const runId = crypto.randomUUID();
-    harness.answer = { ...seededAnswer(runId), branches: { carry_on_to_report: true } } as unknown as typeof harness.answer;
+    harness.answer = carryOnAnswer(runId);
     reports.load = async () => investigation(runId, "OPEN", [], 1);
     let finish: (value: { kind: "WRITING"; reportVersion: number; waitingForDigs: number }) => void = () => undefined;
     reports.write = () => new Promise((resolve) => { finish = resolve; });
@@ -428,7 +452,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
 
   it("with the carry-on box, the map keeps watching while nothing is written: the report the AIs start shows being written", async () => {
     const runId = crypto.randomUUID();
-    harness.answer = { ...seededAnswer(runId), branches: { carry_on_to_report: true } } as unknown as typeof harness.answer;
+    harness.answer = carryOnAnswer(runId);
     reports.load = async () => investigation(runId, "OPEN", [], 1);
     await mountMap(1600, runId);
     expect(waitCard()).toBeNull();

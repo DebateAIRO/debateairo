@@ -29,6 +29,9 @@ import type { TypedWords } from "@/lib/v4/useLeaveGuard";
  * first box greyed for it (dig-f22); Cancel on a wording puts the tick back as it was (dig-f14); the boxes and the
  * person's own words follow the direction of what is typed (dig-f21); on Free a line under the own-view box says the
  * view may be shown publicly (dig-f26); a picked open question and the person's own view are labelled (dig-f34).
+ * V4 start step, Task 62 (spec §2.5, "it is offered first when you dig"): on a path debate the main question's dig list
+ * starts with the menu paths the person left out before Start ("+ N more to explore"), each a pick box of its own
+ * (V4MorePickRows), before its open questions; an R22 debate's list is unchanged.
  */
 
 /** What the page lends the map pieces and the panel for choosing what to dig. */
@@ -63,6 +66,13 @@ export type V4DigChoice = Readonly<{
    * page does not know).
    */
   publicLine?: string;
+  /**
+   * V4 start step, Task 62: what the main question offers to dig before its open questions (lib/v4/suggestions.ts
+   * digSuggestionsWithMore: on a path debate the menu paths left out, as MORE picks). Absent or empty: nothing more.
+   */
+  mainQuestionPicks?: readonly V4DigPick[];
+  /** Task 62: ticks or unticks one of `mainQuestionPicks` (a pick of the main question). */
+  onToggleMainPick?: (pick: V4DigPick) => void;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -116,6 +126,43 @@ export function V4PickReason(props: Readonly<{ reason: PickRefusal; choice: V4Di
         : t(catalog, path === undefined ? "v4.panel.crumbRoot" : "v4.map.pathUntitled")}
       {after}
     </p>
+  );
+}
+
+/**
+ * V4 start step, Task 62 (spec §2.5): the main question's "+ N more" picks, first in its "Where to dig from here", as rows of
+ * that list: a pick box (closed with its reason read aloud when it cannot join the picks), the path's title (AI text), "New"
+ * when the AIs found it after the person had looked, and its question. Null when nothing can be dug or none is offered.
+ */
+export function V4MorePickRows(props: Readonly<{ picks: readonly V4DigPick[]; choice: V4DigChoice; catalog: MessageCatalog }>) {
+  const { choice, catalog } = props;
+  const toggle = choice.onToggleMainPick;
+  const more = props.picks.filter((pick): pick is Extract<V4DigPick, { kind: "MORE" }> => pick.kind === "MORE");
+  if (!choice.canDig || toggle === undefined || more.length === 0) return null;
+  const picked = new Set(choice.draft.picks.map((pick) => pick.key));
+  return (
+    <>
+      {more.map((pick) => {
+        const isPicked = picked.has(pick.key);
+        const refusal = isPicked ? null : choice.refusalFor(null);
+        return (
+          <li key={pick.key} className="v4PanelOpenRow v4MorePick">
+            <label className="v4PanelPick">
+              <input type="checkbox" checked={isPicked} disabled={refusal !== null} onChange={() => toggle(pick)} />
+              <span className="v4SrOnly">
+                {t(catalog, "v4.map.pick", { question: shortLine(pick.more.title) })}
+                {refusal === null ? null : ` ${refusalLine(refusal, choice.planTier, catalog)}`}
+              </span>
+            </label>
+            <span className="v4MorePickBody">
+              <span className="v4PanelRowTitle" data-ai-generated="true">{pick.more.title}</span>
+              {pick.more.isNew ? <span className="v4MoreNew">{t(catalog, "v4.paths.moreNew")}</span> : null}
+              <span className="v4MapNote" data-ai-generated="true">{shortLine(pick.more.question, 120)}</span>
+            </span>
+          </li>
+        );
+      })}
+    </>
   );
 }
 

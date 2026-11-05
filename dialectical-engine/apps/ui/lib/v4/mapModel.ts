@@ -1,24 +1,48 @@
 import {
   canDigFromLevel,
   DigLevelSchema,
+  RUN_PATH_LIMITS,
   type Answer,
+  type AnswerBranch,
+  type AnswerBranches,
   type AnswerStory,
   type DigSuggestion,
   type PathRewrite,
+  type RunPathFinding,
+  type RunPathProgress,
+  type RunProjection,
+  type StartPathAuthor,
   type StoryFate
 } from "@debateai/contract";
 import { pathSuggestionsOf } from "./suggestions.js";
-import { countTrust, pointsOf, servedRewriteCounts, servedRewriteWords } from "./trust.js";
-import type { RewriteState, TrustWord, V4Map, V4OpenQuestion, V4Path, V4PathRewrites, V4PathWeb, V4Point } from "./types.js";
+import { countTrust, emptyCounts, pointsOf, servedRewriteCounts, servedRewriteWords } from "./trust.js";
+import type {
+  RewriteState,
+  TrustWord,
+  V4Branch,
+  V4Map,
+  V4MoreItem,
+  V4OpenQuestion,
+  V4Path,
+  V4PathRewrites,
+  V4PathTag,
+  V4PathWeb,
+  V4Point
+} from "./types.js";
 import { pathWebOf, webNoteOf } from "./web.js";
 
 /*
  * V4 initial (2026-10-28): one served answer (+ its story, when written) as the map row D draws (R/42 §7). Paths are
- * the story's paths; without a story there is one stand-in path holding every point, with no fate invented.
+ * the story's paths.
  * Dig model revision W4-6 (owner Q-D13, 31 Oct): a dig keeps its points and its answer text and writes NO story, so a
  * dig's own map never reads one: its paths are the ones its rewrite names (Q-D2: each with its line and fate), or, until
  * the rewrite is written, the positions it argued (each line the position's own claim, no fate invented). Every path a
  * dig rewrote shows its newest finished text (Answer.path_rewrites), and keeps what it said before.
+ * V4 start step, Task 60 (spec 2026-11-03 §2 items 7 and 8): on a path debate (`Answer.branches`) the paths are the ones
+ * the person chose before Start, in their order, each named by its path id and holding the nodes under its root. The run
+ * read draws the same paths while the debate runs (`buildV4RunMap`), each filling in from its own progress, and Start's
+ * 10 s draws them before any run exists (`buildV4PendingMap`, answer Q11). No path is ever made up (map-f4): an answer
+ * with no story path and no branch has no path, and every point is the question's own.
  */
 
 type StoryBody = NonNullable<AnswerStory["story"]>;
@@ -120,8 +144,14 @@ function digLevelOf(answer: Answer): number | null {
   return level !== undefined && DigLevelSchema.safeParse(level).success ? level : null;
 }
 
-/** One path before its points are placed: the position it stands for, its line and fate, and the nodes it holds. */
-type PathSpec = Readonly<{ id: string; positionRef: string; fate: StoryFate | null; line: string; nodeRefs: readonly string[] }>;
+/**
+ * One path before its points are placed: the position it stands for, its line and fate, and the nodes it holds. `node`:
+ * the node it stands for (a story or dig path's position; a chosen path's root, null while it has none). `branch`: the
+ * path the person chose before Start (Task 60).
+ */
+type PathSpec = Readonly<{
+  id: string; positionRef: string; node: string | null; fate: StoryFate | null; line: string; nodeRefs: readonly string[]; branch?: V4Branch;
+}>;
 
 /** The story's paths (a repeated position gets "#2", "#3" on its id). */
 function storySpecs(body: StoryBody | null): PathSpec[] {
@@ -131,22 +161,28 @@ function storySpecs(body: StoryBody | null): PathSpec[] {
     const times = (seen.get(storyPath.position_ref) ?? 0) + 1;
     seen.set(storyPath.position_ref, times);
     const id = times === 1 ? storyPath.position_ref : `${storyPath.position_ref}#${times}`;
-    return { id, positionRef: storyPath.position_ref, fate: storyPath.fate, line: storyPath.line, nodeRefs: storyPath.node_refs };
+    return { id, positionRef: storyPath.position_ref, node: storyPath.position_ref, fate: storyPath.fate, line: storyPath.line,
+      nodeRefs: storyPath.node_refs };
   });
 }
 
-/**
- * W4-6: the nodes under each position, through the answer's edges (a point attacking an edge sits with the point that edge
- * starts from), the position first, then the answer's order. A node no edge leaves is a position: what the story would
- * call a path.
- */
-function positionTrees(answer: Answer): ReadonlyMap<string, readonly string[]> {
+/** W4-6: each node's parent through the answer's edges (a point attacking an edge sits with the point that edge starts from). */
+function parentsOf(answer: Answer): ReadonlyMap<string, string> {
   const edgeFrom = new Map(answer.edges.map((edge) => [edge.edge_id, edge.from_node_ref]));
   const parentOf = new Map<string, string>();
   for (const edge of answer.edges) {
     const target = edge.target_kind === "NODE" ? edge.target_ref : edgeFrom.get(edge.target_ref);
     if (target !== undefined && target !== edge.from_node_ref && !parentOf.has(edge.from_node_ref)) parentOf.set(edge.from_node_ref, target);
   }
+  return parentOf;
+}
+
+/**
+ * W4-6: the nodes under each position, through the answer's edges, the position first, then the answer's order. A node no
+ * edge leaves is a position: what the story would call a path.
+ */
+function positionTrees(answer: Answer): ReadonlyMap<string, readonly string[]> {
+  const parentOf = parentsOf(answer);
   const rootOf = (id: string): string => {
     let at = id;
     // A loop in the edges ends the climb (each step is counted, so it cannot run on).
@@ -177,11 +213,102 @@ function digSpecs(answer: Answer): PathSpec[] {
   const named = rewrite !== null && isFinishedRewrite(rewrite) ? rewrite.dig_paths : [];
   if (named.length > 0) {
     return named.map((path) => ({
-      id: path.position_ref, positionRef: path.position_ref, fate: path.fate, line: path.line, nodeRefs: trees.get(path.position_ref) ?? []
+      id: path.position_ref, positionRef: path.position_ref, node: path.position_ref, fate: path.fate, line: path.line,
+      nodeRefs: trees.get(path.position_ref) ?? []
     }));
   }
   const claims = new Map(answer.nodes.map((node) => [node.node_id, node.claim]));
-  return [...trees.entries()].map(([id, nodeRefs]) => ({ id, positionRef: id, fate: null, line: claims.get(id) ?? "", nodeRefs }));
+  return [...trees.entries()].map(([id, nodeRefs]) => ({ id, positionRef: id, node: id, fate: null, line: claims.get(id) ?? "", nodeRefs }));
+}
+
+/** Task 60: the root and every node whose parents climb to it, in the answer's order (a loop in the edges ends the climb). */
+function nodesUnder(answer: Answer, parentOf: ReadonlyMap<string, string>, root: string): readonly string[] {
+  const under = (id: string): boolean => {
+    let at = id;
+    for (let steps = 0; steps <= answer.nodes.length; steps += 1) {
+      const up = parentOf.get(at);
+      if (up === undefined) return false;
+      if (up === root) return true;
+      at = up;
+    }
+    return false;
+  };
+  const ids = [...new Set(answer.nodes.map((node) => node.node_id))];
+  return [root, ...ids.filter((id) => id !== root && under(id))];
+}
+
+/**
+ * V4 start step, Task 60: a path debate's paths, one per chosen path in the person's order. Its id and position are its path
+ * id; it holds the nodes under its root; its line is its answer so far's, else its title; its fate its answer so far's, else
+ * the story's path of the same id (a dig's rewrite then moves both, as on any path).
+ */
+function branchSpecs(answer: Answer, branches: AnswerBranches, body: StoryBody | null): PathSpec[] {
+  const parentOf = parentsOf(answer);
+  const storyFates = new Map<string, StoryFate>();
+  for (const storyPath of body?.short.paths ?? []) {
+    if (!storyFates.has(storyPath.position_ref)) storyFates.set(storyPath.position_ref, storyPath.fate);
+  }
+  return branches.paths.map((branch) => {
+    const text = branch.outcome?.text ?? null;
+    return {
+      id: branch.path_id, positionRef: branch.path_id, node: branch.root_node_id,
+      fate: text?.fate ?? storyFates.get(branch.path_id) ?? null,
+      line: text?.line ?? branch.title,
+      nodeRefs: branch.root_node_id === null ? [] : nodesUnder(answer, parentOf, branch.root_node_id),
+      branch: v4BranchOf(branch, null)
+    };
+  });
+}
+
+/**
+ * Task 60 (owner answer Q16): a chosen path's tag: the person's own path ADDED, their rewrite EDITED, their combine
+ * COMBINED, and an AI's path TOGETHER only when it puts two viewpoints or more together (else no tag).
+ */
+export function pathTagOf(branch: Pick<AnswerBranch, "author" | "viewpoints">): V4PathTag | null {
+  if (branch.author === "PERSON_OWN_VIEW") return "ADDED";
+  if (branch.author === "PERSON_EDITED") return "EDITED";
+  if (branch.author === "AI_COMBINED") return "COMBINED";
+  return branch.viewpoints.length >= 2 ? "TOGETHER" : null;
+}
+
+/**
+ * Task 60: one chosen path as the map shows it: its answer so far (the outcome's line and summary), what changed, the point
+ * of view line and its trust word, once argued; its step and dots only while it is being looked into (the run read's).
+ */
+export function v4BranchOf(branch: AnswerBranch, progress: RunPathProgress | null): V4Branch {
+  const outcome = branch.outcome;
+  return {
+    order: branch.order,
+    title: branch.title,
+    question: branch.question,
+    author: branch.author,
+    tag: pathTagOf(branch),
+    viewpoints: branch.viewpoints,
+    state: branch.state,
+    answerSoFar: outcome?.text?.line ?? null,
+    summary: outcome?.text?.summary ?? null,
+    whatChanged: outcome?.what_changed ?? [],
+    view: outcome?.view ?? null,
+    trust: outcome?.trust ?? null,
+    progress: branch.state === "LOOKING" && progress !== null
+      ? { step: progress.step, dots: progress.points.slice(0, RUN_PATH_LIMITS.pointsShownMax) }
+      : null
+  };
+}
+
+/** Task 60 (journey-f1): a filled path's findings as points: each its node, its words and its word, and nothing else (first copy wins). */
+export function pointsOfFindings(findings: readonly RunPathFinding[]): readonly V4Point[] {
+  const seen = new Set<string>();
+  return findings.flatMap((finding): V4Point[] => {
+    if (seen.has(finding.node_ref)) return [];
+    seen.add(finding.node_ref);
+    return [{ id: finding.node_ref, text: finding.text, trust: finding.trust, basis: null, reasons: [], answeredBy: null, asOf: null }];
+  });
+}
+
+/** Task 60: "+ N more to explore", in menu order. */
+function moreOf(branches: AnswerBranches | undefined): readonly V4MoreItem[] {
+  return (branches?.more ?? []).map((item) => ({ id: item.more_id, title: item.title, question: item.question, isNew: item.is_new }));
 }
 
 /** W4-6: a finished rewrite (the checker passed it, or its last round left a reservation): it carries the path's new text. */
@@ -235,18 +362,22 @@ function placePaths(answer: Answer, specs: ReadonlyArray<PathSpec & { rewrites?:
     const served = servedRewriteCounts(spec.rewrites?.history);
     return { ...path, ...(served === null ? {} : served), positionRef: spec.positionRef,
       trust: pathTrustOf(spec, byId),
-      ...(spec.rewrites === undefined ? {} : { rewrites: spec.rewrites }) };
+      ...(spec.rewrites === undefined ? {} : { rewrites: spec.rewrites }),
+      ...(spec.branch === undefined ? {} : { branch: spec.branch }) };
   });
 }
 
 /**
  * Owner r2-20 A: a path's one trust word — the word of the point it stands for (its position). For a rewritten path the
  * word the server worked out for that point wins (W4-8), else the page's own (which already reads the path's fate now).
+ * Task 60: a chosen path's word is its answer so far's, worked out from its points by the server (as the run read gave it,
+ * so nothing changes when the answer lands), unless a dig's rewrite gave its root one.
  */
 function pathTrustOf(spec: PathSpec & { rewrites?: V4PathRewrites }, byId: ReadonlyMap<string, V4Point>): TrustWord | null {
   const served = servedRewriteWords(spec.rewrites?.history);
-  if (served.has(spec.positionRef)) return served.get(spec.positionRef) ?? null;
-  return byId.get(spec.positionRef)?.trust ?? null;
+  if (spec.node !== null && served.has(spec.node)) return served.get(spec.node) ?? null;
+  if (spec.branch !== undefined) return spec.branch.trust;
+  return spec.node === null ? null : byId.get(spec.node)?.trust ?? null;
 }
 
 type TurningPoint = Readonly<{ text: string | null; alt: string | null }>;
@@ -359,20 +490,19 @@ export function buildV4Map(input: Readonly<{
   const isDig = answer.dig !== undefined || answer.contribution !== undefined;
   const story = isDig ? null : input.story;
   const body = readyBody(story);
-  const specs = applyRewrites(answer, isDig ? digSpecs(answer) : storySpecs(body));
-  // Decision B on the map's own fates: the story's, a dig's own, and what a rewrite made of a path.
-  const fell = new Set(specs.filter((spec) => spec.fate === "FELL").map((spec) => spec.positionRef));
+  // Task 60: a path debate's paths are the ones the person chose (a dig of one too); else the story's, or a dig's own.
+  const branches = answer.branches;
+  const specs = applyRewrites(answer, branches !== undefined ? branchSpecs(answer, branches, body) : isDig ? digSpecs(answer) : storySpecs(body));
+  // Decision B on the map's own fates: the story's, a dig's own, a chosen path's answer so far, and what a rewrite made of a path.
+  const fell = new Set(specs.flatMap((spec) => (spec.fate === "FELL" && spec.node !== null ? [spec.node] : [])));
   const byId = pointsOf(answer, story, fell);
   const allPoints = [...byId.values()];
+  // map-f4 (Task 60): no made-up path. With no story path and no chosen path there is none, and every point is the question's own.
   let paths = placePaths(answer, specs, byId);
-  if (paths.length === 0) {
-    const first = answer.composed_text.find((segment) => segment.text.trim().length > 0);
-    paths = [pathOf("all", null, first === undefined ? answer.question_line : first.text, allPoints)];
-  }
   const turning = turningPoint(answer, body);
   const turn = turning.text;
   let open = rootOpen(answer, turn);
-  // DATA-6: a still-argued point no story path cites still counts as open; it hangs under the question itself.
+  // DATA-6: a still-argued point no path cites still counts as open; it hangs under the question itself (all of them, with no path).
   const covered = new Set(paths.flatMap((path) => path.open.map((question) => question.id)));
   open = [...open, ...stillArgued(allPoints, null).filter((question) => !covered.has(question.id))];
   const star = pickStar(open, paths);
@@ -419,8 +549,89 @@ export function buildV4Map(input: Readonly<{
     webNote: webNoteOf(answer),
     digLevel: digLevelOf(answer),
     changedSince: answer.path_rewrites?.changed_since ?? null,
-    dig: answer.dig ?? null
+    dig: answer.dig ?? null,
+    ...(branches === undefined ? {} : {
+      more: moreOf(branches), alsoRaised: [...branches.also_raised], mainTrust: branches.main_trust,
+      carryOnToReport: branches.carry_on_to_report
+    })
   };
+}
+
+/**
+ * Task 60: the map's shape while a path debate runs or is about to: no answer, no story, nothing open and an empty bar for the
+ * question (its bar waits for the main answer, which comes last).
+ */
+function runShape(runId: string, question: string, pending: boolean): V4Map {
+  return {
+    runId, answerId: "", answerVersion: 0, question, headline: null, summary: null, confidence: null, why: [], sections: [],
+    paths: [], points: [], open: [], counts: emptyCounts(), unchecked: 0, wouldChange: null, wouldChangeAlt: null, objections: [],
+    storyState: "NONE", fallbackText: null, reservation: false,
+    phase: "RUN", pending, more: [], alsoRaised: [], mainTrust: null, carryOnToReport: false
+  };
+}
+
+/**
+ * V4 start step, Task 60 (wait-d1, map-d2, journey-f1, wait-f16): the map while a path debate runs, drawn from its run read
+ * at once: the question as it was sent (its answers are sentences in it, r2-8 under answer Q17), and one path per chosen path,
+ * in order, with the same ids the served answer gives them. A path being looked into shows its step and dots; a path whose
+ * own checks are done shows its findings, its line and its word. Null for a failed run and for an R22 run read (no progress).
+ * With `path_progress` [] the AIs are still choosing the paths (pending); before they are named the server sends the carry-on
+ * part only when the box is ticked (Task 57b).
+ */
+export function buildV4RunMap(input: Readonly<{ runId: string; run: RunProjection }>): V4Map | null {
+  const { run } = input;
+  const progress = run.path_progress;
+  if (run.state === "FAILED" || progress === undefined) return null;
+  const byPath = new Map(progress.map((entry) => [entry.path_id, entry] as const));
+  const paths = (run.branches?.paths ?? []).map((branch): V4Path => {
+    const entry = byPath.get(branch.path_id) ?? null;
+    const points = branch.state === "ARGUED" && entry !== null ? pointsOfFindings(entry.findings) : [];
+    const text = branch.outcome?.text ?? null;
+    const shown = v4BranchOf(branch, entry);
+    return {
+      id: branch.path_id, positionRef: branch.path_id, fate: text?.fate ?? null, line: text?.line ?? branch.title,
+      points, counts: countTrust(points).counts, unchecked: 0, open: [], trust: shown.trust, branch: shown
+    };
+  });
+  // Every point once (the question's own panel groups them all).
+  const points: V4Point[] = [];
+  const seen = new Set<string>();
+  for (const point of paths.flatMap((path) => path.points)) {
+    if (seen.has(point.id)) continue;
+    seen.add(point.id);
+    points.push(point);
+  }
+  return {
+    ...runShape(input.runId, run.question_line, progress.length === 0),
+    paths,
+    points,
+    more: moreOf(run.branches),
+    alsoRaised: [...(run.branches?.also_raised ?? [])],
+    carryOnToReport: run.branches === undefined ? run.carry_on_part !== undefined : run.branches.carry_on_to_report
+  };
+}
+
+/** Task 60: each tag's author, for the paths drawn during Start's 10 s (an AI's path when it has no tag or TOGETHER). */
+const AUTHOR_OF_TAG: Readonly<Record<V4PathTag, StartPathAuthor>> = Object.freeze({
+  TOGETHER: "AI_SUGGESTION", COMBINED: "AI_COMBINED", EDITED: "PERSON_EDITED", ADDED: "PERSON_OWN_VIEW"
+});
+
+/**
+ * V4 start step, Task 60 (answer Q11, chat-undo-after-start): the map during Start's 10 s, before any run exists: the question
+ * line and each chosen path being looked into, `b<n>` in the person's order, with no progress. Pure: it reads no server data
+ * and is never cached (Task 76b draws it; Undo turns it back into the card).
+ */
+export function buildV4PendingMap(input: Readonly<{ questionLine: string;
+  paths: readonly Readonly<{ title: string; question: string; tag: V4PathTag | null }>[] }>): V4Map {
+  const paths = input.paths.map((path, index): V4Path => {
+    const id = `b${index + 1}`;
+    const branch: V4Branch = {
+      order: index + 1, title: path.title, question: path.question, author: path.tag === null ? "AI_SUGGESTION" : AUTHOR_OF_TAG[path.tag],
+      tag: path.tag, viewpoints: [], state: "LOOKING", answerSoFar: null, summary: null, whatChanged: [], view: null, trust: null, progress: null
+    };
+    return { id, positionRef: id, fate: null, line: path.title, points: [], counts: emptyCounts(), unchecked: 0, open: [], trust: null, branch };
+  });
+  return { ...runShape("", input.questionLine, paths.length === 0), paths };
 }
 
 /** W4-6: the path a dig rewrote on this map and that dig's rewrite of it (by the dig's run), or null when none here. */

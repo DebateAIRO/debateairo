@@ -22,6 +22,8 @@ import { V4TourBar } from "./V4TourBar";
  *   place, puts the notice away. dig-f1: the question itself (the main answer) is the last place.
  * - map-f19: "Since you last looked: Confirmed" under the where-you-are line, from the last visit the account keeps.
  * Every change shows at once with a 1-second soft highlight (no movement, the same with reduced motion).
+ * V4 start step, Task 62 (wait-f10): a short answer that comes after the page stopped waiting for it is its own moment, "The
+ * short answer is ready." with [See it] (the answer was already there, so "Your answer is ready." would be untrue).
  */
 
 /** How long the soft highlight stays on a place the tour or [See it] opened. */
@@ -29,6 +31,8 @@ const FLASH_MS = 1_000;
 
 type Moment =
   | Readonly<{ kind: "ANSWER"; id: number }>
+  /** Task 62 (wait-f10): the short answer came after the page had stopped waiting for it. */
+  | Readonly<{ kind: "SHORT_ANSWER"; id: number }>
   | Readonly<{ kind: "NEWS"; changes: readonly V4Change[]; id: number }>
   | Readonly<{ kind: "REPORT"; id: number }>;
 
@@ -56,6 +60,11 @@ export type V4ReadyInput = Readonly<{
   hideNews: () => void;
   focusHeading: () => void;
   reportHref: string;
+  /**
+   * V4 start step, Task 62 (wait-f10): how many times a short answer came after the page stopped waiting for it; each rise
+   * is one SHORT_ANSWER moment.
+   */
+  shortAnswerLate: number;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -108,6 +117,21 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
     setMoment({ kind: "ANSWER", id: next() });
     setReadyUnseen("ANSWER");
   }, [input.waiting, served]);
+
+  // Task 62 (wait-f10): each rise of the late short answer's count is its moment (none for the count the page opened with).
+  const lateSeen = useRef(input.shortAnswerLate);
+  useEffect(() => {
+    if (input.shortAnswerLate <= lateSeen.current) return;
+    lateSeen.current = input.shortAnswerLate;
+    setMoment({ kind: "SHORT_ANSWER", id: next() });
+    setReadyUnseen("ANSWER");
+  }, [input.shortAnswerLate]);
+  // Its [See it] takes focus to the answer card's heading, once that card is drawn open (only on the press).
+  const [cardFocus, setCardFocus] = useState(0);
+  useEffect(() => {
+    if (cardFocus === 0) return;
+    document.querySelector<HTMLElement>(".v4AnswerCard .v4AnswerHead .v4Eyebrow")?.focus();
+  }, [cardFocus]);
 
   // The soft highlight on the place just opened: its card on the map, its heading, and the main answer for the question.
   useEffect(() => {
@@ -189,6 +213,17 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
         onAct: () => {
           close();
           open("root");
+        }
+      };
+    } else if (moment.kind === "SHORT_ANSWER") {
+      noteText = readyText(catalog, "v4.ready.shortAnswer");
+      action = {
+        label: t(catalog, "v4.ready.seeIt"),
+        onAct: () => {
+          close();
+          input.select("root", false);
+          setFlash({ stop: "root", serial: next() });
+          setCardFocus((count) => count + 1);
         }
       };
     } else if (moment.kind === "REPORT") {
@@ -294,7 +329,7 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
     acknowledge: () => {
       // Functional updates only, so a handler from an earlier render still acts on the newest state.
       setReadyUnseen((unseen) => (unseen === "ANSWER" ? null : unseen));
-      setMoment((before) => (before?.kind === "ANSWER" ? null : before));
+      setMoment((before) => (before?.kind === "ANSWER" || before?.kind === "SHORT_ANSWER" ? null : before));
     }
   };
 }

@@ -86,7 +86,11 @@ test("the V4 map's dig choice, money lines (W3-4) and rewrites (W4-6) are scanne
     "components/v4/V4Outline.tsx", "components/v4/V4Panel.tsx", "components/v4/V4Rail.tsx", "components/v4/V4AskClient.tsx",
     "lib/v4/suggestions.ts", "lib/v4/money.ts",
     "components/v4/V4PathRewrite.tsx", "components/v4/V4LevelTrail.tsx", "components/v4/V4ChangesBar.tsx",
-    "lib/v4/mapModel.ts", "lib/v4/changes.ts", "lib/v4/load.ts", "app/v4/debate/[id]/page.tsx"
+    "lib/v4/mapModel.ts", "lib/v4/changes.ts", "lib/v4/load.ts", "app/v4/debate/[id]/page.tsx",
+    // V4 start step, Task 61: the trust word on a path's bar and the main answer's trust line.
+    "components/v4/V4TrustBar.tsx", "components/v4/V4MainAnswer.tsx",
+    // V4 start step, Task 62: what sits under the map's first card while the debate runs, and the ready moments.
+    "components/v4/V4RunPaths.tsx", "components/v4/useV4Ready.tsx"
   ];
   for (const path of files) {
     assert.equal(allowed(path), false, path);

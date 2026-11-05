@@ -325,6 +325,110 @@
 .v4DigFailedRetry { min-height: 44px; }
 .v4DebRailMark .v4PauseDot { width: 10px; height: 10px; }
 
+/* V4 start step, Task 61 (wait-d1 C, journey-f1, journey-f2, map-d2, wait-f16): a chosen path's card (V4PathCard), the same
+   while the AIs look into it and once it has its answer so far. The card's look (journey-f2's "being looked into" or settled,
+   v4-map-looks.css) sits on its box; the box holds the card's own button and, while the path is looked into, the dots' own
+   button beside it (never a button inside a button). Phone first: nothing but a dot has a fixed width, text wraps, and every
+   control keeps the 44px touch height. */
+.v4PathCard { cursor: default; padding: 0; gap: 0; }
+.v4PathCardMain {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px; padding: 9px 12px;
+  background: transparent; border: 0; border-radius: inherit; color: inherit; font: inherit; text-align: start; cursor: pointer;
+  overflow-wrap: break-word; hyphens: auto;
+}
+.v4OutPath.v4PathCard .v4PathCardMain { padding: 10px 12px; }
+.v4PathCardLine {
+  font-size: var(--t-meta); color: var(--text-2);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+.v4PathTag { font-size: var(--t-micro); font-weight: 700; color: var(--text-2); }
+/* wait-d1 C: one plain step line, changed only when the work really moves on. */
+.v4PathStep { font-size: var(--t-meta); color: var(--text-2); }
+/* A compact row (the outline, the phone's path rows): the step line with the dots to its right. */
+.v4PathCardCompact { flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
+.v4PathCardCompact > .v4PathCardMain { flex: 1 1 12em; min-width: 0; }
+/* journey-f2: the slow pulse ring of the "being looked into" look runs only while the AIs work; while the run waits, holds or
+   is paused, the ring stands still (journey-f2's own still ring, the one it shows under reduced motion). */
+.v4PathCard.v4GroundLOOKING:not(.v4PathPulse)::after { animation: none; opacity: .6; }
+
+/* wait-d1 C: the quiet dots, one per point put forward (at most 6), all alike: grey; a dot being checked has a ring that
+   slowly closes; a checked one is ink. Never a colour for or against, never a number. */
+@property --v4-ring { syntax: "<angle>"; inherits: false; initial-value: 300deg; }
+.v4PathDots { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 8px 6px; min-width: 0; }
+.v4PathCardCompact > .v4PathDots { padding-block: 0 4px; padding-inline: 0 8px; }
+.v4PathDotsBtn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 0 4px; background: transparent;
+  border: 0; border-radius: 10px; cursor: pointer;
+}
+.v4PathDot { position: relative; flex: none; width: 7px; height: 7px; border-radius: var(--r-dot); background: var(--line-strong); }
+.v4PathDotCHECKED { background: var(--ink); }
+.v4PathDotRing::after {
+  content: ""; position: absolute; inset: -3px; border-radius: var(--r-dot);
+  background: conic-gradient(var(--ink) var(--v4-ring), transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+  animation: v4RingClose 8s ease-out 1 both;
+}
+@keyframes v4RingClose { from { --v4-ring: 20deg; } to { --v4-ring: 330deg; } }
+.v4PathDotsStill .v4PathDotRing::after { animation-play-state: paused; }
+.v4PathDotsNote { margin: 0; padding: 0 4px; font-size: var(--t-meta); color: var(--text-2); }
+.v4PathDotsNote[hidden] { display: none; }
+
+/* "+ N more to explore" sits under the paths, off the trunk: the path above it ends the trunk as the last path does. */
+.v4MapMoreRow { list-style: none; }
+.v4MapBranches > .v4MapBranch:has(+ .v4MapMoreRow)::before { bottom: auto; height: 47px; }
+.v4MapBranches > .v4MapBranch:first-child:has(+ .v4MapMoreRow)::before { display: none; }
+@supports (grid-template-columns: subgrid) { .v4MapMoreRow { grid-column: 1; } }
+.v4MapExplore { align-self: flex-start; }
+.v4MapExplore[aria-current="true"] { border-style: solid; border-color: var(--accent); }
+.v4OutMoreRow { padding-block: 6px 0; padding-inline: 12px 0; }
+/* What the page adds right under the question's card (rootExtra), never inside it. */
+.v4MapRootExtra { padding-top: 10px; min-width: 0; }
+/* map-f4: a map with no path draws no path column, so the question's card has no stub to a trunk. */
+.v4MapRootCol:last-child::after { display: none; }
+
+/* The path's panel: what it asks, what it brings together (every viewpoint; the chips wrap), the person's own words. */
+.v4PathViews { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.v4PathView {
+  font-size: var(--t-ui); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 2px 10px; min-width: 0;
+  overflow-wrap: anywhere;
+}
+.v4PathOwnWords { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.v4PathOwnWords li { padding-inline-start: 10px; border-inline-start: 2px solid var(--line-strong); }
+.v4PathTrustWord { font-weight: 600; }
+.v4MoreItem {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 12px; min-width: 0;
+  border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); overflow-wrap: anywhere;
+}
+.v4MoreNew { font-size: var(--t-micro); font-weight: 700; color: var(--con-text); }
+.v4MoreDig { min-height: 44px; }
+
+/* wait-f16: the carry-on line, the running part in ink and the rest grey. */
+.v4CarryOn { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v4CarryOnSteps { margin: 0; font-size: var(--t-ui); color: var(--text-3); overflow-wrap: anywhere; }
+.v4CarryOnSteps [aria-current="step"] { color: var(--text); font-weight: 600; }
+.v4CarryOnNote { margin: 0; font-size: var(--t-meta); color: var(--text-2); }
+
+/* Reduced motion: the dot ring and the pulse stand still; every change is at once. */
+@media (prefers-reduced-motion: reduce) {
+  .v4PathDotRing::after { animation: none; }
+  .v4PathCard.v4PathPulse::after { animation: none; opacity: .6; }
+}
+
+/* V4 start step, Task 62 (wait-d1, journey-d2, map-f4, wait-f9): what sits under the map's first card while the debate runs
+   (V4RunRoot), the first card of the waits without a map, and the main question's "+ N more" picks. With the question open
+   during the wait the map takes the width (no panel column). Phone first: nothing here has a fixed width, text wraps, and the
+   path rows keep the card's 44px touch height (.v4PathCardMain). */
+.v4RunRoot { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4RunChoosing { margin: 0; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.v4RunPhonePaths { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4RunPhoneRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4DebFirstCard { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4DebNoPanel.v4DebLayout-desktop .v4DebMapCol, .v4DebNoPanel.v4DebLayout-laptop .v4DebMapCol { grid-column: 2 / -1; }
+.v4DebNoPanel.v4DebLayout-mid .v4DebMapCol { grid-column: 1 / -1; }
+.v4DebMoved { margin-block: 0 8px; }
+.v4MorePickBody { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; }
+
 /* Perplexity plan W2-6: sources under a point, a path's search note and its other pages (V4Sources.tsx). Phone first:
    nothing here has a fixed width, long titles and addresses wrap, and buttons keep the 44px touch height. */
 .v4WebNote { margin: 0; font-size: var(--t-ui); color: var(--text-2); border-inline-start: 3px solid var(--line-strong); padding-block: 2px; padding-inline: 10px 0; }

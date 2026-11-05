@@ -164,10 +164,13 @@ export function composeQuestion(question: string, goal: V4Goal, catalog: Message
 /** W3-4: how a pick is asked: an open question by its kind, a suggestion as written or edited, the person's own view. */
 function pickItem(pick: V4DigPick): DigItem {
   if (pick.kind === "OPEN") return { key: DIG_KIND_KEYS[pick.question.kind], text: oneLine(pick.question.text) };
+  // V4 start step, Task 60: a "+ N more" item is a path the AIs wrote, asked like a suggestion as written.
+  if (pick.kind === "MORE") return { key: "v4.digText.suggestion", text: oneLine(pick.more.question) };
   return { key: pick.kind === "SUGGESTION" ? "v4.digText.suggestion" : "v4.digText.ownView", text: oneLine(pick.text) };
 }
 
 function pickText(pick: V4DigPick): string {
+  if (pick.kind === "MORE") return pick.more.question;
   return pick.kind === "OPEN" ? pick.question.text : pick.text;
 }
 

@@ -64,7 +64,7 @@ function expectWithinLimitAndFloor(levels: ReturnType<typeof chain>): void {
     expect(bytes(question)).toBeLessThanOrEqual(askQuestionMaxBytes());
     if (target.kind !== "picks") throw new Error("a picks target");
     for (const pick of target.picks) {
-      const text = pick.kind === "OPEN" ? pick.question.text : pick.text;
+      const text = pick.kind === "OPEN" ? pick.question.text : pick.kind === "MORE" ? pick.more.question : pick.text;
       // Never cut below the floor: at least the first 80 characters (or the whole text when shorter) are sent.
       expect(oneLine(question)).toContain(head(text, DIG_ITEM_FLOOR));
     }

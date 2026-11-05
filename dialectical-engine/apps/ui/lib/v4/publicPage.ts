@@ -26,6 +26,13 @@ export type PublicPathView = {
   canDig: boolean;
   line: string;
   fate: StoryFate;
+  /** V4 start step (Task 63): a path debate's path name, the title chosen before Start; null on every other path (an R22 debate's, a dig's). */
+  title: string | null;
+  /**
+   * Task 63: the person's own words on this path, each once, never shown as AI text: a path they added or rewrote is theirs whole (its title,
+   * then its question), and every view they wrote into a path is theirs (the API's rule, apps/api/src/start-paths-at-ask.ts storedPathOf).
+   */
+  ownWords: readonly string[];
   /** The newest contribution's own text about the path; null while none changed it. */
   summary: string | null;
   points: readonly string[];
@@ -38,13 +45,24 @@ export type PublicPathView = {
 export type PublicDigView = { ref: string | null; paths: PublicPathView[] };
 
 function digPathView(path: NonNullable<PublicContribution["dig_paths"]>[number], digRef: string | null): PublicPathView {
-  return { ref: path.position_ref, digRef, canDig: digRef !== null, line: path.line, fate: path.fate, summary: null, points: path.points, additions: [], digs: [] };
+  return { ref: path.position_ref, digRef, canDig: digRef !== null, line: path.line, fate: path.fate, title: null, ownWords: [], summary: null, points: path.points,
+    additions: [], digs: [] };
+}
+
+/** Task 63: a chosen path's title and the person's own words in it; none for a story path that is no chosen path. */
+function branchWordsOf(debate: PublicDebate, ref: string): Pick<PublicPathView, "title" | "ownWords"> {
+  const branch = debate.branches?.paths.find((path) => path.path_id === ref);
+  if (branch === undefined) return { title: null, ownWords: [] };
+  const theirs = branch.author === "PERSON_EDITED" || branch.author === "PERSON_OWN_VIEW" ? [branch.title, branch.question] : [];
+  const views = branch.viewpoints.filter((viewpoint) => viewpoint.own).map((viewpoint) => viewpoint.question);
+  return { title: branch.title, ownWords: [...new Set([...theirs, ...views])] };
 }
 
 /** The debate's paths at their newest text, each with who added to it, and the digs under it with their own paths. Empty for a snapshot with no story. */
 export function publicPathViews(debate: PublicDebate): readonly PublicPathView[] {
   const paths: PublicPathView[] = (debate.story_short?.paths ?? []).map((path) => ({
-    ref: path.position_ref, digRef: null, canDig: true, line: path.line, fate: path.fate, summary: null, points: [], additions: [], digs: []
+    ref: path.position_ref, digRef: null, canDig: true, line: path.line, fate: path.fate, ...branchWordsOf(debate, path.position_ref), summary: null, points: [],
+    additions: [], digs: []
   }));
   const digs: PublicDigView[] = [];
   const pathOf = (ref: string): PublicPathView | null => paths.find((path) => path.ref === ref)

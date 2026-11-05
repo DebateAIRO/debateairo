@@ -9,6 +9,7 @@ import { TRUST_WORDS, type TrustCounts, type TrustWord } from "@/lib/v4/types";
  * V4 screen review (3 Nov): map-f28 drops the number captions ("3 sure · 6 sure for the case named · …"): the bar's words
  * are map-f8's "How sure" sentence, built only from the trust words. dig-d4 B: every word keeps its slot (an empty one
  * has no width), so when a dig moves the shares the bar on a map card slides to the new ones (v4-map-looks.css).
+ * V4 start step, Task 61: a chosen path's bar also says its one trust word ("How sure: Sure"), worked out from its points.
  */
 
 const SEGMENT_CLASS: Readonly<Record<TrustWord, string>> = {
@@ -38,13 +39,17 @@ export function V4TrustBar(props: Readonly<{
   size?: "small" | "large";
   /** Shows the bar's words under it: "How sure: …" (map-f8; never a count, map-f28). */
   showCounts?: boolean;
+  /** Task 61: a chosen path's one trust word, said with the bar ("How sure: Sure"); absent or null: none. */
+  word?: TrustWord | null;
 }>) {
   const { counts, catalog } = props;
   const unchecked = props.unchecked ?? 0;
   const size = props.size ?? "small";
   const total = TRUST_WORDS.reduce((sum, word) => sum + counts[word], 0);
   const sentence = howSureSentence(counts, catalog, unchecked);
-  const label = t(catalog, "v4.bar.label", { counts: sentence });
+  const word = props.word ?? null;
+  const said = t(catalog, "v4.bar.label", { counts: sentence });
+  const label = word === null ? said : `${said} ${t(catalog, "v4.paths.trustWord", { word: t(catalog, `v4.trust.${word}`) })}`;
   return (
     <span className={`v4Bar ${size === "large" ? "v4BarLarge" : "v4BarSmall"}`}>
       <span className={total === 0 ? "v4BarTrack v4BarEmpty" : "v4BarTrack"} role="img" aria-label={label}>

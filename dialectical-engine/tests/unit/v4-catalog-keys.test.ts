@@ -407,7 +407,56 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.debate.state.HOLDING.noTime",
   "v4.panel.found",
   "v4.digLive.found",
-  "v4.digLive.pathNow"
+  "v4.digLive.pathNow",
+  // V4 start step, Task 63 (draft wording): the label over the person's own words in a public path debate's row.
+  "v4.public.pathOwnWords",
+  // V4 start step, Task 61 (P6): the map's chosen paths, their wait and their panel; wait-d1 C's, wait-f16's and the plan's
+  // words, and draft wording; every v4.paths.* key waits for the click-test. Then r2-1 A's five rewordings ("path" on the map).
+  "v4.paths.looking",
+  "v4.paths.failed",
+  "v4.paths.answerSoFar",
+  "v4.paths.asks",
+  "v4.paths.viewpoints",
+  "v4.paths.yourWords",
+  "v4.paths.whatChanged",
+  "v4.paths.more.one",
+  "v4.paths.more.other",
+  "v4.paths.moreHeading",
+  "v4.paths.moreHint",
+  "v4.paths.moreNew",
+  "v4.paths.digThis",
+  "v4.paths.alsoRaised",
+  "v4.paths.tag.TOGETHER",
+  "v4.paths.tag.COMBINED",
+  "v4.paths.tag.EDITED",
+  "v4.paths.tag.ADDED",
+  "v4.paths.trustWord",
+  "v4.paths.mainTrust",
+  "v4.paths.running",
+  "v4.paths.step.FINDING_SOURCES",
+  "v4.paths.step.ARGUING",
+  "v4.paths.step.CHECKING",
+  "v4.paths.dots",
+  "v4.paths.dotsNote",
+  "v4.paths.lookingPanel",
+  "v4.paths.moreLater",
+  "v4.paths.choosing",
+  "v4.paths.carryOn.ANSWER",
+  "v4.paths.carryOn.DIGS",
+  "v4.paths.carryOn.DIGS_FREE",
+  "v4.paths.carryOn.REPORT",
+  "v4.paths.carryOn.nothingToDo",
+  "v4.map.pathUntitled",
+  "v4.panel.kind.path",
+  "v4.map.noPaths",
+  "v4.panel.pathNoMore",
+  "v4.panel.noOpenPath",
+  // V4 start step, Task 62 (wait-d1, map-f4, answer Q15, wait-f10): drafts until the click-test.
+  "v4.paths.filled",
+  "v4.paths.movedUp",
+  "v4.paths.yourPaths",
+  "v4.paths.writingAnswer",
+  "v4.ready.shortAnswer"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -675,5 +724,43 @@ describe("the owner's 3 Nov screen review", () => {
       "v4.rail.digsPaused.other", "v4.rewrite.digCard.PAUSED", "v4.state.PAUSED", "v4.state.PAUSED.noDate"
     ].sort());
     expect(catalog["v4.state.SHORT_BREAK"]).not.toMatch(/\bpaused\b/iu);
+  });
+});
+
+/**
+ * V4 start step, Task 61 (spec 2026-11-03 §2 items 7 and 8): the map's chosen paths. Every v4.paths.* key is a draft until
+ * the click-test; r2-1 A says "path" on the map in five existing lines. Not here: v4.paths.lookedInto (it waits for the
+ * owner's wait-f9 (b) card, Task 62), v4.paths.carryOn (wait-f16's line replaces it) and a "Dig deeper here" key (journey-f13:
+ * one dig button everywhere, in the record's words).
+ */
+describe("V4 start step, Task 61: the map's paths", () => {
+  const paths = Object.keys(catalog).filter((key) => key.startsWith("v4.paths."));
+
+  it("every v4.paths.* key is drafted until the click-test", () => {
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+    for (const key of ["v4.paths.lookedInto", "v4.paths.carryOn", "v4.paths.digDeeper"]) expect(key in catalog, key).toBe(false);
+  });
+
+  it("r2-1 A: the map says 'path' in its five lines, each drafted", () => {
+    const lines: Readonly<Record<string, string>> = {
+      "v4.map.pathUntitled": "A path the AIs looked into",
+      "v4.panel.kind.path": "A path the AIs looked into",
+      "v4.map.noPaths": "No paths to show yet.",
+      "v4.panel.pathNoMore": "Nothing more is written about this path yet.",
+      "v4.panel.noOpenPath": "Nothing is open here. You can still dig deeper into this path."
+    };
+    expect(Object.fromEntries(Object.keys(lines).map((key) => [key, catalog[key]]))).toEqual(lines);
+    expect(Object.keys(lines).filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+  });
+
+  it("the path words name no engine word, no figure, no time and no quota left; the share word is never 'allowance'", () => {
+    const words = paths.map((key) => catalog[key]!);
+    expect(words.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|LOOKING|ARGUED|checker|judge|GLM|Haiku|Luna|branch|node)\b/u.test(line)))
+      .toEqual([]);
+    // ("What you left out before Start." is what the person chose not to look into, never a quota left. Task 62: the phone's
+    // "Your paths" heading over the rows is spec §2 item 7's words, not a mark on a card, so only "Your path" alone is refused.)
+    expect(words.filter((line) => /allowance|usually|minute|\bleft\b(?! out)|You picked|Your path(?!s)/iu.test(line))).toEqual([]);
+    expect(words.filter((line) => /\d/u.test(line.replace("+ 1 more", "")))).toEqual([]);
   });
 });
