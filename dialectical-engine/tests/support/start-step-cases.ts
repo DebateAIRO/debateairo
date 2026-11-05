@@ -180,8 +180,9 @@ function cutText(text: string, max: number): string {
  * the first put-together path after them, split into its viewpoints, each in its own words (the AIs' suggestion; left
  * whole when its split would not fit); one own path, SHAPED_OWN_TEXT (the person's own view); then the rest of the top
  * paths, as written, to the width. One combine call, with the read line, the check and the menu's id. A combine that
- * answers none keeps the joined words the page shows (titles with " · ", numbered questions) and no reference: the
- * person's edit. Throws TypeError START_SHAPED_NO_MENU without a menu, START_SHAPED_MENU_TOO_SMALL under two paths.
+ * answers none keeps the joined words the page shows (titles with " · ", numbered questions) and no reference: the AIs'
+ * wording, since the server joins the menu's own texts the same way (Task 33b, AI_COMBINED). Throws TypeError
+ * START_SHAPED_NO_MENU without a menu, START_SHAPED_MENU_TOO_SMALL under two paths.
  */
 export async function shapedChoice(drive: StartStepDrive, client: Pick<ContractClient, "startPathCombine">): Promise<StartPaths> {
   const signed = drive.menu;

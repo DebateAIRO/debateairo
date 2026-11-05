@@ -646,6 +646,58 @@ describe("Combine (Task 65)", () => {
   });
 });
 
+/*
+ * Task 33b: the joined words now come from the one join the server also uses (packages/kernel/src/path-join.ts), so the
+ * server can tell code-joined AI words from the person's. These pin, as literal text, the words the page wrote before the
+ * join moved: the path being written, the fallback and what Start sends read the same, in Latin, CJK and right-to-left
+ * texts and when the title is cut. Every text here is made up.
+ */
+describe("the joined fallback still reads the same (Task 33b)", () => {
+  const world: Readonly<Record<string, Readonly<{ title: string; question: string }>>> = {
+    pt11: { title: "能源成本", question: "新建核电站会让家庭的电费上涨多少？" },
+    pt13: { title: "تكلفة الطاقة", question: "هل ستزيد المحطات الجديدة فواتير الكهرباء؟" },
+    pt14: { title: "電力の安定", question: "寒い冬の週に電力は足りるのか？" },
+    pt15: { title: "ביטחון האספקה", question: "האם המדינה תהיה תלויה בדלק מיובא?" }
+  };
+  const long: Readonly<Record<string, Readonly<{ title: string }>>> = {
+    pt11: { title: "A".repeat(50) }, pt13: { title: "B".repeat(50) }, pt14: { title: "😀".repeat(20) }, pt15: { title: "C" }
+  };
+  const menuWith = (words: Readonly<Record<string, Readonly<{ title: string; question?: string }>>>): typeof NUCLEAR_MENU =>
+    ({ ...NUCLEAR_MENU, viewpoints: NUCLEAR_MENU.viewpoints.map((one) => ({ ...one, ...words[one.viewpoint_id] })) });
+  const failed = (menu: typeof NUCLEAR_MENU, ...picked: string[]): PathPlan => {
+    const writing = reduce(pathPlanFromMenu(menu, 5, false), ...selectAll(...picked), { type: "COMBINE_SELECTED" }).plan;
+    expect(writing.paths[0]).toMatchObject({ key: "p1", wording: "WRITING" });
+    return pathPlanReduce(writing, { type: "COMBINE_FAILED", key: "p1" }).plan;
+  };
+
+  it("two Latin viewpoints", () => {
+    const words = {
+      title: "Whole-system costs · A calm winter week",
+      question: "1. What would new nuclear plants cost households once the whole power system is counted?\n"
+        + "2. What happens to Romania's power in a cold winter week with little wind or sun?"
+    };
+    const plan = failed(NUCLEAR_MENU, "kp01", "kp02");
+    expect(plan.paths[0]).toMatchObject({ wording: "FALLBACK", ...words });
+    expect(pathPlanToStartPaths(plan)[0]).toEqual({ ...words, members: [{ viewpoint_id: "pt11" }, { viewpoint_id: "pt13" }] });
+  });
+
+  it("four viewpoints in Chinese, Arabic, Japanese and Hebrew", () => {
+    const plan = failed(menuWith(world), "kp01", "kp02", "kp03");
+    expect(plan.paths[0]).toMatchObject({
+      wording: "FALLBACK",
+      title: "能源成本 · تكلفة الطاقة · 電力の安定 · ביטחון האספקה",
+      question: "1. 新建核电站会让家庭的电费上涨多少？\n2. هل ستزيد المحطات الجديدة فواتير الكهرباء؟\n3. 寒い冬の週に電力は足りるのか？\n"
+        + "4. האם המדינה תהיה תלויה בדלק מיובא?"
+    });
+  });
+
+  it("a joined title over 120 is cut with '…', never inside an emoji", () => {
+    const plan = failed(menuWith(long), "kp01", "kp02", "kp03");
+    expect(plan.paths[0]!.title).toBe(`${"A".repeat(50)} · ${"B".repeat(50)} · ${"😀".repeat(6)}…`);
+    expect(plan.paths[0]!.question).toBe(["pt11", "pt13", "pt14", "pt15"].map((id, at) => `${at + 1}. ${viewpointQuestion(id)}`).join("\n"));
+  });
+});
+
 describe("Split apart (Task 65)", () => {
   const plan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
 

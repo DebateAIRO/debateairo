@@ -299,14 +299,17 @@ describe("choosing the paths", () => {
     expect(verified.questionEdited).toBe(true);
   });
 
-  it("a combine that answers none keeps the joined words, as the page does, and the path is the person's edit", async () => {
+  // Task 33b: the joined words are the menu's own texts joined (joinedPathWords), so the server stores them as the AIs'.
+  it("a combine that answers none keeps the joined words, as the page does, and the path is the AIs' wording (AI_COMBINED)", async () => {
     const fake = fakeClient(STREAM, [{ source: "AI", menu: MENU1 }, { source: "AI", menu: MENU2 }], () => ({ source: "NONE", reason: "DEADLINE" }));
     const d = await driveStartStep(fake.client, INPUT);
     const shaped = await shapedChoice(d, fake.client);
     expect(fake.calls.combines).toHaveLength(1);
     expect(shaped.paths[0]).toEqual({ title: `${viewpoint("pt11").title} · ${viewpoint("pt13").title}`,
       question: `1. ${viewpoint("pt11").question}\n2. ${viewpoint("pt13").question}`, members: [{ viewpoint_id: "pt11" }, { viewpoint_id: "pt13" }] });
-    expect(atStart(shaped, d).paths.map((path) => path.author)).toEqual(["PERSON_EDITED", "AI_SUGGESTION", "AI_SUGGESTION", "PERSON_OWN_VIEW",
+    const verified = atStart(shaped, d);
+    expect(verified.paths.map((path) => path.author)).toEqual(["AI_COMBINED", "AI_SUGGESTION", "AI_SUGGESTION", "PERSON_OWN_VIEW",
       "AI_SUGGESTION"]);
+    expect(verified.paths[0]!.ownWords).toEqual([]);
   });
 });

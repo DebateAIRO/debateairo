@@ -17,8 +17,9 @@ import {
   AskRequestSchema, StartListSchema, StartMenuSchema, type AskRequest, type DigPick, type SignedStartList, type SignedStartMenu, type StartList,
   type StartMenu, type StartPathChoice, type StartPaths
 } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, joinedPathWords } from "@debateai/kernel";
 import type { DebateShapePlanKey, DebateShapeWidths } from "@debateai/register";
+import { pathPlanFromMenu, pathPlanReduce, pathPlanToStartPaths, type PathPlan, type PathPlanAction } from "../../apps/ui/lib/v4/pathPlan.js";
 import type { DigPickAuthor } from "../../apps/api/src/dig-admission.js";
 import type { QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import {
@@ -252,6 +253,67 @@ describe("verifyStartPathsAtAsk: the paths signed at Next, read back at Start (s
 
     it("chosen by the AIs: every path must be an AI suggestion", () => {
       expect(verify(ask({}, { paths: [P_KP01, P_KP02_REVERSED, P_CARD], width: 3, chosen_by: "AIS" })).chosenBy).toBe("AIS");
+    });
+
+    /*
+     * Task 33b (spec §7 "A path you added or rewrote is your own words"; the coordinator's ruling of 5 Nov on Task 63's
+     * review): when the AI combine fails, or Start comes while it is being written, the page sends the code-joined words
+     * of the viewpoints (joinedPathWords) with no combine_ref. The server joins the signed menu's own texts the same way:
+     * the same words are the AIs' (AI_COMBINED), never the person's; a word changed, or a join the menu cannot vouch for,
+     * stays the person's.
+     */
+    describe("code-joined AI words (Task 33b)", () => {
+      const JOINED = joinedPathWords([PT14, PT21]);
+      const P_JOINED: StartPathChoice = { ...JOINED, members: [{ viewpoint_id: "pt14" }, { viewpoint_id: "pt21" }] };
+      const authorOfOne = (path: StartPathChoice): string => verify(ask({}, { paths: [path], width: 3 })).paths[0]!.author;
+      /** The page's plan of MENU after these actions, as Start sends it, verified. */
+      const pageStart = (...actions: PathPlanAction[]) => {
+        let plan: PathPlan = pathPlanFromMenu(MENU, 5, false);
+        for (const action of actions) plan = pathPlanReduce(plan, action).plan;
+        return { plan, verified: verify(ask({}, { paths: [...pathPlanToStartPaths(plan)], width: plan.width })) };
+      };
+
+      it("(b) two menu viewpoints under their joined words, no combine_ref: AI_COMBINED, and no title or question is the person's", () => {
+        expect(JOINED).toEqual({ title: "Imports of fuel · Using less power first",
+          question: `1. ${PT14.question}\n2. ${PT21.question}` });
+        const v = verify(ask({}, { paths: [P_KP01, P_JOINED], width: 3 }));
+        expect(v.paths[1]).toMatchObject({ author: "AI_COMBINED", ...JOINED, ownWords: [] });
+        expect(v.ownWords).toEqual([]);
+        const withCard: StartPathChoice = { ...joinedPathWords([PT14, CD1]), members: [{ viewpoint_id: "pt14" }, { viewpoint_id: "cd1" }] };
+        expect(authorOfOne(withCard)).toBe("AI_COMBINED");
+      });
+
+      it("(c) the same path with one word changed by the person: PERSON_EDITED, as before", () => {
+        const changed: StartPathChoice = { ...P_JOINED, question: JOINED.question.replace("imported fuel", "fuel from abroad") };
+        const v = verify(ask({}, { paths: [changed], width: 3 }));
+        expect(v.paths[0]).toMatchObject({ author: "PERSON_EDITED", ownWords: [JOINED.title, changed.question] });
+        expect(authorOfOne({ ...P_JOINED, title: "Fuel and saving power" })).toBe("PERSON_EDITED");
+      });
+
+      it("(d) a join of texts the signed menu does not hold (a client's own join) is the person's: the server cannot vouch for it", () => {
+        const forged = joinedPathWords([{ title: PT14.title, question: "Would new plants make Romania depend on fuel bought abroad?" }, PT21]);
+        expect(authorOfOne({ ...forged, members: P_JOINED.members })).toBe("PERSON_EDITED");
+        expect(authorOfOne({ ...JOINED, members: [{ viewpoint_id: "pt14" }, { viewpoint_id: "pt22" }] })).toBe("PERSON_EDITED");
+        expect(authorOfOne({ ...JOINED, members: [{ viewpoint_id: "pt21" }, { viewpoint_id: "pt14" }] })).toBe("PERSON_EDITED");
+        // The person's own words joined in are theirs; and one viewpoint is never joined by the page.
+        const withOwn = joinedPathWords([PT14, { title: OWN_TEXT, question: OWN_TEXT }]);
+        expect(authorOfOne({ ...withOwn, members: [{ viewpoint_id: "pt14" }, { own_text: OWN_TEXT }] })).toBe("PERSON_EDITED");
+        expect(authorOfOne({ ...joinedPathWords([PT14]), members: [{ viewpoint_id: "pt14" }] })).toBe("PERSON_EDITED");
+      });
+
+      it("(e) the page's fallback path, as pathPlanToStartPaths sends it, verifies as AI_COMBINED; so does a path still being written", () => {
+        const combine: PathPlanAction[] = [{ type: "SELECT", key: "kp03" }, { type: "SELECT", key: "kp04" }, { type: "COMBINE_SELECTED" }];
+        const writing = pageStart(...combine);
+        expect(writing.plan.paths[2]).toMatchObject({ wording: "WRITING", combineRef: null, ...JOINED });
+        expect(writing.verified.paths.map((path) => path.author)).toEqual(["AI_SUGGESTION", "AI_SUGGESTION", "AI_COMBINED", "AI_SUGGESTION"]);
+        const fallback = pageStart(...combine, { type: "COMBINE_FAILED", key: writing.plan.paths[2]!.key });
+        expect(fallback.plan.paths[2]).toMatchObject({ wording: "FALLBACK", combineRef: null, ...JOINED });
+        expect(fallback.verified.paths[2]).toMatchObject({ author: "AI_COMBINED", ...JOINED, ownWords: [] });
+        expect(fallback.verified.ownWords).toEqual([]);
+        const card = pageStart({ type: "USE_CARD", cardId: "cd2", intoPathKey: "kp01" });
+        expect(card.plan.paths[0]).toMatchObject({ wording: "WRITING", combineRef: null });
+        expect(card.verified.paths[0]!.author).toBe("AI_COMBINED");
+      });
     });
   });
 

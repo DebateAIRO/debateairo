@@ -1335,6 +1335,7 @@ packages/kernel/src/italy-approval.ts
 packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
+packages/kernel/src/path-join.ts
 packages/kernel/src/payment-regions.ts
 packages/kernel/src/personal-data-scan.ts
 packages/kernel/src/provider-funding.ts

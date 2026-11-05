@@ -10,6 +10,7 @@ import {
   type StartPathMember,
   type StartSuggestion
 } from "@debateai/contract";
+import { cutPathText as cutText, joinedPathWords } from "@debateai/kernel";
 
 /*
  * V4 start step, Task 64 (spec 2026-11-03 §2 items 3, 5 and 6; row D section 5): the path plan, the list of paths the
@@ -58,7 +59,6 @@ export const PATH_PLAN_LIMITS = Object.freeze({
 const PICK_NO_MAX = 16;
 /** Suggestions shown at a time (spec §2 item 5: "At most two at a time"). */
 const SUGGESTIONS_SHOWN_MAX = 2;
-const ELLIPSIS = "…";
 
 /** Where a viewpoint (a chip on a path) came from: the menu (or one of its cards), a dig's pick, or the person's own words. */
 export type PlanViewpointSource = { kind: "MENU"; viewpointId: string } | { kind: "PICK"; pickNo: number } | { kind: "OWN" };
@@ -298,17 +298,11 @@ export function combineMembersKey(members: readonly StartCombineMember[]): strin
   })));
 }
 
-/** `text` when it fits in `max` UTF-16 code units; else whole code points (never half an emoji) and "…", at most `max` in all. */
-export function cutText(text: string, max: number): string {
-  if (text.length <= max) return text;
-  if (max < ELLIPSIS.length) return "";
-  let kept = "";
-  for (const point of text) {
-    if (kept.length + point.length + ELLIPSIS.length > max) break;
-    kept += point;
-  }
-  return `${kept}${ELLIPSIS}`;
-}
+/**
+ * `text` when it fits in `max` UTF-16 code units; else whole code points (never half an emoji) and "…", at most `max` in
+ * all. The kernel's cutPathText (Task 33b), the cut of the one join, so the page and the server cut alike.
+ */
+export { cutText };
 
 const unchanged = (plan: PathPlan): PathPlanResult => ({ plan, refusal: null, folded: [], added: [] });
 const refused = (plan: PathPlan, refusal: PathPlanRefusal): PathPlanResult => ({ plan, refusal, folded: [], added: [] });
@@ -433,12 +427,14 @@ function inOwnWords(path: PlanPath, viewpoint: PlanViewpoint): PlanPath {
   };
 }
 
-/** Two to four viewpoints put together: an AI writes one question; until then their titles joined and their questions numbered. */
+/**
+ * Two to four viewpoints put together: an AI writes one question; until then their titles joined and their questions
+ * numbered, by the one join the server also makes from the signed menu (Task 33b), so it stores them as the AIs' words.
+ */
 function joined(path: PlanPath, viewpoints: readonly PlanViewpoint[]): PlanPath {
   return {
     ...path, viewpoints,
-    title: cutText(viewpoints.map(viewpointTitle).join(" · "), PATH_PLAN_LIMITS.titleMaxChars),
-    question: cutText(viewpoints.map((viewpoint, at) => `${at + 1}. ${viewpoint.question}`).join("\n"), PATH_PLAN_LIMITS.questionMaxChars),
+    ...joinedPathWords(viewpoints.map((viewpoint) => ({ title: viewpointTitle(viewpoint), question: viewpoint.question }))),
     wording: "WRITING", tag: "COMBINED_BY_YOU", combineRef: null, askReword: false
   };
 }

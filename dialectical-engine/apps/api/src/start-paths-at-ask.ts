@@ -5,7 +5,7 @@ import {
   type StartPaths
 } from "@debateai/contract";
 import type { StartPathsStore, StoredPathViewpoint, StoredStartMenu, StoredStartPath, StoredStartPathSet } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, joinedPathWords } from "@debateai/kernel";
 import {
   isShapeReceiptV2, type DebateShapePlanKey, type DebateShapePolicy, type DebateShapeWidths, type EngineVersionPolicy, type PlanId
 } from "@debateai/register";
@@ -226,9 +226,24 @@ const sameWords = (path: StartPathChoice, title: string, question: string): bool
   path.title.trim() === title.trim() && path.question.trim() === question.trim();
 
 /**
+ * Task 33b (spec §7; the coordinator's ruling of 5 Nov on Task 63's review): two or more of the menu's viewpoints or cards
+ * under the words the page joins for them when no AI wrote one question (`joinedPathWords`: the combine failed, or Start
+ * came while it was being written). The join is of the signed menu's own texts, in the members' order, never of words the
+ * client sent, so a client's join of other texts, or with the person's own words in it, stays the person's.
+ */
+function codeJoined(path: StartPathChoice, members: readonly StoredPathViewpoint[]): boolean {
+  const texts = members.flatMap((member) =>
+    member.viewpointId !== null && member.title !== null ? [{ title: member.title, question: member.question }] : []);
+  if (members.length < 2 || texts.length !== members.length) return false;
+  const joined = joinedPathWords(texts);
+  return sameWords(path, joined.title, joined.question);
+}
+
+/**
  * Who wrote a path, first match: one own text is the person's own view; a verifying combine_ref is the AI's combined
  * question; on a menu, a menu path's viewpoints (any order) under its words, or one card or one viewpoint under its own
- * words, is the AI's suggestion; on a dig, one pick under its text is the pick's author; anything else is the person's edit.
+ * words, is the AI's suggestion, and the menu's viewpoints and cards under their code-joined words are the AI's combined
+ * question (Task 33b); on a dig, one pick under its text is the pick's author; anything else is the person's edit.
  */
 function authorOf(path: StartPathChoice, members: readonly StoredPathViewpoint[], combined: () => boolean,
   from: Readonly<{ menu: StartMenu } | { dig: StartDig }>): StartPathAuthor {
@@ -240,6 +255,7 @@ function authorOf(path: StartPathChoice, members: readonly StoredPathViewpoint[]
     if (!ids.has(null) && from.menu.paths.some((one) => one.viewpoint_ids.length === ids.size
       && one.viewpoint_ids.every((id) => ids.has(id)) && sameWords(path, one.title, one.question))) return "AI_SUGGESTION";
     if (only !== null && only.viewpointId !== null && only.title !== null && sameWords(path, only.title, only.question)) return "AI_SUGGESTION";
+    if (codeJoined(path, members)) return "AI_COMBINED";
     return "PERSON_EDITED";
   }
   if (only !== null && only.pickNo !== null && path.question.trim() === only.question.trim()) return from.dig.pickAuthors[only.pickNo - 1]!;
