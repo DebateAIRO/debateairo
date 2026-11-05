@@ -124,6 +124,33 @@ describe("the carry-on part", () => {
   });
 });
 
+/**
+ * V4 start step, Task 57b (owner, 4 Nov, card "Carry-on", "Show it from the start"; wait-f16, wait-d1): a debate whose box is ticked
+ * shows the carry-on line from the first second. While the AIs are still choosing its paths ("Just answer it", or a list that could not
+ * be made) the run read has no paths of its own to show the box, so the server sends the part only for an ask whose box is ticked, and
+ * before the paths are named that part is the answer.
+ */
+describe("the carry-on part while the paths are being chosen (Task 57b)", () => {
+  it("rides a ticked debate still choosing its paths: the answer, beside no progress and no paths", () => {
+    expect(messagesOf(RunProjectionSchema, { ...RUN, path_progress: [], carry_on_part: "ANSWER" })).toEqual(["accepted"]);
+    expect(messagesOf(RunProjectionSchema, { ...RUN, state: "WAITING", waits_until: "2026-11-04T10:00:00.000Z", waits_for: null,
+      path_progress: [], carry_on_part: "ANSWER" })).toEqual(["accepted"]);
+  });
+
+  it("before its paths are named, only the answer", () => {
+    for (const part of ["DIGS", "REPORT"]) {
+      expect(messagesOf(RunProjectionSchema, { ...RUN, path_progress: [], carry_on_part: part }))
+        .toEqual(["before its paths are named, a carry-on debate is on its answer"]);
+    }
+    expect(messagesOf(RunProjectionSchema, { ...RUN, path_progress: PROGRESS, carry_on_part: "ANSWER" }))
+      .toEqual(["before its paths are named, a carry-on debate is on its answer"]);
+  });
+
+  it("a part without progress is one refusal", () => {
+    expect(messagesOf(RunProjectionSchema, { ...RUN, carry_on_part: "ANSWER" })).toEqual(["only a path debate carries the carry-on part"]);
+  });
+});
+
 describe("R22's run reads and answers", () => {
   it("an R22 answer with its purpose lines parses unchanged and carries no carry-on part", () => {
     const answer = { ...buildFairShapedAnswer(), purpose_lines: { answers: [{ question: "Where?", answer: "Romania." }] } };

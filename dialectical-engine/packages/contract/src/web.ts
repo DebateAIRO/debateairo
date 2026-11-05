@@ -783,11 +783,29 @@ export function purposeAnswerSentence(answer: PurposeAnswer): string {
  * The stored lines the question's own text does not already say, in the order they were added. New debates say every one of them in
  * `question_line`, so this is empty for them unless the words were changed after step 2 (the language pop-up's rewrite); the question check
  * and the later AIs read whatever is left here, so nothing the person said is lost and nothing is read twice.
+ *
+ * V4 start step, Task 36 (read-d3): with `answersSaid`, the line already says every answer (the v2 page writes each one into the
+ * question as a sentence, which the person may then reword or take out), so `answers` are left out as said; the other lines are read
+ * as before. Without it, today's lines, byte for byte.
  */
-export function purposeLinesUnsaid(questionLine: string, lines: PurposeLines | null | undefined): readonly string[] {
+export function purposeLinesUnsaid(questionLine: string, lines: PurposeLines | null | undefined,
+  options?: Readonly<{ answersSaid?: true }>): readonly string[] {
   if (lines === null || lines === undefined) return Object.freeze([]);
-  const all = [lines.place, lines.time, lines.purpose, ...(lines.answers ?? []).map(purposeAnswerSentence), lines.matters, ...(lines.angles ?? [])];
+  const answers = options?.answersSaid === true ? [] : (lines.answers ?? []).map(purposeAnswerSentence);
+  const all = [lines.place, lines.time, lines.purpose, ...answers, lines.matters, ...(lines.angles ?? [])];
   return Object.freeze(all.filter((line): line is string => line !== undefined && !questionLine.includes(line)));
+}
+
+/**
+ * The text the question check reads: the question, then each stored line it does not already say. The question alone when there are none.
+ * V4 start step, Task 36 (read-d3): `answersSaid` is passed on to `purposeLinesUnsaid` (the answers count as said); without it, today's bytes.
+ * Task 48: here beside `purposeLinesUnsaid` (apps/api/src/purpose-lines.ts re-exports it), so a path debate's web planners read the very
+ * text the question check reads.
+ */
+export function questionWithPurposeLines(questionLine: string, lines: PurposeLines | null | undefined,
+  options?: Readonly<{ answersSaid?: true }>): string {
+  const added = purposeLinesUnsaid(questionLine, lines, options);
+  return added.length === 0 ? questionLine : `${questionLine}\n\n${added.join("\n")}`;
 }
 
 /**

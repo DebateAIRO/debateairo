@@ -42,7 +42,7 @@
  */
 import type { Pool } from "pg";
 import { PostgresAskApplication, type Dispatcher, type RunCreationSettings } from "@debateai/api";
-import { ProviderProbeRepository, RunWaitRepository } from "@debateai/db";
+import { PostgresStartPathsStore, ProviderProbeRepository, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -85,6 +85,7 @@ import {
   type AdmissionSiteContext
 } from "../../apps/api/src/admission-settings.js";
 import { createActiveSettingsVersionReader } from "../../apps/api/src/active-settings-version.js";
+import { postgresPurposeLines } from "../../apps/api/src/purpose-lines.js";
 import { questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
@@ -338,7 +339,10 @@ export async function composePracticeAsk(input: Readonly<{
       activeSettingsVersion: () => activeSettings.current(),
       admissionSettingsFor: async (version: number) =>
         practiceMembersOf(admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)))
-    }
+    },
+    // V4 start step, Task 36, as main.ts: the chosen paths store and the purpose lines the START_PATHS setup step records.
+    startPaths: new PostgresStartPathsStore(pool),
+    purposeLines: postgresPurposeLines(pool)
   } as RunCreationSettings;
   const application = new PostgresAskApplication(pool, input.dispatcher, runSettings, undefined, input.provisionPool,
     Object.freeze({ server: input.serverAdmissionPool, legacy: input.legacyAdmissionPool }));

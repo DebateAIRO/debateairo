@@ -1,20 +1,24 @@
 import { createHash } from "node:crypto";
 import {
-  START_PATHS_INVALID, START_PATHS_NARROWED, START_PATHS_STALE, START_PATHS_TOO_MANY, START_STEP_LIMITS, pathIdOf, type AskRequest,
-  type DigPick, type PurposeLines, type StartMenu, type StartPathAuthor, type StartPathChoice, type StartPathMember, type StartPaths
+  START_PATHS_INVALID, START_PATHS_NARROWED, START_PATHS_STALE, START_PATHS_TOO_MANY, START_STEP_LIMITS, pathIdOf, purposeLinesUnsaid,
+  type AskRequest, type DigPick, type PurposeLines, type StartMenu, type StartPathAuthor, type StartPathChoice, type StartPathMember,
+  type StartPaths
 } from "@debateai/contract";
 import type { StartPathsStore, StoredPathViewpoint, StoredStartMenu, StoredStartPath, StoredStartPathSet } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
-import { isShapeReceiptV2, type DebateShapePlanKey, type DebateShapeWidths } from "@debateai/register";
+import {
+  isShapeReceiptV2, type DebateShapePlanKey, type DebateShapePolicy, type DebateShapeWidths, type EngineVersionPolicy, type PlanId
+} from "@debateai/register";
 import type { Pool } from "pg";
-import { askStartShapeOf, type AskStartShape } from "./debate-shape-ask.js";
+import { askStartShapeOf, startStepWidthsFor, type AskStartShape } from "./debate-shape-ask.js";
 import type { DigPickAuthor } from "./dig-admission.js";
-import { readPurposeLinesOf, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
+import { questionWithPurposeLines, readPurposeLinesOf, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
 import type { QuestionLanguageLock } from "./question-language/decider.js";
 import {
   startMembersHash, startRefQuestionOf, startRefVersionOf, verifyStartCheck, verifyStartCombine, verifyStartList, verifyStartMenu,
   type StartCombineContext, type StartRefBinding, type StartRefCheck, type StartStepKey
 } from "./start-step/signing.js";
+import type { StartStepBinding } from "./start-step/step.js";
 
 /**
  * V4 start step, Tasks 33 and 35 (spec 2026-11-03 §4.2) — THE CHOSEN PATHS AT START. `POST /v1/asks` checks the paths
@@ -79,7 +83,7 @@ export function startPathsFit(widths: DebateShapeWidths, plan: DebateShapePlanKe
  */
 
 /** The dig an ask digs, with its picks and who wrote each (`digPickAuthorOf`), as the route read them. */
-type DigAtStart = Readonly<{ parentRunId: string; picks: readonly DigPick[]; pickAuthors: readonly DigPickAuthor[] }>;
+export type StartDig = Readonly<{ parentRunId: string; picks: readonly DigPick[]; pickAuthors: readonly DigPickAuthor[] }>;
 /** The reading the references belong to, and the line each is compared with (null: the line changed, not compared). */
 type Reading = Readonly<{ question: string; version: number; compareLine: string | null }>;
 
@@ -187,13 +191,13 @@ function menuMemberOf(member: StartPathMember, menu: StartMenu): StoredPathViewp
 }
 
 /** A dig path's member: pick 1..n (its text, the person's unless an AI suggestion as written) or the person's own words. */
-function digMemberOf(member: StartPathMember, dig: DigAtStart): StoredPathViewpoint {
+function digMemberOf(member: StartPathMember, dig: StartDig): StoredPathViewpoint {
   if ("own_text" in member) return ownMember(member.own_text);
   if (!("pick_no" in member)) throw invalid();
   return pickMemberOf(member.pick_no, dig);
 }
 
-function pickMemberOf(pickNo: number, dig: DigAtStart): StoredPathViewpoint {
+function pickMemberOf(pickNo: number, dig: StartDig): StoredPathViewpoint {
   const pick = Number.isSafeInteger(pickNo) && pickNo >= 1 ? dig.picks[pickNo - 1] : undefined;
   if (pick === undefined) throw invalid();
   return Object.freeze({ viewpointId: null, pickNo, title: null, question: pick.text, own: dig.pickAuthors[pickNo - 1] !== "AI_SUGGESTION" });
@@ -227,7 +231,7 @@ const sameWords = (path: StartPathChoice, title: string, question: string): bool
  * words, is the AI's suggestion; on a dig, one pick under its text is the pick's author; anything else is the person's edit.
  */
 function authorOf(path: StartPathChoice, members: readonly StoredPathViewpoint[], combined: () => boolean,
-  from: Readonly<{ menu: StartMenu } | { dig: DigAtStart }>): StartPathAuthor {
+  from: Readonly<{ menu: StartMenu } | { dig: StartDig }>): StartPathAuthor {
   const only = members.length === 1 ? members[0]! : null;
   if (only !== null && isOwn(only)) return "PERSON_OWN_VIEW";
   if (combined()) return "AI_COMBINED";
@@ -252,7 +256,7 @@ function storedPathOf(index: number, author: StartPathAuthor, title: string, que
 }
 
 /** The set's own words: every path's, then the dig's picks the person wrote, each once. */
-function setOwnWordsOf(paths: readonly StoredStartPath[], dig: DigAtStart | null): readonly string[] {
+function setOwnWordsOf(paths: readonly StoredStartPath[], dig: StartDig | null): readonly string[] {
   const picks = dig === null ? [] : dig.picks.filter((_pick, index) => dig.pickAuthors[index] !== "AI_SUGGESTION").map((pick) => pick.text);
   return once([...paths.flatMap((path) => path.ownWords), ...picks]);
 }
@@ -280,7 +284,7 @@ function checkWidth(chosen: StartPaths, widths: DebateShapeWidths, plan: DebateS
 }
 
 /** A dig with picks and no start_paths (an old page): one path per pick, in pick order, How wide = the picks. */
-function pathsOfPicks(widths: DebateShapeWidths, plan: DebateShapePlanKey, dig: DigAtStart | null): VerifiedStartPaths {
+function pathsOfPicks(widths: DebateShapeWidths, plan: DebateShapePlanKey, dig: StartDig | null): VerifiedStartPaths {
   if (dig === null || dig.picks.length === 0) throw new TypeError("START_PATHS_NOT_GIVEN");
   if (!startPathsFit(widths, plan, dig.picks.length)) throw tooMany();
   const paths = Object.freeze(dig.picks.map((pick, index) =>
@@ -298,7 +302,7 @@ function pathsOfPicks(widths: DebateShapeWidths, plan: DebateShapePlanKey, dig: 
  * `now` is not read: nothing expires (answer Q8). A dig never carries on to the report (Task 56).
  */
 export function verifyStartPathsAtAsk(input: Readonly<{ key: StartStepKey; ownerScope: string; ask: AskRequest; planKey: DebateShapePlanKey;
-  settingsVersion: number; widths: DebateShapeWidths; dig: DigAtStart | null; now: Date }>): VerifiedStartPaths {
+  settingsVersion: number; widths: DebateShapeWidths; dig: StartDig | null; now: Date }>): VerifiedStartPaths {
   const { key, ownerScope, ask, planKey, dig } = input;
   if (dig !== null && dig.pickAuthors.length !== dig.picks.length) throw new TypeError("START_DIG_PICK_AUTHORS_INVALID");
   const chosen = ask.start_paths;
@@ -350,6 +354,133 @@ export function verifyStartPathsAtAsk(input: Readonly<{ key: StartStepKey; owner
     questionSwap: swap === undefined ? null : Object.freeze({ originalQuestionLine: swap.original_question_line.trim() }),
     paths, menu, ownWords: setOwnWordsOf(paths, dig),
     questionEdited: reading !== null && editedOf(ask.question_line, reading, swapQuestion) });
+}
+
+/*
+ * V4 start step, Task 36 (spec 2026-11-03 §4.2; read-d2, choose-d2, read-d3, ask-f2; owner answers Q8 and Q14 of 4 Nov) — POST
+ * /v1/asks AT START. The route screens every word the person wrote on step 2 for a crisis first (`startTextsOfBody`), holds a Free
+ * question sent without the notice (`freeNoticeMissing`), verifies the paths with the one binding Next used and hands them to `submit`
+ * (`startHandOverOf`), and checks the question once, as `startQuestionCheckText` says.
+ */
+
+/** What the route reads of the active settings version (its admission view): the version's number and its rows in force. */
+export type StartStepView = Readonly<{ registerVersion?: number; debateShapePolicy?: DebateShapePolicy; engineVersionPolicy?: EngineVersionPolicy;
+  modelScorecardInForce: boolean }>;
+
+/** A signed-in person's widths for `plan` on the view's version (`startStepWidthsFor`, the one v2 predicate), else null. */
+export function startWidthsOfView(view: StartStepView, plan: DebateShapePlanKey): DebateShapeWidths | null {
+  return startStepWidthsFor({ policy: view.debateShapePolicy ?? null, engineInForce: view.engineVersionPolicy !== undefined,
+    scorecardInForce: view.modelScorecardInForce, serverPrincipal: true }, plan);
+}
+
+/**
+ * Whether the start step runs on the view's version for a signed-in person. The switch is the version's: its row gives every plan
+ * widths (they differ, never whether they exist), so it is on for every plan or for none, and where it is off no plan need be read.
+ */
+export function startStepOnInView(view: StartStepView): boolean {
+  return startWidthsOfView(view, "free") !== null;
+}
+
+/** What `startHandOverOf` answers: the hand-over `submit` takes, and whether the line sent is not the one the AIs read at Next. */
+export type StartHandOverAtAsk = AskStartHandOver & Readonly<{ questionEdited: boolean }>;
+
+/**
+ * The hand-over of an ask that carries start members (`start_check`, `start_paths`) or a dig's picks, else null (today's ask). In
+ * order: chosen paths with no key composed are INVALID; where the step does not run (no settings version, or the switch off for the
+ * plan: `widths` null) a menu is STALE (the page offers "Read it again") and anything else is ignored, so a dig is today's dig and a
+ * lone check is today's whole-line check; then the paths (Task 33's verifier, refs of another settings version kept unless fewer
+ * paths are allowed: answer Q8), or one path per pick for a dig that sends none, and the check's language lock (a refused lone check
+ * is ignored). The binding is the one Next derives (`startStepBindingOf`), under the active version. Every refusal is a
+ * TypedDomainError whose message is its code; `now` is not read (nothing expires).
+ */
+export function startHandOverOf(input: Readonly<{ key: StartStepKey | undefined; ownerRef: string; ask: AskRequest; binding: StartStepBinding | null;
+  view: StartStepView; dig: StartDig | null; now: Date }>): StartHandOverAtAsk | null {
+  const { key, ask, binding, dig, now } = input;
+  const chosen = ask.start_paths;
+  const digPicks = chosen === undefined && dig !== null && dig.picks.length > 0;
+  if (chosen === undefined && ask.start_check === undefined && !digPicks) return null;
+  if (chosen !== undefined && key === undefined) throw invalid();
+  const widths = binding === null ? null : startWidthsOfView(input.view, binding.planKey);
+  if (binding === null || widths === null) {
+    if (chosen?.source === "MENU") throw stale();
+    return null;
+  }
+  const { ownerScope, planKey, settingsVersion } = binding;
+  let verified: VerifiedStartPaths | null = null;
+  if (chosen !== undefined && key !== undefined) {
+    verified = verifyStartPathsAtAsk({ key, ownerScope, ask, planKey, settingsVersion, widths, dig, now });
+  } else if (digPicks && dig !== null) {
+    if (dig.pickAuthors.length !== dig.picks.length) throw new TypeError("START_DIG_PICK_AUTHORS_INVALID");
+    verified = pathsOfPicks(widths, planKey, dig);
+  }
+  const checked = key === undefined ? null : verifyStartCheckAtAsk({ key, binding, ask, now });
+  if (verified === null && checked === null) return null;
+  // Review (wave 5): edited when either reading says so. One path per pick has no reading of its own (its questionEdited is
+  // always false), so a check sent with a dig's picks must still say whether the dig's line is the line it vouches for; else a
+  // check signed for one question would let any other line past Start's question check.
+  return Object.freeze({ binding: Object.freeze({ planKey, settingsVersion }), verified, lock: checked?.lock ?? null,
+    questionEdited: (verified?.questionEdited ?? false) || (checked?.questionEdited ?? false) });
+}
+
+/**
+ * The one text Start's question check reads (read-d2, read-d3), or null: nothing new to check. With a verified check the answers
+ * count as said (the v2 page writes each into the line, `answersSaid`): on the line as checked at Next, only the lines it does not
+ * say and the person's own words, one per line; on a line changed on step 2, the whole line with what it does not say, then a blank
+ * line and the own words. Without one (an old or broken page, a dig), today's whole-line text, then the own words.
+ */
+export function startQuestionCheckText(input: Readonly<{ questionLine: string; purposeLines: PurposeLines | undefined; ownWords: readonly string[];
+  startCheckVerified: boolean; questionEdited: boolean }>): string | null {
+  const { questionLine, purposeLines, ownWords } = input;
+  if (input.startCheckVerified && !input.questionEdited) {
+    const unsaid = [...purposeLinesUnsaid(questionLine, purposeLines, { answersSaid: true }), ...ownWords];
+    return unsaid.length === 0 ? null : unsaid.join("\n");
+  }
+  const line = input.startCheckVerified ? questionWithPurposeLines(questionLine, purposeLines, { answersSaid: true })
+    : questionWithPurposeLines(questionLine, purposeLines);
+  return ownWords.length === 0 ? line : `${line}\n\n${ownWords.join("\n")}`;
+}
+
+const recordOf = (value: unknown): Readonly<Record<string, unknown>> | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : null;
+
+/**
+ * What the person wrote on step 2, read from the body before it is parsed, for the crisis check that comes first: each chosen
+ * path's title and question and each own text, at most How wide's 7 paths and 4 members each. A value that is not text, or longer
+ * (trimmed) than the contract allows there, is not read: the parse refuses it as malformed, and a long text never holds the loop.
+ */
+export function startTextsOfBody(body: unknown): readonly string[] {
+  const texts: string[] = [];
+  const take = (value: unknown, max: number): void => {
+    if (typeof value !== "string") return;
+    const text = value.trim();
+    if (text.length > 0 && text.length <= max) texts.push(text);
+  };
+  const paths = recordOf(recordOf(body)?.start_paths)?.paths;
+  if (!Array.isArray(paths)) return Object.freeze(texts);
+  for (const path of paths.slice(0, START_STEP_LIMITS.pathsMax)) {
+    const choice = recordOf(path);
+    if (choice === null) continue;
+    take(choice.title, START_STEP_LIMITS.pathTitleMaxChars);
+    take(choice.question, START_STEP_LIMITS.pathQuestionMaxChars);
+    if (!Array.isArray(choice.members)) continue;
+    // Every member the contract allows (Task 92a: a merged path may hold more than four), so no word of the person's goes unread.
+    for (const member of choice.members.slice(0, START_STEP_LIMITS.pathMembersMax)) {
+      take(recordOf(member)?.own_text, START_STEP_LIMITS.ownTextMaxChars);
+    }
+  }
+  return Object.freeze(texts);
+}
+
+/**
+ * The Free notice lock (ask-f2; owner answer Q14): a new question (no parent, no public parent) from a signed-in person whose decided
+ * plan is Free (a plan id: a site with no plans has none; an internal grant decides premium), where the start step runs, that came
+ * without the notice flag. Digs and public digs are contributions and are never held.
+ */
+export function freeNoticeMissing(input: Readonly<{ ask: AskRequest; signedIn: boolean; decided: Readonly<{ planTier: string; planId: PlanId | null }>;
+  switchOn: boolean }>): boolean {
+  const { ask, decided } = input;
+  return ask.parent === undefined && ask.public_parent === undefined && input.signedIn && decided.planId !== null
+    && decided.planTier === "free" && input.switchOn && ask.free_public_notice !== true;
 }
 
 /**

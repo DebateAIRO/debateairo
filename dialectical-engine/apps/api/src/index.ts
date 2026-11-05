@@ -4,7 +4,7 @@ import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-rou
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
 import {
   digSuggestionTextFromAnswer,
-  admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
+  admitDig, digPathIndexOf, digPickAuthorOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
   type DigPicksPort, type DigSuggestionTextReader
 } from "./dig-admission.js";
 import { addToResearched } from "./web-researched.js";
@@ -166,7 +166,9 @@ import {
   // V4 start step, Task 30: the four calls before Start.
   START_PATHS_EXPIRED, START_PATHS_INVALID, START_PATHS_STALE, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema,
   StartFitResponseSchema, StartListsEventSchema, StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema,
-  type StartCombineResponse, type StartFitResponse, type StartListsEvent, type StartMergeResponse, type StartStepNoneReason
+  type StartCombineResponse, type StartFitResponse, type StartListsEvent, type StartMergeResponse, type StartStepNoneReason,
+  // V4 start step, Task 36: Start's refusals of the paths, the Free notice lock and the route's own body limit.
+  FREE_PUBLIC_NOTICE_REQUIRED, START_PATHS_NARROWED, START_PATHS_TOO_MANY, START_STEP_LIMITS
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -340,7 +342,10 @@ import {
   askShapesForPanel, normaliseAskForDebateShape, roomDepthParams, startRunBuiltPaths, startStepWidthsFor, type AskStartShape
 } from "./debate-shape-ask.js";
 import {
-  sealStartPathsAtSetup, startAskContractMember, startOfAsk, type AskStart, type AskStartHandOver
+  sealStartPathsAtSetup, startAskContractMember, startOfAsk, type AskStart, type AskStartHandOver,
+  // V4 start step, Task 36: POST /v1/asks at Start.
+  freeNoticeMissing, startHandOverOf, startQuestionCheckText, startStepOnInView, startTextsOfBody, startWidthsOfView, type StartDig,
+  type StartHandOverAtAsk
 } from "./start-paths-at-ask.js";
 // V4 start step, Task 30: the step behind the four calls before Start, its key and its stream writer.
 import { START_STEP_TIMING, type StartStepTiming } from "@debateai/map";
@@ -2091,6 +2096,12 @@ export interface ApiOptions {
    * them). Absent in production: START_STEP_TIMING's.
    */
   readonly startStepTiming?: Readonly<Partial<Record<keyof Pick<StartStepTiming, "heartbeatMs" | "streamMaxLifeMs">, number>>>;
+  /**
+   * V4 start step, Task 36: the chosen paths store, the ONE object main.ts also hands the AskApplication's settings (on the runtime
+   * pool, whose login holds debateai_runtime: core.read_start_paths is granted to it only). The asks route itself seals nothing:
+   * `submit` does, in its START_PATHS setup step; the later steps that read the marks (the carry-on, Task 56) take it from here.
+   */
+  readonly startPaths?: StartPathsStore;
 }
 
 /**
@@ -2170,7 +2181,7 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 401 | 403 | 409 | 422 | 429 {
+export function askRefusalStatus(code: string): 400 | 401 | 403 | 409 | 422 | 429 {
   if (code === ASK_SIGN_IN_REQUIRED) return 401;
   // Step 1: the same 403 the route answers when it refuses a person outside the preview's team.
   if (code === PREVIEW_TEAM_ONLY) return 403;
@@ -2178,8 +2189,17 @@ export function askRefusalStatus(code: string): 401 | 403 | 409 | 422 | 429 {
   if (QUESTION_LANGUAGE_CHOICE_REFUSALS.has(code)) return 409;
   // Side-by-side spec §13 (Task S12): the settings changed under the page; it reads the room again and says so.
   if (code === ASK_SETTINGS_CHANGED) return 409;
+  // V4 start step, Task 36: paths that do not verify or do not fit How wide are a wrong request (400); paths of another reading or
+  // plan (STALE), or more than a moved version allows (NARROWED, Task 35b), are 409, so the page reads again or asks to combine.
+  // EXPIRED keeps its 409 but is never answered now: references have no lifetime (Task 26b).
+  if (START_PATHS_REFUSAL_STATUS.has(code)) return START_PATHS_REFUSAL_STATUS.get(code)!;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
+
+/** V4 start step, Task 36: the status of each refusal of the chosen paths, at Start (the route) or in `submit` (`startOfAsk`). */
+const START_PATHS_REFUSAL_STATUS: ReadonlyMap<string, 400 | 409> = new Map<string, 400 | 409>([
+  [START_PATHS_INVALID, 400], [START_PATHS_TOO_MANY, 400], [START_PATHS_STALE, 409], [START_PATHS_NARROWED, 409], [START_PATHS_EXPIRED, 409]
+]);
 
 /**
  * Side-by-side spec §13 (Task S12) — "PLEASE CHOOSE AGAIN": the ask names the settings version the /new page's room read
@@ -4170,7 +4190,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   }
 
-  api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+  // V4 start step, Task 36 (decided 3 Nov): this route's own body limit, START_STEP_LIMITS.askBodyMaxBytes (384 KiB), which carries
+  // the largest legal Start (seven paths of the person's own words in a 3-byte script, the signed menu and its late lists); it widens
+  // F-07's API_BODY_LIMIT_BYTES for this one route, and every other route keeps the server default.
+  api.post("/v1/asks", { ...routePolicy("POST /v1/asks"), bodyLimit: START_STEP_LIMITS.askBodyMaxBytes }, async (request, reply) => {
     // Ask pre-flight, step 1 — the crisis check (V, 2026-09-30; V, 2026-10-01: "make sure this
     // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
     // help numbers, never a debate. It stays the FIRST thing this route does: before the
@@ -4185,8 +4208,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Only a question the API would accept is checked: a longer one is refused as malformed
     // below anyway, and checking 256 KB of text would hold the event loop for seconds. Trimmed
     // first, exactly as AskRequestSchema keeps it, so the limit measured here is the limit
-    // below: padding a crisis question past 8 KB with spaces must not skip the check.
-    if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis) {
+    // below: padding a crisis question past 8 KB with spaces must not skip the check. V4 start step, Task 36: the whole line, so
+    // words typed on step 2 are screened too, and then every word the person wrote there (their paths, own texts and rewrites,
+    // `startTextsOfBody`), with the same answer: their words go to no model, the question check's included.
+    if ((Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis)
+      || startTextsOfBody(request.body).some((text) => detectCrisis(text).crisis)) {
       return reply.status(422).send({
         error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
         country: edgeCountry(request.headers)
@@ -4219,6 +4245,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    // V4 start step, Task 36: the active version, read once for this ask (the Free notice lock and the hand-over), and the person's
+    // plan, decided once (the lock and the Free notice record after submit), each only when asked for.
+    let viewRead: ReturnType<typeof admissionView> | null = null;
+    const viewOnce = (): ReturnType<typeof admissionView> => viewRead ??= admissionView();
+    const askSettings = Object.freeze({ plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params });
+    const decideFor = (ownerRef: string) => decideRoomSettingsAndPlan(askSettings, ownerRef, options.askBilling);
+    let decidedPlan: ReturnType<typeof decideFor> | null = null;
+    const decidedOnce = (ownerRef: string): ReturnType<typeof decideFor> => decidedPlan ??= decideFor(ownerRef);
+    // V4 start step, Task 36 (ask-f2; owner answer Q14): THE FREE NOTICE LOCK. A new question from a person on the Free plan that
+    // arrives without the notice flag is refused with a plain code, before the dig checks, the question check, the room or any
+    // charge; the page then shows the notice and sends again. Only where the start step runs: its switch is the version's, the same
+    // for every plan (`startStepOnInView`), so a version without it reads no plan here and an old page's Free question goes through
+    // as today. Digs and public digs are contributions and are never held; an internal grant decides premium; a site with no plans
+    // has no plan id.
+    const newQuestion = ask.parent === undefined && ask.public_parent === undefined;
+    if (asker !== undefined && newQuestion && startStepOnInView(await viewOnce())) {
+      const decided = await decidedOnce(asker.ownerRef);
+      const switchOn = startWidthsOfView(await viewOnce(), debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier)) !== null;
+      if (freeNoticeMissing({ ask, signedIn: true, decided: { planTier: decided.settings.plan_tier, planId: decided.planId }, switchOn })) {
+        return reply.status(403).send({ error: FREE_PUBLIC_NOTICE_REQUIRED, message: FREE_PUBLIC_NOTICE_REQUIRED });
+      }
+    }
     // Plan 2026-10-30 dig-model revision W3-2: a dig's own checks come before the question check (a paid site call) and
     // before the room, so a refused dig is charged nothing. Without the dig model the parent is not read (as before).
     // Decision 13: a dig on a public debate: named by the page it was started from, or by the author's own map once the debate is public. Every dig on a public debate is a contribution, whoever
@@ -4242,17 +4290,54 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (options.questionCheck === undefined) {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
-    // Decision 5 of 31 Oct: place, time and purpose lines the question does not already say are checked with it.
-    const outcome = await options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines));
-    const answer = answerForOutcome(outcome, edgeCountry(request.headers));
+    // W3-7: what the dig's parent offered, read once for the dig (its picks' authors at Start, then the picks kept after the join).
+    const digSuggestionText = options.digSuggestionText ?? digSuggestionTextFromAnswer((parentRunId) =>
+      options.application.readRunAnswer(parentRunId, request.session, ownershipFor(request)));
+    // V4 start step, Task 36 (spec 2026-11-03 §4.2; read-d2, choose-d2; owner answer Q8): THE HAND-OVER. A signed-in ask that carries
+    // start members or a dig's picks: the paths signed at Next, verified with the one binding Next derives (startStepBindingOf),
+    // under the active version, or one path per pick (their authors read only where the step runs for the dig). A refusal is
+    // answered here, before the question check and before anything is charged or sealed: 400 INVALID or TOO_MANY, 409 STALE or NARROWED.
+    let start: StartHandOverAtAsk | null = null;
+    if (asker !== undefined && (ask.start_check !== undefined || ask.start_paths !== undefined || (digParent?.picks?.length ?? 0) > 0)) {
+      const view = await viewOnce();
+      // Where the switch is off nothing runs, so no plan is read for a binding (null: a menu is STALE, the rest is today's ask).
+      const binding = !startStepOnInView(view) ? null
+        : await startStepBindingOf({ ownerRef: asker.ownerRef, askBilling: options.askBilling, registerVersion: view.registerVersion });
+      const digRuns = digParent !== undefined && binding !== null && startWidthsOfView(view, binding.planKey) !== null;
+      const picks = digParent?.picks ?? [];
+      const dig: StartDig | null = digParent === undefined || !digRuns ? null : Object.freeze({ parentRunId: digParent.parent_run_id, picks,
+        pickAuthors: Object.freeze(await Promise.all(picks.map(async (pick) => digPickAuthorOf(pick, pick.suggestion_id === null ? null
+          : await digSuggestionText(asker.ownerRef, digParent.parent_run_id, pick.suggestion_id))))) });
+      try {
+        start = startHandOverOf({ key: options.startStepKey, ownerRef: asker.ownerRef, ask, binding, view, dig, now: new Date() });
+      } catch (error) {
+        if (error instanceof TypedDomainError && START_PATHS_REFUSAL_STATUS.has(error.code)) {
+          return reply.status(askRefusalStatus(error.code)).send({ error: error.code, message: error.code });
+        }
+        throw error;
+      }
+    }
+    // Decision 5 of 31 Oct: place, time and purpose lines the question does not already say are checked with it. V4 start step,
+    // Task 36 (read-d2, read-d3): with a hand-over, the one text Start's check reads (`startQuestionCheckText`): on the line as
+    // checked at Next only what is new (null: nothing, no call), on a line changed on step 2 the whole line, and every own word.
+    const startCheckText = start === null ? null : startQuestionCheckText({ questionLine: ask.question_line, purposeLines: ask.purpose_lines,
+      ownWords: start.verified?.ownWords ?? [], startCheckVerified: start.lock !== null, questionEdited: start.questionEdited });
+    const outcome = start === null ? await options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines))
+      : startCheckText === null ? null : await options.questionCheck.check(startCheckText);
+    const answer = outcome === null ? null : answerForOutcome(outcome, edgeCountry(request.headers));
     if (answer !== null) return reply.status(answer.status).send(answer.body);
+    // V4 start step, Task 36: `submit` gets the hand-over as its fourth argument, and three arguments without one; the ask keeps its
+    // whole `question_line`, as the person sent it.
+    const handOver: readonly [] | readonly [AskStartHandOver] = start === null ? []
+      : [Object.freeze({ binding: start.binding, verified: start.verified, lock: start.lock })];
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,
       request.authenticatedSession === undefined
         ? Object.freeze({ kind: "legacy" as const, legacyAskerId: request.session.asker_id })
         : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
-          ownerRef: request.authenticatedSession.ownerRef })
+          ownerRef: request.authenticatedSession.ownerRef }),
+      ...handOver
     ));
     // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
     // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
@@ -4262,8 +4347,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // W3-7: a dig that joined keeps what it was made of (0135), for the rewrite of the path its picks are on.
       if ((joined === "JOINED" || joined === "ALREADY") && options.digPicks !== undefined) {
         await recordDigPicksAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref, positionRef: digPositionRef },
-          options.digPicks, options.digSuggestionText ?? digSuggestionTextFromAnswer((parentRunId) =>
-            options.application.readRunAnswer(parentRunId, request.session, ownershipFor(request))));
+          options.digPicks, digSuggestionText);
       }
     }
     // Decision 13: a public dig's own run joins the public tree, with its copy of the page and its picks.
@@ -4274,8 +4358,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (joined !== "JOINED" && joined !== "ALREADY") return reply.status(202).send({ ...accepted, public_dig_not_joined: true });
     }
     // Decision 13: the page showed the Free notice, on the Free plan: this debate goes public when finished, after the AI check. A dig is a contribution instead; a paid plan's flag means nothing.
-    if (ask.free_public_notice === true && ask.parent === undefined && ask.public_parent === undefined && digOwner !== undefined && options.publicTree !== undefined) {
-      const decided = await decideRoomSettingsAndPlan({ plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params }, digOwner, options.askBilling);
+    // V4 start step, Task 36: the plan the lock decided, when it did (no second call).
+    if (ask.free_public_notice === true && newQuestion && digOwner !== undefined && options.publicTree !== undefined) {
+      const decided = await decidedOnce(digOwner);
       if (decided.settings.plan_tier === "free") {
         await options.publicTree.contributions.recordFreeNotice(digOwner, accepted.run_ref).catch(() => undefined);
       }

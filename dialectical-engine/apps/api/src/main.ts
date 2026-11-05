@@ -35,6 +35,8 @@ import { ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify } fr
 import { createStartCharges } from "./start-step/charge.js";
 import { startStepKeyFrom } from "./start-step/signing.js";
 import { createStartStep, startStepRouteOf } from "./start-step/step.js";
+// V4 start step, Task 36: the one chosen paths store, for the AskApplication and the API.
+import { PostgresStartPathsStore } from "@debateai/db";
 import { createStartTransport } from "./start-step/transport.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
@@ -1126,6 +1128,12 @@ const emailChange = new EmailChangeService({
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
+/**
+ * V4 start step, Task 36: THE ONE chosen paths store, on the runtime pool (its login holds debateai_runtime, the only role granted
+ * core.record_start_paths and core.read_start_paths, 0157): the AskApplication seals a run's chosen paths through it (the START_PATHS
+ * setup step) and reads them when a waiting debate is let in again; buildApi gets the same object.
+ */
+const startPaths = new PostgresStartPathsStore(pool);
 const application = new PostgresAskApplication(pool, dispatcher, {
   /**
    * Side-by-side spec §13: the members a settings version decides (its preview line-up and gate terms, the daily guard
@@ -1151,7 +1159,11 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   admissionSettings: {
     activeSettingsVersion: () => activeSettings.current(),
     admissionSettingsFor: async (version) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version))
-  }
+  },
+  // V4 start step, Task 36: the chosen paths (sealed at the START_PATHS setup step, read at re-admission) and a debate's purpose
+  // lines, which the setup step records with them; without the store a v2 ask with chosen paths fails START_PATHS_STORE_UNAVAILABLE.
+  startPaths,
+  purposeLines: postgresPurposeLines(pool)
 },undefined,contentProvisionPool,Object.freeze({
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
@@ -1868,6 +1880,8 @@ const api = buildApi({
   // stream opens; without it the four calls answer none OFF). The streams keep START_STEP_TIMING's heartbeat and longest life.
   startStep,
   startStepKey,
+  // V4 start step, Task 36: the same chosen paths store the AskApplication holds.
+  startPaths,
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).

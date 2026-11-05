@@ -1046,8 +1046,14 @@ export const RunProjectionSchema = z.object({
   if (run.carry_on_part !== undefined && progress === undefined) {
     context.addIssue({ code: "custom", path: ["carry_on_part"], message: "only a path debate carries the carry-on part" });
   }
-  if (run.carry_on_part !== undefined && run.branches?.carry_on_to_report !== true) {
+  // V4 start step, Task 57b (owner, 4 Nov, "Show it from the start"): beside the paths the box must be ticked; before the paths are
+  // named (no `branches`), the server sends a part only for an ask whose box is ticked, and it is the answer.
+  if (run.carry_on_part !== undefined && run.branches !== undefined && run.branches.carry_on_to_report !== true) {
     context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
+  }
+  if (run.carry_on_part !== undefined && run.branches === undefined && progress !== undefined
+    && (progress.length > 0 || run.carry_on_part !== "ANSWER")) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "before its paths are named, a carry-on debate is on its answer" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -1126,6 +1132,12 @@ export type PublicAiProvidersResponse = z.infer<typeof PublicAiProvidersResponse
  */
 export const SENSITIVE_DATA_NOTICE_VERSION = "2026-09-29" as const;
 export const SENSITIVE_DATA_CONSENT_REQUIRED = "SENSITIVE_DATA_CONSENT_REQUIRED" as const;
+/**
+ * V4 start step, Task 36 (ask-f2; owner answer Q14): where the start step runs, a new question from a person on the Free plan
+ * that arrives without `free_public_notice` is refused 403 with this code (body `{ error, message }`, as the consent above),
+ * before anything is checked or charged; the page shows the notice and sends again.
+ */
+export const FREE_PUBLIC_NOTICE_REQUIRED = "FREE_PUBLIC_NOTICE_REQUIRED" as const;
 export const SensitiveDataConsentRequestSchema = z.object({
   notice_version: z.literal(SENSITIVE_DATA_NOTICE_VERSION),
   locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
