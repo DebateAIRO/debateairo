@@ -10,8 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * The owner's third round of follow-ups (5 Nov 2026 afternoon, OPEN-OWNER-QUESTIONS-2026-11-04.md "Your answers"):
  *  - The page behind the account menu's "My questions" is renamed "My questions" (its heading, so its tab title too), and
  *    the first screen's link to it becomes "All my questions" (both the owner's words).
- *  - V4Header takes an optional onBrandClick, called when the brand link is pressed (the start-step session passes it);
- *    without it the brand is the plain link to /v4 it always was.
+ * And, not one of the owner's answers: V4Header takes an optional onBrandClick, called when the brand link is pressed (the
+ * start-step session asked for it and will pass it); without it the brand is the plain link to /v4 it always was.
  * Made-up texts only.
  */
 vi.mock("@/lib/api", () => ({
@@ -98,26 +98,51 @@ describe("the third round: the page behind 'My questions' is called 'My question
   });
 });
 
-describe("the third round: V4Header's optional onBrandClick", () => {
-  it("is called with the brand link's click, before the link is followed; the handler may keep the page where it is", async () => {
-    window.history.replaceState(null, "", "/v4");
-    const seen: Array<{ target: string | null; prevented: boolean }> = [];
-    const onBrandClick = (event: MouseEvent<HTMLAnchorElement>): void => {
-      event.preventDefault();
-      seen.push({ target: event.currentTarget.getAttribute("href"), prevented: event.defaultPrevented });
-    };
-    const page = await mount(<V4Header catalog={CATALOG} showQuota={false} session="OUT" onBrandClick={onBrandClick} />);
+describe("V4Header's optional onBrandClick (asked for by the start-step session, not one of the owner's answers)", () => {
+  // What the browser does with the click once React and the Link have seen it: a listener on the document runs after them
+  // (React listens on its root, inside the document), reads whether the click was kept from going ahead, then stops jsdom's
+  // own navigation, which it does not implement.
+  const prevented: boolean[] = [];
+  const settleClick = (event: Event): void => {
+    prevented.push(event.defaultPrevented);
+    event.preventDefault();
+  };
+  async function pressBrand(onBrandClick?: (event: MouseEvent<HTMLAnchorElement>) => void): Promise<boolean> {
+    window.history.replaceState(null, "", "/v4/debate/made-up");
+    const page = await mount(
+      <V4Header catalog={CATALOG} showQuota={false} session="OUT" {...(onBrandClick === undefined ? {} : { onBrandClick })} />
+    );
     const brand = page.querySelector<HTMLAnchorElement>("a.v4HdrBrand")!;
     expect(brand.getAttribute("href")).toBe("/v4");
-    await act(async () => brand.click());
-    expect(seen).toEqual([{ target: "/v4", prevented: true }]);
-    expect(window.location.pathname + window.location.search).toBe("/v4");
+    prevented.length = 0;
+    document.addEventListener("click", settleClick);
+    try {
+      await act(async () => brand.click());
+    } finally {
+      document.removeEventListener("click", settleClick);
+    }
+    expect(prevented).toHaveLength(1);
+    return prevented[0]!;
+  }
+
+  it("is called with the brand link's click, before the link is followed; a handler that prevents it keeps the page where it is", async () => {
+    const seen: string[] = [];
+    const kept = await pressBrand((event) => {
+      seen.push(event.currentTarget.getAttribute("href") ?? "");
+      event.preventDefault();
+    });
+    expect(seen).toEqual(["/v4"]);
+    expect(kept).toBe(true);
   });
 
-  it("without it the brand is the plain link to /v4, as before", async () => {
-    const page = await mount(<V4Header catalog={CATALOG} showQuota={false} session="OUT" />);
-    const brand = page.querySelector<HTMLAnchorElement>("a.v4HdrBrand")!;
-    expect(brand.getAttribute("href")).toBe("/v4");
-    expect(brand.getAttribute("onclick")).toBeNull();
+  it("a handler that does not prevent it lets the click go ahead to /v4", async () => {
+    const seen: string[] = [];
+    const kept = await pressBrand((event) => { seen.push(event.type); });
+    expect(seen).toEqual(["click"]);
+    expect(kept).toBe(false);
+  });
+
+  it("without it the brand is the plain link to /v4, as before: nothing keeps the click from going ahead", async () => {
+    expect(await pressBrand()).toBe(false);
   });
 });

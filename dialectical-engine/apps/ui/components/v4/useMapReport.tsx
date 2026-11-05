@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import type { Answer } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
@@ -10,6 +10,7 @@ import {
 import { stateWordText, whenText } from "@/lib/v4/stateWords";
 import { quotaChanged } from "@/lib/v4/quotaPulse";
 import { levelHref } from "@/lib/v4/storage";
+import { useBrowserLayoutEffect } from "@/lib/v4/useBrowserLayoutEffect";
 import { focusInPlace } from "@/lib/v4/useFocusHandOff";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { useReportWatch, type ReportAnswer } from "@/lib/v4/useReportVersions";
@@ -42,8 +43,6 @@ import { reportWaitStateOf, useQuestionPublic, useReportStart, V4ReportStrip, V4
  *    (`waitingDigLanguage`, as the report page does), and says "the digs in progress", with no number, when several wait.
  */
 
-/** useLayoutEffect in the browser, useEffect on the server (which has no layout), as V4DigTray.tsx does. */
-const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export type MapReportInput = Readonly<{
   /** The page's own run id (a dig's on a dig's map). */

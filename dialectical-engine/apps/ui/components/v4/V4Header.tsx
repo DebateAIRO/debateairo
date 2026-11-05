@@ -23,7 +23,8 @@ import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
  *    fullest period the plan counts, at every screen size.
  *  - Question 15: on a phone the header is one row, the brand's mark (its name stays its accessible name), the circle and
  *    the round account button (app/v4/v4-base.css). Question 18 A (no "Write my report" in the top bar while the bottom
- *    bar shows it) is the map's own report item, still to come (V4DebateClient, V4BottomStack: the start-step session's).
+ *    bar shows it) is built in the map's own report item (useMapReport's `bottomShowsReport`, V4BottomStack's
+ *    `onReportShown`); only the map page's wiring of the two remains (V4DebateClient, the start-step session's).
  */
 
 export function V4Header({
@@ -55,9 +56,9 @@ export function V4Header({
    */
   after?: ReactNode;
   /**
-   * Called when the brand link is pressed, before the browser follows it to /v4 (the owner's third round, 5 Nov: the
-   * start-step session passes it); a handler may call event.preventDefault() to keep the page where it is. Absent: the
-   * plain link it always was.
+   * Called when the brand link is pressed, before the browser follows it to /v4; a handler may call event.preventDefault()
+   * to keep the page where it is. Asked for by the start-step session (5 Nov), which will pass it; not one of the owner's
+   * answers. Absent: the plain link it always was.
    */
   onBrandClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }>) {

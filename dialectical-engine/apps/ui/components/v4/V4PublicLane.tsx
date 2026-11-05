@@ -124,6 +124,10 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   debate: PublicDebate; lane: V4PublicLaneConfig; returnPath: LaneActions["returnPath"]; children: ReactNode;
 }>) {
   const { catalog, locale } = lane;
+  // STILL DUE (the owner's second round, 5 Nov: a public page shows each debate at the level it was asked at; the start-step
+  // plan leaves the public page's own use of reading_level to this review): a dig asked here should take the debate's own
+  // level once the server sends reading_level with the public debate. Until then it takes the visitor's saved level, or
+  // Plain words (and V4PublicPage draws the points at Plain words).
   const [savedLevel] = useReadingLevel(null);
   const ask = useV4Ask({
     catalog,

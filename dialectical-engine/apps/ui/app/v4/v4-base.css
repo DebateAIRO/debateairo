@@ -83,8 +83,9 @@
    extra's words may wrap inside its own button rather than push the row onto a second line. A strip the page puts after
    the row (the map's report strip, V4Header's `after`) keeps its own row below. Nothing here moves. Loaded by every V4
    page and the public page, so their headers match.
-   Question 18 A (the top bar drops "Write my report" whenever the phone's bottom bar shows it) is not built here: the map's
-   report item belongs to the start-step session. These rules sit here, not in v4-ask.css (that session's file), and win
+   Question 18 A (the top bar drops "Write my report" whenever the phone's bottom bar shows it) is not here: it is built in
+   the map's report item (useMapReport's `bottomShowsReport`, V4BottomStack's `onReportShown`, v4-debate.css), and only the
+   map page's wiring of the two remains (V4DebateClient, the start-step session's). These rules sit here, not in v4-ask.css (that session's file), and win
    over its `.v4HdrRight` wrap rule on a phone; its `.v4HdrLevel*` and `.v4HdrAllowance` rules are dead (no component
    draws those classes) and are that session's to remove. */
 @media (max-width: 767px) {

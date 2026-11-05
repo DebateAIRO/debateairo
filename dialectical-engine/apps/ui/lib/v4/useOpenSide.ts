@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import { useState, type RefObject } from "react";
+import { useBrowserLayoutEffect } from "./useBrowserLayoutEffect.js";
 import { isRightToLeft } from "./useMapKeys.js";
 
 /*
@@ -16,8 +17,6 @@ import { isRightToLeft } from "./useMapKeys.js";
 
 /** Which edge of its control a box that opens from it is held to. */
 export type OpenSide = "start" | "end";
-
-const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** "start" when the middle of `control` lies in the start half of the window (the room is toward the end side), else "end". */
 export function openSideOf(control: Element): OpenSide {

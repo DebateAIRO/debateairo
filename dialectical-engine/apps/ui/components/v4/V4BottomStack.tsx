@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { V4ShareChange } from "@/components/v4/V4ShareChange";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { replayHighlight } from "@/lib/v4/highlight";
+import { useBrowserLayoutEffect } from "@/lib/v4/useBrowserLayoutEffect";
 import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 
 /*
@@ -70,9 +72,6 @@ function useStackRoom(ref: RefObject<HTMLDivElement | null>, phone: boolean): vo
   }, [ref, phone]);
 }
 
-/** useLayoutEffect in the browser, useEffect on the server (which has no layout), as V4DigTray.tsx does. */
-const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
-
 /**
  * Question 19 A (wait-f5): the page's own pause block that says `reason` (V4MonthPause's sentence line, in the panel), by its
  * id, or null when none on the page says it. Looked up before the browser paints, so no frame says the pause twice.
@@ -86,15 +85,6 @@ function usePauseLineOnPage(reason: string | null): string | null {
     setId((previous) => (previous === found ? previous : found));
   });
   return id;
-}
-
-/** The shared 1-second highlight (v4-base.css .v4Highlight) on `line` again, without re-mounting it. */
-function replayHighlight(line: HTMLElement): void {
-  line.classList.remove("v4Highlight");
-  // Reading the layout restarts the animation when the class goes back on.
-  void line.offsetWidth;
-  line.classList.add("v4Highlight");
-  line.addEventListener("animationend", () => line.classList.remove("v4Highlight"), { once: true });
 }
 
 /**

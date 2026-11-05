@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { continueRun, type ContinueOutcome } from "@/lib/v4/money";
 import { pauseDate, pauseDay, pauseSentence, type PauseState } from "@/lib/v4/monthPause";
+import { replayHighlight } from "@/lib/v4/highlight";
 import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 
 /*
@@ -20,16 +21,6 @@ import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
  * Motion (journey-d1 A): nothing moves here. When the block changes while it is on screen (the new month starts), it
  * changes at once and gets the 1-second soft highlight; the sentence itself is the written line, read out once.
  */
-
-/** Plays the shared 1-second highlight on `line` again (v4-base.css .v4Highlight), without re-mounting it. */
-function replayHighlight(line: HTMLElement | null): void {
-  if (line === null) return;
-  line.classList.remove("v4Highlight");
-  // Reading the layout restarts the animation when the class goes back on.
-  void line.offsetWidth;
-  line.classList.add("v4Highlight");
-  line.addEventListener("animationend", () => line.classList.remove("v4Highlight"), { once: true });
-}
 
 /** journey-d1 A: how long the soft highlight stays on a block that just changed. */
 const CHANGED_HIGHLIGHT_MS = 1_000;

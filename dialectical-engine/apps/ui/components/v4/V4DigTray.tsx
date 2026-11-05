@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type Ref, type RefObject } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { V4DigQuota } from "@/lib/v4/digQuota";
+import { replayHighlight } from "@/lib/v4/highlight";
 import type { MoneyLine } from "@/lib/v4/money";
 import { picksMax, type V4PlanTier } from "@/lib/v4/suggestions";
 import type { DigMode, DigTarget } from "@/lib/v4/types";
+import { useBrowserLayoutEffect } from "@/lib/v4/useBrowserLayoutEffect";
 import { V4PickChips } from "./V4ChoiceChips";
 import { V4MoneyLines } from "./V4DigSuggest";
 import { pathTitle, TitleText } from "./V4MapTree";
@@ -58,9 +60,6 @@ function useDockRoom(ref: RefObject<HTMLElement | null>): void {
  * why). Null: no such line above (the panel shows a dig, or the deepest level), so the tray shows its own. Read again after
  * each of the tray's renders: the page draws the panel and the tray together, so a change of panel redraws the tray too.
  */
-/** useLayoutEffect in the browser, useEffect on the server (which has no layout), as V4AskClient.tsx does. */
-const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
-
 function useReasonAbove(ref: RefObject<HTMLElement | null>, reason: string | null): string | null {
   const [above, setAbove] = useState<string | null>(null);
   // Before the browser paints (WHOLE NEW-5, the wave-2 checks): no frame shows the reason twice while this looks.
@@ -80,14 +79,8 @@ function useReasonAbove(ref: RefObject<HTMLElement | null>, reason: string | nul
  * A press of a greyed tray button gives the line above that says why the shared highlight again (public-d4 A), as
  * glowOnPage does (V4PublicDig.tsx), without moving focus or the page.
  */
-function replayHighlight(id: string): void {
-  const line = document.getElementById(id);
-  if (line === null) return;
-  line.classList.remove("v4Highlight");
-  // Re-read the layout so the highlight plays again when it is put on again.
-  void line.offsetWidth;
-  line.classList.add("v4Highlight");
-  line.addEventListener("animationend", () => line.classList.remove("v4Highlight"), { once: true });
+function replayHighlightOf(id: string): void {
+  replayHighlight(document.getElementById(id));
 }
 
 /** The path the picks are on, then the mode word (left out on Free, which has no Quick look / Thorough choice). */
@@ -164,7 +157,7 @@ export function V4DigTray(props: Readonly<{
               aria-disabled={greyed ? "true" : undefined}
               aria-describedby={greyed ? reasonAbove ?? reasonId : undefined}
               onClick={() => {
-                if (greyed && reasonAbove !== null) replayHighlight(reasonAbove);
+                if (greyed && reasonAbove !== null) replayHighlightOf(reasonAbove);
                 else if (greyed) setReplay((count) => count + 1);
                 else props.onDig();
               }}
