@@ -24,7 +24,8 @@ import {
   type PlanViewpoint
 } from "../../apps/ui/lib/v4/pathPlan.js";
 import {
-  SignedStartListSchema, SignedStartMenuSchema, START_STEP_LIMITS, StartMenuSchema, StartPathsSchema, type StartCard, type StartCombineMember
+  SignedStartListSchema, SignedStartMenuSchema, START_STEP_LIMITS, StartCombineRequestSchema, StartMenuSchema, StartPathsSchema, type StartCard,
+  type StartCombineMember
 } from "../../packages/contract/src/index.js";
 import {
   NUCLEAR_MENU, NUCLEAR_MENU_REV2, SIXTEEN_PATH_MENU, START_FIXTURE_QUESTION, TWO_PATH_MENU, signedList, signedMenu
@@ -1333,5 +1334,48 @@ describe("pathPlanReduce (Task 66)", () => {
   it("builds every action and refuses one it does not know", () => {
     const plan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
     expect(() => pathPlanReduce(plan, { type: "NOPE" } as unknown as PathPlanAction)).toThrow("PATH_PLAN_ACTION_INVALID");
+  });
+});
+
+/*
+ * Task 92a (owner, 4 Nov, AI instructions batch 1): the merges no longer say "of at most four", so the menu may hold a path the AI
+ * put together of five or more. The page takes it whole ("put together by us · Split"), sends it whole at Start, and when one
+ * viewpoint is taken out the rest stay joined and the AI writes them again (the combine takes up to 54 points). What the person
+ * puts together themselves stays four until Task 92c's answer.
+ */
+describe("a merged path of any size (Task 92a)", () => {
+  const SIX_IDS = ["pt11", "pt12", "pt13", "pt14", "pt15", "pt21"];
+  const SIX_MENU = {
+    ...NUCLEAR_MENU,
+    paths: [
+      { path_ref: "kp01", title: "Costs, supply and security", question: "What would new plants cost, and could Romania supply and guard them?",
+        viewpoint_ids: SIX_IDS, put_together: true, is_new: false },
+      ...NUCLEAR_MENU.paths.filter((path) => path.viewpoint_ids.every((id) => !SIX_IDS.includes(id)))
+    ],
+    suggestions: []
+  };
+
+  it("a merged path of six comes in whole and goes out whole; one taken out is written again", () => {
+    expect(StartMenuSchema.safeParse(SIX_MENU).error?.issues ?? []).toEqual([]);
+    const plan = pathPlanFromMenu(SIX_MENU, 5, false);
+    const six = pathOf(plan, "kp01");
+    expect(six.viewpoints.map((viewpoint) => viewpoint.key)).toEqual(SIX_IDS);
+    expect(six.tag).toBe("PUT_TOGETHER_BY_US");
+    const sent = pathPlanToStartPaths(plan);
+    expect(sent[0]!.members).toEqual(SIX_IDS.map((viewpoint_id) => ({ viewpoint_id })));
+    expect(StartPathsSchema.safeParse({ source: "MENU", menu: signedMenu(SIX_MENU), paths: sent, width: 5, chosen_by: "PERSON" }).error?.issues ?? [])
+      .toEqual([]);
+    // A chip's Remove: the five left stay joined, to be written again by the AI.
+    const five = pathOf(pathPlanReduce(plan, { type: "REMOVE", key: "pt21" }).plan, "kp01");
+    expect(five.viewpoints.map((viewpoint) => viewpoint.key)).toEqual(SIX_IDS.slice(0, 5));
+    expect(five.wording).toBe("WRITING");
+    const combine = { context: { kind: "MENU", question_line: START_FIXTURE_QUESTION, check_ref: "check1.sig", menu_id: SIX_MENU.menu_id },
+      reading_level: "plain", members: pathPlanCombineMembers(five) };
+    expect(StartCombineRequestSchema.safeParse(combine).error?.issues ?? []).toEqual([]);
+    // Combining it with another path is still the person's four (Task 92c asks the owner).
+    expect(keys(plan.paths)).toEqual(["kp01", "kp05", "kp07", "kp08", "kp09"]);
+    const picked = reduce(plan, { type: "SELECT", key: "kp01" }, { type: "SELECT", key: "kp05" }).plan;
+    expect(pathPlanReduce(picked, { type: "COMBINE_SELECTED" })).toMatchObject({ refusal: "VIEWPOINTS_FULL", plan: picked });
+    expect(PATH_PLAN_LIMITS).toEqual({ viewpointsPerPathMax: 4, pathsMax: 7, freePathsMax: 3, ownTextMaxChars: 1000, titleMaxChars: 120, questionMaxChars: 1000 });
   });
 });

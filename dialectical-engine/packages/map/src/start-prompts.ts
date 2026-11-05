@@ -42,20 +42,21 @@ const LIST_INSTRUCTION = "Suggest what is worth looking into before this questio
 
 // OWNER WORDING — approve before switch-on
 const MERGE_INSTRUCTION = "Several people suggested what is worth looking into for this question; you are given their suggestions, each with an "
-  + "id, and never who wrote which. First, mark every suggestion that says the same as another in other words as a repeat of it. Then make "
-  + "the list of paths: put suggestions that clearly belong together into one path of at most four, with a short title and one question that "
-  + "covers them and names only what they add, without repeating the main question; keep suggestions that say different things apart, and "
-  + "when in doubt keep them apart. Order the paths most useful first for answering the main question, using what the asker already said "
-  + "about it. Then pick up to three other ways to read the question that the suggestions show and the asker may not have weighed, each with "
-  + "one sentence saying what kind of surprise it is and a path that would look into it. Last, suggest up to nine changes: two paths that ask "
-  + "the same thing and could be combined, with a short reason, or a path that fits inside another.";
+  + "id. First, mark every suggestion that says the same as another in other words as a repeat of it. Then make the list of paths: put "
+  + "suggestions that clearly belong together into one path, with a short title that represents all of them and one question that covers them "
+  + "and names only what they add, without repeating the main question; keep suggestions that say different things apart, and when in doubt "
+  + "keep them apart. Order the paths most useful first for answering the main question, using what the asker already said about it. Then "
+  + "pick up to three other ways to read the question that the suggestions show and the asker may not have weighed, each with one sentence "
+  + "saying what kind of surprise it is and a path that would look into it. Last, suggest up to nine changes: two paths that ask almost the "
+  + "same thing and could be combined into one path (but you decided not to, because they do contain separate angles), with a short reason, "
+  + "or a path that fits inside another.";
 
 // OWNER WORDING — approve before switch-on
 const MERGE_LATE_INSTRUCTION = "More suggestions arrived for this question after its list of paths was made. You are given the list so far, and "
   + "the new suggestions, each with an id. Never change, reorder or remove a path of the list so far. Mark every new suggestion that says the "
   + "same as a suggestion already listed, or as another new one, as a repeat of it. Put the other new suggestions into new paths: suggestions "
-  + "that clearly belong together go into one path of at most four, with a short title and one question that covers them and names only what "
-  + "they add, without repeating the main question. When a new path fits inside a path of the list so far, say which.";
+  + "that clearly belong together go into one path, with a short title and one question that covers them and names only what they add, "
+  + "without repeating the main question. When a new path fits inside a path of the list so far, say which.";
 
 // OWNER WORDING — approve before switch-on
 const COMBINE_INSTRUCTION = "The asker wants to look into several points together, as one path of their main question. The main question is "
@@ -81,12 +82,12 @@ const LIST_FORM = `${MAP_STRICT_SENTENCE}\n{ "paths": [{ "angle_id": <one angle_
   + `"why": <one sentence of about ${String(W.why)} words> }, ...] }\npaths has ${String(START_FORM_COUNTS.listPathsMin)} to `
   + `${String(L.viewpointsPerListMax)} entries.`;
 const MERGE_FORM = `${MAP_STRICT_SENTENCE}\n{ "repeats": [${REPEAT_FORM}, ...], "paths": [${PATH_FORM}, ...], "cards": [${CARD_FORM}, ...], `
-  + `"suggestions": [${SUGGESTION_FORM}, ...] }\nEvery id that is not in repeats appears in exactly one path; a path has 1 to `
-  + `${String(L.viewpointsPerPathMax)} ids, and its title and question are null only when it has one id; paths are in order, most useful `
+  + `"suggestions": [${SUGGESTION_FORM}, ...] }\nEvery id that is not in repeats appears in exactly one path; a path has 1 or more `
+  + `ids, and its title and question are null only when it has one id; paths are in order, most useful `
   + `first; cards has 0 to ${String(L.cardsMax)} entries; suggestions has 0 to ${String(L.suggestionsMax)} entries.`;
 const MERGE_LATE_FORM = `${MAP_STRICT_SENTENCE}\n{ "repeats": [${REPEAT_FORM}, ...], "paths": [${PATH_FORM}, ...], "fits": [{ "path": <number in paths>, `
   + `"into": <the path_ref of a path you were given> }, ...] }\nEvery new id that is not in repeats appears in exactly one path; a path has 1 `
-  + `to ${String(L.viewpointsPerPathMax)} ids; fits has at most one entry per path.`;
+  + `or more ids; fits has at most one entry per path.`;
 const COMBINE_FORM = `${MAP_STRICT_SENTENCE}\n{ "title": ${TITLE}, "question": ${QUESTION} }`;
 const FIT_FORM = `${MAP_STRICT_SENTENCE}\n{ "fits": <the key of one path you were given> | null }`;
 

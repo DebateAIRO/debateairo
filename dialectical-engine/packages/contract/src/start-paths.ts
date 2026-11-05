@@ -101,7 +101,8 @@ export const StartMenuPathSchema = z.object({
   path_ref: MenuPathRefSchema,
   title: words(L.titleMaxChars),
   question: words(L.questionMaxChars),
-  viewpoint_ids: z.array(ViewpointIdSchema).min(1).max(L.viewpointsPerPathMax),
+  /** The merge's group whole, whatever its size (Task 92a: the owner's merge words set none), up to every viewpoint of the menu. */
+  viewpoint_ids: z.array(ViewpointIdSchema).min(1).max(L.pathMembersMax),
   /** "put together by us · Split": the merge pre-combined these viewpoints. */
   put_together: z.boolean(),
   /** Merged in after the first menu ("new"). */
@@ -255,6 +256,21 @@ export const StartCombineMemberSchema = z.object({
   question: words(L.pathQuestionMaxChars)
 }).strict();
 export type StartCombineMember = z.infer<typeof StartCombineMemberSchema>;
+
+/**
+ * V4 start step, Task 92a (owner, 4 Nov: "of at most four" is gone from the merges): a path's members may be every viewpoint
+ * one merge is given (`pathMembersMax`), but the person's own words and a dig's picks in it stay at most 4, counted together, as
+ * every member counted against 4 before (`ownWordsAndPicksPerPathMax`). Own words: an own_text, or a combine member with no
+ * viewpoint and no pick; picks: a pick_no.
+ */
+const isOwnWordsOrPick = (member: StartPathMember | StartCombineMember): boolean =>
+  "own_text" in member || ("pick_no" in member && member.pick_no !== null) || ("viewpoint_id" in member && member.viewpoint_id === null);
+function atMostOwnWordsAndPicks(path: Readonly<{ members: readonly (StartPathMember | StartCombineMember)[] }>, ctx: z.RefinementCtx): void {
+  if (path.members.filter(isOwnWordsOrPick).length > L.ownWordsAndPicksPerPathMax) {
+    ctx.addIssue({ code: "custom", path: ["members"], message: `a path holds at most ${String(L.ownWordsAndPicksPerPathMax)} own words and picks` });
+  }
+}
+
 export const StartCombineRequestSchema = z.object({
   context: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("MENU"), question_line: z.string().trim().min(1), check_ref: StartRefSchema,
@@ -262,8 +278,8 @@ export const StartCombineRequestSchema = z.object({
     z.object({ kind: z.literal("DIG"), parent_run_id: z.uuid() }).strict()
   ]),
   reading_level: AccountReadingLevelSchema,
-  members: z.array(StartCombineMemberSchema).min(2).max(L.viewpointsPerPathMax)
-}).strict();
+  members: z.array(StartCombineMemberSchema).min(2).max(L.pathMembersMax)
+}).strict().superRefine(atMostOwnWordsAndPicks);
 export type StartCombineRequest = z.infer<typeof StartCombineRequestSchema>;
 export const StartCombineResponseSchema = z.union([
   z.object({ source: z.literal("AI"), title: words(L.pathTitleMaxChars), question: words(L.pathQuestionMaxChars), combine_ref: StartRefSchema }).strict(),
@@ -298,12 +314,13 @@ export const StartPathMemberSchema = z.union([
   z.object({ pick_no: z.number().int().min(1).max(16) }).strict()
 ]);
 export type StartPathMember = z.infer<typeof StartPathMemberSchema>;
+/** A chosen path: a merged group taken whole (up to `pathMembersMax` members), at most 4 of them own words and picks (Task 92a). */
 export const StartPathChoiceSchema = z.object({
   title: words(L.pathTitleMaxChars),
   question: words(L.pathQuestionMaxChars),
-  members: z.array(StartPathMemberSchema).min(1).max(L.viewpointsPerPathMax),
+  members: z.array(StartPathMemberSchema).min(1).max(L.pathMembersMax),
   combine_ref: StartRefSchema.optional()
-}).strict();
+}).strict().superRefine(atMostOwnWordsAndPicks);
 export type StartPathChoice = z.infer<typeof StartPathChoiceSchema>;
 
 /** The ask's chosen paths: from the signed menu (and any late lists) or from a dig's picks; at most How wide. */

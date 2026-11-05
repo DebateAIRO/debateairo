@@ -12,7 +12,7 @@ import {
 import {
   JUDGE_ANSWER_FORM, JUDGE_CLAIM_TYPE_INSTRUCTIONS, JUDGE_INSTRUCTIONS, JUDGE_INSTRUCTIONS_WITH_SOURCES, JUDGE_LEG_KINDS,
   JUDGE_PATH_ROOT_DIRECTIVE, JUDGE_PATH_ROOT_MATERIAL_FIELDS, JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS, JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
-  PATH_ROOT_DRAFT_CONTRACTS, framedJudgePromptForTest, judgeLegFrameSpec, judgeLegLengthStep, judgeLegModelRole, judgePathRootContractForReader,
+  PATH_ROOT_DRAFT_CONTRACTS, PATH_ROOT_JUDGE_INSTRUCTIONS, PATH_ROOT_JUDGE_INSTRUCTIONS_WITH_SOURCES, PATH_ROOT_NO_INVENTION_SENTENCE, framedJudgePromptForTest, judgeLegFrameSpec, judgeLegLengthStep, judgeLegModelRole, judgePathRootContractForReader,
   judgePathRootPromptContract, judgePathRootSourcesPromptContract, type JudgeLeg
 } from "@debateai/judgement";
 import { readPromptFrame } from "@debateai/providers";
@@ -42,19 +42,34 @@ describe("the four drafted contracts", () => {
     }
   });
 
-  it("each is the drafted directive, the judge's shared rules (with sources: item 5's), the claim branch and the length sentence, in the judge form", () => {
+  it("each is the drafted directive, the path root's shared rules (with sources: item 5's), the claim branch and the length sentence, in the judge form", () => {
     for (const claim of ["unknown", "resolved"] as const) {
       expect(judgePathRootPromptContract(claim)).toEqual({ contractId: `judge.path-root.${claim}.v1`,
-        instruction: [JUDGE_PATH_ROOT_DIRECTIVE, JUDGE_INSTRUCTIONS, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim], LENGTH_SENTENCE_WRITING].join(" "),
+        instruction: [JUDGE_PATH_ROOT_DIRECTIVE, PATH_ROOT_JUDGE_INSTRUCTIONS, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim], LENGTH_SENTENCE_WRITING].join(" "),
         answerForm: JUDGE_ANSWER_FORM });
       expect(judgePathRootSourcesPromptContract(claim)).toEqual({ contractId: `judge.path-root.${claim}.sources.v1`,
-        instruction: [JUDGE_PATH_ROOT_DIRECTIVE, JUDGE_INSTRUCTIONS_WITH_SOURCES, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim], LENGTH_SENTENCE_WRITING].join(" "),
+        instruction: [JUDGE_PATH_ROOT_DIRECTIVE, PATH_ROOT_JUDGE_INSTRUCTIONS_WITH_SOURCES, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim], LENGTH_SENTENCE_WRITING].join(" "),
         answerForm: JUDGE_ANSWER_FORM });
     }
   });
 
+  it("the path root writer reads the owner's sentence on sources; every other judge keeps the sealed one", () => {
+    // Task 92a: the owner's words of 4 Nov (page "AI Instructions, Batch 1"), shared by all four drafts.
+    const SEALED_SENTENCE = "Never invent evidence, citations, or sources.";
+    expect(PATH_ROOT_NO_INVENTION_SENTENCE).toBe("Never invent evidence, citations, or sources that are outside of the given text.");
+    expect(PATH_ROOT_JUDGE_INSTRUCTIONS).toBe(PATH_ROOT_NO_INVENTION_SENTENCE + JUDGE_INSTRUCTIONS.slice(SEALED_SENTENCE.length));
+    expect(PATH_ROOT_JUDGE_INSTRUCTIONS_WITH_SOURCES).toBe(PATH_ROOT_NO_INVENTION_SENTENCE + JUDGE_INSTRUCTIONS_WITH_SOURCES.slice(SEALED_SENTENCE.length));
+    for (const contract of PATH_ROOT_DRAFT_CONTRACTS) {
+      expect(contract.instruction.split(PATH_ROOT_NO_INVENTION_SENTENCE).length - 1, contract.contractId).toBe(1);
+      expect(contract.instruction, contract.contractId).not.toContain(`${SEALED_SENTENCE} `);
+    }
+    expect(JUDGE_INSTRUCTIONS.startsWith(`${SEALED_SENTENCE} `)).toBe(true);
+    expect(JUDGE_INSTRUCTIONS_WITH_SOURCES.startsWith(`${SEALED_SENTENCE} `)).toBe(true);
+  });
+
   it("awaits the owners' wording; the draft names no field, and no base instruction carries the reader sentence", () => {
-    expect(readFileSync(join(SRC, "path-root-prompts.ts"), "utf8").split("// OWNER WORDING — approve before switch-on").length - 1).toBe(1);
+    // The directive and the owner's sentence on sources, each under its own marker.
+    expect(readFileSync(join(SRC, "path-root-prompts.ts"), "utf8").split("// OWNER WORDING — approve before switch-on").length - 1).toBe(2);
     expect(JUDGE_PATH_ROOT_DIRECTIVE).not.toMatch(/[A-Za-z]+_[A-Za-z]+/u);
     for (const name of new Set([...JUDGE_PATH_ROOT_MATERIAL_FIELDS, ...JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS, "question_language"])) {
       expect(JUDGE_PATH_ROOT_DIRECTIVE, name).not.toContain(name);

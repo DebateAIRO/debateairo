@@ -65,6 +65,47 @@ describe("the five drafted contracts", () => {
     expect(START_STEP_DRAFT_CONTRACTS.merge.answerForm).toContain("cards has 0 to 3 entries; suggestions has 0 to 9 entries.");
     expect(START_STEP_DRAFT_CONTRACTS.mergeLate.answerForm).toContain("fits has at most one entry per path.");
     expect(START_STEP_DRAFT_CONTRACTS.combine.answerForm).toContain(`<about ${String(START_WORD_TARGETS.title)} words>`);
+    // Task 92a (owner, 4 Nov): the merges' words set no group size, so the forms hold none either, and never offer 54 as a target.
+    for (const name of ["merge", "mergeLate"] as const) {
+      expect(START_STEP_DRAFT_CONTRACTS[name].answerForm, name).toContain("a path has 1 or more ids");
+      expect(START_STEP_DRAFT_CONTRACTS[name].answerForm, name).not.toContain("1 to 4 ids");
+      expect(START_STEP_DRAFT_CONTRACTS[name].answerForm, name).not.toContain(String(START_STEP_LIMITS.viewpointsMax));
+    }
+  });
+
+  it("the two merges say what the owner wrote on 4 Nov, word for word", () => {
+    // The owner's words (page "AI Instructions, Batch 1", 4 Nov ~23:05), byte for byte.
+    expect(START_STEP_DRAFT_CONTRACTS.merge.instruction).toBe("Several people suggested what is worth looking into for this question; you are "
+      + "given their suggestions, each with an id. First, mark every suggestion that says the same as another in other words as a repeat of it. "
+      + "Then make the list of paths: put suggestions that clearly belong together into one path, with a short title that represents all of them "
+      + "and one question that covers them and names only what they add, without repeating the main question; keep suggestions that say different "
+      + "things apart, and when in doubt keep them apart. Order the paths most useful first for answering the main question, using what the asker "
+      + "already said about it. Then pick up to three other ways to read the question that the suggestions show and the asker may not have "
+      + "weighed, each with one sentence saying what kind of surprise it is and a path that would look into it. Last, suggest up to nine changes: "
+      + "two paths that ask almost the same thing and could be combined into one path (but you decided not to, because they do contain separate "
+      + "angles), with a short reason, or a path that fits inside another.");
+    expect(START_STEP_DRAFT_CONTRACTS.mergeLate.instruction).toBe("More suggestions arrived for this question after its list of paths was made. "
+      + "You are given the list so far, and the new suggestions, each with an id. Never change, reorder or remove a path of the list so far. Mark "
+      + "every new suggestion that says the same as a suggestion already listed, or as another new one, as a repeat of it. Put the other new "
+      + "suggestions into new paths: suggestions that clearly belong together go into one path, with a short title and one question that covers "
+      + "them and names only what they add, without repeating the main question. When a new path fits inside a path of the list so far, say which.");
+    for (const name of ["merge", "mergeLate"] as const) {
+      expect(START_STEP_DRAFT_CONTRACTS[name].instruction, name).not.toContain("at most four");
+      expect(START_STEP_DRAFT_CONTRACTS[name].instruction, name).not.toContain("who wrote which");
+    }
+    // Approved as written (the same page): the list, combine and fit drafts keep their text of 7feeba8d9.
+    expect(START_STEP_DRAFT_CONTRACTS.list.instruction).toBe("Suggest what is worth looking into before this question is investigated. You are "
+      + "given one to four angles to look from. For each angle, suggest paths that someone looking from that angle would think of and others might "
+      + "miss. A path is a short title and one question that, once looked into, helps answer the main question from its angle, with one short line "
+      + "on why it matters. Suggest three to six paths in all, each clearly different from the others. Do not answer the main question and do not "
+      + "repeat it in other words.");
+    expect(START_STEP_DRAFT_CONTRACTS.combine.instruction).toBe("The asker wants to look into several points together, as one path of their main "
+      + "question. The main question is given only so you know what the path is for: do not repeat it and do not reword it. Write one short title "
+      + "and one question that cover all the points together and name only what this path adds.");
+    expect(START_STEP_DRAFT_CONTRACTS.fit.instruction).toBe("The asker wrote their own point of view and wants it looked into. You are given the "
+      + "paths they have chosen, each with a key. Say which one path it fits inside, so it needs no path of its own, or that it fits none. Do not "
+      + "judge whether the point of view is right.");
+    expect(readFileSync(join(SRC, "start-prompts.ts"), "utf8").split("// OWNER WORDING — approve before switch-on").length - 1).toBe(5);
   });
 
   it("no file of the map package takes a value from the contract", () => {
@@ -165,11 +206,11 @@ const PRIOR: StartMenu = {
 };
 
 describe("the merge's reply", () => {
-  it("a group of five keeps four, and the fifth becomes a path of its own", () => {
+  it("a group of five stays one path of five, with its words", () => {
+    // Task 92a (owner, 4 Nov): the merge's words set no group size, so a group the AI made is taken whole, never broken up.
     const merged = startMergeSpec(CTX_EN, { said: [], viewpoints: SIX }).read(FIVE_GROUP_REPLY);
-    expect(merged.paths.map((path) => path.ids)).toEqual([["pt11", "pt12", "pt13", "pt14"], ["pt15"]]);
-    expect(merged.paths[0]).toMatchObject({ title: "The pier's whole cost" });
-    expect(merged.paths[1]).toEqual({ ids: ["pt15"], title: null, question: null });
+    expect(merged.paths).toEqual([{ ids: ["pt11", "pt12", "pt13", "pt14", "pt15"], title: "The pier's whole cost",
+      question: "What would the pier cost to build and run each year?" }]);
     expect(merged.repeats).toEqual([]);
     expect(merged.suggestions).toEqual([]);
   });

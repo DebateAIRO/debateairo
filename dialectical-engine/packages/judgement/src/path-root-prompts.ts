@@ -1,4 +1,4 @@
-import { LENGTH_SENTENCE_WRITING, READER_SENTENCE_WRITING, type ReadingLevel } from "@debateai/kernel";
+import { LENGTH_SENTENCE_WRITING, READER_SENTENCE_WRITING, TypedDomainError, type ReadingLevel } from "@debateai/kernel";
 import type { PromptContract } from "@debateai/providers";
 import { JUDGE_ANSWER_FORM, JUDGE_CLAIM_TYPE_INSTRUCTIONS, JUDGE_INSTRUCTIONS } from "./prompts.js";
 import { JUDGE_INSTRUCTIONS_WITH_SOURCES } from "./web-prompts.js";
@@ -22,6 +22,29 @@ export const JUDGE_PATH_ROOT_DIRECTIVE = "Write one claim on what this angle sho
   + "that it is an assumption. Never mention the material you were given or how the debate works, and never restate the "
   + "main question.";
 
+// OWNER WORDING — approve before switch-on (the owner's words of 4 Nov, AI instructions batch 1; Task 92 seals them).
+export const PATH_ROOT_NO_INVENTION_SENTENCE = "Never invent evidence, citations, or sources that are outside of the given text.";
+
+/** The sealed first sentence of the judge's shared rules, which the path root's own copy replaces with the owner's. */
+const JUDGE_NO_INVENTION_SENTENCE = "Never invent evidence, citations, or sources.";
+
+/**
+ * The path root's own copy of the judge's shared rules (Task 92a): `rules` with its first sentence replaced by the owner's.
+ * Derived, never retyped, so every rule after it keeps its sealed bytes; the shared rules themselves are never edited, so every
+ * other judge contract keeps its sealed text.
+ */
+function pathRootRulesOf(rules: string): string {
+  if (!rules.startsWith(`${JUDGE_NO_INVENTION_SENTENCE} `)) {
+    throw new TypedDomainError("JUDGE_NO_INVENTION_SENTENCE_MOVED", "the judge's shared rules no longer open with the sentence on inventing sources");
+  }
+  return `${PATH_ROOT_NO_INVENTION_SENTENCE}${rules.slice(JUDGE_NO_INVENTION_SENTENCE.length)}`;
+}
+
+/** JUDGE_INSTRUCTIONS (sealed, never edited) with its first sentence replaced by the owner's. */
+export const PATH_ROOT_JUDGE_INSTRUCTIONS: string = pathRootRulesOf(JUDGE_INSTRUCTIONS);
+/** The same, from JUDGE_INSTRUCTIONS_WITH_SOURCES (item 5's sentence in place of the locator sentence). */
+export const PATH_ROOT_JUDGE_INSTRUCTIONS_WITH_SOURCES: string = pathRootRulesOf(JUDGE_INSTRUCTIONS_WITH_SOURCES);
+
 /** The closed material tables: the question, the path's title and question, its viewpoints, the points raised for it, (its sources,) the length, the reader. */
 export const JUDGE_PATH_ROOT_MATERIAL_FIELDS = Object.freeze(
   ["question_line", "path_title", "path_question", "viewpoints", "points_raised", "length", "reader"] as const);
@@ -31,7 +54,7 @@ export const JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS = Object.freeze(
 export function judgePathRootPromptContract(claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS): PromptContract {
   return Object.freeze({
     contractId: `judge.path-root.${claim}.v1`,
-    instruction: [JUDGE_PATH_ROOT_DIRECTIVE, JUDGE_INSTRUCTIONS, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim], LENGTH_SENTENCE_WRITING].join(" "),
+    instruction: [JUDGE_PATH_ROOT_DIRECTIVE, PATH_ROOT_JUDGE_INSTRUCTIONS, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim], LENGTH_SENTENCE_WRITING].join(" "),
     answerForm: JUDGE_ANSWER_FORM
   });
 }
@@ -39,7 +62,7 @@ export function judgePathRootPromptContract(claim: keyof typeof JUDGE_CLAIM_TYPE
 export function judgePathRootSourcesPromptContract(claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS): PromptContract {
   return Object.freeze({
     contractId: `judge.path-root.${claim}.sources.v1`,
-    instruction: [JUDGE_PATH_ROOT_DIRECTIVE, JUDGE_INSTRUCTIONS_WITH_SOURCES, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim],
+    instruction: [JUDGE_PATH_ROOT_DIRECTIVE, PATH_ROOT_JUDGE_INSTRUCTIONS_WITH_SOURCES, JUDGE_CLAIM_TYPE_INSTRUCTIONS[claim],
       LENGTH_SENTENCE_WRITING].join(" "),
     answerForm: JUDGE_ANSWER_FORM
   });

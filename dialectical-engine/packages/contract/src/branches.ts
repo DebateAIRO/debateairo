@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { START_PATH_AUTHORS, START_PATHS_SOURCES, pathIdOf } from "@debateai/kernel";
+import { START_PATH_AUTHORS, START_PATHS_SOURCES, START_STEP_LIMITS, pathIdOf } from "@debateai/kernel";
 import { PathOutcomeSchema, PATH_OUTCOME_STATES } from "./path-outcome.js";
 import { PathIdSchema } from "./start-paths.js";
 import { PathTextSchema, TrustWordSchema } from "./web.js";
@@ -11,8 +11,11 @@ import { PathTextSchema, TrustWordSchema } from "./web.js";
  * no path took. The public snapshot keeps what a reader of a public debate may see: never the "more" list, the person's
  * point-of-view line, the carry-on box, the evidence ids or the root's node id.
  */
-export const ANSWER_BRANCH_LIMITS = Object.freeze({ pathsMax: 8, viewpointsMax: 4, moreMax: 54, alsoRaisedMax: 40, alsoRaisedMaxChars: 400,
-  titleMaxChars: 120, questionMaxChars: 1000, moreTitleMaxChars: 80, moreQuestionMaxChars: 240, nodeRefMaxChars: 160 });
+export const ANSWER_BRANCH_LIMITS = Object.freeze({ pathsMax: 8,
+  /** Every viewpoint of a path, a merged group whole (Task 92a: the owner's merge words of 4 Nov set no group size). */
+  viewpointsMax: START_STEP_LIMITS.pathMembersMax,
+  moreMax: 54, alsoRaisedMax: 40, alsoRaisedMaxChars: 400, titleMaxChars: 120, questionMaxChars: 1000, moreTitleMaxChars: 80,
+  moreQuestionMaxChars: 240, nodeRefMaxChars: 160 });
 export const BRANCH_STATES = Object.freeze(["LOOKING", "ARGUED", "FAILED"] as const);
 export type BranchState = typeof BRANCH_STATES[number];
 /** A "+ N more" item's id: more-<the menu path's ref>. */

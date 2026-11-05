@@ -11,9 +11,17 @@ export const START_STEP_LIMITS = Object.freeze({
   /** The angle planner gives up to 7 angles, at most 4 to a list. */
   anglesMax: 7, anglesPerListMax: 4,
   titleMaxChars: 80, questionMaxChars: 240, whyMaxChars: 200, angleLabelMaxChars: 80,
-  /** The menu: at most one path per viewpoint, at most 4 viewpoints to a path, 3 cards, 9 suggestions. */
-  menuPathsMax: 54, viewpointsPerPathMax: 4, cardsMax: 3,
-  cardSentenceMaxChars: 300, suggestionsMax: 9, suggestionReasonMaxChars: 200,
+  /** The menu: at most one path per viewpoint. */
+  menuPathsMax: 54,
+  /** What the person puts together on step 2: at most 4 viewpoints to a path (spec §2 item 5; the page, Task 64). Task 92c asks the owner. */
+  viewpointsPerPathMax: 4,
+  /** A path's members as the merge groups them: every suggestion one merge can be given (= viewpointsMax). Technical only: the
+   *  owner's merge words of 4 Nov set no group size, so a reply that follows them never meets it. */
+  pathMembersMax: 54,
+  /** The person's own words and a dig's picks in one path, counted together, at most 4 (every member counted against 4 before). */
+  ownWordsAndPicksPerPathMax: 4,
+  /** The menu's 3 cards and 9 suggestions. */
+  cardsMax: 3, cardSentenceMaxChars: 300, suggestionsMax: 9, suggestionReasonMaxChars: 200,
   /** Lists merged in after the first menu, and the menu's revisions (the first plus each late merge). */
   lateListsMax: 8, menuRevisionsMax: 9,
   /** Chosen paths: at most 7 (How wide's widest), 8 stored (b1..b8), Free at most 3. */

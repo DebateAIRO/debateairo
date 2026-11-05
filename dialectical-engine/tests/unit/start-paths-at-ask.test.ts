@@ -14,7 +14,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  StartListSchema, StartMenuSchema, type AskRequest, type DigPick, type SignedStartList, type SignedStartMenu, type StartList,
+  AskRequestSchema, StartListSchema, StartMenuSchema, type AskRequest, type DigPick, type SignedStartList, type SignedStartMenu, type StartList,
   type StartMenu, type StartPathChoice, type StartPaths
 } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
@@ -25,7 +25,7 @@ import {
   digPathTitleOf, storedSetOf, verifyStartCheckAtAsk, verifyStartPathsAtAsk
 } from "../../apps/api/src/start-paths-at-ask.js";
 import {
-  newStartStepKey, signStartCheck, signStartCombine, signStartList, signStartMenu, startMembersHash
+  newStartStepKey, signStartCheck, signStartCombine, signStartList, signStartMenu, startMembersHash, type StartStepKey
 } from "../../apps/api/src/start-step/signing.js";
 
 const KEY = newStartStepKey();
@@ -451,6 +451,62 @@ describe("verifyStartPathsAtAsk: the paths signed at Next, read back at Start (s
     const v = verify(ask({ carry_on_to_report: true }));
     expect(storedSetOf("run-1", v)).toEqual({ runId: "run-1", source: "MENU", width: 5, chosenBy: "PERSON", carryOnToReport: true,
       paths: v.paths, menu: v.menu });
+  });
+});
+
+/*
+ * Task 92a (owner, 4 Nov): "of at most four" is gone from the merges, so the menu may hold a path the AIs put together of five
+ * or more, and Start takes it whole. Task 33's author rules hold unchanged whatever the size; only the person's own words and a
+ * dig's picks stay at most 4 in a path, which the contract refuses before the verifier reads any reference.
+ */
+describe("a merged path of any size, at Start (Task 92a)", () => {
+  const SIX_IDS = ["pt11", "pt12", "pt13", "pt14", "pt21", "pt22"];
+  const SIX_WORDS = { title: "Costs, supply and designs", question: "What would new plants cost, and could Romania build and supply them on time?" };
+  /** The nuclear menu with kp01 holding six viewpoints the merge put together (built here, so only these cases see it). */
+  const sixMenu = (): StartMenu => ({ ...MENU, paths: [menuPath("kp01", SIX_WORDS.title, SIX_WORDS.question, SIX_IDS),
+    menuPath("kp02", PT23.title, PT23.question, ["pt23"]), menuPath("kp03", PT24.title, PT24.question, ["pt24"])] });
+  /** A Start of one path from `menu`, its check and its menu signed for the reading of Q. */
+  const askOf = (path: StartPathChoice, chosenBy: "PERSON" | "AIS" = "PERSON", menu: StartMenu = sixMenu()): AskRequest =>
+    baseAsk({ start_check: { ref: checkRef() }, start_paths: { source: "MENU", menu: signedMenu({}, menu), paths: [path], width: 3, chosen_by: chosenBy } });
+  /** As the route does: the body parsed with AskRequestSchema first, then the verifier, whose every reference check reads the key. */
+  const atRoute = (body: unknown, key: StartStepKey = KEY) => {
+    const parsed = AskRequestSchema.safeParse(body);
+    if (!parsed.success) return { refused: parsed.error.issues.map((issue) => issue.message) } as const;
+    return { verified: verify(parsed.data, { key }) } as const;
+  };
+  const verifiedOf = (result: ReturnType<typeof atRoute>) => {
+    if ("refused" in result) throw new Error(`refused before the verifier: ${result.refused.join("; ")}`);
+    return result.verified;
+  };
+  const SIX: StartPathChoice = { ...SIX_WORDS, members: SIX_IDS.map((viewpoint_id) => ({ viewpoint_id })) };
+
+  it("a merged path of six is taken whole: the AI's suggestion, also when the AIs choose", () => {
+    const byPerson = verifiedOf(atRoute(askOf(SIX)));
+    expect(byPerson.paths[0]).toMatchObject({ pathId: "b1", author: "AI_SUGGESTION", ...SIX_WORDS, ownWords: [] });
+    expect(byPerson.paths[0]!.viewpoints.map((one) => one.viewpointId)).toEqual(SIX_IDS);
+    expect(verifiedOf(atRoute(askOf(SIX, "AIS")))).toMatchObject({ chosenBy: "AIS", paths: [{ author: "AI_SUGGESTION" }] });
+    expect(StartMenuSchema.safeParse(sixMenu()).error?.issues ?? []).toEqual([]);
+  });
+
+  it("one taken out of six leaves five, the person's edit", () => {
+    const five = verifiedOf(atRoute(askOf({ ...SIX, members: SIX.members.slice(0, 5) })));
+    expect(five.paths[0]).toMatchObject({ author: "PERSON_EDITED", ownWords: [SIX_WORDS.title, SIX_WORDS.question] });
+    expect(five.paths[0]!.viewpoints.map((one) => one.viewpointId)).toEqual(SIX_IDS.slice(0, 5));
+    // Not the AIs' suggestion as written, so a set the AIs chose cannot carry it (Task 33's rule, unchanged).
+    expect(codeOf(() => verifiedOf(atRoute(askOf({ ...SIX, members: SIX.members.slice(0, 5) }, "AIS"))))).toBe("START_PATHS_INVALID");
+  });
+
+  it("a fifth own word in a path is refused before any reference is read", () => {
+    const refReads = vi.fn();
+    const watched: StartStepKey = { get bytes() { refReads(); return KEY.bytes; } };
+    // Not vacuous: a legal Start (the nuclear menu as built) reads its references through the key.
+    expect("verified" in atRoute(askOf(P_KP01, "PERSON", MENU), watched)).toBe(true);
+    expect(refReads).toHaveBeenCalled();
+    refReads.mockClear();
+    const fifth: StartPathChoice = { title: "My worries", question: "What do my own worries about new plants add?",
+      members: Array.from({ length: 5 }, (_, at) => ({ own_text: `My own worry number ${String(at + 1)}.` })) };
+    expect(atRoute(askOf(fifth, "PERSON", MENU), watched)).toEqual({ refused: ["a path holds at most 4 own words and picks"] });
+    expect(refReads).not.toHaveBeenCalled();
   });
 });
 

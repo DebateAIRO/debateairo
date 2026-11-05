@@ -467,6 +467,27 @@ describe("the material", () => {
     expect(outcome.rests_on).toEqual(["h2", "h5"]);
   });
 
+  it("a path of 50 viewpoints and 4 own words in a 3-byte script stays within the end-of-debate body limit", async () => {
+    // Task 92a (a merged path of any size): the largest path above, holding 50 of the menu's viewpoints at their limits and the
+    // person's 4 own words of 1000 characters, all in "中"; every body sent, the writer's and the checker's, stays at or under the line.
+    const CJK = "中";
+    const merged = pathOf(1, { ...HUGE, viewpoints: Array.from({ length: 50 }, () => `${CJK.repeat(80)}: ${CJK.repeat(240)}`),
+      ownWords: Array.from({ length: 4 }, () => CJK.repeat(1000)) });
+    const big = { line: long("The second pier helps at rush hour.", 300), fate: "PARTLY_HELD",
+      summary: long("The queues at rush hour are real, but winter ridership falls by half.", 3900),
+      what_changed: [1, 2, 3].map(() => ({ text: long("The arguing showed that winter ridership falls by half in the town.", 950), rests_on: ["P3", "P6"] })),
+      view: VIEW };
+    const problem = JSON.stringify({ satisfied: false, problem: long("The summary calls the winter figure settled, but a point still disputes it.", 3900),
+      part: "summary" });
+    const { gateway, sent, requests } = team(() => JSON.stringify(big), () => problem);
+    const outcome = await runPathOutcomeFor(jobOf({ gateway, store: memoryStore().store, paths: [merged], readingLevel: "plain" }), "b1");
+    expect(requests.map((request) => request.callSiteKey)).toEqual([
+      "PATH_OUTCOME:WRITER:1:1", "PATH_OUTCOME:CHECKER:1:1", "PATH_OUTCOME:WRITER:1:2", "PATH_OUTCOME:CHECKER:1:2"]);
+    expect(outcome.state).toBe("READY_WITH_RESERVATION");
+    expect(JSON.parse(fieldsOf(requests[0]!.packet).get("viewpoints")!)).toHaveLength(50);
+    for (const one of sent) expect(pathRewriteBodyBytes(one.packet), one.key).toBeLessThanOrEqual(LINE);
+  });
+
   // Task 49 review (Review Focus 5): the 100K line is kept by code, not only by the ladder's room. Neither case below was exercised:
   // with the guard and the too-large refusal both taken out, every test above still passed.
   it("a path over the line on every step: FAILED with no call, stored, and logged as too large", async () => {

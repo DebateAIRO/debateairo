@@ -40,7 +40,7 @@ export type StartSpecContext = MapSpecContext & Readonly<{
 const text = (max: number) => z.string().trim().min(1).max(max);
 const PathNumberSchema = z.number().int().min(1);
 const RepeatSchema = z.object({ id: z.string(), same_as: z.string() }).strict();
-const GroupSchema = z.object({ ids: z.array(z.string()).min(1).max(L.viewpointsPerPathMax), title: text(L.titleMaxChars).nullable(),
+const GroupSchema = z.object({ ids: z.array(z.string()).min(1).max(L.pathMembersMax), title: text(L.titleMaxChars).nullable(),
   question: text(L.questionMaxChars).nullable() }).strict();
 
 export const startListReplySchema = z.object({
@@ -157,9 +157,11 @@ function repeatsOf(repeats: readonly StartRepeat[], ids: ReadonlySet<string>, ta
 }
 
 /**
- * The paths, kept: each id one the call was given, not a repeat, used once; a path left with no id is left out; past four ids the rest become
- * paths of one; a group's words that break a rule are null (the first viewpoint's words stand); a path of one has none. `numbers` maps a path's
- * number in the reply (from 1) to its number in the result.
+ * The paths, kept: each id one the call was given, not a repeat, used once; a path left with no id is left out; a group is kept whole, whatever
+ * its size (Task 92a: the owner's merge words of 4 Nov set none); a group's words that break a rule are null (the first viewpoint's words
+ * stand); a path of one has none. Past `pathMembersMax` ids the rest would become paths of one, but that is never reached: a group holds only
+ * ids the call was given, once each, and a call is given at most that many. `numbers` maps a path's number in the reply (from 1) to its
+ * number in the result.
  */
 function groupsOf(groups: readonly z.infer<typeof GroupShape>[], ids: ReadonlySet<string>, repeated: ReadonlySet<string>, done: Repairs):
   Readonly<{ paths: StartGroup[]; numbers: ReadonlyMap<number, number> }> {
@@ -174,12 +176,12 @@ function groupsOf(groups: readonly z.infer<typeof GroupShape>[], ids: ReadonlySe
     });
     if (kept.length !== group.ids.length || kept.length === 0) done.dropped = true;
     if (kept.length === 0) return;
-    const head = kept.slice(0, L.viewpointsPerPathMax);
+    const head = kept.slice(0, L.pathMembersMax);
     const words = head.length > 1 && clean(group.title, L.titleMaxChars) && clean(group.question, L.questionMaxChars);
     if (!words && (group.title !== null || group.question !== null)) done.dropped = true;
     paths.push(Object.freeze({ ids: Object.freeze(head), title: words ? group.title!.trim() : null, question: words ? group.question!.trim() : null }));
     numbers.set(at + 1, paths.length);
-    for (const id of kept.slice(L.viewpointsPerPathMax)) {
+    for (const id of kept.slice(L.pathMembersMax)) {
       done.dropped = true;
       paths.push(Object.freeze({ ids: Object.freeze([id]), title: null, question: null }));
     }
@@ -436,10 +438,13 @@ const combineCheck = (mainQuestion: string, languageTag: string, expected: Reply
 const fitCheck = (keys: ReadonlySet<string>): MapReplyCheck<StartFitReply> => (reply) =>
   reply.fits !== null && !keys.has(reply.fits) ? [issue(["fits"], "START_FIT_UNKNOWN_KEY")] : [];
 
-/** The combine: the main question (only so the writer knows what the path is for), the points the person put together. */
+/**
+ * The combine: the main question (only so the writer knows what the path is for), the points the person put together, 2 to `pathMembersMax`
+ * (Task 92a: a merged path of six with one taken out is written again whole, as the words rule says).
+ */
 export function startCombineSpec(ctx: StartSpecContext, members: readonly Readonly<{ title: string | null; question: string }>[]):
   MapStepSpec<StartCombineReply> {
-  if (members.length < 2 || members.length > L.viewpointsPerPathMax) throw refused("START_COMBINE_INVALID", "a combine is given 2 to 4 points");
+  if (members.length < 2 || members.length > L.pathMembersMax) throw refused("START_COMBINE_INVALID", "a combine is given 2 to 54 points");
   return startSpecOf("START_COMBINE", ctx, "combine", [field("main_question", ctx.questionLine),
     field("points", members.map((member) => ({ title: member.title, question: member.question })))],
   startCombineReplySchema as z.ZodType<StartCombineReply>, combineCheck(ctx.questionLine, ctx.languageTag, ctx.replyLanguage),

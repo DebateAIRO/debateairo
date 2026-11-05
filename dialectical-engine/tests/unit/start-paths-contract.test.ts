@@ -3,8 +3,8 @@
  * strict; a list never names its maker or model; a menu holds every viewpoint once (shown in exactly one path, or kept
  * as the words of a repeat), so every list is sealed whole; the chosen paths fit How wide and name only what their
  * source allows. The largest legal ask body (every limit at once, in a 3-byte script: 54 viewpoints across the menu and
- * the late lists, 7 paths of 4 own-words members, the question and both originals at their limits) stays under the
- * route's limit.
+ * the late lists, all of them members too since Task 92a, 7 paths of 4 own-words members, the question and both
+ * originals at their limits) stays under the route's limit.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -46,7 +46,11 @@ const PATHS = { source: "MENU", menu: { menu: MENU1, ref: REF }, width: 3, chose
   paths: [{ title: "Whole-system costs", question: "What does the whole system cost?", members: [{ viewpoint_id: "pt11" }] }] };
 const lateList = (listNo: number) => ({ list: { ...LIST, list_no: listNo, viewpoints: [viewpoint(listNo, 1)] }, ref: REF });
 
-/** Every limit at once: a full menu, every late list, 7 chosen paths of 4 own-words members, in `fill`'s script. */
+/**
+ * Every limit at once: a full menu, every late list, 7 chosen paths of 4 own-words members each, in `fill`'s script. Since
+ * Task 92a (a merged path of any size) all 54 viewpoints are members too: b1 takes the first 50 beside its own words (54
+ * members), b2 the other 4.
+ */
 function worstCaseAskBody(fill: string): Record<string, unknown> {
   const longRef = `${"A".repeat(300)}.${"B".repeat(49)}`;
   const menu = menuOf(30, 0, fill);
@@ -65,6 +69,10 @@ function worstCaseAskBody(fill: string): Record<string, unknown> {
       label: fill.repeat(START_STEP_LIMITS.angleLabelMaxChars) })),
     viewpoints: Array.from({ length: START_STEP_LIMITS.viewpointsPerListMax }, (__, item) => viewpoint(6 + index, item + 1, fill)) } }));
   const own = fill.repeat(START_STEP_LIMITS.ownTextMaxChars);
+  const everyViewpoint = [...fullMenu.viewpoints.map((one) => one.viewpoint_id), ...late.flatMap((one) => one.list.viewpoints.map((item) => item.viewpoint_id))];
+  if (everyViewpoint.length !== START_STEP_LIMITS.viewpointsMax) throw new Error("worst case does not hold every viewpoint");
+  const viewpointsOf = (index: number) => (index === 0 ? everyViewpoint.slice(0, 50) : index === 1 ? everyViewpoint.slice(50) : [])
+    .map((viewpoint_id) => ({ viewpoint_id }));
   const body = {
     // The question at its byte limit (askQuestionMaxBytes, 8,192), the two originals at their 8,192 characters.
     question_line: fill.repeat(Math.floor(askQuestionMaxBytes() / Buffer.byteLength(fill, "utf8"))),
@@ -72,9 +80,10 @@ function worstCaseAskBody(fill: string): Record<string, unknown> {
     start_paths: {
       source: "MENU", menu: { menu: fullMenu, ref: longRef }, late_lists: late, width: START_STEP_LIMITS.pathsMax, chosen_by: "PERSON",
       question_swap: { card_id: "cd1", original_question_line: fill.repeat(8192) },
-      paths: Array.from({ length: START_STEP_LIMITS.pathsMax }, () => ({ title: fill.repeat(START_STEP_LIMITS.pathTitleMaxChars),
+      paths: Array.from({ length: START_STEP_LIMITS.pathsMax }, (_, index) => ({ title: fill.repeat(START_STEP_LIMITS.pathTitleMaxChars),
         question: fill.repeat(START_STEP_LIMITS.pathQuestionMaxChars),
-        members: Array.from({ length: START_STEP_LIMITS.viewpointsPerPathMax }, () => ({ own_text: own })), combine_ref: longRef }))
+        members: [...viewpointsOf(index), ...Array.from({ length: START_STEP_LIMITS.ownWordsAndPicksPerPathMax }, () => ({ own_text: own }))],
+        combine_ref: longRef }))
     }
   };
   const parsed = StartPathsSchema.safeParse(body.start_paths);
@@ -85,7 +94,8 @@ function worstCaseAskBody(fill: string): Record<string, unknown> {
 describe("the start step's limits and ids", () => {
   it("pins every limit, frozen", () => {
     expect(START_STEP_LIMITS).toEqual({ listsMax: 9, viewpointsPerListMax: 6, viewpointsMax: 54, anglesMax: 7, anglesPerListMax: 4,
-      titleMaxChars: 80, questionMaxChars: 240, whyMaxChars: 200, angleLabelMaxChars: 80, menuPathsMax: 54, viewpointsPerPathMax: 4, cardsMax: 3,
+      titleMaxChars: 80, questionMaxChars: 240, whyMaxChars: 200, angleLabelMaxChars: 80, menuPathsMax: 54, viewpointsPerPathMax: 4,
+      pathMembersMax: 54, ownWordsAndPicksPerPathMax: 4, cardsMax: 3,
       cardSentenceMaxChars: 300, suggestionsMax: 9, suggestionReasonMaxChars: 200, lateListsMax: 8, menuRevisionsMax: 9, pathsMax: 7, storedPathsMax: 8,
       freePathsMax: 3, pathTitleMaxChars: 120, pathQuestionMaxChars: 1000, ownTextMaxChars: 1000, refMaxChars: 4096, askBodyMaxBytes: 393_216 });
     expect(Object.isFrozen(START_STEP_LIMITS)).toBe(true);
