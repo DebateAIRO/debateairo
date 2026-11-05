@@ -15,7 +15,10 @@ import type { ReadingLevel } from "@/lib/v4/types";
  * "All my maps" view lists them further back, with "Show more". No counts anywhere. Nothing moves except the one slow
  * pulse of a map being looked into (none with reduced motion).
  * The reading-level ruling (owner, 5 Nov): a debate keeps the level it was asked at, so no link here carries a level; the
- * level props are accepted and unused.
+ * level props are accepted and unused. Until the run read names the debate's own level (the server field), the map still
+ * shows and digs at the account's level, which it reads itself: the same level these links carried before (the ask page
+ * and All my maps held only the account's level). A debate's own links (its map and report, its digs) keep `?level=` until
+ * that field lands (the report page's rule on its sibling branch), so a round trip never leans on the account.
  */
 
 /** The ask page's shelf: this many questions. */

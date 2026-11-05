@@ -39,10 +39,17 @@ describe("English dates: day first", () => {
     }
   });
 
-  it("writes a date more than five weeks old day first in the classic home list", () => {
-    expect(relativeTime("2020-10-20T12:00:00.000Z", undefined, "en")).toBe("20/10/2020");
-    expect(relativeTime("2020-10-20T12:00:00.000Z", undefined, "en-US")).toBe("20/10/2020");
+  it("writes a date more than five weeks old day first, in words, in the classic home list", () => {
+    // In words ("20 Oct 2020"), never all in numbers: "05/11/2026" reads as May 11 to a reader of United States English
+    // (the wave-4 checks, 5 Nov). Every other language keeps its own form.
+    expect(relativeTime("2020-10-20T12:00:00.000Z", undefined, "en")).toBe("20 Oct 2020");
+    expect(relativeTime("2020-10-20T12:00:00.000Z", undefined, "en-US")).toBe("20 Oct 2020");
+    expect(relativeTime("2020-10-20T12:00:00.000Z", undefined, "en-GB")).toBe("20 Oct 2020");
+    for (const locale of ["ro", "de", "fr"]) {
+      expect(relativeTime("2020-10-20T12:00:00.000Z", undefined, locale)).toBe(new Intl.DateTimeFormat(locale).format(new Date("2020-10-20T12:00:00.000Z")));
+    }
   });
+
 });
 
 describe("English times: the 24-hour clock", () => {

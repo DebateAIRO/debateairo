@@ -24,8 +24,13 @@ import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, LIVE_STEPS_NO_WEB, LIVE_STEPS_WEB } from "../../tools/v4-mock-api/live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS } from "../../tools/v4-mock-api/climb-seed.js";
 import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "../../tools/v4-mock-api/failed-seed.js";
+import { windowsForPlan } from "../../tools/v4-mock-api/plan-windows.js";
 import { RUN_FAILURE_KINDS, runFailureKind } from "../../apps/ui/lib/v3/runFailure.js";
 import { failedQuotaKey } from "../../apps/ui/lib/v4/failedRun.js";
+import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
+import { digRetryOf, rebuildDigTarget, sameDig } from "../../apps/ui/lib/v4/digRetry.js";
+import { buildV4Map, findOpenQuestion, findPath } from "../../apps/ui/lib/v4/mapModel.js";
+import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
 import { parseDigProgress } from "../../apps/ui/lib/v4/digProgress.js";
 import { belowStateOf, type BelowDig } from "../../apps/ui/lib/v4/digsBelow.js";
 
@@ -400,7 +405,7 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(FAILED_DIGS.map((dig) => dig.kind).sort()).toEqual([...RUN_FAILURE_KINDS].sort());
     for (const dig of FAILED_DIGS) {
       expect(runFailureKind(dig.reason), dig.runRef).toBe(dig.kind);
-      expect(dig.place, dig.runRef).toMatch(/^path:n-(?:mix|renew|nuclear|smr)$/u);
+      expect(dig.place, dig.runRef).toMatch(/^(?:path:n-(?:mix|renew|nuclear|smr)|p:n-renew-storage|o:0|w)$/u);
       expect(DraftRunQuotaUsedSchema.safeParse(dig.quotaUsed).success, dig.runRef).toBe(true);
       // Each dig's own line is in the catalogue (the page never shows the code).
       expect(catalog[`v4.digFailed.reason.${dig.kind}`], dig.kind).toBeTruthy();
@@ -424,6 +429,46 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(failedQuotaKey({ run_ref: RUN_FAILED_SOME.runRef, question_line: RUN_FAILED_SOME.question, state: "FAILED",
       terminal_reason: RUN_FAILED_SOME.reason, hold_until: null, quota_used: "SOME" } as never, false)).toBe("v4.debate.failedSomeTaken");
     expect(catalog["v4.debate.failedSomeTaken"]).toBeTruthy();
+  });
+
+  it("the 5 Nov seed (wave-4 browser check): each failed dig digs its own place, asked as the website asks it, so its panel offers a retry", () => {
+    const parent = FAILED_DIGS_PARENT;
+    const answer = seed.answer({ answerId: parent.answerId, runRef: parent.runRef, question: parent.question, askedAt: parent.askedAt, servedAt: parent.settledAt, web: "PAID" });
+    const map = buildV4Map({ runId: parent.runRef, answer, story: seed.story(parent.answerId, "READY", parent.settledAt) });
+    // As the map reads a recorded dig: its places, and the map's own words at them (lib/v4/accountMemory.ts linkOfRecord).
+    const textAt = (place: string): string | undefined =>
+      place.startsWith("path:") ? findPath(map, place.slice("path:".length))?.line : findOpenQuestion(map, place)?.text;
+    const views: DigView[] = FAILED_DIGS.map((dig) => {
+      const link: DigLink = {
+        parentRunId: parent.runRef, childRunId: dig.runRef, openQuestionIds: [dig.place], questions: [textAt(dig.place)!], mode: dig.mode, startedAt: dig.askedAt
+      };
+      expect(link.questions[0], dig.runRef).toBeTruthy();
+      return { link, state: "FAILED", headline: null, counts: null, terminalReason: dig.reason, questionLine: dig.question };
+    });
+    for (const view of views) {
+      const target = rebuildDigTarget(view.link, map);
+      expect(target, view.link.childRunId).not.toBeNull();
+      // Word for word what the website sends for that dig, so the page offers it again (lib/v4/useFailedDigs.ts).
+      expect(digQuestion(target!, parent.question, catalog, "en"), view.link.childRunId).toBe(view.questionLine);
+      const retry = digRetryOf(view, views, map, null, (rebuilt) => digQuestion(rebuilt, parent.question, catalog, "en") === view.questionLine);
+      expect(retry.kind, view.link.childRunId).toBe("OFFER");
+    }
+    // No two are the same dig, so none reads as one dig that failed twice ("This keeps failing").
+    expect(views.flatMap((a, i) => views.slice(i + 1).filter((b) => sameDig(a.link, b.link)).map((b) => [a.link.childRunId, b.link.childRunId]))).toEqual([]);
+    // Four whole paths and three open questions, each dug once.
+    expect(new Set(FAILED_DIGS.map((dig) => dig.place)).size).toBe(FAILED_DIGS.length);
+  });
+
+  it("the usage read names only the windows the plan counts: Free the month alone, a paid plan its day, week and month", () => {
+    // The wave-4 browser check (5 Nov): a Free person's circle opened three bars on the stand-in.
+    const all = [{ scope: "PERSON_DAY", percent: 14 }, { scope: "PERSON_WEEK", percent: 31 }, { scope: "PERSON_MONTH", percent: 9 }] as const;
+    expect(windowsForPlan("FREE", all).map((window) => window.scope)).toEqual(["PERSON_MONTH"]);
+    for (const plan of ["PLUS", "PRO", "MAX"]) expect(windowsForPlan(plan, all).map((window) => window.scope)).toEqual(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+    // Each read still passes the contract's own shape.
+    for (const plan of ["FREE", "PLUS"]) {
+      const read = { plan_id: plan, windows: windowsForPlan(plan, all.map((window) => ({ ...window, resets_at: "2026-12-01T00:00:00.000Z" }))) };
+      expect(BillingUsageResponseSchema.safeParse(read).success, plan).toBe(true);
+    }
   });
 
   it("the quota's windows (owner's screen review, 3 Nov): share_scope and question_share pass their draft schemas and fall back", () => {

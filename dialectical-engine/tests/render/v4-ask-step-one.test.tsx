@@ -368,7 +368,8 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     const dig = shelf.querySelector<HTMLAnchorElement>(".v4ShelfDig")!;
     expect(dig.closest(".v4ShelfItem")?.querySelector(".v4ShelfQuestion")?.textContent).toBe("Should countries build new nuclear power?");
     expect(dig.querySelector(".v4ShelfDigText")?.textContent).toBe("Dig: Batteries can cover multi-day lulls.");
-    // The reading-level ruling (5 Nov): a map keeps the level it was asked at, so no shelf link carries one.
+    // The reading-level ruling (5 Nov): links carry no level; the map still uses the account's level until the run read
+    // names the debate's own level (the server field), as it did when these links carried the account's level.
     expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}`);
     expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}`);
     expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all");

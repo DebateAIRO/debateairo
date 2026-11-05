@@ -544,7 +544,9 @@ describe("W4-6: dig cards and rewritten paths", () => {
     expect(noteOf(tree(buildMap(), "root", { digs: [] }), ".v4MapBranch")).toBeNull();
     for (const [rewrite, expected] of [
       [writing, t(catalog, "v4.rewrite.state.WRITING")],
-      [rewritten(true), t(catalog, "v4.rewrite.rewrittenOnce", { date: "30 Oct 2026" })], // day first on English pages (question 5)
+      // Day first on English pages (question 5). TEMPORARY short form: question 4 A gives "Rewritten after a dig on …" the
+      // long form with the year ("30 October 2026"), which comes with the map's dates item (V4PathRewrite, coordinated).
+      [rewritten(true), t(catalog, "v4.rewrite.rewrittenOnce", { date: "30 Oct 2026" })],
       [rewritten(false), t(catalog, "v4.rewrite.state.NO_CHANGE")],
       [{ ...writing, state: "FAILED", failed_at: "2026-10-30T09:20:00.000Z" } as PathRewrite, t(catalog, "v4.rewrite.card.FAILED")]
     ] as const) {

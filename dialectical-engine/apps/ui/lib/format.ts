@@ -1,4 +1,11 @@
-import { formatDate, t, tPlural, type MessageCatalog } from "./i18n/translate.js";
+import { dateLocale, formatDate, t, tPlural, type MessageCatalog } from "./i18n/translate.js";
+
+/**
+ * An English date older than five weeks is written in words ("20 Oct 2020"), never all in numbers: since English pages
+ * write the day first (owner's answer to question 5, 5 Nov 2026), "05/11/2026" would read as May 11 to a reader of United
+ * States English. Every other language keeps its own short form.
+ */
+const ENGLISH_OLDER_DATE: Intl.DateTimeFormatOptions = Object.freeze({ dateStyle: "medium" });
 
 export function relativeTime(
   input: string | null | undefined,
@@ -20,7 +27,7 @@ export function relativeTime(
   if (day < 7) return tPlural(catalog, "time.days", day, locale);
   const week = Math.round(day / 7);
   if (week < 5) return tPlural(catalog, "time.weeks", week, locale);
-  return formatDate(locale, input);
+  return formatDate(locale, input, dateLocale(locale) === dateLocale("en") ? ENGLISH_OLDER_DATE : undefined);
 }
 
 export function statusLabel(status: string, catalog?: MessageCatalog): string {

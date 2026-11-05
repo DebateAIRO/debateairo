@@ -14,7 +14,8 @@ import { setPathname } from "next/navigation";
  *               "Light or dark", "Settings", "Sign out". Signed out: "Sign in" in place of the round button.
  *   ask-f5      only one header row on the V4 pages: the site's old top bar steps back there.
  *   journey-f19 / ask-f6  "Open in the classic view" moves into the account menu, once; the header shows no classic link.
- *               Question 12 B (5 Nov): the menu shows it whenever the page gives its classic address.
+ *               The menu shows it whenever the page gives its classic address. Question 12 B (5 Nov: in the menu only)
+ *               is not done on the map yet: its waiting, paused and failed screens still show it in their body.
  *   The reading-level ruling (5 Nov): the menu's links and its way back carry no level, whatever the page hands it.
  */
 const server = vi.hoisted(() => ({
@@ -177,14 +178,14 @@ describe("ask-d6 A: the round account button", () => {
     expect(document.querySelectorAll("[data-v4-menu=classic]")).toHaveLength(1);
   });
 
-  it("a page with no classic view passes none, so the menu has no classic item", async () => {
+  it("a page that shows the classic view elsewhere (or has none) passes none, so the menu has no classic item", async () => {
     await mount(header({ classicHref: null }));
     await openMenu();
     expect(items().map((item) => item.textContent)).not.toContain(CATALOG["v4.common.classicView"]);
     expect(items()).toHaveLength(5);
   });
 
-  it("question 12 B (5 Nov): given a classic address, the menu itself shows 'Open in the classic view' to it, just above Sign out", async () => {
+  it("given a classic address, the menu shows 'Open in the classic view' to it once, just above Sign out (what question 12 B builds on)", async () => {
     // The account menu alone, as any page's header holds it (the map, its waiting, paused and failed screens, the report).
     for (const classicHref of ["/debate/11111111-1111-4111-8111-111111111111", "/debate/22222222-2222-4222-8222-222222222222"]) {
       await mount(<V4AccountMenu catalog={CATALOG} classicHref={classicHref} session="IN" />);

@@ -157,7 +157,9 @@ describe("sources under a point (V4SourceList)", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer nofollow");
     expect(item.querySelector(".v4SourceSite")!.textContent).toBe("grid-costs.example");
     expect(item.querySelector("time")!.getAttribute("dateTime")).toBe("2025-06-12");
-    expect(item.querySelector("time")!.textContent).toBe("12 Jun 2025"); // day first on English pages (question 5)
+    // Day first on English pages (question 5). TEMPORARY short form: question 4 A gives a point's evidence date the long form
+    // with the year ("12 June 2025"), which comes with the map's dates item (V4Sources, coordinated).
+    expect(item.querySelector("time")!.textContent).toBe("12 Jun 2025");
   });
 
   it("marks preview-only and abstract-only pages, and a page fewer AIs read, and nothing on a whole page", () => {

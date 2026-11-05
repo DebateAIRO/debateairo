@@ -18,7 +18,10 @@ import { allMapsHref } from "./V4MapShelf";
  *     (the owner's answer to question 13, 5 Nov: C, ask-d6's own word; it opens ask-d5 B's "All my maps"), "Language",
  *     "Light or dark", "Settings", then "Sign out". Signed out: "Sign in" in its place, with the way back to this page.
  *   - journey-f19 / ask-f6: "Open in the classic view" lives in this menu, once, just above "Sign out", whenever the page
- *     gives its classic address (question 12 B, 5 Nov: in the account menu only).
+ *     gives its classic address. Question 12 B (5 Nov: in the account menu only, the small links go) is not done yet on the
+ *     map: its waiting, paused and failed screens still show the link in their body and pass none here, until the map's
+ *     header is given the classic address on them (the start-step session's V4DebateClient wiring); then those screens
+ *     drop their link.
  *   - The reading-level ruling (5 Nov): no link here carries a level; the level prop is accepted and unused.
  * Nothing is kept in the browser here: the language and the mode are the site's own existing choices (the language cookie,
  * the mode preference), changed the way the old top bar changed them.

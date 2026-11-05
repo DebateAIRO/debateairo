@@ -11,9 +11,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *  - The reading level is chosen only when asking and is kept for that debate, its digs and its report: no level menu and
  *    no "Plain words" label in any header (the V4 header, the report's header, All my maps), All my maps no longer reads
  *    the account's level, and no link of the header, the account menu, the shelf or All my maps carries a level.
- *  - Question 15 A with 18 A: on a phone the header is one row: the brand's mark (its name hidden on screen but still the
- *    link's name), the quota circle, the round account button. jsdom draws no layout, so the row's rules are read from
- *    the stylesheet here, and the browser check at 320 and 375 px looks at the row itself.
+ *  - Question 15 (with its follow-ups): on a phone the header is one row: the brand's mark (its name hidden on screen but
+ *    still the link's name), the quota circle, the round account button. jsdom draws no layout, so the row's rules are read
+ *    from the stylesheet here, and the browser check at 320 and 375 px looks at the row itself.
+ *  - Not built here: question 18 A and the second follow-up (on a phone the top bar drops "Write my report" or "See my
+ *    report" whenever the bottom bar shows it). The map's report item is the start-step session's (V4DebateClient,
+ *    V4BottomStack); until it lands a phone at a good moment still shows the map's report button in this row too.
+ *  - Not built here either: the ask page's level choice for every question (V4AskClient, the start-step session's). Until
+ *    it lands, a person whose account already holds a level is offered no level choice anywhere.
  */
 const LEVEL_WORDS = /Plain words|Some background|Expert|How much detail/u;
 const server = vi.hoisted(() => ({ levelReads: 0, levelSaves: 0 }));
@@ -91,7 +96,8 @@ describe("the reading-level ruling (5 Nov): no level in any header, and no link 
       <V4Header catalog={CATALOG} readingLevel="expert" linkLevel="expert" onReadingLevel={(level) => chosen.push(level)} session="IN" />
     );
     const header = page.querySelector("header.v4Hdr")!;
-    expect(header.querySelector("[class*='v4HdrLevel']")).toBeNull();
+    // Its only controls are the circle and the round account button: no level menu or label of any kind.
+    expect([...header.querySelectorAll("button")].map((button) => button.className)).toEqual(["v4HdrQuotaCircle", "v4HdrAccountButton"]);
     expect(header.textContent).not.toMatch(LEVEL_WORDS);
     expect([...header.querySelectorAll("[aria-label]")].map((node) => node.getAttribute("aria-label")).join(" ")).not.toMatch(LEVEL_WORDS);
     // The row holds the quota circle and the round account button, nothing else.
@@ -123,7 +129,8 @@ describe("the reading-level ruling (5 Nov): no level in any header, and no link 
     expect(page.querySelector(".v4ShelfCard")).not.toBeNull();
     expect(server.levelReads).toBe(0);
     expect(server.levelSaves).toBe(0);
-    expect(page.querySelector("header.v4Hdr [class*='v4HdrLevel']")).toBeNull();
+    // Its header's only control is the round account button: no level menu or label of any kind.
+    expect([...page.querySelectorAll("header.v4Hdr button")].map((button) => button.className)).toEqual(["v4HdrAccountButton"]);
     expect(page.querySelector("header.v4Hdr")!.textContent).not.toMatch(LEVEL_WORDS);
     // journey-f19: no quota on All my maps.
     expect(page.querySelector(".v4HdrQuotaCircle, .v4HdrQuotaHold")).toBeNull();
@@ -146,7 +153,7 @@ describe("the reading-level ruling (5 Nov): no level in any header, and no link 
   });
 });
 
-describe("question 15 A with 18 A (5 Nov): the phone header is one row", () => {
+describe("question 15 (5 Nov): the phone header is one row", () => {
   const base = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-base.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
   const phoneAt = base.indexOf("@media (max-width: 767px)");
   const phone = base.slice(phoneAt);

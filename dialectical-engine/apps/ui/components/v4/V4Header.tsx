@@ -16,10 +16,14 @@ import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
  *  - The reading level is chosen only when asking and is kept for that debate, its digs and its report, so no header has a
  *    level menu or a "Plain words" label, and no header link carries a level. The level props stay accepted for the pages
  *    that still pass them, and do nothing.
+ *    RELEASE ORDER: until the ask page offers the level choice for every question (the start-step session's V4AskClient
+ *    item: the choice on every question, starting on "Plain words", nothing kept in the account), this header was the
+ *    only way a person who already holds a level could change it. This header must not reach a release before that item.
  *  - Questions 14 B and 15: the quota shows as one round circle that fills as quota is used (V4QuotaPill.tsx), the
  *    fullest period the plan counts, at every screen size.
- *  - Question 15 (with 18): on a phone the header is one row, the brand's mark (its name stays its accessible name), the
- *    circle and the round account button (app/v4/v4-base.css).
+ *  - Question 15: on a phone the header is one row, the brand's mark (its name stays its accessible name), the circle and
+ *    the round account button (app/v4/v4-base.css). Question 18 A (no "Write my report" in the top bar while the bottom
+ *    bar shows it) is the map's own report item, still to come (V4DebateClient, V4BottomStack: the start-step session's).
  */
 
 export function V4Header({

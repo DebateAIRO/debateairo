@@ -104,6 +104,9 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(text()).toContain(CATALOG["v4.debate.askAgainNoteQuestion"]);
     const askNew = [...page().querySelectorAll("a")].find((link) => link.textContent?.trim() === CATALOG["v4.debate.askNew"])!;
     expect(askNew.className).not.toContain("v4BtnPrimary");
+    // A question's page names the question (a dig's page names the dig, below).
+    expect(page().querySelector("h1")!.textContent).toBe(CATALOG["v4.debate.failedTitle"]);
+    expect(page().querySelector(".v4DebFailed .v4Eyebrow")!.textContent).toBe(CATALOG["v4.debate.yourQuestion"]);
     // The server did not say whether anything was taken: nothing is said.
     expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
   });
@@ -122,6 +125,9 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
   });
 
+  // The harness hands the run read straight to the page, so `quota_used` here skips the contract's parse. Today's contract
+  // (RunProjectionSchema, strict) refuses a run read that carries it, so the two lines show on a real page only once the
+  // contract carries the field; the stand-in keeps it to its draft view until then (tools/v4-mock-api/README.md).
   it("question 20 A: when the server says some was used, the question says 'The part that ran used some of your quota.'", async () => {
     const runId = crypto.randomUUID();
     harness.run = failedRun(runId, { quota_used: "SOME" }, STOPPED);
@@ -151,6 +157,10 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     // Question 3 A: its reason is said about the dig, never in the question's sentence.
     expect(text()).toContain(CATALOG["v4.digFailed.reason.MODELS_UNAVAILABLE"]);
     expect(text()).not.toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
+    // The wave-4 browser check (5 Nov): the page names the dig too, in its heading (and so its tab) and the line above.
+    expect(page().querySelector("h1")!.textContent).toBe(CATALOG["v4.debate.digFailedTitle"]);
+    expect(page().querySelector(".v4DebFailed .v4Eyebrow")!.textContent).toBe(CATALOG["v4.seed.yourDig"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedTitle"]);
   });
 
   it("question 20 A: a dig's own failed page says the dig's 'nothing taken' when confirmed, and nothing when some was used", async () => {

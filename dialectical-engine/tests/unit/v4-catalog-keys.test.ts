@@ -62,6 +62,13 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // The owner's answers of 5 Nov: question 3 A's seven lines saying why a dig did not finish, said about the dig (the
   // answer's own example is the "stopped partway" line; all are new words, approved at the click-test), and question 20
   // A's line when the part of a failed question that ran used some of the quota (section 2c: approved at the click-test).
+  // Two of the seven differ from the question's own reason, to be shown so at the click-test: RUN_LIMIT_REACHED says "a
+  // problem on our side" (the question says it "reached its limit"; new text never says "limit", and the run's own ceiling
+  // is the site's), and PLAN_ENDED says "put on hold" (the question says "paused", which on the V4 map is a dig's own state
+  // word at the month wall). The failed-question line cannot be seen in place until the contract's run read carries
+  // `quota_used` (today's strict contract refuses a run read that has it; the stand-in sends it on its draft view only).
+  // The dig's own failed page names the dig, not a question (the wave-4 browser check, 5 Nov): its heading is drafted.
+  "v4.debate.digFailedTitle",
   "v4.digFailed.reason.NOT_STARTED",
   "v4.digFailed.reason.PLAN_ENDED",
   "v4.digFailed.reason.MODELS_UNAVAILABLE",
@@ -142,26 +149,20 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // week" and "of this month" and leaves the words to the owner); the month's "on {date}" for a dig button that waits
   // (journey-f15 writes only "after 08:00"); the two Quick look / Thorough hints (read-f20: the wording is the owner's;
   // Thorough's no longer names today, the period is said once by the switch).
-  "v4.header.over.PERSON_DAY",
+  // The owner's answers of 5 Nov give today's "Today: more than your quota used" (HEADER_ANSWER_LINES below); the week's,
+  // the month's and a team grant's forms follow it and stay drafts.
   "v4.header.over.PERSON_WEEK",
   "v4.header.over.PERSON_MONTH",
   "v4.header.over.PERSON_GRANT",
   "v4.header.quotaDetails",
-  // The owner's answers of 5 Nov (questions 14 B and 15, with the follow-ups): the quota circle's figure and its spoken name
-  // ("Quota used: this week 70%"; past 100% it keeps the "Over" it shows), and the label of each bar it opens. The owner
-  // gave "Over" (HEADER_ANSWER_LINES below); these are drafts until the click-test.
-  "v4.header.circleShare",
-  "v4.header.circle.PERSON_DAY",
-  "v4.header.circle.PERSON_WEEK",
-  "v4.header.circle.PERSON_MONTH",
-  "v4.header.circle.PERSON_GRANT",
+  // The owner's answers of 5 Nov (questions 14 B and 15, with the follow-ups): the quota circle's spoken name past 100% (it
+  // keeps the "Over" it shows; under 100% its name is the record's own "Today: 70% of your quota used"), and a team
+  // grant's bar label. The owner gave "Over", the "70%" form and the bars "Today", "This week" and "This month"
+  // (HEADER_ANSWER_LINES below); these are drafts until the click-test.
   "v4.header.circleOver.PERSON_DAY",
   "v4.header.circleOver.PERSON_WEEK",
   "v4.header.circleOver.PERSON_MONTH",
   "v4.header.circleOver.PERSON_GRANT",
-  "v4.header.bar.PERSON_DAY",
-  "v4.header.bar.PERSON_WEEK",
-  "v4.header.bar.PERSON_MONTH",
   "v4.header.bar.PERSON_GRANT",
   "v4.room.startShare.PERSON_WEEK",
   "v4.room.startShare.PERSON_MONTH",
@@ -658,30 +659,54 @@ const QUOTA_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
 
 /**
  * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers"), the header's words the owner gave,
- * word for word: question 13 C names the account menu's way to the maps, and the second round of follow-ups to question 15
- * gives the word inside the quota circle past 100%.
+ * word for word: question 13 C names the account menu's way to the maps; the follow-ups to question 15 give the share inside
+ * the circle ("70%"), the bars' names ("Today", "This week" and "This month") and, in the second round, the word inside the
+ * circle past 100% ("Over") and the full bar's "Today: more than your quota used".
  */
 const HEADER_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.maps.menu": "My questions",
-  "v4.header.circleShareOver": "Over"
+  "v4.header.circleShare": "{percent}%",
+  "v4.header.circleShareOver": "Over",
+  "v4.header.bar.PERSON_DAY": "Today",
+  "v4.header.bar.PERSON_WEEK": "This week",
+  "v4.header.bar.PERSON_MONTH": "This month",
+  "v4.header.over.PERSON_DAY": "Today: more than your quota used"
+});
+
+/**
+ * The owner's answers of 5 Nov 2026, the follow-ups to question 15 (the reading level is chosen only when asking): the two
+ * lines under the first screen's level choice, word for word. The line under the choice no longer promises a label at the
+ * top, and the longer explanation drops its last sentence (no level can be changed later).
+ */
+const ASK_LEVEL_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.ask.levelNote": "You choose it for this question. Its map, digs and report all keep it.",
+  "v4.ask.levelHonest": "The AIs that write your answer and its story write for this level. It also changes how much detail we show you, and sometimes how long the answer is."
 });
 
 describe("the owner's 5 Nov answers: the header", () => {
-  it("the account menu's 'My questions' and the circle's 'Over' are the owner's words, and neither waits on the drafted list", () => {
+  it("the owner's header words ('My questions', '70%', 'Over', the bars, the full bar) are pinned and none waits on the drafted list", () => {
     expect(Object.fromEntries(Object.keys(HEADER_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(HEADER_ANSWER_LINES);
     expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in HEADER_ANSWER_LINES)).toEqual([]);
   });
 
-  it("no header line names the level any more, and every period the circle can show has its name, its 'over' name and its bar", () => {
+  it("no header line names the level any more, and every period the circle can show has its 'over' name and its bar", () => {
     // The reading-level ruling: no level menu in any header, so its two lines are gone.
     expect(Object.keys(catalog).filter((key) => key.startsWith("v4.header.level"))).toEqual([]);
+    // Under 100% the circle's name is the record's own line (v4.header.used.*): no words of its own.
+    expect(Object.keys(catalog).filter((key) => key.startsWith("v4.header.circle."))).toEqual([]);
     for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]) {
-      expect(catalog[`v4.header.circle.${scope}`], scope).toMatch(/^Quota used: [a-z ]+ \{percent\}%$/u);
       // Past 100% the name keeps the word the circle shows (WCAG 2.5.3, label in name).
       expect(catalog[`v4.header.circleOver.${scope}`], scope).toMatch(/\bover\b/u);
       // A bar's label is the period word of its read-out line ("Today", "This week", "This month", "In total").
       expect(catalog[`v4.header.bar.${scope}`], scope).toBe(catalog[`v4.header.used.${scope}`]!.split(":")[0]);
     }
+  });
+
+  it("the follow-ups to question 15: the first screen's two level lines are the owner's words, and neither waits on the drafted list", () => {
+    expect(Object.fromEntries(Object.keys(ASK_LEVEL_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(ASK_LEVEL_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in ASK_LEVEL_ANSWER_LINES)).toEqual([]);
+    // Nothing on the first screen promises a level label at the top, or a level changed later.
+    expect(Object.entries(catalog).filter(([key, value]) => key.startsWith("v4.ask.") && /label at the top|change it later/iu.test(value))).toEqual([]);
   });
 });
 
@@ -695,9 +720,17 @@ describe("the owner's 5 Nov answers: failed digs and questions, one pick, the pu
     for (const key of keys) {
       expect(catalog[key], key).toMatch(/\bdig\b/u);
       expect(catalog[key], key).not.toMatch(/question|debate|ask|allowance|limit|paused/iu);
+      // Plain words (the wave-4 checks, 5 Nov): no line names an internal reserve "set aside" for the dig, which beside
+      // "Nothing was taken from your quota for this." could read as the person's quota set aside.
+      expect(catalog[key], key).not.toMatch(/set aside/iu);
     }
     // The two kinds that were never charged say so in their own line (lib/v4/failedRun.ts never says it twice).
     for (const kind of ["SET_ASIDE", "CHOICE_GONE"]) expect(catalog[`v4.digFailed.reason.${kind}`], kind).toMatch(/did not use (?:any of )?your quota\./u);
+  });
+
+  it("a dig's own failed page has its own drafted heading, about the dig", () => {
+    expect(catalog["v4.debate.digFailedTitle"]).toMatch(/^This dig didn't finish$/u);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.digFailedTitle");
   });
 
   it("question 20 A: the failed question's 'used some' line is the answer's words, a draft until the click-test", () => {

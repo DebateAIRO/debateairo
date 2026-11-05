@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { contractClient } from "@/lib/api";
 import { readBillingUsage, type BillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -13,11 +13,14 @@ import { useQuotaRefresh } from "@/lib/v4/quotaPulse";
  *    sentence does, so a Free or paid person whose month is used up reads the month). The same circle at every screen
  *    size: it replaces the words "Today: 14% of your quota used" (follow-up 3).
  *  - Never what is left (r2-2 A, journey-f8). Past 100% (a running debate's finish leeway; map-f9: never "100%"), a full
- *    ring with "Over" inside (the owner's word, second follow-up).
- *  - Its name says that period in words and keeps the figure it shows ("Quota used: this week 70%"; WCAG 2.5.3).
+ *    ring with "Over" inside (the owner's word, second follow-up). A four-character share ("100%", "Over") is drawn a
+ *    little smaller, so it never touches the ring (the browser check, 5 Nov).
+ *  - Its name is the record's own line for that period ("This week: 70% of your quota used", ask-f4), which holds the
+ *    figure it shows (WCAG 2.5.3); past 100% a drafted name that keeps the "Over" it shows.
  *  - Tapping it opens one bar per period the plan counts, day first: "Today", "This week" and "This month" on paid plans,
  *    "This month" alone on Free, a team grant's own windows ("In total"). Each bar shows its percentage; a bar past 100% is
- *    full and says "Today: more than your quota used". Escape or a click outside closes the bars.
+ *    full and says "Today: more than your quota used". Escape, a click outside, or keyboard focus moving outside closes
+ *    the bars (UI-11, as the site's menus do), so they never stay open under the next control.
  *  - wait-f22 / public-f15 / map-f9: it is read again when something that uses quota starts or finishes
  *    (lib/v4/quotaPulse.ts) and when the person comes back to the tab, quietly: the ring and the bars change at once, with
  *    no transition or animation (so reduced motion has nothing to stop), and a failed read keeps what was shown. Nothing
@@ -68,11 +71,17 @@ export function circleShare(window: PillWindow, catalog: MessageCatalog): string
   return isOver(window) ? t(catalog, "v4.header.circleShareOver") : t(catalog, "v4.header.circleShare", { percent: window.percent });
 }
 
-/** The circle's name: the period in words with what it shows ("Quota used: this week 70%"). */
+/**
+ * The circle's name: the record's own line for its period ("This week: 70% of your quota used"), which holds the "70%" it
+ * shows; past 100% the drafted name that keeps the "Over" it shows ("Quota used: this week, over your quota").
+ */
 export function circleName(window: PillWindow, catalog: MessageCatalog): string {
-  return isOver(window)
-    ? t(catalog, `v4.header.circleOver.${window.scope}`)
-    : t(catalog, `v4.header.circle.${window.scope}`, { percent: window.percent });
+  return isOver(window) ? t(catalog, `v4.header.circleOver.${window.scope}`) : pillText(window, catalog);
+}
+
+/** A share of four characters or more ("100%", "Over") is drawn a little smaller inside the 44 px ring. */
+function wideShare(share: string): boolean {
+  return Array.from(share).length >= 4;
 }
 
 /** Today, this week and this month (or a team grant's windows), day first: the bars tapping the circle shows. */
@@ -159,15 +168,23 @@ export function V4QuotaPill({ catalog, wanted = true, hold = false }: Readonly<{
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+  // UI-11: keyboard focus moving outside closes the bars, as a click outside does. A blur with no new target is left to the
+  // mousedown handler (Safari blurs without focusing what is clicked).
+  function onBlur(event: FocusEvent<HTMLDivElement>): void {
+    const next = event.relatedTarget;
+    if (open && next instanceof Node && root.current !== null && !root.current.contains(next)) setOpen(false);
+  }
   const shown = pillWindow(usage);
   // ask-f16 (first frame = the real page, nothing moves): until the first read answers, the circle's place is held, empty
   // and hidden, so the header row does not shift when it comes.
   if (shown === null) return (wanted && !answered) || (hold && !wanted) ? <span className="v4HdrQuotaHold" aria-hidden="true" data-quota-hold="" /> : null;
   const over = isOver(shown);
+  const share = circleShare(shown, catalog);
   return (
     <div
       className="v4HdrQuota"
       ref={root}
+      onBlur={onBlur}
       onKeyDown={(event) => {
         if (event.key === "Escape" && open) {
           event.preventDefault();
@@ -192,7 +209,7 @@ export function V4QuotaPill({ catalog, wanted = true, hold = false }: Readonly<{
           <circle className="v4HdrQuotaTrack" cx="18" cy="18" r="15.9155" />
           <circle className="v4HdrQuotaFill" cx="18" cy="18" r="15.9155" strokeDasharray={`${filled(shown)} 100`} transform="rotate(-90 18 18)" />
         </svg>
-        <span className="v4HdrQuotaShare" aria-hidden="true">{circleShare(shown, catalog)}</span>
+        <span className="v4HdrQuotaShare" aria-hidden="true" data-quota-wide={wideShare(share) ? "" : undefined}>{share}</span>
       </button>
       <ul className="v4HdrQuotaBars" id={barsId} hidden={!open} aria-label={t(catalog, "v4.header.quotaDetails")}>
         {pillDetails(usage).map((bar) => <QuotaBar key={bar.scope} bar={bar} catalog={catalog} />)}

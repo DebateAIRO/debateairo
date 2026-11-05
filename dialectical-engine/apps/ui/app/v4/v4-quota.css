@@ -27,6 +27,9 @@
   position: relative; font-size: var(--t-micro); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* The browser check (5 Nov): at 11px "100%" touched the ring on both sides; a four-character share is a pixel smaller and a
+   little tighter, so it sits inside the ring's opening with room to spare. */
+.v4HdrQuotaShare[data-quota-wide] { font-size: calc(var(--t-micro) - 1px); letter-spacing: -0.02em; }
 /* Tapping the circle: one bar per period the plan counts, under the circle at the end side. */
 .v4HdrQuotaBars {
   position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-end: 0; inline-size: min(260px, calc(100vw - 32px));
@@ -38,7 +41,9 @@
 .v4HdrQuotaBar { display: flex; flex-direction: column; gap: 6px; }
 .v4HdrQuotaBarHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .v4HdrQuotaBarShare { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
-.v4HdrQuotaBarTrack { display: block; block-size: 6px; border-radius: var(--r-pill); background: var(--surface-sunken); overflow: hidden; }
+/* The bar's empty part takes the ring's own track colour: on the dark panel the sunken surface was nearly invisible (the
+   browser check, 5 Nov: about 1.1:1), so a bar read as a short line rather than a share of a whole. */
+.v4HdrQuotaBarTrack { display: block; block-size: 6px; border-radius: var(--r-pill); background: var(--line-strong); overflow: hidden; }
 .v4HdrQuotaBarFill { display: block; block-size: 100%; max-inline-size: 100%; border-radius: var(--r-pill); background: var(--ink); }
 
 /* ---- The map's top line (V4TopLine) and "This question: …" ---- */

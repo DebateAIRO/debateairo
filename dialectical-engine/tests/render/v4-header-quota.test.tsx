@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -10,11 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * The header's quota circle (the owner's answers of 5 Nov 2026, questions 14 B and 15 with both rounds of follow-ups; the
  * word is "quota"). A round circle fills as quota is used, with the whole percentage inside, and shows the FULLEST period
  * the plan counts, the longest on a tie (a Free or paid person whose month is used up reads the month). Past 100% (a
- * running debate's finish leeway, map-f9: never "100%") it is a full ring with "Over" inside. Its name says the period in
- * words. Tapping it opens one bar per period the plan counts (paid: today, this week, this month; Free: this month; a team
- * grant: its own windows), each with its percentage; a bar past 100% says "Today: more than your quota used". Never what
- * is left. It is read again after each quota moment and when the tab is shown again (wait-f22, public-f15, map-f9),
- * quietly, in place. Nothing shows without a read.
+ * running debate's finish leeway, map-f9: never "100%") it is a full ring with "Over" inside. Its name is the record's line
+ * for that period ("This week: 70% of your quota used", ask-f4), which holds the figure it shows; past 100% a drafted name
+ * that keeps the "Over" it shows. Tapping it opens one bar per period the plan counts (paid: today, this week, this month;
+ * Free: this month; a team grant: its own windows), each with its percentage; a bar past 100% says "Today: more than your
+ * quota used". Keyboard focus leaving the circle closes the bars, as a click outside does (UI-11). Never what is left. It
+ * is read again after each quota moment and when the tab is shown again (wait-f22, public-f15, map-f9), quietly, in
+ * place. Nothing shows without a read.
  */
 const server = vi.hoisted(() => ({ usage: null as unknown, reads: 0, answer: null as Promise<unknown> | null }));
 vi.mock("@/lib/api", () => ({
@@ -84,26 +86,38 @@ const ringOf = (host: ParentNode): string | null => host.querySelector(".v4HdrQu
 
 describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
   it.each([
-    ["a paid person mid-day reads today", paid(window_("PERSON_DAY", 15), window_("PERSON_WEEK", 5), window_("PERSON_MONTH", 2)), "15%", "Quota used: today 15%", "15 100"],
+    ["a paid person mid-day reads today", paid(window_("PERSON_DAY", 15), window_("PERSON_WEEK", 5), window_("PERSON_MONTH", 2)), "15%", "Today: 15% of your quota used", "15 100"],
     // 14 B: always the fullest period, so a fuller week is named even while today is light.
-    ["a paid person whose week is fuller reads the week", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 70), window_("PERSON_MONTH", 30)), "70%", "Quota used: this week 70%", "70 100"],
-    ["a paid person whose month is fuller reads the month", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 45)), "45%", "Quota used: this month 45%", "45 100"],
-    ["a Free person reads the month", free(60), "60%", "Quota used: this month 60%", "60 100"],
-    ["a Free person whose month is used up reads a full month", free(100), "100%", "Quota used: this month 100%", "100 100"],
-    ["a used-up month outweighs a lighter day", paid(window_("PERSON_DAY", 5), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 100)), "100%", "Quota used: this month 100%", "100 100"],
-    ["a tie names the longest period", paid(window_("PERSON_DAY", 40), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 12)), "40%", "Quota used: this week 40%", "40 100"],
-    ["a tie at the top names the longest period", paid(window_("PERSON_DAY", 100), window_("PERSON_WEEK", 100), window_("PERSON_MONTH", 100)), "100%", "Quota used: this month 100%", "100 100"],
+    ["a paid person whose week is fuller reads the week", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 70), window_("PERSON_MONTH", 30)), "70%", "This week: 70% of your quota used", "70 100"],
+    ["a paid person whose month is fuller reads the month", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 45)), "45%", "This month: 45% of your quota used", "45 100"],
+    ["a Free person reads the month", free(60), "60%", "This month: 60% of your quota used", "60 100"],
+    ["a Free person whose month is used up reads a full month", free(100), "100%", "This month: 100% of your quota used", "100 100"],
+    ["a used-up month outweighs a lighter day", paid(window_("PERSON_DAY", 5), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 100)), "100%", "This month: 100% of your quota used", "100 100"],
+    ["a tie names the longest period", paid(window_("PERSON_DAY", 40), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 12)), "40%", "This week: 40% of your quota used", "40 100"],
+    ["a tie at the top names the longest period", paid(window_("PERSON_DAY", 100), window_("PERSON_WEEK", 100), window_("PERSON_MONTH", 100)), "100%", "This month: 100% of your quota used", "100 100"],
     // The second round of follow-ups (5 Nov) with map-f9: past 100% a full ring with "Over", never "100%" or the real share.
     ["a finish leeway past 100% is a full ring with 'Over'", paid(window_("PERSON_DAY", 108), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 4)), "Over", "Quota used: today, over your quota", "100 100"],
-    ["a team grant reads its fullest window, 'In total' here", team(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_GRANT", 90)), "90%", "Quota used: in total 90%", "90 100"]
+    ["a team grant reads its fullest window, 'In total' here", team(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_GRANT", 90)), "90%", "In total: 90% of your quota used", "90 100"]
   ])("%s", async (_name, usage, share, name, ring) => {
     server.usage = usage;
     const host = await mountHeader();
     expect(shownBy(host)).toEqual({ share, name });
     expect(ringOf(host)).toBe(ring);
-    // The old words ("Today: 14% of your quota used") are not on the header any more, at any size.
-    expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+    // The old words ("Today: 14% of your quota used") are no longer shown on the header, at any size: the only words its
+    // row shows for the quota are the circle's share (the bars, hidden until tapped, hold the rest).
+    const row = host.querySelector(".v4HdrRight")!.cloneNode(true) as HTMLElement;
+    row.querySelector(".v4HdrQuotaBars")?.remove();
+    expect(row.textContent).toBe(share);
     expect(circleOf(host)!.hasAttribute("data-quota-over")).toBe(share === "Over");
+  });
+
+  it("the circle's name under 100% is the record's own line for its period (ask-f4), with no words of its own", () => {
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"] as const) {
+      for (const percent of [0, 31, 100]) expect(circleName({ scope, percent }, CATALOG)).toBe(pillText({ scope, percent }, CATALOG));
+    }
+    // Past 100% the name keeps the word the circle shows ("Over"), a drafted line, never the bar's "more than" line.
+    expect(circleName({ scope: "PERSON_DAY", percent: 104 }, CATALOG)).toBe(CATALOG["v4.header.circleOver.PERSON_DAY"]);
+    expect(Object.keys(CATALOG).filter((key) => key.startsWith("v4.header.circle."))).toEqual([]);
   });
 
   it("the circle's name keeps the figure it shows (WCAG 2.5.3), and never says 100% past it", () => {
@@ -151,7 +165,7 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
         await act(async () => answer(free(60)));
         await flush();
         expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-        expect(shownBy(host)).toEqual({ share: "60%", name: "Quota used: this month 60%" });
+        expect(shownBy(host)).toEqual({ share: "60%", name: "This month: 60% of your quota used" });
         await act(async () => root!.unmount());
         root = null;
         host.remove();
@@ -232,7 +246,7 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
     server.usage = paid(window_("PERSON_MONTH", 9), window_("PERSON_DAY", 14), window_("PERSON_WEEK", 31));
     const host = await mountHeader();
     const circle = circleOf(host)!;
-    expect(shownBy(host)).toEqual({ share: "31%", name: "Quota used: this week 31%" });
+    expect(shownBy(host)).toEqual({ share: "31%", name: "This week: 31% of your quota used" });
     const bars = host.querySelector<HTMLUListElement>(".v4HdrQuotaBars")!;
     expect(bars.hidden).toBe(true);
     expect(circle.getAttribute("aria-expanded")).toBe("false");
@@ -254,6 +268,42 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
     expect(bars.hidden).toBe(true);
     // Never what is left (r2-2 A, journey-f8).
     expect(host.textContent).not.toMatch(/\bleft\b/u);
+  });
+
+  it("UI-11 (the wave-4 checks, 5 Nov): keyboard focus leaving the circle closes its bars, as a click outside does", async () => {
+    server.usage = paid(window_("PERSON_DAY", 14), window_("PERSON_WEEK", 31), window_("PERSON_MONTH", 9));
+    const host = await mountHeader();
+    // The next control the keyboard meets (the round account button, mocked away here).
+    const next = document.createElement("button");
+    document.body.append(next);
+    const circle = circleOf(host)!;
+    const bars = host.querySelector<HTMLUListElement>(".v4HdrQuotaBars")!;
+    await act(async () => circle.focus());
+    await act(async () => circle.click());
+    expect(bars.hidden).toBe(false);
+    // A blur with no new target (Safari's click) is left to the click-outside rule, so the bars stay.
+    await act(async () => circle.blur());
+    expect(bars.hidden).toBe(false);
+    await act(async () => circle.focus());
+    // Tab onward: the bars close and the focus stays where it went (never under an open panel).
+    await act(async () => next.focus());
+    expect(bars.hidden).toBe(true);
+    expect(circle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(next);
+  });
+
+  it("the browser check (5 Nov): a share of four characters ('100%', 'Over') is drawn smaller, so it never touches the ring", async () => {
+    for (const [usage, wide] of [[free(100), true], [paid(window_("PERSON_DAY", 108)), true], [free(70), false], [free(7), false]] as const) {
+      server.usage = usage;
+      const host = await mountHeader();
+      const share = host.querySelector(".v4HdrQuotaShare")!;
+      expect(share.hasAttribute("data-quota-wide"), share.textContent ?? "").toBe(wide);
+      await act(async () => root!.unmount());
+      root = null;
+      host.remove();
+    }
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-quota.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect(css).toMatch(/\.v4HdrQuotaShare\[data-quota-wide\] \{[^}]*font-size: calc\(var\(--t-micro\) - 1px\);/u);
   });
 
   it("Free opens too: one bar, this month", async () => {
@@ -289,7 +339,7 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
     expect(server.reads).toBe(2);
     // The same circle, redrawn at once: no new element, no highlight, no animation.
     expect(circleOf(host)).toBe(circle);
-    expect(shownBy(host)).toEqual({ share: "40%", name: "Quota used: this week 40%" });
+    expect(shownBy(host)).toEqual({ share: "40%", name: "This week: 40% of your quota used" });
     expect(ringOf(host)).toBe("40 100");
     expect(host.querySelector(".v4Highlight")).toBeNull();
     // A failed read keeps what was shown (no blinking out).
@@ -308,7 +358,20 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
     for (const [, selector, body] of rules) expect(body, selector).not.toMatch(/transition|animation/u);
     // No screen size hides it or swaps it for words.
     expect(css).not.toMatch(/@media[^{]*\{[^@]*\.v4HdrQuota/u);
-    expect(css).not.toMatch(/\.v4HdrAllowance/u);
+    // The browser check (5 Nov): in dark mode the bars' empty part was nearly invisible; each bar's track is drawn with
+    // the ring's own track colour, so a bar reads as a share of a whole in both modes.
+    const ringTrack = /\.v4HdrQuotaTrack \{ stroke: ([^;]+); \}/u.exec(css)?.[1];
+    expect(ringTrack).toBe("var(--line-strong)");
+    expect(/\.v4HdrQuotaBarTrack \{[^}]*background: ([^;]+);/u.exec(css)?.[1]).toBe(ringTrack);
+  });
+
+  it("no V4 component draws the old words pill or a header level control any more", () => {
+    // The old pill's and level menu's rules still sit in v4-ask.css (the start-step session's file, theirs to remove); no
+    // component emits those classes, so they cannot match anything (a check on the stylesheet alone would pass anyway).
+    const dir = resolve(import.meta.dirname, "../../apps/ui/components/v4");
+    const sources = readdirSync(dir).filter((name) => name.endsWith(".tsx")).map((name) => [name, readFileSync(resolve(dir, name), "utf8")] as const);
+    expect(sources.length).toBeGreaterThan(20);
+    expect(sources.filter(([, text]) => /v4HdrAllowance|v4HdrLevel/u.test(text)).map(([name]) => name)).toEqual([]);
   });
 
   it("every window has its 'more than' line, and the bars' words come from the catalogue", () => {

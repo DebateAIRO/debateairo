@@ -25,6 +25,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { FAILED_DIGS } from "./failed-seed.js";
 
 const ROUTE = join("app", "api", "[...path]", "route.ts");
 function findUiDir(): string {
@@ -281,7 +282,9 @@ await step("Free person: room and usage", async () => {
     const room: Loose = await client.getAskRoom({ plan_tier: "free", composition_budget_tier: "medium", depth: 1, answer_length: "short" });
     const usage: Loose = await client.getBillingUsage();
     must(room.plan_id === "FREE" && usage.plan_id === "FREE", `room ${room.plan_id}, usage ${usage.plan_id}`);
-    return "room plan FREE, usage plan FREE";
+    // Free counts the month alone (plan-windows.ts), so the header's circle opens one bar.
+    must(usage.windows.map((window: Loose) => window.scope).join() === "PERSON_MONTH", "Free's usage names the month alone");
+    return "room plan FREE, usage plan FREE, the month alone";
   } finally {
     await mock("/__mock/set?plan=PLUS");
   }
@@ -498,6 +501,8 @@ await step("a failed dig per reason group, and a failed question that used some 
     must(draft.quota_used === "NONE" || draft.quota_used === "SOME", `${link.child_run_id}: the draft view says what it took`);
   }
   must(failure.RUN_FAILURE_KINDS.every((kind: string) => kinds.has(kind)), `every reason group has a failed dig (${[...kinds].join(", ")})`);
+  // The wave-4 browser check (5 Nov): each digs its own place, so none reads as one dig that failed twice.
+  must(new Set(links.children.map((link: Loose) => [...link.places].sort().join(" "))).size === links.children.length, "each failed dig digs its own place");
   const some: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failedSome}`);
   must(some.state === "FAILED" && some.quota_used === "SOME", "the second failed question's draft view says it used some");
   return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}`;
@@ -725,7 +730,9 @@ await step("Your maps: digs left out by their dig links and hung under their que
   const { readFileSync } = await import("node:fs");
   const v4Catalog = JSON.parse(readFileSync(join(UI, "messages", "en", "v4.json"), "utf8"));
   const shelf: Loose = await shelfModule.readMapShelf(5, v4Catalog, { client });
-  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest];
+  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest,
+    // The owner's answers of 5 Nov (failed-seed.ts): the seven failed digs hang under their debate, never as questions.
+    ...FAILED_DIGS.map((dig) => dig.runRef)];
   must(shelf.maps.length === 5 && shelf.maps.every((map: Loose) => !seededDigs.includes(map.runId)), "five real questions, no dig among them");
   const first: Loose = shelf.maps.find((map: Loose) => map.runId === RUNS.settled);
   must(first === undefined || first.digs.length > 0, "the first debate carries its digs");

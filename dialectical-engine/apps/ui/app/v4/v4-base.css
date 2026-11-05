@@ -77,12 +77,16 @@
 .v4Chip[aria-pressed="true"], .v4Chip[aria-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
 .v4Card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); padding: 16px; }
 .v4SrOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-/* The owner's answers of 5 Nov 2026 (question 15 A with 18 A and the follow-ups): on a phone every V4 header is ONE row.
+/* The owner's answers of 5 Nov 2026 (question 15 and its follow-ups): on a phone every V4 header is ONE row.
    The brand shows its mark alone: its name and the "V4 preview" badge are hidden on screen but stay the link's name. Then
    the quota circle (v4-quota.css), the page's own extras and the round account button share the rest of the row; an
    extra's words may wrap inside its own button rather than push the row onto a second line. A strip the page puts after
    the row (the map's report strip, V4Header's `after`) keeps its own row below. Nothing here moves. Loaded by every V4
-   page and the public page, so their headers match. */
+   page and the public page, so their headers match.
+   Question 18 A (the top bar drops "Write my report" whenever the phone's bottom bar shows it) is not built here: the map's
+   report item belongs to the start-step session. These rules sit here, not in v4-ask.css (that session's file), and win
+   over its `.v4HdrRight` wrap rule on a phone; its `.v4HdrLevel*` and `.v4HdrAllowance` rules are dead (no component
+   draws those classes) and are that session's to remove. */
 @media (max-width: 767px) {
   header.v4Hdr { column-gap: 8px; }
   .v4Hdr .v4HdrBrand { position: relative; flex: none; justify-content: center; min-inline-size: 44px; }

@@ -22,6 +22,9 @@ import { digFailureMessage, failedQuotaKey } from "@/lib/v4/failedRun";
  * panel), never the question's sentence. Under the reason, one quota line at most (question 20 A): a question says
  * "Nothing was taken for the failed try." when the server confirms nothing was used, and "The part that ran used some of
  * your quota." when it says some was; a dig says "Nothing was taken from your quota for this." only when nothing was used.
+ * The wave-4 browser check (5 Nov): a dig's own page names the dig, not a question: "Your dig" above it and "This dig didn't
+ * finish" as its heading (so its tab says it too; a drafted line). Its "Open in the classic view" link stays in the body
+ * until the map's header is given the classic address on these screens (question 12 B, the start-step session's wiring).
  */
 
 export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, catalog, homeCatalog }: Readonly<{
@@ -44,9 +47,9 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
   const quotaKey = failedQuotaKey(run, dig !== null);
   return (
     <section className="v4Card v4DebStatus v4DebFailed">
-      <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
+      <p className="v4Eyebrow">{t(catalog, dig === null ? "v4.debate.yourQuestion" : "v4.seed.yourDig")}</p>
       <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
-      <h1 className="v4DebStatusTitle">{t(catalog, "v4.debate.failedTitle")}</h1>
+      <h1 className="v4DebStatusTitle">{t(catalog, dig === null ? "v4.debate.failedTitle" : "v4.debate.digFailedTitle")}</h1>
       <p>{dig === null ? runFailureMessage(run.terminal_reason, homeCatalog) : digFailureMessage(run.terminal_reason, catalog)}</p>
       {quotaKey === null ? null : <p>{t(catalog, quotaKey)}</p>}
       {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}

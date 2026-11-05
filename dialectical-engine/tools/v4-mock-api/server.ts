@@ -44,6 +44,7 @@ import {
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
 import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "./failed-seed.js";
+import { windowsForPlan } from "./plan-windows.js";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Find the repository (no machine path is written here): MOCK_ENGINE_DIR, else the dialectical-engine folder this file
@@ -778,14 +779,15 @@ function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: Usa
   const date = new Date(now);
   const daysToMonday = ((8 - date.getUTCDay()) % 7) || 7;
   // W2-7 (money rule, draft): BORROWED is the day after the running debate went past it: 104% used, 4% of tomorrow's taken.
-  const borrowed = usage === "BORROWED";
+  // Only a paid plan's day and week borrow (the money rule); Free counts the month alone (plan-windows.ts).
+  const borrowed = usage === "BORROWED" && plan_id !== "FREE";
   return {
     plan_id,
-    windows: [
+    windows: windowsForPlan(plan_id, [
       { scope: "PERSON_DAY", percent: borrowed ? 104 : 14, resets_at: nextUtcMidnight(now) },
       { scope: "PERSON_WEEK", percent: borrowed ? 47 : 31, resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday)) },
       { scope: "PERSON_MONTH", percent: borrowed ? 16 : 9, resets_at: nextUtcMonth(now) }
-    ],
+    ]),
     ...(borrowed ? { borrowed: [borrowNotice(RUN_RUNNING, nextUtcMidnight(now))] } : {})
   };
 }
