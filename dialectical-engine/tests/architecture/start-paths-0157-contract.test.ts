@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CONTENT_CARRIERS } from "../../packages/crypto/src/index.js";
-import { START_PATH_AUTHORS, START_PATHS_SOURCES, pathIdOf } from "../../packages/kernel/src/start-step-limits.js";
+import { START_PATH_AUTHORS, START_PATHS_SOURCES, START_STEP_LIMITS, pathIdOf } from "../../packages/kernel/src/start-step-limits.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationReplaySafety, definedRelationNames } from "../../tools/orphan-audit/src/index.js";
@@ -122,6 +122,26 @@ describe("0157: the chosen paths, sealed per run", () => {
     // The readable text columns are codes: no question, list, path or own words in plain text anywhere.
     const textColumns = [set, path, mark].flatMap((body) => [...body.matchAll(/^ {2}([a-z_]+) text\b/gmu)].map((match) => match[1]!)).sort();
     expect(textColumns).toEqual(["author", "chosen_by", "mark", "path_id", "source"]);
+  });
+
+  it("C-S: a path holds a merged group of any size: 0..54 members in the table and in the writer, and a sealed path up to 256 KiB", () => {
+    // Task 92b (4 Nov night): the merges keep every suggestion the AI put in a group, so a path holds up to the 54 suggestions one merge
+    // can be given; 0157 was edited in place before its first release. 262,144 is the limit 0158 sets for a gap round's content.
+    const whole = read(SQL_PATH);
+    const sql = code(whole);
+    const path = tableBody(sql, "core.start_path");
+    expect(path).toContain("start_path_viewpoint_count_check CHECK (viewpoint_count BETWEEN 0 AND 54)");
+    expect(path).toContain("start_path_content_size CHECK (octet_length(content_ciphertext::text) <= 262144)");
+    const at = sql.indexOf("CREATE OR REPLACE FUNCTION core.record_start_paths(");
+    const writer = sql.slice(at, sql.indexOf("$$;", sql.indexOf("AS $$", at)));
+    expect(writer).toContain("(path.value->>'viewpoint_count') !~ '^([0-9]|[1-4][0-9]|5[0-4])$'");
+    for (const old of ["BETWEEN 0 AND 4", "<= 65536", "'^[0-4]$'"]) expect(whole, old).not.toContain(old);
+    // The writer's pattern takes every count a merge can make, written as JSON writes a number, and nothing else.
+    const pattern = new RegExp(/\(path\.value->>'viewpoint_count'\) !~ '([^']+)'/u.exec(writer)![1]!, "u");
+    for (let count = 0; count <= START_STEP_LIMITS.viewpointsMax; count += 1) expect(pattern.test(String(count)), String(count)).toBe(true);
+    for (const refused of [String(START_STEP_LIMITS.viewpointsMax + 1), "60", "99", "100", "054", "00", "-1", "4.0", "1e1", " 5"]) {
+      expect(pattern.test(refused), refused).toBe(false);
+    }
   });
 
   it("C-G: seven EXECUTE grants to the runtime only, and no new core function is left to PUBLIC (the content-provision boot count)", () => {

@@ -45,10 +45,10 @@ CREATE TABLE IF NOT EXISTS core.start_path (
   path_id text NOT NULL CONSTRAINT start_path_id_check CHECK (path_id ~ '^b[1-8]$'),
   path_no smallint NOT NULL CONSTRAINT start_path_no_check CHECK (path_no BETWEEN 1 AND 8),
   author text NOT NULL CONSTRAINT start_path_author_check CHECK (author IN ('AI_SUGGESTION', 'AI_COMBINED', 'PERSON_EDITED', 'PERSON_OWN_VIEW')),
-  viewpoint_count smallint NOT NULL CONSTRAINT start_path_viewpoint_count_check CHECK (viewpoint_count BETWEEN 0 AND 4),
+  viewpoint_count smallint NOT NULL CONSTRAINT start_path_viewpoint_count_check CHECK (viewpoint_count BETWEEN 0 AND 54),
   has_own_words boolean NOT NULL,
   recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  content_ciphertext jsonb NOT NULL CONSTRAINT start_path_content_size CHECK (octet_length(content_ciphertext::text) <= 65536),
+  content_ciphertext jsonb NOT NULL CONSTRAINT start_path_content_size CHECK (octet_length(content_ciphertext::text) <= 262144),
   content_attestation bytea NOT NULL,
   PRIMARY KEY (run_id, path_id),
   UNIQUE (run_id, path_no),
@@ -116,7 +116,7 @@ BEGIN
         OR pg_catalog.jsonb_typeof(path.value->'path_id') <> 'string' OR (path.value->>'path_id') <> 'b' || path.ordinality::text
         OR pg_catalog.jsonb_typeof(path.value->'path_no') <> 'number' OR (path.value->>'path_no') <> path.ordinality::text
         OR pg_catalog.jsonb_typeof(path.value->'author') <> 'string'
-        OR pg_catalog.jsonb_typeof(path.value->'viewpoint_count') <> 'number' OR (path.value->>'viewpoint_count') !~ '^[0-4]$'
+        OR pg_catalog.jsonb_typeof(path.value->'viewpoint_count') <> 'number' OR (path.value->>'viewpoint_count') !~ '^([0-9]|[1-4][0-9]|5[0-4])$'
         OR pg_catalog.jsonb_typeof(path.value->'has_own_words') <> 'boolean'
         OR pg_catalog.jsonb_typeof(path.value->'content') <> 'object'
         OR pg_catalog.jsonb_typeof(path.value->'attestation') <> 'string' OR (path.value->>'attestation') !~ '^[0-9a-f]{64}$') THEN

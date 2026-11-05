@@ -4,7 +4,7 @@
 // Data is made up.
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { StartMenuSchema, type StartMenu } from "@debateai/contract";
+import { START_STEP_LIMITS, StartMenuSchema, type StartMenu } from "@debateai/contract";
 import {
   START_PATH_CARRIER, START_PATH_SET_CARRIER, PostgresStartPathsStore, configureContentEncryption, contentCipherFor, createPool,
   decryptLeasedContentForRun, encryptAttestedContentForRun, migrate, prepareLeasedContentEncryptionForRun, withRunContentLease,
@@ -186,6 +186,64 @@ describe("a debate's chosen paths, sealed under its own key", () => {
     expect(await store.readStartPaths(runId)).toBeNull();
     const legacy = await createLegacyStoryRun(database.pool, QUESTION, `legacy:${randomUUID()}`);
     await expect(store.recordStartPaths(setOf(legacy))).rejects.toMatchObject({ code: "START_PATHS_NOT_SEALED" });
+  });
+});
+
+describe("a merged path of any size (Task 92b: 0157 holds 0..54 members and a sealed path up to 256 KiB)", () => {
+  /** The menu's viewpoint ids in order, pt11..pt96 (VIEWPOINT_ID_PATTERN), the first `count` of them. */
+  const viewpointIds = (count: number): readonly string[] =>
+    Array.from({ length: 9 }, (_row, list) => Array.from({ length: 6 }, (_one, no) => `pt${list + 1}${no + 1}`)).flat().slice(0, count);
+  const menuMember = (viewpointId: string, title: string, question: string): StoredStartPath["viewpoints"][number] =>
+    ({ viewpointId, pickNo: null, title, question, own: false });
+
+  it("a path holding the merge's group of six records and reads back whole", async () => {
+    const six = viewpointIds(6).map((id, index) => menuMember(id, `Pier worry ${index + 1}`, `Does the second pier change worry ${index + 1}?`));
+    const merged: StoredStartPath = { pathId: "b1", pathNo: 1, author: "AI_SUGGESTION", title: "What the town worries about",
+      question: "Which of the town's worries would a second pier ease?", viewpoints: six, ownWords: [] };
+    const runId = await debate();
+    const set = setOf(runId, { source: "RUN_BUILT", chosenBy: "AIS", paths: [merged, PATHS[1]!], menu: null });
+    expect(await store.recordStartPaths(set)).toBe("RECORDED");
+    const read = await store.readStartPaths(runId);
+    expect(read).toEqual(set);
+    expect(read!.paths[0]!.viewpoints.map((one) => one.viewpointId)).toEqual(["pt11", "pt12", "pt13", "pt14", "pt15", "pt16"]);
+  });
+
+  it("55 members are refused, by the writer and by the table", async () => {
+    const runId = await debate();
+    expect(await sqlError(async () => rawRecord(runId, await rawSet(runId, { path_count: 1 }), [await rawPath(runId, 1, { viewpoint_count: 55 })])))
+      .toMatchObject({ code: "22023", message: "START_PATHS_INVALID" });
+    expect(await store.readStartPathIds(runId)).toBeNull();
+    // Past the writer, as the database's own fixtures write: the table's own rule refuses it.
+    const recorded = await withSet();
+    const sealed = await attested(recorded, START_PATH_CARRIER, "b3");
+    const refused = await sqlError(() => seeded([[`INSERT INTO core.start_path (run_id, path_id, path_no, author, viewpoint_count, has_own_words,
+      content_ciphertext, content_attestation) VALUES ($1, 'b3', 3, 'AI_SUGGESTION', 55, false, $2::jsonb, decode($3, 'hex'))`,
+      [recorded, JSON.stringify(sealed.content), sealed.attestation]]])) as SqlError & { constraint?: string };
+    expect({ code: refused.code, constraint: refused.constraint }).toEqual({ code: "23514", constraint: "start_path_viewpoint_count_check" });
+    expect(await store.readStartPathIds(recorded)).toEqual(["b1", "b2"]);
+  });
+
+  it("the largest legal path seals and records", async () => {
+    // A menu path of 50 viewpoints and 4 own words, every text at its limit in a 3-byte script ("中"), under the person's own title and
+    // question: 54 members. The own words differ in their last character, as four own words of one path must.
+    const L = START_STEP_LIMITS;
+    const viewpoints = viewpointIds(50).map((id) => menuMember(id, "中".repeat(L.titleMaxChars), "中".repeat(L.questionMaxChars)));
+    const own = ["一", "二", "三", "四"].map((last) => `${"中".repeat(L.ownTextMaxChars - 1)}${last}`);
+    const title = "中".repeat(L.pathTitleMaxChars);
+    const question = "中".repeat(L.pathQuestionMaxChars);
+    const largest: StoredStartPath = { pathId: "b1", pathNo: 1, author: "PERSON_EDITED", title, question,
+      viewpoints: [...viewpoints, ...own.map((text) => ({ viewpointId: null, pickNo: null, title: null, question: text, own: true }))],
+      ownWords: [title, question, ...own] };
+    const runId = await debate();
+    const set = setOf(runId, { paths: [largest] });
+    expect(await store.recordStartPaths(set)).toBe("RECORDED");
+    const row = (await database.pool.query<{ viewpoint_count: number; size: number }>(
+      "SELECT viewpoint_count, octet_length(content_ciphertext::text) AS size FROM core.start_path WHERE run_id=$1 AND path_id='b1'", [runId])).rows[0]!;
+    expect(row.viewpoint_count).toBe(54);
+    // Above the old 64 KiB and below the new 256 KiB; the figure itself is never printed.
+    expect(row.size > 65_536, "the sealed path is above 64 KiB").toBe(true);
+    expect(row.size < 262_144, "the sealed path is below 256 KiB").toBe(true);
+    expect(await store.readStartPaths(runId)).toEqual(set);
   });
 });
 
