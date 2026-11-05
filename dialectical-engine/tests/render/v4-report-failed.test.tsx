@@ -24,7 +24,9 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
  * Owner review 3 Nov 2026 (map-f30): the report page of a debate that did not finish has no map to go back to. It says
  * there is no report and links back to the debate's own page ("Back to your question"), where "Ask this again" is; the
  * header's back link says the same. A debate still running keeps "Back to the map".
- * Owner 5 Nov: the classic view is in the account menu only (question 12 B), and no link carries ?level= (the level ruling).
+ * Owner 5 Nov: the classic view is in the account menu only (question 12 B). The level ruling: until the server's run read
+ * names the debate's own level, the way back to this debate keeps the level the report was opened at (?level=), so the map
+ * and its report agree both ways; "Ask a new question" carries none (a new question picks its own level).
  */
 
 let root: Root | null = null;
@@ -76,8 +78,8 @@ describe("the report page of a debate that did not finish (map-f30)", () => {
     await mountReport(runId);
     expect(host!.textContent).toContain(CATALOG["v4.report.failed"]);
     // Under the line, and in the report's own header (t4: V4ReportHeader's arrow link).
-    expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([`/v4/debate/${runId}`]);
-    expect(headerBack()).toEqual({ text: CATALOG["v4.report.backToQuestion"], href: `/v4/debate/${runId}` });
+    expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([`/v4/debate/${runId}?level=background`]);
+    expect(headerBack()).toEqual({ text: CATALOG["v4.report.backToQuestion"], href: `/v4/debate/${runId}?level=background` });
     expect(links(CATALOG["v4.report.backToMap"]!)).toEqual([]);
     // report-f10 (t4 report track): Ask a new question; the classic view only in the account menu.
     expect(links(CATALOG["v4.debate.askNew"]!)).toEqual(["/v4"]);
@@ -90,7 +92,7 @@ describe("the report page of a debate that did not finish (map-f30)", () => {
     harness.run = run(runId, "RUNNING");
     await mountReport(runId);
     expect(host!.textContent).toContain(CATALOG["v4.report.notReady"]);
-    expect(links(CATALOG["v4.report.backToMap"]!)).toEqual([`/v4/debate/${runId}`]);
+    expect(links(CATALOG["v4.report.backToMap"]!)).toEqual([`/v4/debate/${runId}?level=background`]);
     expect(headerBack()?.text).toBe(CATALOG["v4.report.backToMap"]);
     expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([]);
     // Question 12 B: no foot link under the line any more; the account menu holds the classic view.

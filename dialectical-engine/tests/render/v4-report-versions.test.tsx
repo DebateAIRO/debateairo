@@ -125,12 +125,12 @@ const noInvestigation = (runId: string): InvestigationReports =>
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
-async function mountReport(runId: string, level: "plain" | "background" | "expert" = "background"): Promise<HTMLDivElement> {
+async function mountReport(runId: string, level: "plain" | "background" | "expert" = "background", locale = "en"): Promise<HTMLDivElement> {
   const { V4ReportClient } = await import("../../apps/ui/components/v4/V4ReportClient.js");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root?.render(<V4ReportClient id={runId} locale="en" initialLevel={level} catalog={CATALOG} newDebateCatalog={{}} />));
+  await act(async () => root?.render(<V4ReportClient id={runId} locale={locale} initialLevel={level} catalog={CATALOG} newDebateCatalog={{}} />));
   await settle();
   return host;
 }
@@ -315,6 +315,8 @@ describe("the report page's versions", () => {
   });
 
   it("question 4 A (owner, 5 Nov): a start on another day names it in the long form with the year, the clock in 24 hours", async () => {
+    // The long form for start times waits on an owner question (the map's report line still says "4 Nov, 14:02"); this
+    // pins what the report page says until the answer, and changes with the map's whenText when it comes.
     // Pressed just before midnight, read just after it (local time): another day, still well inside the 15 minutes.
     const closed = new Date(2026, 10, 4, 23, 55).toISOString();
     vi.setSystemTime(new Date(2026, 10, 5, 0, 5));
@@ -326,6 +328,24 @@ describe("the report page's versions", () => {
     // The parts, whichever order the site's English puts the day and the month in.
     for (const part of ["November", "2026", ", 23:55."]) expect(status).toContain(part);
     expect(status).not.toMatch(/\b(?:AM|PM)\b/u);
+  });
+
+  it("question 4 A: on another day, a page in another language joins the date and the clock in its own way, not with an English comma", async () => {
+    const closed = new Date(2026, 10, 4, 23, 55).toISOString();
+    vi.setSystemTime(new Date(2026, 10, 5, 0, 5));
+    for (const locale of ["de", "ja"]) {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+        host?.remove();
+      }
+      const runId = crypto.randomUUID();
+      reports.load = vi.fn(async () => investigation(runId, "CLOSED", [{ ...writing(1, 0), closed_at: closed } as InvestigationReportVersion], 0));
+      const node = versionSection(await mountReport(runId, "background", locale))!;
+      const status = text(node.querySelector(".v4RepStatusBox"));
+      const joined = formatDate(locale, closed, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" });
+      expect(status, locale).toBe(word("v4.investigation.writingSince", { time: joined }));
+      expect(status, locale).not.toContain(`${formatDate(locale, closed, { dateStyle: "long" })}, `);
+    }
   });
 
   it("f7: while a dig runs, ONLY the line that names it; with several, the line that says how many", async () => {
@@ -553,9 +573,10 @@ describe("the report page's address and states", () => {
     await settle();
     expect(reports.reads).toEqual([dig, rootRun]);
     expect(window.location.pathname).toBe(`/v4/debate/${rootRun}/report`);
-    // The level ruling (owner, 5 Nov): the report's addresses carry no ?level=.
-    expect(window.location.search).toBe("");
-    expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${rootRun}`);
+    // The level ruling (owner, 5 Nov): until the server names the debate's own level, the moved address and the way back
+    // keep the level the report was opened at, so the map and its report agree both ways.
+    expect(window.location.search).toBe("?level=background");
+    expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${rootRun}?level=background`);
     expect(versionSection(node)).not.toBeNull();
   });
 
@@ -575,7 +596,7 @@ describe("the report page's address and states", () => {
       await settle();
       expect(reports.reads, state).toEqual([dig, rootRun]);
       expect(window.location.pathname, state).toBe(`/v4/debate/${rootRun}/report`);
-      expect(window.location.search, state).toBe("");
+      expect(window.location.search, state).toBe("?level=background");
       expect(node.textContent, state).not.toContain(word("v4.report.notReady"));
       expect(node.textContent, state).not.toContain(word("v4.report.failed"));
       expect(versionSection(node), state).not.toBeNull();
@@ -626,7 +647,9 @@ describe("the report page's address and states", () => {
     // map-f30 first: back to the debate's own page, where "Ask this again" is; then report-f10's Ask a new question.
     expect(links.map((link) => link.textContent)).toEqual([CATALOG["v4.report.backToQuestion"], CATALOG["v4.debate.askNew"]]);
     expect(links[0]!.className).toContain("v4BtnPrimary");
-    expect(links[0]!.getAttribute("href")).toBe(`/v4/debate/${runId}`);
+    // The level ruling: the way back keeps the level the report was opened at (until the server names the debate's own);
+    // a new question picks its own level, so "Ask a new question" carries none.
+    expect(links[0]!.getAttribute("href")).toBe(`/v4/debate/${runId}?level=background`);
     expect(links[1]!.getAttribute("href")).toBe("/v4");
     // Owner 5 Nov, question 12 B (journey-f19, "nowhere else"): the small link under it went; the account menu has it.
     expect(node.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
@@ -651,10 +674,13 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     const row = node.querySelector(".v4RepHdr")!;
     // ask-d6 A: the row ends in the V4 header's round account button.
     expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepLevel", "v4RepMenu v4RepShare", "v4HdrAccount"]);
-    // The level ruling (owner, 5 Nov): the report's links carry no ?level=, the menu's neither.
-    expect(row.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${runId}`);
+    // The level ruling (owner, 5 Nov): until the server names the debate's own level, only the ways back to this debate's
+    // map keep the level the report was opened at; the account menu gets none.
+    expect(row.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${runId}?level=background`);
     expect(row.querySelector(".v4HdrAccount")!.getAttribute("data-level")).toBe("none");
-    expect([...node.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "").filter((href) => href.includes("level="))).toEqual([]);
+    const levelled = [...node.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "").filter((href) => href.includes("level="));
+    expect(levelled.length).toBeGreaterThan(0);
+    expect(new Set(levelled)).toEqual(new Set([`/v4/debate/${runId}?level=background`]));
     // ...and the line above the title says only "Report", with no level (a drafted line).
     expect(node.querySelector(".v4RepMeta")!.textContent).toBe(CATALOG["v4.report.eyebrow"]);
     expect(node.querySelector(".v4RepMeta")!.textContent).not.toContain(CATALOG["v4.readingLevel.background"]);
@@ -696,7 +722,8 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     await press((await shareMenu(node)).print!);
     expect(print).toHaveBeenCalledTimes(2);
     expect(status()).toBe("");
-    // A copy that fails says so, and that line stays too until the next choice.
+    // A copy that fails says so, and that line stays until the next choice (as before: the old timer only cleared "Link
+    // copied.", so this part guards what was already so).
     writeText.mockImplementationOnce(async () => { throw new Error("denied"); });
     await press((await shareMenu(node)).copy!);
     expect(status()).toBe(word("v4.report.copyFailed"));
@@ -705,6 +732,28 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     await press((await shareMenu(node)).copy!);
     expect(status()).toBe(word("v4.report.linkCopied"));
     print.mockRestore();
+  });
+
+  it("question 35 A: a second Copy link clears the line first, so the status line says 'Link copied.' anew and is read out again", async () => {
+    answerFetch(200);
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => noInvestigation(runId));
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const node = await mountReport(runId);
+    const status = () => node.querySelector(".v4RepHdrStatus")!.textContent;
+    await press((await shareMenu(node)).copy!);
+    expect(status()).toBe(word("v4.report.linkCopied"));
+    // The second press: while the copy is under way the line is empty, then it says "Link copied." again. Setting the same
+    // words twice would change nothing on the page, and a screen reader would say nothing the second time.
+    let release: () => void = () => undefined;
+    writeText.mockImplementationOnce(() => new Promise<undefined>((resolveCopy) => { release = () => resolveCopy(undefined); }));
+    await press((await shareMenu(node)).copy!);
+    expect(writeText).toHaveBeenCalledTimes(2);
+    expect(status()).toBe("");
+    await act(async () => release());
+    await settle();
+    expect(status()).toBe(word("v4.report.linkCopied"));
   });
 
   it("f11: once a report stands, Share offers that version's PDF, made inside the page with 'Making your PDF…'", async () => {
@@ -875,8 +924,9 @@ describe("the report's digs (review F6, F7)", () => {
     const digs = node.querySelector(".v4RepDigs")!;
     expect(digs.querySelectorAll(".v4RepDig")).toHaveLength(1);
     expect(node.textContent).not.toContain(CATALOG["v4.common.loading"]);
-    // The level ruling (owner, 5 Nov): the dig's map link carries no ?level=.
-    expect(digs.querySelector("a.v4RepDigLink")!.getAttribute("href")).toBe(`/v4/debate/${child}`);
+    // The level ruling (owner, 5 Nov): a dig keeps its first question's level; until the server names it, the dig's map
+    // link carries the level the report was opened at.
+    expect(digs.querySelector("a.v4RepDigLink")!.getAttribute("href")).toBe(`/v4/debate/${child}?level=background`);
   });
 
   it("F7: while the report waits, each dig is read again with the versions, so the line names the dig really still going", async () => {

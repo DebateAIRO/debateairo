@@ -11,7 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *   question 12 B  "Open in the classic view" is in the account menu only (journey-f19, "nowhere else"): the report page's
  *                  foot link and its small link under "Ask a new question" went, and the report header's round account
  *                  button now carries it, once, just above "Sign out".
- *   level ruling   the reading level is fixed for a debate: the report's links carry no ?level=, the menu's neither.
+ *   level ruling   the reading level is fixed for a debate: the account menu's links carry no ?level= (the report's ways
+ *                  back to its own map keep it until the server names the debate's level; v4-report-versions covers those).
  * The real account menu, inside the report's own header row.
  */
 vi.mock("@/lib/api", () => ({
@@ -64,9 +65,11 @@ async function openMenu(): Promise<void> {
 describe("the report header's account menu (owner 5 Nov)", () => {
   it("question 12 B: holds 'Open in the classic view' once, just above Sign out, to the debate's classic page", async () => {
     const node = await mount({ classicHref: `/debate/${RUN}` });
-    // The row itself shows no classic link: only the menu does.
-    expect(node.querySelector(`.v4RepHdr > a[href="/debate/${RUN}"]`)).toBeNull();
+    // Nowhere in the whole header (its row, the steps under it, the status line) until the menu opens...
+    expect(node.querySelectorAll(`a[href="/debate/${RUN}"]`)).toHaveLength(0);
     await openMenu();
+    // ...and then once on the whole page: the menu's own item.
+    expect(document.querySelectorAll(`a[href="/debate/${RUN}"]`)).toHaveLength(1);
     const classic = [...document.querySelectorAll("[data-v4-menu=classic]")];
     expect(classic).toHaveLength(1);
     expect(classic[0]!.textContent).toBe(CATALOG["v4.common.classicView"]);

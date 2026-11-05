@@ -22,7 +22,7 @@ import {
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { waitForDigs } from "@/lib/v4/digUndo";
-import { useReadingLevel } from "@/lib/v4/storage";
+import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
 } from "@/lib/v4/types";
@@ -61,10 +61,15 @@ import {
  * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers" and its follow-ups):
  *  - 12 B: "Open in the classic view" only in the header's account menu (journey-f19, "nowhere else"); the foot link and the
  *    small link under "Ask a new question" went.
- *  - 35 A: "Link copied." (and the copy-failed line) stays until the next Share choice, as the "Public" line's does.
- *  - The level ruling: a debate keeps the level it was asked at; no link or address of this page carries ?level=, and the
- *    line above the title says "Report" with no level.
- *  - 4 A: the version list and the start of writing on another day in the long form with the year, clocks in 24 hours.
+ *  - 35 A: "Link copied." stays until the next Share choice, as the "Public" line's does (the copy-failed line already
+ *    did). Each choice first clears the line, so a second "Link copied." is read out again.
+ *  - The level ruling: a debate keeps the level it was asked at, and the line above the title says "Report" with no level.
+ *    Until the server's run read names that level (reading_level), the links to this debate's map and its digs' maps, and
+ *    the address moves, still carry ?level=, so the map and its report keep one level both ways; they drop it in the same
+ *    change that reads reading_level. "Ask a new question" carries none: a new question picks its own level.
+ *  - 4 A: the version list in the long form with the year, clocks in 24 hours. The start of writing on another day in the
+ *    long form too ("Started 4 November 2026, 14:02") waits on an owner question (the map's report line still says
+ *    "4 Nov, 14:02"; whichever form stands, lib/v4/stateWords.ts whenText follows in the same change).
  */
 
 type Props = Readonly<{
@@ -345,7 +350,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // Decision A: the level lives in the address; choosing one rewrites `?level=` (useReadingLevel does that).
   // Owner's level ruling (5 Nov): the report shows its details at the level its debate was asked at. Until the server's run
   // read names that level (reading_level, coming on the other session's branch), the details keep today's level (the
-  // address, else the account); the page's own links and addresses no longer carry it.
+  // address, else the account), and the links back to this debate's map and its digs, and the address moves below, keep
+  // carrying it (the map's links into this page carry it too), so the round trip never depends on the account's memory.
+  // The change that reads reading_level drops ?level= from all of them at once.
   const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
   const level: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
 
@@ -387,6 +394,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // names the first question: its report address moves there as well. Its own line shows only once that read has answered.
   const notReady = load.kind === "NOT_READY";
   const [rootChecked, setRootChecked] = useState<string | null>(null);
+  const levelForMove = useRef(chosenLevel);
+  levelForMove.current = chosenLevel;
   useEffect(() => {
     if (!notReady) return;
     let active = true;
@@ -395,7 +404,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       if (!active) return;
       const root = read?.root_run_id ?? null;
       if (root !== null && root.toLowerCase() !== target.toLowerCase()) {
-        window.history.replaceState(null, "", `/v4/debate/${encodeURIComponent(root)}/report`);
+        window.history.replaceState(null, "", levelHref(`/v4/debate/${encodeURIComponent(root)}/report`, levelForMove.current));
         setTarget(root);
         return;
       }
@@ -482,9 +491,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const elsewhere = runId !== null && rootRunId !== null && rootRunId.toLowerCase() !== runId.toLowerCase();
   useEffect(() => {
     if (!elsewhere || rootRunId === null) return;
-    window.history.replaceState(null, "", `/v4/debate/${encodeURIComponent(rootRunId)}/report`);
+    window.history.replaceState(null, "", levelHref(`/v4/debate/${encodeURIComponent(rootRunId)}/report`, chosenLevel));
     setTarget(rootRunId);
-  }, [elsewhere, rootRunId]);
+  }, [elsewhere, rootRunId, chosenLevel]);
 
   // Decision A: digs are found again from the account's question list (lib/v4/digIndex.ts); read once — the report is a
   // snapshot. Digs are newer than their parent, so the list is paged only until this run has been seen (FIXES2,
@@ -577,8 +586,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const language = load.kind === "SERVED" ? load.language : null;
   const ai = aiProps(language);
 
-  const mapHref = `/v4/debate/${encodeURIComponent(target)}`;
+  const mapHref = levelHref(`/v4/debate/${encodeURIComponent(target)}`, chosenLevel);
   const classicHref = `/debate/${encodeURIComponent(target)}`;
+  // A new question picks its own level on the first screen (owner, 5 Nov: it starts on "Plain words"), so no ?level= here.
   const askHref = "/v4";
   // Owner review 3 Nov (map-f30): a debate that did not finish has no map; the way back is to its page, which offers
   // "Ask this again". Review F5: only once the page knows it stays here (a failed dig's address moves to the first
@@ -601,7 +611,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     return () => { active = false; };
   }, [current, pdfHref]);
 
-  // Question 35 A: what a Share choice says stays until the next Share choice, which replaces it (Print clears it).
+  // Question 35 A: what a Share choice says stays until the next Share choice, which replaces it (Print clears it). Copy
+  // link clears the line first, so a second "Link copied." is a new line the status region reads out again.
   const [shareNote, setShareNote] = useState<ShareNote | null>(null);
   const savePdfNow = async () => {
     if (pdfHref === null || current === null) return;
@@ -611,6 +622,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   };
   const copyLink = async () => {
     if (runId === null) return;
+    setShareNote(null);
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/v4/debate/${encodeURIComponent(runId)}/report`);
       if (alive.current) setShareNote("COPIED");
@@ -714,7 +726,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // A read that failed cannot say whether a report exists, so the first answer waits behind the same closed row.
   const firstFolded = hasReport || investigation.state.kind === "FAILED";
   const first = (
-    <FirstAnswer map={map} level={level} locale={locale} catalog={catalog} language={language}
+    <FirstAnswer map={map} level={level} chosenLevel={chosenLevel} locale={locale} catalog={catalog} language={language}
       digs={digs} digsReady={digsReady} storyPending={storyPending} retrying={retrying} />
   );
 
@@ -769,9 +781,10 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
 }
 
 /** The first debate's own answer and parts: open before any report exists, behind a closed row once one does (report-f3). */
-function FirstAnswer({ map, level, locale, catalog, language, digs, digsReady, storyPending, retrying }: Readonly<{
+function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs, digsReady, storyPending, retrying }: Readonly<{
   map: V4Map;
   level: ReadingLevel;
+  chosenLevel: ReadingLevel | null;
   locale: string;
   catalog: MessageCatalog;
   language: string | null;
@@ -870,7 +883,7 @@ function FirstAnswer({ map, level, locale, catalog, language, digs, digsReady, s
           <h2 id="v4-report-digs" className="v4RepH2">{t(catalog, "v4.report.digsHeading")}</h2>
           {digsReady ? (
             <ul className="v4RepDigs">
-              {digs.map((dig) => <ReportDigItem key={dig.link.childRunId} dig={dig} catalog={catalog} language={language} />)}
+              {digs.map((dig) => <ReportDigItem key={dig.link.childRunId} dig={dig} level={chosenLevel} catalog={catalog} language={language} />)}
             </ul>
           ) : <p className="v4RepNote" role="status">{t(catalog, "v4.common.loading")}</p>}
         </section>
@@ -978,8 +991,9 @@ function ReportPath({ path, level, catalog, locale, language, debateNote }: Read
   );
 }
 
-function ReportDigItem({ dig, catalog, language }: Readonly<{
+function ReportDigItem({ dig, level, catalog, language }: Readonly<{
   dig: ReportDig;
+  level: ReadingLevel | null;
   catalog: MessageCatalog;
   language: string | null;
 }>) {
@@ -1005,7 +1019,7 @@ function ReportDigItem({ dig, catalog, language }: Readonly<{
         <div className="v4RepBar"><V4TrustBar counts={view.counts} catalog={catalog} size="small" /></div>
       ) : null}
       {view?.state === "DONE" ? (
-        <Link className="v4Link v4RepDigLink" href={`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`}>
+        <Link className="v4Link v4RepDigLink" href={levelHref(`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`, level)}>
           {t(catalog, "v4.report.digOpenMap")}
         </Link>
       ) : null}
@@ -1024,14 +1038,20 @@ const CLOCK: Intl.DateTimeFormatOptions = { timeStyle: "short", hourCycle: "h23"
 /** Question 4 A (owner, 5 Nov): a report's dates in the long form with the year ("4 November 2026", report-f13). */
 const LONG_DATE: Intl.DateTimeFormatOptions = { dateStyle: "long" };
 
+/** English page languages ("en", "en-GB", "en-US"): the ones whose date and clock the owner's record joins with ", ". */
+const ENGLISH = /^en(?:-|$)/iu;
+
 /**
  * report-f7: a clock time ("Started 14:02"); on another day the long date with the year before it ("Started 4 November
- * 2026, 14:02", question 4 A: start times keep no short form of their own). Nothing ticks.
+ * 2026, 14:02", the form question 4 A gives every date; still an open owner question for start times, see the header
+ * note). English joins the two the way the owner's record writes them ("29 October 2026, 14:30"); every other language
+ * lets its own date format join them (German "4. November 2026 um 14:02", Japanese "2026年11月4日 14:02"). Nothing ticks.
  */
 function clockTime(locale: string, at: number): string {
   const sameDay = new Date(at).toDateString() === new Date().toDateString();
   const time = formatDate(locale, at, CLOCK);
-  return sameDay ? time : `${formatDate(locale, at, LONG_DATE)}, ${time}`;
+  if (sameDay) return time;
+  return ENGLISH.test(locale) ? `${formatDate(locale, at, LONG_DATE)}, ${time}` : formatDate(locale, at, { ...LONG_DATE, ...CLOCK });
 }
 
 type PressKind = "write" | "reopen";
