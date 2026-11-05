@@ -287,7 +287,9 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   "core.claim_run_key_provision_cleanup(integer)",
   "core.complete_run_key_provision_cleanup(uuid,uuid)",
   // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
-  "core.prepare_readmitted_run_key_provision(uuid,uuid)"
+  "core.prepare_readmitted_run_key_provision(uuid,uuid)",
+  // V4 start step (0161, plan 2026-11-03 Task 56a): a carry-on dig of a debate's chosen path, without a live sign-in.
+  "core.prepare_carry_on_run_key_provision(uuid,uuid,text)"
 ] as const);
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
   "public",
@@ -1843,8 +1845,16 @@ export type StoredAsk = Readonly<{
   contentEncrypted: boolean;
 }>;
 
+/**
+ * Whose new run `startRun` writes. A server principal's `carryOn` (V4 start step, 0161, plan 2026-11-03 Task 56a) makes the run a carry-on
+ * dig of `parentRunId`'s chosen path `pathId`: its key is provisioned from the debate's own binding (the same user and identity session,
+ * signed out or not), so no live session is needed and `sessionId` is not read; the debate must be the principal's own.
+ */
 export type RunCreationPrincipal =
-  | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
+  | Readonly<{
+      readonly kind: "server"; readonly userId: string; readonly ownerRef: string;
+      readonly carryOn?: Readonly<{ parentRunId: string; pathId: string }>;
+    }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
 /**
@@ -1863,6 +1873,11 @@ export type StartReadmittedRunInput = Omit<StartRunInput, "principal" | "session
 /** The codes 0123's re-admission key provision refuses with (55000, MESSAGE = code), surfaced typed. */
 const READMISSION_REFUSALS: ReadonlySet<string> = new Set([
   "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_READMISSION_TAKEN"
+]);
+
+/** The codes 0161's carry-on dig key provision refuses with (55000, MESSAGE = code), surfaced typed as the re-admission's are. */
+const CARRY_ON_DIG_REFUSALS: ReadonlySet<string> = new Set([
+  "CARRY_ON_DIG_INVALID", "CARRY_ON_DIG_OWNER_GONE", "CARRY_ON_DIG_TAKEN"
 ]);
 
 /**
@@ -2298,11 +2313,45 @@ export class RunRepository {
     admissionClient?: PoolClient
   ): Promise<string> {
     const principal = input.principal;
+    const carryOn = principal.kind === "server" ? principal.carryOn : undefined;
+    if (principal.kind === "server" && carryOn !== undefined) {
+      // 0161 (V4 start step, Task 56a): the debate a carry-on digs is the principal's own encrypted run, read before anything is
+      // provisioned, as startReadmittedRun reads the run it re-admits. 0161's prepare checks the rest under the account's lock.
+      const parent = UUID_V4.test(carryOn.parentRunId) ? (await this.pool.query<{ asker_id: string; encrypted: boolean }>(
+        `SELECT asker_id, content_encryption_version IS NOT DISTINCT FROM 1 AS encrypted
+         FROM core.run WHERE run_id = $1`,
+        [carryOn.parentRunId]
+      )).rows[0] : undefined;
+      if (parent === undefined || !parent.encrypted || parent.asker_id !== `owner:${principal.ownerRef}`) {
+        throw new TypedDomainError("CARRY_ON_DIG_INVALID", "The debate to dig is not this principal's own encrypted run");
+      }
+    }
     const identity: RunRowIdentity = principal.kind === "legacy"
       ? Object.freeze({ kind: "plain", askerId: principal.legacyAskerId, sessionId: input.sessionId, callerScope: input.callerScope })
       : Object.freeze({
           kind: "encrypted", ownerRef: principal.ownerRef, callerScope: input.callerScope,
           prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
+            if (carryOn !== undefined) {
+              // 0161: the key is provisioned from the debate's own binding (its user and identity session, signed out or not), so
+              // no live session is needed and the session id is not read. Refused typed, as the re-admission's provision is.
+              let rows: ReadonlyArray<{ execution_ref: string | null; user_id: string | null }>;
+              try {
+                rows = (await executor.query<{ execution_ref: string | null; user_id: string | null }>(
+                  "SELECT execution_ref::text AS execution_ref, user_id::text AS user_id FROM core.prepare_carry_on_run_key_provision($1,$2,$3)",
+                  [carryOn.parentRunId, runId, carryOn.pathId]
+                )).rows;
+              } catch (error) {
+                const code = error instanceof Error ? error.message : undefined;
+                if (code !== undefined && CARRY_ON_DIG_REFUSALS.has(code)) throw new TypedDomainError(code, code);
+                throw error;
+              }
+              const executionRef = rows[0]?.execution_ref ?? "";
+              const userId = rows[0]?.user_id ?? "";
+              if (!UUID_V4.test(executionRef) || userId.toLowerCase() !== principal.userId.toLowerCase()) {
+                throw new TypedDomainError("RUN_OWNER_INVALID", "The carry-on dig's key provision answered no binding of this user");
+              }
+              return Object.freeze({ executionRef, userId });
+            }
             if (!UUID_V4.test(input.sessionId)) {
               throw new TypedDomainError(
                 "RUN_OWNER_INVALID",

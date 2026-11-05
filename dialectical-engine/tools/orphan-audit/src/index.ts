@@ -627,7 +627,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Task 21 comments above now name 0157 and 0158 (the start step's three migrations moved up one again). Comments only;
 // migrate() is byte-identical.
 // V4 start step Task 53a (2026-11-04): one comment and one export line for the path progress repository (0159). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "c6acf77300574c43a4d4e0c53633aa6c63350b49d2f56ecf0b6b58ca43504ea3";
+// V4 start step Task 56a (2026-11-05): startRun's carry-on dig (0161: RunCreationPrincipal's carryOn, CARRY_ON_DIG_REFUSALS, the
+// content-provision list's new prepare). migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+const NATIVE_MIGRATE_MODULE_SHA256 = "0bec81180e644e41df98f07a56707ec14daad5a1725833600305952597100866";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
