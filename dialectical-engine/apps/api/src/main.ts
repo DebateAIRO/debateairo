@@ -37,6 +37,8 @@ import { startStepKeyFrom } from "./start-step/signing.js";
 import { createStartStep, startStepRouteOf } from "./start-step/step.js";
 // V4 start step, Task 36: the one chosen paths store, for the AskApplication and the API.
 import { PostgresStartPathsStore } from "@debateai/db";
+// V4 start step, Task 56b: Task 53a's counts of a public debate's report versions, for the person's own closings of it.
+import { PostgresOwnClosingsReader } from "@debateai/db";
 import { createStartTransport } from "./start-step/transport.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
@@ -1882,6 +1884,9 @@ const api = buildApi({
   startStepKey,
   // V4 start step, Task 36: the same chosen paths store the AskApplication holds.
   startPaths,
+  // V4 start step, Task 56b (owner answer Q20 B): a public debate's report counts, on this pool (0159 grants them to its billing role),
+  // so the owner's first report of their own public debate uses the kept reserve and a further one waits for the reset.
+  ownClosings: new PostgresOwnClosingsReader(pool),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).

@@ -155,7 +155,13 @@ export const InvestigationReportsSchema = z.object({
   state: z.enum(["OPEN", "CLOSED"]),
   digs: z.number().int().min(0).max(INVESTIGATION_REPORT_LIMITS.digsMax),
   versions: z.array(InvestigationReportVersionSchema).max(INVESTIGATION_REPORT_LIMITS.versionsMax),
-  current: z.number().int().positive().nullable()
+  current: z.number().int().positive().nullable(),
+  /**
+   * V4 start step, Task 56b (item public-f25; owner answer Q20 B: only a debate's very first report uses the kept reserve): on the
+   * owner's read only, whether their next "Write my report" would be the debate's first report (none written or being written, theirs
+   * or a visitor's), which goes ahead while new starts wait for the reset. A yes or no only; absent where the API reads no counts.
+   */
+  first_closing_left: z.boolean().optional()
 }).strict().superRefine((read, context) => {
   if (read.versions.some((version, at) => version.report_version !== at + 1)) {
     context.addIssue({ code: "custom", message: "report versions are 1, 2, 3… in order" });

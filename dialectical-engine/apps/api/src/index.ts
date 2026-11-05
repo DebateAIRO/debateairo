@@ -158,6 +158,7 @@ import {
   InvestigationReopenRequestSchema,
   InvestigationReopenedSchema,
   InvestigationReportAcceptedSchema,
+  InvestigationReportsSchema,
   InvestigationReportWritingSchema,
   INVESTIGATION_REPORT_WRITING,
   RunContinueRefusedSchema,
@@ -204,6 +205,8 @@ import {
   PostgresInvestigationReportRepository, PostgresOwnClosingsReader, PostgresPathProgressRepository, PostgresPublicPageRepository,
   PostgresPublicTreeRepository as PublicTreeOfRunReader, type RunLoadingProjection
 } from "@debateai/db";
+// V4 start step, Task 56b: Task 53a's counts of a public debate's report versions, for the person's own closings of it.
+import type { OwnClosingsStore } from "@debateai/db";
 import type { CarryOnPart } from "@debateai/contract";
 import { carryOnPartOf, carryOnReportOfInvestigation, carryOnReportOfPublic, type CarryOnReportState } from "./carry-on-part.js";
 import { ServeRepository, SynthesisCheckRepository, readSynthesisTexts, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
@@ -1874,6 +1877,47 @@ export type PublicTreeOptions = Readonly<{
   readPublicDebate: (publicationRef: string) => Promise<PublicDebate | null>;
 }>;
 
+/**
+ * V4 start step, Task 56b (item public-f25; owner answer Q20 B: "Only a debate's very first report uses the kept reserve: if a visitor
+ * wrote the first report, the owner's own report waits for the next month"). The person's own closings of one debate, codes and counts
+ * only (no content opened): `privateClosings`, the versions of the investigation it is in that did not fail (a written one, or the newest
+ * still being written; one that FAILED, or was reopened before it was written, wrote nothing); `ownPublicReports` and `publicReports`,
+ * Task 53a's counts of its public report versions that did not fail, the person's and every writer's (the person's own included).
+ */
+export type OwnClosings = Readonly<{ privateClosings: number; ownPublicReports: number; publicReports: number }>;
+
+/** The person's next press would be the debate's first report: none written or being written, theirs or a visitor's (answer Q20). */
+export function ownFirstClosingLeft(own: OwnClosings): boolean {
+  return own.privateClosings === 0 && own.publicReports === 0;
+}
+
+/** The person's own reports of this debate, never a visitor's (Task 56's carry-on counts them). */
+export function ownClosingsCount(own: OwnClosings): number {
+  return own.privateClosings + own.ownPublicReports;
+}
+
+/**
+ * Task 56b: the person's own closings of a debate, from 0136's reports read (a debate in no investigation has none) and, for a public
+ * debate (`publicationRef`: the publication it is the root of), Task 53a's counts. Null without the counts port: the routes then answer
+ * as they did before Task 56b.
+ */
+export async function ownClosingsOf(input: Readonly<{ ownerRef: string; runId: string; publicationRef: string | null }>,
+  ports: Readonly<{ reports: InvestigationReportPorts["reports"]; ownClosings: OwnClosingsStore | undefined }>): Promise<OwnClosings | null> {
+  if (ports.ownClosings === undefined) return null;
+  const read = await ports.reports.read(input.ownerRef, input.runId);
+  const closings = read?.investigation.closings ?? [];
+  const outcomeOf = new Map((read?.reports ?? []).map((report) => [report.report_version, report.outcome] as const));
+  const newest = Math.max(0, ...closings.map((closing) => closing.report_version));
+  const privateClosings = closings.filter((closing) => {
+    const outcome = outcomeOf.get(closing.report_version);
+    // Not written yet: only the newest closing, still closed, is being written (./investigation-report.ts reads them so).
+    return outcome === undefined ? closing.reopened_at === null && closing.report_version === newest : outcome !== "FAILED";
+  }).length;
+  const counts = input.publicationRef === null ? Object.freeze({ own: 0, all: 0 })
+    : await ports.ownClosings.countPublicReports(input.ownerRef, input.publicationRef);
+  return Object.freeze({ privateClosings, ownPublicReports: counts.own, publicReports: counts.all });
+}
+
 export interface ApiOptions {
   readonly questionCheck?: AskQuestionCheck;
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
@@ -2109,6 +2153,14 @@ export interface ApiOptions {
    * `submit` does, in its START_PATHS setup step; the later steps that read the marks (the carry-on, Task 56) take it from here.
    */
   readonly startPaths?: StartPathsStore;
+  /**
+   * V4 start step, Task 56b (item public-f25; owner answer Q20 B): Task 53a's counts of a public debate's report versions
+   * (`PostgresOwnClosingsReader`, on the API's own pool: 0159 grants identity.count_public_reports to its billing role only). With it,
+   * the owner's "Write my report" on their own public debate, and their press on its public page, go ahead while new starts wait for
+   * the reset when the press is the debate's first report (the kept reserve), and the owner's investigation read says so
+   * (`first_closing_left`). Absent: both presses and the read answer as before.
+   */
+  readonly ownClosings?: OwnClosingsStore;
 }
 
 /**
@@ -3593,6 +3645,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan) });
     return { planId: room.planId, waitsForReset: room.newStarts === "BLOCKED_UNTIL_RESET" };
   };
+  // V4 start step, Task 56b (owner answer Q20 B): the publication a debate is the public root of, as the report route reads it; null for a
+  // private debate and for a dig (a dig's report is its investigation's).
+  const publicRootOf = async (runId: string): Promise<string | null> => {
+    const tree = await options.publicTree?.tree.readTreeOfRun(runId);
+    return tree === null || tree === undefined || tree.dig_update_id !== null ? null : tree.publication_ref;
+  };
+  // Task 56b: whether a press on the person's OWN public debate is its first report (none written or being written, theirs or a
+  // visitor's), which then uses the kept reserve instead of waiting for the reset. Asked only while new starts wait. False without the
+  // counts (today's rule) and for anyone but the debate's owner, decided as the owner routes decide it (`investigationReports.owns`).
+  const ownFirstReportLeft = async (ownerRef: string, runId: string, publicationRef: string): Promise<boolean> => {
+    const reports = options.investigationReports;
+    if (reports === undefined || options.ownClosings === undefined || !(await reports.owns(ownerRef, runId))) return false;
+    const own = await ownClosingsOf({ ownerRef, runId, publicationRef }, { reports: reports.reports, ownClosings: options.ownClosings });
+    return own !== null && ownFirstClosingLeft(own);
+  };
+  // Task 56b: the same rule on the public page, where the presser names the publication: its debate is 0151's read of the run the
+  // publication is of (the flag route's `readTarget`); without that read the press is a stranger's, as today.
+  const ownFirstReportLeftOnPage = async (ownerRef: string, publicationRef: string): Promise<boolean> => {
+    if (options.ownClosings === undefined || options.publicFlags === undefined) return false;
+    const runId = await options.publicFlags.repository.readTarget(publicationRef);
+    return runId !== null && await ownFirstReportLeft(ownerRef, runId, publicationRef);
+  };
   // Decision 13: the page a dig names. `public_parent` is a stranger's (the page is all they know); a `parent` the person owns goes public-side once that debate is public, or is an allowed contribution.
   const publicParentOf = async (ask: AskRequest): Promise<PublicDigParent | null> => {
     if (options.publicTree === undefined) return null;
@@ -3962,7 +4036,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!PublicReportRequestSchema.safeParse(request.body ?? {}).success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     if (!admitOrRefuse(reply, "asks", "POST /v1/public/debates/{id}/report", ownerRef)) return reply;
     const room = await roomOfPerson(request, ownerRef);
-    if (room.waitsForReset) return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+    // Task 56b (owner answer Q20 B): the debate's owner presses its first report from the kept reserve, as from "Write my report".
+    if (room.waitsForReset && !(await ownFirstReportLeftOnPage(ownerRef, publicationRef.data))) {
+      return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+    }
     const press = await pressPublicReport({ ownerRef, publicationRef: publicationRef.data, reportId: randomUUID(), free: room.planId === "FREE", now: new Date(), pool: store.pool, tree: store.tree,
       readPublicDebate: store.readPublicDebate });
     switch (press.kind) {
@@ -5264,7 +5341,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const target = memoryRunOf(request);
     if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     const read = await readInvestigationReports(target, options.investigationReports);
-    return read === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(read);
+    if (read === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    // Task 56b: whether the person's next press would be the debate's first report (the owner's read only; absent without the counts).
+    if (options.ownClosings === undefined) return reply.send(read);
+    const own = await ownClosingsOf({ ...target, publicationRef: await publicRootOf(target.runId) },
+      { reports: options.investigationReports.reports, ownClosings: options.ownClosings });
+    return reply.send(own === null ? read : InvestigationReportsSchema.parse({ ...read, first_closing_left: ownFirstClosingLeft(own) }));
   });
   api.post<{ Params: { id: string } }>("/v1/runs/:id/report", credentialRoutePolicy("POST /v1/runs/{id}/report"), async (request, reply) => {
     const target = memoryRunOf(request);
@@ -5276,7 +5358,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const publicTree = await options.publicTree?.tree.readTreeOfRun(target.runId);
     if (publicTree !== null && publicTree !== undefined && publicTree.dig_update_id === null && options.publicTree !== undefined) {
       const room = await roomOfPerson(request, target.ownerRef);
-      if (room.waitsForReset) return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+      // Task 56b (owner answer Q20 B): the debate's first report uses the kept reserve (charged as today, to the person, on the public
+      // report's seam); a further one, after the person's own or a visitor's, waits for the reset like a dig.
+      if (room.waitsForReset && !(await ownFirstReportLeft(target.ownerRef, target.runId, publicTree.publication_ref))) {
+        return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+      }
       const press = await pressPublicReport({ ownerRef: target.ownerRef, publicationRef: publicTree.publication_ref, reportId: randomUUID(), free: room.planId === "FREE", now: new Date(),
         pool: options.publicTree.pool, tree: options.publicTree.tree, readPublicDebate: options.publicTree.readPublicDebate });
       switch (press.kind) {
