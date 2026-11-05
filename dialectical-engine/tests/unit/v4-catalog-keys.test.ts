@@ -52,6 +52,17 @@ const APPROVED_REPORT_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.investigation.noStory": "We couldn't write a short answer this time. The parts below show everything the AIs found."
 });
 
+/**
+ * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers"), the map's and the report's words
+ * the owner gave in the second round of follow-ups, word for word: "Your report starts when the digs in progress finish."
+ * (question 23 A's line, quoted whole for the report page and the map) and "See my report" (question 2 A's words, named in
+ * the phone rule of question 18). Every other new line of those answers waits on DRAFTED_UNTIL_CLICK_TEST.
+ */
+const REPORT_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.rail.seeReport": "See my report",
+  "v4.investigation.waitingDigs.other": "Your report starts when the digs in progress finish."
+});
+
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
 const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // The wave-2 checks (4 Nov): a public dig's period line without the map's "you can still finish your report" (journey-f8's
@@ -199,7 +210,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.versionCurrent",
   "v4.investigation.version",
   "v4.investigation.waitingDigs.one",
-  "v4.investigation.waitingDigs.other",
   "v4.investigation.failed",
   "v4.investigation.keepDigging",
   "v4.investigation.fromReport",
@@ -354,9 +364,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.result.box.NOTHING_NEW",
   "v4.rail.goodTimeStarDone",
   "v4.rail.goodTimeHint",
-  // The owner's answers of 5 Nov (question 2 A): once a report is asked for, the map's report button reads "See my report"
-  // (a new line, section 2c: approved in place at the click-test, L1 A).
-  "v4.rail.seeReport",
   "v4.answerCard.region",
   "v4.answerCard.folded",
   "v4.answerCard.fold",
@@ -539,6 +546,11 @@ describe("V4 catalogue keys", () => {
     // The drafted lines name a version by its number and a wait by how many digs: no engine word, no score.
     const drafts = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.investigation.")).map((key) => catalog[key]!);
     expect(drafts.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
+  });
+
+  it("the owner's 5 Nov answers: the report's words from the second round of follow-ups are the owner's, and wait on no list", () => {
+    expect(Object.fromEntries(Object.keys(REPORT_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(REPORT_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in REPORT_ANSWER_LINES)).toEqual([]);
   });
 
   it("placeholders are well formed", () => {

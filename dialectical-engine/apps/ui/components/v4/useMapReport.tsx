@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import type { Answer } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
@@ -32,13 +32,18 @@ import { reportWaitStateOf, useQuestionPublic, useReportStart, V4ReportStrip, V4
  *  - question 2 A: once a report is asked for, the top bar's link reads "See my report" while the report waits for a dig,
  *    while it is written, and once it stands with nothing new to ask (lib/v4/reportWriting.ts reportSeenFor); "Write my
  *    report" again as soon as a dig reopens it; "Write it again" after a version that did not finish. Before the map's first
- *    report check answers, the button's place is held with no words, so nothing moves when it comes (ask-f16); when that
- *    first check fails, today's "Write my report" link to the report page stays.
+ *    report check answers, the button's place is held with no words, as wide as "Write my report" (what most first checks
+ *    give), so nothing moves when it comes (ask-f16); when that first check fails, today's "Write my report" link stays.
  *  - question 18 A: on a phone the top bar shows its report button only while the bottom bar does not show "Write my
- *    report" (`bottomShowsReport`, from V4BottomStack's `onReportShown`); a computer always keeps it (v4-debate.css).
+ *    report" (`bottomShowsReport`, from V4BottomStack's `onReportShown`); a computer always keeps it (v4-debate.css). When
+ *    the top button steps aside while it has focus, focus goes on to the pinned bar's job, without scrolling.
  *  - question 23 A: the waiting card names the one dig the report waits for (`waitingDigQuestion`, report-f7's rule in
- *    lib/v4/reportWriting.ts waitingDigQuestionOf), and says "the digs in progress", with no number, when several wait.
+ *    lib/v4/reportWriting.ts waitingDigQuestionOf), its words marked in the debate's language when known
+ *    (`waitingDigLanguage`, as the report page does), and says "the digs in progress", with no number, when several wait.
  */
+
+/** useLayoutEffect in the browser, useEffect on the server (which has no layout), as V4DigTray.tsx does. */
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export type MapReportInput = Readonly<{
   /** The page's own run id (a dig's on a dig's map). */
@@ -68,6 +73,11 @@ export type MapReportInput = Readonly<{
    * investigation is the first question's and whose digs it does not all know.
    */
   waitingDigQuestion?: string | null;
+  /**
+   * Question 23 A with report-f14: the language the dig's question is written in (the debate's, a BCP 47 tag), so its words
+   * carry it as on the report page. Null, absent or "und": the words carry no language, as before.
+   */
+  waitingDigLanguage?: string | null;
   /**
    * Question 18 A (5 Nov): the phone's bottom bar shows "Write my report" now (its own button, the slim line, or the strip
    * grown from the bar: V4BottomStack's `onReportShown`). True: the header's report button steps aside on a phone (below
@@ -182,12 +192,26 @@ export function useMapReport(input: MapReportInput): MapReport {
   const firstCheckAnswered = watch.read !== null || watch.checkedAt !== null || watch.reconnecting;
   // Question 18 A: on a phone the header's report button steps aside while the bottom bar shows "Write my report".
   const atBottom = input.bottomShowsReport === true ? " v4DebReportAtBottom" : "";
+  // ...and, before the browser paints, focus held by it goes on to the pinned bar's job (it is hidden only on a phone, where
+  // the bar is), without scrolling, never to the page's body.
+  const bottomShows = input.bottomShowsReport === true;
+  const { barJobRef } = input;
+  useBrowserLayoutEffect(() => {
+    const top = headerRef.current;
+    if (!bottomShows || top === null || document.activeElement !== top) return;
+    focusInPlace(barJobRef.current);
+  }, [bottomShows, barJobRef]);
 
   const headerItem = (good: boolean): ReactNode => {
     if (start.at === "top") return null;
     // Question 2 A: before the first check answers, the place is held with no words (ask-f16: nothing moves when it comes).
+    // It is as wide as "Write my report", the label most first checks give: the CSS draws the label from the attribute,
+    // hidden (v4-debate.css), so nothing is read out or found as text.
     if (stage.kind === "UNKNOWN" && !firstCheckAnswered) {
-      return <span className={`v4Btn v4DebReportHold${atBottom}`} aria-hidden="true" data-report-hold="" />;
+      return (
+        <span className={`v4Btn v4DebReportHold${atBottom}`} aria-hidden="true" data-report-hold=""
+          data-hold-label={t(catalog, "v4.rail.writeReport")} />
+      );
     }
     const mark = good ? <span className="v4DebReportMark" aria-hidden="true" /> : null;
     const goodWords = good ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null;
@@ -246,6 +270,7 @@ export function useMapReport(input: MapReportInput): MapReport {
       <V4ReportWait
         stage={stage}
         waitingDig={input.isDig ? null : input.waitingDigQuestion ?? null}
+        waitingDigLanguage={input.waitingDigLanguage ?? null}
         writingSince={watch.writingSince}
         slowFrom={watch.slowFrom}
         checkedAt={watch.checkedAt}

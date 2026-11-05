@@ -149,12 +149,14 @@ describe("the screens before the map (waiting, paused, failed)", () => {
     expect(marker.querySelector("a")).toBeNull();
   });
 
-  it("ask-f6 / the owner's 5 Nov answer 12 B: a debate that did not finish shows no classic link on its screen", async () => {
+  // The owner's answers of 5 Nov (question 12 B) move it to the account menu only; that lands with the page's own wiring
+  // (V4DebateClient, the start-step's file), which then hands it to the header and not to this screen.
+  it("ask-f6: a debate that did not finish shows the classic view once, on its screen, and not in the header's menu too", async () => {
     const runId = crypto.randomUUID();
     harness.run = run(runId, "FAILED");
     await mountMap(1600, runId);
-    expect(page().querySelector(".v4DebFailed")).not.toBeNull();
-    expect([...page().querySelectorAll(".v4DebFailed a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"])).toEqual([]);
+    expect(seen.headerLinks.at(-1)).toBeNull();
+    expect(classicLinks()).toHaveLength(1);
     expect(page().querySelector(".v4StepsTop nav.v4Steps-line")).not.toBeNull();
   });
 

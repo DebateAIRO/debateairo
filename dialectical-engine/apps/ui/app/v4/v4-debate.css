@@ -33,8 +33,11 @@
 /* ---------- header extras, back link, notes ---------- */
 .v4DebReportLink { text-decoration: none; }
 /* The owner's answers of 5 Nov (question 2 A): before the map's first report check answers, the report button's place is
-   held with no words, about as wide as the button, so nothing moves when it comes (ask-f16). */
-.v4DebReportHold { visibility: hidden; min-inline-size: calc(8em + 38px); pointer-events: none; }
+   held with no words in the page: the hold draws the label most first checks give ("Write my report", from its
+   data-hold-label) invisibly, with the button's own classes, so it is exactly as wide and nothing moves when it comes
+   (ask-f16). A first check that gives "See my report" still moves the row by the two labels' difference. */
+.v4DebReportHold { visibility: hidden; pointer-events: none; }
+.v4DebReportHold::before { content: attr(data-hold-label); }
 .v4DebBack {
   display: inline-flex; align-items: center; gap: 4px; min-height: 44px; max-width: 100%; align-self: flex-start;
   color: var(--link); font-size: var(--t-ui); font-weight: 600; text-decoration: none;

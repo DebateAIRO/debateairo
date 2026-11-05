@@ -7,9 +7,10 @@ import type { DigView } from "./types.js";
  * or a dig stopped at the month wall shows. The server decides both facts: until when (`month_pause.until`) and whether
  * it may continue now (`month_pause.can_continue`, true once the person's new month has started). The page never works
  * either out from the clock. The owner's answers of 5 Nov (question 19 A): before the reset a greyed "Continue on 1
- * December" (public-d4 A's words) stays where Continue will be, with the pause's one sentence as the visible line that says
- * why (journey-f14); pressing it sends nothing. After the reset the same button is the live Continue. Nothing pulses while
- * paused: the mark is a still, hollow dot. Nothing is kept anywhere.
+ * December" (public-d4 A's words) stays where Continue will be, named by the pause's one sentence, the visible line that
+ * says why (journey-f14), said once on a screen (wait-f5); pressing it sends nothing and only gives that sentence the
+ * 1-second highlight. After the reset the same button is the live Continue. Nothing pulses while paused: the mark is a
+ * still, hollow dot. Nothing is kept anywhere.
  */
 
 /** One pause as the pages show it. */
@@ -57,8 +58,9 @@ export function digPauseCardLine(pause: PauseState, catalog: MessageCatalog, loc
 
 /**
  * For the phone's pinned bar (the bottom-stack track draws it): its word "Paused", then the button's words: "Continue"
- * after the reset, the greyed "Continue on 1 December" before it (question 19 A), with `reason`, the pause's one sentence,
- * as the visible line right above the bar (journey-f14; null after the reset). Together they read "Paused · Continue".
+ * after the reset, the greyed "Continue on 1 December" before it (question 19 A), with `reason`, the pause's one sentence
+ * (null after the reset): the bar finds the panel's pause block that says it and points there, so it is said once (wait-f5),
+ * and shows it above the bar only where no pause block on the page does (journey-f14). Together they read "Paused · Continue".
  */
 export type PausePhoneBar = Readonly<{ label: string; continueLabel: string | null; untilLabel: string | null; reason: string | null }>;
 

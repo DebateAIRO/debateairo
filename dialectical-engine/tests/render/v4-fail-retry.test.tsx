@@ -267,7 +267,7 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
   const pausedDig = (canContinue: boolean) => (link: DigLink): DigView =>
     ({ link, state: "RUNNING", headline: null, counts: null, pausedUntil: NEXT_MONTH, canContinue });
 
-  it("reads 'Dig · paused until …' with a still mark, the rail counts it as paused, and nothing can be pressed yet", async () => {
+  it("reads 'Dig · paused until …' with a still mark, the rail counts it as paused, and its greyed 'Continue on …' sends nothing", async () => {
     const runId = crypto.randomUUID();
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
     harness.digView = pausedDig(false);
@@ -299,28 +299,50 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     expect(document.activeElement).toBe(early);
   });
 
-  it("question 19 A on a phone: the bar's greyed \"Continue on …\" with its visible reason above it; a press sends nothing", async () => {
+  it("question 19 A on a phone: the bar's greyed \"Continue on …\" sends nothing; the pause is said once, in the panel, whose line a press highlights", async () => {
     const runId = crypto.randomUUID();
     const child = crypto.randomUUID();
     recordDig(runId, child, ["path:n-mix"]);
     harness.digView = pausedDig(false);
     harness.search = `?dig=${child}`;
     await mountMap(375, runId);
+    const sentence = word("v4.money.paused", { date });
     const bar = (): HTMLElement => page().querySelector<HTMLElement>(".v4DebPhoneBar")!;
     const early = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused button")!;
     expect(early.textContent).toBe(word("v4.pause.continuesOn", { date: day }));
     expect(early.getAttribute("aria-disabled")).toBe("true");
     expect(early.classList.contains("v4DigWaiting")).toBe(true);
-    // journey-f14: the reason is a visible line right above the bar, never only for screen readers.
-    const why = page().querySelector<HTMLElement>("[data-bar-why]")!;
-    expect(why.textContent).toBe(word("v4.money.paused", { date }));
-    expect(why.classList.contains("v4SrOnly")).toBe(false);
-    expect(early.getAttribute("aria-describedby")).toBe(why.id);
+    // wait-f5 and the owner's answer ("the one sentence stays as it is"): the panel's pause block says it, and the bar adds no
+    // second copy; the bar's greyed button is named by that visible line (journey-f14).
+    expect(text().split(sentence).length - 1).toBe(1);
+    expect(page().querySelector("[data-bar-why]")).toBeNull();
+    const line = panel().querySelector<HTMLElement>(".v4Pause .v4PauseLine")!;
+    expect(line.textContent).toBe(sentence);
+    expect(early.getAttribute("aria-describedby")).toBe(line.id);
+    // A press sends nothing and adds no sentence: the panel's line gets the 1-second highlight, scrolled to only when it is
+    // off screen, and focus stays on the bar's button.
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+    const box = vi.spyOn(line, "getBoundingClientRect");
+    const at = (top: number): void => {
+      box.mockReturnValue({ top, bottom: top + 40, left: 0, right: 300, width: 300, height: 40, x: 0, y: top, toJSON: () => ({}) } as DOMRect);
+    };
+    at(120);
+    const before = text();
     early.focus();
     await click(early);
     expect(harness.continueRun).not.toHaveBeenCalled();
-    expect(page().querySelector<HTMLElement>("[data-bar-why]")!.classList.contains("v4Highlight")).toBe(true);
+    expect(text()).toBe(before);
+    expect(panel().querySelector(".v4Pause .v4PauseLine")!.classList.contains("v4Highlight")).toBe(true);
+    expect(scroll).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(bar().querySelector(".v4DebPhonePaused button"));
+    at(-400);
+    await click(early);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(bar().querySelector(".v4DebPhonePaused button"));
+    box.mockRestore();
+    delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
     // On the day it is the same button, live: "Paused · Continue", with no reason line.
     harness.digView = pausedDig(true);
     await advance(15_000);
@@ -328,6 +350,7 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     const live = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused button")!;
     expect(live.textContent).toBe(CATALOG["v4.money.continue"]);
     expect(live.getAttribute("aria-disabled")).toBeNull();
+    expect(live.getAttribute("aria-describedby")).toBeNull();
     expect(page().querySelector("[data-bar-why]")).toBeNull();
     expect(document.activeElement).toBe(live);
   });

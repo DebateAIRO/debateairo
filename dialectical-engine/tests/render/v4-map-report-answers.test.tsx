@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act, useRef, type ReactNode } from "react";
+import { act, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMapReport, type MapReportInput } from "../../apps/ui/components/v4/useMapReport.js";
@@ -59,6 +59,8 @@ function Probe(props: Readonly<{ input: Partial<MapReportInput> }>) {
     <>
       <header className="probeHeader">{report.headerItem(false)}</header>
       {report.waitCard}
+      {/* The phone's pinned bar job button (V4BottomStack's), for focus handed on to it. */}
+      <button ref={barJobRef as RefObject<HTMLButtonElement | null>} type="button" data-probe-bar="">Bar</button>
     </>
   );
 }
@@ -102,6 +104,19 @@ describe("question 23 A: the report's wait line on the map", () => {
     expect(flat(waitLine())).not.toMatch(/\d/u);
   });
 
+  it("the dig's words carry the debate's language when the page knows it, as on the report page (report-f14)", async () => {
+    reads.load = async () => investigation("CLOSED", [waiting(1)]);
+    await mount(<Probe input={{ waitingDigQuestion: "Mai ales regenerabile", waitingDigLanguage: "ro" }} />);
+    const dig = waitLine()!.querySelector<HTMLElement>("[data-ai-generated]")!;
+    expect(dig.getAttribute("lang")).toBe("ro");
+    expect(dig.getAttribute("dir")).toBe("auto");
+    // Not known (absent, null, or "und"): no lang, as before.
+    for (const waitingDigLanguage of [undefined, null, "und"]) {
+      await mount(<Probe input={{ waitingDigQuestion: "Mostly renewables", waitingDigLanguage }} />);
+      expect(waitLine()!.querySelector("[data-ai-generated]")!.hasAttribute("lang")).toBe(false);
+    }
+  });
+
   it("without the dig's question (absent or null), and on a dig's own map, the line names no dig", async () => {
     reads.load = async () => investigation("CLOSED", [waiting(1)]);
     await mount(<Probe input={{}} />);
@@ -112,6 +127,25 @@ describe("question 23 A: the report's wait line on the map", () => {
     await mount(<Probe input={{ waitingDigQuestion: "Mostly renewables", isDig: true }} />);
     expect(flat(waitLine())).toBe(CATALOG["v4.investigation.waitingDigs.one"]);
     expect(waitLine()!.querySelector("[data-ai-generated]")).toBeNull();
+  });
+});
+
+describe("question 2 A: the report button's place before the first report check answers", () => {
+  it("is held at the width of \"Write my report\" (the label most first reads give), with no words in the page", async () => {
+    reads.load = () => new Promise(() => undefined);
+    await mount(<Probe input={{}} />);
+    const hold = header().querySelector<HTMLElement>("[data-report-hold]")!;
+    expect(hold.textContent).toBe("");
+    expect(hold.getAttribute("aria-hidden")).toBe("true");
+    // The label sits in an attribute the CSS draws, invisibly, so the place is as wide as the button that comes (same
+    // classes, same font) and nothing is read out or found as text.
+    expect(hold.dataset.holdLabel).toBe(CATALOG["v4.rail.writeReport"]);
+    expect(hold.classList.contains("v4Btn")).toBe(true);
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-debate.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect(css).toMatch(/\.v4DebReportHold::before \{[^}]*content: attr\(data-hold-label\);[^}]*\}/u);
+    expect(css).toMatch(/\.v4DebReportHold \{[^}]*visibility: hidden;[^}]*\}/u);
+    // No guessed width any more.
+    expect(css).not.toMatch(/\.v4DebReportHold \{[^}]*inline-size/u);
   });
 });
 
@@ -159,5 +193,59 @@ describe("question 18 A: one \"Write my report\" on a phone's screen", () => {
     // A computer has no pinned bar: it never shows it at the bottom.
     await mount(stack({ kind: "report", href: "/v4/debate/r/report" }, { phone: false }));
     expect(shown.at(-1)).toBe(false);
+  });
+
+  it("the follow-up's rule: while the keyboard is open the stack steps aside, so it does not show it and the top bar has it", async () => {
+    const shown: boolean[] = [];
+    const box = document.body.appendChild(document.createElement("input"));
+    try {
+      await mount(<V4BottomStack phone notes={null} tray={null} goodTime reportHref="/v4/debate/r/report" job={{ kind: "report", href: "/v4/debate/r/report" }}
+        onReportShown={(value) => shown.push(value)} catalog={CATALOG} />);
+      expect(shown.at(-1)).toBe(true);
+      // A text box takes focus on a phone (dig-f16: its keyboard is open): the stack is hidden, so the bottom shows nothing.
+      await act(async () => box.focus());
+      expect(host!.querySelector(".v4StackAside")).not.toBeNull();
+      expect(shown.at(-1)).toBe(false);
+      // The keyboard closes: the bottom carries it again.
+      await act(async () => box.blur());
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(host!.querySelector(".v4StackAside")).toBeNull();
+      expect(shown.at(-1)).toBe(true);
+    } finally {
+      box.remove();
+    }
+  });
+
+  it("the stack tells the page before the browser paints, so both report buttons never show together for a frame", async () => {
+    // Layout effects run child first, then parent; plain effects only after every layout effect. The stack's word must come
+    // before its parent's layout effect, so the page hides its top button in the same frame (ask-f16: nothing moves).
+    const order: string[] = [];
+    function Page() {
+      useLayoutEffect(() => { order.push("page layout"); });
+      return (
+        <V4BottomStack phone notes={null} tray={null} goodTime={false} reportHref="/v4/debate/r/report" job={{ kind: "report", href: "/v4/debate/r/report" }}
+          onReportShown={(value) => order.push(`shown ${String(value)}`)} catalog={CATALOG} />
+      );
+    }
+    await mount(<Page />);
+    expect(order.slice(0, 2)).toEqual(["shown true", "page layout"]);
+  });
+
+  it("a top-bar report button that has focus when it steps aside hands focus to the bar's job, without scrolling", async () => {
+    reads.load = async () => investigation("OPEN", [], 0);
+    await mount(<Probe input={{ bottomShowsReport: false }} />);
+    const top = header().querySelector<HTMLElement>(".v4DebReportLink")!;
+    top.focus();
+    expect(document.activeElement).toBe(top);
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    await mount(<Probe input={{ bottomShowsReport: true }} />);
+    expect(document.activeElement).toBe(host!.querySelector("[data-probe-bar]"));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
+    // Focus elsewhere stays where it is.
+    const bar = host!.querySelector<HTMLElement>("[data-probe-bar]")!;
+    await mount(<Probe input={{ bottomShowsReport: false }} />);
+    await mount(<Probe input={{ bottomShowsReport: true }} />);
+    expect(document.activeElement).toBe(bar);
   });
 });

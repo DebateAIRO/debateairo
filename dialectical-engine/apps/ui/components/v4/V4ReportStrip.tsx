@@ -311,6 +311,11 @@ export type V4ReportWaitProps = Readonly<{
    * lib/v4/reportWriting.ts waitingDigQuestionOf), named in the wait line as the report page does. Null or absent: no name.
    */
   waitingDig?: string | null;
+  /**
+   * report-f14: the language the dig's question is written in (the debate's), so its words carry it as on the report page.
+   * Null, absent or "und": no language mark, as before.
+   */
+  waitingDigLanguage?: string | null;
   /** When writing started, only when this visit knows it (ms). */
   writingSince: number | null;
   /** report-f8: where the 15 minutes count from (ms), or null. */
@@ -333,13 +338,17 @@ export type V4ReportWaitProps = Readonly<{
 
 /**
  * The report's wait line, the report page's (question 23 A): the one dig by its question, its words marked as AI text in
- * their own direction; else "the dig in progress" or "the digs in progress", with no number.
+ * their own direction and, when known, their language (report-f14); else "the dig in progress" or "the digs in progress",
+ * with no number.
  */
-function WaitLine({ waiting, dig, catalog, locale }: Readonly<{ waiting: number; dig: string | null; catalog: MessageCatalog; locale: string }>) {
+function WaitLine({ waiting, dig, language, catalog, locale }: Readonly<{
+  waiting: number; dig: string | null; language: string | null; catalog: MessageCatalog; locale: string;
+}>) {
   const line = reportWaitLineOf(waiting, dig, catalog, locale);
+  const lang = language === null || language.trim().length === 0 || language === "und" ? undefined : language;
   return (
     <p className="v4DebReportWaitLine">
-      {line.kind === "NAMED" ? <>{line.before}<span data-ai-generated="true" dir="auto">{line.dig}</span>{line.after}</> : line.text}
+      {line.kind === "NAMED" ? <>{line.before}<span data-ai-generated="true" dir="auto" lang={lang}>{line.dig}</span>{line.after}</> : line.text}
     </p>
   );
 }
@@ -383,7 +392,7 @@ export function V4ReportWait(props: V4ReportWaitProps) {
         catalog={catalog}
         locale={locale}
       >
-        {stage.kind === "WAITING_DIGS" ? <WaitLine waiting={stage.waitingForDigs} dig={props.waitingDig ?? null} catalog={catalog} locale={locale} /> : null}
+        {stage.kind === "WAITING_DIGS" ? <WaitLine waiting={stage.waitingForDigs} dig={props.waitingDig ?? null} language={props.waitingDigLanguage ?? null} catalog={catalog} locale={locale} /> : null}
         {stage.kind === "FAILED" ? <p className="v4DebReportWaitLine">{t(catalog, "v4.investigation.failed")}</p> : null}
         {stage.kind === "WRITING" && slow ? (
           <div className="v4DebReportWaitSlow" data-report-slow="">

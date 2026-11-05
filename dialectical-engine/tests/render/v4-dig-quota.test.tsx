@@ -248,9 +248,22 @@ describe("a debate paused at the month wall", () => {
     expect(text()).toBe(before);
     expect(document.getElementById(early.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
     expect(document.activeElement).toBe(early);
-    // ask-f6 / journey-f19 (the owner's 5 Nov answer 12 B): the classic view is in the account menu only, not on this card.
-    expect([...page().querySelectorAll(".v4DebPausedCard a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]))
-      .toEqual([]);
+    // ask-f6: the classic view once, on this card, while the page hands it here (the owner's 5 Nov answer 12 B moves it to
+    // the account menu with the page's own wiring, the start-step's V4DebateClient).
+    const card = page().querySelector(".v4DebPausedCard");
+    expect(card).not.toBeNull();
+    const classic = [...page().querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
+    expect(classic).toHaveLength(1);
+    expect(card!.contains(classic[0]!)).toBe(true);
+  });
+
+  it("on a phone too, the pause is said once (wait-f5)", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, false);
+    await mountMap(375, runId);
+    const sentence = word("v4.money.paused", { date: formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" }) });
+    expect(page().querySelector(".v4DebPausedCard")).not.toBeNull();
+    expect(text().split(sentence).length - 1).toBe(1);
   });
 
   it("once the month has reset, Continue resumes it", async () => {
