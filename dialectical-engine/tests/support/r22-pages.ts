@@ -4,7 +4,7 @@
 // reuses it instead of copying it. All data is made up.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { AskParent, PublicDigParent, PurposeLines } from "@debateai/contract";
+import type { AskParent, PublicDigParent, PurposeLines, StartCheck, StartPaths } from "@debateai/contract";
 import { COOKIE_SESSION_MARKER, createDebate } from "../../apps/ui/lib/api.js";
 import type { R22Account, R22Script } from "./r22-world.js";
 
@@ -22,11 +22,15 @@ export const v4Catalog = catalogOf("v4");
 export const PREMIUM: V4AskSettings = { planTier: "premium", shapeSettings: false, lengthSettings: false };
 export const FREE: V4AskSettings = { planTier: "free", shapeSettings: false, lengthSettings: false };
 
-/** What the V4 ask page sends for a question (useV4Ask's submit, without its dialogs). */
+/**
+ * What the V4 ask page sends for a question (useV4Ask's submit, without its dialogs). V4 start step, Task 88: `startLane` is
+ * Start's hand-over (the check of Next, the chosen paths, the carry-on box); absent, the ask is today's, byte for byte.
+ */
 export async function ask(who: R22Account, question: string, options: Readonly<{ settings?: V4AskSettings; mode?: "quick" | "thorough"; parent?: AskParent; purposeLines?: PurposeLines;
-  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }> }> = {}) {
+  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }>;
+  startLane?: Readonly<{ startCheck?: StartCheck; startPaths?: StartPaths; carryOnToReport?: true }> }> = {}) {
   const config = v4AskConfig(options.mode ?? "quick", "plain", options.settings ?? PREMIUM, new Date(), newDebateCatalog);
-  return createDebate(question, config, COOKIE_SESSION_MARKER, who.client, undefined, options.parent, options.purposeLines, options.publicLane);
+  return createDebate(question, config, COOKIE_SESSION_MARKER, who.client, undefined, options.parent, options.purposeLines, options.publicLane, options.startLane);
 }
 
 /** A panel that agrees with the writers, so no scripted point falls under the site's hidden-score line (the stand-in's own panel scores 0). */

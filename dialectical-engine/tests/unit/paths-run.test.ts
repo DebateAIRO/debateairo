@@ -19,6 +19,7 @@ import {
   runBuiltStartPathSet
 } from "../../apps/runner/src/paths-run.js";
 import { createRunnerMapCaller, mapStageBound, type MapStageDeps } from "../../apps/runner/src/map-stage.js";
+import { isMonthPausedStop, monthPausedStop } from "../../apps/runner/src/month-pause.js";
 
 const RUN = "11111111-2222-4333-8444-555555555555";
 const seat = (aiRef: string, maker: string): MapSeat => Object.freeze({ aiRef, maker });
@@ -211,6 +212,35 @@ describe("a run's own menu (the lists, then the merge on Haiku)", () => {
 
   it("no list: no menu", async () => {
     expect(await runBuiltMenu({ ...input(scripted({})), seats: [] })).toBeNull();
+  });
+
+  // Review of Task 88 (r22-end-to-end path 7): a copy that must stop while it writes its own lists (the month wall's pause, a lost
+  // claim, its time up) never builds a menu from what the stop left. Before, the stop was read as a failed list, the run sealed the
+  // question alone as its one path, and the debate continued after the pause on that one path.
+  it("a copy that must stop while its lists are written (the month wall's pause) builds no menu: the stop leaves, nothing more is sent", async () => {
+    const paused = monthPausedStop();
+    const sent: string[] = [];
+    const provider = { call: async (call: ProviderCallRequest) => { sent.push(call.callSiteKey); throw paused; } } as unknown as ProviderGateway;
+    const caller = createRunnerMapCaller({ runId: RUN, subjectItemId: "wi-1", mapContractHash: mapPromptContractHash(),
+      judgeBound: { maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 1_260_000 }, longBounds: { merge: 32_768, choose: 32_768 },
+      memberOf: (aiRef) => ({ provider, providerRef: aiRef }), sitsOut: () => false, satOutBy: () => false, spendStopOf: () => null,
+      laneStopped: () => false, abandon: isMonthPausedStop, serial: true, engineContractHash: mapPromptContractHash() });
+    const left = await runBuiltMenu({ ...input(caller), abandoned: caller.abandoned }).catch((error: unknown) => error);
+    expect(left).toBe(paused);
+    expect(sent).toEqual(["START:angles"]);
+  });
+
+  it("a stop met at the merge leaves too: no code menu is made of the lists it left", async () => {
+    const paused = monthPausedStop();
+    let gone: Readonly<{ error: unknown }> | null = null;
+    const lists = scripted({});
+    const caller: MapCaller = { call: async <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => {
+      if (request.step !== "START_MERGE") return lists.call(request);
+      gone = { error: paused };
+      throw paused;
+    } };
+    const left = await runBuiltMenu({ ...input(caller), abandoned: () => gone }).catch((error: unknown) => error);
+    expect(left).toBe(paused);
   });
 });
 

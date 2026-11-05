@@ -63,6 +63,11 @@ export type RunnerMapCaller = MapCaller & Readonly<{
   spendStop: () => EnvelopeStopKind | null;
   stopped: () => boolean;
   settled: () => Promise<void>;
+  /**
+   * Review of Task 88: the first abandon this caller met (claim lost, time up, the month wall's pause), boxed; null: none. The start
+   * steps read a thrown call as a failed one, so a run that builds its own list asks this before it seals what the stop left.
+   */
+  abandoned: () => Readonly<{ error: unknown }> | null;
 }>;
 
 /**
@@ -169,7 +174,7 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
     while (inFlight.size > 0) await Promise.allSettled([...inFlight]);
     await tail;
   };
-  return Object.freeze({ call, spendStop: () => spendStop, stopped: () => stopped, settled });
+  return Object.freeze({ call, spendStop: () => spendStop, stopped: () => stopped, settled, abandoned: () => abandoned });
 }
 
 /** The map AIs: the first `mapAIs` seats of the distinct-maker order (the opener-rotation seat plans). */

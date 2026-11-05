@@ -48,20 +48,30 @@ export function runBuiltMenuId(runId: string): string {
  * A run's own menu: the angle planner (the first seat), every list at once, waiting for all (no cut: nothing is shown before Start),
  * then the first merge on the Haiku seat (none: the first list's code menu), under the run's own menu id. The menu must pass the
  * contract, else the run is refused START_MENU_INVALID before any root. No list came back (or no seat): no menu, null.
+ * Review of Task 88 (r22-end-to-end path 7): the start steps read a thrown call as a failed one, so `abandoned` (the runner caller's
+ * first abandon: claim lost, time up, the month wall's pause) is asked after the lists and after the merge; a stop met there leaves
+ * as itself, so this copy seals nothing it left (never the question alone as the one path) and the copy that resumes writes the lists
+ * afresh (the calls already answered replayed from the record).
  */
 export async function runBuiltMenu(input: Readonly<{ runId: string; questionLine: string; languageName: string; languageTag: string;
   readingLevel: ReadingLevel | null; clarifyLines: readonly string[]; seats: readonly MapSeat[]; haiku: MapSeat | null; caller: MapCaller;
-  signal?: AbortSignal }>): Promise<StartMenu | null> {
+  signal?: AbortSignal; abandoned?: () => Readonly<{ error: unknown }> | null }>): Promise<StartMenu | null> {
   const planner = input.seats[0];
   if (planner === undefined) return null;
   const signal = input.signal ?? new AbortController().signal;
+  const leaveIfAbandoned = (): void => {
+    const stop = input.abandoned?.() ?? null;
+    if (stop !== null) throw stop.error;
+  };
   const run = { questionLine: input.questionLine, languageName: input.languageName, languageTag: input.languageTag, readingLevel: input.readingLevel };
   const listed = await mapRunStartLists({ ...run, seats: input.seats, planner, caller: input.caller, signal, cut: "WAIT_ALL",
     onSeatDone: () => undefined, onList: () => undefined, onCut: () => undefined });
+  leaveIfAbandoned();
   const lists = [...listed.lists, ...listed.late];
   if (lists.length === 0) return null;
   const made = await mapMergeStartLists({ ...run, clarifyLines: input.clarifyLines, lists, prior: null, seat: input.haiku, caller: input.caller,
     menuId: runBuiltMenuId(input.runId), signal });
+  leaveIfAbandoned();
   const menu = StartMenuSchema.safeParse(made.menu);
   if (!menu.success) {
     throw new TypedDomainError(PATHS_RUN_CODES.menuInvalid, "The run's own menu does not pass the start-step contract");

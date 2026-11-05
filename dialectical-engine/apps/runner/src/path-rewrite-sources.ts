@@ -252,7 +252,7 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
    * is still writing has no such line: its answer on that path stands, and its fate is not known. Null: no such path, or nothing stored.
    */
   const digPathOf = async (parentRunId: string, positionRef: string): Promise<Readonly<{ answerVersion: number; line: string; fate: StoryFate;
-    points: readonly PathRewritePoint[]; extracts: readonly PathRewriteExtract[] }> | null> => {
+    rewritten: boolean; points: readonly PathRewritePoint[]; extracts: readonly PathRewriteExtract[] }> | null> => {
     const stored = (await picks.read(parentRunId))?.input?.value;
     if (stored === undefined || stored === null) return null;
     const path = storedDigPathsOf(stored).find((candidate) => candidate.positionRef.toLowerCase() === positionRef.toLowerCase());
@@ -271,7 +271,7 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       if (isRecord(line) && typeof line.line === "string" && fate?.success === true) written = Object.freeze({ line: line.line, fate: fate.data });
     }
     return Object.freeze({ answerVersion, line: written?.line ?? path.statement, fate: written?.fate ?? "SET_ASIDE",
-      points: path.points, extracts: path.extracts });
+      rewritten: written !== null, points: path.points, extracts: path.extracts });
   };
 
   return Object.freeze({
@@ -318,8 +318,10 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
         // R22 decision 2: the path's newest text is a climb's row, sealed under the dig that started the climb.
         const written = await updateTextOf(parentRunId, baseUpdateId);
         text = { answerVersion: text.answerVersion, line: written.line, summary: written.summary, fate: written.fate };
-      } else if (PATH_ID_PATTERN.test(positionRef)) {
+      } else if (PATH_ID_PATTERN.test(positionRef) && digPath?.rewritten !== true) {
         // V4 start step, Task 55b: a path debate's path b<n> that nothing rewrote yet stands as its answer so far (FAILED: its question).
+        // Review of Task 88 (R22 decision 1, r22-end-to-end path 4): a dig's path b<n> that the dig's own rewrite wrote a line for
+        // was rewritten: that line stands, never the dig's answer so far under it.
         const base = await outcomeBaseOf(parentRunId, positionRef);
         if (base !== null) text = { answerVersion: text.answerVersion, line: base.line, summary: base.summary, fate: base.fate };
       }

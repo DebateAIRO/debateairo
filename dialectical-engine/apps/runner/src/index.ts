@@ -8192,7 +8192,9 @@ export class WalkingSkeletonRunner {
               const menu = await runBuiltMenu({ runId: run.runId, questionLine: run.questionLine, languageName: run.argumentLanguageName,
                 languageTag: run.argumentLanguageTag, readingLevel, clarifyLines: purposeLinesUnsaid(run.questionLine, lines, { answersSaid: true }),
                 seats: runBuiltListSeats(mapSeats, pathsShape.runListWriters),
-                haiku: haikuMember === undefined ? null : Object.freeze({ aiRef: haikuMember.providerRef, maker: haikuMember.maker }), caller: startCaller });
+                haiku: haikuMember === undefined ? null : Object.freeze({ aiRef: haikuMember.providerRef, maker: haikuMember.maker }), caller: startCaller,
+                // Review of Task 88: a stop met by the start steps (the month wall's pause, a lost claim) leaves here, sealing nothing.
+                abandoned: startCaller.abandoned });
               const startStop = startCaller.spendStop();
               if (startStop !== null) mapSpendStop ??= startStop;
               const ask = await this.#runs.readStoredAsk(run.runId);
