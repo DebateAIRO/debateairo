@@ -6,6 +6,8 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 /**
  * Terms 2.12 and Privacy 3.11, R22 decisions 35 and 36: the Report button, a report's six months, and the sealed originals' six months.
  * English is pinned word for word; every language must have the same rows at the same places, and the old "control" and the old "link" are gone from the live text.
+ * Privacy 3.12 (plan Task 83c) adds a row after section 2's "Page settings and visits" and another after section 7's, so
+ * the privacy indexes from 44 on moved by one, and those from 153 on by two (0-based, as below).
  */
 const read = (locale: string, name: string): string => readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, name), "utf8");
 const privacy = (locale: string): string[] => read(locale, "privacy-policy.md").split("\n");
@@ -22,7 +24,7 @@ describe("the Report button and the six months in the legal texts", () => {
     const reportsRow = privacy("en").find((line) => line.startsWith("| **Reports you make** |"));
     expect(cells(reportsRow!)[1]).toContain("Only admins who review can see your name");
     expect(read("en", "privacy-policy.md")).not.toMatch(/two people/iu);
-    expect(privacy("en")[95]).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
+    expect(privacy("en")[96]).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
   });
 
   it("nothing in the English live text still calls it a control, and only the 3.10 history still calls it a link", () => {
@@ -36,16 +38,16 @@ describe("the Report button and the six months in the legal texts", () => {
   it.each(LOCALES.map(({ code }) => [code]))("%s: the same rows at the same places, the versions and the addresses", (code) => {
     const policy = privacy(code);
     const contract = terms(code);
-    expect(cells(policy[46]!), `${code}: section 2's new row`).toHaveLength(3);
-    expect(policy[47]!.startsWith("| **"), `${code}: section 2 goes on after it`).toBe(true);
-    for (const at of [156, 157, 158]) expect(cells(policy[at]!), `${code}: section 7 row at ${at}`).toHaveLength(3);
-    expect(policy[156]!).not.toContain("Anthropic");
-    expect(policy[157]!).not.toContain("Anthropic");
-    expect(policy[158]!, `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
-    expect(cells(policy[157]!).join(" "), `${code}: decision 36's six months`).toContain("6");
-    expect(policy[89]!, `${code}: section 4 points at section 5`).toMatch(/5/u);
+    expect(cells(policy[47]!), `${code}: section 2's new row`).toHaveLength(3);
+    expect(policy[48]!.startsWith("| **"), `${code}: section 2 goes on after it`).toBe(true);
+    for (const at of [158, 159, 160]) expect(cells(policy[at]!), `${code}: section 7 row at ${at}`).toHaveLength(3);
+    expect(policy[158]!).not.toContain("Anthropic");
+    expect(policy[159]!).not.toContain("Anthropic");
+    expect(policy[160]!, `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
+    expect(cells(policy[159]!).join(" "), `${code}: decision 36's six months`).toContain("6");
+    expect(policy[90]!, `${code}: section 4 points at section 5`).toMatch(/5/u);
     // The paragraph still names the model for the two other checks, so the marker is the count: the report sentence, which comes last, adds no third mention.
-    const section5 = policy[95]!;
+    const section5 = policy[96]!;
     const mentions = [...section5.matchAll(/Claude Haiku 5\.5/gu)].map((match) => match.index);
     expect(mentions, `${code}: section 5 names the model for the synthesis and the question checks only`).toHaveLength(2);
     expect(section5.match(/Haiku/gu), `${code}: no other spelling of the model`).toHaveLength(2);

@@ -374,13 +374,15 @@ describe("legal documents — generated data", () => {
     });
 
     // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen; R22 item 15
-    // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen.
-    it("turns the collection table into fifteen rows joined with em dashes", () => {
+    // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen. Privacy 3.12 (plan Task 83c) adds
+    // "Questions not started yet" after "Page settings and visits": sixteen.
+    it("turns the collection table into sixteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(15);
+      expect(table.items).toHaveLength(16);
+      expect(table.items[9]!.startsWith("Questions not started yet — When you press Next, agree that the AIs may read your question")).toBe(true);
       expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
       expect(table.items[8]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
