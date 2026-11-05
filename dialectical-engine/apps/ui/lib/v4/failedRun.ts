@@ -70,9 +70,14 @@ export function failedQuotaKey(run: RunProjection, isDig: boolean): string | nul
 /**
  * Question 3 A: why a dig did not finish, said about the dig: one V4 line for each reason group of lib/v3/runFailure.ts
  * (the same groups as a question's sentence, never the code itself). Used in the dig's panel and on its own failed page.
+ * The owner's third round (5 Nov afternoon): once the same dig keeps failing (`keepsFailing`, the panel's "This keeps
+ * failing. Write your report; it uses everything that finished."), the AIs-unavailable line drops its "You can try it
+ * again in a while.", so the two lines do not disagree (a drafted line). Absent or false: the line as before.
  */
-export function digFailureMessage(reason: string | null | undefined, catalog: MessageCatalog): string {
-  return t(catalog, `v4.digFailed.reason.${runFailureKind(reason)}`);
+export function digFailureMessage(reason: string | null | undefined, catalog: MessageCatalog, keepsFailing = false): string {
+  const kind = runFailureKind(reason);
+  if (keepsFailing && kind === "MODELS_UNAVAILABLE") return t(catalog, "v4.digFailed.unavailableKeepsFailing");
+  return t(catalog, `v4.digFailed.reason.${kind}`);
 }
 
 /** Run ids are UUIDs; anything else in `?again=` is ignored (never read, never shown). */

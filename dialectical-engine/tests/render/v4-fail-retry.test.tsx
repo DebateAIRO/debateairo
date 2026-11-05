@@ -70,6 +70,9 @@ function writingReport(runId: string) {
   });
 }
 
+/** A stored reason of the "the AIs it needs were unavailable" group (lib/v3/runFailure.ts MODELS_UNAVAILABLE). */
+const UNAVAILABLE = "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM";
+
 function failedDig(link: DigLink, extra: Partial<DigView> = {}): DigView {
   return { link, state: "FAILED", headline: null, counts: null, terminalReason: STOPPED, ...extra };
 }
@@ -314,6 +317,31 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     await mountMap(1600, runId);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.digFailed.keepsFailing"]);
+    expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
+  });
+
+  it("the owner's third round (5 Nov): a dig that failed once because the AIs were unavailable keeps 'You can try it again in a while.'", async () => {
+    const runId = crypto.randomUUID();
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
+    harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix"), terminalReason: UNAVAILABLE });
+    await mountMap(1600, runId);
+    await openDig(PATHS.mix);
+    // The reason with its "try it again in a while", and the button to do so.
+    expect(panel().textContent).toContain(CATALOG["v4.digFailed.reason.MODELS_UNAVAILABLE"]);
+    expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toHaveLength(1);
+  });
+
+  it("the owner's third round (5 Nov): a dig that keeps failing because the AIs were unavailable drops 'You can try it again in a while.'", async () => {
+    const runId = crypto.randomUUID();
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
+    harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix"), terminalReason: UNAVAILABLE });
+    await mountMap(1600, runId);
+    await openDig(PATHS.mix);
+    // The reason without the promise, so it does not disagree with "This keeps failing. Write your report; ...".
+    const lines = [...panel().querySelectorAll(".v4DigFailed p")].map((line) => line.textContent).join(" | ");
+    expect(lines).toBe(`${CATALOG["v4.digFailed.unavailableKeepsFailing"]!} | ${CATALOG["v4.digFailed.keepsFailing"]!}`);
+    expect(panel().textContent).not.toContain("try it again in a while");
     expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
   });
 });

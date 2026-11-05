@@ -47,7 +47,7 @@ export function useFailedDigs(input: Readonly<{
         if (retry.kind !== "OFFER" || !canDig) return;
         queueDig(retryPending(retry, effectiveDigMode(retry.mode ?? digMode, planTier), Date.now(), DIG_UNDO_MS));
       },
-      reasonText: (reason) => digFailureMessage(reason, catalog)
+      reasonText: (reason, keepsFailing) => digFailureMessage(reason, catalog, keepsFailing === true)
     };
   }, [map, digs, canDig, digMode, planTier, servedQuestionLine, catalog, locale, queueDig]);
 }

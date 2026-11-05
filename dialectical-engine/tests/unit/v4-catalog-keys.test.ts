@@ -87,6 +87,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.digFailed.reason.SET_ASIDE",
   "v4.digFailed.reason.STOPPED",
   "v4.digFailed.reason.CHOICE_GONE",
+  // The owner's third round (5 Nov afternoon): a dig that keeps failing because the AIs were unavailable says its reason
+  // without "You can try it again in a while.", so it does not disagree with "This keeps failing. Write your report; ...".
+  "v4.digFailed.unavailableKeepsFailing",
   "v4.debate.failedSomeTaken",
   // ACCESS-13 (the wave-2 checks): "Light or dark"'s name also says what a press does. Owner question.
   "v4.header.menu.themeToDark",
@@ -746,6 +749,12 @@ describe("the owner's 5 Nov answers: failed digs and questions, one pick, the pu
     }
     // The two kinds that were never charged say so in their own line (lib/v4/failedRun.ts never says it twice).
     for (const kind of ["SET_ASIDE", "CHOICE_GONE"]) expect(catalog[`v4.digFailed.reason.${kind}`], kind).toMatch(/did not use (?:any of )?your quota\./u);
+  });
+
+  it("the third round: a dig that keeps failing because the AIs were unavailable drops only 'You can try it again in a while.'", () => {
+    expect(catalog["v4.digFailed.reason.MODELS_UNAVAILABLE"]).toBe(`${catalog["v4.digFailed.unavailableKeepsFailing"]} You can try it again in a while.`);
+    expect(catalog["v4.digFailed.unavailableKeepsFailing"]).not.toMatch(/again/iu);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.digFailed.unavailableKeepsFailing");
   });
 
   it("a dig's own failed page has its own drafted heading, about the dig", () => {

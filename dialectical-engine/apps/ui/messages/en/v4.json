@@ -422,6 +422,7 @@
   "v4.panel.digState.FAILED": "This dig didn't finish.",
   "v4.digFailed.retry": "Try this dig again",
   "v4.digFailed.keepsFailing": "This keeps failing. Write your report; it uses everything that finished.",
+  "v4.digFailed.unavailableKeepsFailing": "This dig could not start because the AIs it needs were unavailable.",
   "v4.digFailed.nothingTaken": "Nothing was taken from your quota for this.",
   "v4.digFailed.reason.NOT_STARTED": "Something went wrong on our side before this dig began.",
   "v4.digFailed.reason.PLAN_ENDED": "Your paid plan ended or was put on hold while this dig waited, so it didn't start.",
