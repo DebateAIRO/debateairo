@@ -1,7 +1,7 @@
 import {
   DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, InvestigationReportAnswerSchema, InvestigationReportPathSchema, InvestigationReportSourceSchema, InvestigationReportStorySchema, PublicDebateSchema,
   PublicMaterialSchema, PublicReportVersionSchema, type AnswerContribution, StoryFateSchema, cutQuoteAtWordEdge, type AskParent, type PublicContribution, type PublicDebate, type PublicDigParent, type PublicMainAnswer, type PublicMaterial,
-  type PublicMaterialPath, type PublicMaterialPoint, type PublicReportVersion, type StoryFate
+  type PublicMaterialPath, type PublicMaterialPoint, type PublicReportVersion, type ReadingLevel, type StoryFate
 } from "@debateai/contract";
 import type { CryptoEnvelope, PreparedPublicationCipher } from "@debateai/crypto";
 import {
@@ -36,8 +36,8 @@ const dayOf = (at: string): string => new Date(at).toISOString().slice(0, 10);
 /** Decision 33: what a review changed. A correction replaces one string of one piece; the piece itself never changes. `piece_key`: the page's own name for it. */
 export type PublicReviewOverlay = Readonly<{ changed: boolean; corrections: readonly Readonly<{ piece_kind: "SNAPSHOT" | "UPDATE" | "REPORT"; piece_key: string; pointer: string; content: CryptoEnvelope }>[] }>;
 
-/** Keys that hold words a person reads. An id, a code, a date or a model is no piece of text. */
-const NOT_TEXT = /(_ref|_refs|_id|_ids|_at|_on|_sha256|^v$|^kind$|state|fate|relation|outcome|verdict|language|confidence|band|lineage|model|provider|contract|version|mode|target|lane)/iu;
+/** Keys that hold words a person reads. An id, a code, a date, a model or a level (Task 75d's `reading_level`) is no piece of text. */
+const NOT_TEXT = /(_ref|_refs|_id|_ids|_at|_on|_sha256|^v$|^kind$|state|fate|relation|outcome|verdict|language|confidence|band|lineage|model|provider|contract|version|mode|target|lane|^reading_level$)/iu;
 /** Every string a person reads in a piece, by its pointer. Only these can be corrected. */
 export function textPiecesOf(value: unknown, at = ""): readonly Readonly<{ pointer: string; text: string }>[] {
   if (typeof value === "string") return at === "" ? [] : [{ pointer: at, text: value }];
@@ -181,7 +181,9 @@ export function publicPathIndexOf(debate: PublicDebate, digRef: string | null): 
 }
 
 export type PublicDigAdmission =
-  | Readonly<{ kind: "ADMIT"; positionRef: string; parentRunId: string; publicationRef: string; picks: NonNullable<AskParent["picks"]>; places: readonly string[]; mode: "quick" | "thorough" }>
+  | Readonly<{ kind: "ADMIT"; positionRef: string; parentRunId: string; publicationRef: string; picks: NonNullable<AskParent["picks"]>; places: readonly string[]; mode: "quick" | "thorough";
+    /** V4 start step, Task 75d: the level the page was asked at, as its public read says; absent on a page published without one. */
+    readingLevel?: ReadingLevel }>
   | Readonly<{ kind: "NOT_FOUND" }>
   | Readonly<{ kind: "TOO_DEEP" }>
   | Readonly<{ kind: "NEEDS_A_PATH" }>
@@ -205,7 +207,8 @@ export async function admitPublicDig(input: Readonly<{ parent: PublicDigParent; 
   const positionRef = digAnchorOf(shape, index);
   // A place the page does not show is a guess: it has no path to land on.
   if (positionRef === null || !(index ?? []).some((path) => path.pathId === positionRef)) return Object.freeze({ kind: "NEEDS_A_PATH" });
-  return Object.freeze({ kind: "ADMIT", positionRef, parentRunId: read.parent_run_id, publicationRef: parent.public_ref, picks: parent.picks ?? [], places: parent.places, mode: parent.mode });
+  return Object.freeze({ kind: "ADMIT", positionRef, parentRunId: read.parent_run_id, publicationRef: parent.public_ref, picks: parent.picks ?? [], places: parent.places, mode: parent.mode,
+    ...(debate.reading_level === undefined ? {} : { readingLevel: debate.reading_level }) });
 }
 
 const sealFor = (pool: Pool, runId: string, carrier: typeof PUBLIC_MATERIAL_CARRIER, id: string, content: unknown): Promise<WebSealed | null> =>

@@ -630,7 +630,37 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.start.suggest.keepApart",
   "v4.start.suggest.fits",
   "v4.start.suggest.addTo",
-  "v4.start.suggest.notNow"
+  "v4.start.suggest.notNow",
+  // V4 start step, Task 76 (r2-6, choose-f15, ask-f7; 4 Nov night ask-f13, the owner's words of record :239): step 2's calm
+  // no-questions line, Free's one joined line, the screens' way back and "Use my words instead", shown at the click-test.
+  "v4.read.noQuestions",
+  "v4.read.freeJoined",
+  "v4.ask.editMyQuestion",
+  "v4.ask.useMyWords",
+  // V4 start step, Task 76b (answers Q11 and Q13; 4 Nov night read-f3: the record's example words and the coordinator's):
+  // Start's Undo note, its line read out once and its confirmation, and the two lines of a plan read at the press.
+  "v4.start.undo.note",
+  "v4.start.undo.noteNoShare",
+  "v4.start.undo.announce",
+  "v4.start.undo.done",
+  "v4.ask.checkingPlan",
+  "v4.ask.planUnknown",
+  // V4 start step, Task 76c (read-f2, choose-f2, choose-f21; the spec's words for answers Q2 and Q3): step 1's line after Back,
+  // the logo's question, and a started question's line with its map, shown at the click-test.
+  "v4.ask.pathsKept",
+  "v4.ask.leavePaths",
+  "v4.ask.started",
+  "v4.ask.openItsMap",
+  // V4 start step, Task 76h (ask-d3: the owner's words of 4 Nov night; read-f8: the record's example, approved at the
+  // click-test): the clarifying call's slow-wait lines, its "Try again", and Free's cap line.
+  "v4.read.clarifyStill",
+  "v4.read.clarifyLonger",
+  "v4.read.clarifyTryAgain",
+  "v4.read.capReached",
+  // V4 start step, Task 76g (read-f1, the owner's words of record :303): a new reading's line for an answer it set aside, and
+  // its button, shown at the click-test.
+  "v4.read.setAside",
+  "v4.read.putBack"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

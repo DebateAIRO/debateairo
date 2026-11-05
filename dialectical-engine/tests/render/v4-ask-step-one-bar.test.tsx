@@ -241,7 +241,7 @@ describe("the CSS (read as text)", () => {
   });
 });
 
-describe("the level block (first visit; owner answer Q15)", () => {
+describe("the level block (every first screen; owner answer Q15, Task 75d)", () => {
   it("three radios in one row, the plain sentence with no label box, and one grey line with 'What does it change?'", async () => {
     await mount({ level: null });
     const radios = [...host!.querySelectorAll<HTMLInputElement>(".v4AskLevels input[type=radio]")];
@@ -266,13 +266,13 @@ describe("the level block (first visit; owner answer Q15)", () => {
     expect(host!.textContent).not.toContain("The AIs that write your answer");
   });
 
-  it("while the account loads, the held place holds three pill outlines and no text", async () => {
+  // Task 75d (owner, 5 Nov, second round): no account level is read, so nothing is held: the block is there from the first frame.
+  it("is there from the first frame, on Plain words, while an account would never answer; no held place is left", async () => {
     server.level = new Promise(() => undefined);
     await mount({ level: null });
-    const held = host!.querySelector(".v4AskLevelsHold")!;
-    expect(held.querySelectorAll(".v4AskLevelsHoldPill")).toHaveLength(3);
-    expect(held.textContent).toBe("");
-    expect(CSS).toMatch(/\.v4AskLevelsHoldPill\s*\{[^}]*height:\s*44px;[^}]*border:\s*1\.5px solid var\(--line-2\);[^}]*border-radius:\s*var\(--r-pill\);/u);
+    expect(host!.querySelector(".v4AskLevelsHold")).toBeNull();
+    expect([...host!.querySelectorAll<HTMLInputElement>(".v4AskLevels input[type=radio]")].map((radio) => radio.checked)).toEqual([true, false, false]);
+    expect(CSS).not.toContain(".v4AskLevelsHold");
   });
 
   it("the words: the grey line is the owner's, and the honest note ends after its second sentence", () => {

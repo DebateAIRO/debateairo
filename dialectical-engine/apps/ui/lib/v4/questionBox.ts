@@ -161,6 +161,18 @@ export function boxOwnWords(box: QuestionBox, words: string): QuestionBox {
   return made(blank === null ? own : textOf(own, BLANK_LINE.test(blank) ? blank : "\n\n", lines), box.placed);
 }
 
+/**
+ * V4 start step, Task 76g (read-f1, read-d3): a new reading keeps an answer under a reworded question. The sentence stays where it
+ * is, byte for byte; only the key it is placed under changes (`from` to `to`). A key not placed, or the same key: the box as it is.
+ */
+export function boxRekey(box: QuestionBox, from: string, to: string): QuestionBox {
+  if (from === to || !box.placed.some((placed) => placed.key === from)) return box;
+  return Object.freeze({
+    text: box.text,
+    placed: Object.freeze(box.placed.map((placed) => (placed.key === from ? Object.freeze({ key: to, text: placed.text }) : placed)))
+  });
+}
+
 /** The person typed: the text is theirs; only the sentences still written as placed stay placed. */
 export function boxTyped(box: QuestionBox, text: string): QuestionBox {
   return made(text, box.placed);

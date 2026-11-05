@@ -90,6 +90,51 @@ describe("a dig is written at its parent debate's level (the asks route)", () =>
   });
 });
 
+/*
+ * V4 start step, Task 75d (owner, 5 Nov: "every dig is stored and priced at its debate's level"): the level sets the answer length
+ * a V4 page asks for (plain: short, background: standard, expert: detailed; apps/ui/lib/v4/askConfig.ts), and the length is what
+ * the price counts. So a dig asks the length its debate's level picks, whatever length the request names; a debate stored without
+ * a level reads as Plain words. A request that names no length (no length switch in force) gets none.
+ */
+describe("a dig is priced at its debate's level (Task 75d)", () => {
+  it("a dig of an Expert debate asks Expert's length, whatever length and level the request names", async () => {
+    for (const asked of [{ depth: 1, answerLength: "short", readingLevel: "plain" }, { depth: 1, answerLength: "standard" }]) {
+      const { api, submitted } = apiWith({ depth: 1, answerLength: "detailed", readingLevel: "expert" });
+      const response = await api.inject({ method: "POST", url: "/v1/asks", headers: HEADERS, payload: askOf(asked) });
+      expect(response.statusCode, JSON.stringify(asked)).toBe(202);
+      expect(submitted.map((ask) => ask.depth_params)).toEqual([{ depth: 1, answerLength: "detailed", readingLevel: "expert" }]);
+      await api.close();
+    }
+  });
+
+  it("a dig of a debate stored without a level is priced as Plain words, and keeps no level", async () => {
+    const { api, submitted } = apiWith({ depth: 2, answerLength: "detailed" });
+    const response = await api.inject({ method: "POST", url: "/v1/asks", headers: HEADERS,
+      payload: askOf({ depth: 1, answerLength: "detailed", readingLevel: "expert" }) });
+    expect(response.statusCode).toBe(202);
+    expect(submitted.map((ask) => ask.depth_params)).toEqual([{ depth: 1, answerLength: "short" }]);
+    await api.close();
+  });
+
+  it("the length is the one each level picks on the V4 pages, so a page's estimate at the debate's level agrees", async () => {
+    // askConfig.ts reaches app/new/defaults.tsx, which the root test compiler cannot read: loaded by a path it does not follow
+    // (as tests/unit/v4-ask-config.test.ts does); Vitest resolves it as usual.
+    const askConfig = "@/lib/v4/askConfig";
+    const { v4RoomQuery } = (await import(/* @vite-ignore */ askConfig)) as Readonly<{
+      v4RoomQuery(mode: "quick", level: "plain" | "background" | "expert", settings: Readonly<Record<string, unknown>>): Readonly<{ answer_length?: string }>;
+    }>;
+    for (const level of ["plain", "background", "expert"] as const) {
+      const pageLength = v4RoomQuery("quick", level, { planTier: "premium", shapeSettings: false, lengthSettings: true }).answer_length;
+      expect(digDepthParamsAtParentLevel({ depth: 1, answerLength: "standard", readingLevel: "plain" }, { depth: 1, readingLevel: level }), level)
+        .toEqual({ depth: 1, answerLength: pageLength, readingLevel: level });
+    }
+    // No length asked (no length switch in force): none is added; a parent that cannot be read leaves the ask as sent.
+    expect(digDepthParamsAtParentLevel({ depth: 1, readingLevel: "plain" }, { depth: 1, readingLevel: "expert" })).toEqual({ depth: 1, readingLevel: "expert" });
+    expect(digDepthParamsAtParentLevel({ depth: 1, answerLength: "short", readingLevel: "plain" }, null))
+      .toEqual({ depth: 1, answerLength: "short", readingLevel: "plain" });
+  });
+});
+
 describe("digDepthParamsAtParentLevel (pure)", () => {
   it("takes the parent's level, drops the asked one when the parent has none, and keeps the asked params when the parent is unknown", () => {
     expect(digDepthParamsAtParentLevel({ depth: 1, readingLevel: "plain" }, { depth: 2, readingLevel: "background" }))

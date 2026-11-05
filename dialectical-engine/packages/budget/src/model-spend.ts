@@ -201,7 +201,14 @@ export type PreStartChargeKind = typeof PRE_START_CHARGE_KINDS[number];
 /** The writer of the small AIs before Start: the ledger's row and the person's, in one transaction, as ASK_CLARIFY's. */
 export const PRE_START_CHARGE_WRITER = "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)" as const;
 
-export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind }>;
+/**
+ * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call was made for (the API's keyed
+ * hash of one person's one question, 64 lower-case hex characters), when it has one: written with the charge by 0163's writer.
+ */
+export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind; tryRef?: string }>;
+
+/** 0163's writer: 0156's, and the call's try in the same transaction. */
+export const PRE_START_TRY_CHARGE_WRITER = "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)" as const;
 
 /** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0156's writer checks the kind matches. */
 export function preStartSpendRef(kind: PreStartChargeKind, provider: string, model: string): string {
@@ -217,9 +224,35 @@ export async function preStartChargeWriterPresent(pool: Pick<Pool, "query">): Pr
 }
 
 export async function recordPreStartCharge(pool: Pick<Pool, "query">, entry: PreStartChargeEntry): Promise<void> {
+  const values = [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.kind, entry.providerRef,
+    entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens];
+  if (entry.tryRef !== undefined) {
+    await pool.query("SELECT identity.record_pre_start_try_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::date,$8::bigint,$9::bigint,$10::bigint,$11::text)",
+      [...values, entry.tryRef]);
+    return;
+  }
   await pool.query("SELECT identity.record_pre_start_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::date,$8::bigint,$9::bigint,$10::bigint)",
-    [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.kind, entry.providerRef, entry.chargedOn,
-      entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+    values);
+}
+
+/**
+ * Task 57c (0163): at Start, the person's charges of that try not yet given to a debate are given to their new debate, once; how many.
+ * Another person's debate, or none, takes nothing (0).
+ */
+export async function linkPreStartTry(pool: Pick<Pool, "query">, input: Readonly<{ ownerRef: string; tryRef: string; runId: string }>): Promise<number> {
+  const result = await pool.query<{ given: number | string }>("SELECT identity.link_pre_start_try($1::uuid,$2::text,$3::uuid) AS given",
+    [input.ownerRef, input.tryRef, input.runId]);
+  return Number(result.rows[0]?.given ?? 0);
+}
+
+/** Task 57c (0163): whether a person's debate used any of their quota (its own counted spend, or a charge before Start not given back). */
+export type RunQuotaUsed = "NONE" | "SOME";
+
+/** Task 57c (0163): the answer for the person's own debate; null for another's, or for any answer that is not one of the two. */
+export async function readRunQuotaUsed(pool: Pick<Pool, "query">, input: Readonly<{ ownerRef: string; runId: string }>): Promise<RunQuotaUsed | null> {
+  const result = await pool.query<{ used: unknown }>("SELECT identity.read_run_quota_used($1::uuid,$2::uuid) AS used", [input.ownerRef, input.runId]);
+  const used = result.rows[0]?.used;
+  return used === "NONE" || used === "SOME" ? used : null;
 }
 
 const wholeCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;

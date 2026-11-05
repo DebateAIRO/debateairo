@@ -96,7 +96,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -172,7 +172,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -242,7 +242,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -308,7 +308,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -374,7 +374,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -440,7 +440,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -717,8 +717,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the synthesis check 0126 after 0125: the recipe, 0125's manifest and the effective verifier 0125 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-37);
-    const prior = plan.forwardChain.at(-38);
+    const step = plan.forwardChain.at(-38);
+    const prior = plan.forwardChain.at(-39);
     expect(step?.name).toBe("0126_synthesis_check.sql");
     expect(prior?.name).toBe("0125_italy_specific_approval.sql");
     const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0126.json")).toString("utf8"));
@@ -756,15 +756,15 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("0127 is followed by 0128 and its previous is 0126", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-36);
+    const step = plan.forwardChain.at(-37);
     expect(step?.name).toBe("0127_publication_review.sql");
     expect(step?.previousName).toBe("0126_synthesis_check.sql");
   });
 
   it("0127's manifest binds 0126's manifest and effective verifier SHA-256", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-36);
-    const prior = plan.forwardChain.at(-37);
+    const step = plan.forwardChain.at(-37);
+    const prior = plan.forwardChain.at(-38);
     expect(step?.name).toBe("0127_publication_review.sql");
     const manifest = JSON.parse((await bytesOf("lineage/publication-review-forward0127.json")).toString("utf8"));
     expect(manifest.previous).toEqual({
@@ -987,8 +987,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   }, 120_000);
   it("chains the threat reports 0128 after 0127 with 0127's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-35);
-    const previous = plan.forwardChain.at(-36);
+    const step = plan.forwardChain.at(-36);
+    const previous = plan.forwardChain.at(-37);
     const manifest = JSON.parse((await bytesOf("lineage/threat-reports-forward0128.json")).toString("utf8"));
     expect(step?.name).toBe("0128_threat_reports.sql");
     expect(previous?.name).toBe("0127_publication_review.sql");
@@ -1012,8 +1012,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains support deletion 0129 after 0128 and records its source digest", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-34);
-    const previous = plan.forwardChain.at(-35);
+    const step = plan.forwardChain.at(-35);
+    const previous = plan.forwardChain.at(-36);
     const manifest = JSON.parse((await bytesOf("lineage/support-answer-scope-forward0129.json")).toString("utf8"));
     expect(step?.name).toBe("0129_support_answer_scope.sql");
     expect(previous?.name).toBe("0128_threat_reports.sql");
@@ -1026,8 +1026,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-32);
-    const previous = plan.forwardChain.at(-33);
+    const step = plan.forwardChain.at(-33);
+    const previous = plan.forwardChain.at(-34);
     const manifest = JSON.parse((await bytesOf("lineage/v4-account-memory-forward0131.json")).toString("utf8"));
     expect(step?.name).toBe("0131_v4_account_memory.sql");
     expect(previous?.name).toBe("0130_row_level_security.sql");
@@ -1040,13 +1040,13 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the web evidence store 0132 after 0131, the investigations 0133, the dig model 0134, the dig picks 0135, the investigation reports 0136, the public debates 0137, the tree updates 0138, the passage retention 0139, the funded spend kinds 0140, the path suggestions 0141 and the team's one limit 0142 last, each keeping 0130's effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team, handover, askClarifyCharge, researched, teamAllowances, publicTree, erasureKeepsPublic, publicReportTeamMonth, publicReview, publicFlag, reportExport, digTreeSettled, regionWiden, ownerAnswerWrites, preStartCharge, startPaths, pathResults, pathProgress, savedQuestions, carryOnDigs, pathAdded] = [
-      plan.forwardChain.at(-32), plan.forwardChain.at(-31), plan.forwardChain.at(-30), plan.forwardChain.at(-29), plan.forwardChain.at(-28), plan.forwardChain.at(-27), plan.forwardChain.at(-26), plan.forwardChain.at(-25), plan.forwardChain.at(-24), plan.forwardChain.at(-23), plan.forwardChain.at(-22), plan.forwardChain.at(-21), plan.forwardChain.at(-20), plan.forwardChain.at(-19), plan.forwardChain.at(-18), plan.forwardChain.at(-17), plan.forwardChain.at(-16), plan.forwardChain.at(-15), plan.forwardChain.at(-14), plan.forwardChain.at(-13), plan.forwardChain.at(-12), plan.forwardChain.at(-11), plan.forwardChain.at(-10), plan.forwardChain.at(-9), plan.forwardChain.at(-8), plan.forwardChain.at(-7), plan.forwardChain.at(-6), plan.forwardChain.at(-5), plan.forwardChain.at(-4), plan.forwardChain.at(-3), plan.forwardChain.at(-2), plan.forwardChain.at(-1)];
+    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team, handover, askClarifyCharge, researched, teamAllowances, publicTree, erasureKeepsPublic, publicReportTeamMonth, publicReview, publicFlag, reportExport, digTreeSettled, regionWiden, ownerAnswerWrites, preStartCharge, startPaths, pathResults, pathProgress, savedQuestions, carryOnDigs, pathAdded, preStartRelease] = [
+      plan.forwardChain.at(-33), plan.forwardChain.at(-32), plan.forwardChain.at(-31), plan.forwardChain.at(-30), plan.forwardChain.at(-29), plan.forwardChain.at(-28), plan.forwardChain.at(-27), plan.forwardChain.at(-26), plan.forwardChain.at(-25), plan.forwardChain.at(-24), plan.forwardChain.at(-23), plan.forwardChain.at(-22), plan.forwardChain.at(-21), plan.forwardChain.at(-20), plan.forwardChain.at(-19), plan.forwardChain.at(-18), plan.forwardChain.at(-17), plan.forwardChain.at(-16), plan.forwardChain.at(-15), plan.forwardChain.at(-14), plan.forwardChain.at(-13), plan.forwardChain.at(-12), plan.forwardChain.at(-11), plan.forwardChain.at(-10), plan.forwardChain.at(-9), plan.forwardChain.at(-8), plan.forwardChain.at(-7), plan.forwardChain.at(-6), plan.forwardChain.at(-5), plan.forwardChain.at(-4), plan.forwardChain.at(-3), plan.forwardChain.at(-2), plan.forwardChain.at(-1)];
     expect([account?.name, web?.name, investigations?.name, digModel?.name, digPicks?.name, reports?.name, publicDebates?.name,
-      treeUpdates?.name, passages?.name, spendKinds?.name, suggestions?.name, team?.name, handover?.name, askClarifyCharge?.name, researched?.name, teamAllowances?.name, publicTree?.name, erasureKeepsPublic?.name, publicReportTeamMonth?.name, publicReview?.name, publicFlag?.name, reportExport?.name, digTreeSettled?.name, regionWiden?.name, ownerAnswerWrites?.name, preStartCharge?.name, startPaths?.name, pathResults?.name, pathProgress?.name, savedQuestions?.name, carryOnDigs?.name, pathAdded?.name])
+      treeUpdates?.name, passages?.name, spendKinds?.name, suggestions?.name, team?.name, handover?.name, askClarifyCharge?.name, researched?.name, teamAllowances?.name, publicTree?.name, erasureKeepsPublic?.name, publicReportTeamMonth?.name, publicReview?.name, publicFlag?.name, reportExport?.name, digTreeSettled?.name, regionWiden?.name, ownerAnswerWrites?.name, preStartCharge?.name, startPaths?.name, pathResults?.name, pathProgress?.name, savedQuestions?.name, carryOnDigs?.name, pathAdded?.name, preStartRelease?.name])
       .toEqual(["0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql",
         "0135_dig_picks.sql", "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql",
-        "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql", "0143_run_handover.sql", "0144_ask_clarify_charge.sql", "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql"]);
+        "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql", "0143_run_handover.sql", "0144_ask_clarify_charge.sql", "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_pre_start_charge.sql", "0157_start_paths.sql", "0158_path_results.sql", "0159_path_progress.sql", "0160_saved_questions.sql", "0161_carry_on_session_free_digs.sql", "0162_main_answer_path_added.sql", "0163_pre_start_release.sql"]);
     for (const [step, previous, manifestPath, previousManifestPath] of [
       [web, account, "lineage/web-evidence-forward0132.json", "lineage/v4-account-memory-forward0131.json"],
       [investigations, web, "lineage/investigations-forward0133.json", "lineage/web-evidence-forward0132.json"],
@@ -1078,7 +1078,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       [pathProgress, pathResults, "lineage/path-progress-forward0159.json", "lineage/path-results-forward0158.json"],
       [savedQuestions, pathProgress, "lineage/saved-questions-forward0160.json", "lineage/path-progress-forward0159.json"],
       [carryOnDigs, savedQuestions, "lineage/carry-on-forward0161.json", "lineage/saved-questions-forward0160.json"],
-      [pathAdded, carryOnDigs, "lineage/main-answer-path-added-forward0162.json", "lineage/carry-on-forward0161.json"]
+      [pathAdded, carryOnDigs, "lineage/main-answer-path-added-forward0162.json", "lineage/carry-on-forward0161.json"],
+      [preStartRelease, pathAdded, "lineage/pre-start-release-forward0163.json", "lineage/main-answer-path-added-forward0162.json"]
     ] as const) {
       const manifest = JSON.parse((await bytesOf(manifestPath)).toString("utf8"));
       expect(manifest.previous).toEqual({ name: previous?.name, manifestSha256: sha256(await bytesOf(previousManifestPath)),

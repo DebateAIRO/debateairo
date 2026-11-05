@@ -96,6 +96,11 @@ export {
   recordPreStartCharge,
   type PreStartChargeEntry,
   type PreStartChargeKind,
+  // V4 start step, Task 57c (0163): a charge's try, its link at Start, and a failed debate's quota read.
+  PRE_START_TRY_CHARGE_WRITER,
+  linkPreStartTry,
+  readRunQuotaUsed,
+  type RunQuotaUsed,
   QUESTION_CHECK_SPEND_WRITER,
   PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,

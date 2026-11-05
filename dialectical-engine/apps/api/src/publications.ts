@@ -3,6 +3,7 @@ import {
   AnswerFloorSchema,
   PublicDebateSchema,
   PublicStoryShortSchema,
+  ReadingLevelSchema,
   StoryLanguageTagSchema,
   publicBranchesOf,
   type Answer,
@@ -16,6 +17,7 @@ import {
   type PublicNode,
   type PublicStoryShort,
   type PublicationRefusalStatement,
+  type ReadingLevel,
   type PurposeLines
 } from "@debateai/contract";
 import {
@@ -223,6 +225,38 @@ function logLanguageNotPublished(requestId: string, diagnostic: string): void {
 }
 
 /**
+ * V4 start step, Task 75d (owner's second-round answers: "A public page shows each debate at the level it was asked at"): the
+ * run's reading level, copied into the snapshot as its language is, read as the publisher (owner-scoped). Like the language it
+ * never blocks publishing: a run asked without one publishes none (the page reads Plain words), and a value that is not a level
+ * or a failed read publishes none too, the log recording only a bounded diagnostic.
+ */
+async function readPublishableReadingLevel(
+  repository: PostgresPublicationRepository,
+  input: Readonly<{ runId: string; owner: { userId: string; ownerRef: string }; source: AuthSourceContext }>
+): Promise<ReadingLevel | null> {
+  let level: string | null;
+  try {
+    level = await repository.readRunReadingLevel(input.runId, input.owner.userId, input.owner.ownerRef);
+  } catch (error) {
+    logReadingLevelNotPublished(input.source.requestId, storyReadDiagnostic(error));
+    return null;
+  }
+  if (level === null) return null;
+  const parsed = ReadingLevelSchema.safeParse(level);
+  if (parsed.success) return parsed.data;
+  logReadingLevelNotPublished(input.source.requestId, "READING_LEVEL_REFUSED");
+  return null;
+}
+
+function logReadingLevelNotPublished(requestId: string, diagnostic: string): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.publication.reading_level_not_published",
+    requestId,
+    diagnostic
+  })));
+}
+
+/**
  * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of a
  * components-only answer — its label and its leading position — copied from
  * the owner's disclosure record, so the public page can say "Our best answer"
@@ -318,6 +352,7 @@ export async function buildPublicDebateBody(input: Readonly<{
   const language = await readPublishableLanguage(input.readers.repository, input);
   const floor = await readPublishableFloor(input.readers.repository, input);
   const mapView = await readPublishableMapView(input.readers.mapViews, input);
+  const readingLevel = await readPublishableReadingLevel(input.readers.repository, input);
   return PublicDebateSchema.omit({ public_ref: true, author_pseudonym: true, published_at: true }).parse({
     question: input.answer.question_line,
     answer: {
@@ -341,7 +376,9 @@ export async function buildPublicDebateBody(input: Readonly<{
     // V4 start step, Task 63 (spec 2026-11-03 §7): a path debate publishes its paths, the person's own among them, and the publication
     // check reads them (material.ts). Never the "+ N more" list, the point-of-view line, the carry-on box, the evidence or the root's
     // node id (publicBranchesOf). An R22 answer has no paths, so its snapshot keeps its bytes.
-    ...(input.answer.branches === undefined ? {} : { branches: publicBranchesOf(input.answer.branches) })
+    ...(input.answer.branches === undefined ? {} : { branches: publicBranchesOf(input.answer.branches) }),
+    // V4 start step, Task 75d: the level the debate was asked at, last; none for a debate asked without one.
+    ...(readingLevel === null ? {} : { reading_level: readingLevel })
   });
 }
 

@@ -7,7 +7,8 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "pg";
 import {
-  PRE_START_CHARGE_KINDS, PRE_START_CHARGE_WRITER, PostgresModelSpendStore, preStartSpendRef, recordPreStartCharge
+  PRE_START_CHARGE_KINDS, PRE_START_CHARGE_WRITER, PRE_START_TRY_CHARGE_WRITER, PostgresModelSpendStore, linkPreStartTry, preStartSpendRef, readRunQuotaUsed,
+  recordPreStartCharge
 } from "@debateai/budget";
 import { RAW_SECTIONS, KEEP_COLUMNS, collectSnapshot } from "../../apps/api/src/data-export/snapshot.js";
 import { buildArchive } from "../../apps/api/src/data-export/archive.js";
@@ -34,6 +35,29 @@ describe("the pre-Start charge", () => {
       ["s", "o", "g", "e", "FIT", "pre-start:fit:anthropic:claude-haiku-5-5", "2026-11-03", 40, 700, 90]]);
     const store = new PostgresModelSpendStore({ query: async () => { throw new Error("no query may run"); } } as unknown as Pool);
     await expect(store.recordSpend({ spendSource: "PRE_START", runId: null } as never)).rejects.toMatchObject({ code: "MODEL_SPEND_PRE_START_FUNCTION_ONLY" });
+  });
+
+  // V4 start step, Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): a call made for a try names it (0163).
+  it("a call made for a try is written by 0163's writer with the try, in one call; the link at Start and the failed debate's quota read are 0163's", async () => {
+    const TRY = "a".repeat(64);
+    const calls: unknown[][] = [];
+    const pool = { query: async (text: string, values: unknown[]) => {
+      calls.push([text, values]);
+      return { rows: [text.includes("link_pre_start_try") ? { given: 2 } : { used: "NONE" }] };
+    } } as unknown as Pool;
+    await recordPreStartCharge(pool, { spendId: "s", ownerRef: "o", grant: null, kind: "LIST", providerRef: "pre-start:list:deepinfra:zai-org/GLM-5.3-Flash",
+      chargedOn: "2026-11-05", chargeMicros: 40, inputTokens: 700, outputTokens: 90, tryRef: TRY });
+    expect(PRE_START_TRY_CHARGE_WRITER).toBe("identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)");
+    expect(calls[0]).toEqual(["SELECT identity.record_pre_start_try_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::date,$8::bigint,$9::bigint,$10::bigint,$11::text)",
+      ["s", "o", null, null, "LIST", "pre-start:list:deepinfra:zai-org/GLM-5.3-Flash", "2026-11-05", 40, 700, 90, TRY]]);
+    expect(await linkPreStartTry(pool, { ownerRef: OWNER, tryRef: TRY, runId: "r" })).toBe(2);
+    expect(calls[1]).toEqual(["SELECT identity.link_pre_start_try($1::uuid,$2::text,$3::uuid) AS given", [OWNER, TRY, "r"]]);
+    expect(await readRunQuotaUsed(pool, { ownerRef: OWNER, runId: "r" })).toBe("NONE");
+    expect(calls[2]).toEqual(["SELECT identity.read_run_quota_used($1::uuid,$2::uuid) AS used", [OWNER, "r"]]);
+    const answering = (used: unknown) => ({ query: async () => ({ rows: [{ used }] }) }) as unknown as Pool;
+    expect(await readRunQuotaUsed(answering("SOME"), { ownerRef: OWNER, runId: "r" })).toBe("SOME");
+    expect(await readRunQuotaUsed(answering(null), { ownerRef: OWNER, runId: "r" })).toBeNull();
+    expect(await readRunQuotaUsed(answering("MAYBE"), { ownerRef: OWNER, runId: "r" })).toBeNull();
   });
 
   it("counts in both of the person's subscription window readers", async () => {

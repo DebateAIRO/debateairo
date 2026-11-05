@@ -23,7 +23,9 @@ import type { QuestionLanguageLock } from "../../apps/api/src/question-language/
 import {
   startQuestionCheckText, startStepOnInView, startTextsOfBody, startWidthsOfView, type AskStartHandOver
 } from "../../apps/api/src/start-paths-at-ask.js";
-import { newStartStepKey, signStartCheck, signStartList, signStartMenu } from "../../apps/api/src/start-step/signing.js";
+import {
+  newStartStepKey, signStartCheck, signStartList, signStartMenu, startDigTryRefOf, startTryRefOfCheck
+} from "../../apps/api/src/start-step/signing.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const KEY = newStartStepKey();
@@ -126,15 +128,22 @@ const PUBLIC_TREE = Object.freeze({
 });
 
 type Over = Readonly<{ view?: AdmissionView | null; outcome?: QuestionCheckOutcome; key?: "NONE"; dig?: boolean; publicTree?: boolean;
-  suggestions?: Readonly<Record<string, string>> }>;
+  suggestions?: Readonly<Record<string, string>>; linkFails?: boolean }>;
 function apiOver(over: Over = {}) {
   const checked: string[] = [];
   const submitted: unknown[][] = [];
   const suggestionReads: string[] = [];
+  const linked: unknown[][] = [];
   let consentReads = 0;
   const application = {
     submit: async (...args: unknown[]) => { submitted.push(args); return { run_ref: RUN_ID, status: "QUEUED" as const }; },
-    readRunAnswer: async () => null
+    readRunAnswer: async () => null,
+    // Task 57c: the try's charges before Start given to the new debate (0163's link).
+    linkPreStartTry: async (...args: unknown[]) => {
+      linked.push(args);
+      if (over.linkFails === true) throw Object.assign(new Error("database down"), { code: "57P01" });
+      return 2;
+    }
   } as unknown as AskApplication;
   const sessions = { ...testSessionApplication([IDENTITY]),
     readSensitiveDataConsent: async () => { consentReads += 1; return "given" as const; } };
@@ -155,7 +164,7 @@ function apiOver(over: Over = {}) {
   } as never);
   const post = (payload: AskRequest | string) => api.inject({ method: "POST", url: "/v1/asks", payload,
     headers: typeof payload === "string" ? { ...HEADERS, "content-type": "application/json" } : HEADERS });
-  return { api, post, checked, submitted, suggestionReads, consentReads: () => consentReads };
+  return { api, post, checked, submitted, suggestionReads, linked, consentReads: () => consentReads };
 }
 type Harness = ReturnType<typeof apiOver>;
 const handOverOf = (harness: Harness): AskStartHandOver => harness.submitted[0]![3] as AskStartHandOver;
@@ -614,5 +623,56 @@ describe("startQuestionCheckText: the one check at Start", () => {
     expect(startQuestionCheckText(input({ startCheckVerified: false }))).toBe(Q);
     expect(startQuestionCheckText(input({ startCheckVerified: false, purposeLines: { answers: [ROMANIA] }, ownWords: ["Mine"] })))
       .toBe(`${Q}\n\n${purposeAnswerSentence(ROMANIA)}\n\nMine`);
+  });
+});
+
+/*
+ * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): once the debate is
+ * accepted, it takes the charges before Start of each try this Start names, the question's (its check) and a dig's combine (its parent),
+ * so 0163 gives them back if it fails. A link that fails never changes the 202, and its one line names no word.
+ */
+describe("the charges before Start go to the new debate (Task 57c)", () => {
+  it("a Start from Next: the check's try, linked to the accepted debate once", async () => {
+    const h = apiOver();
+    expect((await h.post(startAsk())).statusCode).toBe(202);
+    expect(h.linked).toEqual([[IDENTITY.authenticated.ownerRef, startTryRefOfCheck(KEY, SCOPE, checkRef()), RUN_ID]]);
+    await h.api.close();
+  });
+
+  it("a dig's picks: its parent's try (a combine over them); with a check from Next as well, both", async () => {
+    const dig = { parent_run_id: PARENT_RUN_ID, places: [], mode: "quick" as const,
+      picks: [{ kind: "OWN_VIEW" as const, suggestion_id: null, place: "w", text: "I worry about earthquakes near the plants." }] };
+    const h = apiOver({ dig: true });
+    expect((await h.post(baseAsk({ question_line: `${Q} Dig: the risks.`, parent: dig }))).statusCode).toBe(202);
+    const digTry = startDigTryRefOf(KEY, { ownerScope: SCOPE, parentRunId: PARENT_RUN_ID });
+    expect(h.linked).toEqual([[IDENTITY.authenticated.ownerRef, digTry, RUN_ID]]);
+    expect((await h.post(baseAsk({ question_line: `${Q} Dig: the risks.`, parent: dig, start_check: { ref: checkRef() } }))).statusCode).toBe(202);
+    expect(h.linked.slice(1)).toEqual([[IDENTITY.authenticated.ownerRef, startTryRefOfCheck(KEY, SCOPE, checkRef()), RUN_ID],
+      [IDENTITY.authenticated.ownerRef, digTry, RUN_ID]]);
+    await h.api.close();
+  });
+
+  it("nothing is linked for today's ask, a refused Start, or where the step does not run", async () => {
+    const h = apiOver();
+    expect((await h.post(baseAsk())).statusCode).toBe(202);
+    expect((await h.post(startAsk({}, {}, { planKey: "plus" }))).statusCode).toBe(409);
+    const off = apiOver({ view: viewOf(POLICY_OFF) });
+    expect((await off.post(baseAsk({ start_check: { ref: checkRef() } }))).statusCode).toBe(202);
+    expect([h.linked, off.linked]).toEqual([[], []]);
+    await h.api.close();
+    await off.api.close();
+  });
+
+  it("a link that fails: still 202, one line with the debate's id and no word", async () => {
+    const lines: string[] = [];
+    const error = vi.spyOn(console, "error").mockImplementation((line: unknown) => { lines.push(String(line)); });
+    const h = apiOver({ linkFails: true });
+    const response = await h.post(startAsk());
+    expect(response.statusCode).toBe(202);
+    expect(h.linked).toHaveLength(1);
+    expect(lines.map((line) => JSON.parse(line) as unknown)).toContainEqual({ event: "api.start_step.try_link_failed", run_id: RUN_ID });
+    expect(lines.join("\n")).not.toContain("nuclear");
+    error.mockRestore();
+    await h.api.close();
   });
 });

@@ -714,6 +714,7 @@ apps/ui/components/v4/V4AllMaps.tsx
 apps/ui/components/v4/V4AnswerCard.tsx
 apps/ui/components/v4/V4AskClient.tsx
 apps/ui/components/v4/V4AskGate.tsx
+apps/ui/components/v4/V4AskQuestions.tsx
 apps/ui/components/v4/V4BottomStack.tsx
 apps/ui/components/v4/V4ChangesBar.tsx
 apps/ui/components/v4/V4ChoiceChips.tsx
@@ -996,9 +997,12 @@ apps/ui/lib/v3/useAnswerStory.ts
 apps/ui/lib/v3/useStoryLocaleReady.ts
 apps/ui/lib/v4/accountMemory.ts
 apps/ui/lib/v4/askConfig.ts
+apps/ui/lib/v4/askHistory.ts
 apps/ui/lib/v4/askText.ts
 apps/ui/lib/v4/carryOn.ts
 apps/ui/lib/v4/changes.ts
+apps/ui/lib/v4/clarifyPlace.ts
+apps/ui/lib/v4/clarifyWait.ts
 apps/ui/lib/v4/clock.ts
 apps/ui/lib/v4/digDock.ts
 apps/ui/lib/v4/digIndex.ts
@@ -1008,6 +1012,7 @@ apps/ui/lib/v4/digRetry.ts
 apps/ui/lib/v4/digUndo.ts
 apps/ui/lib/v4/digsBelow.ts
 apps/ui/lib/v4/failedRun.ts
+apps/ui/lib/v4/foldMove.ts
 apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapLooks.ts
 apps/ui/lib/v4/mapModel.ts
@@ -1026,6 +1031,7 @@ apps/ui/lib/v4/questionBox.ts
 apps/ui/lib/v4/quotaPulse.ts
 apps/ui/lib/v4/readyMoment.ts
 apps/ui/lib/v4/reportWriting.ts
+apps/ui/lib/v4/startUndo.ts
 apps/ui/lib/v4/stateWords.ts
 apps/ui/lib/v4/storage.ts
 apps/ui/lib/v4/suggestions.ts
@@ -1259,6 +1265,7 @@ packages/db/src/migration-forward0159.ts
 packages/db/src/migration-forward0160.ts
 packages/db/src/migration-forward0161.ts
 packages/db/src/migration-forward0162.ts
+packages/db/src/migration-forward0163.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts

@@ -30,7 +30,11 @@ import { DIG_MODES, type DigMode, type ReadingLevel } from "@/lib/v4/types";
  * sits right under the box"), the declined line right under Next, and the late lines after the row (ask-f16).
  */
 
-export type StartBarState = "PATHS_COMING" | "READY" | "WRITING_WAIT" | "PENDING" | "SENDING" | "OFFLINE" | "BLOCKED";
+/**
+ * Task 76b (read-f3, 4 Nov night): CHECKING_PLAN while a press waits for one more read of a plan still unknown ("Checking
+ * your plan…", busy; nothing waits or is sent meanwhile).
+ */
+export type StartBarState = "PATHS_COMING" | "READY" | "WRITING_WAIT" | "PENDING" | "SENDING" | "CHECKING_PLAN" | "OFFLINE" | "BLOCKED";
 
 /** One press of the bar's "Just answer it". */
 export type StartBarJustAnswer = Readonly<{
@@ -232,14 +236,15 @@ function StartBar(props: V4StartBarProps) {
     : state === "PATHS_COMING" ? t(catalog, "v4.start.pathsComing")
       : state === "WRITING_WAIT" ? t(catalog, "v4.start.writingWait")
         : state === "SENDING" ? t(catalog, "v4.ask.starting")
-          : t(catalog, "v4.start.start");
+          : state === "CHECKING_PLAN" ? t(catalog, "v4.ask.checkingPlan")
+            : t(catalog, "v4.start.start");
   const startButton = (
     <button
       id={startId}
       type="button"
       className="v4Btn v4BtnPrimary v4StartBarStart"
       disabled={!pressable}
-      aria-busy={!helpFirst && (state === "SENDING" || state === "WRITING_WAIT")}
+      aria-busy={!helpFirst && (state === "SENDING" || state === "WRITING_WAIT" || state === "CHECKING_PLAN")}
       onClick={() => {
         if (pressable) onStart();
       }}

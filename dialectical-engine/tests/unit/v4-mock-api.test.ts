@@ -392,6 +392,19 @@ describe("V4 mock API: the new dig model and the money rule", () => {
       "v4.pause.digCard", "v4.pause.digCardReady"].filter((key) => !(key in catalog))).toEqual([]);
   });
 
+  // V4 start step, Task 57c (owner answer Q20 A, 5 Nov): the contract's run read carries a failed run's quota_used, so the stand-in's normal
+  // view sends it as the API does (the failed question's "NONE", a failed dig's "SOME"), and a run that did not fail never carries it.
+  it("Task 57c: a failed run's quota_used is the contract's own, so the normal view keeps it", () => {
+    const run = {
+      run_ref: "44444444-4444-4444-8444-444444444444", question_line: "Will AI tutors replace homework help?", state: "FAILED",
+      terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", hold_until: null
+    };
+    for (const quota of ["NONE", "SOME"] as const) {
+      expect(contractOrDraft(RunProjectionSchema, { ...run, quota_used: quota }, stripRun)).toEqual({ body: { ...run, quota_used: quota }, draft: true });
+    }
+    expect(RunProjectionSchema.safeParse({ ...run, state: "RUNNING", terminal_reason: null, quota_used: "NONE" }).success).toBe(false);
+  });
+
   it("the quota's windows (owner's screen review, 3 Nov): share_scope and question_share pass their draft schemas and fall back", () => {
     // read-f19 / public-f14 / map-f33: the window a room read's share is of, only beside a share.
     for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]) expect(DraftShareScopeSchema.safeParse(scope).success).toBe(true);
@@ -617,6 +630,36 @@ describe("the public dig flow and the public state (owner screen review, 3 Nov: 
     for (const body of [rewrite, same]) {
       expect(AnswerContributionSchema.safeParse({ public_ref: "f1000000-0000-4000-8000-000000000001", state: "ON_THE_PAGE", rewrite: body }).success).toBe(true);
     }
+  });
+});
+
+/*
+ * V4 start step, Task 75d (owner, 5 Nov): the mock serves the reading level as the API does. The run read says the level each run
+ * was asked at (a new question its own, a dig its debate's, a dig on a public page the page's); the public read says the level the
+ * page was asked at, last and optional (the seeded snapshot of an older page has none and reads as Plain words).
+ */
+describe("V4 mock API: the reading level kept per question (Task 75d)", () => {
+  const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
+
+  it("the public read: the first seeded page names its level, last; the older page names none; both parse", async () => {
+    const { seedPublicDebates } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicDebateSchema } = await import("../../packages/contract/src/index.js");
+    const [first, older] = seedPublicDebates().map((debate) => PublicDebateSchema.parse(debate));
+    expect(first!.reading_level).toBe("background");
+    expect(Object.keys(seedPublicDebates()[0]!).at(-1)).toBe("reading_level");
+    expect(older).not.toHaveProperty("reading_level");
+  });
+
+  it("the run read serves the level each run was asked at, kept when the ask is accepted", () => {
+    const projection = server.slice(server.indexOf("function runProjection("), server.indexOf("function withQuestionShare("));
+    expect(projection).toContain("...(level === undefined ? {} : { reading_level: level })");
+    const ask = server.slice(server.indexOf("const publicParent = parsed.data.public_parent;"), server.indexOf('log(parent === null ? "QUEUED" : "QUEUED_DIG", runRef);'));
+    expect(ask).toContain("const askedLevel = publicParent !== undefined ? publicLevelOf(publicParent.public_ref)");
+    expect(ask).toContain(": parent !== null ? askedLevels.get(parent.parent_run_id) : ask.depth_params.readingLevel;");
+    expect(ask).toContain("if (askedLevel !== undefined) askedLevels.set(runRef, askedLevel);");
+    // The level is kept before any of the three ways a run starts (waiting, a dig that fails, a run that settles).
+    expect(ask.indexOf("askedLevels.set(runRef, askedLevel)")).toBeLessThan(ask.indexOf("addRun("));
+    expect(RunProjectionSchema.safeParse({ run_ref: "r", question_line: "q", state: "RUNNING", terminal_reason: null, hold_until: null, reading_level: "expert" }).success).toBe(true);
   });
 });
 

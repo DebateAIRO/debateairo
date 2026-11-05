@@ -173,8 +173,11 @@ const INDEX_PARENT_PAGES = 2;
 const FILLED_SLOT = "\u2063\u2063";
 /** Task 62: a path's whole title in the polite "ready to read" line (the panel's heading shows it whole too). */
 const PATH_TITLE_WHOLE = 2_000;
-/** The reading level a page uses when the address names none (Decision A). */
-const DEFAULT_LEVEL: ReadingLevel = "background";
+/**
+ * The reading level the page uses for a debate asked without one. V4 start step, Task 75d (owner, 5 Nov, second round): Plain
+ * words, the level every question starts on (it was "some background" while the address named the level).
+ */
+const DEFAULT_LEVEL: ReadingLevel = "plain";
 /**
  * Spec: desktop ≥ 1100 px, 768–1099 px a top strip, < 768 px the phone layout. map-d3 (3 Nov): from 1440 px the three
  * columns; 1100–1439 px ("laptop") a 56 px strip of steps, the map in two columns with only the opened path unfolded;
@@ -348,7 +351,8 @@ function V4Debate({
   const [loadAttempt, setLoadAttempt] = useState(0);
   // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level belongs to the question. The page shows the debate at the level it
   // was asked at, as its run read says (lib/v4/load.ts); the address's `?level=` and the account's saved level no longer change it,
-  // and nothing on this page changes it. A debate asked without one reads as the default level, as today. Links carry its own level.
+  // and nothing on this page changes it. A debate asked without one reads as the default level (Task 75d: Plain words). Links carry
+  // its own level.
   const debateLevel: ReadingLevel | null = load === null ? null : load.kind === "RUN" ? load.run.reading_level ?? null : load.level ?? null;
   const readingLevel: ReadingLevel = debateLevel ?? DEFAULT_LEVEL;
   /** The level is known once the debate was read (map-f6: no level shows before). */
@@ -1431,7 +1435,8 @@ function V4Debate({
             // Owner review 3 Nov (wait-f11, map-f30): "Ask this again" fills the ask step from this debate; a dig leads back to its map.
             <V4FailedScreen
               run={load.run}
-              askAgainHref={levelHref(askAgainHref(runId), debateLevel)}
+              // Task 75d: the ask step reads this debate's level back from the server with its words, never from the address.
+              askAgainHref={askAgainHref(runId)}
               askHref={askHref}
               classicHref={classicHref}
               dig={isDigPage || recordParent !== null

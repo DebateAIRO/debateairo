@@ -107,7 +107,10 @@ export function seedPublicDebates(): readonly Record<string, unknown>[] {
         dig_paths: [{ position_ref: "p-towns", line: "Small towns behave like large cities here: partly held.", fate: "PARTLY_HELD", points: ["Only a few towns were studied."] }]
       }],
       main_answer_update: { updated_at: "2026-10-28T16:00:00.000Z", segments: [{ text: "Better service first, and free fares for those who need them, also in small towns, though the studies there are few." }] },
-      reports: [REPORT]
+      reports: [REPORT],
+      // V4 start step, Task 75d: the level the debate was asked at, last, as the API copies it at publish time. The page below was
+      // published before the level was copied: it names none and reads as Plain words.
+      reading_level: "background"
     },
     {
       public_ref: PUBLIC_REF_AUTHOR_GONE, author_pseudonym: "a contributor", author_name_gone: true, question: "Should schools start an hour later?",
@@ -181,4 +184,14 @@ export function contributionOf(positionRef: string, onRef: string | null, update
     fate: "PARTLY_HELD", what_changed: ["The dig added one point to this path."], update_ref: updateRef, own_rewrite: true, on_ref: onRef,
     dig_paths: [{ position_ref: `p-${updateRef.slice(0, 8)}`, line: "A path of this dig's own.", fate: "HELD_UP", points: ["A made-up point this dig argued."] }]
   };
+}
+
+/**
+ * V4 start step, Task 79c (owner answer Q33 A, 5 Nov): what a row of GET /v1/answers says of a dig made on someone else's public page, for
+ * its own card on "Your maps" ("Dig: {its pick}"): `dug_on_public`, and its first pick's words (`dig_pick`) when it had a pick. Every other
+ * row says false. Contract members (AnswerSummarySchema, OpenRunSummarySchema), so the website's view carries them too.
+ */
+export function publicDigRowPart(dig: Readonly<{ pick: string | null }> | undefined): { dug_on_public: boolean; dig_pick?: string } {
+  if (dig === undefined) return { dug_on_public: false };
+  return dig.pick === null ? { dug_on_public: true } : { dug_on_public: true, dig_pick: dig.pick };
 }

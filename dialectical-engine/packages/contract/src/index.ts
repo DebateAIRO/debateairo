@@ -1023,10 +1023,17 @@ export const RunProjectionSchema = z.object({
   // V4 start step, Task 57a (./run-paths.ts), last: each path's step line, dots and findings, in the paths' order ([] while the AIs
   // are still choosing the paths), and the part a carry-on debate is running. Both absent on every R22 run.
   path_progress: z.array(RunPathProgressSchema).max(ANSWER_BRANCH_LIMITS.pathsMax).optional(),
-  carry_on_part: z.enum(CARRY_ON_PARTS).optional()
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional(),
+  // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up), last: whether a FAILED debate used any of the person's
+  // quota. NONE: nothing was taken (its path-list charge was given back, 0163, and nothing else ran); SOME: some was. Absent on every
+  // other run, and where the server cannot say, so an older reader still parses.
+  quota_used: z.enum(["NONE", "SOME"]).optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
+  }
+  if (run.quota_used !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["quota_used"], message: "only a failed debate says whether any quota was used" });
   }
   if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
     context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
@@ -1491,6 +1498,25 @@ export const AbstentionSchema = z.object({
   ledger_unknown_ref: z.string().trim().min(1)
 }).strict();
 
+/**
+ * V4 start step, Task 79c (owner answer Q33 A, 5 Nov 2026): "Your maps" shows a dig made on someone else's public page as a card of
+ * its own, "Dig: {its pick}" (dig-f30's words), the one case of a dig card of its own. A row of GET /v1/answers (served or still open)
+ * says whether it is one (`dug_on_public`) and, for one, its first pick's words (`dig_pick`, the person's own as they sent it; absent
+ * when the dig had no pick or the words cannot be read). Both optional and last: a row without them is today's, and a dig of the
+ * person's own debate, public or not, says false (it sits under its own question).
+ */
+function publicDigRowMembers() {
+  return {
+    dug_on_public: z.boolean().optional(),
+    dig_pick: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.pickTextMaxChars).optional()
+  };
+}
+function publicDigRowCheck(row: Readonly<{ dug_on_public?: boolean | undefined; dig_pick?: string | undefined }>, context: z.RefinementCtx): void {
+  if (row.dig_pick !== undefined && row.dug_on_public !== true) {
+    context.addIssue({ code: "custom", path: ["dig_pick"], message: "only a dig made on someone else's public page names its pick" });
+  }
+}
+
 export const AnswerSummarySchema = z.object({
   answer_id: z.string().min(1),
   run_ref: z.string().min(1),
@@ -1511,14 +1537,18 @@ export const AnswerSummarySchema = z.object({
   // nothing there and removes the home page's per-row full answer read.
   // Optional, never invented: a row with no recorded maker lineage says so by
   // omission rather than by an empty claim about what ran.
-  models: z.array(z.string().trim().min(1)).optional()
-}).strict();
+  models: z.array(z.string().trim().min(1)).optional(),
+  // V4 start step, Task 79c (owner answer Q33 A, 5 Nov), last: whether this is a dig made on someone else's public page, and its pick.
+  ...publicDigRowMembers()
+}).strict().superRefine(publicDigRowCheck);
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
   state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
-  created_at_sequence: z.number().int().positive()
+  created_at_sequence: z.number().int().positive(),
+  // V4 start step, Task 79c, last: the same two members on a run still open (a dig on a public page that is still running).
+  ...publicDigRowMembers()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
@@ -1526,6 +1556,7 @@ export const OpenRunSummarySchema = z.object({
       message: "FAILED requires a terminal reason and non-failed runs forbid one"
     });
   }
+  publicDigRowCheck(run, context);
 });
 export const AnswerIndexSchema = z.object({
   items: z.array(AnswerSummarySchema),
@@ -1714,7 +1745,11 @@ export const PublicDebateSchema = z.object({
   // Decisions 13 and 16: every report anyone wrote on it, oldest first; the newest is current, the earlier ones stay readable.
   reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional(),
   // V4 start step, Task 16: a public path debate's paths (publicBranchesOf); absent on every R22 debate.
-  branches: PublicBranchesSchema.optional()
+  branches: PublicBranchesSchema.optional(),
+  // V4 start step, Task 75d (owner's second-round answers): the reading level the debate was asked at, copied at publish time from
+  // the run (as `language` is), so the public page shows it at that level and a dig made there is kept at it. Last and optional:
+  // every snapshot published before it parses, and a page reads one without it as Plain words.
+  reading_level: ReadingLevelSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 

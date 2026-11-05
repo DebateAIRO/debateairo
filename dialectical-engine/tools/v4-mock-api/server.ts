@@ -39,7 +39,7 @@ import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurr
 import { quadernoPricingFromKeyFile, type QuadernoPriced } from "./quaderno-tax.js";
 import {
   contributionOf, contributionRewriteOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
-  type PublicMode, type PublicState
+  publicDigRowPart, type PublicMode, type PublicState
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
@@ -285,12 +285,14 @@ type MockRun = {
   startedAt?: number;
   /** Owner review 3 Nov: a run with `failedReason` fails only from this moment (a new dig under `dig=FAIL`); absent: failed from the start. */
   failsAt?: number;
-  /** Owner review 3 Nov (draft field): what a FAILED run took from the person's quota, on its draft view only. */
+  /** Owner review 3 Nov: what a FAILED run took from the person's quota (the contract's `quota_used` since Task 57c, so both views send it). */
   quotaUsed?: "NONE" | "SOME";
   /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
   settlesAfterContinue?: boolean;
   /** dig-f1: its main answer is still being rewritten until this moment, then has its newest version (rewrite-seed.ts mainAnswerAt). */
   mainAnswerReadyAt?: number;
+  /** Task 79c (owner answer Q33 A): a dig made on someone else's public page, with its first pick's words (null: it had none). */
+  publicDig?: Readonly<{ pick: string | null }>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -298,6 +300,11 @@ type MockRun = {
 const runs = new Map<string, MockRun>();
 const runsByAnswer = new Map<string, MockRun>();
 let nextSeq = 100;
+/**
+ * V4 start step, Task 75d (owner, 5 Nov): the reading level each run was asked at, kept when POST /v1/asks accepts it, as the API
+ * keeps it (a new question its own, a dig its debate's, a dig on a public page the page's). The seeded runs have none.
+ */
+const askedLevels = new Map<string, string>();
 
 function addRun(run: MockRun): MockRun {
   runs.set(run.runRef, run);
@@ -413,20 +420,26 @@ settledRun({
 // Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const publicDebates = new Map<string, any>(seedPublicDebates().map((debate) => [debate.public_ref as string, structuredClone(debate)]));
+/** Task 75d: the level a public page was asked at, as its public read says (none: a page published without one). */
+const publicLevelOf = (publicRef: string): string | undefined => publicDebates.get(publicRef)?.reading_level;
 const SEEDED_CONTRIBUTION_DIGS = [
   { state: "CHECKING", runRef: "c1000000-0000-4000-8000-000000000001", answerId: "aaaac100-0000-4000-8000-000000000001" },
   { state: "ON_THE_PAGE", runRef: "c1000000-0000-4000-8000-000000000002", answerId: "aaaac100-0000-4000-8000-000000000002" },
   { state: "KEPT_PRIVATE", runRef: "c1000000-0000-4000-8000-000000000003", answerId: "aaaac100-0000-4000-8000-000000000003" },
   { state: "REMOVED_AFTER_REVIEW", runRef: "c1000000-0000-4000-8000-000000000004", answerId: "aaaac100-0000-4000-8000-000000000004" }
 ] as const;
+/** Task 79c: the seeded digs' one pick; "Your maps" shows each as its own card, "Dig: Small towns behave differently." */
+const SEEDED_CONTRIBUTION_PICK = "Small towns behave differently.";
 for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
   const run = settledRun({
     runRef: seeded.runRef, answerId: seeded.answerId, seq: 30 + at, web: "PAID",
     question: `Look deeper into this part of the answer: free fares for everyone. (a dig on a public debate, ${seeded.state})`,
     askedAt: Date.parse("2026-10-29T08:00:00.000Z"), settleAt: Date.parse("2026-10-29T08:12:00.000Z"), storyReadyAt: 0,
     dig: { parent_run_id: RUN_SETTLED, position_ref: "n-mix", places: ["path:n-mix"], level: 1,
-      picks: [{ kind: "OWN_VIEW", place: "path:n-mix", text: "Small towns behave differently.", by: "PERSON_OWN_VIEW" }], rewrite: null }
+      picks: [{ kind: "OWN_VIEW", place: "path:n-mix", text: SEEDED_CONTRIBUTION_PICK, by: "PERSON_OWN_VIEW" }], rewrite: null }
   });
+  // Task 79c (owner answer Q33 A): the public debate is someone else's, so each is a dig made on someone else's public page.
+  run.publicDig = Object.freeze({ pick: SEEDED_CONTRIBUTION_PICK });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (run.answer as any).contribution = { public_ref: PUBLIC_REF, state: seeded.state, rewrite: seeded.state === "CHECKING" || seeded.state === "REMOVED_AFTER_REVIEW" ? null
     : { line: "Free fares for everyone: partly held, by this dig's own reading.", summary: "The dig looked at small towns, and the picture stayed the same.", fate: "PARTLY_HELD", what_changed: ["Small towns are now covered."] } };
@@ -582,6 +595,7 @@ function digPartOf(parent: DraftAskParent, level: number) {
 
 function runProjection(run: MockRun, now = Date.now()) {
   const state = stateOf(run, now);
+  const level = askedLevels.get(run.runRef);
   return {
     run_ref: run.runRef,
     question_line: run.question,
@@ -591,9 +605,11 @@ function runProjection(run: MockRun, now = Date.now()) {
     argument_language: run.language ?? ENGLISH,
     waits_until: state === "WAITING" ? waitsUntil(now) : null,
     waits_for: null,
+    // V4 start step, Task 75d: the level the debate was asked at, as the API's run read says it (none: a seeded run, read as Plain words).
+    ...(level === undefined ? {} : { reading_level: level }),
     // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
     ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {}),
-    // Owner review 3 Nov (draft, web-draft.ts DraftRunQuotaUsedSchema): what a failed run took from the quota.
+    // Owner review 3 Nov; V4 start step, Task 57c (the contract's RunProjectionSchema.quota_used, last): what a failed run took from the quota.
     ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {})
   };
 }
@@ -638,14 +654,16 @@ function storyRead(run: MockRun, now = Date.now()) {
 /**
  * The shelf's draft parts of a row (web-draft.ts DraftShelfRowPartSchema, owner's screen review 3 Nov): the debate it was
  * dug from (the account's dig link; null for a first question), and for an answer the seeded map's four-shade bar and
- * whether its map changed since the person last opened it (here: no last visit recorded yet).
+ * whether its map changed since the person last opened it (here: no last visit recorded yet). Last, Task 79c's two CONTRACT members
+ * (owner answer Q33 A): whether the row is a dig made on someone else's public page, and its first pick (public-seed.ts publicDigRowPart),
+ * which the website's view keeps when the draft parts are held back.
  */
 const SEEDED_MAP_BAR = Object.freeze({ sure: 4, sure_for_case: 5, still_argued: 2, didnt_hold: 1 });
 function shelfPart(run: MockRun, served: boolean, now: number) {
   const dugFrom = digLinks.find((record) => record.child_run_id === run.runRef)?.parent_run_id ?? null;
-  if (served) return { map_bar: { ...SEEDED_MAP_BAR }, changed_since_visit: !lastVisits.has(run.runRef), dug_from: dugFrom };
+  if (served) return { map_bar: { ...SEEDED_MAP_BAR }, changed_since_visit: !lastVisits.has(run.runRef), dug_from: dugFrom, ...publicDigRowPart(run.publicDig) };
   const working = !["WAITING", "FAILED"].includes(stateOf(run, now));
-  return { ...(working && run.startedAt !== undefined ? { started_at: iso(run.startedAt) } : {}), dug_from: dugFrom };
+  return { ...(working && run.startedAt !== undefined ? { started_at: iso(run.startedAt) } : {}), dug_from: dugFrom, ...publicDigRowPart(run.publicDig) };
 }
 
 function answerIndex(limit: number, offset: number, now = Date.now()) {
@@ -1073,7 +1091,7 @@ function startupCheck(): number {
   check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, withQuestionShare(runProjection(run), run, true), stripRun, runDraftSchema);
-    // The normal view as its route sends it: a draft-only part (a failed run's quota_used) is held back there, and the
+    // The normal view as its route sends it: a failed run's quota_used is the contract's own since Task 57c, so it stays; the
     // question's share never makes the read fall back and lose its month pause.
     const normalRun = contractOrDraft(C.RunProjectionSchema, withQuestionShare(withStartedAt(runProjection(run), run, false), run, false), stripRun).body;
     check(`GET /v1/runs/${run.runRef} (normal view)`, C.RunProjectionSchema, normalRun);
@@ -1411,6 +1429,9 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
       return;
     }
   }
+  // Task 79c (owner answer Q33 A): the mock's public debates are someone else's, so a dig sent with `public_parent` is a dig made on
+  // someone else's public page; "Your maps" shows it as its own card with its first pick (none: a dig of the whole path).
+  const publicDig = publicParent === undefined ? undefined : Object.freeze({ pick: publicParent.picks?.[0]?.text ?? null });
   if (parsed.data.free_public_notice === true && parent === null && publicParent === undefined) freeNotices += 1;
   if (parent !== null && !runs.has(parent.parent_run_id)) {
     log("PARENT_NOT_FOUND", null);
@@ -1428,6 +1449,10 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
   }
   const ask = parsed.data;
   const question: string = ask.question_line.trim();
+  // Task 75d (owner, 5 Nov): the level the run is kept at, as POST /v1/asks keeps it: a dig on a public page the page's, a dig its
+  // debate's, a new question the level it was asked at.
+  const askedLevel = publicParent !== undefined ? publicLevelOf(publicParent.public_ref)
+    : parent !== null ? askedLevels.get(parent.parent_run_id) : ask.depth_params.readingLevel;
   const wantsLanguageChoice = mode === "LANGUAGE_CHOICE" || /#mix/iu.test(question);
   if (wantsLanguageChoice && ask.question_language_choice === undefined) {
     log("LANGUAGE_CHOICE_NEEDED", null);
@@ -1441,6 +1466,7 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
   }
   const now = Date.now();
   const runRef = randomUUID();
+  if (askedLevel !== undefined) askedLevels.set(runRef, askedLevel);
   const seq = nextSeq++;
   // A new question opens its own investigation; a dig with a parent joins (and reopens) its parent's, as the server
   // will once W3-2 lands. The page's after-start link (POST /v1/runs/{id}/dig-links) does the same.
@@ -1449,7 +1475,7 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     else linkDig(parent.parent_run_id, { child_run_id: child, places: parent.places, mode: parent.mode }, now);
   };
   if (mode === "WAITING") {
-    const run = addRun({ runRef, question, seq, waiting: true });
+    const run = addRun({ runRef, question, seq, waiting: true, ...(publicDig === undefined ? {} : { publicDig }) });
     join(runRef);
     log(parent === null ? "WAITING" : "WAITING_DIG", runRef);
     sendJson(req, res, 202, askAccepted(run, true), C.AskAcceptedSchema);
@@ -1475,6 +1501,7 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     // A stranger's dig names no run; the answer still needs a parent, so it hangs under the mock's first debate. The page never reads it.
     ...(publicParent === undefined ? {} : { dig: digPartOf({ parent_run_id: RUN_SETTLED, places: publicParent.places, mode: publicParent.mode, picks: publicParent.picks } as DraftAskParent, 1) })
   });
+  if (publicDig !== undefined) run.publicDig = publicDig;
   if (publicParent !== undefined) startPublicCheck(run, publicParent, question, settleAt);
   // Owner review 3 Nov (dig=PAUSE): a new dig reaches the month wall at once; Continue (once pause=CAN_CONTINUE) lets it finish.
   if (parent !== null && digEndMode === "PAUSE") {

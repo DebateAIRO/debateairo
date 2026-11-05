@@ -117,8 +117,16 @@ describe("the step-2 choices on Free (owner 2026-10-29: capped at 3)", () => {
     expect(FREE_GOAL_CHOICES_MAX).toBe(3);
     expect(goalChoiceCount(EMPTY_GOAL)).toBe(0);
     expect(goalChoiceCount(FULL)).toBe(3);
-    // A pressed "Other" chip is a choice; blank matters is not.
-    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "", other: true }], matters: "  " })).toBe(1);
+    // V4 start step, Task 76h (read-f8): only real answers count. A pressed "Other" with nothing typed in it is not a choice
+    // (it says nothing), and neither is blank matters; an "Other" with words is.
+    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "", other: true }], matters: "  " })).toBe(0);
+    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "   ", other: true }, WHEN], matters: "" })).toBe(1);
+    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "Cluj", other: true }], matters: "" })).toBe(1);
+    // So Free keeps the first three real answers, whatever empty "Other" lies between them.
+    const BLANK = { question: "Whose?", answer: "", other: true };
+    const PAST_THE_CAP = { answers: [WHERE, BLANK, WHEN, WHY, { question: "How much?", answer: "A lot", other: false }], matters: "" };
+    expect(goalChoiceCount(PAST_THE_CAP)).toBe(4);
+    expect(goalWithinPlan(PAST_THE_CAP, "free").answers.filter((given) => given.answer.trim().length > 0)).toEqual([WHERE, WHEN, WHY]);
   });
 
   it("Free keeps the first 3 choices in the order they are sent and drops the rest from the end", () => {

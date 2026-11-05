@@ -116,3 +116,28 @@ describe("Task 75b: the level block's label and old note are retired", () => {
     expect(sources().filter(({ text }) => READS_LEVEL_RETIRED.test(text)).map(({ path }) => path)).toEqual([]);
   });
 });
+
+/*
+ * V4 start step, Task 76 (chat-one-place-for-answers, choose-f15; 4 Nov night read-f8): step 2's answers live in the question
+ * box, so the bottom box "We'll ask the AIs:" and its label retire; Free's old cap sentence gives way to the one joined line
+ * "Free: up to 3 answers above, up to 3 paths below." (v4.read.freeJoined).
+ */
+describe("Task 76: the sent-text box's label and Free's old cap sentence are retired", () => {
+  const STEP_TWO_RETIRED = ["v4.read.sentLabel", "v4.read.freeChoices"] as const;
+  const READS_STEP_TWO_RETIRED = /v4\.read\.(sentLabel|freeChoices)\b/u;
+
+  it("no catalogue keeps them", () => {
+    const kept: string[] = [];
+    for (const locale of readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)) {
+      for (const file of readdirSync(join(messages, locale)).filter((name) => name.endsWith(".json"))) {
+        const catalog = JSON.parse(readFileSync(join(messages, locale, file), "utf8")) as Record<string, unknown>;
+        kept.push(...Object.keys(catalog).filter((key) => (STEP_TWO_RETIRED as readonly string[]).includes(key)).map((key) => `${locale}/${file}: ${key}`));
+      }
+    }
+    expect(kept).toEqual([]);
+  });
+
+  it("no source of the website reads them", () => {
+    expect(sources().filter(({ text }) => READS_STEP_TWO_RETIRED.test(text)).map(({ path }) => path)).toEqual([]);
+  });
+});

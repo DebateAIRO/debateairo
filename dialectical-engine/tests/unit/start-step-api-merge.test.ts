@@ -24,7 +24,8 @@ import type { QuestionLanguageLock } from "../../apps/api/src/question-language/
 import { createStartCharges } from "../../apps/api/src/start-step/charge.js";
 import { startModelOfSeat } from "../../apps/api/src/start-step/seats.js";
 import {
-  newStartStepKey, signStartCheck, signStartList, signStartMenu, startMembersHash, startRefVersionOf, verifyStartCombine, verifyStartMenu
+  newStartStepKey, signStartCheck, signStartList, signStartMenu, startDigTryRefOf, startMembersHash, startRefVersionOf, startTryRefOfCheck,
+  verifyStartCombine, verifyStartMenu
 } from "../../apps/api/src/start-step/signing.js";
 import {
   createStartStep, type StartCombineInput, type StartFitInput, type StartMergeInput, type StartStepSettings
@@ -587,3 +588,28 @@ describe("the fit: where the person's own view fits", () => {
   });
 });
 
+
+/*
+ * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): every call on step 2 is
+ * charged to the question's try, which its check carries; a combine over a dig's picks to its parent's try (0163 gives them back when the
+ * debate they were for fails).
+ */
+describe("step 2's charges name the try they were for (Task 57c)", () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] }); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("the merge, a combine on the menu and the fit: the check's try; a combine over a dig's picks: the parent's", async () => {
+    const h = harness();
+    const made = startTryRefOfCheck(h.key, SCOPE, h.checkRef());
+    expect(made).toMatch(/^[0-9a-f]{64}$/u);
+    await after(h.step.merge(h.mergeInput(), live()));
+    await after(h.step.combine(h.combineInput(), live()));
+    await after(h.step.fit(h.fitInput(), live()));
+    expect(h.entries.map((entry) => [entry.kind, entry.tryRef])).toEqual([["MERGE", made], ["COMBINE", made], ["FIT", made]]);
+    const picks = [{ viewpoint_id: null, pick_no: 1, title: null, question: "Would the winter timetable change it?" },
+      { viewpoint_id: null, pick_no: 2, title: null, question: "Would the crews' hours change it?" }];
+    await after(h.step.combine(h.combineInput({ context: { kind: "DIG", parent_run_id: PARENT_RUN }, members: picks,
+      digParent: { questionLine: PARENT, language: EN } }), live()));
+    expect(h.entries.at(-1)).toMatchObject({ kind: "COMBINE", tryRef: startDigTryRefOf(h.key, { ownerScope: SCOPE, parentRunId: PARENT_RUN }) });
+  });
+});

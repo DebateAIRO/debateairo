@@ -100,6 +100,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "path_update", "path_update_turn",
       // 0156: one row per small AI call before Start, naming the person, the kind, the cost and the time.
       "pre_start_charge",
+      // 0163: which try each of those calls was made for, and the debate it was given to at Start.
+      "pre_start_try",
       "private_erasure_audit_binding",
       // 0137 public debates: the public debates' contributions, updates and report charges. 0147 the public tree: the sealed copy, a dig's paths, the
       // AI check's pass, the climb's end, the answer's versions, a report and its copy, the skipped texts.

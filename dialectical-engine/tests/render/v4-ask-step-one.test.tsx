@@ -23,7 +23,10 @@ const ask = vi.hoisted(() => ({
 const server = vi.hoisted(() => ({
   readAnswerIndex: vi.fn(async (_limit: number, _offset: number): Promise<unknown> => ({ items: [], open_runs: [], limit: 32, offset: 0, total: 0 })),
   readDigLinks: vi.fn(async (_runId: string): Promise<unknown> => ({ parent: null, children: [] })),
-  level: Promise.resolve({ reading_level: null }) as Promise<{ reading_level: string | null }>
+  level: Promise.resolve({ reading_level: null }) as Promise<{ reading_level: string | null }>,
+  // Task 75d: the account's level routes stay for old pages; this page never calls them.
+  readReadingLevel: vi.fn(),
+  saveReadingLevel: vi.fn()
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
@@ -42,12 +45,17 @@ vi.mock("@/lib/v4/useV4Ask", () => ({
     submit: (...args: unknown[]) => ask.submit(...args), ensureConsent: async () => true, flagsCrisis: () => false
   })
 }));
+// V4 start step, Task 76b (answer Q12): "Just answer it" waits its 10-second Undo window before the send; here the window is 0
+// and a case that needs the send lets its timer run (the 10 seconds themselves: tests/render/v4-start-undo.test.tsx).
+vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
+}));
 vi.mock("@/lib/api", () => ({
   contractClient: {
     readAnswerIndex: (limit: number, offset: number) => server.readAnswerIndex(limit, offset),
     readDigLinks: (runId: string) => server.readDigLinks(runId),
-    readReadingLevel: () => server.level,
-    saveReadingLevel: async () => ({ reading_level: "plain" }),
+    readReadingLevel: () => { server.readReadingLevel(); return server.level; },
+    saveReadingLevel: async (level: string) => { server.saveReadingLevel(level); return { reading_level: level }; },
     clarifyAsk: async () => ({ source: "NONE" })
   }
 }));
@@ -67,7 +75,7 @@ async function settle(): Promise<void> {
   await act(async () => { for (let at = 0; at < 8; at += 1) await Promise.resolve(); });
 }
 
-async function mount(options: Readonly<{ question?: string; level?: "plain" | null }> = {}): Promise<HTMLDivElement> {
+async function mount(options: Readonly<{ question?: string; level?: "plain" | "background" | "expert" | null }> = {}): Promise<HTMLDivElement> {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -128,6 +136,8 @@ beforeEach(() => {
   server.readDigLinks.mockReset();
   server.readDigLinks.mockImplementation(async () => ({ parent: null, children: [] }));
   server.level = Promise.resolve({ reading_level: null });
+  server.readReadingLevel.mockReset();
+  server.saveReadingLevel.mockReset();
 });
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -263,6 +273,9 @@ describe("why a step-1 button cannot be pressed (ask-f14, read-f18)", () => {
     await mount();
     await act(async () => justButton().click());
     await settle();
+    // Task 76b: the Undo window (0 here) runs out, then the ask is sent and refused.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await settle();
     expect(host!.querySelector(".v4AskRefusal")?.textContent).toBe(CATALOG["v4.ask.failed"]);
     await type(`${QUESTION} And the buses?`);
     expect(host!.querySelector(".v4AskRefusal")).toBeNull();
@@ -289,17 +302,15 @@ describe("the used-up quota (ask-f18, ask-d4 C)", () => {
   });
 });
 
-describe("the detail level (ask-f15, ask-f16)", () => {
-  it("its place is held until the account answers, then it is one choice of three", async () => {
-    let answer: (value: { reading_level: string | null }) => void = () => undefined;
-    server.level = new Promise((resolveLevel) => { answer = resolveLevel; });
+/*
+ * V4 start step, Task 75d (owner, 5 Nov, second round): the level choice always starts on Plain words, for every question and
+ * every visit; the account stops remembering a level, and no level is taken from the address. Nothing is held while an account
+ * answers: there is nothing to wait for.
+ */
+describe("the detail level (ask-f15; Task 75d: always Plain words at first)", () => {
+  it("is one choice of three that starts on Plain words, even when the account kept Expert; the account's level is never read or saved", async () => {
+    server.level = Promise.resolve({ reading_level: "expert" });
     await mount({ level: null });
-    expect(host!.querySelector(".v4AskLevelsHold")).not.toBeNull();
-    // V4 start step, Task 75b (ask-d2): the held place is the new block's shape, three faint pill outlines in one row.
-    expect(host!.querySelectorAll(".v4AskLevelsHold .v4AskLevelsHoldPill")).toHaveLength(3);
-    expect(host!.querySelector(".v4AskLevels")).toBeNull();
-    await act(async () => { answer({ reading_level: null }); });
-    await settle();
     expect(host!.querySelector(".v4AskLevelsHold")).toBeNull();
     const radios = [...host!.querySelectorAll<HTMLInputElement>(".v4AskLevels input[type=radio]")];
     expect(radios).toHaveLength(3);
@@ -309,13 +320,22 @@ describe("the detail level (ask-f15, ask-f16)", () => {
     expect(radios.map((radio) => radio.checked)).toEqual([false, false, true]);
     expect(host!.querySelector(".v4AskSample")?.textContent).toContain(CATALOG["v4.ask.levelShows.expert"]);
     expect(host!.querySelector(".v4AskLevelChip[data-checked=true]")?.textContent).toBe(CATALOG["v4.readingLevel.expert"]);
+    // Next goes on to step 2 with the level chosen here; the account is told nothing.
+    await act(async () => nextButton().click());
+    await settle();
+    expect(host!.querySelector(".v4AskReadTitle")).not.toBeNull();
+    expect(server.readReadingLevel).not.toHaveBeenCalled();
+    expect(server.saveReadingLevel).not.toHaveBeenCalled();
   });
 
-  it("a level already chosen closes the held place at once", async () => {
+  it("a returning person and a level in the address get the same first screen: the choice shown, on Plain words", async () => {
+    window.history.replaceState(null, "", "/v4?level=expert");
     server.level = Promise.resolve({ reading_level: "background" });
-    await mount({ level: null });
-    expect(host!.querySelector(".v4AskLevelsHold")).toBeNull();
-    expect(host!.querySelector(".v4AskLevels")).toBeNull();
+    await mount({ level: "expert" });
+    const radios = [...host!.querySelectorAll<HTMLInputElement>(".v4AskLevels input[type=radio]")];
+    expect(radios.map((radio) => radio.checked)).toEqual([true, false, false]);
+    expect(host!.querySelector(".v4AskSample")?.textContent).toContain(CATALOG["v4.ask.levelShows.plain"]);
+    expect(server.readReadingLevel).not.toHaveBeenCalled();
   });
 
   it("the box follows the writing direction and grows with the words (no fixed handle)", async () => {
@@ -370,9 +390,10 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     const dig = shelf.querySelector<HTMLAnchorElement>(".v4ShelfDig")!;
     expect(dig.closest(".v4ShelfItem")?.querySelector(".v4ShelfQuestion")?.textContent).toBe("Should countries build new nuclear power?");
     expect(dig.querySelector(".v4ShelfDigText")?.textContent).toBe("Dig: Batteries can cover multi-day lulls.");
-    expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}?level=plain`);
-    expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}?level=plain`);
-    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all&level=plain");
+    // Task 75d: no level from the address or the account rides the links; each map shows its own debate's level.
+    expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}`);
+    expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}`);
+    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all");
     expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.textContent).toBe("All my maps");
     // No counts anywhere, and no seed: this account has maps.
     expect(shelf.textContent).not.toMatch(/\d+ (maps|questions|digs)/u);

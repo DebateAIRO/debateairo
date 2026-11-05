@@ -178,6 +178,7 @@ import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { AdmissionHold, SpendScope, WaitsFor } from "@debateai/budget";
+import { linkPreStartTry, readRunQuotaUsed, type RunQuotaUsed } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RELEASE_LIFECYCLE_STATES,
@@ -210,6 +211,9 @@ import {
 } from "@debateai/db";
 // V4 start step, Task 56b: Task 53a's counts of a public debate's report versions, for the person's own closings of it.
 import type { OwnClosingsStore } from "@debateai/db";
+// V4 start step, Task 79c: a dig's first pick (0135), for its card on "Your maps" when it was made on someone else's public page.
+import { PostgresDigPicksRunnerRepository } from "@debateai/db";
+import { WEB_CONTRACT_LIMITS } from "@debateai/contract";
 import type { CarryOnPart } from "@debateai/contract";
 import { carryOnPartOf, carryOnReportOfInvestigation, carryOnReportOfPublic, type CarryOnReportState } from "./carry-on-part.js";
 // V4 start step, Task 56 ("Let the AIs carry on to the report"): the carry-on's pure steps, driven here through the routes' own steps.
@@ -370,7 +374,7 @@ import {
 // V4 start step, Task 30: the step behind the four calls before Start, its key and its stream writer.
 import { START_STEP_TIMING, type StartStepTiming } from "@debateai/map";
 import { detectArgumentLanguage } from "@debateai/kernel";
-import { verifyStartMergeRequest, type StartStepKey } from "./start-step/signing.js";
+import { startDigTryRefOf, startTryRefOfCheck, verifyStartMergeRequest, type StartStepKey } from "./start-step/signing.js";
 import { startStepBindingOf, type StartCombineInput, type StartStepContext, type StartStepPort } from "./start-step/step.js";
 import { openStartStream, startClientGoneOf, type StartStream, type StartStreamStop } from "./start-step/stream.js";
 // V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04), their five routes and the removal at Start.
@@ -1865,6 +1869,16 @@ export interface AskApplication {
    * no such run. Read only by the carry-on, for the settings each of its digs is asked with. Absent: nothing carries on.
    */
   readStoredAsk?(runId: string): Promise<StoredAsk | null>;
+  /**
+   * V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): whether a FAILED debate used any of the person's quota (0163), read only
+   * after that debate's owner-gated read; null when it cannot be said (a legacy asker's debate). Absent: the run read says nothing of it.
+   */
+  readRunQuotaUsed?(runId: string, ownership: RunOwnershipAccess): Promise<RunQuotaUsed | null>;
+  /**
+   * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): at Start, the person's charges before Start of one try
+   * (signing.ts's startTryRefOf) not yet given to a debate, given to their new debate (0163); how many. Absent: nothing is given.
+   */
+  linkPreStartTry?(ownerRef: string, tryRef: string, runId: string): Promise<number>;
 }
 
 /** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
@@ -2222,6 +2236,13 @@ export interface ApiOptions {
    * and the dig's whole share of today (`digShareMicros`). Absent (local mode, billing off): no dig is stopped for room.
    */
   readonly carryOnRoom?: Pick<AskRoom, "precheck" | "digShareMicros">;
+  // V4 start step
+  /**
+   * V4 start step, Task 79c (owner answer Q33 A, 5 Nov): the first pick's words of a dig made on someone else's public page, for its
+   * card on "Your maps" ("Dig: {its pick}"): 0135's pick, opened under the dig's own run key and content lease; null when it keeps
+   * none. Absent: read with 0135's reader (`PostgresDigPicksRunnerRepository`) on `publicTree`'s pool. Only asked with `publicTree`.
+   */
+  readonly publicDigPick?: (digRunId: string) => Promise<string | null>;
 }
 
 /**
@@ -4505,10 +4526,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // V4 start step, Task 75c (owner answer Q15, 5 Nov): a dig, own or public, is written at its parent debate's reading level,
     // whatever this request names (another is ignored, never refused); a parent asked without one gives the dig none. Read from the
     // parent's stored ask once the dig is admitted; without the reader (or a parent that cannot be read) the ask stays as sent.
+    // Task 75d (owner's second-round answers: "every dig is stored and priced at its debate's level"): priced at it too (the length its
+    // level picks, digDepthParamsAtParentLevel). A dig on a public page whose run the person cannot read (someone else's: the run's
+    // own policy) follows the level the page shows, a page published without one reading as Plain words.
     const levelParentRunId = publicAdmission?.parentRunId ?? ask.parent?.parent_run_id ?? null;
-    if (levelParentRunId !== null && options.application.readStoredAsk !== undefined) {
-      const parentAsk = await options.application.readStoredAsk(levelParentRunId);
-      ask = Object.freeze({ ...ask, depth_params: digDepthParamsAtParentLevel(ask.depth_params, parentAsk?.depthParams ?? null) });
+    if (levelParentRunId !== null) {
+      const parentAsk = options.application.readStoredAsk === undefined ? null : await options.application.readStoredAsk(levelParentRunId);
+      const pageLevel = publicAdmission === null ? null
+        : publicAdmission.readingLevel === undefined ? {} : { readingLevel: publicAdmission.readingLevel };
+      ask = Object.freeze({ ...ask, depth_params: digDepthParamsAtParentLevel(ask.depth_params, parentAsk?.depthParams ?? pageLevel) });
     }
     if (options.questionCheck === undefined) {
       return refusedWith({ status: 503, body: { error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" } });
@@ -4566,6 +4592,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : Object.freeze({ kind: "server" as const, userId: owner.userId, ownerRef: owner.ownerRef, ...extras.principal }),
       ...handOver
     ));
+    // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): the
+    // debate takes the charges before Start of each try this Start names (the question's, from its check; a combine over a dig's picks,
+    // from its parent), once, so 0163 gives them back if it fails. A link that fails never changes the 202 (the charges stay counted), and
+    // its one line names the debate and no word.
+    if (start !== null && owner !== null && options.startStepKey !== undefined && options.application.linkPreStartTry !== undefined) {
+      const ownerScope = ownerScopeOf({ kind: "server", ownerRef: owner.ownerRef });
+      const tries = [ask.start_check === undefined ? null : startTryRefOfCheck(options.startStepKey, ownerScope, ask.start_check.ref),
+        digOfStart === null ? null : startDigTryRefOf(options.startStepKey, { ownerScope, parentRunId: digOfStart.parentRunId })];
+      for (const tryRef of tries) {
+        if (tryRef === null) continue;
+        try {
+          await options.application.linkPreStartTry(owner.ownerRef, tryRef, accepted.run_ref);
+        } catch {
+          console.error(JSON.stringify(Object.freeze({ event: "api.start_step.try_link_failed", run_id: accepted.run_ref })));
+        }
+      }
+    }
     // V4 start step
     // Task 39e (saved questions spec 2026-11-04 §3.7; owner answer S4 A): the debate is accepted and now holds the question, so the
     // question not started yet it came from goes, exactly as Delete removes it (the caller's own only, its key destroyed first). A
@@ -4626,8 +4669,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     const question = body.data.question_line;
+    // V4 start step, Task 76d (read-f1): the questions shown for an earlier wording and the person's answers (a typed "Other…" answer is
+    // their own words, so it is read for crisis words too); the reading frames them only once version 2 of the call is sealed.
+    const earlier = body.data.earlier ?? null;
     const none = { source: "NONE" as const };
     const mayAsk = options.askClarify !== undefined && !detectCrisis(question).crisis
+      && !(earlier?.answers ?? []).some((given) => detectCrisis(given.answer).crisis)
       && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
       && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
       && options.sessions?.readSensitiveDataConsent !== undefined
@@ -4637,7 +4684,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const pool = options.askRoom?.readPersonPool === undefined ? { empty: false, funding: null }
       : await options.askRoom.readPersonPool(asker.ownerRef, new Date()).catch(() => ({ empty: true, funding: null }));
     if (pool.empty) return reply.send(none);
-    return reply.send(AskClarifyResponseSchema.parse(await options.askClarify!.read(asker.ownerRef, question, pool.funding)));
+    return reply.send(AskClarifyResponseSchema.parse(await options.askClarify!.read(asker.ownerRef, question, pool.funding, earlier)));
   });
 
   // V4 start step
@@ -4964,6 +5011,39 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }));
   });
 
+  // V4 start step, Task 79c (owner answer Q33 A, 5 Nov): "Your maps" shows a dig made on someone else's public page as a card of its own,
+  // "Dig: {its pick}" (dig-f30's words). Of the listed runs, the ones that are such a dig, each with its first pick's words (null: none
+  // kept, or not readable). A run is one when it is the person's own contribution to a public tree (0137's read, as the run's answer
+  // reads it) whose debate, the tree's root, the owner-gated run read does not find: a dig of the person's own debate, public or not,
+  // sits under its own question. Each root is asked once per list. A read that fails leaves its run out (its row says false); a pick
+  // that cannot be read leaves the run in without one. Null without the public tree or a signed-in person: the rows are today's.
+  const publicDigsOfRows = async (request: AskerOfRequest, runIds: readonly string[]): Promise<ReadonlyMap<string, string | null> | null> => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    const tree = options.publicTree;
+    if (ownerRef === undefined || tree === undefined) return null;
+    const pickOf = options.publicDigPick
+      ?? (async (digRunId: string) => (await new PostgresDigPicksRunnerRepository(tree.pool).read(digRunId))?.picks[0]?.text ?? null);
+    const roots = new Map<string, Promise<boolean>>();
+    const rootIsTheirs = (rootRunId: string): Promise<boolean> => {
+      const key = rootRunId.toLowerCase();
+      const known = roots.get(key) ?? options.application.readRun(rootRunId, request.session, ownershipFor(request)).then((run) => run !== null);
+      roots.set(key, known);
+      return known;
+    };
+    const found = new Map<string, string | null>();
+    await Promise.all([...new Set(runIds)].map(async (runId) => {
+      try {
+        const own = await tree.contributions.readOwn(ownerRef, runId);
+        const contribution = own.find((entry) => entry.dig_run_id.toLowerCase() === runId.toLowerCase());
+        if (contribution === undefined || await rootIsTheirs(contribution.root_run_id)) return;
+        found.set(runId, await pickOf(runId).catch(() => null));
+      } catch {
+        // Not known: the row stays as it was, not marked.
+      }
+    }));
+    return found;
+  };
+
   api.get<{ Querystring: { limit?: string; offset?: string } }>("/v1/answers", routePolicy("GET /v1/answers"), async (request, reply) => {
     const limit = Number(request.query.limit);
     const offset = Number(request.query.offset);
@@ -4986,7 +5066,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return item;
     }))).filter((item) => item !== null);
-    return reply.send(AnswerIndexSchema.parse({ ...index, items }));
+    // V4 start step, Task 79c (owner answer Q33 A): each row says whether it is a dig made on someone else's public page, and its pick.
+    const publicDigs = await publicDigsOfRows(request, [...items, ...index.open_runs].map((row) => row.run_ref));
+    const marked = <Row extends Readonly<{ run_ref: string }>>(row: Row) => {
+      if (publicDigs === null) return row;
+      if (!publicDigs.has(row.run_ref)) return { ...row, dug_on_public: false };
+      const pick = publicDigs.get(row.run_ref)?.trim() ?? "";
+      return { ...row, dug_on_public: true,
+        ...(pick.length === 0 || pick.length > WEB_CONTRACT_LIMITS.pickTextMaxChars ? {} : { dig_pick: pick }) };
+    };
+    return reply.send(AnswerIndexSchema.parse({ ...index, items: items.map(marked), open_runs: index.open_runs.map(marked) }));
   });
 
   api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id", routePolicy("GET /v1/answers/{id}"), async (request, reply) => {
@@ -5227,10 +5316,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       { route: "GET /v1/runs/{id}", id: runId }
     );
     if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-    // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
-    if (run.state === "FAILED" && run.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
-      const found = await options.application.readRunFound(runId);
-      if (found.length > 0) return reply.send(RunProjectionSchema.parse({ ...run, found }));
+    if (run.state === "FAILED") {
+      // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): a failed debate says whether any of the person's quota was used (0163),
+      // after its owner-gated read above; nothing is said where the server cannot say. A debate that did not fail reads as before.
+      const quotaUsed = await options.application.readRunQuotaUsed?.(runId, ownershipFor(request)) ?? null;
+      const failed = quotaUsed === null ? run : RunProjectionSchema.parse({ ...run, quota_used: quotaUsed });
+      // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
+      if (failed.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
+        const found = await options.application.readRunFound(runId);
+        if (found.length > 0) return reply.send(RunProjectionSchema.parse({ ...failed, found }));
+      }
+      return reply.send(failed);
     }
     // W3-2 (the money rule): a debate paused at the month wall says until when, and whether Continue is offered.
     const ownerRef = request.authenticatedSession?.ownerRef;
@@ -7968,6 +8064,16 @@ export class PostgresAskApplication implements AskApplication {
 
   readRunFound(runId: string): Promise<readonly RunFoundPage[]> {
     return this.#serve.readRunFound(runId);
+  }
+
+  /** V4 start step, Task 57c (0163): the person's own debate only (its latest owner); a legacy asker's: none. */
+  async readRunQuotaUsed(runId: string, ownership: RunOwnershipAccess): Promise<RunQuotaUsed | null> {
+    return ownership.ownerRef === null ? null : readRunQuotaUsed(this.pool, { ownerRef: ownership.ownerRef, runId });
+  }
+
+  /** V4 start step, Task 57c (0163): the try's charges before Start given to the person's new debate, once. */
+  linkPreStartTry(ownerRef: string, tryRef: string, runId: string): Promise<number> {
+    return linkPreStartTry(this.pool, { ownerRef, tryRef, runId });
   }
 
   async readRunAnswer(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Answer | null> {

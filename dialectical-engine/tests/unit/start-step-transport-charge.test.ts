@@ -87,6 +87,18 @@ describe("the per-person charge (0156)", () => {
       grant: { grantId: GRANT.grantId, grantEventId: GRANT.grantEventId } }]);
   });
 
+  // Task 57c (owner, 5 Nov): a call made for a try names it, so a failed debate can give its charges back (0163); a call without one does not.
+  it("a call made for a try carries the try to its record", async () => {
+    const { book, entries } = charges();
+    const TRY = "b".repeat(64);
+    await book.seamFor({ ownerRef: OWNER, funding: null, kind: "ANGLES", target: GLM_TARGET, tryRef: TRY })
+      .recordCall({ providerRef: GLM_TARGET.providerRef, usage: { prompt_tokens: 10, completion_tokens: 0 }, projection: PROJECTION });
+    await book.seamFor({ ownerRef: OWNER, funding: null, kind: "FIT", target: GLM_TARGET })
+      .recordCall({ providerRef: GLM_TARGET.providerRef, usage: { prompt_tokens: 10, completion_tokens: 0 }, projection: PROJECTION });
+    expect(entries[0]).toMatchObject({ kind: "ANGLES", tryRef: TRY });
+    expect(Object.hasOwn(entries[1]!, "tryRef")).toBe(false);
+  });
+
   it("the person's own plan names no grant; a merge-late is its own kind", async () => {
     const { book, entries } = charges();
     const seam = book.seamFor({ ownerRef: OWNER, funding: { kind: "SUBSCRIPTION", planId: "PLUS", entitlementEventId: GRANT.grantEventId },

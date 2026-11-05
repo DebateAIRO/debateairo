@@ -24,7 +24,12 @@ import { previewModelRow, type ProviderCostEnvelopeSeam, type ProviderDiscoveryT
  */
 export type StartCharges = Readonly<{
   recordDown(): boolean;
-  seamFor(input: Readonly<{ ownerRef: string; funding: FundingBasis | null; kind: PreStartChargeKind; target: ProviderDiscoveryTarget }>): ProviderCostEnvelopeSeam;
+  /**
+   * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call is made for (signing.ts's
+   * startTryRefOf), rides the record, so Start can give the try's charges to its debate and 0163 gives them back if it fails.
+   */
+  seamFor(input: Readonly<{ ownerRef: string; funding: FundingBasis | null; kind: PreStartChargeKind; target: ProviderDiscoveryTarget;
+    tryRef?: string }>): ProviderCostEnvelopeSeam;
 }>;
 
 const RECORD_LATCHING_CODES: ReadonlySet<string> = new Set(["42501", "42883", "23514"]);
@@ -82,7 +87,8 @@ export function createStartCharges(deps: Readonly<{
             if (usage === null || price === null || provider === null) return;
             entry = Object.freeze({ spendId: newId(), ownerRef: input.ownerRef, kind: input.kind,
               providerRef: preStartSpendRef(input.kind, provider, input.target.model), chargedOn: costEnvelopeDay(deps.clock()),
-              chargeMicros: chargeMicrosForUsage(price, usage), inputTokens: usage.promptTokens, outputTokens: usage.completionTokens, grant });
+              chargeMicros: chargeMicrosForUsage(price, usage), inputTokens: usage.promptTokens, outputTokens: usage.completionTokens, grant,
+              ...(input.tryRef === undefined ? {} : { tryRef: input.tryRef }) });
           } catch {
             unrecorded("");
             return;

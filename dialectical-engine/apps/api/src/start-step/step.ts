@@ -20,8 +20,8 @@ import {
 import type { StartCharges } from "./charge.js";
 import { createStartBusyBook, startModelOfSeat, startSeatsFor, type StartBusyBook } from "./seats.js";
 import {
-  signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startMembersHash, verifyStartCheck, verifyStartMergeRequest,
-  type StartCombineContext, type StartStepKey
+  signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startDigTryRefOf, startMembersHash, startTryRefOf,
+  startTryRefOfCheck, verifyStartCheck, verifyStartMergeRequest, type StartCombineContext, type StartStepKey
 } from "./signing.js";
 import type { StartCallEnd, StartTransport } from "./transport.js";
 
@@ -192,10 +192,14 @@ export function createStartStep(deps: Readonly<{
   const callEnded = (end: StartCallEnd): void => {
     tell({ event: "api.start_step.call", call_site: end.callSiteKey, model: end.model, outcome: end.outcome, ms: end.ms });
   };
-  /** Each call charged to this person (the first asker of a kept answer), through its kind's seam; a call's end is one code line. */
-  const callerOf = (transport: StartTransport, config: PreviewProviderTestConfig, who: StartStepContext): MapCaller =>
+  /**
+   * Each call charged to this person (the first asker of a kept answer), through its kind's seam; a call's end is one code line. Task 57c:
+   * each charge names the try it was made for (signing.ts), so Start gives it to its debate and a failed debate gives it back (0163).
+   */
+  const callerOf = (transport: StartTransport, config: PreviewProviderTestConfig, who: StartStepContext, tryRef: string | null): MapCaller =>
     transport.callerFor({ config, busy, onCallEnd: callEnded,
-      seamFor: (kind, target) => deps.charges.seamFor({ ownerRef: who.ownerRef, funding: who.funding, kind, target }) });
+      seamFor: (kind, target) => deps.charges.seamFor({ ownerRef: who.ownerRef, funding: who.funding, kind, target,
+        ...(tryRef === null ? {} : { tryRef }) }) });
   const newMenuId = deps.newMenuId ?? ((): string => randomBytes(16).toString("base64url"));
 
   // Task 29: the step's own clock for the deadlines of step 2 (the map's merge, combine and fit have none; wave-3 note a).
@@ -526,7 +530,9 @@ export function createStartStep(deps: Readonly<{
         timed("REUSED", now());
         return listen(kept, emit, signal);
       }
-      const caller = callerOf(transport, config, input);
+      // Task 57c: the person's words as typed (an accepted rewrite's original), which the planner reads and the check's try names.
+      const caller = callerOf(transport, config, input, startTryRefOf(deps.key, { ownerScope: input.ownerScope,
+        words: input.question_language_choice?.original_question_line ?? input.question_line }));
       const reading: Reading = { key, createdAt: at, firstAt: null, events: [], bytes: 0, answeredNone: false, ended: false, inBook: true,
         listeners: new Set() };
       book.set(key, reading);
@@ -557,7 +563,8 @@ export function createStartStep(deps: Readonly<{
       const kept = keptIn(merges, key);
       if (kept !== null) return kept;
       if (signal.aborted) return noneOf("NOT_ASKED");
-      return keep(merges, key, mergeOnce(input, verified, callerOf(transport, ready.config, input), haikuOf(transport)).catch(() => noneOf("TRANSPORT")));
+      return keep(merges, key, mergeOnce(input, verified, callerOf(transport, ready.config, input, startTryRefOfCheck(deps.key, input.ownerScope, input.check_ref)),
+        haikuOf(transport)).catch(() => noneOf("TRANSPORT")));
     },
 
     async combine(input, signal) {
@@ -585,7 +592,10 @@ export function createStartStep(deps: Readonly<{
       const kept = keptIn(combines, key);
       if (kept !== null) return kept;
       if (signal.aborted) return noneOf("NOT_ASKED");
-      return keep(combines, key, combineOnce(input, main, context, membersHash, callerOf(transport, ready.config, input), haikuOf(transport))
+      // Task 57c: on the menu, the question's try; over a dig's picks, the dig's of its parent.
+      const tryRef = asked.kind === "MENU" ? startTryRefOfCheck(deps.key, input.ownerScope, asked.check_ref)
+        : startDigTryRefOf(deps.key, { ownerScope: input.ownerScope, parentRunId: asked.parent_run_id });
+      return keep(combines, key, combineOnce(input, main, context, membersHash, callerOf(transport, ready.config, input, tryRef), haikuOf(transport))
         .catch(() => noneOf("TRANSPORT")));
     },
 
@@ -601,7 +611,8 @@ export function createStartStep(deps: Readonly<{
       if (seat === null) return noneOf("TRANSPORT");
       // Raced with fitDeadlineMs; a key it was not given is refused by the fit's own reader (no usable reply: none UNREADABLE).
       const fitted = await within(timing.fitDeadlineMs, mapFitOwnPath({ questionLine: input.question_line, languageName: lock.language.name,
-        languageTag: lock.language.code, ownText: input.own_text, paths: input.paths, seat, caller: callerOf(transport, ready.config, input) }))
+        languageTag: lock.language.code, ownText: input.own_text, paths: input.paths, seat,
+        caller: callerOf(transport, ready.config, input, startTryRefOfCheck(deps.key, input.ownerScope, input.check_ref)) }))
         .catch(() => "THREW" as const);
       if (fitted === "DEADLINE") return noneOf("DEADLINE");
       if (fitted === "THREW") return noneOf("TRANSPORT");

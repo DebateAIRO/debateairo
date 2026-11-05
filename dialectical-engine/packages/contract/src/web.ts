@@ -767,12 +767,14 @@ export type PurposeAnswer = z.infer<typeof PurposeAnswerSchema>;
  * and the person's answers, the one about what the answer is for among them), `matters` and `angles` (the person's own words: an angle stays a
  * thing to investigate). `place`, `time` and `purpose` are the first shape: nothing writes them any more, and what was stored that way stays
  * readable. Stored encrypted, written at the ask, passed to every rewrite, answer update and report. An old debate has none.
+ * V4 start step, Task 76d (owner answer Q4): `answers` has room for the answer to "What do you care about most?" too (a widening only:
+ * every stored line still parses).
  */
 export const PurposeLinesSchema = z.object({
   place: PurposeLineSchema.optional(),
   time: PurposeLineSchema.optional(),
   purpose: PurposeLineSchema.optional(),
-  answers: z.array(PurposeAnswerSchema).min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 1).optional(),
+  answers: z.array(PurposeAnswerSchema).min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2).optional(),
   matters: PurposeLineSchema.optional(),
   angles: z.array(PurposeLineSchema).min(1).max(WEB_CONTRACT_LIMITS.anglesMax).optional()
 }).strict().refine((lines) => lines.place !== undefined || lines.time !== undefined || lines.purpose !== undefined
@@ -833,25 +835,46 @@ Readonly<{ place: string | null; time: string | null; purpose: string | null }> 
 const ClarifyTextSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionMaxChars);
 const ClarifyAnswerSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.clarifyAnswerMaxChars);
 
-/** Decision 29: one question to the person, with the answers to choose from. "Other" is the page's own, never the AI's. */
+/**
+ * Decision 29: one question to the person, with the answers to choose from. "Other" is the page's own, never the AI's.
+ * V4 start step, Task 76d (owner answer Q5; version 2 of the call, sealed only through Task 92): `sentences`, the small AI's own sentence
+ * for each answer, in the person's voice ("I mean the next 25 years."), exactly one per answer and in the same order; `about_place`, on
+ * the one question that asks where (the page puts the site's country first among its answers). Both are absent from a version 1 reply.
+ */
 export const ClarifyQuestionSchema = z.object({
   text: ClarifyTextSchema,
-  answers: z.array(ClarifyAnswerSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax)
-}).strict();
+  answers: z.array(ClarifyAnswerSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax),
+  sentences: z.array(ClarifyTextSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax).optional(),
+  about_place: z.literal(true).optional()
+}).strict().refine((question) => question.sentences === undefined || question.sentences.length === question.answers.length,
+  { message: "one sentence per answer", path: ["sentences"] });
 export type ClarifyQuestion = z.infer<typeof ClarifyQuestionSchema>;
 
-/** POST /v1/asks/clarify: the question as typed. Nothing else; the person is the session's. */
-export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim().min(1) }).strict();
+/**
+ * read-f1 (Task 76d): the questions the page showed for an earlier wording of the question (the AI's, the purpose question and the care
+ * question) and the answers the person gave them. The API reads it only once version 2 of the call is sealed.
+ */
+export const AskClarifyEarlierSchema = z.object({
+  questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2),
+  answers: z.array(PurposeAnswerSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2)
+}).strict();
+export type AskClarifyEarlier = z.infer<typeof AskClarifyEarlierSchema>;
+
+/** POST /v1/asks/clarify: the question as typed. Nothing else; the person is the session's. Task 76d (read-f1): and, after a new wording, `earlier`. */
+export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim().min(1), earlier: AskClarifyEarlierSchema.optional() }).strict();
 export type AskClarifyRequest = z.infer<typeof AskClarifyRequestSchema>;
 
 /**
  * The questions for step 2. `AI`: up to three questions and the one about what the answer is for (absent only when the AI would not write it, even
  * asked twice). `NONE`: no AI read the question (it failed, it was too slow, the person's pool or limit is spent, or this deployment has no paid AI):
  * the page shows no questions, only the person's own-words boxes, and they carry on.
+ * V4 start step, Task 76d (owner answer Q4): version 2's `cares`, the question "What do you care about most?" with 2 to 4 answers; the page
+ * shows it last. It counts as a question of its own.
  */
 export const AskClarifyResponseSchema = z.discriminatedUnion("source", [
-  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema.optional() }).strict()
-    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined, { message: "at least one question" }),
+  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema.optional(),
+    cares: ClarifyQuestionSchema.optional() }).strict()
+    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined || reply.cares !== undefined, { message: "at least one question" }),
   z.object({ source: z.literal("NONE") }).strict()
 ]);
 export type AskClarifyResponse = z.infer<typeof AskClarifyResponseSchema>;

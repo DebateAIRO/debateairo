@@ -33,6 +33,11 @@ const server = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
+// V4 start step, Task 76b: a press of Start or "Just answer it" waits its 10-second Undo window before the send; here the
+// window is 0 and `sent` lets its timer run (the 10 seconds themselves: tests/render/v4-start-undo.test.tsx).
+vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
+}));
 vi.mock("@/lib/api", () => ({
   COOKIE_SESSION_MARKER: "cookie",
   createDebate: (...args: unknown[]) => server.createDebate(...args),
@@ -154,6 +159,12 @@ const helpOpen = (): boolean => document.querySelector('[data-dialog="crisis-sup
 
 async function click(target: HTMLElement): Promise<void> {
   await act(async () => { target.click(); });
+  await settle();
+}
+
+/** Task 76b: after a press, its Undo window (0 here) runs out and what it sends settles. */
+async function sent(): Promise<void> {
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   await settle();
 }
 
@@ -340,23 +351,42 @@ describe("the plan (ask-f2, read-f3)", () => {
     expect(field().value).toBe("Should");
   });
 
-  it("a room read failing twice: the Free notice shows, and 'Just answer it' sends that it was shown", async () => {
+  // Task 76b (read-f3, the coordinator's ruling of 4 Nov night): the same setup; the press now reads the plan once more first.
+  // The notice's flag goes only when that read names FREE; with that read failing too, nothing is sent.
+  it("a room read failing twice: the Free notice shows; 'Just answer it' reads the plan first and sends that it was shown when the read names FREE", async () => {
     server.roomAnswer = down;
     await mount();
     expect(server.roomReads).toBe(2);
     expect(host!.querySelector(".v4AskPublicNotice")?.textContent).toBe(NOTICE);
     expect(nextButton().textContent).toBe("Next");
     server.consent = "given";
+    server.roomAnswer = () => Promise.resolve(room({ plan_id: "FREE", start_step: undefined }));
     await click(justButton());
+    await sent();
+    expect(server.roomReads).toBe(3);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(server.createDebate.mock.calls[0]![7]).toEqual({ freePublicNotice: true });
   });
 
-  it("a room read failing twice: Start sends it too", async () => {
+  it("a room read failing twice, and the press's read too: 'Just answer it' sends nothing and says the plan could not be checked", async () => {
+    server.roomAnswer = down;
+    await mount();
+    server.consent = "given";
+    await click(justButton());
+    await sent();
+    expect(server.roomReads).toBe(3);
+    expect(server.createDebate).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain(CATALOG["v4.ask.planUnknown"]);
+  });
+
+  it("a room read failing twice: Start reads the plan first too, and sends the notice's flag when the read names FREE", async () => {
     server.roomAnswer = down;
     await toStepTwo();
-    expect(host!.querySelector(".v4AskBar .v4AskPublicNotice")?.textContent).toBe(NOTICE);
-    await click(button(CATALOG["v4.read.start"]!)!);
+    // Task 76: step 2's Start is the start bar's, with the notice directly above it.
+    expect(host!.querySelector(".v4StartBar .v4AskPublicNotice")?.textContent).toBe(NOTICE);
+    server.roomAnswer = () => Promise.resolve(room({ plan_id: "FREE", start_step: undefined }));
+    await click(button(CATALOG["v4.start.start"]!)!);
+    await sent();
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(server.createDebate.mock.calls[0]![7]).toEqual({ freePublicNotice: true });
   });
@@ -379,7 +409,8 @@ describe("the plan (ask-f2, read-f3)", () => {
     await toStepTwo();
     expect(server.roomReads).toBeGreaterThan(1);
     expect(host!.querySelector(".v4AskPublicNotice")).toBeNull();
-    await click(button(CATALOG["v4.read.start"]!)!);
+    await click(button(CATALOG["v4.start.start"]!)!);
+    await sent();
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(server.createDebate.mock.calls[0]![7]).toBeUndefined();
   });
@@ -625,6 +656,7 @@ describe("one line, never both, while one question already waits (read-f17)", ()
     });
     const page = await mount();
     await click(justButton());
+    await sent();
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(page.querySelectorAll(".roomNotice")).toHaveLength(1);
     expect(page.textContent).not.toContain("One question is already waiting for a free spot");
@@ -637,6 +669,7 @@ describe("one line, never both, while one question already waits (read-f17)", ()
     expect(page.querySelector(".roomNotice")).toBeNull();
     expect(justButton().disabled).toBe(false);
     await click(justButton());
+    await sent();
     expect(page.querySelector(".v4AskRefusal")?.textContent).toBe(CATALOG["v4.askError.alreadyWaiting"]);
   });
 });

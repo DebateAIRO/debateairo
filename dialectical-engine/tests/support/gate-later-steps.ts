@@ -44,7 +44,10 @@ export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Obj
   // V4 start step (Task 52): the path steps after Start (drafts until Task 92 seals them). map.gap-paths.v1 is no map contract name
   // (the stand-in coverage's stale-row check proves it), so this row, not the debate map's script, answers it.
   "map.gap-paths.v1": "PATH_GAP", "path.outcome.v1": "PATH_OUTCOME_WRITER", "path.outcome-check.v1": "PATH_OUTCOME_CHECKER",
-  "story.paths.v5": "STORY_PATHS", "story.paths-check.v5": "STORY_PATHS_CHECK"
+  "story.paths.v5": "STORY_PATHS", "story.paths-check.v5": "STORY_PATHS_CHECK",
+  // V4 start step (Task 76d): the clarifying call's version 2 (a draft until Task 92 seals it). Version 1's reply is version 2's too
+  // (its sentences, place mark and care question are optional), so the same default answers it.
+  "ask.clarify.v2": "ASK_CLARIFY"
 });
 
 const LATER_PROSE = Object.freeze({

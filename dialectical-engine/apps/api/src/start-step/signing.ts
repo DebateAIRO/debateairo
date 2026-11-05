@@ -225,6 +225,34 @@ export function startRefVersionOf(key: StartStepKey, ref: string): number | null
   return payload === null || payload.t === "COMBINE" ? null : payload.s;
 }
 
+/*
+ * V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): THE TRY a
+ * call before Start is charged to. One person's one question as they typed it at Next (an accepted rewrite's original, which the planner
+ * reads first): an HMAC under this key of the owner hash and the words' hash, so it never reads back as words, is the same for every call
+ * of that question (the planner, the lists, the merges, a combine on its menu, a fit) and for its Start, and differs for other words or
+ * another person. A combine over a dig's picks is charged to the dig's parent instead. 64 lower-case hex characters (0163's shape).
+ */
+const tryOf = (key: StartStepKey, part: string): string =>
+  createHmac("sha256", key.bytes).update(`debateai:start-step-try:v1\0${part}`, "utf8").digest("hex");
+
+/** The try of a person's words at Next. */
+export function startTryRefOf(key: StartStepKey, input: Readonly<{ ownerScope: string; words: string }>): string {
+  return tryOf(key, `${ownerOf(input.ownerScope)}\0${questionOf(input.words)}`);
+}
+
+/** The try a check this key signed for this person belongs to (its original's hash after a rewrite, else its line's); null otherwise. */
+export function startTryRefOfCheck(key: StartStepKey, ownerScope: string, ref: string): string | null {
+  const payload = payloadOf(key, ref);
+  if (payload === null || payload.t !== "CHECK" || payload.o !== ownerOf(ownerScope)) return null;
+  const check = payload as CheckPayload;
+  return tryOf(key, `${check.o}\0${check.r ?? check.q}`);
+}
+
+/** The try a combine over a dig's picks is charged to: the person's dig of that parent debate. */
+export function startDigTryRefOf(key: StartStepKey, input: Readonly<{ ownerScope: string; parentRunId: string }>): string {
+  return tryOf(key, `${ownerOf(input.ownerScope)}\0dig:${input.parentRunId}`);
+}
+
 const combineWords = (title: string, question: string): string => sha(`${title}\0${question}`);
 
 /** A combined question, bound to its context, its members and its own words (Task 33 reads it as AI_COMBINED). */

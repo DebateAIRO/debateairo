@@ -43,12 +43,14 @@ describe("0162: a dig under the main question of a path debate updates the main 
   it("C-T is the chain's head, right after 0161, found by name, with its own loader and its one declared amendment of 0138", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0162 } from './migration-forward0162.js';");
-    expect(chain).toContain("loadForward0160,loadForward0161,loadForward0162]);");
+    expect(chain).toContain("loadForward0160,loadForward0161,loadForward0162,loadForward0163]);");
     // The amendment shape this step needs: a widened CHECK an earlier step's digest pins.
     expect(chain).toContain("|Readonly<{step:string;relations:readonly string[];constraints:readonly string[];field:'constraint_definition'}>;");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual([PREVIOUS, NAME]);
-    const step = plan.forwardChain.at(-1)!;
+    // Task 57c (0163): found by its name, so a later step leaves this pin alone.
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
+    const step = plan.forwardChain.find((entry) => entry.name === NAME)!;
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
     expect(step.amendsPostconditionsOf).toEqual(AMENDS);

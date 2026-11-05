@@ -20,7 +20,7 @@ import type { QuestionCheckOutcome } from "../../apps/api/src/question-check/con
 import { QuestionLanguageChoiceNeeded, type QuestionLanguageLock, type QuestionLanguagePort } from "../../apps/api/src/question-language/decider.js";
 import { createStartCharges } from "../../apps/api/src/start-step/charge.js";
 import { startModelOfSeat } from "../../apps/api/src/start-step/seats.js";
-import { newStartStepKey, verifyStartCheck, verifyStartList } from "../../apps/api/src/start-step/signing.js";
+import { newStartStepKey, startTryRefOf, startTryRefOfCheck, verifyStartCheck, verifyStartList } from "../../apps/api/src/start-step/signing.js";
 import {
   START_LISTS_REUSE, createStartStep, startStepRouteOf, type StartListsInput, type StartStepSettings
 } from "../../apps/api/src/start-step/step.js";
@@ -259,6 +259,25 @@ describe("the step port at Next: the lists stream", () => {
       originalQuestionLine: MIXED })).toMatchObject({ rewriteAccepted: true, originalQuestionLine: MIXED });
     expect(() => verifyStartCheck(h.key, { ownerScope: INPUT.ownerScope, questionLine: MIXED, planKey: "plus", settingsVersion: 30, ref,
       originalQuestionLine: MIXED })).toThrow("START_PATHS_STALE");
+  });
+
+  // Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): every call of a question is charged to its try, the person's
+  // words at Next, which the check carries, so Start can give the try's charges to the debate (0163).
+  it("every charge of a reading names the check's try: the planner and each list, after an offer and its re-post too", async () => {
+    const plain = harness({ times: ORDER_TIMES });
+    const read = await readToEnd(plain, INPUT);
+    const made = startTryRefOfCheck(plain.key, INPUT.ownerScope, checkOf(read).check_ref);
+    expect(made).toMatch(/^[0-9a-f]{64}$/u);
+    expect(plain.entries.length).toBeGreaterThan(1);
+    expect(plain.entries.map((entry) => entry.tryRef)).toEqual(plain.entries.map(() => made));
+    const h = harness();
+    await readToEnd(h, inputOf({ question_line: MIXED }));
+    const chosen = await readToEnd(h, inputOf({ question_line: REWRITE,
+      question_language_choice: { check_ref: OFFER_REF, choice: "USE_REWRITE", original_question_line: MIXED } }));
+    const rewritten = startTryRefOfCheck(h.key, INPUT.ownerScope, checkOf(chosen).check_ref);
+    expect(rewritten).toBe(startTryRefOf(h.key, { ownerScope: INPUT.ownerScope, words: MIXED }));
+    expect(h.entries.map((entry) => [entry.kind, entry.tryRef])).toEqual(h.entries.map((entry) => [entry.kind, rewritten]));
+    expect(h.entries.map((entry) => entry.kind)).toContain("ANGLES");
   });
 
   it("a choice the language step refuses is none NOT_ASKED, and no list is asked", async () => {

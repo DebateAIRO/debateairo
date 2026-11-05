@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { BillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { levelHref } from "@/lib/v4/storage";
@@ -122,7 +122,7 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
 }
 
 export function V4Header({
-  catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, session, children, after
+  catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, session, children, after, onBrandClick
 }: Readonly<{
   catalog: MessageCatalog;
   /** The level the menu shows (a page may show its default when none was chosen). */
@@ -151,6 +151,11 @@ export function V4Header({
    * check, 4 Nov: on a phone they jumped from the start side to the end side).
    */
   after?: ReactNode;
+  /**
+   * V4 start step, Task 76c (read-f2, choose-f2): the page's own say before the brand link goes (the ask page asks first while
+   * something would be lost, and prevents the link's default then). Absent: the link simply goes.
+   */
+  onBrandClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
 }>) {
   // ask-f16 with the wave-2 checks (4 Nov): the usage is read only for a signed-in person, and a page that knows the person
   // is signed out reads nothing and holds nothing (they never get a pill). While the page is still checking, the pill's
@@ -160,7 +165,8 @@ export function V4Header({
   const quotaHeld = showQuota && session === "CHECKING";
   return (
     <header className="v4Hdr">
-      <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
+      <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand"
+        {...(onBrandClick === undefined ? {} : { onClick: onBrandClick })}>
         <span className="v4HdrMark" aria-hidden="true" />
         <span className="v4HdrName">Dialectical Engine</span>
         <span className="v4HdrBadge">{t(catalog, "v4.brand.badge")}</span>

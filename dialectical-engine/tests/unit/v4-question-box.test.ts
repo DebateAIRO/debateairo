@@ -9,6 +9,7 @@ import {
   boxOf,
   boxOwnWords,
   boxPlace,
+  boxRekey,
   boxRemove,
   boxTyped,
   type BoxSentence,
@@ -212,6 +213,29 @@ describe("boxChanged", () => {
     const placed = tap(boxOf(Q), REGION);
     expect(boxChanged(placed, Q)).toBe(true);
     expect(boxChanged(boxRemove(placed, REGION.question), Q)).toBe(false);
+  });
+});
+
+// V4 start step, Task 76g (read-f1, read-d3): a new reading keeps an answer under a reworded question; its sentence stays as it
+// was, byte for byte, and only the key it sits under changes.
+describe("boxRekey", () => {
+  it("keeps the text byte for byte, and a later boxRemove(box, newKey) removes that line", () => {
+    const placed = boxTyped(tap(boxOf(Q), REGION, WHEN), `${Q}\n\n${S1}\n${S2}\nAlso the cost to households.`);
+    const moved = boxRekey(placed, WHEN.question, "Over what time?");
+    expect(moved.text).toBe(placed.text);
+    expect(new TextEncoder().encode(moved.text)).toEqual(new TextEncoder().encode(placed.text));
+    expect(moved.placed).toEqual([{ key: REGION.question, text: S1 }, { key: "Over what time?", text: S2 }]);
+    const removed = boxRemove(moved, "Over what time?");
+    expect(boxLine(removed)).toBe(`${Q}\n\n${S1}\nAlso the cost to households.`);
+    expect(removed.placed).toEqual([{ key: REGION.question, text: S1 }]);
+    // The old key no longer names it.
+    expect(boxRemove(moved, WHEN.question)).toBe(moved);
+  });
+
+  it("a key not placed: the box as it is", () => {
+    const placed = tap(boxOf(Q), REGION);
+    expect(boxRekey(placed, "By when?", "Over what time?")).toBe(placed);
+    expect(boxRekey(placed, REGION.question, REGION.question)).toBe(placed);
   });
 });
 

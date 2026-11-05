@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  PostgresModelSpendStore, preStartChargeWriterPresent, preStartSpendRef, recordAskClarifyCharge, recordPreStartCharge, type PreStartChargeKind
+  PostgresModelSpendStore, linkPreStartTry, preStartChargeWriterPresent, preStartSpendRef, readRunQuotaUsed, recordAskClarifyCharge, recordPreStartCharge,
+  type PreStartChargeKind
 } from "@debateai/budget";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { ASK_CLARIFY_SPEND_REF } from "../../apps/api/src/ask-clarify.js";
+import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -191,5 +193,148 @@ describe("0156: erasure, export and the roles", () => {
       expect(await denied(pool, "SELECT identity.record_pre_start_charge($1,$2,NULL,NULL,'LIST','pre-start:list:x:y',current_date,1,1,1)", [randomUUID(), owner])).toBe(true);
     }
     for (const pool of [runner, billing, erasure, authorization, replay]) expect(await denied(pool, "SELECT identity.read_data_export_pre_start($1,$1)", [owner])).toBe(true);
+  });
+});
+
+/*
+ * 0163 (V4 start step, plan 2026-11-03 Task 57c; the owner's 5 Nov answer Q20 A and its second-round follow-up): a failed question gives back
+ * its path-list charge. Each charge names its try; Start gives the try's charges to the debate once; while that debate is FAILED the person's
+ * windows, a team member's grant and the team's limit leave them out, and the site's day keeps them. Data is made up.
+ */
+describe("0163: a failed question gives back its charges before Start", () => {
+  let owner: StoryEncryptedOwner;
+  beforeAll(async () => { owner = await provisionStoryEncryptedOwner(database.pool); });
+  afterAll(async () => { if (owner !== undefined) await releaseStoryEncryptedOwner(owner); });
+
+  const tryRef = (): string => createHash("sha256").update(`try:${randomUUID()}`).digest("hex");
+  /** The person's own debate, as the asks route starts one (its ownership event names them). */
+  const ownRun = (): Promise<string> => createEncryptedStoryRun(database.pool, owner, "Should Harbour Town build a second ferry pier?");
+  /** A work item of the debate in `state`, written past every trigger as the database's own fixtures write one. */
+  async function workItem(runId: string, state: "READY" | "DONE" | "FAILED"): Promise<void> {
+    const seed = await database.pool.connect();
+    try {
+      await seed.query("BEGIN");
+      await seed.query("SET LOCAL session_replication_role = 'replica'");
+      await seed.query(`INSERT INTO core.work_item (run_id,battery_row_id,node_set,command_key,state,terminal_reason,created_at_seq)
+        VALUES ($1,'Q1','[]'::jsonb,$2,$3,$4,ledger.allocate_sequence())`, [runId, `pre-start-try:${randomUUID()}`, state, state === "FAILED" ? "TEST_RUN_FAILED" : null]);
+      await seed.query("COMMIT");
+    } catch (error) { await seed.query("ROLLBACK"); throw error; } finally { seed.release(); }
+  }
+  /** One round's charge of the debate (the RUN kind the person's windows count). */
+  const round = (runId: string, micros: number): Promise<unknown> => database.pool.query(
+    `INSERT INTO ledger.model_spend (spend_id,spend_source,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens)
+     VALUES (gen_random_uuid(),'RUN',$1,'fake-provider',(clock_timestamp() AT TIME ZONE 'UTC')::date,$2,1,1)`, [runId, micros]);
+  const charged = (micros: number, kind: PreStartChargeKind, made: string, grant: typeof GRANT | null = null) =>
+    recordPreStartCharge(runner, { ...entry(owner.ownerRef, micros, kind, grant), tryRef: made });
+  const quota = (runId: string, ownerRef = owner.ownerRef) => readRunQuotaUsed(runner, { ownerRef, runId });
+
+  it("a try's charges count until its debate fails, then the person's windows fall by exactly them, once; the site's day keeps them", async () => {
+    const [mine, another] = [tryRef(), tryRef()];
+    const run = await ownRun();
+    const [from, to] = window();
+    const store = new PostgresModelSpendStore(runner);
+    const site = new PostgresModelSpendStore(database.pool);
+    const [before, dayBefore] = [await store.readOwnerSpentMicros(owner.ownerRef, from, to), await site.readDaySpentMicros(today())];
+    await charged(3, "ANGLES", mine);
+    await charged(2, "LIST", mine);
+    await charged(4, "LIST", another);
+    await recordPreStartCharge(runner, entry(owner.ownerRef, 1, "FIT"));
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: mine, runId: run })).toBe(2);
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 10);
+    // While it runs, its list's charge is the person's.
+    await workItem(run, "READY");
+    expect(await quota(run)).toBe("SOME");
+    await workItem(run, "FAILED");
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 5);
+    expect(await store.readOwnerSpentInRangesMicros(owner.ownerRef, [{ from, to }])).toEqual([before + 5]);
+    expect(await quota(run)).toBe("NONE");
+    // Never given back twice: a second failed work item, a second read.
+    await workItem(run, "FAILED");
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 5);
+    expect(await site.readDaySpentMicros(today())).toBe(dayBefore + 10);
+    expect((await database.pool.query("SELECT run_id::text AS run_id FROM identity.pre_start_try WHERE try_ref=$1", [mine])).rows)
+      .toEqual([{ run_id: run }, { run_id: run }]);
+  });
+
+  it("a debate that does not fail keeps its charges; a failed one whose round ran used some; a set-aside one's round is waived", async () => {
+    const [kept, ran, setAside] = [tryRef(), tryRef(), tryRef()];
+    const [settled, failed, waived] = [await ownRun(), await ownRun(), await ownRun()];
+    const [from, to] = window();
+    const store = new PostgresModelSpendStore(runner);
+    const before = await store.readOwnerSpentMicros(owner.ownerRef, from, to);
+    await charged(6, "MERGE", kept);
+    await charged(2, "LIST", ran);
+    await charged(1, "LIST", setAside);
+    for (const [made, run] of [[kept, settled], [ran, failed], [setAside, waived]] as const) {
+      expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBe(1);
+    }
+    await workItem(settled, "DONE");
+    await round(failed, 7);
+    await workItem(failed, "FAILED");
+    await round(waived, 5);
+    await database.pool.query("INSERT INTO ledger.model_spend_waiver (run_id, reason) VALUES ($1, 'RELEASE_NOT_SERVED')", [waived]);
+    await workItem(waived, "FAILED");
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 6);
+    expect(await quota(settled)).toBe("SOME");
+    expect(await quota(failed)).toBe("SOME");
+    expect(await quota(waived)).toBe("NONE");
+  });
+
+  it("Start gives a try's charges once, to the person's own debate only; a charge recorded after it waits for the next Start", async () => {
+    const made = tryRef();
+    const [first, second] = [await ownRun(), await ownRun()];
+    await charged(3, "LIST", made);
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: first })).toBe(1);
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: second })).toBe(0);
+    await charged(2, "MERGE_LATE", made);
+    // Another person's charges never go to this debate, and this person's never to a debate that is not theirs.
+    const dan = await account();
+    await recordPreStartCharge(runner, { ...entry(dan.ownerRef, 4, "LIST"), tryRef: made });
+    expect(await linkPreStartTry(runner, { ownerRef: dan.ownerRef, tryRef: made, runId: second })).toBe(0);
+    expect(await quota(second, dan.ownerRef)).toBeNull();
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: randomUUID() })).toBe(0);
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: second })).toBe(1);
+    expect((await sqlError(() => linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: "not-a-try", runId: second }))).code).toBe("23514");
+    expect((await sqlError(() => charged(1, "FIT", made.toUpperCase()))).code).toBe("23514");
+    expect(await quota(randomUUID())).toBeNull();
+  });
+
+  it("a team member's charge leaves the grant's window and the team's limit when its debate fails", async () => {
+    const made = tryRef();
+    const run = await ownRun();
+    const [from, to] = window();
+    const grantSpent = () => total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total",
+      [owner.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to]);
+    const teamSpent = () => total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const [grantBefore, teamBefore] = [await grantSpent(), await teamSpent()];
+    await charged(4, "COMBINE", made, GRANT);
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBe(1);
+    expect([await grantSpent(), await teamSpent()]).toEqual([grantBefore + 4, teamBefore + 4]);
+    await workItem(run, "FAILED");
+    expect([await grantSpent(), await teamSpent()]).toEqual([grantBefore, teamBefore]);
+  });
+
+  it("the try's row is append-only but for its one link; an erased account takes it; no request role reads it; each function has its roles", async () => {
+    const ana = await account();
+    const made = tryRef();
+    const charge = { ...entry(ana.ownerRef, 2, "LIST"), tryRef: made };
+    await recordPreStartCharge(runner, charge);
+    for (const sql of ["UPDATE identity.pre_start_try SET try_ref=repeat('a',64) WHERE charge_id=$1",
+      "UPDATE identity.pre_start_try SET run_id=gen_random_uuid() WHERE charge_id=$1", "DELETE FROM identity.pre_start_try WHERE charge_id=$1"]) {
+      expect((await sqlError(() => database.pool.query(sql, [charge.spendId]))).message, sql).toContain("PRE_START_TRY_GIVEN_ONCE");
+    }
+    await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [ana.userId]);
+    expect((await database.pool.query("SELECT 1 FROM identity.pre_start_try WHERE owner_ref=$1", [ana.ownerRef])).rowCount).toBe(0);
+    for (const pool of [runner, billing, erasure, worker, authorization, replay]) {
+      expect((await sqlError(() => pool.query("SELECT * FROM identity.pre_start_try"))).code).toBe("42501");
+    }
+    const denied = async (pool: Pool, sql: string, values: readonly unknown[]) => (await sqlError(() => pool.query(sql, [...values]))).code === "42501";
+    // As 0156's own: the API's billing and authorization logins hold the runtime role, so only the other roles are refused.
+    for (const pool of [erasure, worker, replay]) {
+      expect(await denied(pool, "SELECT identity.link_pre_start_try($1,$2,$1)", [randomUUID(), made])).toBe(true);
+      expect(await denied(pool, "SELECT identity.read_run_quota_used($1,$1)", [randomUUID()])).toBe(true);
+      expect(await denied(pool, "SELECT identity.record_pre_start_try_charge($1,$1,NULL,NULL,'LIST','pre-start:list:x:y',current_date,1,1,1,$2)",
+        [randomUUID(), made])).toBe(true);
+    }
   });
 });

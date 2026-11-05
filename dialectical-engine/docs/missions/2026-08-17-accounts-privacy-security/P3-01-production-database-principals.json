@@ -410,6 +410,9 @@
         "identity.read_ask_clarify_spent",
         "identity.record_pre_start_charge",
         "identity.read_pre_start_spent",
+        "identity.record_pre_start_try_charge",
+        "identity.link_pre_start_try",
+        "identity.read_run_quota_used",
         "staff.keep_threat_report",
         "staff.list_threat_reports",
         "staff.count_unread_threat_reports",
@@ -3317,6 +3320,22 @@
       "source": "migrations/0160_saved_questions.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0163_pre_start_release.sql",
+      "grants": [
+        "SELECT, INSERT, UPDATE (run_id, linked_at) ON identity.pre_start_try"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0163_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
+        "EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid)"
       ]
     }
   ],

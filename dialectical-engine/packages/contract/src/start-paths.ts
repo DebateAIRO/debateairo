@@ -230,7 +230,8 @@ export const StartMergeRequestSchema = z.object({
   reading_level: AccountReadingLevelSchema,
   lists: z.array(SignedStartListSchema).min(1).max(L.listsMax),
   clarify: z.object({
-    answers: z.array(PurposeAnswerSchema).max(4).optional(),
+    // Task 76d (owner answer Q4): the same room as PurposeLinesSchema.answers, the care question's answer included (a widening only).
+    answers: z.array(PurposeAnswerSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2).optional(),
     matters: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.purposeLineMaxChars).optional()
   }).strict().optional(),
   prior_menu: SignedStartMenuSchema.optional()

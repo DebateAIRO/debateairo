@@ -33,6 +33,11 @@ vi.mock("@/components/SensitiveDataConsent", () => ({
 vi.mock("@/components/QuestionLanguageChoice", () => ({
   useQuestionLanguageChoice: () => ({ ensureChoice: async () => { server.offers += 1; return server.languageAnswer; }, dialog: null })
 }));
+// V4 start step, Task 76b: Start waits its 10-second Undo window before the send; here the window is 0 and `sent` lets its
+// timer run.
+vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
+}));
 vi.mock("@/lib/api", () => ({
   COOKIE_SESSION_MARKER: "cookie",
   createDebate: (...args: unknown[]) => server.createDebate(...args),
@@ -86,14 +91,31 @@ const button = (name: string): HTMLButtonElement => [...host!.querySelectorAll("
 const click = async (target: HTMLElement): Promise<void> => {
   await act(async () => { target.click(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
 };
+const flush = async (): Promise<void> => {
+  for (let round = 0; round < 4; round += 1) await act(async () => { for (let tick = 0; tick < 10; tick += 1) await Promise.resolve(); });
+};
+/** V4 start step, Task 76b: after a press of Start, its Undo window (0 here) runs out and the ask is sent and answered. */
+async function sent(): Promise<void> {
+  await flush();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  await flush();
+}
+/**
+ * A room read that answers, on a site with no plans. Task 76b (read-f3): with no plan read at all, a press reads the room
+ * once more and sends nothing while it stays unknown, so these cases name the room.
+ */
+const NO_PLANS = Object.freeze({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null });
 
 /** The owner's path on 2 Nov: a question, Continue, then Start on "How we read your question", which the server refuses. */
 async function startRefusedWith(error: unknown): Promise<HTMLDivElement> {
   server.createDebate.mockRejectedValue(error);
+  server.room = NO_PLANS;
   const page = await render(<V4AskClient catalog={CATALOG} homeCatalog={HOME} newDebateCatalog={NEW_DEBATE} billingCatalog={messages("billing")}
     locale="en" crisisCountryHint={null} initialQuestion="Should the city fund the tram line?" initialLevel="plain" />);
   await click(button(CATALOG["v4.ask.continue"]!));
-  await click(button(CATALOG["v4.read.start"]!));
+  // V4 start step, Task 76: step 2's Start is the start bar's "Start investigating" (no start step here, so it works at once).
+  await click(button(CATALOG["v4.start.start"]!));
+  await sent();
   expect(server.createDebate).toHaveBeenCalledTimes(1);
   return page;
 }
@@ -119,6 +141,8 @@ describe("the V4 ask page shows the question check's own answers", () => {
 
   it("Back closes the screen and keeps the person on the page with the question", async () => {
     const page = await startRefusedWith(unavailable());
+    // Task 76 (ask-f7): only the screens of Next say "Edit my question"; Start's keeps today's way back.
+    expect(page.querySelector('[data-part="back"]')?.textContent).toBe(HOME["home.questionRefusal.back"]);
     await click(page.querySelector<HTMLButtonElement>('[data-part="back"]')!);
     expect(page.querySelector('[data-dialog="question-refusal"]')).toBeNull();
     expect(page.textContent).toContain("Should the city fund the tram line?");
@@ -138,12 +162,14 @@ describe("a rewrite the person accepted survives the check's screen (ASK-5)", ()
     const page = await render(<V4AskClient catalog={CATALOG} homeCatalog={HOME} newDebateCatalog={NEW_DEBATE} billingCatalog={messages("billing")}
       locale="en" crisisCountryHint={null} initialQuestion="Should the city fund the tram line?" initialLevel="plain" />);
     await click(button(CATALOG["v4.ask.continue"]!));
-    await click(button(CATALOG["v4.read.start"]!));
+    await click(button(CATALOG["v4.start.start"]!));
+    await sent();
     expect(server.createDebate).toHaveBeenCalledTimes(2);
     expect(server.createDebate.mock.calls[1]![0]).toBe(REWRITE);
     expect(page.querySelector('[data-part="try-again"]')).not.toBeNull();
     await click(page.querySelector<HTMLButtonElement>('[data-part="back"]')!);
-    await click(button(CATALOG["v4.read.start"]!));
+    await click(button(CATALOG["v4.start.start"]!));
+    await sent();
     expect(server.createDebate).toHaveBeenCalledTimes(3);
     expect(server.createDebate.mock.calls[2]![0]).toBe(REWRITE);
     expect(server.offers).toBe(1);

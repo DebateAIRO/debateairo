@@ -133,10 +133,6 @@
 .v4AskLevelChip[data-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
 .v4AskLevelInput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .v4AskLevelChip:has(.v4AskLevelInput:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
-/* ask-f16: the held place of the level choice, a faint shape of about its height, gone at once when not needed. */
-/* V4 start step, Task 75b (ask-d2): in the new block's shape (a legend bar, three pill outlines in one row, two text lines);
-   its parts are in the start-step block below. */
-.v4AskLevelsHold { display: flex; flex-direction: column; gap: 12px; opacity: .7; }
 
 /* ask-d1 D: the seed of the map (first visits). Nothing in it moves. */
 .v4Seed { margin: 0; display: flex; flex-direction: column; gap: 12px; max-width: 520px; }
@@ -343,12 +339,12 @@
 .v4AskLevelRow .v4AskLevelChip { flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; overflow-wrap: anywhere; }
 .v4AskLevelKept { overflow-wrap: anywhere; }
 .v4AskLevelWhat { min-height: 44px; font-size: var(--t-ui); }
-/* The held place: faint outlines only, no fill and no shimmer (ask-f16). */
-.v4AskLevelsHoldBar { display: block; inline-size: 46%; block-size: 18px; border-radius: var(--r-btn); background: var(--surface-2); }
-.v4AskLevelsHoldPills { display: flex; gap: 8px; }
-.v4AskLevelsHoldPill { flex: 1 1 0; height: 44px; border: 1.5px solid var(--line-2); border-radius: var(--r-pill); }
-.v4AskLevelsHoldLine { display: block; inline-size: 100%; block-size: 14px; border-radius: var(--r-btn); background: var(--surface-2); }
-.v4AskLevelsHoldLine:last-child { inline-size: 72%; }
+
+/* ---- V4 start step — Task 76b: Start's 10 seconds (answer Q11; choose-f19, the fold) ---- */
+/* The map's first card grows from where the card was (the page sets its first transform inline, from the top left), then
+   goes to its place under the fold's own token; Undo plays the same move backwards on the card. With reduced motion the
+   token makes it instant and the page gives the card the 1-second highlight instead. */
+.v4FoldMoving { transition: transform var(--v4-move-fold) var(--v4-ease-move); transform-origin: 0 0; }
 
 /* ---- V4 start step — P3: the choosing card (Task 72: the path rows; choose-d3, choose-f6) ---- */
 /* Clean rows with no tick box; text may wrap anywhere; targets at least 44 px; logical properties only (Task 77 checks). */
@@ -529,3 +525,65 @@
 .v4StartFull { display: flex; flex-direction: column; gap: 6px; min-width: 0; align-self: stretch; }
 .v4StartFullLine, .v4StartFullError { margin: 0; min-width: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
 .v4StartFullButtons { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+
+/* ---- V4 start step — Task 76h: the clarifying questions (read-f5, read-f8, read-f15, read-f23, ask-d3) ---- */
+/* Two extra moves beside the six (the owner's card "Add these as extra moves", 4 Nov night), each on its own token, under
+   0.5 s: a question taking a held row is revealed in place, and each later one slides up 8 px into place. Under reduced
+   motion both tokens are 0.01ms and the wait line is still; the page then gives the block the 1-second highlight instead.
+   Logical properties only, no px value above 44 (Task 77 checks). */
+.v4Root { --v4-move-reveal: 200ms; --v4-move-arrive: 250ms; }
+/* read-f5: the one status line, the thin line under it with a slowly moving segment (about 2.4 s a loop), and "Try again". */
+.v4AskClarifyStatus { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+/* With only the heard title (or nothing) to say, the line takes no room of its own in the card. */
+.v4AskClarifyStatus--quiet { display: contents; }
+.v4AskClarifyStatus > p { overflow-wrap: anywhere; }
+.v4AskTryAgain { min-height: 44px; font-size: var(--t-ui); }
+.v4AskWaitLine {
+  display: block; inline-size: min(100%, 16em); block-size: 2px; border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--text-3), transparent) no-repeat, var(--line-2);
+  background-size: 30% 100%, 100% 100%;
+  animation: v4AskWaitMove 2.4s ease-in-out infinite;
+}
+@keyframes v4AskWaitMove { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }
+/* With less motion: three small dots, one of them ink, stepping every second (never a slide). */
+.v4AskWaitDots { display: inline-flex; gap: 6px; }
+.v4AskWaitDot {
+  inline-size: 6px; block-size: 6px; border-radius: 50%; background: var(--line-strong);
+  animation: v4AskWaitDot 3s step-end infinite;
+}
+.v4AskWaitDot:nth-child(2) { animation-delay: 1s; }
+.v4AskWaitDot:nth-child(3) { animation-delay: 2s; }
+@keyframes v4AskWaitDot { 0% { background: var(--ink); } 33.333% { background: var(--line-strong); } }
+/* read-f23: two pale rows hold the questions' place: a short grey bar and three pill outlines, lighter than real buttons, with
+   no shimmer. A row no question takes folds shut (its height to 0) on the reveal's token. */
+.v4AskHeld { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.v4AskHeldRow {
+  display: grid; grid-template-rows: 1fr; opacity: 1;
+  transition: grid-template-rows var(--v4-move-reveal) var(--v4-ease-move), opacity var(--v4-move-reveal) var(--v4-ease-move);
+}
+.v4AskHeldFold { grid-template-rows: 0fr; opacity: 0; }
+.v4AskHeldInner { min-block-size: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.v4AskHeldBar { inline-size: 40%; block-size: 12px; border-radius: 6px; background: var(--surface-2); }
+.v4AskHeldPills { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.v4AskHeldPill { inline-size: 6em; block-size: 44px; border-radius: var(--r-pill); border: 1.5px solid var(--line-2); }
+/* The questions, with the card's own gaps (the answered ones' fold included); their arrival. */
+.v4AskQuestions { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.v4AskQuestions .v4StartFoldBox:not([hidden]) { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.v4AskReveal { animation: v4AskReveal var(--v4-move-reveal) var(--v4-ease-move) backwards; }
+@keyframes v4AskReveal { from { opacity: 0; } }
+.v4AskArrive { animation: v4AskArrive var(--v4-move-arrive) var(--v4-ease-move) backwards; }
+@keyframes v4AskArrive { from { opacity: 0; transform: translateY(8px); } }
+/* read-f8: Free's cap. One still line under the title; the buttons it waits on stay in the keyboard's order, muted. */
+.v4AskCapLine { color: var(--text); overflow-wrap: anywhere; }
+.v4Chip.v4ChipMuted { color: var(--text-3); border-color: var(--line-2); background: var(--surface-2); cursor: not-allowed; }
+.v4AskInput[readonly] { background: var(--surface-2); }
+@media (prefers-reduced-motion: reduce) {
+  .v4Root { --v4-move-reveal: 0.01ms; --v4-move-arrive: 0.01ms; }
+  .v4AskWaitLine { animation: none; }
+}
+
+/* ---- V4 start step — Task 76g: a new reading's set-aside answers (read-f1) ---- */
+/* "Set aside: To 2035 · Put it back", where its question was; the button a full touch target, muted while Free's cap waits. */
+.v4AskSetAside { color: var(--text-2); overflow-wrap: anywhere; }
+.v4AskPutBack { min-block-size: 44px; display: inline-flex; align-items: center; }
+.v4AskPutBack[aria-disabled="true"] { color: var(--text-3); cursor: not-allowed; text-decoration: none; }

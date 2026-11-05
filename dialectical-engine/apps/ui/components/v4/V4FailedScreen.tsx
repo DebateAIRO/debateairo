@@ -21,7 +21,10 @@ import { quotaUntouched, sayNothingTaken } from "@/lib/v4/failedRun";
 
 export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, catalog, homeCatalog }: Readonly<{
   run: RunProjection;
-  /** The ask step, filled from this debate (lib/v4/failedRun.ts askAgainHref, with the reading level). */
+  /**
+   * The ask step, filled from this debate (lib/v4/failedRun.ts askAgainHref). Task 75d: its words and its reading level are read
+   * back from the server there, so the address names only the debate.
+   */
   askAgainHref: string;
   /** The empty ask step. */
   askHref: string;

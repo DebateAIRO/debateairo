@@ -43,11 +43,14 @@ function languageList(names: readonly string[], locale: LocaleCode): string {
  * shows this pop-up once per press of "Start debate": the languages it saw, named in the page's
  * language, and the server's one-language version, which the person can use, refuse, or go back
  * and edit. `ensureChoice` resolves with the person's answer; `dialog` is rendered by the caller.
+ * V4 start step, Task 76 (ask-f7): `backLabel` names the way back when the pop-up opens before the question's page step is
+ * done (V4's step 2: "Edit my question"); without it, today's label for every other caller.
  */
 export function useQuestionLanguageChoice({
   catalog,
-  locale
-}: Readonly<{ catalog: MessageCatalog; locale: LocaleCode }>): Readonly<{
+  locale,
+  backLabel
+}: Readonly<{ catalog: MessageCatalog; locale: LocaleCode; backLabel?: string }>): Readonly<{
   ensureChoice: (offer: QuestionLanguageOffer) => Promise<QuestionLanguageAnswer>;
   dialog: React.ReactNode;
 }> {
@@ -70,7 +73,7 @@ export function useQuestionLanguageChoice({
 
   const dialog = offer === null
     ? null
-    : <QuestionLanguageChoiceDialog catalog={catalog} locale={locale} offer={offer} onAnswer={settle} />;
+    : <QuestionLanguageChoiceDialog catalog={catalog} locale={locale} offer={offer} onAnswer={settle} backLabel={backLabel} />;
   return { ensureChoice, dialog };
 }
 
@@ -78,12 +81,15 @@ function QuestionLanguageChoiceDialog({
   catalog,
   locale,
   offer,
-  onAnswer
+  onAnswer,
+  backLabel
 }: Readonly<{
   catalog: MessageCatalog;
   locale: LocaleCode;
   offer: QuestionLanguageOffer;
   onAnswer: (answer: QuestionLanguageAnswer) => void;
+  /** The [Edit] button's words (absent: today's "Edit"). */
+  backLabel?: string | undefined;
 }>): React.ReactElement {
   const scrimRef = React.useRef<HTMLDivElement | null>(null);
   const dialogRef = React.useRef<HTMLElement | null>(null);
@@ -140,7 +146,7 @@ function QuestionLanguageChoiceDialog({
               {t(catalog, "newDebate.languageCheck.keep")}
             </button>
             <button type="button" className="sensitiveConsentDecline questionLanguageEdit" onClick={edit}>
-              {t(catalog, "newDebate.languageCheck.edit")}
+              {backLabel ?? t(catalog, "newDebate.languageCheck.edit")}
             </button>
           </div>
         </div>

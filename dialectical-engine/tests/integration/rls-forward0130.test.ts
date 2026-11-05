@@ -47,7 +47,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 const HEAD = "0130_row_level_security.sql";
 /** The chain's last step since the merge into the V4 branch (2026-10-30): the V4 account memory follows 0130, so a
  *  migrate() that reaches 0130 ends at it. */
-const CHAIN_END = "0162_main_answer_path_added.sql";
+const CHAIN_END = "0163_pre_start_release.sql";
 const PREVIOUS = "0129_support_answer_scope.sql";
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const MANIFEST = "lineage/row-level-security-forward0130.json";

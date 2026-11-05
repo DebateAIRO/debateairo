@@ -121,8 +121,8 @@ export const DraftUsageBorrowsSchema = UsageBorrowsSchema;
 export const DraftRunStartedAtSchema = z.iso.datetime();
 /**
  * Owner review 3 Nov 2026 (wait-f11, map-f30, wait-f18): a FAILED run's `quota_used` ("NONE": nothing was taken from the
- * person's quota for it; "SOME": some was). NOT in the contract yet: the mock shows it only on its draft view, and the
- * website says "Nothing was taken" only once the run read carries it (apps/ui/lib/v4/failedRun.ts).
+ * person's quota for it; "SOME": some was). In the contract since V4 start step Task 57c (RunProjectionSchema.quota_used), so the
+ * normal view sends it too; this draft schema stays for the draft view's own check (apps/ui/lib/v4/failedRun.ts reads the field).
  */
 export const DraftRunQuotaUsedSchema = z.enum(["NONE", "SOME"]);
 export type DraftRunQuotaUsed = z.infer<typeof DraftRunQuotaUsedSchema>;

@@ -354,7 +354,8 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(card.textContent).toContain(V4["v4.public.digCard.running"]);
     expect(card.classList.contains("v4GroundLOOKING")).toBe(true);
     expect([...card.querySelectorAll(".v4PubDigStop")].map((stop) => stop.getAttribute("data-reached"))).toEqual(["false", "false"]);
-    expect(card.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999?level=plain");
+    // Task 75d: the account remembers no level, so none rides the link; the dig's map shows the level it was kept at.
+    expect(card.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999");
     expect(lane.readRun).toHaveBeenCalledWith("99999999-9999-4999-8999-999999999999");
     // The note says it started; its [See it] opens the dig's own page (a public page has no map of the person's).
     expect(notes()!.textContent).toContain("You can leave this page.");
@@ -547,7 +548,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(note.getAttribute("role")).toBe("status");
     expect(note.className).toBe("v4PubNote");
     expect(note.textContent).toBe(`${V4["v4.public.dig.notJoined"]} Open it`);
-    expect(note.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999?level=plain");
+    expect(note.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999");
     // It started: the box is gone, so it cannot be started twice; its own run is not read for a page it never joined.
     expect(startButtons()).toEqual([]);
     expect(lane.push).not.toHaveBeenCalled();

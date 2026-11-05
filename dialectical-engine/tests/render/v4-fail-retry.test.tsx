@@ -98,8 +98,9 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     harness.run = failedRun(runId);
     await mountMap(1600, runId);
     expect(text()).toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
-    // The ask step is filled from this debate: only its id travels in the address, never the words.
-    expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBe(`/v4?again=${runId}&level=background`);
+    // The ask step is filled from this debate: only its id travels in the address, never the words; Task 75d: nor its level,
+    // which the ask step reads back from the server with the words.
+    expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBe(`/v4?again=${runId}`);
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).not.toContain("tutors");
     expect(text()).toContain(CATALOG["v4.debate.askAgainNoteQuestion"]);
     const askNew = [...page().querySelectorAll("a")].find((link) => link.textContent?.trim() === CATALOG["v4.debate.askNew"])!;

@@ -37,19 +37,41 @@ function oneLine(value: string): string {
 /** Owner 2026-10-29 (Free plan shape): a Free ask carries at most this many D2 choices; a paid plan has no cap. */
 export const FREE_GOAL_CHOICES_MAX = 3;
 
-/** How many D2 choices a goal carries: each question answered (a pressed "Other" counts) and what matters (when not blank). */
+/**
+ * V4 start step, independent review of Task 76g (read-f1): the most answers any ask (and any merge before Start) carries, on every
+ * plan: the wire's own room (PurposeLinesSchema and StartMergeRequestSchema, `clarifyQuestionsMax + 2`). One reading never asks
+ * more questions than that; the blocks a new reading keeps, and "Put it back", can put more on screen, so the page stops the
+ * answers there, the way Free's cap does at FREE_GOAL_CHOICES_MAX. A paid plan otherwise has no cap.
+ */
+export const GOAL_ANSWERS_MAX = WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2;
+
+/**
+ * V4 start step, Task 76h (read-f8): whether an answer is a real choice. A pressed "Other" with nothing typed in it says nothing
+ * (it is never sent), so it is not one.
+ */
+export function answerCounts(given: V4GoalAnswer): boolean {
+  return oneLine(given.answer).length > 0;
+}
+
+/** How many D2 choices a goal carries: each question answered (Task 76h: an "Other" only once it has words) and what matters (when not blank). */
 export function goalChoiceCount(goal: V4Goal): number {
-  return goal.answers.length + (oneLine(goal.matters).length === 0 ? 0 : 1);
+  return goal.answers.filter(answerCounts).length + (oneLine(goal.matters).length === 0 ? 0 : 1);
 }
 
 /**
  * The goal a plan may send. A paid plan: the goal itself. Free: at most FREE_GOAL_CHOICES_MAX choices, the first ones in the order they are sent
- * (the answers, then what matters); the rest are dropped from the end. A goal already within the cap is returned as it is.
+ * (the answers, then what matters); the rest are dropped from the end. A goal already within the cap is returned as it is. Task 76h: an
+ * empty "Other" counts nothing, so it never takes a real answer's place (it is kept: it sends nothing).
  */
 export function goalWithinPlan(goal: V4Goal, planTier: "free" | "premium"): V4Goal {
   if (planTier !== "free" || goalChoiceCount(goal) <= FREE_GOAL_CHOICES_MAX) return goal;
-  const answers = goal.answers.slice(0, FREE_GOAL_CHOICES_MAX);
-  const keepsMatters = oneLine(goal.matters).length > 0 && answers.length < FREE_GOAL_CHOICES_MAX;
+  let counted = 0;
+  const answers = goal.answers.filter((given) => {
+    if (!answerCounts(given)) return true;
+    counted += 1;
+    return counted <= FREE_GOAL_CHOICES_MAX;
+  });
+  const keepsMatters = oneLine(goal.matters).length > 0 && answers.filter(answerCounts).length < FREE_GOAL_CHOICES_MAX;
   return Object.freeze({ answers: Object.freeze(answers), matters: keepsMatters ? goal.matters : "" });
 }
 
@@ -81,12 +103,93 @@ export function purposeLinesOfGoal(goal: V4Goal): PurposeLines | undefined {
   return { ...(answers.length === 0 ? {} : { answers: [...answers] }), ...(matters.length === 0 ? {} : { matters }) };
 }
 
-/** The questions a reply puts on the page, in order: the AI's, the one about what the answer is for last; none when no AI could help (decision 31). */
+/**
+ * The questions a reply puts on the page, in order: the AI's, then the one about what the answer is for; none when no AI could help
+ * (decision 31). V4 start step, Task 76d (owner answer Q4): version 2's "What do you care about most?" shows last, after the purpose
+ * question, and is answered like any other.
+ */
 export function clarifyingQuestions(reply: AskClarifyResponse): readonly ClarifyQuestion[] {
-  return reply.source === "AI" ? Object.freeze([...reply.questions, ...(reply.purpose === undefined ? [] : [reply.purpose])]) : Object.freeze([]);
+  return reply.source === "AI"
+    ? Object.freeze([...reply.questions, ...(reply.purpose === undefined ? [] : [reply.purpose]), ...(reply.cares === undefined ? [] : [reply.cares])])
+    : Object.freeze([]);
 }
 
-/** A changed question: an answer stays only while its question is still asked and, unless the person typed it, still offered. */
+/**
+ * V4 start step, Task 76d (owner answer Q5, read-d3, read-f22): one answer as the sentence the question box holds. An offered answer the
+ * small AI wrote a sentence for (version 2 of its call, once sealed): that sentence, in the person's own voice ("I mean the next 25
+ * years."; for the care question, "What I care about is: keeping bills low."). A typed "Other…" answer, or an answer with no sentence
+ * (version 1, or the site's country added by code): today's pair, as the stored lines say it ("Over what time? 2040."). The answer
+ * itself still travels as {question, answer} in the purpose lines.
+ */
+export function answerSentenceOf(question: ClarifyQuestion, given: V4GoalAnswer): string {
+  const at = given.other ? -1 : question.answers.indexOf(given.answer);
+  const written = at === -1 || question.sentences?.length !== question.answers.length ? undefined : question.sentences[at];
+  if (written !== undefined && oneLine(written).length > 0) return oneLine(written);
+  const line = (text: string): string => oneLine(text).slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
+  return purposeAnswerSentence({ question: line(given.question), answer: line(given.answer) });
+}
+
+/**
+ * V4 start step, Task 76g (read-f1): whether two answers say the same words: trimmed, in one Unicode form (NFC), and in the
+ * question's language's lower case ("România" and "românia" in "ro").
+ */
+export function sameAnswerWords(first: string, second: string, locale: string): boolean {
+  const said = (text: string): string => text.trim().normalize("NFC").toLocaleLowerCase(locale);
+  return said(first) === said(second);
+}
+
+/**
+ * V4 start step, Task 76g (read-f1): what a new reading does with the answers given before it. `kept`: each answer with the
+ * question it now sits under (`to`: the new question's text, or its own question's words for a typed answer); `setAside`: each
+ * answer no new question offers, with its question and its place in the earlier list.
+ */
+export type AnswersAcross = Readonly<{
+  kept: readonly Readonly<{ given: V4GoalAnswer; to: string }>[];
+  setAside: readonly Readonly<{ given: V4GoalAnswer; question: ClarifyQuestion; at: number }>[];
+}>;
+
+/**
+ * V4 start step, Task 76g (read-f1, owner "All in this build", 4 Nov night; read-d3): after Back, new words and Next, the new
+ * reading keeps the person's answers where it can. `before`: every answer given, with its question as shown, in the earlier
+ * list's order. `after` null (the new reading brought nothing back): every answer kept under its own question. An offered answer
+ * is kept under the first new question (in shown order, not already taken by another answer) one of whose answers says the same
+ * words (sameAnswerWords); none: it is set aside at its place in `before`. A typed answer ("Other…") is always kept, under its own
+ * question's words, and a new question asking those very words is its own (it sits there), so no offered answer takes it.
+ */
+export function answersAcrossReadings(before: readonly Readonly<{ given: V4GoalAnswer; question: ClarifyQuestion }>[],
+  after: readonly ClarifyQuestion[] | null, locale: string): AnswersAcross {
+  if (after === null) {
+    return Object.freeze({ kept: Object.freeze(before.map(({ given, question }) => Object.freeze({ given, to: question.text }))), setAside: Object.freeze([]) });
+  }
+  const taken = new Set<number>();
+  for (const { given, question } of before) {
+    if (!given.other) continue;
+    const own = after.findIndex((asked, at) => !taken.has(at) && asked.text === question.text);
+    if (own !== -1) taken.add(own);
+  }
+  const kept: Array<Readonly<{ given: V4GoalAnswer; to: string }>> = [];
+  const setAside: Array<Readonly<{ given: V4GoalAnswer; question: ClarifyQuestion; at: number }>> = [];
+  before.forEach(({ given, question }, at) => {
+    if (given.other) {
+      kept.push(Object.freeze({ given, to: question.text }));
+      return;
+    }
+    const found = after.findIndex((asked, place) => !taken.has(place) && asked.answers.some((offered) => sameAnswerWords(offered, given.answer, locale)));
+    if (found === -1) {
+      setAside.push(Object.freeze({ given, question, at }));
+      return;
+    }
+    taken.add(found);
+    kept.push(Object.freeze({ given, to: after[found]!.text }));
+  });
+  return Object.freeze({ kept: Object.freeze(kept), setAside: Object.freeze(setAside) });
+}
+
+/**
+ * A changed question: an answer stays only while its question is still asked and, unless the person typed it, still offered.
+ * V4 start step, Task 76g (read-f1): the ask page no longer drops answers this way; a new reading keeps or sets them aside
+ * (answersAcrossReadings).
+ */
 export function answersStillAsked(answers: readonly V4GoalAnswer[], questions: readonly ClarifyQuestion[]): readonly V4GoalAnswer[] {
   const kept = answers.filter((given) => {
     const asked = questions.find((question) => question.text === given.question);

@@ -163,8 +163,11 @@ describe("Accounts S8 publication architecture", () => {
     // V4 start step (Task 16): a path debate's paths ride on the snapshot, optional (old snapshots parse), their own strict
     // public schema in branches.ts: never the "more" list, the point-of-view line, the carry-on box, the evidence or the root id.
     expect(schema).toContain("branches: PublicBranchesSchema.optional()");
+    // V4 start step, Task 75d (owner, 5 Nov): the level the debate was asked at rides on the snapshot, last and optional (old
+    // snapshots parse), one of the three levels only, copied at publish time from the run by the owner-scoped read: no words.
+    expect(schema).toContain("reading_level: ReadingLevelSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view", "contributions", "main_answer_update", "author_name_gone", "changed_after_review", "reports", "branches"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view", "contributions", "main_answer_update", "author_name_gone", "changed_after_review", "reports", "branches", "reading_level"]);
     const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
     const floorEnd = disclosure.indexOf("export type AnswerFloor =");
     expect(floorStart).toBeGreaterThan(-1);

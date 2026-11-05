@@ -17,8 +17,9 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { questionLanguageReferenceKeyFrom } from "../../apps/api/src/question-language/reference.js";
 import {
-  newStartStepKey, signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startMembersHash, startRefQuestionOf,
-  startRefVersionOf, startStepKeyFrom, verifyStartCheck, verifyStartCombine, verifyStartList, verifyStartMenu, verifyStartMergeRequest
+  newStartStepKey, signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startDigTryRefOf, startMembersHash,
+  startRefQuestionOf, startRefVersionOf, startStepKeyFrom, startTryRefOf, startTryRefOfCheck, verifyStartCheck, verifyStartCombine, verifyStartList,
+  verifyStartMenu, verifyStartMergeRequest
 } from "../../apps/api/src/start-step/signing.js";
 
 const key = newStartStepKey();
@@ -364,5 +365,49 @@ describe("the start step's signed references (spec 2026-11-03 §4.1)", () => {
     try { verifyList({ questionLine: OTHER_QUESTION }); } catch (error) { caught = error; }
     expect(caught).toBeInstanceOf(TypedDomainError);
     expect((caught as TypedDomainError).message).toBe("START_PATHS_STALE");
+  });
+});
+
+/*
+ * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): THE TRY a call before Start
+ * is charged to. One person's one question, as they typed it at Next (an accepted rewrite's original): the same for every call of that
+ * question and for its Start, never the same for another person or other words, and it never reads back as words. A dig's combine is
+ * charged to its parent's try.
+ */
+describe("the try a call before Start is charged to (Task 57c)", () => {
+  it("is the person's words under the step's key: the same for the check's reading, another for other words, another person or another key", () => {
+    const made = startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: QUESTION });
+    expect(made).toMatch(/^[0-9a-f]{64}$/u);
+    expect(made).not.toContain(sha(QUESTION));
+    expect(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: `  ${QUESTION} ` })).toBe(made);
+    expect(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: OTHER_QUESTION })).not.toBe(made);
+    expect(startTryRefOf(key, { ownerScope: "owner:5555", words: QUESTION })).not.toBe(made);
+    expect(startTryRefOf(newStartStepKey(), { ownerScope: BINDING.ownerScope, words: QUESTION })).not.toBe(made);
+    const check = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null });
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, check)).toBe(made);
+  });
+
+  it("after an accepted rewrite the check's try is the person's own words (the planner read them first)", () => {
+    const check = signStartCheck(key, { ...BINDING, questionLine: REWRITE, lock: LOCK, originalQuestionLine: ORIGINAL });
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, check)).toBe(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: ORIGINAL }));
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, check)).not.toBe(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: REWRITE }));
+  });
+
+  it("is none for another person's check, another kind of reference, a forged one or another key's", () => {
+    const check = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null });
+    expect(startTryRefOfCheck(key, "owner:5555", check)).toBeNull();
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, signStartList(key, { ...BINDING, list: LIST1 }))).toBeNull();
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, `${check.split(".")[0]!}.AAAA`)).toBeNull();
+    expect(startTryRefOfCheck(newStartStepKey(), BINDING.ownerScope, check)).toBeNull();
+  });
+
+  it("a dig's combine is charged to its parent's try: one per person and parent, never a question's", () => {
+    const parent = "5f0c2a8e-1b3d-4c6e-9a7b-2d4f6e8a0c1b";
+    const made = startDigTryRefOf(key, { ownerScope: BINDING.ownerScope, parentRunId: parent });
+    expect(made).toMatch(/^[0-9a-f]{64}$/u);
+    expect(startDigTryRefOf(key, { ownerScope: BINDING.ownerScope, parentRunId: parent })).toBe(made);
+    expect(startDigTryRefOf(key, { ownerScope: "owner:5555", parentRunId: parent })).not.toBe(made);
+    expect(startDigTryRefOf(key, { ownerScope: BINDING.ownerScope, parentRunId: "6f0c2a8e-1b3d-4c6e-9a7b-2d4f6e8a0c1b" })).not.toBe(made);
+    expect(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: parent })).not.toBe(made);
   });
 });

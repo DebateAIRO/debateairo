@@ -92,14 +92,16 @@ describe("the map page shows the debate at its own level", () => {
     expect(seen.askLevels.at(-1)).toBe("expert");
   });
 
-  it("a debate asked without a level reads as the default level, as today", async () => {
+  // Task 75d (owner, 5 Nov): an old debate with no stored level reads as Plain words, the level every question starts on, and
+  // a dig from it is asked (and priced) at Plain words, as the server prices it.
+  it("a debate asked without a level reads as Plain words", async () => {
     harness.level = null;
     harness.search = "?level=expert";
     harness.accountLevel = Promise.resolve("expert");
     await mountMap(1600, crypto.randomUUID(), null, "expert");
     await settle();
-    expect(lastHeader().readingLevel).toBe("background");
-    expect(seen.askLevels.at(-1)).toBe("background");
+    expect(lastHeader().readingLevel).toBe("plain");
+    expect(seen.askLevels.at(-1)).toBe("plain");
     expect(lastHeader().linkLevel).toBeNull();
   });
 });
