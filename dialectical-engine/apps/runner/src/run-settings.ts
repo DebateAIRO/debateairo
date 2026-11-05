@@ -50,6 +50,7 @@ import {
   previewPlanTierRosters,
   previewRunnerPolicy,
   resolvePreviewLineUp,
+  type PreviewFinalWriterPlan,
   type PreviewGateSettings,
   type PreviewLineUp,
   type PreviewProviderTestConfig,
@@ -777,6 +778,43 @@ export function createRunSettingsVersions(): RunSettingsVersions {
       return versions.get(runId);
     }
   });
+}
+
+/**
+ * V4 start step, Task 53 (spec 2026-11-03 §5; plan Review Focus 2) — THE RUN → FINAL-WRITER TERMS MAP, for the life of the
+ * process, beside the run → version map. `execute()` sets it at the claim, from the claimed run's own receipt, before any call: a
+ * v2 run (shape receipt v2) its plan, Free or paid; a v1 run null. The preview call policy reads it by run id, synchronously
+ * (`finalWriterTermsOf`, Task 3), so a v2 run's four final writers ask the shared rule and a v1 run's ask R22's, byte for byte. A
+ * run this process never claimed is undefined.
+ */
+export type RunFinalWriterTermsValue = Readonly<{ plan: PreviewFinalWriterPlan }>;
+export type RunFinalWriterTerms = Readonly<{
+  set(runId: string, terms: RunFinalWriterTermsValue | null): void;
+  termsOf(runId: string): RunFinalWriterTermsValue | null | undefined;
+}>;
+
+export function createRunFinalWriterTerms(): RunFinalWriterTerms {
+  const terms = new Map<string, RunFinalWriterTermsValue | null>();
+  return Object.freeze({
+    set(runId: string, value: RunFinalWriterTermsValue | null): void {
+      terms.set(runId, value === null ? null : Object.freeze({ plan: value.plan }));
+    },
+    termsOf(runId: string): RunFinalWriterTermsValue | null | undefined {
+      return terms.get(runId);
+    }
+  });
+}
+
+/** A receipt's terms: a v2 shape's plan (Free, else paid); no v2 shape (a v1 run), none. */
+export function finalWriterTermsOfShape(shapeV2: Readonly<{ plan: string }> | null | undefined): RunFinalWriterTermsValue | null {
+  if (shapeV2 === null || shapeV2 === undefined) return null;
+  return Object.freeze({ plan: shapeV2.plan === "free" ? "free" as const : "paid" as const });
+}
+
+/** The call policy's `finalWriterTermsOf` (Task 3) over the map: a v2 run's terms; a v1 run, an unknown run and no run, undefined. */
+export function finalWriterTermsResolver(terms: Pick<RunFinalWriterTerms, "termsOf">):
+  (runId: string | null) => RunFinalWriterTermsValue | undefined {
+  return (runId) => runId === null ? undefined : terms.termsOf(runId) ?? undefined;
 }
 
 /**

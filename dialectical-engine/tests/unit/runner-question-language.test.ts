@@ -95,7 +95,9 @@ describe("runQuestionLanguageLock: the receipt's shape decides the lock", () => 
     // P2d Task 7c (controller ruling D-CATCHUP): the definition, the run's own call, and the review catch-up's.
     expect(source.match(/runQuestionLanguageLock\(/gu)).toHaveLength(3);
     expect(source).toContain("const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);");
-    expect(source).toContain("runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {");
+    // V4 start step, Task 53: a path debate's receipt (shape receipt v2) locks the catch-up's language as a v1 shape's does.
+    expect(source).toContain("const catchUpBasis = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis);");
+    expect(source).toContain("runQuestionLanguageLock(catchUpBasis.shape ?? catchUpBasis.shapeV2 ?? null, {");
     expect(source).not.toContain("shapeRun === null ? null\n      : questionLanguageFromRun(");
   });
 });

@@ -8,7 +8,10 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, PostgresDigModelRunnerRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
+import {
+  configureContentEncryption, createPool, PostgresDigModelRunnerRepository, PostgresPathProgressRepository, PostgresPathResultsRepository,
+  PostgresStartPathsStore, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository
+} from "@debateai/db";
 import { MonthPause, monthPaused } from "./month-pause.js";
 import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { composeInvestigationClose } from "./investigation-close-sources.js";
@@ -48,7 +51,7 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf } from "./run-settings.js";
+import { createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -201,6 +204,12 @@ const siteVersionSettings = await runnerSettings.requireSettings(environment.REG
  */
 const runSettingsVersions = createRunSettingsVersions();
 const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+/**
+ * V4 start step, Task 53 (plan Review Focus 2): each claimed run's final-writer terms, by run id, set by the runner at the claim from
+ * the run's own receipt, before any call: a v2 run's plan (Free or paid), a v1 run none. The preview call policy below reads it, so a
+ * v2 run's four final writers ask the shared rule (Task 3), and a v1 run's R22's asks.
+ */
+const runFinalWriterTerms = createRunFinalWriterTerms();
 // V-9(2): each vendor's credential file, read once under the custody contract: after the settings checks above, so a
 // boot they refuse (the preview's scorecard conflict among them) never reads a credential.
 const providerTargets = resolveProviderTargetCredentials(
@@ -304,7 +313,9 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
     onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
     gateRemaining: previewGateRemaining,
     onFinalWriterTierUnread: previewFinalWriterTierUnread,
-    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)
+    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),
+    // V4 start step, Task 53: a v2 run's terms (its plan); a v1 run and a call of no run, none (R22's asks).
+    finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms)
   });
 }
 /**
@@ -435,6 +446,13 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // its run → version map (the money seams above read it).
   settingsForVersion: (version) => runnerSettings.settingsFor(version),
   runSettingsVersions,
+  // V4 start step, Task 53: the run → final-writer terms map the call policy reads, set at each claim.
+  runFinalWriterTerms,
+  // V4 start step, Task 53: a path debate's stores on the runner's pool: the paths sealed at Start (0157), each path's root and the gap
+  // round (0158), each path's step and points (0159).
+  startPaths: new PostgresStartPathsStore(pool),
+  pathResults: new PostgresPathResultsRepository(pool),
+  pathProgress: new PostgresPathProgressRepository(pool),
   providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
   ...(providerTopology.critique === undefined
     ? {} : { critique: providerTopology.critique }),

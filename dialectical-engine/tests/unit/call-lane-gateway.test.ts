@@ -647,8 +647,12 @@ describe("the runner's wiring (source pins)", () => {
     // sitOutMaker (which lanes) runs over the configured makers once, on an out-of-panel role's UNWRAPPED maker, and
     // (debate shape, c5e0b2862, PF-B40) on a map seat's UNWRAPPED maker outside the claim-eligible list — kept, so that
     // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is. The web
-    // step (Perplexity plan W3-1) wraps each configured maker's UNWRAPPED copy once, for its one call per run.
-    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(4);
+    // step (Perplexity plan W3-1) wraps each configured maker's UNWRAPPED copy once, for its one call per run. V4 start
+    // step, Task 53: a path debate (which runs no map and no map web step) does the same for its start steps' and gap
+    // round's map-only seats and for its own web step — so still once per run.
+    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(6);
+    expect(code.split("members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,")).toHaveLength(3);
+    expect(code).toContain("const wrapped = pathsMapOnly.get(aiRef) ?? sitOutMaker(configured);\n          pathsMapOnly.set(aiRef, wrapped);");
     expect(code).toContain("members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,");
     expect(code).toContain("configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });");
     expect(code).toContain("const unwrapped = configuredByProviderRef.get(roleRef);\n      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);");
@@ -690,7 +694,8 @@ describe("the runner's wiring (source pins)", () => {
     expect(MAIN.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createRunInFlight\(\)/gu) ?? []).toHaveLength(2);
-    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)\n  });");
+    // V4 start step, Task 53: plus each run's final-writer terms, by run id (a v2 run's plan).
+    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),\n    // V4 start step, Task 53: a v2 run's terms (its plan); a v1 run and a call of no run, none (R22's asks).\n    finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms)\n  });");
     // Ruling R31: on the preview only, every lane call waits on the busy coordinator before it asks for a slot.
     expect(MAIN).toContain("...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
     expect(MAIN).toContain("inFlight: gatewayInFlight");

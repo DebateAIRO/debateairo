@@ -1116,8 +1116,14 @@ export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "web
     search: async () => Object.freeze({ outcome: "FAILED" as const, failure: "NOT_CONFIGURED" as const, chargeMicros: 0 as const, resultCount: 0 as const })
   });
   const port = settings.search ?? unconfigured;
+  // Review of Task 53 (spec 2026-11-03 §4.4): a dig of a path debate is a dig. Its planners are told what its investigation already
+  // looked into, and its read pages are reused, from the dig read above; the runner's path mode carries neither (it never reads the
+  // dig). A first path debate reads no dig, and its mode is sent as given.
+  const pathsMode = rest.pathsMode !== undefined && rest.pathsMode !== null && rest.pathsMode.origin === "DIG" && dig !== null
+    ? Object.freeze({ ...rest.pathsMode, alreadyInvestigated: dig.alreadyInvestigated, reuse: dig.reuse }) : rest.pathsMode;
   return runWebStep({
     ...rest,
+    ...(pathsMode === undefined ? {} : { pathsMode }),
     siteLanguage,
     mode,
     dig,
