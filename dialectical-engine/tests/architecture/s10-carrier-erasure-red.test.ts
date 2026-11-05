@@ -259,6 +259,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Debate shape (0117): the map repository seals and reads core.map_item / core.map_choice inside withRunContentLease.
       "packages/map/src/repository.ts",
       "packages/memory/src/index.ts",
+      // V4 start step (Task 57): a path's findings show each found point's own words, opened under the debate's run key inside
+      // withRunContentLease (prepareLeasedContentEncryptionForRun), as the served answer opens its nodes; nothing else is opened.
+      "packages/serve/src/branches.ts",
       "packages/serve/src/index.ts",
       // The publication review (0127) seals the review copy and the decision reason.
       "packages/serve/src/publication-review.ts",

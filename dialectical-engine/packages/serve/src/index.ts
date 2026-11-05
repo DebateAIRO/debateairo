@@ -106,6 +106,8 @@ export * from "./web-sources.js";
 export * from "./dig-suggestions.js";
 // Dig-model revision W4-5: each path's rewrites by digs, and a dig's own `dig`, as the answer serves them.
 export * from "./path-rewrites.js";
+// V4 start step, Task 57: a path debate's paths and each path's progress, read from the stored paths, roots, outcomes and marks.
+export * from "./branches.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.

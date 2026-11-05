@@ -1486,6 +1486,7 @@ packages/scorecard/src/picker.ts
 packages/scorecard/src/plan-caps.ts
 packages/scorecard/src/role-rotation.ts
 packages/scorecard/src/schema.ts
+packages/serve/src/branches.ts
 packages/serve/src/dig-suggestions.ts
 packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
