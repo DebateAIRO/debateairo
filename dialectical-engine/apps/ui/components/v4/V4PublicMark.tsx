@@ -64,6 +64,10 @@ export function V4CopyLink({ href, catalog, className = "v4Link" }: Readonly<{ h
   const side = useOpenSide(button, copy !== "IDLE");
   const press = async (): Promise<void> => {
     const url = new URL(href, window.location.origin).toString();
+    // The owner's answer to question 35 (5 Nov, A, "in both places"): "Link copied." stays until the next press, and that
+    // press clears it first, so a second "Link copied." is a new line the status region reads out again (setting the same
+    // words twice changes nothing, and a screen reader says nothing). The report page's Share line does the same.
+    setCopy("IDLE");
     const outcome = await shareOrCopy(url);
     setCopy(outcome === "SHARED" ? "IDLE" : outcome);
   };
