@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Maksas plāni",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine piedāvā bezmaksas plānu. Būs pieejams maksas Premium plāns, kas nodrošina piekļuvi pilnam modeļu klāstam un ļauj jums pašam iestatīt debašu parametrus." },
+      { kind: "p", text: "Dialectical Engine piedāvā bezmaksas plānu. Būs pieejami trīs maksas plāni, Plus, Pro un Max; katrs no tiem nodrošina piekļuvi pilnam modeļu klāstam un ļauj jums pašam iestatīt debašu parametrus." },
       { kind: "p", text: "Pirms maksājuma veikšanas tieši virs maksājuma pogas mēs parādām: plānu; kopējo cenu ar piemērojamiem nodokļiem; norēķinu periodu; to, ka plāns tiek automātiski atjaunots līdz atcelšanai; datumu, kad beidzas bezmaksas izmēģinājums, un pēc tam iekasējamo summu; un atcelšanas kārtību. Jūs apstiprināt atjaunošanas noteikumus, atzīmējot atsevišķu izvēles rūtiņu. Uz pogas ir teksts Abonēt un maksāt (rumāņu valodā Abonați-vă și plătiți). Mēs nosūtām jums apstiprinājumu pastāvīgā informācijas nesējā, kurā ietverta tā pati informācija, šie Noteikumi un atteikuma veidlapa." },
       { kind: "p", text: "Atgādinājumi. Mēs jums nosūtām e-pasta ziņojumu vismaz 5 dienas pirms bezmaksas izmēģinājuma pārvēršanas maksas plānā; vismaz reizi gadā attiecībā uz plāniem, kas turpinās; un 30 līdz 45 dienas pirms jebkādas divpadsmit mēnešu vai ilgāka termiņa atjaunošanas. Katrā atgādinājumā ir norādīti cena, datums un atcelšanas saite." },
       { kind: "p", text: "Atcelšana. Abonementu varat atcelt jebkurā laikā sadaļā Iestatījumi → Abonements ar vienu apstiprinājuma klikšķi vai atcelšanas lapā dezbatere.ro/cancel, kurā nav jāpierakstās. Atcelšana stājas spēkā pašreizējā norēķinu perioda beigās, un līdz tam jūs saglabājat piekļuvi. Mēs nepadarīsim atcelšanu sarežģītāku par abonēšanu." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Maksājumu veidi. Jūs maksājat ar karti. Mēs pieņemam Visa un Mastercard kartes; American Express kartes mēs nepieņemam. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com), un pilns jūsu kartes numurs nekad nenonāk pie mums." },
       { kind: "p", text: "Piegāde. Dialectical Engine ir tiešsaistes pakalpojums, tāpēc jums nekas netiek nosūtīts. Jūsu maksas plāna funkcijas jūsu kontā ir pieejamas, tiklīdz maksājums ir apstiprināts." },
       { kind: "p", text: "Maksājumu apstrīdēšana. Ja apstrīdat maksājumu pie savas kartes izdevēja, mēs varam apturēt maksas funkcijas, kamēr strīds tiek atrisināts. Par to mēs neiekasējam maksu." },
-      { kind: "p", text: "Vispirms likumā noteiktās tiesības. Ja pakalpojums neatbilst mūsu solītajam, jums ir tiesības panākt tā atbilstību vai saņemt samērīgu cenas samazinājumu vai atmaksu, kā noteikts tiesību aktos. Papildus tam, ja jūs maksas plānu izbeidzat norēķinu perioda laikā, mēs atmaksājam to perioda cenas daļu, kuru neesat izmantojis, mērot pēc plāna lietojuma, neatkarīgi no tā, cik dienu ir pagājis: ja esat izmantojis 30 %, mēs atmaksājam 70 %; ja neesat izmantojis neko, mēs atmaksājam pilnu cenu. Atmaksu varat pieprasīt, rakstot uz support@dezbatere.ro; kad atmaksa ir veikta, plāns beidzas. Ja piemēro arī 13. sadaļā noteiktās atteikuma tiesības, jūs saņemat lielāko no abām atmaksām. Abu plānu lietošanas ierobežojumi ir publicēti produktā; mēs jūs brīdinām, pirms tos pastiprinām tādā veidā, kas jūs būtiski ietekmē." }
+      { kind: "p", text: "Vispirms likumā noteiktās tiesības. Ja pakalpojums neatbilst mūsu solītajam, jums ir tiesības panākt tā atbilstību vai saņemt samērīgu cenas samazinājumu vai atmaksu, kā noteikts tiesību aktos. Papildus tam, ja jūs maksas plānu izbeidzat norēķinu perioda laikā, mēs atmaksājam to perioda cenas daļu, kuru neesat izmantojis, mērot pēc plāna lietojuma, neatkarīgi no tā, cik dienu ir pagājis: ja esat izmantojis 30 %, mēs atmaksājam 70 %; ja neesat izmantojis neko, mēs atmaksājam pilnu cenu. Atmaksu varat pieprasīt, rakstot uz support@dezbatere.ro; kad atmaksa ir veikta, plāns beidzas. Ja piemēro arī 13. sadaļā noteiktās atteikuma tiesības, jūs saņemat lielāko no abām atmaksām. Visu plānu lietošanas ierobežojumi ir publicēti produktā; mēs jūs brīdinām, pirms tos pastiprinām tādā veidā, kas jūs būtiski ietekmē." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pakalpojuma izmaiņas. Mēs nepārtraukti attīstām Dialectical Engine, un kārtējie uzlabojumi, labojumi un modeļu klāsta izmaiņas notiek bez iepriekšēja paziņojuma. Ja veicam izmaiņas, kas pārsniedz pakalpojuma darbības uzturēšanu atbilstoši aprakstam, mēs to darām tikai kāda no šiem iemesliem dēļ: lai izpildītu juridisku vai regulatīvu prasību; reaģētu uz drošības vai ļaunprātīgas izmantošanas problēmu; jo modeļa pakalpojumu sniedzējs maina, ierobežo vai atsauc modeli vai funkciju, no kuras esam atkarīgi; lai pielāgotos tehniskai videi, kuru nekontrolējam; vai lai pievienotu, uzlabotu vai izbeigtu funkciju tādā veidā, kas jums nerada izmaksas." },
       { kind: "p", text: "Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu 30 dienu laikā pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu." },
       { kind: "p", text: "Šo Noteikumu izmaiņas. Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz 30 dienu iepriekš nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versija 2.16 aizstāja versiju 2.15: 12. sadaļā nosaukti maksas plāni, Plus, Pro un Max, un 12. un 15. sadaļā vairs nav sagatavošanas piezīmju; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās." },
       { kind: "p", text: "Versija 2.15 aizstāja versiju 2.14: 12. sadaļā teikts, ka mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN, un ka nodoklis tiek pievienots norēķinu laikā." },
       { kind: "p", text: "Versija 2.14 aizstāja versiju 2.13: 18. sadaļā un A pielikumā kā alternatīvas strīdu izšķiršanas ceļš norādīta ANPC (SAL)." },
       { kind: "p", text: "Versija 2.13 aizstāja versiju 2.12: 12. sadaļā norādīts maksājuma pogas uzraksts rumāņu valodā." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ko mēs neierobežojam. Nekas šajos Noteikumos neizslēdz un neierobežo mūsu atbildību par nāvi vai miesas bojājumiem, ko izraisījusi mūsu nolaidība, par krāpšanu vai krāpniecisku sagrozīšanu, par rupju neuzmanību vai tīšu pārkāpumu vai par jebko citu, ko likumīgi nevar ierobežot. Ja esat patērētājs, nekas šeit neatceļ jūsu likumā noteiktās tiesības, tostarp tiesības panākt neatbilstoša pakalpojuma atbilstību vai saņemt cenas samazinājumu vai atmaksu, vai jebkādu garantiju, kas piemērojama saskaņā ar jūsu dzīvesvietas valsts tiesību aktiem." },
       { kind: "p", text: "Ģenerētais saturs. Pakalpojums sagatavo materiālu jūsu vērtējumam, nevis secinājumus, pēc kuriem varat rīkoties bez pārbaudes, un 5. sadaļā tas ir skaidri norādīts. Ievērojot iepriekšējo rindkopu, mēs neatbildam par lēmumiem, kurus pieņemat, pamatojoties uz ģenerētajiem argumentiem, vērtējumiem vai spriedumiem, ja neesat veicis 5. sadaļā aprakstītos saprātīgos pārbaudes pasākumus." },
       { kind: "p", text: "Jūsu saturs un lietošana. Jūs atbildat par iesniegto un publicēto, tostarp par tiesībām to iesniegt un 7. sadaļas ievērošanu." },
-      { kind: "p", text: "Notikumi ārpus mūsu kontroles. Mēs nepārkāpjam līgumu, ja kaut kas ārpus mūsu saprātīgas kontroles liedz mums to izpildīt. Trešās personas modeļa pakalpojumu sniedzēja kļūme vai pakalpojuma atsaukšana automātiski nav šāds notikums; ja tās dēļ pakalpojums kļūst nepieejams, piemēro 14. sadaļu, un jūs varat izbeigt līgumu un saņemt tajā aprakstīto atmaksu." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Notikumi ārpus mūsu kontroles. Mēs nepārkāpjam līgumu, ja kaut kas ārpus mūsu saprātīgas kontroles liedz mums to izpildīt. Trešās personas modeļa pakalpojumu sniedzēja kļūme vai pakalpojuma atsaukšana automātiski nav šāds notikums; ja tās dēļ pakalpojums kļūst nepieejams, piemēro 14. sadaļu, un jūs varat izbeigt līgumu un saņemt tajā aprakstīto atmaksu." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "aa8b53620edc3a5bf6d9b20f30a980953b7a5256f522cc2f58a8d5cb819cf488",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.15 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
+  version: "2.16",
+  sha256: "69c4c50f3f97042fa458169c6c924393c5316836ba365456ad9f664f616880cf",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.16 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v2.15",
+  endMarker: "NOTEIKUMU BEIGAS · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

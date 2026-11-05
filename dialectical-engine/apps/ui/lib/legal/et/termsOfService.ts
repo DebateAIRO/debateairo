@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tasulised paketid",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline Premium-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata." },
+      { kind: "p", text: "Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval kolm tasulist paketti, Plus, Pro ja Max; igaüks neist annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata." },
       { kind: "p", text: "Enne maksmist näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri Tellige ja makske (rumeenia keeles Abonați-vă și plătiți). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi." },
       { kind: "p", text: "Meeldetuletused. Saadame teile e-kirja vähemalt 5 päeva enne tasuta prooviperioodi muutumist tasuliseks paketiks; jätkuvate pakettide puhul vähemalt kord aastas; ning 30–45 päeva enne vähemalt kaheteistkuulise tähtaja uuendamist. Igas meeldetuletuses on hind, kuupäev ja tühistamislink." },
       { kind: "p", text: "Tühistamine. Tühistage igal ajal menüüs Seaded → Tellimus ühe kinnitava klõpsuga või tühistamislehel aadressil dezbatere.ro/cancel, kuhu sisenemiseks ei ole vaja sisse logida. Tühistamine jõustub jooksva arveldusperioodi lõpus ja juurdepääs säilib selle ajani. Me ei muuda tühistamist keerulisemaks kui tellimist." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Makseviisid. Maksate kaardiga. Aktsepteerime Visa ja Mastercardi kaarte; American Expressi kaarte me ei aktsepteeri. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com) ja teie kaardi täielik number ei jõua kunagi meieni." },
       { kind: "p", text: "Tarnimine. Dialectical Engine on veebiteenus, seega teile midagi ei saadeta. Teie tasulise paketi funktsioonid on teie kontol kasutatavad kohe, kui makse on kinnitatud." },
       { kind: "p", text: "Makse tagasinõuded. Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu." },
-      { kind: "p", text: "Seadusest tulenevad õigused on esikohal. Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab." }
+      { kind: "p", text: "Seadusest tulenevad õigused on esikohal. Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Kõigi pakettide kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Teenuse muudatused. Arendame Dialectical Engine-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu." },
       { kind: "p", text: "Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada 30 päeva jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa." },
       { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versioon 2.16 asendas versiooni 2.15: jaotis 12 nimetab tasulised paketid, Plus, Pro ja Max, ning jaotistes 12 ja 15 ei ole enam koostamismärkusi; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata." },
       { kind: "p", text: "Versioon 2.15 asendas versiooni 2.14: jaotis 12 ütleb, et meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks, ja et maks lisatakse kassas." },
       { kind: "p", text: "Versioon 2.14 asendas versiooni 2.13: jaotis 18 ja lisa A nimetavad vaidluste kohtuvälise lahendamise teeks ANPC (SAL)." },
       { kind: "p", text: "Versioon 2.13 asendas versiooni 2.12: jaotis 12 esitab maksenupu rumeeniakeelse teksti." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Mida me ei piira. Miski neis Tingimustes ei välista ega piira meie vastutust meie hooletusest põhjustatud surma või kehavigastuse eest, pettuse või petturliku valeandmete esitamise eest, raske hooletuse või tahtliku rikkumise eest ega muu eest, mida ei saa seaduslikult piirata. Kui olete tarbija, ei kõrvalda miski siin teie seadusest tulenevaid õigusi, sealhulgas õigust nõuda mittevastava teenuse vastavusse viimist või hinnaalandust või tagasimakset ega ühtki teie elukohariigi õiguse alusel kohaldatavat garantiid." },
       { kind: "p", text: "Loodud sisu. Teenus loob materjali, mida peate ise hindama, mitte järeldusi, mille alusel saab kontrollimata tegutseda, ja jaotises 5 on see selgelt öeldud. Kui eespool esitatud lõikest ei tulene teisiti, ei vastuta me otsuste eest, mille teete loodud argumentide, hinnete või otsuste põhjal, kui te ei ole võtnud nende kontrollimiseks jaotises 5 kirjeldatud mõistlikke meetmeid." },
       { kind: "p", text: "Teie sisu ja kasutus. Vastutate selle eest, mida esitate ja avaldate, sealhulgas selle esitamise õiguse olemasolu ja jaotise 7 järgimise eest." },
-      { kind: "p", text: "Meie kontrolli alt väljas olevad sündmused. Me ei riku lepingut, kui meid takistab kohustust täitmast miski, mis ei allu mõistlikult meie kontrollile. Kolmandast isikust mudelipakkuja rikkumine või teenusest loobumine ei ole automaatselt selline sündmus; kui see muudab teenuse kättesaamatuks, kohaldatakse jaotist 14 ning võite seal kirjeldatud viisil lepingu lõpetada ja saada tagasimakse." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Meie kontrolli alt väljas olevad sündmused. Me ei riku lepingut, kui meid takistab kohustust täitmast miski, mis ei allu mõistlikult meie kontrollile. Kolmandast isikust mudelipakkuja rikkumine või teenusest loobumine ei ole automaatselt selline sündmus; kui see muudab teenuse kättesaamatuks, kohaldatakse jaotist 14 ning võite seal kirjeldatud viisil lepingu lõpetada ja saada tagasimakse." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "7c198c21903e158c37336185c3e8d0a92aa7286bd0be880f5e59cc66d3106c7a",
-  eyebrow: "TEENUSETINGIMUSED · v2.15 · KEHTIB ALATES 1. NOVEMBRIST 2026",
+  version: "2.16",
+  sha256: "aebb73b2dda22b6278452b67a387291d9e1283673da41324b65f98fea7de61b4",
+  eyebrow: "TEENUSETINGIMUSED · v2.16 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.15",
+  endMarker: "TINGIMUSTE LÕPP · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

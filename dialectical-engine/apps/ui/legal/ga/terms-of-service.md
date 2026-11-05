@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.15 · I bhFEIDHM 1 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.16 · I bhFEIDHM 1 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.15
+endMarker: DEIREADH NA dTÉARMAÍ · v2.16
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.15 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.16 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -211,9 +211,7 @@ Maireann rannáin 8 (a mhéid a bhaineann le hábhar a foilsíodh cheana), 15, 1
 
 ## 12. Pleananna íoctha
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Cuireann Dialectical Engine plean saor in aisce ar fáil. Beidh plean íoctha **Préimh** ar fáil, a dhíghlasálann liosta iomlán na samhlacha agus a ligeann duit rialtáin na díospóireachta a shocrú tú féin.
+Cuireann Dialectical Engine plean saor in aisce ar fáil. Beidh trí phlean íoctha ar fáil, **Plus**, **Pro** agus **Max**; díghlasálann gach ceann acu liosta iomlán na samhlacha agus ligeann sé duit rialtáin na díospóireachta a shocrú tú féin.
 
 **Sula n-íocann tú** taispeánaimid duit, díreach os cionn an chnaipe íocaíochta: an plean; an praghas iomlán lena n-áirítear an cháin is infheidhme; an tréimhse bhilleála; go n-athnuaitear an plean go huathoibríoch go dtí go gcealaítear é; an dáta a chríochnaíonn aon triail saor in aisce agus an méid a ghearrfar ort ansin; agus conas cealú. Deimhníonn tú na téarmaí athnuachana trí bhosca ar leith a thiceáil. Léitear **Liostáil agus íoc** ar an gcnaipe (sa Rómáinis, *Abonați-vă și plătiți*). Seolaimid deimhniú chugat ar mheán marthanach ina bhfuil an fhaisnéis chéanna, na Téarmaí seo, agus an fhoirm um tharraingt siar.
 
@@ -233,7 +231,7 @@ Ní thagann **athruithe praghais** i bhfeidhm ach tráth athnuachana. Tugaimid f
 
 **Aisghairmeacha íocaíochta.** Má dhéanann tú agóid i gcoinne muirir le d'eisitheoir cárta, féadfaimid gnéithe íoctha a chur ar fionraí fad a réitítear an díospóid. Ní ghearraimid táillí as seo.
 
-**Cearta reachtúla ar dtús.** Sa chás nach gcomhlíonann an tseirbhís an méid a gheallamar, tá tú i dteideal go dtabharfaí chun comhréireachta í, nó go bhfaighfeá laghdú comhréireach ar an bpraghas nó aisíocaíocht, de réir mar a fhoráiltear sa dlí. Thairis sin, má chuireann tú plean íoctha ar ceal i rith tréimhse bhilleála, aisíocaimid duit an chuid de phraghas na tréimhse sin nár úsáid tú, arna tomhas de réir úsáide an phlean, is cuma cé mhéad lá atá caite: má úsáid tú 30% di, aisíocaimid 70%; mura bhfuil aon chuid di úsáidte agat, aisíocaimid an praghas iomlán. Iarr é ag support@dezbatere.ro; chomh luath agus a aisíocaimid, tagann deireadh leis an bplean. Má bhaineann an ceart tarraingthe siar i rannán 13 leis freisin, gheobhaidh tú cibé aisíocaíocht is mó. Foilsítear teorainneacha úsáide ar cheachtar plean sa táirge; tugaimid fógra sula ndéanaimid níos déine iad ar bhealach a théann i bhfeidhm go hábhartha ort.
+**Cearta reachtúla ar dtús.** Sa chás nach gcomhlíonann an tseirbhís an méid a gheallamar, tá tú i dteideal go dtabharfaí chun comhréireachta í, nó go bhfaighfeá laghdú comhréireach ar an bpraghas nó aisíocaíocht, de réir mar a fhoráiltear sa dlí. Thairis sin, má chuireann tú plean íoctha ar ceal i rith tréimhse bhilleála, aisíocaimid duit an chuid de phraghas na tréimhse sin nár úsáid tú, arna tomhas de réir úsáide an phlean, is cuma cé mhéad lá atá caite: má úsáid tú 30% di, aisíocaimid 70%; mura bhfuil aon chuid di úsáidte agat, aisíocaimid an praghas iomlán. Iarr é ag support@dezbatere.ro; chomh luath agus a aisíocaimid, tagann deireadh leis an bplean. Má bhaineann an ceart tarraingthe siar i rannán 13 leis freisin, gheobhaidh tú cibé aisíocaíocht is mó. Foilsítear teorainneacha úsáide ar gach plean sa táirge; tugaimid fógra sula ndéanaimid níos déine iad ar bhealach a théann i bhfeidhm go hábhartha ort.
 
 ## 13. Do cheart tarraingt siar
 
@@ -250,6 +248,8 @@ Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tar
 Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de **30 lá** tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh.
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
+
+Tháinig leagan 2.16 in ionad leagan 2.15: ainmníonn rannán 12 na pleananna íoctha, Plus, Pro agus Max, agus níl nótaí dréachtaithe i rannáin 12 agus 15 a thuilleadh; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo.
 
 Tháinig leagan 2.15 in ionad leagan 2.14: deir rannán 12 go dtaispeántar ár bpraghsanna gan cháin, mar phraghas + CBL, agus go gcuirtear an cháin leo ag an tseiceáil amach.
 
@@ -278,8 +278,6 @@ Tháinig leagan 2.7 in ionad leagan 2.6: cuireann sé an tseiceáil ceiste leis,
 **D'ábhar agus d'úsáid.** Tá tú freagrach as an méid a chuireann tú isteach agus a fhoilsíonn tú, lena n-áirítear an ceart a bheith agat é a chur isteach agus rannán 7 a chomhlíonadh.
 
 **Teagmhais lasmuigh dár smacht.** Ní bhíonn sárú déanta againn nuair a chuireann rud atá lasmuigh dár smacht réasúnta cosc orainn feidhmiú. Ní teagmhas den sórt sin go huathoibríoch é teip nó tarraingt siar soláthraí samhla tríú páirtí; nuair a fhágann sé nach bhfuil an tseirbhís ar fáil, tá feidhm ag rannán 14 agus féadfaidh tú foirceannadh agus aisíocaíocht a fháil mar a thuairiscítear ann.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Maoin intleachtúil
 

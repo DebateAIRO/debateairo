@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.15 · BERLAKU 1 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.16 · BERLAKU 1 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.15
+endMarker: AKHIR KETENTUAN · v2.16
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.15 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.16 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -211,9 +211,7 @@ Bagian 8 (terkait konten yang telah dipublikasikan), 15, 16, dan 18 tetap berlak
 
 ## 12. Paket berbayar
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan tersedia, yang membuka seluruh daftar model dan memungkinkan Anda menetapkan sendiri indikator debat.
+Dialectical Engine menawarkan paket gratis. Tiga paket berbayar, **Plus**, **Pro**, dan **Max**, akan tersedia; masing-masing membuka seluruh daftar model dan memungkinkan Anda menetapkan sendiri indikator debat.
 
 **Sebelum Anda membayar**, tepat di atas tombol pembayaran kami menampilkan: paket; harga total termasuk pajak yang berlaku; periode penagihan; bahwa paket diperpanjang secara otomatis hingga dibatalkan; tanggal berakhirnya uji coba gratis dan jumlah yang selanjutnya akan ditagihkan kepada Anda; serta cara membatalkan. Anda mengonfirmasi ketentuan perpanjangan dengan mencentang kotak terpisah. Tombol tersebut bertuliskan **Berlangganan dan bayar** (dalam bahasa Rumania, *Abonați-vă și plătiți*). Kami mengirimkan kepada Anda konfirmasi pada media tahan lama yang memuat informasi yang sama, Ketentuan ini, dan formulir penarikan diri.
 
@@ -233,7 +231,7 @@ Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan ters
 
 **Sanggahan transaksi.** Jika Anda menyanggah suatu tagihan kepada penerbit kartu, kami dapat menangguhkan fitur berbayar selama sengketa diselesaikan. Kami tidak mengenakan biaya untuk hal ini.
 
-**Hak berdasarkan undang-undang didahulukan.** Jika layanan tidak sesuai dengan yang kami janjikan, Anda berhak agar layanan dibuat sesuai, atau menerima pengurangan harga maupun pengembalian dana yang proporsional, sebagaimana ditentukan hukum. Di luar itu, jika Anda membatalkan paket berbayar selama periode penagihan, kami mengembalikan dana sebesar bagian harga periode itu yang belum Anda gunakan, diukur dari penggunaan paket, berapa pun hari yang telah berlalu: jika Anda telah menggunakan 30%, kami mengembalikan 70%; jika Anda belum menggunakan sama sekali, kami mengembalikan harga penuh. Ajukan permintaan ke support@dezbatere.ro; begitu kami mengembalikan dana, paket berakhir. Jika hak penarikan diri dalam bagian 13 juga berlaku, Anda menerima pengembalian dana yang lebih besar di antara keduanya. Batas penggunaan untuk kedua paket dipublikasikan dalam produk; kami memberi tahu Anda sebelum memperketat batas tersebut dengan cara yang berdampak material bagi Anda.
+**Hak berdasarkan undang-undang didahulukan.** Jika layanan tidak sesuai dengan yang kami janjikan, Anda berhak agar layanan dibuat sesuai, atau menerima pengurangan harga maupun pengembalian dana yang proporsional, sebagaimana ditentukan hukum. Di luar itu, jika Anda membatalkan paket berbayar selama periode penagihan, kami mengembalikan dana sebesar bagian harga periode itu yang belum Anda gunakan, diukur dari penggunaan paket, berapa pun hari yang telah berlalu: jika Anda telah menggunakan 30%, kami mengembalikan 70%; jika Anda belum menggunakan sama sekali, kami mengembalikan harga penuh. Ajukan permintaan ke support@dezbatere.ro; begitu kami mengembalikan dana, paket berakhir. Jika hak penarikan diri dalam bagian 13 juga berlaku, Anda menerima pengembalian dana yang lebih besar di antara keduanya. Batas penggunaan untuk setiap paket dipublikasikan dalam produk; kami memberi tahu Anda sebelum memperketat batas tersebut dengan cara yang berdampak material bagi Anda.
 
 ## 13. Hak Anda untuk menarik diri
 
@@ -250,6 +248,8 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.16 menggantikan versi 2.15: bagian 12 menyebutkan paket berbayar, yaitu Plus, Pro, dan Max, dan bagian 12 dan 15 tidak lagi memuat catatan penyusunan; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah.
 
 Versi 2.15 menggantikan versi 2.14: bagian 12 menyatakan bahwa harga kami ditampilkan sebelum pajak, sebagai harga + PPN, dan bahwa pajak ditambahkan di halaman pembayaran.
 
@@ -278,8 +278,6 @@ Versi 2.7 menggantikan versi 2.6: versi ini menambahkan pemeriksaan pertanyaan, 
 **Konten dan penggunaan Anda.** Anda bertanggung jawab atas hal yang Anda kirimkan dan publikasikan, termasuk memastikan Anda memiliki hak untuk mengirimkannya serta mematuhi bagian 7.
 
 **Peristiwa di luar kendali kami.** Kami tidak dianggap melakukan pelanggaran jika sesuatu di luar kendali wajar kami menghalangi pelaksanaan kewajiban kami. Kegagalan atau penarikan oleh penyedia model pihak ketiga tidak secara otomatis merupakan peristiwa tersebut; jika hal itu menyebabkan layanan tidak tersedia, bagian 14 berlaku dan Anda dapat mengakhiri layanan serta menerima pengembalian dana sebagaimana dijelaskan di dalamnya.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Kekayaan intelektual
 

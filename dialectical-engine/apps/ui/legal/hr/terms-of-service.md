@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.15 · NA SNAZI OD 1. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.16 · NA SNAZI OD 1. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.15
+endMarker: KRAJ UVJETA · v2.16
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.15 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.16 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -211,9 +211,7 @@ Odjeljci 8. (u odnosu na već objavljeni sadržaj), 15., 16. i 18. nastavljaju s
 
 ## 12. Plaćeni planovi
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium**, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
+Dialectical Engine nudi besplatni plan. Bit će dostupna tri plaćena plana, **Plus**, **Pro** i **Max**; svaki od njih otključat će cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
 
 **Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Abonați-vă și plătiți*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
 
@@ -233,7 +231,7 @@ Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium
 
 **Osporavanje kartičnih transakcija.** Ako osporite terećenje kod izdavatelja kartice, možemo suspendirati plaćene značajke dok se spor ne riješi. Za to ne naplaćujemo naknade.
 
-**Zakonska prava imaju prednost.** Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za oba plana objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas.
+**Zakonska prava imaju prednost.** Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za sve planove objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas.
 
 ## 13. Vaše pravo na odustanak
 
@@ -250,6 +248,8 @@ Ako živite drugdje, Prilog A navodi pravo na odustanak ili razdoblje za odustan
 Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od **30 dana** od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje.
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
+
+Verzija 2.16 zamijenila je verziju 2.15: odjeljak 12. navodi plaćene planove, Plus, Pro i Max, a odjeljci 12. i 15. više ne sadrže napomene iz izrade nacrta; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni.
 
 Verzija 2.15 zamijenila je verziju 2.14: odjeljak 12. navodi da su naše cijene prikazane bez poreza, kao cijena + PDV, i da se porez dodaje na naplati.
 
@@ -278,8 +278,6 @@ Verzija 2.7 zamijenila je verziju 2.6: dodaje provjeru pitanja, koja čita svako
 **Vaš sadržaj i vaša uporaba.** Odgovorni ste za ono što šaljete i objavljujete, uključujući to da imate pravo to poslati i da postupate u skladu s odjeljkom 7.
 
 **Događaji izvan naše kontrole.** Ne kršimo ugovor ako nas u ispunjavanju sprječava nešto izvan naše razumne kontrole. Propust ili povlačenje pružatelja modela treće strane nije automatski takav događaj; ako zbog toga usluga postane nedostupna, primjenjuje se odjeljak 14. te možete raskinuti ugovor i dobiti povrat kako je u njemu opisano.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Intelektualno vlasništvo
 

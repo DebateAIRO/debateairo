@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.15 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.16 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.15
+endMarker: FIN DE LOS TÉRMINOS · v2.16
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.15 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.16 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. En el plan gratuito, sus debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que los publique. Una vez públicos, cualquiera puede leer un debate, y sigue siendo público. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -211,9 +211,7 @@ Las secciones 8 (respecto del contenido ya publicado), 15, 16 y 18 seguirán vig
 
 ## 12. Planes de pago
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine ofrece un plan gratuito. Un plan de pago **Premium** estará disponible, que desbloquea toda la selección de modelos y le permite configurar usted mismo los parámetros del debate.
+Dialectical Engine ofrece un plan gratuito. Estarán disponibles tres planes de pago, **Plus**, **Pro** y **Max**; cada uno desbloquea toda la selección de modelos y le permite configurar usted mismo los parámetros del debate.
 
 **Antes de que pague**, le mostramos, justo encima del botón de pago: el plan; el precio total con los impuestos aplicables; el período de facturación; que el plan se renueva automáticamente hasta que se cancele; la fecha en que finaliza cualquier prueba gratuita y el importe que se le cobrará entonces; y cómo cancelar. Usted confirma las condiciones de renovación marcando una casilla aparte. El botón indica **Suscribirse y pagar** (en rumano, *Abonați-vă și plătiți*). Le enviamos una confirmación en un soporte duradero que contiene la misma información, estos Términos y el formulario de desistimiento.
 
@@ -233,7 +231,7 @@ Dialectical Engine ofrece un plan gratuito. Un plan de pago **Premium** estará 
 
 **Contracargos.** Si impugna un cargo ante el emisor de su tarjeta, podemos suspender las funciones de pago mientras se resuelve la controversia. No cobramos comisiones por ello.
 
-**Primero, los derechos legales.** Cuando el servicio no sea conforme con lo que prometimos, tendrá derecho a que se restablezca su conformidad o a una reducción proporcional del precio o un reembolso, según disponga la ley. Además de lo anterior, si cancela un plan de pago durante un período de facturación, le reembolsamos la parte del precio de ese período que no haya utilizado, medida según el uso del plan, con independencia de cuántos días hayan pasado: si ha utilizado el 30 %, le reembolsamos el 70 %; si no ha utilizado nada, le reembolsamos el precio íntegro. Solicítelo en support@dezbatere.ro; una vez efectuado el reembolso, el plan finaliza. Si además se aplica el derecho de desistimiento de la sección 13, recibirá el reembolso que sea mayor. Los límites de uso de cada plan se publican en el producto; le avisaremos antes de endurecerlos de una manera que le afecte sustancialmente.
+**Primero, los derechos legales.** Cuando el servicio no sea conforme con lo que prometimos, tendrá derecho a que se restablezca su conformidad o a una reducción proporcional del precio o un reembolso, según disponga la ley. Además de lo anterior, si cancela un plan de pago durante un período de facturación, le reembolsamos la parte del precio de ese período que no haya utilizado, medida según el uso del plan, con independencia de cuántos días hayan pasado: si ha utilizado el 30 %, le reembolsamos el 70 %; si no ha utilizado nada, le reembolsamos el precio íntegro. Solicítelo en support@dezbatere.ro; una vez efectuado el reembolso, el plan finaliza. Si además se aplica el derecho de desistimiento de la sección 13, recibirá el reembolso que sea mayor. Los límites de uso de todos los planes se publican en el producto; le avisaremos antes de endurecerlos de una manera que le afecte sustancialmente.
 
 ## 13. Su derecho de desistimiento
 
@@ -250,6 +248,8 @@ Si vive en otro lugar, el anexo A indica el derecho de desistimiento o período 
 Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuándo. Si el cambio tiene un efecto negativo que no sea menor sobre su acceso al servicio o su uso, podrá resolver el contrato sin coste alguno en un plazo de **30 días** desde que se le informe o desde que el cambio surta efecto, si esta fecha es posterior, y le reembolsaremos cualquier importe pagado por adelantado correspondiente al período no utilizado.
 
 **En estos Términos.** Podemos modificar estos Términos por los mismos tipos de motivos. Para los cambios que no reduzcan sus derechos, publicaremos la nueva versión con un resumen de las modificaciones y le enviaremos un correo electrónico al menos **30 días** antes de que entre en vigor; si continúa utilizando Dialectical Engine después de esa fecha, se entenderá que la acepta, y puede cerrar su cuenta antes de entonces. Para los cambios que reduzcan sus derechos —incluidos aumentos de precio de un plan existente, límites inferiores, funciones retiradas, nuevos usos de su contenido o cambios en la responsabilidad, la ley aplicable o la resolución de controversias—, le pediremos que acepte expresamente la nueva versión la próxima vez que inicie sesión, y el cambio solo se aplicará en lo sucesivo. Nunca aplicamos cambios con carácter retroactivo ni utilizamos esta sección para modificar, durante la vigencia del contrato, la esencia de aquello por lo que ha pagado sin ofrecerle una vía de salida. Las versiones anteriores seguirán disponibles en dezbatere.ro/terms/versions.
+
+La versión 2.16 sustituyó a la versión 2.15: la sección 12 nombra los planes de pago, Plus, Pro y Max, y las secciones 12 y 15 ya no contienen notas de redacción; aquello de lo que respondemos, y cada uno de los derechos de estos Términos, no cambia.
 
 La versión 2.15 sustituyó a la versión 2.14: la sección 12 indica que nuestros precios se muestran sin impuestos, como precio + IVA, y que el impuesto se añade al finalizar la compra.
 
@@ -278,8 +278,6 @@ La versión 2.7 sustituyó a la versión 2.6: añade la comprobación de pregunt
 **Su contenido y su uso.** Usted es responsable de lo que envía y publica, incluido disponer del derecho a enviarlo y cumplir la sección 7.
 
 **Acontecimientos fuera de nuestro control.** No incurrimos en incumplimiento cuando algo ajeno a nuestro control razonable nos impide cumplir. El fallo o la retirada de un proveedor externo de modelos no constituye automáticamente uno de esos acontecimientos; cuando haga que el servicio deje de estar disponible, se aplicará la sección 14 y usted podrá resolver el contrato y recibir un reembolso según allí se describe.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Propiedad intelectual
 

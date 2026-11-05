@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.15 · IN VIGORE DAL 1 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.16 · IN VIGORE DAL 1 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.15
+endMarker: FINE DELLE CONDIZIONI · v2.16
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.15 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.16 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -211,9 +211,7 @@ Le sezioni 8 (per quanto riguarda i contenuti già pubblicati), 15, 16 e 18 cont
 
 ## 12. Piani a pagamento
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine offre un piano gratuito. Sarà disponibile un piano **Premium** a pagamento, che consente di accedere all'intera gamma di modelli e di impostare personalmente i parametri del dibattito.
+Dialectical Engine offre un piano gratuito. Saranno disponibili tre piani a pagamento, **Plus**, **Pro** e **Max**; ciascuno consente di accedere all'intera gamma di modelli e di impostare personalmente i parametri del dibattito.
 
 **Prima che tu paghi**, direttamente sopra il pulsante di pagamento ti mostriamo: il piano; il prezzo totale comprensivo delle imposte applicabili; il periodo di fatturazione; il fatto che il piano si rinnova automaticamente fino alla disdetta; la data di fine di qualsiasi prova gratuita e l'importo che ti sarà successivamente addebitato; e come disdirlo. Confermi le condizioni di rinnovo selezionando una casella separata. Il pulsante reca la dicitura **Abbonati e paga** (in rumeno, *Abonați-vă și plătiți*). Ti inviamo una conferma su un supporto durevole contenente le stesse informazioni, le presenti Condizioni e il modulo di recesso.
 
@@ -233,7 +231,7 @@ Dialectical Engine offre un piano gratuito. Sarà disponibile un piano **Premium
 
 **Storni.** Se contesti un addebito presso l'emittente della tua carta, possiamo sospendere le funzionalità a pagamento mentre la controversia viene risolta. Non addebitiamo commissioni a tale titolo.
 
-**Prevalenza dei diritti previsti dalla legge.** Qualora il servizio non sia conforme a quanto promesso, hai diritto a ottenerne la conformità oppure a una riduzione proporzionata del prezzo o a un rimborso, come previsto dalla legge. Oltre a ciò, se disdici un piano a pagamento durante un periodo di fatturazione, ti rimborsiamo la quota del prezzo di quel periodo che non hai utilizzato, misurata in base all'utilizzo del piano, indipendentemente dal numero di giorni trascorsi: se ne hai utilizzato il 30%, ti rimborsiamo il 70%; se non ne hai utilizzato nulla, ti rimborsiamo l'intero prezzo. Chiedilo a support@dezbatere.ro; una volta effettuato il rimborso, il piano termina. Se si applica anche il diritto di recesso di cui alla sezione 13, ottieni il rimborso più elevato tra i due. I limiti di utilizzo di ciascun piano sono pubblicati nel prodotto; diamo preavviso prima di renderli più restrittivi in modo tale da incidere significativamente su di te.
+**Prevalenza dei diritti previsti dalla legge.** Qualora il servizio non sia conforme a quanto promesso, hai diritto a ottenerne la conformità oppure a una riduzione proporzionata del prezzo o a un rimborso, come previsto dalla legge. Oltre a ciò, se disdici un piano a pagamento durante un periodo di fatturazione, ti rimborsiamo la quota del prezzo di quel periodo che non hai utilizzato, misurata in base all'utilizzo del piano, indipendentemente dal numero di giorni trascorsi: se ne hai utilizzato il 30%, ti rimborsiamo il 70%; se non ne hai utilizzato nulla, ti rimborsiamo l'intero prezzo. Chiedilo a support@dezbatere.ro; una volta effettuato il rimborso, il piano termina. Se si applica anche il diritto di recesso di cui alla sezione 13, ottieni il rimborso più elevato tra i due. I limiti di utilizzo di tutti i piani sono pubblicati nel prodotto; diamo preavviso prima di renderli più restrittivi in modo tale da incidere significativamente su di te.
 
 ## 13. Il tuo diritto di recesso
 
@@ -250,6 +248,8 @@ Se vivi altrove, l'Allegato A indica il diritto di recesso o il periodo di ripen
 Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. Se la modifica produce un effetto negativo più che minimo sul tuo accesso al servizio o sul suo utilizzo, puoi recedere gratuitamente entro **30 giorni** dalla comunicazione o dall'entrata in vigore della modifica, se successiva, e rimborsiamo qualsiasi importo prepagato per il periodo non utilizzato.
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
+
+La versione 2.16 ha sostituito la versione 2.15: la sezione 12 indica i piani a pagamento, Plus, Pro e Max, e le sezioni 12 e 15 non contengono più note di redazione; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato.
 
 La versione 2.15 ha sostituito la versione 2.14: la sezione 12 afferma che i nostri prezzi sono indicati al netto delle imposte, come prezzo + IVA, e che l'imposta viene aggiunta al momento del pagamento.
 
@@ -278,8 +278,6 @@ La versione 2.7 ha sostituito la versione 2.6: aggiunge la verifica delle domand
 **I tuoi contenuti e il tuo utilizzo.** Sei responsabile di ciò che invii e pubblichi, anche per quanto riguarda il diritto di inviarlo e il rispetto della sezione 7.
 
 **Eventi al di fuori del nostro controllo.** Non siamo inadempienti quando siamo impossibilitati a eseguire le nostre obbligazioni a causa di un evento al di fuori del nostro ragionevole controllo. L'inadempimento o il ritiro di un fornitore terzo di modelli non costituisce automaticamente un simile evento; se rende indisponibile il servizio, si applica la sezione 14 e puoi recedere e ottenere un rimborso come ivi descritto.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Proprietà intellettuale
 

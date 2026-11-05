@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.15 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.16 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.15
+endMarker: KOŞULLARIN SONU · v2.16
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.15 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.16 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -211,9 +211,7 @@ Hizmeti tamamen kapatırsak veya ülkenizden çekersek en az **30 gün önceden 
 
 ## 12. Ücretli planlar
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir **Premium** plan sunulacaktır.
+Dialectical Engine ücretsiz bir plan sunar. **Plus**, **Pro** ve **Max** adlı ücretli üç plan sunulacaktır; her biri model listesinin tamamının kilidini açar ve tartışma göstergelerini kendiniz belirlemenize olanak tanır.
 
 **Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Abonați-vă și plătiți*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
 
@@ -233,7 +231,7 @@ Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidi
 
 **Ters ibrazlar.** Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız.
 
-**Öncelik kanuni haklardadır.** Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz.
+**Öncelik kanuni haklardadır.** Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Tüm planların kullanım sınırları üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz.
 
 ## 13. Cayma hakkınız
 
@@ -250,6 +248,8 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.16, sürüm 2.15'in yerine geçmiştir: 12. bölüm ücretli planları, yani Plus, Pro ve Max'i adlarıyla belirtir ve 12. ile 15. bölümler artık taslak notları içermez; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir.
 
 Sürüm 2.15, sürüm 2.14'ün yerine geçmiştir: 12. bölüm, fiyatlarımızın vergi hariç olarak, fiyat + KDV şeklinde gösterildiğini ve verginin ödeme sayfasında eklendiğini söyler.
 
@@ -278,8 +278,6 @@ Sürüm 2.7, sürüm 2.6'ün yerine geçmiştir: her soruyu bir tartışma başl
 **İçeriğiniz ve kullanımınız.** Gönderme hakkına sahip olmak ve 7. bölüme uymak dahil, gönderdiklerinizden ve yayımladıklarınızdan siz sorumlusunuz.
 
 **Denetimimiz dışındaki olaylar.** Makul denetimimiz dışındaki bir hususun ifamızı engellediği durumlarda sözleşmeyi ihlal etmiş sayılmayız. Üçüncü taraf bir model sağlayıcısının başarısız olması veya hizmeti geri çekmesi kendiliğinden böyle bir olay sayılmaz; bu durum hizmeti kullanılamaz hâle getirirse 14. bölüm uygulanır ve orada açıklandığı üzere sözleşmeyi sona erdirip geri ödeme alabilirsiniz.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Fikrî mülkiyet
 
