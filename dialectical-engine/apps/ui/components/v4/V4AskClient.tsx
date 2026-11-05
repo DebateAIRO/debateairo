@@ -1,21 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { askQuestionMaxBytes, detectCrisis, type ClarifyQuestion } from "@debateai/contract";
-import { RoomNotice } from "@/components/billing/RoomNotice";
+import { alreadyWaitingShown, RoomNotice } from "@/components/billing/RoomNotice";
 import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4Steps } from "@/components/v4/V4Steps";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
+import { catalogLocale, isLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
 import {
   answersStillAsked, clarifyingQuestions, composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, purposeLinesOfGoal
 } from "@/lib/v4/askText";
 import { limitLine, startShareLine, startsWaitLine, usedUpLine, type MoneyLine } from "@/lib/v4/money";
+import { boxLine, boxOf, boxTyped, type QuestionBox } from "@/lib/v4/questionBox";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   DIG_MODES,
@@ -29,6 +31,7 @@ import {
 import { useAskAgain } from "@/lib/v4/useAskAgain";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
+import { useStartPaths } from "@/lib/v4/useStartPaths";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
 /*
@@ -52,6 +55,11 @@ const SHOWS_KEYS: Readonly<Record<ReadingLevel, string>> = Object.freeze({
 });
 
 type Step = "ask" | "read";
+/**
+ * V4 start step, Task 70b (read-f13, ask-f9): Next's own press. CONSENT while the one-time consent window is open (Next
+ * busy, still reading "Next"), READING for the moment after its yes ("Reading…"), then step 2; a press meanwhile does nothing.
+ */
+type NextPress = "IDLE" | "CONSENT" | "READING";
 
 function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;
@@ -244,8 +252,29 @@ function V4AskForm({
     crisisCountryHint,
     // ASK-8: on D1 the only ask is "Just answer it" (quick), so its room notice describes a quick ask.
     mode: step === "ask" ? "quick" : mode,
-    readingLevel: level
+    readingLevel: level,
+    // V4 start step, Task 70b (ask-f8): a declined consent's line sits right under Next, never at the page's bottom.
+    showDeclinedLine: false
   });
+  // Task 70b (read-d2, read-f14): the question is read once, at Next. `readLine` is the line read then (the step-1 words, tidied
+  // as R22 sends them); step 2's box starts as it (Task 70c), and nothing typed there is read again. Back keeps both.
+  const [readLine, setReadLine] = useState<string | null>(null);
+  const [box, setBox] = useState<QuestionBox>(() => boxOf(""));
+  const boxWords = boxLine(box);
+  const [nextPress, setNextPressState] = useState<NextPress>("IDLE");
+  // The press state as a ref too, so a second press in the same moment (before a re-render) sees the first.
+  const nextPressRef = useRef<NextPress>("IDLE");
+  const setNextPress = useCallback((value: NextPress) => {
+    nextPressRef.current = value;
+    setNextPressState(value);
+  }, []);
+  const pressedLine = useRef<string | null>(null);
+  // Start and "Just answer it" in flight (a ref for the same reason).
+  const startFlight = useRef(false);
+  // Answer Q1 / ask-f8: a declined consent keeps the person on step 1, with one line right under Next.
+  const [declinedAtNext, setDeclinedAtNext] = useState(false);
+  // read-f17: the refusal says one question already waits (shown only while the room notice does not say it).
+  const [refusalWaits, setRefusalWaits] = useState(false);
 
   // Owner 2026-10-29 (Free plan shape): a Free ask carries at most FREE_GOAL_CHOICES_MAX choices; paid plans have no cap.
   // Once Free's cap is reached, only the choices already set can still be changed. What is sent never carries more.
@@ -255,10 +284,10 @@ function V4AskForm({
   const longEnough = trimmed.length >= QUESTION_MIN;
   // ASK-3: a crisis message may be very short; it must still reach the crisis help (V3 enables Start for it).
   const crisisText = ask.flagsCrisis(trimmed);
-  const canGoOn = longEnough || crisisText;
   // Decision 29: the question goes to the small AI only once the person has agreed to the sensitive-data notice, and never in crisis words.
+  // Task 70b: step 2 opens only after that yes, and crisis words never reach it; the clarifying call reads the read line, at once.
   const [consented, setConsented] = useState(false);
-  const clarify = useAskClarify({ active: step === "read" && longEnough, question: trimmed, mayCall: consented && !crisisText });
+  const clarify = useAskClarify({ active: step === "read" && readLine !== null, question: readLine ?? "", mayCall: consented });
   const questions = useMemo(() => (clarify.reply === null ? [] : clarifyingQuestions(clarify.reply)), [clarify.reply]);
   // A changed question: answers that no longer apply are dropped, the moment its new questions arrive.
   useEffect(() => {
@@ -268,10 +297,24 @@ function V4AskForm({
       return answers === current.answers ? current : { ...current, answers };
     });
   }, [clarify.reply, questions]);
-  // The lead-ins are read from `newDebate`, the namespace every language has (v4 is English in all 35 tonight).
-  const composed = useMemo(() => composeQuestion(trimmed, sentGoal, newDebateCatalog), [trimmed, sentGoal, newDebateCatalog]);
-  // "Just answer it" sends the question alone, tidied the same way (so its title is the person's whole words).
+  // Task 70b: the lists too are read once, for the read line (the hook asks nothing again for the same line and starts over
+  // for a new one). What they hold shows on step 2's card (Task 76).
+  useStartPaths({
+    active: step === "read" && readLine !== null && consented,
+    questionLine: readLine ?? "",
+    siteLanguage: catalogLocale(isLocale(locale) ? locale : "en"),
+    readingLevel: level,
+    clarify: purposeLinesOfGoal(sentGoal) ?? null,
+    room: ask.room?.start_step ?? null,
+    freePlan: ask.planIsFree
+  });
+  // The lead-ins are read from `newDebate`, the namespace every language has (v4 is English in all 35 tonight). Step 2 sends its
+  // box's words (the read line and anything typed there) with the answers (Task 76 puts the answers in the box itself).
+  const composed = useMemo(() => composeQuestion(boxWords, sentGoal, newDebateCatalog), [boxWords, sentGoal, newDebateCatalog]);
+  // "Just answer it" sends the question alone, tidied the same way (so its title is the person's whole words); Next reads this line.
   const plain = useMemo(() => composeQuestion(trimmed, EMPTY_GOAL, newDebateCatalog), [trimmed, newDebateCatalog]);
+  const boxLongEnough = boxWords.length >= QUESTION_MIN;
+  const boxCrisis = ask.flagsCrisis(boxWords);
   const sentLine = accepted !== null && accepted.basis === composed ? accepted.text : composed;
   const quickLine = accepted !== null && accepted.basis === plain ? accepted.text : plain;
   const tooLong = byteLength(sentLine) > askQuestionMaxBytes();
@@ -305,13 +348,19 @@ function V4AskForm({
   const quickTooLong = byteLength(quickLine) > askQuestionMaxBytes();
   const reasonKey = trimmed.length === 0 ? "v4.ask.typeFirst" : shortHint ? "v4.ask.tooShort" : quickTooLong ? "v4.ask.tooLong" : null;
   const usedUp = usedUpLine(ask.room, locale);
-  const stepOneWhy = [usedUp === null ? null : `${ids}-usedup`, reasonKey === null ? null : `${ids}-why`]
+  // Task 70b (read-f17): while the room notice says one question already waits (sentence D), both buttons wait, described by it.
+  const waitingShown = alreadyWaitingShown(ask.room);
+  const stepOneWhy = [usedUp === null ? null : `${ids}-usedup`, waitingShown ? `${ids}-room` : null, reasonKey === null ? null : `${ids}-why`]
     .filter((id): id is string => id !== null).join(" ") || undefined;
   const startShare = startShareLine(ask.room);
   const stepOneRoomLines = (
     <>
       <V4MoneyLines lines={startShare === null ? [] : [startShare]} catalog={catalog} />
-      {startsWait === null ? <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} /> : null}
+      {startsWait === null ? (
+        <div id={`${ids}-room`}>
+          <RoomNotice room={ask.room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
+        </div>
+      ) : null}
     </>
   );
   // ask-d1 D: the seed of the map, for a first visit only (signed out, or an account with no debate yet).
@@ -338,6 +387,30 @@ function V4AskForm({
     event.preventDefault();
     void ask.submit(trimmed, "quick", "ask");
   };
+  // ask-d1: the signed-out Next, which Enter presses too (ask-f17).
+  const signInNext = useRef<HTMLAnchorElement>(null);
+
+  // Task 70b (choose-f3, ask-f2, read-f17): what keeps Next and "Just answer it" waiting besides the words and the session:
+  // the plan still being read ("Getting ready…"), new questions waiting for a reset, one question already waiting. Their press
+  // then reads nothing and counts nothing. ask-f3 (4 Nov night): crisis words keep both pressable, with their usual words,
+  // for the help screen alone, whatever else greys them.
+  const planLoading = ask.planState === "LOADING";
+  const stepOneHeld = planLoading || stepTwoWait !== null || waitingShown;
+  const helpFirst = crisisText;
+  const nextGreyed = nextPress !== "IDLE" || (!helpFirst && (!longEnough || busy || sessionUnknown || stepOneHeld));
+  const justGreyed = nextPress !== "IDLE" || (!helpFirst && (!longEnough || busy || quickTooLong || sessionUnknown || stepOneHeld));
+  const gettingReady = planLoading && !helpFirst;
+
+  /** ask-f3: crisis words get the help screen first, whatever their length; nothing else happens (no consent, no AI, no step). */
+  function helpFirstAt(words: string): boolean {
+    return words.length > 0 && detectCrisis(words).crisis && ask.offerCrisisHelp([words]);
+  }
+
+  // ask-f17: Enter presses Next on a computer; a phone (a coarse pointer, read once mounted) keeps its new line.
+  const coarsePointer = useRef(false);
+  useEffect(() => {
+    coarsePointer.current = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  }, []);
 
   // Changing step moves focus to the new step's heading or the question, and back to the top.
   useEffect(() => {
@@ -372,11 +445,23 @@ function V4AskForm({
   }
 
   async function start(questionLine: string, askMode: DigMode, which: "start" | "quick", basis: string) {
-    if (busy) return;
+    if (busy || startFlight.current) return;
+    startFlight.current = true;
     keepLevel();
     setRefusal(null);
     setPressed(which);
     try {
+      // Task 70b (ask-f8): step 1's "Just answer it" asks for the one-time consent first, so a no shows the same line under
+      // Next (the ask page shows no other); a yes is remembered, so the ask's own consent step passes at once.
+      if (which === "quick" && step === "ask") {
+        const agreed = await ask.ensureConsent().catch(() => false);
+        setDeclinedAtNext(!agreed);
+        if (!agreed) {
+          startFlight.current = false;
+          setPressed(null);
+          return;
+        }
+      }
       // "Just answer it" sends the question alone; Start sends the choices too.
       const outcome = await ask.submit(questionLine, askMode, "ask", null, which === "start" ? purposeLinesOfGoal(sentGoal) : undefined);
       switch (outcome.kind) {
@@ -385,6 +470,8 @@ function V4AskForm({
           return; // keep the busy state until the map page takes over
         case "REFUSED": {
           setRefusal(outcome.message);
+          // read-f17: one question already waits; while the room notice says so (sentence D), this line is not shown.
+          setRefusalWaits(outcome.code === "ALREADY_WAITING");
           // ASK-5: a rewrite accepted before the refusal sticks for the next Start of the same text.
           const kept = outcome.acceptedQuestion;
           if (kept !== undefined && kept.trim().length > 0) setAccepted({ basis, text: kept });
@@ -399,23 +486,73 @@ function V4AskForm({
       }
     } catch {
       setRefusal(t(catalog, "v4.ask.failed"));
+      setRefusalWaits(false);
     }
+    startFlight.current = false;
     setPressed(null);
   }
 
-  async function goOn() {
-    if (!canGoOn) return;
-    // ASK-3: a crisis message goes straight to the ask, which offers help (and sends nothing) instead of D2.
-    if (crisisText && !longEnough) {
-      void start(quickLine, "quick", "quick", plain);
-      return;
-    }
+  /** Step 1's "Just answer it": crisis help first (ask-f3), then nothing while it waits, else the ask (its consent first). */
+  function justAnswer(): void {
+    if (nextPressRef.current !== "IDLE") return;
+    if (helpFirstAt(trimmed)) return;
+    if (!longEnough || busy || quickTooLong || sessionUnknown || stepOneHeld) return;
+    void start(quickLine, "quick", "quick", plain);
+  }
+
+  /**
+   * Task 70b: Next. (1) One press at a time; (2) crisis words get the help screen, whatever their length and whatever greys the
+   * button, and nothing else; (3) what greys Next stops its press too, so nothing is read or counted; (4) the one-time consent
+   * before any reading: a no stays on step 1 with the line under Next (answer Q1, ask-f8); (5) "Reading…" once it is given, and
+   * the line read is the words as R22 sends them; (6) step 2 (the effect below). "Show it again" and Enter press it the same way.
+   */
+  async function goOn(): Promise<void> {
+    if (nextPressRef.current !== "IDLE" || startFlight.current) return;
+    if (helpFirstAt(trimmed)) return;
+    if (!longEnough || busy || sessionUnknown || stepOneHeld) return;
     keepLevel();
     setRefusal(null);
-    // Decision 29: the small AI reads the question before Start, so the one-time consent comes first. Refused, or the read failed: D2 opens all the
-    // same, with no questions; Start asks again.
-    setConsented(await ask.ensureConsent().catch(() => false));
+    setNextPress("CONSENT");
+    const agreed = await ask.ensureConsent().catch(() => false);
+    if (!agreed) {
+      setNextPress("IDLE");
+      setDeclinedAtNext(true);
+      return;
+    }
+    setDeclinedAtNext(false);
+    setConsented(true);
+    pressedLine.current = plain;
+    setNextPress("READING");
+  }
+
+  // (5)-(6), once "Reading…" is on the button: the same line as the one read before (Back, then Next with the same words) brings
+  // step 2 back as it was, its box, answers and reading; another starts a fresh box, and the clarifying questions and the lists
+  // read the new line (read-d2). A stale reading read again with the same words is Task 71's.
+  useEffect(() => {
+    if (nextPress !== "READING") return;
+    const line = pressedLine.current;
+    pressedLine.current = null;
+    if (line !== null && line !== readLine) {
+      setReadLine(line);
+      setBox(boxOf(line));
+    }
     setStep("read");
+    setNextPress("IDLE");
+  }, [nextPress, readLine, setNextPress]);
+
+  /**
+   * ask-f17: on a computer, Enter in the step-1 box presses Next, exactly as the button does (greyed: nothing, unless crisis
+   * words); Shift+Enter, a phone, and a word still being composed keep the box's own new line. No hint.
+   */
+  function pressOnEnter(event: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    if (event.nativeEvent.isComposing || event.keyCode === 229 || coarsePointer.current) return;
+    event.preventDefault();
+    if (signedOut) {
+      signInNext.current?.click();
+      return;
+    }
+    void goOn();
   }
 
   /** Sets or clears one question's answer, keeping them in the order the questions are shown (so the sentences read in that order). */
@@ -429,7 +566,8 @@ function V4AskForm({
   // ask-d1 / ask-d6 A: the header knows the session from this page, so a signed-out visitor reads "Sign in" at its end (the
   // way back is this page) and a signed-in person the round account button. ask-f6 / journey-f19: no classic link here.
   const header = <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} session={session} />;
-  const refusalAlert = refusal === null ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
+  // read-f17: one line, never both: while the room notice says one question already waits, its refusal adds nothing.
+  const refusalAlert = refusal === null || (refusalWaits && waitingShown) ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
 
   // One tree for both steps, so the consent / crisis / language pop-ups stay mounted in one place.
   return (
@@ -467,6 +605,7 @@ function V4AskForm({
                 // ask-f14: the red "nothing was started" line was about the words before; new words clear it.
                 if (refusal !== null) setRefusal(null);
               }}
+              onKeyDown={pressOnEnter}
               placeholder={t(catalog, "v4.ask.questionPlaceholder")}
               aria-labelledby={`${ids}-title`}
               aria-describedby={stepOneWhy}
@@ -512,7 +651,7 @@ function V4AskForm({
             {signedOut ? (
               // ask-d1 A, until the start-step's sign-in panel: both go to sign in, with the way back to this page.
               <>
-                <a className="v4Btn v4BtnPrimary" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
+                <a ref={signInNext} className="v4Btn v4BtnPrimary" href={signInHref} aria-describedby={`${ids}-signin`} onClick={helpBeforeSignIn}>
                   {t(catalog, "v4.ask.continue")}
                 </a>
                 <p id={`${ids}-signin`} className="v4AskHint v4Muted v4AskSignInFirst">{t(catalog, "v4.ask.signInFirst")}</p>
@@ -522,25 +661,38 @@ function V4AskForm({
               </>
             ) : (
               <>
+                {/* Task 70b: busy and still "Next" while the consent window is open, "Reading…" once it is given. */}
                 <button
                   type="button"
                   className="v4Btn v4BtnPrimary"
                   onClick={() => void goOn()}
-                  disabled={!canGoOn || busy || sessionUnknown}
+                  disabled={nextGreyed}
+                  aria-busy={nextPress !== "IDLE"}
                   aria-describedby={stepOneWhy}
                 >
-                  {t(catalog, "v4.ask.continue")}
+                  {nextPress === "READING" ? t(catalog, "v4.ask.reading")
+                    : gettingReady ? t(catalog, "v4.ask.gettingReady") : t(catalog, "v4.ask.continue")}
                 </button>
+                {/* ask-f8: after a declined consent, right under Next, in normal text; "Show it again" is a fresh press of Next. */}
+                {declinedAtNext ? (
+                  <p className="v4AskDeclined v4AskUnderNext" role="status">
+                    {t(catalog, "v4.ask.consentDeclined")}{" "}
+                    <button type="button" className="v4Link" onClick={() => void goOn()}>{t(catalog, "v4.ask.consentShowAgain")}</button>
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   className="v4Link v4AskJust"
-                  onClick={() => void start(quickLine, "quick", "quick", plain)}
-                  disabled={!canGoOn || busy || quickTooLong || sessionUnknown}
+                  onClick={justAnswer}
+                  disabled={justGreyed}
                   aria-busy={pressed === "quick"}
                   aria-describedby={stepOneWhy}
                 >
-                  {pressed === "quick" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.ask.justAnswer")}
+                  {pressed === "quick" ? t(catalog, "v4.ask.starting")
+                    : gettingReady ? t(catalog, "v4.ask.gettingReady") : t(catalog, "v4.ask.justAnswer")}
                 </button>
+                {/* r2-4: the grey quota line under Next, on every visit. */}
+                <p className="v4AskHint v4Muted v4AskQuotaNote v4AskUnderNext">{t(catalog, "v4.ask.readingUsesQuota")}</p>
               </>
             )}
           </div>
@@ -566,16 +718,20 @@ function V4AskForm({
               <label id={`${ids}-q2label`} className="v4AskLabel" htmlFor={`${ids}-q2`}>
                 {t(catalog, "v4.read.questionLabel")}
               </label>
+              {/* Task 70b (read-d2): the box starts as the line read at Next; what is typed here joins it and is never read again. */}
               <textarea
                 id={`${ids}-q2`}
                 className="v4AskField v4AskFieldSmall"
                 rows={2}
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
+                value={box.text}
+                onChange={(event) => {
+                  const typed = event.target.value;
+                  setBox((current) => boxTyped(current, typed));
+                }}
                 aria-labelledby={`${ids}-q2label`}
-                aria-describedby={!longEnough && !crisisText ? `${ids}-short2` : undefined}
+                aria-describedby={!boxLongEnough && !boxCrisis ? `${ids}-short2` : undefined}
               />
-              {!longEnough && !crisisText ? (
+              {!boxLongEnough && !boxCrisis ? (
                 <p id={`${ids}-short2`} className="v4AskHint v4Muted">{t(catalog, "v4.ask.tooShort")}</p>
               ) : null}
             </div>
@@ -649,7 +805,7 @@ function V4AskForm({
                 type="button"
                 className="v4Btn v4BtnPrimary v4AskStart"
                 onClick={() => void start(sentLine, mode, "start", composed)}
-                disabled={!canGoOn || tooLong || busy}
+                disabled={!(boxLongEnough || boxCrisis) || tooLong || busy}
                 aria-busy={pressed === "start"}
               >
                 {pressed === "start" ? t(catalog, "v4.ask.starting") : t(catalog, "v4.read.start")}

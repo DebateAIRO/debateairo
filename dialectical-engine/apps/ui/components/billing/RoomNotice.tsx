@@ -102,6 +102,14 @@ export function roomSentence(room: AskRoom | null): RoomSentence | null {
 }
 
 /**
+ * V4 start step, Task 70b (read-f17): whether the notice shows sentence D (one question already waits, with its start). A
+ * page then adds no refusal line of its own beside it, and its buttons wait, described by it: one line, never both.
+ */
+export function alreadyWaitingShown(room: AskRoom | null): boolean {
+  return roomSentence(room)?.key === "newDebate.room.alreadyWaiting";
+}
+
+/**
  * Where "Open the waiting debate" leads (V4 review ask-f11, read-f4, public-f21). The notice is shared by the classic
  * pages (/new, the home composer) and the V4 pages, so it reads the address it sits on: on a V4 page (/v4 and below) the
  * link opens the waiting debate's V4 map, at the reading level the address carries (`?level=`, the parameter every V4

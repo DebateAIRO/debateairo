@@ -250,8 +250,11 @@ describe("the question check's screen on the page's say-so", () => {
 
 describe("a Free question waits for its notice (ask-f2)", () => {
   it("403 FREE_PUBLIC_NOTICE_REQUIRED: the room read again, the notice shown from then on, nothing resent; the next press carries the mark", async () => {
-    server.room = null;
+    // Task 70b (ask-f2): a plan that cannot be read even twice now shows the notice by itself, so the page here first reads
+    // a room that names no plan (it sees no reason for the notice); every read after that fails.
+    server.room = roomOf({ plan_id: null });
     await mount();
+    server.room = null;
     expect(host!.querySelector(".notice")).toBeNull();
     const before = server.roomReads;
     server.createDebate.mockRejectedValueOnce(refusal(403, "FREE_PUBLIC_NOTICE_REQUIRED"));

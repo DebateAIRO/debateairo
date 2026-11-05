@@ -111,6 +111,10 @@
 /* ask-d1, signed out: the grey sign-in line sits on its own row under Next and "Just answer it" at every width,
    never squeezed between the two on a wide screen. */
 .v4AskSignInFirst { flex-basis: 100%; order: 1; }
+/* V4 start step, Task 70b (ask-f8, r2-4): the lines under Next each take a row of their own, in the page's order: Next; after a
+   declined consent its line, in normal text; "Just answer it"; the grey quota line. */
+.v4AskUnderNext { flex-basis: 100%; margin: 0; }
+.v4AskDeclined { font-size: var(--t-ui); color: var(--text); }
 .v4AskRefusal {
   margin: 0; padding: 10px 14px; border-radius: var(--r-btn);
   background: var(--dispute-bg); border: 1px solid var(--dispute-border); color: var(--dispute-text); font-size: var(--t-ui);

@@ -27,7 +27,8 @@ const server = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
-vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
+// V4 start step, Task 70b: no notice shows, so it never says one question already waits (sentence D).
+vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 // ask-d6 A: the header draws "Sign in" or the round account button itself (tests/render/v4-header-account.test.tsx); the
 // stand-in shows what the page hands it: the session it learnt and any classic link.
 vi.mock("@/components/v4/V4Header", () => ({

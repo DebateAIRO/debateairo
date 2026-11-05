@@ -17,7 +17,8 @@ const submitted = vi.hoisted(() => ({ calls: [] as unknown[][] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // The ask page learns the session beside the page (ask-d1 D): a signed-in person here.
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => React.ReactNode }) => children("IN") }));
-vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
+// Task 70b: no notice shows, so it never says one question already waits.
+vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 const clarify = vi.hoisted(() => ({ asked: [] as string[], answer: (_text: string, _signal?: AbortSignal): Promise<unknown> => Promise.resolve({ source: "NONE" }), consent: true }));
 vi.mock("@/lib/api", () => ({ contractClient: { readAnswerIndex: async () => ({ items: [], open_runs: [] }),
@@ -145,18 +146,28 @@ describe("V4 step 2: the AI's questions, in the same look", () => {
     expect(submitted.calls.at(-1)![4]).toBeUndefined();
   });
 
-  it("an edited question calls again and drops the answers that no longer apply", async () => {
+  // Task 70b (read-d2, read-f14): the question is read once, at Next. What used to be read again 1.2 s after an edit on step 2
+  // is now read only after Back, new words and Next: at once, and the answers that no longer apply drop as before.
+  it("an edit on step 2 asks nothing again; Back, a changed question and Next ask once, at once, and drop the answers that no longer apply", async () => {
     const page = await atStepTwo("premium");
     await press("The north");
     await press("To teach");
     vi.useFakeTimers();
     clarify.answer = async () => ({ source: "AI", questions: [], purpose: AI.purpose });
-    const field = page.querySelector("textarea") as HTMLTextAreaElement;
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Should Bulgaria build more nuclear plants?");
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    const type = async (field: HTMLTextAreaElement, text: string): Promise<void> => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, text);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    await type(page.querySelector("textarea") as HTMLTextAreaElement, "Should Bulgaria build more nuclear plants?");
     await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    expect(clarify.asked).toEqual([QUESTION]);
+    expect(sentLines(page)).toEqual(["Which region? The north.", "What do you want it for? To teach."]);
+    await act(async () => page.querySelector<HTMLButtonElement>(".v4AskBack")!.click());
+    await type(page.querySelector("textarea") as HTMLTextAreaElement, "Should Bulgaria build more nuclear plants?");
+    await press(CATALOG["v4.ask.continue"]!);
+    await act(async () => { for (let tick = 0; tick < 6; tick += 1) await Promise.resolve(); });
     expect(clarify.asked).toEqual([QUESTION, "Should Bulgaria build more nuclear plants?"]);
     expect(sentLines(page)).toEqual(["What do you want it for? To teach."]);
   });
@@ -217,11 +228,16 @@ describe("V4 step 2 never gets stuck", () => {
     ownWordsOnly(page);
   });
 
-  it("the consent refused: no call, and step 2 still opens with the own-words boxes", async () => {
+  // Task 70b (owner answer Q1, ask-f8): step 2 never opens without the consent; the person stays on step 1, with one line
+  // right under Next.
+  it("the consent refused: no call, and the page stays on step 1 with the line under Next", async () => {
     clarify.consent = false;
     const page = await atStepTwo("premium");
     expect(clarify.asked).toEqual([]);
-    ownWordsOnly(page);
+    expect(page.querySelector(".v4AskReadTitle")).toBeNull();
+    const line = page.querySelector(".v4AskDeclined");
+    expect(line?.textContent).toContain(CATALOG["v4.ask.consentDeclined"]);
+    expect(buttonNamed(CATALOG["v4.ask.continue"]!).compareDocumentPosition(line!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("no purpose question: the AI's other questions show", async () => {

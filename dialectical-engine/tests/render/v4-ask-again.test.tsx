@@ -18,7 +18,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // The ask page learns the session beside the page (ask-d1 D, w1-step1's V4AskGate): a signed-in person here, whose
 // earlier debate the page may read.
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => React.ReactNode }) => children("IN") }));
-vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
+// V4 start step, Task 70b: no notice shows, so it never says one question already waits (sentence D).
+vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/lib/api", () => ({
   contractClient: {

@@ -17,7 +17,8 @@ const server = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // The ask page learns the session beside the page (ask-d1 D): a signed-in person here.
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => ReactNode }) => children("IN") }));
-vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
+// Task 70b: no notice shows, so it never says one question already waits.
+vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/components/SensitiveDataConsent", () => ({
   isSensitiveDataConsentRefusal: () => false,
@@ -105,20 +106,24 @@ describe("the Free notice on the ask page", () => {
     expect(server.createDebate.mock.calls[0]?.[7]).toBeUndefined();
   });
 
-  it("no plans (a local site), or a room read that failed: no notice, no flag, so nothing goes public unseen", async () => {
+  // Task 70b (ask-f2): the old case's two halves part. A site with no plans answers its read, so nothing goes public; a plan
+  // that cannot be read even on a second try shows the notice, so a Free question is never private unseen.
+  it("no plans (a local site): no notice, no flag", async () => {
     server.room = room(null);
     await mount();
     expect(notice()).toBeNull();
     await click(button(CATALOG["v4.ask.justAnswer"]!));
     expect(server.createDebate.mock.calls[0]?.[7]).toBeUndefined();
-    await act(async () => root?.unmount());
-    host?.remove();
-    server.createDebate.mockClear();
+  });
+
+  it("a room read that failed twice: the notice shows and the flag goes, so a Free question is never private unseen", async () => {
     server.room = null;
     await mount();
-    expect(notice()).toBeNull();
+    // The second read is the hook's own, once the first has failed.
+    await act(async () => { for (let tick = 0; tick < 10; tick += 1) await Promise.resolve(); });
+    expect(notice()).toBe(NOTICE);
     await click(button(CATALOG["v4.ask.justAnswer"]!));
-    expect(server.createDebate.mock.calls[0]?.[7]).toBeUndefined();
+    expect(server.createDebate.mock.calls[0]?.[7]).toEqual({ freePublicNotice: true });
   });
 
   it("the person's language: the catalogue's sentence, not the English", async () => {

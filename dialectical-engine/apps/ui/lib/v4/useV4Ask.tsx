@@ -51,8 +51,10 @@ export type V4AskOutcome =
   /** ASK-5 (V3 ruling L-USE-STICKS): `acceptedQuestion` is the rewrite the person chose ("Use this version") before the
    * refusal, so the next Start can send it again instead of asking a second time. Task 68: `startPathsStale`, the chosen
    * paths are from another reading (a plan change since Next: the page reads the question again); `startPathsNarrowed`, the
-   * site now allows fewer paths than were chosen (answer Q8: the room was read again; the person combines or removes first). */
-  | Readonly<{ kind: "REFUSED"; message: string; acceptedQuestion?: string; startPathsStale?: true; startPathsNarrowed?: true }>;
+   * site now allows fewer paths than were chosen (answer Q8: the room was read again; the person combines or removes first).
+   * Task 70b (read-f17): `code` ALREADY_WAITING, one question already waits; while the room notice says so (sentence D), the
+   * page adds no refusal line of its own. */
+  | Readonly<{ kind: "REFUSED"; message: string; code?: "ALREADY_WAITING"; acceptedQuestion?: string; startPathsStale?: true; startPathsNarrowed?: true }>;
 
 /** Where an ask comes from: the ask page, or a dig button (AI-written text around the person's earlier question). */
 export type V4AskOrigin = "ask" | "dig";
@@ -124,6 +126,11 @@ export function useV4Ask(input: Readonly<{
   locale: string; crisisCountryHint: string | null; mode: DigMode; readingLevel: ReadingLevel;
   /** W3-4: on the map page, the dig its room read is for; absent (the ask page), the read is for a new question. */
   dig?: V4DigRoom | null;
+  /**
+   * V4 start step, Task 70b (ask-f8): absent or true, `dialogs` holds today's line for a declined consent (the map's dig
+   * buttons keep it: a dig has no Next to sit under). The ask page passes false and shows its own line right under Next.
+   */
+  showDeclinedLine?: boolean;
 }>): Readonly<{
   /**
    * W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none.
@@ -150,10 +157,23 @@ export function useV4Ask(input: Readonly<{
    */
   offerCrisisHelp(words: readonly string[]): boolean;
   room: AskRoom | null;
+  /** Task 70b (read-f3, 4 Nov night): the room read again (useAskRoom's own re-read); null when it could not be read. */
+  refreshRoom: () => Promise<AskRoom | null>;
   planTier: "free" | "premium";
   /**
-   * Decision 13: show the notice that a Free debate is public, and send that it was shown. Only a plan the server named as Free: `planTier` is also
-   * "free" before the read answers and on a site with no plans (a local run), where nothing goes public.
+   * Task 70b (ask-f2): what the page knows of the plan. LOADING until a room read answers; KNOWN once one has (a site with
+   * no plans included); FAILED only after one more read failed too. The ask page's buttons read "Getting ready…" while LOADING.
+   */
+  planState: "LOADING" | "KNOWN" | "FAILED";
+  /**
+   * Task 70b (read-f3): the server named the plan FREE, with no internal grant. Free-only things read this, never `planTier`
+   * alone (which is also "free" while the plan is unknown, and on a site with no plans).
+   */
+  planIsFree: boolean;
+  /**
+   * Decision 13: show the notice that a Free debate is public, and send that it was shown. A plan the server named as Free,
+   * or a plan that could not be read even on a second try (Task 70b, ask-f2: a Free question is never private unseen), unless
+   * the person is known to be on a paid plan. Never before the first read answers, and never on a site with no plans.
    */
   freePublicNotice: boolean;
   submitting: boolean;
@@ -196,7 +216,11 @@ export function useV4Ask(input: Readonly<{
   // V4 start step, Task 68 (ask-f2): once the server held a question for the Free notice, the notice shows for the page's
   // life, whatever a later room read says, so the next press carries it.
   const [noticeRequired, setNoticeRequired] = React.useState(false);
-  const freePublicNotice = noticeRequired || (internalFunding === null && decidedPlan === "FREE");
+  // Task 70b (ask-f2, read-f3): the plan read's state; FAILED only after one more read failed too (below).
+  const [planState, setPlanState] = React.useState<"LOADING" | "KNOWN" | "FAILED">("LOADING");
+  const planIsFree = internalFunding === null && decidedPlan === "FREE";
+  const freePublicNotice = noticeRequired
+    || (internalFunding === null && (decidedPlan === "FREE" || (planState === "FAILED" && decidedPlan === null)));
 
   // Side-by-side spec §13 (Task S12): the settings version the switches above were read under, sent back with the ask.
   const settingsVersion = React.useRef<number | undefined>(undefined);
@@ -216,7 +240,21 @@ export function useV4Ask(input: Readonly<{
     dig_mode: effectiveDigMode(mode, planTier),
     ...(digPicks > 0 ? { dig_picks: digPicks } : {})
   };
-  const [room, setRoom] = useAskRoom(contractClient, roomQuery);
+  const [room, setRoom, refreshRoom, roomRead] = useAskRoom(contractClient, roomQuery);
+  // Task 70b (ask-f2): a read that answered makes the plan known; while it is still unknown, a failed read is tried once
+  // more, and only that second failure makes it FAILED. A later failed read never forgets a plan once known.
+  const planRetried = React.useRef(false);
+  React.useEffect(() => {
+    if (roomRead === "READ") {
+      setPlanState("KNOWN");
+      return;
+    }
+    if (roomRead !== "FAILED" || planState !== "LOADING" || planRetried.current) return;
+    planRetried.current = true;
+    void refreshRoom().then((value) => {
+      if (value === null) setPlanState((now) => (now === "LOADING" ? "FAILED" : now));
+    });
+  }, [roomRead, planState, refreshRoom]);
 
   /** Ruling R51: a read from another version is authoritative — its switches apply as they are (they may turn off). */
   const adoptSettingsRead = React.useCallback((read: AskRoom) => {
@@ -267,15 +305,16 @@ export function useV4Ask(input: Readonly<{
     // refused before anything is sent, so the check of Next never goes with a line it was not handed for.
     if (handOver !== undefined && handOver.questionLine.trim() !== question) return { kind: "REFUSED", message: t(now.catalog, "v4.ask.failed") };
     const startLane = startLaneOf(handOver);
-    // Sentence D: one question already waits.
-    if (now.room?.room === "ALREADY_WAITING") return { kind: "REFUSED", message: t(now.catalog, "v4.askError.alreadyWaiting") };
+    // Sentence D: one question already waits (Task 70b, read-f17: coded, so the page adds no line while the notice says it).
+    if (now.room?.room === "ALREADY_WAITING") return { kind: "REFUSED", message: t(now.catalog, "v4.askError.alreadyWaiting"), code: "ALREADY_WAITING" };
     submitFlight.current = true;
     setSubmitting(true);
     let askSettings = settingsFor(now.planTier, now.shapeSettings, now.lengthSettings);
     const askRoomQuery = (): ReturnType<typeof v4RoomQuery> => v4RoomQuery(askMode, now.readingLevel, askSettings);
     // ASK-5: the rewrite the person accepted in this press, returned with any later refusal.
     let acceptedRewrite: string | undefined;
-    const refused = (message: string, startFlag?: Readonly<{ startPathsStale: true } | { startPathsNarrowed: true }>): V4AskOutcome => ({
+    const refused = (message: string,
+      startFlag?: Readonly<{ startPathsStale: true } | { startPathsNarrowed: true } | { code: "ALREADY_WAITING" }>): V4AskOutcome => ({
       kind: "REFUSED", message, ...(acceptedRewrite === undefined ? {} : { acceptedQuestion: acceptedRewrite }), ...startFlag
     });
     // Task 68 (answer Q8): the site now allows fewer paths than were chosen: its words name the new widest (unknown: the
@@ -456,9 +495,9 @@ export function useV4Ask(input: Readonly<{
         const fresh = await readAskRoom(contractClient, askRoomQuery());
         const shown = fresh === null ? waitingRoomOf(exc) : fresh;
         setRoom(shown);
-        return refused(shown?.room === "ALREADY_WAITING"
-          ? t(now.catalog, "v4.askError.alreadyWaiting")
-          : requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
+        return shown?.room === "ALREADY_WAITING"
+          ? refused(t(now.catalog, "v4.askError.alreadyWaiting"), { code: "ALREADY_WAITING" })
+          : refused(requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
       }
       return refused(requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
     } finally {
@@ -473,7 +512,7 @@ export function useV4Ask(input: Readonly<{
 
   const dialogs = (
     <>
-      {consent.declined ? (
+      {consent.declined && input.showDeclinedLine !== false ? (
         <p className="sensitiveConsentDeclined" role="status">{t(homeCatalog, "home.sensitiveConsent.declined")}</p>
       ) : null}
       {consent.dialog}
@@ -488,5 +527,8 @@ export function useV4Ask(input: Readonly<{
   const offerCrisisHelp = React.useCallback((words: readonly string[]) => words.some((text) => live.current.crisis.offerIfCrisis(text)), []);
   // Task 68: the check's own screen for a refusal met outside a send (the same screen a refused send opens).
   const showRefusal = React.useCallback((error: unknown) => live.current.questionRefusal.offer(error), []);
-  return { submit, showRefusal, ensureConsent, flagsCrisis, offerCrisisHelp, room, planTier, freePublicNotice, submitting, dialogs };
+  return {
+    submit, showRefusal, ensureConsent, flagsCrisis, offerCrisisHelp, room, refreshRoom, planTier, planState, planIsFree, freePublicNotice,
+    submitting, dialogs
+  };
 }

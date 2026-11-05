@@ -470,7 +470,15 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.start.shareDown",
   "v4.start.combineFrees.one",
   "v4.start.combineFrees.other",
-  "v4.start.lookWider"
+  "v4.start.lookWider",
+  // V4 start step, Task 70b (read-f13, ask-f2, r2-4, ask-f8; the spec's and the record's words, shown at the click-test): Next's
+  // "Reading…" after the consent, "Getting ready…" while the plan is read, the grey quota line under Next, and the line under
+  // Next after a declined consent with its link.
+  "v4.ask.reading",
+  "v4.ask.gettingReady",
+  "v4.ask.readingUsesQuota",
+  "v4.ask.consentDeclined",
+  "v4.ask.consentShowAgain"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
