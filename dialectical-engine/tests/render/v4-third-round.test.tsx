@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { act } from "react";
+import { act, type MouseEvent } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * The owner's third round of follow-ups (5 Nov 2026 afternoon, OPEN-OWNER-QUESTIONS-2026-11-04.md "Your answers"):
  *  - The page behind the account menu's "My questions" is renamed "My questions" (its heading, so its tab title too), and
  *    the first screen's link to it becomes "All my questions" (both the owner's words).
+ *  - V4Header takes an optional onBrandClick, called when the brand link is pressed (the start-step session passes it);
+ *    without it the brand is the plain link to /v4 it always was.
  * Made-up texts only.
  */
 vi.mock("@/lib/api", () => ({
@@ -38,6 +40,7 @@ vi.mock("@/lib/v4/mapShelf", async (original) => ({
 }));
 
 import { DocumentTitle } from "../../apps/ui/components/DocumentTitle.js";
+import { V4Header } from "../../apps/ui/components/v4/V4Header.js";
 import { V4AllMaps } from "../../apps/ui/components/v4/V4AllMaps.js";
 import { V4MapShelf } from "../../apps/ui/components/v4/V4MapShelf.js";
 
@@ -92,5 +95,29 @@ describe("the third round: the page behind 'My questions' is called 'My question
     expect(all.textContent).toBe("All my questions");
     expect(all.getAttribute("href")).toBe("/v4?maps=all");
     expect(shelf.textContent).not.toMatch(/\b(?:Your|All my) maps\b/u);
+  });
+});
+
+describe("the third round: V4Header's optional onBrandClick", () => {
+  it("is called with the brand link's click, before the link is followed; the handler may keep the page where it is", async () => {
+    window.history.replaceState(null, "", "/v4");
+    const seen: Array<{ target: string | null; prevented: boolean }> = [];
+    const onBrandClick = (event: MouseEvent<HTMLAnchorElement>): void => {
+      event.preventDefault();
+      seen.push({ target: event.currentTarget.getAttribute("href"), prevented: event.defaultPrevented });
+    };
+    const page = await mount(<V4Header catalog={CATALOG} showQuota={false} session="OUT" onBrandClick={onBrandClick} />);
+    const brand = page.querySelector<HTMLAnchorElement>("a.v4HdrBrand")!;
+    expect(brand.getAttribute("href")).toBe("/v4");
+    await act(async () => brand.click());
+    expect(seen).toEqual([{ target: "/v4", prevented: true }]);
+    expect(window.location.pathname + window.location.search).toBe("/v4");
+  });
+
+  it("without it the brand is the plain link to /v4, as before", async () => {
+    const page = await mount(<V4Header catalog={CATALOG} showQuota={false} session="OUT" />);
+    const brand = page.querySelector<HTMLAnchorElement>("a.v4HdrBrand")!;
+    expect(brand.getAttribute("href")).toBe("/v4");
+    expect(brand.getAttribute("onclick")).toBeNull();
   });
 });

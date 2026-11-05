@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { V4QuotaPill } from "./V4QuotaPill";
@@ -27,7 +27,7 @@ import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
  */
 
 export function V4Header({
-  catalog, classicHref = null, showQuota = true, session, children, after
+  catalog, classicHref = null, showQuota = true, session, children, after, onBrandClick
 }: Readonly<{
   catalog: MessageCatalog;
   /** Accepted and unused (the 5 Nov reading-level ruling: no level in any header). */
@@ -54,6 +54,12 @@ export function V4Header({
    * check, 4 Nov: on a phone they jumped from the start side to the end side).
    */
   after?: ReactNode;
+  /**
+   * Called when the brand link is pressed, before the browser follows it to /v4 (the owner's third round, 5 Nov: the
+   * start-step session passes it); a handler may call event.preventDefault() to keep the page where it is. Absent: the
+   * plain link it always was.
+   */
+  onBrandClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }>) {
   // ask-f16 with the wave-2 checks (4 Nov): the usage is read only for a signed-in person, and a page that knows the person
   // is signed out reads nothing and holds nothing (they never get a circle). While the page is still checking, the circle's
@@ -63,7 +69,7 @@ export function V4Header({
   const quotaHeld = showQuota && session === "CHECKING";
   return (
     <header className="v4Hdr">
-      <Link href="/v4" className="v4HdrBrand">
+      <Link href="/v4" className="v4HdrBrand" onClick={onBrandClick}>
         <span className="v4HdrMark" aria-hidden="true" />
         {/* On a phone the name and the badge are hidden on screen (v4-base.css) and stay the link's name; the space keeps
             the two words apart when it is read out (a flex row draws no space-only text). */}
