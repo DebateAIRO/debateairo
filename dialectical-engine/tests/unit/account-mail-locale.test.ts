@@ -106,10 +106,13 @@ describe("C12.2 account renderer: copy, lang, dir, Content-Language (R-07, R-30,
   });
 });
 
-describe("C12.8 dates per entry (R-32, D-82): en-GB, en-US and ro format the expiry differently", () => {
+// Owner's answer to question 5 (5 Nov 2026) and its follow-up: every English writes the day first on the 24-hour clock,
+// so United States English now reads as plain and United Kingdom English do; other languages keep their own order.
+describe("C12.8 dates per entry (R-32, D-82, question 5): every English is day first, ro keeps its own form", () => {
   it.each([
     ["en-GB", "12 October 2026 at 14:30 GMT+0 (UTC)"],
-    ["en-US", "October 12, 2026 at 14:30 GMT+0 (UTC)"],
+    ["en-US", "12 October 2026 at 14:30 GMT+0 (UTC)"],
+    ["en", "12 October 2026 at 14:30 GMT+0 (UTC)"],
     ["ro", "12 octombrie 2026 la 14:30 GMT+0 (UTC)"]
   ])("formats the expiry for %s as %s", (locale, expiry) => {
     expect(renderAccountEmail(verification(locale)).text).toContain(expiry);

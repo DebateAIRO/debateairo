@@ -1,4 +1,4 @@
-import { formatArchiveTime, type ArchiveCatalog } from "./archive-catalog.js";
+import { archiveDateTag, formatArchiveTime, type ArchiveCatalog } from "./archive-catalog.js";
 import type { DebateEntry, ExportSnapshot } from "./types.js";
 
 type ObjectValue = Record<string, unknown>;
@@ -11,7 +11,7 @@ const escapeHtml = (value: unknown): string => String(value ?? "").replace(/[&<>
 
 function dateText(value: unknown, locale: string): string {
   const date = new Date(words(value));
-  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(date) : "";
+  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(archiveDateTag(locale), { dateStyle: "medium", timeZone: "UTC" }).format(date) : "";
 }
 
 function storyTexts(value: unknown): string[] {

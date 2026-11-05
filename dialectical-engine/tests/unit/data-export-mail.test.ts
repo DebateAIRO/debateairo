@@ -21,15 +21,15 @@ describe("DATA_EXPORT mail", () => {
     } });
     await adapter.sendExportReady({ exportId: "10000000-0000-4000-8000-000000000001", to: "a@example.test", locale: "en",
       requestedAt: new Date("2026-10-08T10:00:00Z"), expiresAt: new Date("2026-10-09T15:43:00Z"), downloadUrl });
-    expect(body).toContain("October 9, 2026, 15:43 UTC");
+    expect(body).toContain("9 October 2026, 15:43 UTC");
   });
   it("M-1 names the export and keeps the request, link, expiry and safety paragraphs in order", () => {
     const mail = renderMail("DATA_EXPORT", "en", params);
     expect(mail.subject).toBe("Your data export is ready");
     const positions = [
-      "You asked for a copy of your data on October 8, 2026.",
+      "You asked for a copy of your data on 8 October 2026.",
       `Download it here: ${downloadUrl}`,
-      "The link works until October 9, 2026, 10:02 UTC",
+      "The link works until 9 October 2026, 10:02 UTC",
       "If you did not ask for this"
     ].map((sentence) => mail.text.indexOf(sentence));
     expect(positions.every((position) => position >= 0)).toBe(true);
@@ -39,10 +39,10 @@ describe("DATA_EXPORT mail", () => {
   it("M-2 prints the UTC expiry date and 24-hour time while the request stays date-only", () => {
     const en = renderMail("DATA_EXPORT", "en", params).text;
     const ro = renderMail("DATA_EXPORT", "ro", params).text;
-    expect(en).toContain("The link works until October 9, 2026, 10:02 UTC");
+    expect(en).toContain("The link works until 9 October 2026, 10:02 UTC");
     expect(ro).toContain("9 octombrie 2026, 10:02 UTC");
-    expect(en).toContain("You asked for a copy of your data on October 8, 2026.");
-    expect(en).not.toContain("October 8, 2026, 10:00");
+    expect(en).toContain("You asked for a copy of your data on 8 October 2026.");
+    expect(en).not.toContain("8 October 2026, 10:00");
   });
 
   it("M-3 renders one download link in text and HTML in every mail locale", () => {
