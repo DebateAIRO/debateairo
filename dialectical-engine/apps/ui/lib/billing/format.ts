@@ -79,10 +79,10 @@ const ENGLISH_ORDINAL_SUFFIX: Readonly<Record<Intl.LDMLPluralRule, string>> = Ob
   zero: "th", one: "st", two: "nd", few: "rd", many: "th", other: "th"
 });
 
-/** B1's {day}: "29th" in English, the bare number elsewhere (the translations word around it). */
+/** B1's {day}: "29th" in every English (plain, United States, United Kingdom), the bare number elsewhere (the translations word around it). */
 export function renewDayLabel(locale: string, iso: string): string {
   const day = new Date(iso).getUTCDate();
-  if (locale !== "en") return formatNumber(locale, day);
+  if (!/^en(?:-|$)/i.test(locale)) return formatNumber(locale, day);
   return `${day}${ENGLISH_ORDINAL_SUFFIX[new Intl.PluralRules("en", { type: "ordinal" }).select(day)]}`;
 }
 
