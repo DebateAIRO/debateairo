@@ -13,10 +13,9 @@ export const START_STEP_LIMITS = Object.freeze({
   titleMaxChars: 80, questionMaxChars: 240, whyMaxChars: 200, angleLabelMaxChars: 80,
   /** The menu: at most one path per viewpoint. */
   menuPathsMax: 54,
-  /** What the person puts together on step 2: at most 4 viewpoints to a path (spec §2 item 5; the page, Task 64). Task 92c asks the owner. */
-  viewpointsPerPathMax: 4,
   /** A path's members as the merge groups them: every suggestion one merge can be given (= viewpointsMax). Technical only: the
-   *  owner's merge words of 4 Nov set no group size, so a reply that follows them never meets it. */
+   *  owner's merge words of 4 Nov set no group size, so a reply that follows them never meets it. What the person puts together
+   *  on step 2 meets the same bound (Task 92c, the owner's answer "Four per path" A, 5 Nov: as freely as the AIs). */
   pathMembersMax: 54,
   /** The person's own words and a dig's picks in one path, counted together, at most 4 (every member counted against 4 before). */
   ownWordsAndPicksPerPathMax: 4,

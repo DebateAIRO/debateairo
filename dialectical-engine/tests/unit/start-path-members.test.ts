@@ -59,8 +59,8 @@ describe("a merged path of any size (Task 92a)", () => {
     expect(START_STEP_LIMITS.pathMembersMax).toBe(START_STEP_LIMITS.viewpointsMax);
     expect(ANSWER_BRANCH_LIMITS.viewpointsMax).toBe(START_STEP_LIMITS.pathMembersMax);
     expect(START_STEP_LIMITS.ownWordsAndPicksPerPathMax).toBe(4);
-    // What the person puts together on step 2 stays four (spec §2 item 5; Task 92c asks the owner).
-    expect(START_STEP_LIMITS.viewpointsPerPathMax).toBe(4);
+    // What the person puts together on step 2 follows the AIs (Task 92c, the owner's answer "Four per path" A): no limit of its own.
+    expect(START_STEP_LIMITS).not.toHaveProperty("viewpointsPerPathMax");
   });
 
   it("a menu path holds every viewpoint of its menu, not one more", () => {

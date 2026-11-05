@@ -29,7 +29,7 @@ import { cutPathText as cutText, joinedPathWords } from "@debateai/kernel";
  * Task 65 (spec §2 item 5): Combine (the picked paths and chips become one new path, in the place of the first, joined
  * until an AI writes one question for them), Split apart, a chip's ⋯ (into a path, its own path, Remove), Rewrite and
  * "Rewrite it for me / Keep my wording". The words rule whenever a path's viewpoints change: the person's words stay and
- * the page asks; one viewpoint left speaks in its own words (the person's, for their own point of view); two to four are
+ * the page asks; one viewpoint left speaks in its own words (the person's, for their own point of view); two or more are
  * joined and written again; none, and the path goes. A change that adds paths to a full list folds the bottom path the
  * AI wrote and no one changed into "+ N more", or is refused (PATHS_FULL). The AI's combined words are no Undo step.
  * Task 66 (spec §2 items 3-5; choose-f4, chat-start-waits-for-paths): the person's own path, "+ Look into this" from
@@ -45,9 +45,15 @@ import { cutPathText as cutText, joinedPathWords } from "@debateai/kernel";
  * here fetches, stores or keeps anything.
  */
 
-/** The start step's limits the plan holds (START_STEP_LIMITS; a chosen path's title and question are the wire's). */
+/**
+ * The start step's limits the plan holds (START_STEP_LIMITS; a chosen path's title and question are the wire's). Task 92c (the
+ * owner's answer "Four per path" A, 5 Nov): the person puts viewpoints together as freely as the AIs, so a path's viewpoints
+ * meet only the one technical bound (every viewpoint one menu can hold); the person's own words and a dig's picks in it stay
+ * at most 4, counted together as the contract counts them.
+ */
 export const PATH_PLAN_LIMITS = Object.freeze({
-  viewpointsPerPathMax: START_STEP_LIMITS.viewpointsPerPathMax,
+  viewpointsPerPathMax: START_STEP_LIMITS.pathMembersMax,
+  ownWordsAndPicksPerPathMax: START_STEP_LIMITS.ownWordsAndPicksPerPathMax,
   pathsMax: START_STEP_LIMITS.pathsMax,
   freePathsMax: START_STEP_LIMITS.freePathsMax,
   ownTextMaxChars: START_STEP_LIMITS.ownTextMaxChars,
@@ -126,7 +132,8 @@ export type PathPlanAction =
   | { type: "APPLY_SUGGESTION" | "DISMISS_SUGGESTION"; suggestionId: string }
   | { type: "SET_WIDTH"; width: number }
   | { type: "UNDO" };
-export type PathPlanRefusal = "VIEWPOINTS_FULL" | "PATHS_FULL" | "EMPTY" | "TOO_LONG" | "LAST_PATH";
+/** VIEWPOINTS_FULL: the one technical bound; OWN_WORDS_FULL: a fifth of the person's own words or a dig's picks in a path. */
+export type PathPlanRefusal = "VIEWPOINTS_FULL" | "OWN_WORDS_FULL" | "PATHS_FULL" | "EMPTY" | "TOO_LONG" | "LAST_PATH";
 /** The plan after an action; `folded`: path keys folded into "+ N more", bottom first; `added`: path keys widening added. */
 export type PathPlanResult = Readonly<{ plan: PathPlan; refusal: PathPlanRefusal | null; folded: readonly string[]; added: readonly string[] }>;
 
@@ -307,6 +314,17 @@ export { cutText };
 const unchanged = (plan: PathPlan): PathPlanResult => ({ plan, refusal: null, folded: [], added: [] });
 const refused = (plan: PathPlan, refusal: PathPlanRefusal): PathPlanResult => ({ plan, refusal, folded: [], added: [] });
 
+/**
+ * Why one path cannot hold these viewpoints (Task 92c, the owner's answer A): more than the one technical bound
+ * (VIEWPOINTS_FULL), or more than four of the person's own words and a dig's picks, counted together (OWN_WORDS_FULL); null
+ * when it can.
+ */
+function pathFullRefusal(viewpoints: readonly PlanViewpoint[]): PathPlanRefusal | null {
+  if (viewpoints.length > PATH_PLAN_LIMITS.viewpointsPerPathMax) return "VIEWPOINTS_FULL";
+  const ownWordsAndPicks = viewpoints.filter((viewpoint) => viewpoint.source.kind !== "MENU").length;
+  return ownWordsAndPicks > PATH_PLAN_LIMITS.ownWordsAndPicksPerPathMax ? "OWN_WORDS_FULL" : null;
+}
+
 /** The plan with `next` applied and the plan as it was pushed as one Undo step. */
 function stepped(plan: PathPlan, kind: PathPlanSnapshot["kind"], next: Partial<PathPlan>): PathPlan {
   const snapshot: PathPlanSnapshot = { paths: plan.paths, more: plan.more, width: plan.width, done: plan.done, questionSwap: plan.questionSwap, kind };
@@ -428,7 +446,7 @@ function inOwnWords(path: PlanPath, viewpoint: PlanViewpoint): PlanPath {
 }
 
 /**
- * Two to four viewpoints put together: an AI writes one question; until then their titles joined and their questions
+ * Two or more viewpoints put together: an AI writes one question; until then their titles joined and their questions
  * numbered, by the one join the server also makes from the signed menu (Task 33b), so it stores them as the AIs' words.
  */
 function joined(path: PlanPath, viewpoints: readonly PlanViewpoint[]): PlanPath {
@@ -441,7 +459,7 @@ function joined(path: PlanPath, viewpoints: readonly PlanViewpoint[]): PlanPath 
 
 /**
  * The words rule when a path's viewpoints change: the person's words stay and the page asks "Rewrite it for me / Keep my
- * wording"; one viewpoint left speaks in its own words; two to four are joined to be written again; none, and the path
+ * wording"; one viewpoint left speaks in its own words; two or more are joined to be written again; none, and the path
  * goes (null). A path still being written takes a new key, so the answer for its old viewpoints cannot land on it.
  */
 function regrouped(path: PlanPath, viewpoints: readonly PlanViewpoint[], keys: KeyCounter): PlanPath | null {
@@ -524,13 +542,15 @@ function grown(plan: PathPlan, paths: readonly PlanPath[], touched: ReadonlySet<
 
 /**
  * Combine what is picked (two or more parts: paths, or chips of other paths) into one new path in the place of the first
- * path it takes from, joined until an AI writes it. More than four viewpoints → VIEWPOINTS_FULL; fewer than two parts,
- * nothing. The selection is cleared.
+ * path it takes from, joined until an AI writes it. Any number of viewpoints, as the AIs may (Task 92c, the owner's answer
+ * A): past the technical bound → VIEWPOINTS_FULL; more than four of the person's own words and picks → OWN_WORDS_FULL;
+ * fewer than two parts, nothing. The selection is cleared.
  */
 function combineSelected(plan: PathPlan): PathPlanResult {
   const pick = taken(plan, null);
   if (pick.parts < 2) return unchanged(plan);
-  if (pick.viewpoints.length > PATH_PLAN_LIMITS.viewpointsPerPathMax) return refused(plan, "VIEWPOINTS_FULL");
+  const full = pathFullRefusal(pick.viewpoints);
+  if (full !== null) return refused(plan, full);
   const keys = keyCounter(plan.nextKey);
   const made = joined(madePath(keys.next()), pick.viewpoints);
   const above = withLeft(plan.paths.slice(0, pick.firstAt), pick.left, keys);
@@ -582,13 +602,16 @@ function chipHolder(plan: PathPlan, chipKey: string): Readonly<{ at: number; pat
 /**
  * `viewpoints` taken from their paths (as `left` says) into the end of the path `intoKey`, by the words rule. `keys` goes
  * on from keys the caller already took (an own viewpoint's o<n>); `more` is more after the change (an idea taken from it).
+ * The path then holds any number of viewpoints up to the technical bound (VIEWPOINTS_FULL) and at most four of the person's
+ * own words and picks (OWN_WORDS_FULL; Task 92c).
  */
 function movedInto(
   plan: PathPlan, intoKey: string, viewpoints: readonly PlanViewpoint[], left: ReadonlyMap<string, readonly PlanViewpoint[]>,
   keys: KeyCounter = keyCounter(plan.nextKey), more: readonly PlanPath[] = plan.more
 ): PathPlanResult {
   const into = plan.paths.find((path) => path.key === intoKey)!;
-  if (into.viewpoints.length + viewpoints.length > PATH_PLAN_LIMITS.viewpointsPerPathMax) return refused(plan, "VIEWPOINTS_FULL");
+  const full = pathFullRefusal([...into.viewpoints, ...viewpoints]);
+  if (full !== null) return refused(plan, full);
   const paths = withLeft(plan.paths, new Map<string, readonly PlanViewpoint[]>([...left, [intoKey, [...into.viewpoints, ...viewpoints]]]), keys);
   return unchanged(stepped(plan, "CHANGE", { paths, more, nextKey: keys.value, selected: selectedIn(plan.selected, paths) }));
 }
@@ -688,7 +711,8 @@ function withNewPath(plan: PathPlan, path: PlanPath, swapWithKey: string | undef
 
 /**
  * "+ Add your own path…": the person's words, trimmed (EMPTY; TOO_LONG over 1000 code units), kept as written: into a
- * path on the list (no extra path; a swap asked with it is not needed), or as their own path, added by them.
+ * path on the list (no extra path; a swap asked with it is not needed; a fifth of their own words there → OWN_WORDS_FULL,
+ * Task 92c), or as their own path, added by them.
  */
 function addOwn(plan: PathPlan, text: string, intoPathKey: string | null, swapWithKey: string | undefined): PathPlanResult {
   const words = text.trim();
@@ -752,7 +776,7 @@ function makeMyQuestion(plan: PathPlan, cardId: string, originalQuestion: string
 /**
  * A suggestion applied (whether it is done is the caller's): Combine needs both paths on the list; "fits path N" needs the
  * idea on the list or in more and the path on the list, and moves the idea's viewpoints into it. The same plan when it
- * does not apply, or the refusal (VIEWPOINTS_FULL).
+ * does not apply, or the refusal (VIEWPOINTS_FULL or OWN_WORDS_FULL).
  */
 function applied(plan: PathPlan, suggestion: StartSuggestion): PathPlanResult {
   if (suggestion.kind === "COMBINE") {

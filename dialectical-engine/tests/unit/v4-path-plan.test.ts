@@ -25,7 +25,7 @@ import {
 } from "../../apps/ui/lib/v4/pathPlan.js";
 import {
   SignedStartListSchema, SignedStartMenuSchema, START_STEP_LIMITS, StartCombineRequestSchema, StartMenuSchema, StartPathsSchema, type StartCard,
-  type StartCombineMember
+  type StartCombineMember, type StartMenu
 } from "../../packages/contract/src/index.js";
 import {
   NUCLEAR_MENU, NUCLEAR_MENU_REV2, SIXTEEN_PATH_MENU, START_FIXTURE_QUESTION, TWO_PATH_MENU, signedList, signedMenu
@@ -43,7 +43,7 @@ import {
  * Task 65 (spec §2 item 5: Combine with…, Split apart, the chips' ⋯, Rewrite): combining paths and chips, the AI's
  * combined words or the joined fallback, Split apart, moving and removing chips, Rewrite with "Rewrite it for me / Keep
  * my wording", and how many paths a combine frees. The words rule when a path's viewpoints change: the person's words
- * stay (and the page asks); one viewpoint left speaks in its own words; two to four are written again as one question.
+ * stay (and the page asks); one viewpoint left speaks in its own words; two or more are written again as one question.
  * Task 66 (spec §2 items 3-5; choose-f4, chat-start-waits-for-paths): the person's own path, "+ N more to explore", the
  * "Another way to see it" cards with "Make this my question", the one-tap suggestions, late merges (new ideas only ever
  * go under "+ N more", marked new; they never replace a path), the drawer's "Other directions" and "All, by area", and
@@ -95,14 +95,20 @@ describe("the shared fixture", () => {
 });
 
 describe("PATH_PLAN_LIMITS", () => {
+  /* Task 92c (owner's answer "Four per path" A, 5 Nov): a path holds as many viewpoints as the AIs may put in one (the technical
+   * bound), and at most four of the person's own words and a dig's picks, counted together. */
   it("are the start step's own limits", () => {
-    expect(PATH_PLAN_LIMITS).toEqual({ viewpointsPerPathMax: 4, pathsMax: 7, freePathsMax: 3, ownTextMaxChars: 1000, titleMaxChars: 120, questionMaxChars: 1000 });
     expect(PATH_PLAN_LIMITS).toEqual({
-      viewpointsPerPathMax: START_STEP_LIMITS.viewpointsPerPathMax, pathsMax: START_STEP_LIMITS.pathsMax,
-      freePathsMax: START_STEP_LIMITS.freePathsMax, ownTextMaxChars: START_STEP_LIMITS.ownTextMaxChars,
+      viewpointsPerPathMax: 54, ownWordsAndPicksPerPathMax: 4, pathsMax: 7, freePathsMax: 3, ownTextMaxChars: 1000, titleMaxChars: 120,
+      questionMaxChars: 1000
+    });
+    expect(PATH_PLAN_LIMITS).toEqual({
+      viewpointsPerPathMax: START_STEP_LIMITS.pathMembersMax, ownWordsAndPicksPerPathMax: START_STEP_LIMITS.ownWordsAndPicksPerPathMax,
+      pathsMax: START_STEP_LIMITS.pathsMax, freePathsMax: START_STEP_LIMITS.freePathsMax, ownTextMaxChars: START_STEP_LIMITS.ownTextMaxChars,
       titleMaxChars: START_STEP_LIMITS.pathTitleMaxChars, questionMaxChars: START_STEP_LIMITS.pathQuestionMaxChars
     });
     expect(Object.isFrozen(PATH_PLAN_LIMITS)).toBe(true);
+    expect(START_STEP_LIMITS).not.toHaveProperty("viewpointsPerPathMax");
   });
 });
 
@@ -590,11 +596,15 @@ describe("Combine (Task 65)", () => {
     expect(chips(lone.paths[0]!)).toEqual(["pt11", "pt22"]);
   });
 
-  it("refuses more than four viewpoints in one path and changes nothing", () => {
+  /* Task 92c (owner's answer "Four per path" A): more than four viewpoints go together, as the AIs may put them. */
+  it("puts more than four viewpoints in one path, as the AIs may", () => {
     const four = reduce(plan, ...selectAll("kp01", "kp02", "kp03", "kp04")).plan;
-    const full = pathPlanReduce(four, { type: "COMBINE_SELECTED" });
-    expect(full).toMatchObject({ refusal: "VIEWPOINTS_FULL", folded: [], added: [] });
-    expect(full.plan).toBe(four);
+    const five = pathPlanReduce(four, { type: "COMBINE_SELECTED" });
+    expect(five).toMatchObject({ refusal: null, folded: [], added: [] });
+    expect(keys(five.plan.paths)).toEqual(["p1", "kp05"]);
+    expect(chips(five.plan.paths[0]!)).toEqual(["pt11", "pt13", "pt14", "pt15", "pt21"]);
+    expect(five.plan.paths[0]).toMatchObject({ wording: "WRITING", tag: "COMBINED_BY_YOU", question: numbered("pt11", "pt13", "pt14", "pt15", "pt21") });
+    expect(five.plan.undo.map((step) => step.kind)).toEqual(["CHANGE"]);
     const fits = reduce(plan, ...selectAll("kp01", "kp02", "kp03"), { type: "COMBINE_SELECTED" }).plan;
     expect(chips(fits.paths[0]!)).toEqual(["pt11", "pt13", "pt14", "pt15"]);
   });
@@ -612,7 +622,8 @@ describe("Combine (Task 65)", () => {
     expect(pathPlanCombineFrees(reduce(plan, ...selectAll("kp01", "pt22")).plan)).toBe(1);
     expect(pathPlanCombineFrees(plan)).toBe(0);
     expect(pathPlanCombineFrees(pathPlanReduce(plan, { type: "SELECT", key: "kp01" }).plan)).toBe(0);
-    expect(pathPlanCombineFrees(reduce(plan, ...selectAll("kp01", "kp02", "kp03", "kp04")).plan)).toBe(0);
+    // Task 92c (owner's answer A): five viewpoints go together, so four paths become one.
+    expect(pathPlanCombineFrees(reduce(plan, ...selectAll("kp01", "kp02", "kp03", "kp04")).plan)).toBe(3);
   });
 
   it("combines a dig's picks the same way, sending their pick numbers", () => {
@@ -789,11 +800,15 @@ describe("Chips (Task 65)", () => {
     expect(keys(moved.more)).toEqual(["kp06", "kp07", "kp08", "kp09"]);
   });
 
-  it("refuses a fifth viewpoint", () => {
+  /* Task 92c (owner's answer "Four per path" A): a fifth viewpoint goes in, and the path is written again under a new key. */
+  it("takes a fifth viewpoint, and the path is written again", () => {
     const four = reduce(plan, ...selectAll("kp01", "kp02", "kp03"), { type: "COMBINE_SELECTED" }).plan;
-    const full = pathPlanReduce(four, { type: "MOVE_CHIP", chipKey: "pt21", toPathKey: "p1" });
-    expect(full).toMatchObject({ refusal: "VIEWPOINTS_FULL", folded: [], added: [] });
-    expect(full.plan).toBe(four);
+    const five = pathPlanReduce(four, { type: "MOVE_CHIP", chipKey: "pt21", toPathKey: "p1" });
+    expect(five).toMatchObject({ refusal: null, folded: [], added: [] });
+    expect(keys(five.plan.paths)).toEqual(["p2", "kp05"]);
+    expect(chips(five.plan.paths[0]!)).toEqual(["pt11", "pt13", "pt14", "pt15", "pt21"]);
+    expect(five.plan.paths[0]).toMatchObject({ wording: "WRITING", tag: "COMBINED_BY_YOU" });
+    expect(five.plan.undo).toHaveLength(2);
   });
 
   it("makes a chip its own path under its path, folding the bottom path no one changed", () => {
@@ -874,8 +889,13 @@ describe("Chips (Task 65)", () => {
     expect(pathOf(moved.plan, "kp03")).toMatchObject({ title: titleOf("pt15"), wording: "AI" });
     expect(moved.plan.selected).toEqual([]);
     expect(moved.plan.undo).toHaveLength(1);
-    const tooMany = reduce(plan, ...selectAll("kp03", "kp04", "kp05")).plan;
-    expect(pathPlanReduce(tooMany, { type: "MOVE_SELECTED", toPathKey: "kp01" })).toMatchObject({ refusal: "VIEWPOINTS_FULL", plan: tooMany });
+    // Task 92c (owner's answer A): five viewpoints in one path go through.
+    const five = reduce(plan, ...selectAll("kp03", "kp04", "kp05")).plan;
+    const movedFive = pathPlanReduce(five, { type: "MOVE_SELECTED", toPathKey: "kp01" });
+    expect(movedFive.refusal).toBeNull();
+    expect(keys(movedFive.plan.paths)).toEqual(["kp01", "kp02"]);
+    expect(chips(pathOf(movedFive.plan, "kp01"))).toEqual(["pt11", "pt14", "pt15", "pt21", "pt22"]);
+    expect(pathOf(movedFive.plan, "kp01")).toMatchObject({ wording: "WRITING", tag: "COMBINED_BY_YOU" });
     sameObject(plan, { type: "MOVE_SELECTED", toPathKey: "kp01" });
     sameObject(pathPlanReduce(plan, { type: "SELECT", key: "kp01" }).plan, { type: "MOVE_SELECTED", toPathKey: "kp01" });
     sameObject(picked, { type: "MOVE_SELECTED", toPathKey: "kp06" });
@@ -1054,8 +1074,12 @@ describe("Your own path (Task 66)", () => {
     expect(into.plan.undo.map((step) => step.kind)).toEqual(["CHANGE"]);
     const ignoringSwap = pathPlanReduce(plan, { type: "ADD_OWN", text: FISH, intoPathKey: "kp04", swapWithKey: "kp05" }).plan;
     expect(ignoringSwap.paths).toEqual(into.plan.paths);
+    // Task 92c (owner's answer A): the person's words go into a path of four viewpoints none of which are theirs.
     const four = reduce(plan, ...selectAll("kp01", "kp02", "kp03"), { type: "COMBINE_SELECTED" }).plan;
-    refused(four, { type: "ADD_OWN", text: FISH, intoPathKey: "p1" }, "VIEWPOINTS_FULL");
+    const fifth = pathPlanReduce(four, { type: "ADD_OWN", text: FISH, intoPathKey: "p1" });
+    expect(fifth.refusal).toBeNull();
+    expect(chips(fifth.plan.paths[0]!)).toEqual(["pt11", "pt13", "pt14", "pt15", "o2"]);
+    expect(fifth.plan.paths[0]).toMatchObject({ key: "p3", wording: "WRITING" });
     sameObject(plan, { type: "ADD_OWN", text: FISH, intoPathKey: "kp06" });
     sameObject(plan, { type: "ADD_OWN", text: FISH, intoPathKey: "nope" });
   });
@@ -1123,13 +1147,18 @@ describe("+ N more to explore (Task 66)", () => {
     expect(keys(back.paths)).toEqual(["kp01", "kp02", "kp03", "kp04", "p2"]);
   });
 
-  it("adds nothing that is not in more, nor into a path that is not on the list or is full", () => {
+  it("adds nothing that is not in more, nor into a path that is not on the list", () => {
     sameObject(plan, { type: "ADD_FROM_MORE", key: "kp01", intoPathKey: null, swapWithKey: "kp02" });
     sameObject(plan, { type: "ADD_FROM_MORE", key: "nope", intoPathKey: "kp01" });
     sameObject(plan, { type: "ADD_FROM_MORE", key: "kp06", intoPathKey: "kp07" });
     sameObject(plan, { type: "ADD_FROM_MORE", key: "kp06", intoPathKey: null, swapWithKey: "kp07" });
+    // Task 92c (owner's answer A): an idea goes into a path of four as its fifth viewpoint.
     const four = reduce(plan, ...selectAll("kp01", "kp02", "kp03"), { type: "COMBINE_SELECTED" }).plan;
-    refused(four, { type: "ADD_FROM_MORE", key: "kp06", intoPathKey: "p1" }, "VIEWPOINTS_FULL");
+    const fifth = pathPlanReduce(four, { type: "ADD_FROM_MORE", key: "kp06", intoPathKey: "p1" });
+    expect(fifth.refusal).toBeNull();
+    expect(chips(fifth.plan.paths[0]!)).toEqual(["pt11", "pt13", "pt14", "pt15", "pt12"]);
+    expect(fifth.plan.paths[0]).toMatchObject({ key: "p2", wording: "WRITING" });
+    expect(keys(fifth.plan.more)).toEqual(["kp07", "kp08", "kp09"]);
   });
 });
 
@@ -1306,8 +1335,13 @@ describe("Suggestions (Task 66)", () => {
     const full = reduce(plan, { type: "REWRITE", key: "kp01", question: "Mine?" }, { type: "MOVE_CHIP", chipKey: "pt14", toPathKey: "kp01" },
       { type: "MOVE_CHIP", chipKey: "pt15", toPathKey: "kp01" }, { type: "MOVE_CHIP", chipKey: "pt21", toPathKey: "kp01" }).plan;
     expect(chips(pathOf(full, "kp01"))).toEqual(["pt11", "pt14", "pt15", "pt21"]);
-    expect(ids(pathPlanSuggestions(full))).toEqual(["sg3"]);
-    refused(full, { type: "APPLY_SUGGESTION", suggestionId: "sg2" }, "VIEWPOINTS_FULL");
+    // Task 92c (owner's answer A): a path of four still takes the idea that fits it, and the person's words are asked again.
+    expect(ids(pathPlanSuggestions(full))).toEqual(["sg2", "sg3"]);
+    const fifth = pathPlanReduce(full, { type: "APPLY_SUGGESTION", suggestionId: "sg2" });
+    expect(fifth.refusal).toBeNull();
+    expect(chips(pathOf(fifth.plan, "kp01"))).toEqual(["pt11", "pt14", "pt15", "pt21", "pt12"]);
+    expect(pathOf(fifth.plan, "kp01")).toMatchObject({ wording: "PERSON", question: "Mine?", askReword: true });
+    expect(fifth.plan.done).toEqual(["sg2"]);
   });
 });
 
@@ -1393,20 +1427,20 @@ describe("pathPlanReduce (Task 66)", () => {
  * Task 92a (owner, 4 Nov, AI instructions batch 1): the merges no longer say "of at most four", so the menu may hold a path the AI
  * put together of five or more. The page takes it whole ("put together by us · Split"), sends it whole at Start, and when one
  * viewpoint is taken out the rest stay joined and the AI writes them again (the combine takes up to 54 points). What the person
- * puts together themselves stays four until Task 92c's answer.
+ * puts together themselves follows Task 92c (the owner's answer A: as freely as the AIs).
  */
-describe("a merged path of any size (Task 92a)", () => {
-  const SIX_IDS = ["pt11", "pt12", "pt13", "pt14", "pt15", "pt21"];
-  const SIX_MENU = {
-    ...NUCLEAR_MENU,
-    paths: [
-      { path_ref: "kp01", title: "Costs, supply and security", question: "What would new plants cost, and could Romania supply and guard them?",
-        viewpoint_ids: SIX_IDS, put_together: true, is_new: false },
-      ...NUCLEAR_MENU.paths.filter((path) => path.viewpoint_ids.every((id) => !SIX_IDS.includes(id)))
-    ],
-    suggestions: []
-  };
+const SIX_IDS = ["pt11", "pt12", "pt13", "pt14", "pt15", "pt21"];
+const SIX_MENU = {
+  ...NUCLEAR_MENU,
+  paths: [
+    { path_ref: "kp01", title: "Costs, supply and security", question: "What would new plants cost, and could Romania supply and guard them?",
+      viewpoint_ids: SIX_IDS, put_together: true, is_new: false },
+    ...NUCLEAR_MENU.paths.filter((path) => path.viewpoint_ids.every((id) => !SIX_IDS.includes(id)))
+  ],
+  suggestions: []
+};
 
+describe("a merged path of any size (Task 92a)", () => {
   it("a merged path of six comes in whole and goes out whole; one taken out is written again", () => {
     expect(StartMenuSchema.safeParse(SIX_MENU).error?.issues ?? []).toEqual([]);
     const plan = pathPlanFromMenu(SIX_MENU, 5, false);
@@ -1424,10 +1458,157 @@ describe("a merged path of any size (Task 92a)", () => {
     const combine = { context: { kind: "MENU", question_line: START_FIXTURE_QUESTION, check_ref: "check1.sig", menu_id: SIX_MENU.menu_id },
       reading_level: "plain", members: pathPlanCombineMembers(five) };
     expect(StartCombineRequestSchema.safeParse(combine).error?.issues ?? []).toEqual([]);
-    // Combining it with another path is still the person's four (Task 92c asks the owner).
+    // Combining it with another path makes one path of seven (Task 92c, the owner's answer A: as freely as the AIs).
     expect(keys(plan.paths)).toEqual(["kp01", "kp05", "kp07", "kp08", "kp09"]);
     const picked = reduce(plan, { type: "SELECT", key: "kp01" }, { type: "SELECT", key: "kp05" }).plan;
-    expect(pathPlanReduce(picked, { type: "COMBINE_SELECTED" })).toMatchObject({ refusal: "VIEWPOINTS_FULL", plan: picked });
-    expect(PATH_PLAN_LIMITS).toEqual({ viewpointsPerPathMax: 4, pathsMax: 7, freePathsMax: 3, ownTextMaxChars: 1000, titleMaxChars: 120, questionMaxChars: 1000 });
+    const seven = pathPlanReduce(picked, { type: "COMBINE_SELECTED" });
+    expect(seven.refusal).toBeNull();
+    expect(keys(seven.plan.paths)).toEqual(["p1", "kp07", "kp08", "kp09"]);
+    expect(chips(seven.plan.paths[0]!)).toEqual([...SIX_IDS, "pt22"]);
+    expect(seven.plan.paths[0]).toMatchObject({ wording: "WRITING", tag: "COMBINED_BY_YOU" });
+    expect(PATH_PLAN_LIMITS).toMatchObject({ viewpointsPerPathMax: 54, ownWordsAndPicksPerPathMax: 4 });
+  });
+});
+
+/*
+ * Task 92c (owner's answer "Four per path" A, 5 Nov): the person may put viewpoints together as freely as the AIs. A path holds
+ * any number of viewpoints up to the one technical bound, every viewpoint one menu can hold (54: VIEWPOINTS_FULL), and at most
+ * four of the person's own words and a dig's picks, counted together as the contract counts them (OWN_WORDS_FULL). The owner's
+ * card's example: Ana combines "Whole-system costs" (3 viewpoints) with "Falling prices" (2) into one path of 5. Every text is
+ * made up.
+ */
+describe("you may put viewpoints together as freely as the AIs (Task 92c)", () => {
+  /** NUCLEAR_MENU's ten viewpoints in larger groups: kp01 three, kp02 two, kp03 three; "Combine them?" names kp01 and kp03. */
+  const GROUPS_MENU: StartMenu = {
+    ...NUCLEAR_MENU,
+    paths: [
+      { path_ref: "kp01", title: "Whole-system costs", question: "What would new plants cost households once the whole power system is counted?",
+        viewpoint_ids: ["pt11", "pt13", "pt21"], put_together: true, is_new: false },
+      { path_ref: "kp02", title: "Falling prices", question: "Will falling prices for wind, sun and batteries make new plants a poor deal?",
+        viewpoint_ids: ["pt12", "pt22"], put_together: true, is_new: false },
+      { path_ref: "kp03", title: "Security and delays", question: "Could imports, weapons risks and delays make new plants a poor choice?",
+        viewpoint_ids: ["pt14", "pt15", "pt23"], put_together: true, is_new: false },
+      { path_ref: "kp04", title: "Jobs in the regions", question: "What would new plants mean for jobs in Romania's regions?",
+        viewpoint_ids: ["pt24"], put_together: false, is_new: false },
+      { path_ref: "kp05", title: "Waste for centuries", question: "How would Romania keep the waste safe for centuries?",
+        viewpoint_ids: ["pt25"], put_together: false, is_new: false }
+    ],
+    suggestions: [{ suggestion_id: "sg1", kind: "COMBINE", path_refs: ["kp01", "kp03"], reason: "Made-up reason." }]
+  };
+  /** Every viewpoint one menu can hold (9 lists of 6), all in one path the AI put together. */
+  const ALL_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((list) => [1, 2, 3, 4, 5, 6].map((item) => `pt${String(list)}${String(item)}`));
+  const WHOLE_MENU: StartMenu = {
+    ...NUCLEAR_MENU,
+    viewpoints: ALL_IDS.map((viewpoint_id) => ({
+      viewpoint_id, title: `Idea ${viewpoint_id}`, question: `What does idea ${viewpoint_id} add?`, why: "Made-up reason.", angle_id: "g1", repeat_ids: []
+    })),
+    paths: [{ path_ref: "kp01", title: "Every idea at once", question: "What do all the ideas say together?", viewpoint_ids: ALL_IDS,
+      put_together: true, is_new: false }],
+    suggestions: []
+  };
+  const startIssues = (menu: StartMenu, plan: PathPlan): unknown[] => StartPathsSchema.safeParse({
+    source: "MENU", menu: signedMenu(menu), paths: pathPlanToStartPaths(plan), width: plan.width, chosen_by: "PERSON"
+  }).error?.issues ?? [];
+
+  it("the fixture menus parse as the contract's menus", () => {
+    expect(StartMenuSchema.safeParse(GROUPS_MENU).error?.issues ?? []).toEqual([]);
+    expect(StartMenuSchema.safeParse(WHOLE_MENU).error?.issues ?? []).toEqual([]);
+    expect(ALL_IDS).toHaveLength(START_STEP_LIMITS.pathMembersMax);
+  });
+
+  it("combines a path of three with a path of two into one path of five, as one Undo step", () => {
+    const plan = pathPlanFromMenu(GROUPS_MENU, 5, false);
+    const five = reduce(plan, ...selectAll("kp01", "kp02"), { type: "COMBINE_SELECTED" });
+    expect(five).toMatchObject({ refusal: null, folded: [], added: [] });
+    expect(keys(five.plan.paths)).toEqual(["p1", "kp03", "kp04", "kp05"]);
+    expect(chips(five.plan.paths[0]!)).toEqual(["pt11", "pt13", "pt21", "pt12", "pt22"]);
+    expect(five.plan.paths[0]).toMatchObject({
+      wording: "WRITING", tag: "COMBINED_BY_YOU", combineRef: null, question: numbered("pt11", "pt13", "pt21", "pt12", "pt22")
+    });
+    expect(five.plan.undo.map((step) => step.kind)).toEqual(["CHANGE"]);
+    expect(pathPlanCombineFrees(reduce(plan, ...selectAll("kp01", "kp02")).plan)).toBe(1);
+    expect(keys(pathPlanReduce(five.plan, { type: "UNDO" }).plan.paths)).toEqual(["kp01", "kp02", "kp03", "kp04", "kp05"]);
+    // Start sends it, and the AI combine is asked for it, as the contract allows.
+    expect(startIssues(GROUPS_MENU, five.plan)).toEqual([]);
+    const combine = { context: { kind: "MENU", question_line: START_FIXTURE_QUESTION, check_ref: "check1.sig", menu_id: GROUPS_MENU.menu_id },
+      reading_level: "plain", members: pathPlanCombineMembers(five.plan.paths[0]!) };
+    expect(StartCombineRequestSchema.safeParse(combine).error?.issues ?? []).toEqual([]);
+  });
+
+  it("moves a chip into the AI's path of six: seven, and the words are asked again", () => {
+    const plan = pathPlanFromMenu(SIX_MENU, 5, false);
+    const seven = pathPlanReduce(plan, { type: "MOVE_CHIP", chipKey: "pt22", toPathKey: "kp01" });
+    expect(seven).toMatchObject({ refusal: null, folded: [], added: [] });
+    expect(keys(seven.plan.paths)).toEqual(["kp01", "kp07", "kp08", "kp09"]);
+    expect(chips(pathOf(seven.plan, "kp01"))).toEqual([...SIX_IDS, "pt22"]);
+    expect(pathOf(seven.plan, "kp01")).toMatchObject({ wording: "WRITING", tag: "COMBINED_BY_YOU", question: numbered(...SIX_IDS, "pt22") });
+    expect(seven.plan.undo.map((step) => step.kind)).toEqual(["CHANGE"]);
+  });
+
+  it("shows a \"Combine them?\" suggestion naming two paths of three each, and applying it makes one path of six", () => {
+    const plan = pathPlanFromMenu(GROUPS_MENU, 5, false);
+    expect(ids(pathPlanSuggestions(plan))).toEqual(["sg1"]);
+    const six = pathPlanReduce(plan, { type: "APPLY_SUGGESTION", suggestionId: "sg1" });
+    expect(six).toMatchObject({ refusal: null, folded: [], added: [] });
+    expect(keys(six.plan.paths)).toEqual(["p1", "kp02", "kp04", "kp05"]);
+    expect(chips(six.plan.paths[0]!)).toEqual(["pt11", "pt13", "pt21", "pt14", "pt15", "pt23"]);
+    expect(six.plan.done).toEqual(["sg1"]);
+  });
+
+  it("keeps at most four of the person's own words in a path: a fifth is refused (OWN_WORDS_FULL) and nothing changes", () => {
+    const plan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
+    const one = pathPlanReduce(plan, { type: "ADD_OWN", text: "Fish?", intoPathKey: null, swapWithKey: "kp05" }).plan;
+    const three = reduce(one, { type: "ADD_OWN", text: "Eels?", intoPathKey: "p2" }, { type: "ADD_OWN", text: "Birds?", intoPathKey: "p2" }).plan;
+    expect(chips(pathOf(three, "p2"))).toEqual(["o1", "o3", "o4"]);
+    const fourth = pathPlanReduce(three, { type: "ADD_OWN", text: "Frogs?", intoPathKey: "p2" });
+    expect(fourth.refusal).toBeNull();
+    const four = fourth.plan;
+    expect(chips(pathOf(four, "p2"))).toEqual(["o1", "o3", "o4", "o5"]);
+    expect(startIssues(NUCLEAR_MENU, four)).toEqual([]);
+    refused(four, { type: "ADD_OWN", text: "Otters?", intoPathKey: "p2" }, "OWN_WORDS_FULL");
+    // Another path of the person's own words can be neither put together with it nor moved into it.
+    const other = pathPlanReduce(four, { type: "ADD_OWN", text: "Otters?", intoPathKey: null, swapWithKey: "kp04" }).plan;
+    expect(keys(other.paths)).toEqual(["kp01", "kp02", "kp03", "p7", "p2"]);
+    const both = reduce(other, ...selectAll("p2", "p7")).plan;
+    refused(both, { type: "COMBINE_SELECTED" }, "OWN_WORDS_FULL");
+    expect(pathPlanCombineFrees(both)).toBe(0);
+    refused(other, { type: "MOVE_CHIP", chipKey: "o6", toPathKey: "p2" }, "OWN_WORDS_FULL");
+    // The menu's viewpoints never count against the four.
+    const withMenu = reduce(four, ...selectAll("p2", "kp01"), { type: "COMBINE_SELECTED" });
+    expect(withMenu.refusal).toBeNull();
+    expect(chips(withMenu.plan.paths[0]!)).toEqual(["pt11", "o1", "o3", "o4", "o5"]);
+    expect(startIssues(NUCLEAR_MENU, withMenu.plan)).toEqual([]);
+    const idea = pathPlanReduce(four, { type: "ADD_FROM_MORE", key: "kp06", intoPathKey: "p2" });
+    expect(idea.refusal).toBeNull();
+    expect(chips(pathOf(idea.plan, "p2"))).toEqual(["o1", "o3", "o4", "o5", "pt12"]);
+  });
+
+  it("counts a dig's picks with the person's own words: at most four in a path", () => {
+    const picks = pathPlanFromPicks([1, 2, 3, 4, 5].map((pickNo) => ({ pickNo, title: `Pick ${String(pickNo)}?`,
+      question: `What about pick ${String(pickNo)}?`, own: false })), false);
+    refused(reduce(picks, ...selectAll("p1", "p2", "p3", "p4", "p5")).plan, { type: "COMBINE_SELECTED" }, "OWN_WORDS_FULL");
+    const four = reduce(picks, ...selectAll("p1", "p2", "p3", "p4"), { type: "COMBINE_SELECTED" });
+    expect(four.refusal).toBeNull();
+    expect(keys(four.plan.paths)).toEqual(["p6", "p5"]);
+    expect(pathPlanCombineMembers(four.plan.paths[0]!).map((member) => member.pick_no)).toEqual([1, 2, 3, 4]);
+    expect(StartPathsSchema.safeParse({ source: "DIG_PICKS", paths: pathPlanToStartPaths(four.plan), width: 2, chosen_by: "PERSON" }).error?.issues ?? [])
+      .toEqual([]);
+    refused(four.plan, { type: "MOVE_CHIP", chipKey: "k5", toPathKey: "p6" }, "OWN_WORDS_FULL");
+  });
+
+  it("refuses only at the one technical bound: a path of every viewpoint a menu can hold (VIEWPOINTS_FULL)", () => {
+    const plan = pathPlanFromMenu(WHOLE_MENU, 5, false);
+    expect(pathOf(plan, "kp01").viewpoints).toHaveLength(54);
+    expect(startIssues(WHOLE_MENU, plan)).toEqual([]);
+    refused(plan, { type: "ADD_OWN", text: FISH, intoPathKey: "kp01" }, "VIEWPOINTS_FULL");
+    refused(plan, { type: "USE_CARD", cardId: "cd1", intoPathKey: "kp01" }, "VIEWPOINTS_FULL");
+    // One viewpoint taken out leaves room for one: the person's words make it 54 again, which Start may send.
+    const room = pathPlanReduce(plan, { type: "REMOVE", key: "pt96" }).plan;
+    expect(room.paths[0]!.viewpoints).toHaveLength(53);
+    const full = pathPlanReduce(room, { type: "ADD_OWN", text: FISH, intoPathKey: "kp01" });
+    expect(full.refusal).toBeNull();
+    expect(full.plan.paths[0]!.viewpoints).toHaveLength(54);
+    expect(startIssues(WHOLE_MENU, full.plan)).toEqual([]);
+    refused(full.plan, { type: "ADD_FROM_MORE", key: "p1", intoPathKey: full.plan.paths[0]!.key }, "VIEWPOINTS_FULL");
   });
 });

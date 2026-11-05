@@ -94,7 +94,7 @@ function worstCaseAskBody(fill: string): Record<string, unknown> {
 describe("the start step's limits and ids", () => {
   it("pins every limit, frozen", () => {
     expect(START_STEP_LIMITS).toEqual({ listsMax: 9, viewpointsPerListMax: 6, viewpointsMax: 54, anglesMax: 7, anglesPerListMax: 4,
-      titleMaxChars: 80, questionMaxChars: 240, whyMaxChars: 200, angleLabelMaxChars: 80, menuPathsMax: 54, viewpointsPerPathMax: 4,
+      titleMaxChars: 80, questionMaxChars: 240, whyMaxChars: 200, angleLabelMaxChars: 80, menuPathsMax: 54,
       pathMembersMax: 54, ownWordsAndPicksPerPathMax: 4, cardsMax: 3,
       cardSentenceMaxChars: 300, suggestionsMax: 9, suggestionReasonMaxChars: 200, lateListsMax: 8, menuRevisionsMax: 9, pathsMax: 7, storedPathsMax: 8,
       freePathsMax: 3, pathTitleMaxChars: 120, pathQuestionMaxChars: 1000, ownTextMaxChars: 1000, refMaxChars: 4096, askBodyMaxBytes: 393_216 });
