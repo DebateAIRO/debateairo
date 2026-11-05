@@ -59,7 +59,7 @@ describe("the public page's words", () => {
     "v4.public.report.noCarrier": "This debate's first author has left and no dig is on it yet, so a report can't be written. Dig into a path first.",
     "v4.public.report.write": "Write a report",
     // journey-f13 (owner's screen review, 3 Nov): "Dig here" on every page, own and public, in place of decision 22's "Dig into this";
-    // the box's Start reads as the map's picks button ("Dig into your pick · up to 3%", lib/v4/digQuota.ts).
+    // the box's Start reads as the map's picks button ("Dig into this · up to 3%" for one pick, lib/v4/digQuota.ts).
     "v4.public.dig.open": "Dig here",
     // Round 2, r2-17 (owner, 3 Nov): a whole sentence, "Quiet Heron added to this on 2 November".
     "v4.public.addedBy": "{name} added to this on {date}",

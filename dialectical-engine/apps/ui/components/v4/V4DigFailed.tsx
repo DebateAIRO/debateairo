@@ -8,8 +8,9 @@ import type { DigView } from "@/lib/v4/types";
 
 /*
  * Owner review 3 Nov 2026 (wait-f18, dig-f12): what a dig that did not finish says in its panel, under "This dig didn't
- * finish.": its plain reason sentence (the same fixed sentences as the failed page), "Nothing was taken from your quota
- * for this." only when the server confirms it, then the way on. [Try this dig again] digs the same picks with the same
+ * finish.": its plain reason, said about the dig (the owner's answer to question 3, 5 Nov 2026: one line per reason group,
+ * the same as the dig's own failed page), "Nothing was taken from your quota for this." only when the server confirms it
+ * (never when some was used, question 20 A), then the way on. [Try this dig again] digs the same picks with the same
  * Quick/Thorough choice through the usual 10-second Undo note (lib/v4/digRetry.ts). After a second failure of the same dig:
  * "This keeps failing. Write your report; it uses everything that finished." ("Write my report" stays in the rail and the
  * header, never beside a dig button.) A dig already tried again shows no second button here.
@@ -20,7 +21,7 @@ export type V4FailedDigs = Readonly<{
   retryOf: (dig: DigView) => DigRetry;
   /** Starts the retry (the page's usual Undo window). */
   onRetry: (dig: DigView) => void;
-  /** The plain sentence for a run's stored reason (the page's `home` catalogue reads it). */
+  /** The plain line for a dig's stored reason, said about the dig (lib/v4/failedRun.ts digFailureMessage). */
   reasonText: (reason: string | null | undefined) => string;
 }>;
 

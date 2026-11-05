@@ -63,7 +63,8 @@ export function PublicDebatePageClient({
 }) {
   // Decision 13: the first author's account is gone: the name went, and the page says so in its own words.
   const author = debate.author_name_gone === true ? t(v4Catalog, "v4.public.aContributor") : debate.author_pseudonym;
-  const published = t(publicCatalog, "public.header.summary", { author, date: formatDate(locale, debate.published_at) });
+  // The owner's answer to question 4 (5 Nov 2026, A): the long form with the year, "published 3 November 2026".
+  const published = t(publicCatalog, "public.header.summary", { author, date: formatDate(locale, debate.published_at, { dateStyle: "long" }) });
   return (
     <V4PublicSessionProvider>
       <div className="v4Root v4PubPage" data-public-page>

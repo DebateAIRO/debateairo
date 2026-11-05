@@ -26,8 +26,9 @@ export function PublicAnswerDisclosure({
     {engineLines && answer.tree_included !== true
       ? <p>{t(catalog, "public.disclosure.legacySummaryOnly")}</p>
       : null}
+    {/* The owner's answer to question 4 (5 Nov 2026, A): the long form with the year, and its clock on the 24-hour form ("20 October 2026 at 11:00"). */}
     <p>{t(catalog, "public.disclosure.evidenceAsOf", {
-      date: formatDate(locale, answer.as_of, { dateStyle: "short", timeStyle: "short" })
+      date: formatDate(locale, answer.as_of, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" })
     })}</p>
   </div>;
 }

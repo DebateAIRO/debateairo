@@ -31,11 +31,14 @@ describe("S8 duplicated public readers", () => {
         as_of: "2026-08-23T12:34:56.000Z"
       }
     }).answer;
-    // English pages write the day first on the 24-hour clock (owner's answer to question 5, 5 Nov 2026).
+    // English pages write the day first on the 24-hour clock (owner's answer to question 5, 5 Nov 2026), and the evidence
+    // date in the long form with the year, its clock in the 24-hour form (question 4 A): "23 August 2026 at 12:34".
     const expectedEvidenceDate = new Intl.DateTimeFormat("en-GB", {
-      dateStyle: "short",
-      timeStyle: "short"
+      dateStyle: "long",
+      timeStyle: "short",
+      hourCycle: "h23"
     }).format(new Date(answer.as_of));
+    expect(expectedEvidenceDate).toMatch(/^\d{1,2} August 2026 at \d{2}:\d{2}$/u);
     for (const [key, english] of [
       ["public.disclosure.answerStatus", "Answer status: {status}"],
       ["public.disclosure.verdictUnavailableMode", "Verdict unavailable in this published serving mode."],

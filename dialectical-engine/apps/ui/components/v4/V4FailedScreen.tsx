@@ -5,7 +5,7 @@ import type { RunProjection } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { ownWords } from "@/lib/v4/askText";
-import { quotaUntouched, sayNothingTaken } from "@/lib/v4/failedRun";
+import { digFailureMessage, failedQuotaKey } from "@/lib/v4/failedRun";
 
 /*
  * Owner review 3 Nov 2026 (wait-f11, map-f30): the page of a debate that did not finish. Its plain reason sentence (one of
@@ -17,6 +17,11 @@ import { quotaUntouched, sayNothingTaken } from "@/lib/v4/failedRun";
  *
  * A dig's own page (the dig did not finish) does not offer "Ask this again" (its question is the site's text for the AIs):
  * it leads back to the map it was dug from, where its panel offers "Try this dig again".
+ *
+ * The owner's answers of 5 Nov 2026: a dig's own page says its reason about the dig (question 3 A, the same line as its
+ * panel), never the question's sentence. Under the reason, one quota line at most (question 20 A): a question says
+ * "Nothing was taken for the failed try." when the server confirms nothing was used, and "The part that ran used some of
+ * your quota." when it says some was; a dig says "Nothing was taken from your quota for this." only when nothing was used.
  */
 
 export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, catalog, homeCatalog }: Readonly<{
@@ -36,14 +41,14 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
 }>) {
-  const nothingTaken = sayNothingTaken(run.terminal_reason, quotaUntouched(run));
+  const quotaKey = failedQuotaKey(run, dig !== null);
   return (
     <section className="v4Card v4DebStatus v4DebFailed">
       <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
       <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
       <h1 className="v4DebStatusTitle">{t(catalog, "v4.debate.failedTitle")}</h1>
-      <p>{runFailureMessage(run.terminal_reason, homeCatalog)}</p>
-      {nothingTaken ? <p>{t(catalog, "v4.debate.failedNothingTaken")}</p> : null}
+      <p>{dig === null ? runFailureMessage(run.terminal_reason, homeCatalog) : digFailureMessage(run.terminal_reason, catalog)}</p>
+      {quotaKey === null ? null : <p>{t(catalog, quotaKey)}</p>}
       {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}
       {run.found === undefined || run.found.length === 0 ? null : (
         <section>

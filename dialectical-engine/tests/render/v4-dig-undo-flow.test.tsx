@@ -315,12 +315,13 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect(harness.submit).not.toHaveBeenCalled();
     expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
     expect(bar.querySelector(".v4DebPhoneDig")!.textContent).toBe(CATALOG["v4.dig.chooseWhat"]);
-    // Once something is picked, the bar digs it: "Dig into your pick · up to 3%" (journey-f13 / dig-f5: "up to" while the
-    // server's deep-dig estimate still counts every rewrite above).
+    // Once something is picked, the bar digs it: "Dig into this · up to 3%" (journey-f13 / dig-f5: "up to" while the
+    // server's deep-dig estimate still counts every rewrite above; the owner's answer to question 1, 5 Nov: one pick reads
+    // "Dig into this" everywhere it is dug, the phone bar too).
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     const job = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
     expect(job.textContent).toBe(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
-    expect(job.textContent).toBe("Dig into your pick · up to 3%");
+    expect(job.textContent).toBe("Dig into this · up to 3%");
     await press(job);
     // The note sits inside the stack, above the bar; the bar's dig button steps back for the note's Undo.
     const note = stack()!.querySelector(".v4StackTop .v4Undo");

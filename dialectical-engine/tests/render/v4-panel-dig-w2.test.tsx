@@ -24,7 +24,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 /*
  * Wave 2 of the owner's screen review (OWNER-PICKS-2026-11-03.md), the panel and choosing what to dig, on the map page in
  * jsdom: map-d4 A (evidence first, sources folded into one line, "Skip to the dig button", the dig block pinned to the
- * panel's foot), map-f14 and dig-f4 (one pick reads "Dig into your pick", dig-f5 / dig-f31; the tray only from the second pick, docked in the panel
+ * panel's foot), map-f14 and dig-f4 (one pick reads map-f14's "Dig into this", the owner's answer to question 1 of 5 Nov; the tray only from the second pick, docked in the panel
  * column, never on a phone), dig-f9 (consent and crisis help at the click), dig-f14 (Cancel gives the tick back), dig-f21
  * (the person's words keep their direction), dig-f22 (a visible reason over greyed boxes), dig-f26 (Free's line under the
  * own-view box) and dig-f34 ("Open question", "Your view").
@@ -52,10 +52,10 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-// map-f14's "Dig into this" for one pick is an owner question: the built words are dig-f5 / dig-f31's "Dig into your pick"
-// (one dig-button helper, lib/v4/digQuota.ts), and the tray's "Dig into these" (journey-f13).
-describe("map-f14 / dig-f4: one pick reads \"Dig into your pick\"; the tray comes from the second pick, docked in the panel column", () => {
-  it("one pick: no tray, and the path's pinned button reads 'Dig into your pick'; two: the tray docks under the panel", async () => {
+// map-f14's "Dig into this" for one pick is the owner's answer to question 1 (5 Nov, B), everywhere one pick is dug (one
+// dig-button helper, lib/v4/digQuota.ts); two or more read "Dig into your picks", and the tray's "Dig into these" (journey-f13).
+describe("map-f14 / dig-f4: one pick reads \"Dig into this\"; the tray comes from the second pick, docked in the panel column", () => {
+  it("one pick: no tray, and the path's pinned button reads 'Dig into this'; two: the tray docks under the panel", async () => {
     await mountMap();
     await openPath(PATHS.renew);
     await click(panelBoxes()[0]!);

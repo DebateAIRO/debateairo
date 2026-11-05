@@ -15,7 +15,7 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { crisisWordsOf, digTargetQuestions } from "@/lib/v4/askText";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { addDig, DIG_UNDO_MS, digTargetKey, dismissDig, readDigUndo, undoDig, useDigUndo, type DigUndoResult } from "@/lib/v4/digUndo";
-import { digPeriodLine, picksButtonLabel } from "@/lib/v4/digQuota";
+import { picksButtonLabel, publicDigPeriodLine } from "@/lib/v4/digQuota";
 import { placeAboutLine } from "@/components/v4/digAbout";
 import { cardLabel, firstByOf } from "@/lib/v4/mapLooks";
 import { sharePeriodOf } from "@/lib/v4/money";
@@ -47,7 +47,8 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
  * The wave-2 review (4 Nov): the press runs the map's own click checks (dig-f9, lib/v4/useDigClickCheck.ts): the crisis help on the person's own views and the
  * one-time consent come at the click, and the 10 seconds start from the yes. A send still waiting while this page is open keeps its place (it is never called
  * failed while it may still start); one that met a screen after the page had gone says so in its note. The question check's screen names the path the dig is
- * about. journey-f13 / dig-f5: the box's buttons say "Dig here" and "Dig into your pick(s) · up to 3%", as on the map, with the period named once by the switch.
+ * about. journey-f13 / dig-f5: the box's buttons say "Dig here" and "Dig into this · up to 3%" ("Dig into your picks" for more), as on the map, with the
+ * period named once by the switch (the period alone on a public page: the owner's answer to question 34, 5 Nov).
  */
 
 /**
@@ -152,11 +153,10 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   // dig-f9: the crisis help and the one-time consent at the click, with the map's own piece (no second copy).
   const clickCheck = useDigClickCheck({ ensureConsent: ask.ensureConsent, offerCrisisHelp: ask.offerCrisisHelp });
   const share = useMemo(() => publicDigShare(room), [room]);
-  // public-d3 A / journey-f8: the period, named once by the switch, in the record's words with the approved reassurance
-  // ("of today · you can still finish your report"; "of this month" on Free). Whether someone else's public page should say
-  // the period alone (the drafted v4.public.dig.period.* lines) is an owner question; until it is answered the record's
-  // line stands (the wave-2 checks, W2L-9).
-  const periodLine = share === null ? null : digPeriodLine(room, catalog);
+  // public-d3 A / journey-f8: the period, named once by the switch. The owner's answer to question 34 (5 Nov, A, and its
+  // follow-up): every reader of a public page, its owner included, sees the period alone ("of today"; "of this month" on
+  // Free). Only the person's own map adds "· you can still finish your report".
+  const periodLine = share === null ? null : publicDigPeriodLine(room, catalog);
   const publicRef = debate.public_ref;
   const question = debate.question;
   const startDig = useCallback(async (path: PublicPathView, press: DigPress): Promise<number | DigRefused | null> => {
@@ -259,8 +259,9 @@ export function V4PublicLaneProvider({ debate, lane, children }: Readonly<{ deba
 }
 
 function useDayWords(locale: string): (day: string) => string {
-  // A contribution's day is a calendar date: said as written, whatever the reader's clock.
-  return (day) => formatDate(locale, `${day}T00:00:00.000Z`, { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" });
+  // A contribution's day is a calendar date: said as written, whatever the reader's clock. r2-17 writes it without the year
+  // ("added to this on 2 November"), and the owner's answer to question 4 (5 Nov 2026, A) keeps that shorter form.
+  return (day) => formatDate(locale, `${day}T00:00:00.000Z`, { timeZone: "UTC", day: "numeric", month: "long" });
 }
 
 /** r2-17: "Quiet Heron added to this on 2 November", a whole sentence; a name that went starts it as "A contributor". */
@@ -504,7 +505,7 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
         {/* public-d3 A / journey-f8: the period, once, by the switch, only where the button names a share. */}
         {actions.periodLine === null ? null : <p className="v4PubHint" data-public-dig-share>{actions.periodLine}</p>}
         <div className="v4PubDigActions">
-          {/* journey-f13 / dig-f5: the map's words, "Dig into your pick(s) · up to 3%". */}
+          {/* journey-f13 / dig-f5: the map's words, "Dig into this · up to 3%" ("Dig into your picks" for more). */}
           <button type="button" className="v4Btn v4BtnPrimary" disabled={actions.busy && !locked}
             aria-disabled={locked || checking || picked === 0 ? "true" : undefined}
             aria-describedby={picked === 0 ? `${ids}-why` : undefined} onClick={start} data-public-dig-start>

@@ -122,6 +122,23 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
   });
 
+  it("question 20 A: when the server says some was used, the question says 'The part that ran used some of your quota.'", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME" }, STOPPED);
+    await mountMap(1600, runId);
+    expect(text()).toContain(HOME["runFailure.STOPPED"]);
+    expect(text()).toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    expect(CATALOG["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
+    expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+    await unmountMap();
+    // A waived run never says it used some: its own sentence says it used none, and nothing contradicts it.
+    const other = crypto.randomUUID();
+    harness.run = failedRun(other, { quota_used: "SOME" }, "RUN_SET_ASIDE:BACKSTOP");
+    await mountMap(1600, other);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+  });
+
   it("a dig's own failed page leads back to its map instead of 'Ask this again'", async () => {
     const parent = crypto.randomUUID();
     const runId = crypto.randomUUID();
@@ -131,6 +148,34 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBeNull();
     expect(linkHref(CATALOG["v4.report.backToMap"]!)).toBe(`/v4/debate/${parent}?level=background`);
     expect(text()).toContain(CATALOG["v4.debate.digFailedBackNote"]);
+    // Question 3 A: its reason is said about the dig, never in the question's sentence.
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.MODELS_UNAVAILABLE"]);
+    expect(text()).not.toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
+  });
+
+  it("question 20 A: a dig's own failed page says the dig's 'nothing taken' when confirmed, and nothing when some was used", async () => {
+    const parent = crypto.randomUUID();
+    const mount = async (quota: "NONE" | "SOME", reason = STOPPED): Promise<void> => {
+      const runId = crypto.randomUUID();
+      harness.run = failedRun(runId, { quota_used: quota }, reason);
+      harness.records = { parent: { parent_run_id: parent, child_run_id: runId, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-29T10:05:00.000Z" }, children: [] };
+      await mountMap(1600, runId);
+    };
+    await mount("NONE");
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(text()).not.toContain(HOME["runFailure.STOPPED"]);
+    expect(text()).toContain(CATALOG["v4.digFailed.nothingTaken"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+    await unmountMap();
+    await mount("SOME");
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(text()).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    await unmountMap();
+    // An upload set the dig aside: its own line already says it did not use the quota, so it is not said twice.
+    await mount("NONE", "RUN_SET_ASIDE:BACKSTOP");
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.SET_ASIDE"]);
+    expect(text()).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
   });
 });
 
@@ -144,7 +189,10 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(branch(PATHS.mix).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.FAILED"]);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.panel.digState.FAILED"]);
-    expect(panel().textContent).toContain(HOME["runFailure.STOPPED"]);
+    // Question 3 A (5 Nov): the reason is said about the dig, not in the question's words.
+    expect(panel().textContent).toContain(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(panel().textContent).toContain("This dig stopped partway because of a problem on our side.");
+    expect(panel().textContent).not.toContain(HOME["runFailure.STOPPED"]);
     expect(panel().textContent).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
     // The page's own switch says Quick; the failed dig was Thorough, and is tried again as it was.
     await click(buttonNamed(CATALOG["v4.digFailed.retry"]!, panel()));

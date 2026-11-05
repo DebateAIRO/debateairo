@@ -19,7 +19,7 @@ import { V4ShareChange } from "./V4ShareChange";
  *    panel), under the panel's own pinned dig block. When that block already digs these picks, the tray offers no second
  *    dig button, only the picks and Clear (lib/v4/digDock.ts).
  *  - A phone has no tray: its pinned bar carries the picks, and the Map sheet lists them with Clear (V4PicksList).
- *  - Its button reads "Dig into these · up to 5%" ("Dig into your pick" for one), the picks' own share from their own
+ *  - Its button reads "Dig into these · up to 5%" ("Dig into this" for one), the picks' own share from their own
  *    room read, through the one dig-button helper of lib/v4/digQuota.ts (useDigQuota); a share that changed shows its grey
  *    mark for 2 seconds (journey-f8). While new digs wait for a reset it stays, greyed with the reset time, and the line
  *    beside it says why; pressing it starts nothing (dig-f11, journey-f14).

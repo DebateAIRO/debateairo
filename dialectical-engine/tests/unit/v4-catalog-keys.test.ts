@@ -3,6 +3,7 @@ import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { basisKey, OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
 import { DIG_LEVEL_MAX, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
+import { RUN_FAILURE_KINDS } from "../../apps/ui/lib/v3/runFailure.js";
 
 /*
  * V4 initial (2026-10-28): the v4 namespace has no English backstop in t() (only chrome/home/newDebate/support/time
@@ -54,11 +55,21 @@ const APPROVED_REPORT_LINES: Readonly<Record<string, string>> = Object.freeze({
 
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
 const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
-  // The wave-2 checks (4 Nov): a public dig's period line without the map's "you can still finish your report" (journey-f8's
-  // own "of today" / "of this month"; the week's form follows them). Owner question.
-  "v4.public.dig.period.PERSON_DAY",
+  // The wave-2 checks (4 Nov): a public dig's period line without the map's "you can still finish your report". The owner's
+  // answer to question 34 (5 Nov, A) shows it to every reader of a public page; "of today" and "of this month" are the
+  // record's own words (read-f19, journey-f8: QUOTA_RECORD_LINES below), the week's form follows them and stays a draft.
   "v4.public.dig.period.PERSON_WEEK",
-  "v4.public.dig.period.PERSON_MONTH",
+  // The owner's answers of 5 Nov: question 3 A's seven lines saying why a dig did not finish, said about the dig (the
+  // answer's own example is the "stopped partway" line; all are new words, approved at the click-test), and question 20
+  // A's line when the part of a failed question that ran used some of the quota (section 2c: approved at the click-test).
+  "v4.digFailed.reason.NOT_STARTED",
+  "v4.digFailed.reason.PLAN_ENDED",
+  "v4.digFailed.reason.MODELS_UNAVAILABLE",
+  "v4.digFailed.reason.RUN_LIMIT_REACHED",
+  "v4.digFailed.reason.SET_ASIDE",
+  "v4.digFailed.reason.STOPPED",
+  "v4.digFailed.reason.CHOICE_GONE",
+  "v4.debate.failedSomeTaken",
   // ACCESS-13 (the wave-2 checks): "Light or dark"'s name also says what a press does. Owner question.
   "v4.header.menu.themeToDark",
   "v4.header.menu.themeToLight",
@@ -597,8 +608,8 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   // over greyed boxes), dig-f34 (the two labels). Under the own-view box, journey-f20's "This will be public." where the
   // debate's own public state says so (v4.publicMark.willBePublic, pinned in tests/unit/public-lane.test.ts), and on a
   // Free debate whose state says no more than private, dig-f26's own sentence (the wave-2 review, lib/v4/publicNotes.ts).
-  // One pick's button reads dig-f5 / dig-f31's "Dig into your pick" (QUOTA_RECORD_LINES below), the one dig-button helper
-  // of lib/v4/digQuota.ts; map-f14's "Dig into this" is an owner question.
+  // One pick's button reads map-f14's "Dig into this" (QUOTA_RECORD_LINES below: the owner's answer to question 1, 5 Nov,
+  // B, everywhere one pick is dug), the one dig-button helper of lib/v4/digQuota.ts.
   "v4.suggest.ownViewPublic": "Free debates are public, so your view may be shown on this public page.",
   // map-d4 A, as drawn on the page the owner picked from: the findings' heading.
   "v4.panel.found": "What we found",
@@ -621,12 +632,15 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
 /**
  * The owner's screen review (OWNER-PICKS-2026-11-03.md), the quota track: the record's own words for the dig buttons, the
  * period by the switch, the can't-start states and "This question" (journey-f13, dig-f5, dig-f31, public-d3 A,
- * journey-f14, journey-f15, map-f9), word for word.
+ * journey-f14, journey-f15, map-f9), word for word. The owner's answers of 5 Nov: one pick reads map-f14's "Dig into this"
+ * everywhere it is dug, in the panel, the phone bar, the tray and a public dig box (question 1 B and its follow-up; two or
+ * more keep "Dig into your picks"), and a public page's dig box says the period alone to every reader (question 34 A and
+ * its follow-up: read-f19 / journey-f8's "of today", "of this month" on Free).
  */
 const QUOTA_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.panel.dig": "Dig here",
   "v4.undo.barShare": "up to {percent}%",
-  "v4.dig.yourPicks.one": "Dig into your pick",
+  "v4.dig.yourPicks.one": "Dig into this",
   "v4.dig.yourPicks.other": "Dig into your picks",
   "v4.dig.trayDigThese": "Dig into these",
   "v4.dig.chooseWhat": "Choose what to dig ›",
@@ -634,6 +648,8 @@ const QUOTA_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.dig.addToTray": "Add to tray",
   "v4.dig.period.PERSON_DAY": "of today · you can still finish your report",
   "v4.dig.period.PERSON_MONTH": "of this month · you can still finish your report",
+  "v4.public.dig.period.PERSON_DAY": "of today",
+  "v4.public.dig.period.PERSON_MONTH": "of this month",
   "v4.suggest.waitingOn": "Your picks are waiting on “{path}”.",
   "v4.suggest.goToPicks": "Go to them",
   "v4.suggest.clearPicks": "Clear them",
@@ -666,6 +682,38 @@ describe("the owner's 5 Nov answers: the header", () => {
       // A bar's label is the period word of its read-out line ("Today", "This week", "This month", "In total").
       expect(catalog[`v4.header.bar.${scope}`], scope).toBe(catalog[`v4.header.used.${scope}`]!.split(":")[0]);
     }
+  });
+});
+
+describe("the owner's 5 Nov answers: failed digs and questions, one pick, the public period", () => {
+  it("question 3 A: a dig that did not finish has its own line for every reason group, said about the dig, all drafts", () => {
+    const keys = RUN_FAILURE_KINDS.map((kind) => `v4.digFailed.reason.${kind}`);
+    expect(keys.filter((key) => !(key in catalog))).toEqual([]);
+    expect(keys.filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+    // The answer's own example; every line names the dig, never the question, and asks for nothing to be asked again.
+    expect(catalog["v4.digFailed.reason.STOPPED"]).toBe("This dig stopped partway because of a problem on our side.");
+    for (const key of keys) {
+      expect(catalog[key], key).toMatch(/\bdig\b/u);
+      expect(catalog[key], key).not.toMatch(/question|debate|ask|allowance|limit|paused/iu);
+    }
+    // The two kinds that were never charged say so in their own line (lib/v4/failedRun.ts never says it twice).
+    for (const kind of ["SET_ASIDE", "CHOICE_GONE"]) expect(catalog[`v4.digFailed.reason.${kind}`], kind).toMatch(/did not use (?:any of )?your quota\./u);
+  });
+
+  it("question 20 A: the failed question's 'used some' line is the answer's words, a draft until the click-test", () => {
+    expect(catalog["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.failedSomeTaken");
+    // The two "nothing taken" lines are the record's (map-f30, wait-f18), not drafts.
+    expect([catalog["v4.debate.failedNothingTaken"], catalog["v4.digFailed.nothingTaken"]])
+      .toEqual(["Nothing was taken for the failed try.", "Nothing was taken from your quota for this."]);
+  });
+
+  it("questions 1 B and 34 A: one pick and the public period are the record's words, off the drafted list; the week stays drafted", () => {
+    for (const key of ["v4.dig.yourPicks.one", "v4.public.dig.period.PERSON_DAY", "v4.public.dig.period.PERSON_MONTH"]) {
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).not.toContain(key);
+    }
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.public.dig.period.PERSON_WEEK");
+    expect(Object.values(catalog).filter((value) => /Dig into your pick(?!s)/u.test(value))).toEqual([]);
   });
 });
 

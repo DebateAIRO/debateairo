@@ -100,7 +100,11 @@ const RUNS = {
   digNoChange: "d5000000-0000-4000-8000-000000000005",
   paused: "e1000000-0000-4000-8000-000000000001",
   // W3-4: a dig at the deepest level (10).
-  deepest: "d1000000-0000-4000-8000-000000000010"
+  deepest: "d1000000-0000-4000-8000-000000000010",
+  // The owner's answers of 5 Nov (failed-seed.ts): the debate with a failed dig per reason group, and the failed question
+  // whose draft view says it used some of the quota.
+  failedDigs: "f0000000-0000-4000-8000-000000000000",
+  failedSome: "45000000-0000-4000-8000-000000000045"
 };
 const MOCK = process.env.DIALECTICAL_API_BASE!;
 /** A mock control or a draft read, straight from the mock (not part of the real API). */
@@ -479,6 +483,24 @@ await step("a failed debate's quota_used, and the dig= switch", async () => {
   must(draft.quota_used === "NONE", "the draft view says nothing was taken");
   for (const dig of ["FAIL", "PAUSE", "SETTLE"]) must((await mock(`/__mock/set?dig=${dig}`)).dig === dig, `dig=${dig} is taken`);
   return `draft quota_used ${String(draft.quota_used)}; dig= FAIL, PAUSE, SETTLE`;
+}, (value: string) => value);
+// The owner's answers of 5 Nov (questions 3 A and 20 A): one failed dig per reason group on its own debate's map, sorted by
+// the website's own reason groups, and a failed question whose draft view says it used some of the quota.
+await step("a failed dig per reason group, and a failed question that used some (5 Nov answers)", async () => {
+  const failure: Loose = await import(pathToFileURL(join(UI, "lib", "v3", "runFailure.ts")).href);
+  const links: Loose = await client.readDigLinks(RUNS.failedDigs);
+  const kinds = new Set<string>();
+  for (const link of links.children) {
+    const run: Loose = await client.readRun(link.child_run_id);
+    must(run.state === "FAILED", `${link.child_run_id} failed`);
+    kinds.add(failure.runFailureKind(run.terminal_reason));
+    const draft: Loose = await mock(`/__mock/draft/v1/runs/${link.child_run_id}`);
+    must(draft.quota_used === "NONE" || draft.quota_used === "SOME", `${link.child_run_id}: the draft view says what it took`);
+  }
+  must(failure.RUN_FAILURE_KINDS.every((kind: string) => kinds.has(kind)), `every reason group has a failed dig (${[...kinds].join(", ")})`);
+  const some: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failedSome}`);
+  must(some.state === "FAILED" && some.quota_used === "SOME", "the second failed question's draft view says it used some");
+  return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}`;
 }, (value: string) => value);
 
 // Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any

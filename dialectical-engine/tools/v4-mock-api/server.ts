@@ -43,6 +43,7 @@ import {
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
+import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "./failed-seed.js";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Find the repository (no machine path is written here): MOCK_ENGINE_DIR, else the dialectical-engine folder this file
@@ -409,6 +410,16 @@ settledRun({
   runRef: ARABIC_RUN.runRef, answerId: ARABIC_RUN.answerId, seq: 40, web: "PAID", question: ARABIC_RUN.question,
   askedAt: Date.parse("2026-10-30T09:00:00.000Z"), settleAt: Date.parse("2026-10-30T09:20:00.000Z"), storyReadyAt: 0
 }).language = Object.freeze({ tag: "ar", name: "Arabic" });
+// The owner's answers of 5 Nov (questions 3 A and 20 A; failed-seed.ts): a debate with seven digs that did not finish, one
+// per reason group, and a failed question whose draft view says it used some of the quota.
+settledRun({
+  runRef: FAILED_DIGS_PARENT.runRef, answerId: FAILED_DIGS_PARENT.answerId, seq: FAILED_DIGS_PARENT.seq, web: "PAID", question: FAILED_DIGS_PARENT.question,
+  askedAt: Date.parse(FAILED_DIGS_PARENT.askedAt), settleAt: Date.parse(FAILED_DIGS_PARENT.settledAt), storyReadyAt: 0
+});
+for (const dig of FAILED_DIGS) {
+  addRun({ runRef: dig.runRef, seq: dig.seq, question: dig.question, failedReason: dig.reason, quotaUsed: dig.quotaUsed });
+}
+addRun({ runRef: RUN_FAILED_SOME.runRef, seq: RUN_FAILED_SOME.seq, question: RUN_FAILED_SOME.question, failedReason: RUN_FAILED_SOME.reason, quotaUsed: RUN_FAILED_SOME.quotaUsed });
 
 // Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -541,6 +552,8 @@ for (const dig of SEEDED_NEW_DIGS) {
 }
 linkDig(DEEPEST_DIG.dig.parent_run_id, { child_run_id: DEEPEST_DIG.runRef, places: DEEPEST_DIG.dig.places, mode: DEEPEST_DIG.mode },
   Date.parse(DEEPEST_DIG.askedAt));
+// Questions 3 A and 20 A (5 Nov): the seven failed digs hang on their own debate's map, which opens its own investigation.
+for (const dig of FAILED_DIGS) linkDig(FAILED_DIGS_PARENT.runRef, { child_run_id: dig.runRef, places: [dig.place], mode: dig.mode }, Date.parse(dig.askedAt));
 
 /** W3-4: a debate's dig level, as its answer says it (0: a first debate, or a run with no answer yet). */
 function digLevelOfRun(runRef: string): number {
@@ -2028,7 +2041,9 @@ server.listen(PORT, HOST, () => {
       settled: RUN_SETTLED, running: RUN_RUNNING, waiting: RUN_WAITING, failed: RUN_FAILED, story_writing: RUN_STORY_WRITING,
       free: RUN_FREE, search_failed: RUN_SEARCH_FAILED, dig: RUN_DIG,
       // W2-7: the dig trail (own view at level 1, then levels 2 and 3) and the debate paused at the month wall.
-      dig_own_view: DIG_RUNS.ownView, dig_level_two: DIG_RUNS.levelTwo, dig_level_three: DIG_RUNS.levelThree, dig_deepest: DEEPEST_DIG.runRef, paused: RUN_PAUSED
+      dig_own_view: DIG_RUNS.ownView, dig_level_two: DIG_RUNS.levelTwo, dig_level_three: DIG_RUNS.levelThree, dig_deepest: DEEPEST_DIG.runRef, paused: RUN_PAUSED,
+      // The owner's answers of 5 Nov: the debate with a failed dig per reason group, and the failed question that used some.
+      failed_digs: FAILED_DIGS_PARENT.runRef, failed_some: RUN_FAILED_SOME.runRef
     }
   })}\n`);
 });

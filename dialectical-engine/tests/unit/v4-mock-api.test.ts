@@ -23,6 +23,9 @@ import {
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, LIVE_STEPS_NO_WEB, LIVE_STEPS_WEB } from "../../tools/v4-mock-api/live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS } from "../../tools/v4-mock-api/climb-seed.js";
+import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "../../tools/v4-mock-api/failed-seed.js";
+import { RUN_FAILURE_KINDS, runFailureKind } from "../../apps/ui/lib/v3/runFailure.js";
+import { failedQuotaKey } from "../../apps/ui/lib/v4/failedRun.js";
 import { parseDigProgress } from "../../apps/ui/lib/v4/digProgress.js";
 import { belowStateOf, type BelowDig } from "../../apps/ui/lib/v4/digsBelow.js";
 
@@ -390,6 +393,37 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(DraftRunQuotaUsedSchema.safeParse("ALL").success).toBe(false);
     expect(["v4.debate.failedNothingTaken", "v4.digFailed.nothingTaken", "v4.digFailed.retry", "v4.digFailed.keepsFailing",
       "v4.pause.digCard", "v4.pause.digCardReady"].filter((key) => !(key in catalog))).toEqual([]);
+  });
+
+  it("the owner's 5 Nov answers (questions 3 A, 20 A): a failed dig for every reason group, and a failed question that used some", () => {
+    // Question 3 A: every one of the seven reason groups has one seeded failed dig, each with a code of its group.
+    expect(FAILED_DIGS.map((dig) => dig.kind).sort()).toEqual([...RUN_FAILURE_KINDS].sort());
+    for (const dig of FAILED_DIGS) {
+      expect(runFailureKind(dig.reason), dig.runRef).toBe(dig.kind);
+      expect(dig.place, dig.runRef).toMatch(/^path:n-(?:mix|renew|nuclear|smr)$/u);
+      expect(DraftRunQuotaUsedSchema.safeParse(dig.quotaUsed).success, dig.runRef).toBe(true);
+      // Each dig's own line is in the catalogue (the page never shows the code).
+      expect(catalog[`v4.digFailed.reason.${dig.kind}`], dig.kind).toBeTruthy();
+      const run = { run_ref: dig.runRef, question_line: dig.question, state: "FAILED", terminal_reason: dig.reason, hold_until: null };
+      expect(stripRun({ ...run, quota_used: dig.quotaUsed })).toEqual(run);
+      expect(RunProjectionSchema.safeParse(run).success, dig.runRef).toBe(true);
+    }
+    expect(new Set([FAILED_DIGS_PARENT.runRef, ...FAILED_DIGS.map((dig) => dig.runRef), RUN_FAILED_SOME.runRef]).size).toBe(FAILED_DIGS.length + 2);
+    expect(new Set(FAILED_DIGS.map((dig) => dig.seq)).size).toBe(FAILED_DIGS.length);
+    // Only the dig that ran partway used some; the waived ones say so in their own line, so the page adds nothing.
+    const quota = Object.fromEntries(FAILED_DIGS.map((dig) => [dig.kind, dig.quotaUsed]));
+    expect(quota).toMatchObject({ STOPPED: "SOME", SET_ASIDE: "NONE", CHOICE_GONE: "NONE", NOT_STARTED: "NONE" });
+    const shown = (dig: (typeof FAILED_DIGS)[number]) => failedQuotaKey(
+      { run_ref: dig.runRef, question_line: dig.question, state: "FAILED", terminal_reason: dig.reason, hold_until: null, quota_used: dig.quotaUsed } as never, true);
+    expect(Object.fromEntries(FAILED_DIGS.map((dig) => [dig.kind, shown(dig)]))).toEqual({
+      STOPPED: null, NOT_STARTED: "v4.digFailed.nothingTaken", MODELS_UNAVAILABLE: "v4.digFailed.nothingTaken",
+      RUN_LIMIT_REACHED: "v4.digFailed.nothingTaken", PLAN_ENDED: "v4.digFailed.nothingTaken", SET_ASIDE: null, CHOICE_GONE: null
+    });
+    // Question 20 A: the second failed question's draft view says SOME, so its page would say the "used some" line.
+    expect(RUN_FAILED_SOME.quotaUsed).toBe("SOME");
+    expect(failedQuotaKey({ run_ref: RUN_FAILED_SOME.runRef, question_line: RUN_FAILED_SOME.question, state: "FAILED",
+      terminal_reason: RUN_FAILED_SOME.reason, hold_until: null, quota_used: "SOME" } as never, false)).toBe("v4.debate.failedSomeTaken");
+    expect(catalog["v4.debate.failedSomeTaken"]).toBeTruthy();
   });
 
   it("the quota's windows (owner's screen review, 3 Nov): share_scope and question_share pass their draft schemas and fall back", () => {
