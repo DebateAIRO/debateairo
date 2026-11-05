@@ -274,7 +274,8 @@ describe("0134: the dig model and the month pause", () => {
     expect(read("packages/db/src/account-erasure.ts")).toContain("FORGET_ERASED_DEBATE_DIG_MODEL,\n");
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
-    expect(exporter).toContain("worker.worker_count !== 23");
+    // V4 start step, Task 39e: 0160's export reader is the twenty-fourth worker function.
+    expect(exporter).toContain("worker.worker_count !== 24");
   });
 
   it("C-R is documented as the twenty-fourth step", () => {

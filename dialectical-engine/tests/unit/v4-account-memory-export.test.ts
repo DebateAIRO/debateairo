@@ -144,7 +144,8 @@ describe("V4 account memory in the data export", () => {
   });
 
   // Ten with 0131; twelve since the Perplexity plan's 0132 and 0133 added their two readers; thirteen with 0134's;
-  // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's; twenty-two with 0152's.
+  // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's; twenty-two with 0152's;
+  // twenty-three with 0156's; twenty-four with 0160's (Task 39e).
   it("requires the page memory reader in the worker role witness (twenty-two functions)", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({
@@ -152,9 +153,9 @@ describe("V4 account memory in the data export", () => {
       request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 23) as never)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_page_memory(uuid,uuid)");
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 22) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 23) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   });
 
   it("names the new account records in the README", () => {

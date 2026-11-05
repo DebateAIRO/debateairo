@@ -9,7 +9,7 @@ import {
   buildApi,
   type AskApplication
 } from "@debateai/api";
-import { START_STEP_LIMITS } from "@debateai/contract";
+import { SAVED_QUESTION_LIMITS, START_STEP_LIMITS } from "@debateai/contract";
 import type { MfaApplication } from "../../apps/api/src/mfa.js";
 import { RECOVERY_START_PUBLIC_RESPONSE, type RecoveryApplication } from "../../apps/api/src/recovery.js";
 import {
@@ -215,6 +215,29 @@ describe("API request limits (F-07, L1-F4)", () => {
       });
       expect(oversized.statusCode).toBe(413);
       expect(oversized.json()).toEqual({ error: "PAYLOAD_TOO_LARGE", message: "PAYLOAD_TOO_LARGE" });
+      expect(failureLog).not.toHaveBeenCalled();
+    } finally {
+      await close();
+    }
+  });
+
+  it("gives a saved question's first and later saves their own ceiling (720 KiB) and refuses one byte more with a typed 413", async () => {
+    // V4 start step, Task 39e (saved questions spec 2026-11-04 §3.14): POST /v1/account/saved-questions and PUT …/{id} carry the whole
+    // step 2 (the largest Start's reading, 256 KiB of the page's own state and the request around it): SAVED_QUESTION_LIMITS.saveBodyMaxBytes,
+    // never the 16 KiB credential ceiling. Inside it the transport admits the body (no service here: 503 after it); one byte more is 413.
+    const { api, close, failureLog } = harness();
+    try {
+      for (const [method, url] of [["POST", "/v1/account/saved-questions"], ["PUT", `/v1/account/saved-questions/${RUN_ID}`]] as const) {
+        const within = await api.inject({ method, url, headers: { ...USER_MUTATION_HEADERS, ...JSON_HEADERS },
+          payload: jsonBodyOfBytes(SAVED_QUESTION_LIMITS.saveBodyMaxBytes) });
+        expect(within.statusCode, `${method} within`).toBe(503);
+        expect(within.json()).toEqual({ error: "SAVED_QUESTIONS_UNAVAILABLE", message: "SAVED_QUESTIONS_UNAVAILABLE" });
+        const oversized = await api.inject({ method, url, headers: { ...USER_MUTATION_HEADERS, ...JSON_HEADERS },
+          payload: jsonBodyOfBytes(SAVED_QUESTION_LIMITS.saveBodyMaxBytes + 1) });
+        expect(oversized.statusCode, `${method} oversized`).toBe(413);
+        expect(oversized.json()).toEqual({ error: "PAYLOAD_TOO_LARGE", message: "PAYLOAD_TOO_LARGE" });
+      }
+      expect(SAVED_QUESTION_LIMITS.saveBodyMaxBytes).toBeGreaterThan(START_STEP_LIMITS.askBodyMaxBytes);
       expect(failureLog).not.toHaveBeenCalled();
     } finally {
       await close();

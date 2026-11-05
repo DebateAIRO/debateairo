@@ -71,6 +71,7 @@ import {
   openRecord,
   FilePublicationKeyStore,
   FileRunContentKeyStore,
+  FileSavedQuestionKeyStore,
   FileUserDekStore,
   loadKekRing,
   loadSecretKey,
@@ -198,6 +199,9 @@ import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
 import { accountMemoryStoreFrom } from "./account-memory.js";
+// V4 start step, Task 39e: the questions not started yet, 0160's store of rows and the service over it and the question keys.
+import { savedQuestionStoreFrom } from "./saved-questions/store.js";
+import { createSavedQuestionService, savedQuestionOpener } from "./saved-questions/service.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
@@ -975,6 +979,11 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
       return userId;
     }
   ));
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answer S4 A): each question not started yet has a key of its own,
+// wrapped by the person's user key exactly as a debate's run key is, in its own saved-questions/ folder under the same root. It opens a
+// key only with the caller's own { userId, ownerRef } (the session's, or the export claim's), so it looks no owner up: no cross-account
+// site. The account closing, the saved-question service and the data export all use this one store.
+const savedQuestionKeys = boot.runSync("saved-question-key-store", () => new FileSavedQuestionKeyStore(environment.USER_DEK_STORE_PATH, dekStore));
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
@@ -1257,7 +1266,10 @@ const accountErasure = new AccountErasureCoordinator(
     readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
       'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
     )).rows[0]?.email_ciphertext ?? null,
-    beforeKeyDestruction: threatReportEmailHold(threatReportRepository)
+    beforeKeyDestruction: threatReportEmailHold(threatReportRepository),
+    // V4 start step, Task 39e (owner answer S4 A): closing the account destroys every question key it finds by the owner_ref, then the
+    // account key (Task 39d's step); the same store the service and the export use.
+    savedQuestionKeys
   }
 );
 const threatReportAlertsTimer = startThreatReportAlerts({
@@ -1774,6 +1786,8 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
             return plain.toString("utf8");
           } finally { plain?.fill(0); dek.fill(0); }
         },
+        // V4 start step, Task 39e: a question not started yet, opened with its own key under the claim's account (null: its key is gone).
+        openSavedQuestion: savedQuestionOpener(savedQuestionKeys),
         openRecord: (aad, ciphertext) => {
           const plain = openRecord(recordsKey, aad, ciphertext);
           try { return plain.toString("utf8"); } finally { plain.fill(0); }
@@ -1801,6 +1815,16 @@ const admission = new AdmissionLimiter(admissionPolicy);
 // V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
 // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
 const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answers S3 A, S4 A): the questions not started yet, through 0160's
+// five functions on the same runtime pool (EXECUTE for debateai_billing_runtime only), each sealed and opened with its own key from the
+// one question-key store, and kept only for a reading the start step's key signed (Task 31's, the same the step signs with).
+const savedQuestionStore = savedQuestionStoreFrom((text, values) => pool.query(text, values));
+const savedQuestions = createSavedQuestionService({
+  store: savedQuestionStore,
+  keys: savedQuestionKeys,
+  key: startStepKey,
+  report: (code, id) => { console.error(JSON.stringify({ event: code, ...(id === undefined ? {} : { saved_question_id: id }) })); }
+});
 const investigations = new PostgresInvestigationRepository(pool);
 /**
  * V4 start step, Task 31 (spec 2026-11-03 §4.1; owner answers Q2 and Q8 of 4 Nov): THE STEP BEFORE START, behind POST
@@ -1887,6 +1911,8 @@ const api = buildApi({
   // V4 start step, Task 56b (owner answer Q20 B): a public debate's report counts, on this pool (0159 grants them to its billing role),
   // so the owner's first report of their own public debate uses the kept reserve and a further one waits for the reset.
   ownClosings: new PostgresOwnClosingsReader(pool),
+  // V4 start step, Task 39e: the questions not started yet, their five routes and the removal at Start.
+  savedQuestions,
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).

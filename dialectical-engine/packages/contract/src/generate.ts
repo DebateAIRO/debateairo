@@ -12,7 +12,8 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema,
   StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
-  StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema } from "./index.js";
+  StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
+  SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema } from "./index.js";
 
 const endpointSchemas = {
   ...passwordResetContractSchemas,
@@ -29,7 +30,9 @@ const endpointSchemas = {
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema,
   // V4 start step, Task 30: the four calls before Start.
   StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
-  StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema
+  StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
+  // V4 start step, Task 39e: the five saved-question routes.
+  SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema
 };
 type EndpointSchemaName = keyof typeof endpointSchemas;
 const reference = (name: EndpointSchemaName) => ({ $ref: `#/components/schemas/${name}` });
@@ -84,6 +87,16 @@ const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "POST /v1/asks/paths/merge": { ...request(reference("StartMergeRequestSchema")), ...eventStream(reference("StartMergeEventSchema")) },
   "POST /v1/asks/paths/combine": { ...request(reference("StartCombineRequestSchema")), ...response(reference("StartCombineResponseSchema")) },
   "POST /v1/asks/paths/fit": { ...request(reference("StartFitRequestSchema")), ...response(reference("StartFitResponseSchema")) },
+  // V4 start step, Task 39e: the questions not started yet, the signed-in person's own; every answer no-store. Another person's id answers
+  // as a missing one (404 SAVED_QUESTION_GONE, DELETE 204); a refused save answers its code (saved questions spec 2026-11-04 §3.14).
+  "GET /v1/account/saved-questions": response(reference("SavedQuestionListSchema")),
+  "POST /v1/account/saved-questions": { ...request(reference("SavedQuestionCreateSchema")), ...response(reference("SavedQuestionWrittenSchema"), "201") },
+  "PUT /v1/account/saved-questions/{id}": { ...request(reference("SavedQuestionSaveSchema")), ...response(reference("SavedQuestionWrittenSchema")),
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }] },
+  "GET /v1/account/saved-questions/{id}": { ...response(reference("SavedQuestionReadSchema")),
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }] },
+  "DELETE /v1/account/saved-questions/{id}": { responses: { "204": { description: "Gone, or never there: its key destroyed first" } },
+    parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }] },
   "GET /v1/admin/enrollment": response(variants("StaffEnrollmentResponseSchema","FundedStaffEnrollmentResponseSchema")),
   "POST /v1/admin/webauthn/elevation/verify": response(variants("StaffElevationResponseSchema", "FundedStaffElevationResponseSchema")),
   "GET /v1/admin/team": response(variants("StaffTeamPageSchema", "FundedStaffTeamPageSchema")),

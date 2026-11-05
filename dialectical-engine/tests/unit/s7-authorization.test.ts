@@ -86,6 +86,12 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
   { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
   { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
+  // V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04 §3.14).
+  { route: "GET /v1/account/saved-questions", auth: "user", resource: "identity", action: "list-saved-questions" },
+  { route: "POST /v1/account/saved-questions", auth: "user", resource: "identity", action: "create-saved-question" },
+  { route: "PUT /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "save-saved-question" },
+  { route: "GET /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "read-saved-question" },
+  { route: "DELETE /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "delete-saved-question" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -362,7 +368,7 @@ describe("S7 deny-by-default authorization", () => {
     await api.ready();
     for (const route of contractInventory.routes) {
       const [method, path] = route.split(" ");
-      expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
+      expect(api.hasRoute({method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
@@ -387,7 +393,9 @@ describe("S7 deny-by-default authorization", () => {
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
     // Decision 33 adds the four staff routes of a public debate under review. Decision 35 adds the Report button's three.
     // V4 start step, Task 30 adds the four calls before Start (POST /v1/asks/paths/lists, …/merge, …/combine and …/fit): 205.
-    expect(contractInventory.routes).toHaveLength(205);
+    // V4 start step, Task 39e adds the five of the questions not started yet (GET and POST /v1/account/saved-questions, PUT, GET and
+    // DELETE …/{id}): 210.
+    expect(contractInventory.routes).toHaveLength(210);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
@@ -410,7 +418,8 @@ describe("S7 deny-by-default authorization", () => {
     });
     for (const policy of EXPECTED_AUTHORIZATION_MATRIX) {
       const [method, template] = policy.route.split(" ") as [string, string];
-      const httpMethod = method as "GET" | "POST" | "PATCH" | "DELETE";
+      // V4 start step, Task 39e: the API's first PUT routes (a later save of a question not started yet).
+      const httpMethod = method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
       const registeredUrl = template.replace(/\{([^}]+)\}/g, ":$1");
       expect(api.hasRoute({ method: httpMethod, url: registeredUrl }), policy.route).toBe(true);
       if (policy.auth === "public") continue;

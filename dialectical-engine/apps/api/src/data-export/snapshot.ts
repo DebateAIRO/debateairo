@@ -1,6 +1,7 @@
 import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry, WebSourceEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 import { TypedDomainError } from "@debateai/kernel";
+import { SavedQuestionDocSchema } from "@debateai/contract";
 
 export type ExportClaim = Readonly<{
   exportId: string; userId: string; ownerRef: string; sessionId: string;
@@ -25,6 +26,8 @@ export const RAW_SECTIONS = [
   "pre_start_calls",
   // The reports the person made with the Report button (0152, identity.read_data_export_public_flags). Not what the AI answered.
   "public_flags",
+  // V4 start step, Task 39e: the questions not started yet (0160, identity.read_data_export_saved_questions), each opened with its own key.
+  "saved_questions",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
 export type RawExportRows = Readonly<Record<RawSection, unknown>>;
@@ -65,6 +68,12 @@ export interface ExportDecryptors {
   /** One debate's sealed web values, opened under its run key in one content lease, in order; null when the debate's
    * private content was erased meanwhile (./run-content.ts). */
   openRunContent(runId: string, items: readonly RunContentItem[]): Promise<readonly unknown[] | null>;
+  /**
+   * V4 start step, Task 39e: one part of a question not started yet, opened with the question's own key under the claim's account
+   * (../saved-questions/service.ts savedQuestionOpener); null when its key is gone (the question is deleted in effect); throws when a
+   * key that is there does not open. Absent (Task 39e ruling): an export that holds such a question fails rather than leave it out.
+   */
+  openSavedQuestion?(userId: string, ownerRef: string, id: string, column: "title" | "content", envelope: unknown): Promise<string | null>;
 }
 
 export class DataExportBuildError extends Error {
@@ -143,6 +152,8 @@ export const KEEP_COLUMNS = {
     closings: ["report_version", "closed_at", "reopened_at", "report_ref", "report_written_at"],
   },
   reserve_events: ["event_no", "kind", "amount_micros", "investigation_id", "report_version", "blocked_window", "blocked_until", "recorded_at"],
+  // V4 start step, Task 39e: 0160's reader, per question. Its title and revision are not exported; the content is opened, then read.
+  saved_questions: ["saved_question_id", "content_ciphertext", "created_at", "updated_at"],
 } as const;
 
 type RawRow = Record<string, unknown>;
@@ -373,6 +384,31 @@ async function collectWebSources(raw: RawExportRows, ownerView: OwnerViewPort, d
   return entries;
 }
 
+/**
+ * V4 start step, Task 39e (saved questions spec 2026-11-04 §3.9): the questions not started yet, each opened with its own key: the question
+ * as it reads, the line the AIs read, the answers, the paths and the other suggestions as titles and questions, How wide, Quick look or
+ * Thorough, the carry-on tick, and when it was first and last saved. Never a signed reference (each carries a fingerprint of the words),
+ * a key name or an envelope. A question whose key is gone is left out; a key that is there but does not open fails the export.
+ */
+async function collectQuestionsNotStarted(raw: RawExportRows, claim: ExportClaim, decrypt: ExportDecryptors): Promise<Row[]> {
+  const entries: Row[] = [];
+  for (const source of rows(raw.saved_questions)) {
+    const { saved_question_id: id, content_ciphertext: envelope, created_at, updated_at } = project(source, KEEP_COLUMNS.saved_questions);
+    if (decrypt.openSavedQuestion === undefined) throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
+    const text = await decrypt.openSavedQuestion(claim.userId, claim.ownerRef, string(id), "content", envelope);
+    if (text === null) continue;
+    const { reading, page } = SavedQuestionDocSchema.parse(JSON.parse(text));
+    const titled = (paths: readonly Readonly<{ title: string; question: string }>[]) => paths.map(({ title, question }) => ({ title, question }));
+    entries.push({
+      question: page.box.text, read_question: reading.read_line,
+      answers: page.sent_goal.answers.map(({ question, answer }) => ({ question, answer })),
+      paths: titled(page.plan.paths), other_suggestions: titled(page.plan.more),
+      how_wide: page.width, mode: page.mode, carry_on_to_report: page.carry_on, created_at, saved_at: updated_at
+    });
+  }
+  return entries;
+}
+
 /** 0133: the account's investigations, a debate named by its reference as in debates.json (never a run_id key). */
 function collectInvestigations(raw: RawExportRows): Row[] {
   const keep = KEEP_COLUMNS.investigations;
@@ -527,7 +563,7 @@ export async function collectSnapshot(input: {
       const words = source.content == null ? null : await decrypt.openPublicFlag(string(source.publication_ref), string(source.run_id), source.content) as Readonly<{ where?: unknown; claim?: unknown }>;
       reportsYouMade.push({ debate_reference: string(source.publication_ref), made_at: source.created_at, outcome: source.state, closed_at: source.dismissed_at ?? null, where: words?.where ?? null, what_you_wrote: words?.claim ?? null });
     }
-    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations" | "public_flags">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
+    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations" | "public_flags" | "saved_questions">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
     return utcTimestampStrings({
       exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
       requestedAt: claim.requestedAt, generatedAt: input.now(), recipient: email ?? "",
@@ -550,6 +586,8 @@ export async function collectSnapshot(input: {
         question_readings: simple("ask_clarify_calls"),
         before_start_readings: simple("pre_start_calls"),
         reports_you_made: reportsYouMade,
+        // V4 start step, Task 39e: the questions not started yet (never `kept_questions`, which the threat reports use).
+        questions_not_started: await collectQuestionsNotStarted(raw, claim, decrypt),
       },
       security: {
         mfa_factors: simple("mfa_factors"), passkeys: simple("passkey_credentials"),

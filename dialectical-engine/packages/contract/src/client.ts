@@ -12,6 +12,11 @@ import {
   type AccountReadingLevel, type ReadingLevelState, type LastVisit, type LastVisitRecorded, type VisitItems,
   type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded, type DigLinkMode
 } from "./account-memory.js";
+// V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04 §3.14).
+import {
+  SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema,
+  type SavedQuestionDoc, type SavedQuestionList, type SavedQuestionRead, type SavedQuestionWritten
+} from "./saved-questions.js";
 import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
   type PublicationReviewState } from "./publication-review.js";
@@ -578,6 +583,16 @@ export interface ContractClient {
   /** V4 account memory (N7): the reading level kept in the account (null until first chosen). */
   readReadingLevel(): Promise<ReadingLevelState>;
   saveReadingLevel(level: AccountReadingLevel): Promise<ReadingLevelState>;
+  /**
+   * V4 start step, Task 39e: the questions not started yet, the newest first (at most 20), with their titles and the day each was saved.
+   * The first and later saves send the document exactly as given (checked with SavedQuestionDocSchema.safeParse, never replaced by the
+   * parse, whose words() would trim signed text); Pick up answers the stored document as is. Delete answers nothing (204).
+   */
+  listSavedQuestions(): Promise<SavedQuestionList>;
+  createSavedQuestion(doc: SavedQuestionDoc): Promise<SavedQuestionWritten>;
+  saveSavedQuestion(id: string, revision: number, doc: SavedQuestionDoc): Promise<SavedQuestionWritten>;
+  readSavedQuestion(id: string): Promise<SavedQuestionRead>;
+  deleteSavedQuestion(id: string): Promise<void>;
   /** V4 account memory (N7): what this debate's map showed when the person last looked (both null before a first visit). */
   readLastVisit(runId: string): Promise<LastVisit>;
   recordLastVisit(runId: string, items: VisitItems): Promise<LastVisitRecorded>;
@@ -1096,6 +1111,22 @@ export function createContractClient(
     readReadingLevel: () => request("/v1/account/reading-level", ReadingLevelStateSchema),
     saveReadingLevel: (level: AccountReadingLevel) => request("/v1/account/reading-level", ReadingLevelStateSchema,
       { method: "POST", body: JSON.stringify(ReadingLevelSaveRequestSchema.parse({ reading_level: level })) }),
+    // V4 start step, Task 39e: the raw document goes out as given; the parse is a check only.
+    listSavedQuestions: () => request("/v1/account/saved-questions", SavedQuestionListSchema),
+    createSavedQuestion: (doc: SavedQuestionDoc) => {
+      const checked = SavedQuestionCreateSchema.safeParse({ doc });
+      if (!checked.success) return Promise.reject(checked.error);
+      return request("/v1/account/saved-questions", SavedQuestionWrittenSchema, { method: "POST", body: JSON.stringify({ doc }) }, 201);
+    },
+    saveSavedQuestion: (id: string, revision: number, doc: SavedQuestionDoc) => {
+      const checked = SavedQuestionSaveSchema.safeParse({ revision, doc });
+      if (!checked.success) return Promise.reject(checked.error);
+      return request(`/v1/account/saved-questions/${encodeURIComponent(id)}`, SavedQuestionWrittenSchema,
+        { method: "PUT", body: JSON.stringify({ revision, doc }) });
+    },
+    readSavedQuestion: (id: string) => request(`/v1/account/saved-questions/${encodeURIComponent(id)}`, SavedQuestionReadSchema),
+    deleteSavedQuestion: (id: string) => requestNoContent(root.href, fetchImplementation, `/v1/account/saved-questions/${encodeURIComponent(id)}`,
+      { method: "DELETE" }, auth),
     readLastVisit: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitSchema),
     recordLastVisit: (runId: string, items: VisitItems) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitRecordedSchema,
       { method: "POST", body: JSON.stringify(LastVisitRecordRequestSchema.parse({ items })) }),

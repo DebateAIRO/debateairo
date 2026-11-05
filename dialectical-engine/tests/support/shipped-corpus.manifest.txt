@@ -186,6 +186,8 @@ apps/api/src/release-state.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/run-event-tail.ts
+apps/api/src/saved-questions/routes.ts
+apps/api/src/saved-questions/service.ts
 apps/api/src/saved-questions/store.ts
 apps/api/src/sessions.ts
 apps/api/src/settings-check-cli.ts

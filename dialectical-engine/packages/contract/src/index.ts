@@ -31,6 +31,10 @@ import { CARRY_ON_PARTS, RunPathProgressSchema } from "./run-paths.js";
 // V4 start step, Task 39c: a question not started yet, as the account keeps it (saved questions spec 2026-11-04).
 export * from "./saved-questions.js";
 import { SavedQuestionIdSchema } from "./saved-questions.js";
+// V4 start step, Task 39e: the five saved-question routes' requests and answers, in the inventory's resources.
+import {
+  SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema
+} from "./saved-questions.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -2005,6 +2009,13 @@ export const contractInventory = Object.freeze({
     // V4 account memory (owner rulings N7 and N11, migration 0131): the reading level kept in the account.
     "GET /v1/account/reading-level",
     "POST /v1/account/reading-level",
+    // V4 start step, Task 39e (./saved-questions.ts): the questions not started yet: the list, the first save, a later save, Pick up
+    // and Delete.
+    "GET /v1/account/saved-questions",
+    "POST /v1/account/saved-questions",
+    "PUT /v1/account/saved-questions/{id}",
+    "GET /v1/account/saved-questions/{id}",
+    "DELETE /v1/account/saved-questions/{id}",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
@@ -2151,6 +2162,8 @@ export const contractInventory = Object.freeze({
     // V4 start step, Task 30: the four calls before Start, their requests and what each answers (an event of a stream, or JSON).
     StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
     StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
+    // V4 start step, Task 39e: the saved-question routes' requests (the first and later saves) and answers (the list, Pick up, a save).
+    SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

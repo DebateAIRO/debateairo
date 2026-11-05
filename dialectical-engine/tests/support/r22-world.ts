@@ -25,7 +25,7 @@ import { PostgresModelSpendStore } from "@debateai/budget";
 import { WorkItemRepository } from "@debateai/battery";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
-  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, loadKek
+  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, MemorySavedQuestionKeyStore, PublicationCipher, generateDek, loadKek
 } from "../../packages/crypto/src/index.js";
 import {
   EntitlementRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInternalAllowanceRepository, PostgresInvestigationReportRepository,
@@ -49,6 +49,8 @@ import { PostgresAskApplication, buildApi, type Dispatcher, type RunCreationSett
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import { accountMemoryStoreFrom } from "../../apps/api/src/account-memory.js";
+import { savedQuestionStoreFrom } from "../../apps/api/src/saved-questions/store.js";
+import { createSavedQuestionService } from "../../apps/api/src/saved-questions/service.js";
 import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "../../apps/api/src/active-settings-version.js";
 import {
   admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, createAdmissionView, loadAdmissionSettings
@@ -372,6 +374,12 @@ export async function startR22World(options: R22WorldOptions = {}) {
     complete: async (input: Readonly<{ packet: unknown }>) => ({ text: flag.reply(JSON.stringify(input.packet)), usage: { input_tokens: 10, output_tokens: 5, cost_usd: 0 } }) } as never;
   const investigations = new PostgresInvestigationRepository(apiPool);
   const accountMemory = accountMemoryStoreFrom((text, values) => apiPool.query(text, values));
+  // V4 start step, Task 39e, as main.ts (tests/architecture/saved-question-keys-wiring.test.ts): the questions not started yet through
+  // 0160's store on the API's pool, each under its own key in a question-key store over the world's user-key store, kept only for a
+  // reading the step's key signed.
+  const savedQuestionKeys = new MemorySavedQuestionKeyStore(userDeks);
+  const savedQuestions = createSavedQuestionService({ store: savedQuestionStoreFrom((text, values) => apiPool.query(text, values)),
+    keys: savedQuestionKeys, key: startStepKey, report: (code, id) => { log(`saved-question ${code}${id === undefined ? "" : ` ${id}`}`); } });
   const identities: TestHttpIdentity[] = [];
   const sessions = testSessionApplication(identities);
   const abuseLimits = await readAbuseLimits(apiPool, nextVersion);
@@ -430,6 +438,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
     startStep, startStepKey, startPaths,
     // Task 56b, as main.ts: a public debate's report counts on the API's own pool (the owner's first report uses the kept reserve).
     ownClosings: new PostgresOwnClosingsReader(apiPool),
+    // Task 39e, as main.ts: the questions not started yet, their five routes and the removal at Start.
+    savedQuestions,
     continuedRunWake: continuedRunWake({ claimableWorkItemOf: (runId) => new WorkItemRepository(apiPool).claimableWorkItemOfRun(runId), dispatch: (job) => dispatcher.dispatch(job) }),
     runHandover: runHandoverOf({ ownReleaseKey: environment.RELEASE_KEY, readRunReleaseNow: (runId) => new PostgresDigModelRepository(apiPool).readRunReleaseNow(runId),
       versionPassed: (version) => settingsVersionPassed(apiPool, environment.RELEASE_KEY, version), activeVersion: () => readActiveSettingsVersionOn(apiPool, nextVersion),

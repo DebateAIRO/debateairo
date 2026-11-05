@@ -211,6 +211,14 @@ export function startRefQuestionOf(key: StartStepKey, ref: string): string | nul
   return payload === null || payload.t === "COMBINE" ? null : payload.q;
 }
 
+/**
+ * V4 start step, Task 39e (saved questions spec 2026-11-04 §5): the question hash (`q`) a check, list or menu reference carries for
+ * `line` (sha256 of the trimmed line), so a saved reading's line is shown to be the one its references were signed for.
+ */
+export function startQuestionHashOf(line: string): string {
+  return questionOf(line);
+}
+
 /** The settings version (`s`) such a reference was signed under; null for any other string, as startRefQuestionOf. */
 export function startRefVersionOf(key: StartStepKey, ref: string): number | null {
   const payload = payloadOf(key, ref);

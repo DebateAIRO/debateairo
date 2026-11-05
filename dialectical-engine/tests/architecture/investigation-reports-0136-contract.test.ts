@@ -240,7 +240,8 @@ describe("0136: the final report over an investigation", () => {
   it("C-E the export worker reaches the reader through 0128's lease, and its boot check counts it", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_picks(uuid,uuid)",'));
-    expect(exporter).toContain("worker.worker_count !== 23");
+    // V4 start step, Task 39e: 0160's export reader is the twenty-fourth worker function.
+    expect(exporter).toContain("worker.worker_count !== 24");
     expect(read("packages/db/src/investigation-reports.ts")).toContain(`export const READ_DATA_EXPORT_INVESTIGATION_REPORTS = "${EXPORT_READER}" as const;`);
   });
 

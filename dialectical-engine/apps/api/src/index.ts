@@ -363,6 +363,9 @@ import { detectArgumentLanguage } from "@debateai/kernel";
 import { verifyStartMergeRequest, type StartStepKey } from "./start-step/signing.js";
 import { startStepBindingOf, type StartCombineInput, type StartStepContext, type StartStepPort } from "./start-step/step.js";
 import { openStartStream, startClientGoneOf, type StartStream, type StartStreamStop } from "./start-step/stream.js";
+// V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04), their five routes and the removal at Start.
+import { registerSavedQuestionRoutes } from "./saved-questions/routes.js";
+import type { SavedQuestionService } from "./saved-questions/service.js";
 import { engineForAsk, webSitesForAsk } from "./engine-ask.js";
 import type { WebSites } from "@debateai/register";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
@@ -1534,6 +1537,14 @@ export const authorizationPolicyInventory = Object.freeze([
   // V4 account memory (N7, migration 0131): the account's reading level. A write carries the CSRF pair like any user route.
   { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
   { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
+  // V4 start step
+  // Task 39e (saved questions spec 2026-11-04 §3.14): the questions not started yet, each a signed-in person's own; a write (POST, PUT,
+  // DELETE) carries the CSRF pair like any user route.
+  { route: "GET /v1/account/saved-questions", auth: "user", resource: "identity", action: "list-saved-questions" },
+  { route: "POST /v1/account/saved-questions", auth: "user", resource: "identity", action: "create-saved-question" },
+  { route: "PUT /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "save-saved-question" },
+  { route: "GET /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "read-saved-question" },
+  { route: "DELETE /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "delete-saved-question" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -2161,6 +2172,14 @@ export interface ApiOptions {
    * (`first_closing_left`). Absent: both presses and the read answer as before.
    */
   readonly ownClosings?: OwnClosingsStore;
+  // V4 start step
+  /**
+   * V4 start step, Task 39e (saved questions spec 2026-11-04 §3.14; owner answers S3 A, S4 A): the questions not started yet, each under
+   * a key of its own (./saved-questions/service.ts; main.ts composes it over 0160's store, the question-key store and the start step's
+   * key), behind GET and POST /v1/account/saved-questions and PUT, GET and DELETE …/{id}, and removed after a 202 of POST /v1/asks that
+   * names one. Absent: the five routes are mounted all the same and answer 503 SAVED_QUESTIONS_UNAVAILABLE; Start removes nothing.
+   */
+  readonly savedQuestions?: SavedQuestionService;
 }
 
 /**
@@ -3730,6 +3749,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       throw error;
     }
   });
+  // V4 start step
+  // Task 39e (saved questions spec 2026-11-04 §3.12, §3.14): the five routes of the questions not started yet. What only the request
+  // knows is read here as POST /v1/asks and the step before Start read it: the account from the session, the preview's team rule, the
+  // data consent, and the one binding Next derives (startStepBindingOf) under the active version, less its version.
+  registerSavedQuestionRoutes(api, {
+    routePolicy: (route) => routePolicy(route),
+    service: options.savedQuestions,
+    callerOf: (request) => request.authenticatedSession === undefined ? null
+      : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, userId: request.authenticatedSession.userId }),
+    teamAdmits: (request) => previewTeamAdmits(previewConfig, options.previewTeamUserIds, request.authenticatedSession?.userId),
+    consentGiven: async (request) => request.authenticatedSession !== undefined && options.sessions?.readSensitiveDataConsent !== undefined
+      && await options.sessions.readSensitiveDataConsent(request.authenticatedSession) === "given",
+    bindingOf: async (caller) => {
+      const binding = await startStepBindingOf({ ownerRef: caller.ownerRef, askBilling: options.askBilling,
+        registerVersion: (await admissionView()).registerVersion });
+      return binding === null ? null : Object.freeze({ ownerScope: binding.ownerScope, planKey: binding.planKey });
+    },
+    edgeCountry: (request) => edgeCountry(request.headers)
+  });
   api.post(
     "/v1/account/legacy-runs/claim",
     credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
@@ -4325,7 +4363,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
     const countryRefusal = options.countryGate?.ask(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
-    const ask = parseRequest(AskRequestSchema, request.body);
+    // V4 start step
+    // Task 39e (saved questions spec 2026-11-04 §3.7): the question not started yet this ask starts from is read only by the removal
+    // once the ask is accepted (below); it is never handed to `submit`, so never stored with the run, sealed, logged or passed to the runner.
+    const { saved_question_id: savedQuestionId, ...ask } = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
@@ -4428,6 +4469,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           ownerRef: request.authenticatedSession.ownerRef }),
       ...handOver
     ));
+    // V4 start step
+    // Task 39e (saved questions spec 2026-11-04 §3.7; owner answer S4 A): the debate is accepted and now holds the question, so the
+    // question not started yet it came from goes, exactly as Delete removes it (the caller's own only, its key destroyed first). A
+    // refusal above removed nothing; a failure here never changes the 202, and its line names no word (the page deletes it too).
+    if (savedQuestionId !== undefined && asker !== undefined && options.savedQuestions !== undefined) {
+      try {
+        await options.savedQuestions.remove(Object.freeze({ ownerRef: asker.ownerRef, userId: asker.userId }), savedQuestionId);
+      } catch {
+        console.error(JSON.stringify(Object.freeze({ event: "api.saved_question.remove_failed", saved_question_id: savedQuestionId })));
+      }
+    }
     // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
     // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
     const digOwner = request.authenticatedSession?.ownerRef;
