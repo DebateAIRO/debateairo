@@ -10,13 +10,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { PublicDebateSchema, StoryBodySchema, type Answer, type PublicDebate } from "@debateai/contract";
 import {
-  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, generateVerificationToken, hashToken, loadKek
+  ContentCipher, encrypt, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, generateVerificationToken, hashToken, loadKek
 } from "../../packages/crypto/src/index.js";
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
   PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
-  decryptContentForRun, migrate, withRunContentLease, type Pool, type PublicFlagLimits
+  decryptContentForRun, migrate, PostgresModerationNoticeRepository, withRunContentLease, type Pool, type PublicFlagLimits
 } from "@debateai/db";
+import { renderMail } from "@debateai/mail-templates";
+import { MemoryTemplatedMailSender } from "../../apps/api/src/mail-channel.js";
+import { ModerationNoticeReconciler } from "../../apps/api/src/moderation-notices.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import { StoryRepository, type StoryWriteInput } from "@debateai/story";
@@ -1147,6 +1150,79 @@ async function delegate(): Promise<Actor> {
     const final = await page(debate.ref);
     expect(JSON.stringify(final)).toContain("AFTER-REVIEW");
     expect(JSON.stringify(final)).not.toContain(REMOVED);
+  }, 240_000);
+
+  it("0156: the author of what a review took off the page is told once, in the language of their last Terms, with no words of the debate; the other steps tell no one", async () => {
+    const [ana, xena, wes, una] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors({ writeWith: "TO-BE-REMOVED" });
+    const xRun = await dig(xena, debate, world);
+    await settleAll(world);
+    const tree = new PostgresPublicTreeRepository(api);
+    const readPublicDebate = (ref: string) => application().readPublicDebate(ref);
+    expect(await pressPublicReport({ ownerRef: wes.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toMatchObject({ kind: "WRITING" });
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0 });
+    await pageSweep();
+    // The language: ana's newest Terms acceptance (German after Romanian); xena accepted in a language no mail is written in; wes never did.
+    const terms = (who: StoryEncryptedOwner, locale: string, ago: string) => q().query(`INSERT INTO legal.acceptance(acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id)
+      VALUES($1,$2,'TERMS','1.0',$3,$4,'SIGN_UP',now()-$5::interval,$6,'0123456789abcdef')`, [randomUUID(), who.ownerRef, createHash("sha256").update(locale).digest("hex"), locale, ago, randomBytes(40)]);
+    await terms(ana, "ro", "2 days");
+    await terms(ana, "de", "1 day");
+    await terms(xena, "xx", "1 day");
+    // The sender queues from 0150's log when it claims; here the queue step runs alone, as the database's owner, to read what it wrote.
+    const queued = async (ref = debate.ref) => {
+      await q().query("SELECT identity.queue_moderation_notices()");
+      return (await q().query<{ owner_ref: string | null; kind: string; mail_locale: string }>(`SELECT notice.owner_ref,notice.kind,notice.mail_locale FROM identity.moderation_notice AS notice
+        JOIN identity.public_review_event AS event USING (event_id) WHERE event.publication_ref=$1 ORDER BY event.revision`, [ref])).rows;
+    };
+    await act(owner, debate, "HIDE");
+    const material = (await new PostgresPublicReviewRepository(api).read(owner.context as never, hash(owner.sessionId), debate.ref))!;
+    expect(material.reports).toHaveLength(1);
+    await act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/story_short/paths/0/line", text: "Yes: CORRECTED-LINE." });
+    await act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun });
+    await act(owner, debate, "HIDE_REPORT", { kind: "REPORT", id: material.reports[0]!.report_id });
+    await act(owner, debate, "REPUBLISH");
+    expect(await queued()).toEqual([
+      { owner_ref: ana.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "de" },
+      { owner_ref: xena.ownerRef, kind: "CONTRIBUTION_REMOVED", mail_locale: "en" },
+      { owner_ref: wes.ownerRef, kind: "REPORT_REMOVED", mail_locale: "en" }
+    ]);
+    // An account that is no longer active hears nothing.
+    const quiet = await publishedDebate(una);
+    await q().query(`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [una.userId]);
+    await act(owner, quiet, "HIDE");
+    expect(await queued(quiet.ref)).toEqual([{ owner_ref: null, kind: "DEBATE_HIDDEN", mail_locale: "en" }]);
+    expect((await q().query("SELECT count(*)::int AS n FROM identity.moderation_notice AS notice JOIN identity.public_review_event AS event USING (event_id) WHERE event.publication_ref=$1 AND notice.failed_at IS NOT NULL", [quiet.ref])).rows[0].n).toBe(1);
+    expect(await queued()).toHaveLength(3);
+    // No runtime login reads the queue itself; it claims, reads and settles through 0156's three definers only.
+    await expect(api.query("SELECT * FROM identity.moderation_notice")).rejects.toMatchObject({ code: "42501" });
+    // Each address sealed under its own account's key, as sign-up seals it, and read at sending time.
+    for (const who of [ana, xena, wes]) {
+      const envelope = encrypt(await userDeks.load(who.userId), Buffer.from(`${pseudonymOf(who)}@example.test`, "utf8"), ["identity", "user.email_ciphertext", who.userId, "run:none", who.userId, `user-dek:${who.userId}`, "1"]);
+      await q().query(`UPDATE identity."user" SET email_ciphertext=$2 WHERE user_id=$1`, [who.userId, JSON.stringify(envelope)]);
+    }
+    const memory = new MemoryTemplatedMailSender();
+    const sender = new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(api), userDeks, memory, "https://debate.example.test");
+    await sender.reconcile(100);
+    const mine = new Map([ana, xena, wes].map((who) => [`${pseudonymOf(who)}@example.test`, who]));
+    const sent = memory.messages.filter(({ mail }) => mine.has(mail.to));
+    expect(sent.map(({ mail }) => [mail.to, mail.templateId, mail.locale])).toEqual([
+      [`${pseudonymOf(ana)}@example.test`, "MODERATION_DEBATE_HIDDEN", "de"],
+      [`${pseudonymOf(xena)}@example.test`, "MODERATION_CONTRIBUTION_REMOVED", "en"],
+      [`${pseudonymOf(wes)}@example.test`, "MODERATION_REPORT_REMOVED", "en"]
+    ]);
+    for (const { mail } of sent) {
+      const rendered = renderMail(mail.templateId, mail.locale, mail.params);
+      expect(`${rendered.subject} ${rendered.text}`).not.toContain(QUESTION);
+      expect(rendered.text).not.toContain("TO-BE-REMOVED");
+      expect(rendered.text).not.toContain(owner.staffId);
+    }
+    expect(renderMail(sent[0]!.mail.templateId, "de", sent[0]!.mail.params).subject).toBe("Ihre Debatte wurde von der öffentlichen Seite genommen");
+    expect((await q().query("SELECT count(*)::int AS n FROM identity.moderation_notice WHERE owner_ref = ANY($1::uuid[]) AND delivered_at IS NOT NULL", [[ana.ownerRef, xena.ownerRef, wes.ownerRef]])).rows[0].n).toBe(3);
+    // Once: a later pass sends none of them again.
+    const again = new MemoryTemplatedMailSender();
+    await new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(api), userDeks, again, "https://debate.example.test").reconcile(100);
+    expect(again.messages.filter(({ mail }) => mine.has(mail.to))).toEqual([]);
   }, 240_000);
 
   it("a correction: the first snapshot, a dig's text and a report read corrected everywhere; a later climb rewrites from corrected text; the originals stay sealed, only for the two", async () => {

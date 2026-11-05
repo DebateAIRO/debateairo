@@ -33,6 +33,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   renewDate: "2026-10-29",
   chargeDate: "2026-10-29T10:00:00.000Z",
   requested: "2026-10-08T10:00:00.000Z",
+  happened: "2026-11-05T09:30:00.000Z",
   expires: "2026-10-09T10:02:00.000Z",
   retryDate: "2026-10-30",
   endDate: "2026-11-06T10:00:00.000Z",

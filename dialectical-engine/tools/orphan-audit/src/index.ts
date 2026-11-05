@@ -617,8 +617,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // row-security lines and the R22 CONTENT_REFUSED cause above. migrate() is byte-identical.
 // Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
 // Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
+// Moderation notice (2026-11-05): one export line for the moderation notice repository (0156).
 // migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "cbd585d27e2079c47271b02f226946b2a4a57c1c89d1342a9e815f4e3db0ffc9";
+const NATIVE_MIGRATE_MODULE_SHA256 = "6c3147fe4eb0d174b3f0ccb5bb112e36eed092ae5f65fc7b642b7cee851976a7";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
