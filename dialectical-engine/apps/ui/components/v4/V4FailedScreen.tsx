@@ -5,6 +5,7 @@ import type { RunProjection } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { ownWords } from "@/lib/v4/askText";
+import type { DigRetry } from "@/lib/v4/digRetry";
 import { digFailureMessage, failedQuotaKey } from "@/lib/v4/failedRun";
 
 /*
@@ -24,10 +25,15 @@ import { digFailureMessage, failedQuotaKey } from "@/lib/v4/failedRun";
  * your quota." when it says some was; a dig says "Nothing was taken from your quota for this." only when nothing was used.
  * The wave-4 browser check (5 Nov): a dig's own page names the dig, not a question: "Your dig" above it and "This dig didn't
  * finish" as its heading (so its tab says it too; a drafted line). Its "Open in the classic view" link stays in the body
- * until the map's header is given the classic address on these screens (question 12 B, the start-step session's wiring).
+ * until the map's header is given the classic address on these screens (question 12 B, the start-step session's wiring);
+ * until then it is as small as "Ask a new question" beside it (the w6 browser check).
+ * The owner's third round (5 Nov afternoon): a dig that keeps failing because the AIs were unavailable drops "You can try
+ * it again in a while." here too, as in its panel. The page says what the parent map offers (`digRetry`, worked out by the
+ * page from the map's digs: the start-step session's wiring): "You can try this dig again from the map." only when the map
+ * offers that try; absent, the page is as it was.
  */
 
-export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, catalog, homeCatalog }: Readonly<{
+export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, digRetry, catalog, homeCatalog }: Readonly<{
   run: RunProjection;
   /** The ask step, filled from this debate (lib/v4/failedRun.ts askAgainHref, with the reading level). */
   askAgainHref: string;
@@ -46,16 +52,26 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
    * once the server sends them back): the grey line then says the picks are kept too. Until then it says the question is.
    */
   picksKept?: boolean;
+  /**
+   * A dig only: what the parent map's panel offers for this dig (lib/v4/digRetry.ts DigRetry's kind). "OFFER": the map
+   * offers "Try this dig again", so the page says so. "KEEPS_FAILING": the same dig failed again, so the page promises no
+   * try (no note, and an AIs-unavailable reason without "You can try it again in a while."). "RETRIED" or "NONE": a later
+   * try already runs, or the map cannot offer one, so no note. Absent: not known, the page as it was (the note shows).
+   * Ignored for a first question.
+   */
+  digRetry?: DigRetry["kind"];
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
 }>) {
   const quotaKey = failedQuotaKey(run, dig !== null);
+  const keepsFailing = digRetry === "KEEPS_FAILING";
+  const mapOffersTry = digRetry === undefined || digRetry === "OFFER";
   return (
     <section className="v4Card v4DebStatus v4DebFailed">
       <p className="v4Eyebrow">{t(catalog, dig === null ? "v4.debate.yourQuestion" : "v4.seed.yourDig")}</p>
       <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
       <h1 className="v4DebStatusTitle">{t(catalog, dig === null ? "v4.debate.failedTitle" : "v4.debate.digFailedTitle")}</h1>
-      <p>{dig === null ? runFailureMessage(run.terminal_reason, homeCatalog) : digFailureMessage(run.terminal_reason, catalog)}</p>
+      <p>{dig === null ? runFailureMessage(run.terminal_reason, homeCatalog) : digFailureMessage(run.terminal_reason, catalog, keepsFailing)}</p>
       {quotaKey === null ? null : <p>{t(catalog, quotaKey)}</p>}
       {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}
       {run.found === undefined || run.found.length === 0 ? null : (
@@ -82,14 +98,16 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
       ) : dig.backHref !== null ? (
         <div className="v4DebFailedAgain">
           <Link className="v4Btn v4BtnPrimary" href={dig.backHref}>{t(catalog, "v4.report.backToMap")}</Link>
-          <p className="v4Muted v4DebFailedNote">{t(catalog, "v4.debate.digFailedBackNote")}</p>
+          {mapOffersTry ? <p className="v4Muted v4DebFailedNote">{t(catalog, "v4.debate.digFailedBackNote")}</p> : null}
         </div>
       ) : null}
       <div className="v4DebStatusActions v4DebFailedLinks">
         <Link className={dig !== null && dig.backHref === null ? "v4Btn v4BtnPrimary" : "v4Link v4DebFailedNew"} href={askHref}>
           {t(catalog, "v4.debate.askNew")}
         </Link>
-        {classicHref === null || classicHref === undefined ? null : <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>}
+        {classicHref === null || classicHref === undefined
+          ? null
+          : <Link className="v4Link v4DebFailedNew" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>}
       </div>
     </section>
   );
