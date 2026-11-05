@@ -44,6 +44,10 @@ import {
   type RunOwnershipInput
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, PurposeLinesSchema, RunFoundPageSchema, isDigPickPathRef, type RunFoundPage, type Answer, type AnswerIndex, type ConditionMark, type DigSuggestion, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
+import type { AnswerBranches, RunPathProgress } from "@debateai/contract";
+import {
+  postgresBranchReadPorts, postgresPathProgressReadPorts, readAnswerBranches, readRunPathProgress as readPathProgressOfRun, webPathRootsOfBranches
+} from "./branches.js";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
@@ -3028,6 +3032,9 @@ export class ServeRepository {
       this.readEdgesForRun(row.run_id),
       this.#readServedWeb(row.run_id)
     ]);
+    // V4 start step, Task 58 (Task 16's Answer.branches): a path debate's paths, each with its answer so far, opened under this lease; an
+    // R22 debate reads its paths' ids only (none). Read inside a caller's lease too: the publication publishes them (Task 63).
+    const branches = await readAnswerBranches(postgresBranchReadPorts(this.pool), row.run_id, "ANSWER");
     const numbers = await this.pool.query<{
       value: number;
       number_kind: string;
@@ -3289,7 +3296,9 @@ export class ServeRepository {
       // W4-3: the kinds code finds on each path joined the AI's (`#readServedWeb`); none at level 10, which cannot be dug.
       ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
-      ...digModel
+      ...digModel,
+      // V4 start step, Task 58: a path debate's paths (each its own branch); absent on every R22 answer.
+      ...(branches === null ? {} : { branches })
     };
     });
   }
@@ -3472,6 +3481,49 @@ export class ServeRepository {
     );
     const answerId = result.rows[0]?.answer_id;
     return answerId === undefined ? null : this.readAnswerProjection(answerId, access);
+  }
+
+  /**
+   * V4 start step, Task 58 (spec 2026-11-03 §2 item 7; items map-d2, journey-f1, wait-d1): a path debate's paths as they stand while it
+   * runs, for the owner's run read: each path LOOKING until its own answer so far is stored, while the others keep working (Task 57's
+   * reader, phase RUN), opened inside the debate's content lease. The ids are read first, codes only, so an R22 debate, or a path debate
+   * whose paths are not named yet, takes no lease and reads null. Another person's debate, and one erased meanwhile, read null too.
+   */
+  async readRunBranches(runId: string, ownership: RunOwnershipInput): Promise<AnswerBranches | null> {
+    if (!await this.#ownsRun(runId, ownership)) return null;
+    const ports = postgresBranchReadPorts(this.pool);
+    if (await ports.readStartPathIds(runId) === null) return null;
+    try {
+      return await withRunContentLease(this.pool, [runId], () => readAnswerBranches(ports, runId, "RUN"));
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return null;
+      throw error;
+    }
+  }
+
+  /**
+   * V4 start step, Task 58 (items wait-d1, journey-f1, wait-f16): each path's step line, dots and findings while a path debate runs, for
+   * the owner's run read (Task 57's reader): null for an R22 debate and for another person's, [] while the paths are being chosen. Only
+   * the found points' words are opened; a debate erased meanwhile reads null, as the other served reads do.
+   */
+  async readRunPathProgress(runId: string, ownership: RunOwnershipInput): Promise<readonly RunPathProgress[] | null> {
+    if (!await this.#ownsRun(runId, ownership)) return null;
+    try {
+      return await readPathProgressOfRun(postgresPathProgressReadPorts(this.pool), runId);
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return null;
+      throw error;
+    }
+  }
+
+  /** Whether the debate is this person's (core.run_is_owned_by, the rule every served read applies first). */
+  async #ownsRun(runId: string, ownership: RunOwnershipInput): Promise<boolean> {
+    const access = normalizeRunOwnership(ownership);
+    const owned = await this.pool.query(
+      "SELECT 1 FROM core.run AS run WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)",
+      [runId, access.ownerRef, access.legacyAskerId]
+    );
+    return (owned.rowCount ?? 0) > 0;
   }
 
   async recordInvestigationRequest(input: {
@@ -3922,7 +3974,10 @@ export class ServeRepository {
     const [stored, plan, shownQuotes] = await Promise.all([repository.read(runId), repository.readPlanStatuses(runId),
       new PostgresPassageRetentionRepository(this.pool).readShownQuotes(runId)]);
     if ((stored === null || stored.searches.length === 0) && (plan === null || plan.length === 0)) return null;
-    const roots = webPathRootsOf(await readMapRootsInForce(this.pool, runId));
+    // V4 start step, Task 58: a path debate stores and serves its web paths by path id ("b1", …), the position everywhere on it; the map's
+    // roots in force name an R22 debate's.
+    const pathIds = await postgresBranchReadPorts(this.pool).readStartPathIds(runId);
+    const roots = pathIds !== null ? webPathRootsOfBranches(pathIds) : webPathRootsOf(await readMapRootsInForce(this.pool, runId));
     const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
       const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER | typeof WEB_SHOWN_QUOTE_CARRIER, id: string,

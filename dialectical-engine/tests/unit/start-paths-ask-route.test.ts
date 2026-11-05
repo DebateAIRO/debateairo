@@ -6,7 +6,7 @@
 // once. References have no lifetime; a settings version that moved keeps the paths unless fewer are now allowed (409 NARROWED). A
 // version without the switch keeps today's ask. The route's own body limit carries the largest legal Start. Every question, path and
 // figure here is made up.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { askRefusalStatus, buildApi, type AdmissionView, type AskApplication } from "@debateai/api";
 import {
   CRISIS_SUPPORT_OFFERED, START_STEP_LIMITS, StartListSchema, StartMenuSchema, purposeAnswerSentence, purposeLinesUnsaid,
@@ -16,6 +16,7 @@ import {
 import {
   debateShapePolicyStartValues, debateShapeStartStepStartValues, engineVersionPolicyStartValues, type DebateShapePlanKey, type DebateShapePolicy
 } from "@debateai/register";
+import { digPickAuthorOf } from "../../apps/api/src/dig-admission.js";
 import { questionWithPurposeLines } from "../../apps/api/src/purpose-lines.js";
 import type { QuestionCheckOutcome } from "../../apps/api/src/question-check/contract.js";
 import type { QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
@@ -110,10 +111,26 @@ const ENGINE = engineVersionPolicyStartValues();
 const viewOf = (policy: DebateShapePolicy): AdmissionView => Object.freeze({ registerVersion: ACTIVE, debateShapePolicy: policy,
   engineVersionPolicy: ENGINE, modelScorecardInForce: false });
 
-type Over = Readonly<{ view?: AdmissionView | null; outcome?: QuestionCheckOutcome; key?: "NONE"; dig?: boolean }>;
+/*
+ * Task 36b: a stranger's public page, made up. Its one path is "pos-1"; the run behind it is PUBLIC_PARENT_RUN_ID, which the page never
+ * shows. The join after submit is refused (NOT_PUBLIC), so the route answers 202 with `public_dig_not_joined`: only the hand-over is read.
+ */
+const PUBLIC_REF = "33333333-3333-4333-8333-333333333333";
+const PUBLIC_PARENT_RUN_ID = "44444444-4444-4444-8444-444444444444";
+const PUBLIC_TREE = Object.freeze({
+  pool: {} as never,
+  tree: { readTreeOfRun: async () => null, readDigParent: async () => ({ root_run_id: PUBLIC_PARENT_RUN_ID, parent_run_id: PUBLIC_PARENT_RUN_ID,
+    level: 0, writing: false }), join: async () => ({ outcome: "NOT_PUBLIC" as const, digLevel: null }) } as never,
+  contributions: {} as never,
+  readPublicDebate: async () => ({ story_short: { paths: [{ position_ref: "pos-1", node_refs: [] }] } }) as never
+});
+
+type Over = Readonly<{ view?: AdmissionView | null; outcome?: QuestionCheckOutcome; key?: "NONE"; dig?: boolean; publicTree?: boolean;
+  suggestions?: Readonly<Record<string, string>> }>;
 function apiOver(over: Over = {}) {
   const checked: string[] = [];
   const submitted: unknown[][] = [];
+  const suggestionReads: string[] = [];
   let consentReads = 0;
   const application = {
     submit: async (...args: unknown[]) => { submitted.push(args); return { run_ref: RUN_ID, status: "QUEUED" as const }; },
@@ -129,11 +146,16 @@ function apiOver(over: Over = {}) {
     ...(over.dig === true ? {
       digModel: { readDigLevel: async () => 0, readPause: async () => null, resume: async () => "NOT_OWNED" as const },
       investigations: { join: async () => ({ outcome: "JOINED" as const, investigationId: "inv-1", digLevel: 1 }), reopen: async () => "REOPENED" as const }
-    } : {})
+    } : {}),
+    ...(over.suggestions === undefined ? {} : { digSuggestionText: async (_ownerRef: string, _parentRunId: string, suggestionId: string) => {
+      suggestionReads.push(suggestionId);
+      return over.suggestions?.[suggestionId] ?? null;
+    } }),
+    ...(over.publicTree === true ? { publicTree: PUBLIC_TREE } : {})
   } as never);
   const post = (payload: AskRequest | string) => api.inject({ method: "POST", url: "/v1/asks", payload,
     headers: typeof payload === "string" ? { ...HEADERS, "content-type": "application/json" } : HEADERS });
-  return { api, post, checked, submitted, consentReads: () => consentReads };
+  return { api, post, checked, submitted, suggestionReads, consentReads: () => consentReads };
 }
 type Harness = ReturnType<typeof apiOver>;
 const handOverOf = (harness: Harness): AskStartHandOver => harness.submitted[0]![3] as AskStartHandOver;
@@ -406,6 +428,106 @@ describe("a dig's picks", () => {
     expect(handOverOf(h).verified).toMatchObject({ source: "DIG_PICKS", width: 1 });
     expect(handOverOf(h).verified!.paths.map((path) => path.author)).toEqual(["PERSON_EDITED"]);
     expect(h.checked).toEqual([`${Q} Dig: the risks.\n\nThe risks\nWhat are the risks of the plants?\n${PICKS[0]!.text}\n${PICKS[1]!.text}`]);
+    await h.api.close();
+  });
+});
+
+describe("Task 36b: a public dig's picks become its paths where the step runs, as an own dig's do", () => {
+  const LINE = `${Q} Dig: the risks.`;
+  const PICKS = [
+    { kind: "OWN_VIEW" as const, suggestion_id: null, place: "path:pos-1", text: "I worry about earthquakes near the plants." },
+    { kind: "NEEDS_MORE_WEB" as const, suggestion_id: "sg-1", place: "path:pos-1", text: "Who pays if building runs years late?" }
+  ];
+  /* The page's suggestion, word for word: an own dig's reader would call the second pick the AI's. A public dig never reads it. */
+  const SUGGESTED = Object.freeze({ "sg-1": PICKS[1]!.text });
+  const EIGHT = Array.from({ length: 8 }, (_, index) => ({ kind: "OWN_VIEW" as const, suggestion_id: null, place: "path:pos-1",
+    text: `Made-up worry number ${String(index + 1)}.` }));
+  const publicAsk = (picks?: NonNullable<AskRequest["public_parent"]>["picks"]): AskRequest =>
+    baseAsk({ question_line: LINE, public_parent: { public_ref: PUBLIC_REF, places: ["path:pos-1"], mode: "quick", ...(picks === undefined ? {} : { picks }) } });
+  const ownAsk = (picks: typeof PICKS | typeof EIGHT): AskRequest =>
+    baseAsk({ question_line: LINE, parent: { parent_run_id: PARENT_RUN_ID, places: ["path:pos-1"], mode: "quick", picks } });
+
+  // The join after submit is refused in this made-up world, and says so in one log line: kept off the test output.
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("(a) where the step runs: one path per pick, source DIG_PICKS, each pick's author digPickAuthorOf(pick, null); the suggestion never read", async () => {
+    const h = apiOver({ dig: true, publicTree: true, suggestions: SUGGESTED });
+    expect((await h.post(publicAsk(PICKS))).statusCode).toBe(202);
+    expect(h.submitted[0]).toHaveLength(4);
+    const handOver = handOverOf(h);
+    expect(handOver).toMatchObject({ binding: { planKey: "premium", settingsVersion: ACTIVE }, lock: null });
+    expect(handOver.verified).toMatchObject({ source: "DIG_PICKS", width: 2, chosenBy: "PERSON", menu: null, carryOnToReport: false });
+    expect(handOver.verified!.paths.map((path) => [path.pathId, path.author, path.question])).toEqual([
+      ["b1", digPickAuthorOf(PICKS[0]!, null), PICKS[0]!.text], ["b2", digPickAuthorOf(PICKS[1]!, null), PICKS[1]!.text]]);
+    expect(handOver.verified!.paths.map((path) => path.author)).toEqual(["PERSON_OWN_VIEW", "PERSON_EDITED"]);
+    expect(h.suggestionReads).toEqual([]);
+    // The picks are the person's words, as on an own dig: checked with the line, once.
+    expect(h.checked).toEqual([`${LINE}\n\n${PICKS[0]!.text}\n${PICKS[1]!.text}`]);
+    await h.api.close();
+  });
+
+  it("(b) on a version without the switch: 202 and no hand-over (three arguments, today's public dig)", async () => {
+    const h = apiOver({ dig: true, publicTree: true, view: viewOf(POLICY_OFF) });
+    expect((await h.post(publicAsk(PICKS))).statusCode).toBe(202);
+    expect(h.submitted[0]).toHaveLength(3);
+    expect(h.checked).toEqual([LINE]);
+    await h.api.close();
+  });
+
+  it("(c) eight picks: 400 START_PATHS_TOO_MANY, as for an own dig; nothing checked or submitted", async () => {
+    for (const ask of [publicAsk(EIGHT), ownAsk(EIGHT)]) {
+      const h = apiOver({ dig: true, publicTree: true });
+      const response = await h.post(ask);
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: "START_PATHS_TOO_MANY", message: "START_PATHS_TOO_MANY" });
+      expect([h.checked.length, h.submitted.length]).toEqual([0, 0]);
+      await h.api.close();
+    }
+  });
+
+  it("(d) an own dig's hand-over, byte for byte as before (its suggestion read from its own debate)", async () => {
+    const h = apiOver({ dig: true, publicTree: true, suggestions: SUGGESTED });
+    expect((await h.post(ownAsk(PICKS))).statusCode).toBe(202);
+    expect(h.suggestionReads).toEqual(["sg-1"]);
+    const [own, suggested] = [PICKS[0]!.text, PICKS[1]!.text];
+    expect(JSON.stringify(handOverOf(h))).toBe(JSON.stringify({
+      binding: { planKey: "premium", settingsVersion: ACTIVE },
+      verified: { source: "DIG_PICKS", width: 2, chosenBy: "PERSON", carryOnToReport: false, questionSwap: null, paths: [
+        { pathId: "b1", pathNo: 1, author: "PERSON_OWN_VIEW", title: own, question: own,
+          viewpoints: [{ viewpointId: null, pickNo: 1, title: null, question: own, own: true }], ownWords: [own] },
+        { pathId: "b2", pathNo: 2, author: "AI_SUGGESTION", title: suggested, question: suggested,
+          viewpoints: [{ viewpointId: null, pickNo: 2, title: null, question: suggested, own: false }], ownWords: [] }
+      ], menu: null, ownWords: [own], questionEdited: false },
+      lock: null
+    }));
+    expect(h.checked).toEqual([`${LINE}\n\n${own}`]);
+    await h.api.close();
+  });
+
+  it("(e) a public dig with no picks: no hand-over, where the step runs too", async () => {
+    const h = apiOver({ dig: true, publicTree: true });
+    expect((await h.post(publicAsk())).statusCode).toBe(202);
+    expect(h.submitted[0]).toHaveLength(3);
+    expect(h.checked).toEqual([LINE]);
+    await h.api.close();
+  });
+
+  it("(f) one rule for both digs: a public dig's combined picks (DIG_PICKS) are the person's paths; a menu on a dig is 400 INVALID", async () => {
+    const h = apiOver({ dig: true, publicTree: true });
+    const combined = { ...publicAsk(PICKS), start_paths: { source: "DIG_PICKS" as const, width: 1, chosen_by: "PERSON" as const,
+      paths: [{ title: "The risks", question: "What are the risks of the plants?", members: [{ pick_no: 1 }, { pick_no: 2 }] }] } };
+    expect((await h.post(combined)).statusCode).toBe(202);
+    expect(handOverOf(h).verified).toMatchObject({ source: "DIG_PICKS", width: 1 });
+    expect(handOverOf(h).verified!.paths.map((path) => path.author)).toEqual(["PERSON_EDITED"]);
+    const menu = await h.post({ ...publicAsk(PICKS), start_paths: pathsOf() });
+    expect(menu.statusCode).toBe(400);
+    expect(menu.json()).toEqual({ error: "START_PATHS_INVALID", message: "START_PATHS_INVALID" });
+    expect(h.submitted).toHaveLength(1);
     await h.api.close();
   });
 });

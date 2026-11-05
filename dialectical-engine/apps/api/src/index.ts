@@ -199,6 +199,13 @@ import {
   type WaitingRun,
   type WaitingRunCursor
 } from "@debateai/db";
+// V4 start step, Task 58: the run read's carry-on part (Task 53a's carry-on mark, the person's newest report version).
+import {
+  PostgresInvestigationReportRepository, PostgresOwnClosingsReader, PostgresPathProgressRepository, PostgresPublicPageRepository,
+  PostgresPublicTreeRepository as PublicTreeOfRunReader, type RunLoadingProjection
+} from "@debateai/db";
+import type { CarryOnPart } from "@debateai/contract";
+import { carryOnPartOf, carryOnReportOfInvestigation, carryOnReportOfPublic, type CarryOnReportState } from "./carry-on-part.js";
 import { ServeRepository, SynthesisCheckRepository, readSynthesisTexts, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
 import type { SynthesisVerdict, SynthesisCheckCategory } from "@debateai/contract";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
@@ -4297,17 +4304,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // start members or a dig's picks: the paths signed at Next, verified with the one binding Next derives (startStepBindingOf),
     // under the active version, or one path per pick (their authors read only where the step runs for the dig). A refusal is
     // answered here, before the question check and before anything is charged or sealed: 400 INVALID or TOO_MANY, 409 STALE or NARROWED.
+    // Task 36b (spec: "Digs work the same way"): the dig the hand-over reads, own or public, by one rule: its parent's run and its picks.
+    // A public dig's parent is the run behind the page (admitPublicDig's, never one the page sends), and its picks are never passed off as
+    // an AI's: nothing of a stranger's debate is read to compare them with, so each is `digPickAuthorOf(pick, null)`, as
+    // joinPublicDigAtStart records it.
+    const digOfStart = digParent !== undefined ? { parentRunId: digParent.parent_run_id, picks: digParent.picks ?? [], own: true }
+      : publicAdmission === null ? null : { parentRunId: publicAdmission.parentRunId, picks: publicAdmission.picks, own: false };
     let start: StartHandOverAtAsk | null = null;
-    if (asker !== undefined && (ask.start_check !== undefined || ask.start_paths !== undefined || (digParent?.picks?.length ?? 0) > 0)) {
+    if (asker !== undefined && (ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
       const view = await viewOnce();
       // Where the switch is off nothing runs, so no plan is read for a binding (null: a menu is STALE, the rest is today's ask).
       const binding = !startStepOnInView(view) ? null
         : await startStepBindingOf({ ownerRef: asker.ownerRef, askBilling: options.askBilling, registerVersion: view.registerVersion });
-      const digRuns = digParent !== undefined && binding !== null && startWidthsOfView(view, binding.planKey) !== null;
-      const picks = digParent?.picks ?? [];
-      const dig: StartDig | null = digParent === undefined || !digRuns ? null : Object.freeze({ parentRunId: digParent.parent_run_id, picks,
-        pickAuthors: Object.freeze(await Promise.all(picks.map(async (pick) => digPickAuthorOf(pick, pick.suggestion_id === null ? null
-          : await digSuggestionText(asker.ownerRef, digParent.parent_run_id, pick.suggestion_id))))) });
+      const digRuns = digOfStart !== null && binding !== null && startWidthsOfView(view, binding.planKey) !== null;
+      const dig: StartDig | null = digOfStart === null || !digRuns ? null : Object.freeze({ parentRunId: digOfStart.parentRunId, picks: digOfStart.picks,
+        pickAuthors: Object.freeze(await Promise.all(digOfStart.picks.map(async (pick) => digPickAuthorOf(pick,
+          pick.suggestion_id === null || !digOfStart.own ? null : await digSuggestionText(asker.ownerRef, digOfStart.parentRunId, pick.suggestion_id))))) });
       try {
         start = startHandOverOf({ key: options.startStepKey, ownerRef: asker.ownerRef, ask, binding, view, dig, now: new Date() });
       } catch (error) {
@@ -7625,8 +7637,13 @@ export class PostgresAskApplication implements AskApplication {
     return this.#serve.readRunFound(runId);
   }
 
-  readRunAnswer(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Answer | null> {
-    return this.#serve.readRunAnswerProjection(runId, ownership);
+  async readRunAnswer(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Answer | null> {
+    const answer = await this.#serve.readRunAnswerProjection(runId, ownership);
+    // V4 start step, Task 58 (item wait-f16): the part a ticked carry-on debate is running once its answer is served (the digs, then the
+    // report), so the line under the question stays on the map until the report is ready. Never on an R22 answer (no branches).
+    if (answer === null || answer.branches?.carry_on_to_report !== true) return answer;
+    const part = await this.#carryOnPartOf(answer.run_ref, true, ownership.ownerRef);
+    return part === null ? answer : { ...answer, carry_on_part: part };
   }
 
   async readRun(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null> {
@@ -7659,8 +7676,69 @@ export class PostgresAskApplication implements AskApplication {
       hold_until: run.holdUntil?.toISOString() ?? null,
       argument_language: runArgumentLanguage(run.argumentLanguage),
       ...(waitsUntil === null ? {} : { waits_until: waitsUntil.toISOString() }),
-      ...(waitsFor === null ? {} : { waits_for: waitsFor })
+      ...(waitsFor === null ? {} : { waits_for: waitsFor }),
+      // V4 start step, Task 58: a path debate's paths, each path's progress and the part a carry-on debate is running; none on R22.
+      ...await this.#runPaths(runId, run.state, ownership)
     });
+  }
+
+  /**
+   * V4 start step, Task 58 (spec 2026-11-03 §2 items 7 and 8; items map-d2, wait-d1, journey-f1, wait-f16; owner card "Carry-on", "Show it
+   * from the start"): what the owner's run read of a path debate adds, after the read's own owner check. The paths are read before their
+   * progress, so a set the runner records between the two reads shows for one read as paths still being chosen, never as paths without
+   * their progress; while the paths are not named, their progress is [] whatever was read after. A ticked debate whose paths are not named
+   * yet is on its answer from the first read, from its own stored ask contract (Task 35's member, opened only then; Task 57b). A debate
+   * that failed carries nothing on. An R22 debate gets none of these members.
+   */
+  async #runPaths(runId: string, state: RunLoadingProjection["state"], ownership: RunOwnershipAccess):
+    Promise<Pick<RunProjection, "branches" | "path_progress" | "carry_on_part">> {
+    const branches = await this.#serve.readRunBranches(runId, ownership);
+    const progress = await this.#serve.readRunPathProgress(runId, ownership);
+    if (progress === null) return {};
+    const runSettled = state === "SETTLED";
+    if (branches === null) {
+      const asked = state !== "FAILED" && !runSettled && ownership.ownerRef !== null && await this.#askedCarryOn(runId);
+      const part = carryOnPartOf({ carryOnToReport: asked, runSettled, mark: "NONE", report: "NONE" });
+      return { path_progress: [], ...(part === "ANSWER" ? { carry_on_part: part } : {}) };
+    }
+    const part = state === "FAILED" || !branches.carry_on_to_report ? null : await this.#carryOnPartOf(runId, runSettled, ownership.ownerRef);
+    return { branches, path_progress: [...progress], ...(part === null ? {} : { carry_on_part: part }) };
+  }
+
+  /** Task 57b: whether the person ticked the carry-on box at Start, from the run's own stored ask contract (`startAskContractMember`). */
+  async #askedCarryOn(runId: string): Promise<boolean> {
+    try {
+      return (await this.#runs.readStoredAsk(runId))?.askContract.carry_on_to_report === true;
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return false;
+      throw error;
+    }
+  }
+
+  /**
+   * Task 58: the part a ticked carry-on debate is running (`carryOnPartOf`). While it runs, its answer, with nothing more read; once it
+   * settled, from Task 53a's carry-on mark and the person's newest report version. A legacy asker's debate never carries on.
+   */
+  async #carryOnPartOf(runId: string, runSettled: boolean, ownerRef: string | null): Promise<CarryOnPart | null> {
+    if (ownerRef === null) return null;
+    if (!runSettled) return carryOnPartOf({ carryOnToReport: true, runSettled, mark: "NONE", report: "NONE" });
+    const mark = await new PostgresPathProgressRepository(this.pool).readCarryOnMark(runId);
+    return carryOnPartOf({ carryOnToReport: true, runSettled, mark, report: await this.#carryOnReportOf(ownerRef, runId) });
+  }
+
+  /**
+   * Task 58: the person's newest report version, codes and counts only (no content opened). A public debate's from its report versions
+   * (decision 13: the author's press is the debate's public report; Task 53a's counts and the page's copies), a private one's from the
+   * person's investigation read, as GET /v1/runs/{id}/investigation reads it.
+   */
+  async #carryOnReportOf(ownerRef: string, runId: string): Promise<CarryOnReportState> {
+    const tree = await new PublicTreeOfRunReader(this.pool).readTreeOfRun(runId);
+    if (tree !== null && tree.dig_update_id === null) {
+      const counts = await new PostgresOwnClosingsReader(this.pool).countPublicReports(ownerRef, tree.publication_ref);
+      const onPage = (await new PostgresPublicPageRepository(this.pool).readReports(tree.publication_ref)).length;
+      return carryOnReportOfPublic({ counts, onPage });
+    }
+    return carryOnReportOfInvestigation(await new PostgresInvestigationReportRepository(this.pool).read(ownerRef, runId));
   }
 
   readAnswerIndex(_session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex> {
