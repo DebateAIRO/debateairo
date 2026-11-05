@@ -51,13 +51,14 @@ const definedFunctions = (sql: string): readonly string[] =>
   [...code(sql).matchAll(/^CREATE OR REPLACE FUNCTION ([a-z_0-9.]+)\(/gmu)].map((match) => match[1]!);
 
 describe("0159: each path's step and points, the carry-on mark and the public report counts", () => {
-  it("C-T is the chain's last step, after 0158, with its own loader and no amendment", async () => {
+  it("C-T is a step of the chain, after 0158, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0159 } from './migration-forward0159.js';");
-    expect(chain).toContain("loadForward0158,loadForward0159]");
+    expect(chain).toContain("loadForward0158,loadForward0159,");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual([PREVIOUS, NAME]);
-    expect(plan.forwardChain.at(-1)!.amendsPostconditionsOf).toEqual([]);
+    const names = plan.forwardChain.map((step) => step.name);
+    expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
+    expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([]);
     const loader = read("packages/db/src/migration-forward0159.ts");
     for (const name of [...TABLES, ...DEFINERS]) expect(loader, name).toContain(`"${name}"`);
     expect(loader).toContain('const VERSION = "path-progress-forward0159-v1";');

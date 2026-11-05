@@ -3300,6 +3300,24 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.count_public_reports(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0160_saved_questions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.create_saved_question(uuid,uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_saved_questions(uuid,integer)",
+        "EXECUTE ON FUNCTION identity.read_saved_question(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.delete_saved_question(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0160_saved_questions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

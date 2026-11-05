@@ -1429,6 +1429,24 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.count_public_reports(uuid,uuid)"
   ]
+},
+// The V4 start step's saved questions (0160, plan 2026-11-03 Task 39d): the five functions for the API's own role (never the shared
+// runtime role), the export reader for the export worker alone, as 0131. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0160_saved_questions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.create_saved_question(uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_saved_questions(uuid,integer)",
+    "EXECUTE ON FUNCTION identity.read_saved_question(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.delete_saved_question(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0160_saved_questions.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

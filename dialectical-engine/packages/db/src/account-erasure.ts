@@ -6,7 +6,8 @@ import {
   decrypt,
   type PublicationCipher,
   type ReadableUserDekStore,
-  type RunContentKeyStore
+  type RunContentKeyStore,
+  type SavedQuestionKeyStore
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
 import {
@@ -691,6 +692,8 @@ export class AccountErasureCoordinator {
     private readonly options: Readonly<{
       readEmailCiphertext?: (userId: string) => Promise<CryptoEnvelope | null>;
       beforeKeyDestruction?: (input: Readonly<{ erasureId: string; userId: string; email: string }>) => Promise<void>;
+      // V4 start step, saved questions (Task 39d; owner answer S4 A): each question not started yet has its own key, which closing the account destroys.
+      savedQuestionKeys?: Pick<SavedQuestionKeyStore, "listByOwner" | "destroy">;
     }> = {}
   ) {}
 
@@ -802,6 +805,13 @@ export class AccountErasureCoordinator {
       if (result === "DESTROYED") destroyedRunKeyCount += 1;
       else alreadyAbsentRunKeyCount += 1;
     }
+    // Owner answer S4 A: every saved question's own key goes too, before the user key that locks it. They are found by the
+    // owner_ref in the key files (a key whose row never landed goes too), and destroyed and checked, never counted: 0110's
+    // finalize counts the debates' keys only.
+    const savedQuestionKeys = this.options.savedQuestionKeys;
+    if (savedQuestionKeys !== undefined) {
+      for (const id of await savedQuestionKeys.listByOwner(cleanup.ownerRef)) await savedQuestionKeys.destroy(id);
+    }
     const userDekResult = await this.users.destroy(cleanup.userId);
 
     // Non-vacuous durable-store readback: absence must hold for every physical
@@ -811,6 +821,9 @@ export class AccountErasureCoordinator {
       if (await this.runs.exists(runId)) return "INVALID_EVIDENCE";
     }
     if ((await this.runs.listByOwner(cleanup.ownerRef)).length !== 0) return "INVALID_EVIDENCE";
+    // A question key left (or made after the listing) stops the closing here; the next cycle destroys it, without the user key.
+    if (savedQuestionKeys !== undefined
+      && (await savedQuestionKeys.listByOwner(cleanup.ownerRef)).length !== 0) return "INVALID_EVIDENCE";
 
     const completedAt = new Date();
     let finalized: AccountErasureTransitionOutcome;

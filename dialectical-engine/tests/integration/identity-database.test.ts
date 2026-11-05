@@ -122,6 +122,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0138 tree updates: a run's purpose lines.
       "run_purpose_lines",
       "runtime_audit_attempt",
+      // 0160 saved questions: a person's questions not started yet, each part sealed under the question's own key.
+      "saved_question",
       "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
       "verification_delivery_reservation", "verification_token_credential",
       // 0132 web evidence store: a debate's searches, pages, transient page texts, readings, extracts, packs, picks, choices.
