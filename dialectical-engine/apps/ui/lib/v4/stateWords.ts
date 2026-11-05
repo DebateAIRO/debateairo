@@ -1,5 +1,5 @@
 import type { RunProjection } from "@debateai/contract";
-import { formatDate, t, type MessageCatalog } from "../i18n/translate.js";
+import { formatDate, formatDateAndTime, t, type MessageCatalog } from "../i18n/translate.js";
 import { CLOCK_24H } from "./clock.js";
 import type { DigState } from "./types.js";
 
@@ -82,9 +82,6 @@ export function clockText(value: string | number | Date, locale: string): string
   return when === null ? null : formatDate(locale, when, CLOCK_24H);
 }
 
-/** English page languages ("en", "en-GB", "en-US"): the ones whose date and clock the owner's record joins with ", ". */
-const ENGLISH = /^en(?:-|$)/iu;
-
 /**
  * A clock time that names its day only when it is not today: "14:31", or "3 November 2026, 14:31" on another day (a
  * report or a question started before midnight, a wait that ends tomorrow). `now` is the moment the page compares with.
@@ -98,8 +95,7 @@ export function whenText(value: string | number | Date, locale: string, now: num
   const when = validDate(value);
   if (when === null) return null;
   if (when.toDateString() === new Date(now).toDateString()) return clockText(when, locale);
-  if (ENGLISH.test(locale)) return `${formatDate(locale, when, { dateStyle: "long" })}, ${clockText(when, locale)!}`;
-  return formatDate(locale, when, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" });
+  return formatDateAndTime(locale, when);
 }
 
 /** "1 December": the day the month's pause ends, in the page's language. */

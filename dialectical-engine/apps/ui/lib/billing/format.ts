@@ -1,5 +1,5 @@
 import type { BillingCurrency, BillingPlansPlace, BillingPlansTax } from "@debateai/contract";
-import { formatDate, formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
+import { formatDate, formatNumber, isEnglishLocale, t, type MessageCatalog } from "../i18n/translate.js";
 import type { BillingPlanId } from "./plans.js";
 
 const DECIMAL_PRICE = /^\d{1,9}\.\d{2}$/;
@@ -82,7 +82,7 @@ const ENGLISH_ORDINAL_SUFFIX: Readonly<Record<Intl.LDMLPluralRule, string>> = Ob
 /** B1's {day}: "29th" in every English (plain, United States, United Kingdom), the bare number elsewhere (the translations word around it). */
 export function renewDayLabel(locale: string, iso: string): string {
   const day = new Date(iso).getUTCDate();
-  if (!/^en(?:-|$)/i.test(locale)) return formatNumber(locale, day);
+  if (!isEnglishLocale(locale)) return formatNumber(locale, day);
   return `${day}${ENGLISH_ORDINAL_SUFFIX[new Intl.PluralRules("en", { type: "ordinal" }).select(day)]}`;
 }
 

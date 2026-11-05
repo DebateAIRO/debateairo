@@ -32,13 +32,13 @@ describe("S8 duplicated public readers", () => {
       }
     }).answer;
     // English pages write the day first on the 24-hour clock (owner's answer to question 5, 5 Nov 2026), and the evidence
-    // date in the long form with the year, its clock in the 24-hour form (question 4 A): "23 August 2026 at 12:34".
-    const expectedEvidenceDate = new Intl.DateTimeFormat("en-GB", {
-      dateStyle: "long",
-      timeStyle: "short",
-      hourCycle: "h23"
-    }).format(new Date(answer.as_of));
-    expect(expectedEvidenceDate).toMatch(/^\d{1,2} August 2026 at \d{2}:\d{2}$/u);
+    // date in the long form with the year, its clock in the 24-hour form (question 4 A). The third round (5 Nov afternoon):
+    // only the data download, the sign-in link email and the classic report PDF keep "at"; pages keep the comma, so the
+    // public page writes "23 August 2026, 12:34".
+    const when = new Date(answer.as_of);
+    const expectedEvidenceDate = `${new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(when)}, ${
+      new Intl.DateTimeFormat("en-GB", { timeStyle: "short", hourCycle: "h23" }).format(when)}`;
+    expect(expectedEvidenceDate).toMatch(/^\d{1,2} August 2026, \d{2}:\d{2}$/u);
     for (const [key, english] of [
       ["public.disclosure.answerStatus", "Answer status: {status}"],
       ["public.disclosure.verdictUnavailableMode", "Verdict unavailable in this published serving mode."],
@@ -58,6 +58,7 @@ describe("S8 duplicated public readers", () => {
       expect(html).toContain("Answer status: COMPONENTS_ONLY");
       expect(html).toContain("Verdict unavailable in this published serving mode.");
       expect(html).toContain(`Evidence as of ${expectedEvidenceDate}.`);
+      expect(html).not.toMatch(/Evidence as of [^.]* at /u);
       expect(html).toContain("may be indexed by search engines");
       expect(html).toContain("copies may remain elsewhere");
     }
