@@ -185,6 +185,13 @@ describe("the rail's words (map-f28, map-f26)", () => {
     expect(done).toContain(CATALOG["v4.rail.digsFailed.one"]);
   });
 
+  it("a round whose only dig failed says that alone, with no finished word before it", () => {
+    const round = rail("column", counts(0, 0, 1)).querySelectorAll(".v4DebRailRounds li")[1]!.textContent!;
+    expect(round).toContain(CATALOG["v4.rail.digsFailed.one"]);
+    expect(round).not.toContain(CATALOG["v4.rail.digsDone.one"]);
+    expect(round).not.toContain(" · ");
+  });
+
   it("the notes line carries only the count, the notes and the moment; the steps line only the steps", () => {
     const notes = rail("notes", counts(0, 1, 0), "DIG_DONE");
     expect(notes.querySelector(".v4DebRailOpen")!.textContent).toBe(CATALOG["v4.rail.openLeftLine"]!.replace("{count}", "2"));

@@ -84,7 +84,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR",
   "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST",
   "v4.suggest.ownView",
-  "v4.suggest.edit",
   // Dig model revision (W2-7): the page labels of section 5.5 (no search-words box: the owner corrected that on 30 Oct).
   "v4.view.heading",
   "v4.rewrite.changedSince.one",
@@ -177,7 +176,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.heading",
   "v4.suggest.onePath",
   "v4.suggest.otherPath",
-  "v4.suggest.freeCap",
   "v4.suggest.full",
   "v4.suggest.empty",
   "v4.suggest.tooLong",
@@ -190,7 +188,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.cancel",
   "v4.suggest.ownViewLabel",
   "v4.suggest.ownViewAdd",
-  "v4.suggest.ownViewTag",
   "v4.suggest.remove",
   "v4.money.continueFailed",
   // R22 W5-1 (31 Oct): the final report's versions, its waits, a failed version, "Keep digging", and the map's answer from
@@ -262,7 +259,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // "← Back to the map" (report-f12) was cut off; the record gives no short form.
   "v4.report.backToMapShort",
   // ask-d6 A (owner's screen review, 3 Nov): the round account button's name for screen readers (and its menu's). The menu's
-  // own words ("My maps", "Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not.
+  // own words ("Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not, and "My maps" is an
+  // owner question (below: ask-d6 A drew "My questions").
   "v4.header.account",
   // V4 screen review (3 Nov), map-d4 A: a point's sources folded into one line. The drawn option said "From 3 pages: …";
   // journey-f23 says nothing counts sources, so the line names every site and counts nothing ("From iea.org and
@@ -312,7 +310,104 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.publicMark.WILL_BE_PUBLIC",
   "v4.publicMark.BEING_CHECKED",
   "v4.publicMark.KEPT_PRIVATE",
-  "v4.publicMark.addsToPublic"
+  "v4.publicMark.addsToPublic",
+  // The 3-4 Nov screen-review build's own words (checked line by line against OWNER-PICKS-2026-11-03.md on 4 Nov): the
+  // record gives no words for these places, so they are drafts, held here until the owner approves them at the click-test.
+  "v4.report.backToQuestion",
+  "v4.ask.usedUp.PERSON_WEEK",
+  "v4.maps.empty",
+  "v4.maps.ask",
+  "v4.maps.failed",
+  "v4.maps.more",
+  "v4.debate.askAgainNoteQuestion",
+  "v4.debate.digFailedBackNote",
+  "v4.state.WAITING.noTime",
+  "v4.state.SHORT_BREAK.noTime",
+  "v4.state.PAUSED.canContinue",
+  "v4.wait.choices",
+  "v4.report.eyebrow",
+  "v4.report.pathsHeading",
+  "v4.undo.still",
+  "v4.undo.more",
+  "v4.bar.goodTimeClose",
+  "v4.dig.picksClearedUndoLabel",
+  "v4.dig.picksClearedStill",
+  "v4.dig.picksClearedAnnounce",
+  "v4.map.legendLooking",
+  "v4.map.legendNew",
+  "v4.map.level",
+  "v4.map.digWholePath",
+  "v4.map.openGround",
+  "v4.sure.none",
+  "v4.sure.mixed",
+  "v4.sure.SURE.most",
+  "v4.sure.STILL_ARGUED.most",
+  "v4.sure.DIDNT_HOLD.all",
+  "v4.sure.DIDNT_HOLD.most",
+  "v4.sure.argued.some",
+  "v4.sure.fell.one",
+  "v4.sure.fell.some",
+  "v4.result.card.NOTHING_NEW",
+  "v4.result.box.NOTHING_NEW",
+  "v4.rail.goodTimeStarDone",
+  "v4.rail.goodTimeHint",
+  "v4.answerCard.region",
+  "v4.answerCard.folded",
+  "v4.answerCard.fold",
+  "v4.answerCard.first",
+  "v4.answerCard.firstOn",
+  "v4.answerCard.readWhole",
+  "v4.answerCard.updated.PATH_REWRITE",
+  "v4.answerCard.updated.CHILD_PATH",
+  "v4.phone.position",
+  "v4.phone.openMap",
+  "v4.rewrite.youAsked",
+  "v4.digsDid.news.HOLDS",
+  "v4.digsDid.news.FAILED",
+  "v4.digsDid.news.FAILED.noLine",
+  "v4.digsDid.news.ONE_DONE",
+  "v4.digsDid.news.ANSWER",
+  "v4.digsDid.news.OTHER",
+  "v4.ready.digPage",
+  "v4.ready.report",
+  "v4.ready.close",
+  "v4.tour.label",
+  "v4.suggest.leaveStay",
+  "v4.suggest.leaveGo",
+  "v4.public.addedByGone",
+  "v4.public.oneMoment",
+  "v4.public.dig.termsMore",
+  "v4.public.flag.NOT_FOUND",
+  "v4.public.dig.notJoined",
+  // The same check (4 Nov): lines whose words differ from the record, held as owner questions until the click-test. The
+  // account menu's "My maps" (ask-d6 A drew "My questions" before ask-d5 B named the list "Your maps"); the dig result
+  // box's two sentences as drawn in dig-d4 (journey-f10's one win sentence is "Confirmed: the answer holds."); the map's
+  // "+N more" (map-f10 names "+3 open", but the fold also holds digs and suggestions since map-f22); the rail's failed
+  // digs (journey-f22's "Didn't finish" sits there beside another state word); one point not checked (map-f28 words only
+  // the plural); and a signed-out visitor's lead before "Create a free account · Sign in" (public-f3, then r2-21 A).
+  "v4.maps.menu",
+  "v4.result.box.CONFIRMED_HOLDS",
+  "v4.result.box.CONFIRMED",
+  "v4.map.moreOpen",
+  "v4.rail.digsFailed.one",
+  "v4.rail.digsFailed.other",
+  "v4.panel.unchecked.one",
+  "v4.public.signedOut.dig",
+  "v4.public.signedOut.report",
+  // The final check of that list (5 Nov): two more of the build's own words (ask-f4 words only the day and month pills;
+  // no record words a pause whose date is unknown), and lines whose words are only in the drawings the owner picked from
+  // or join two record phrases. REVIEW_LINES below keeps their drawn words; the owner confirms them at the click-test.
+  "v4.header.used.PERSON_WEEK",
+  "v4.state.PAUSED.noDate",
+  "v4.report.digWait",
+  "v4.digsDid.line.CORRECTED",
+  "v4.digsDid.line.ADDED_TO",
+  "v4.digsDid.line.CONFIRMED",
+  "v4.dig.started",
+  "v4.debate.state.HOLDING.noTime",
+  "v4.panel.found",
+  "v4.digLive.found",
+  "v4.digLive.pathNow"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -501,7 +596,12 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.suggest.picksOn": "Your picks are on “{path}”.",
   "v4.suggest.freeCap": "On the Free plan a dig combines up to {count} picks.",
   "v4.suggest.openTag": "Open question",
-  "v4.suggest.ownViewTag": "Your view"
+  "v4.suggest.ownViewTag": "Your view",
+  // journey-f22: the rail says the shared state word "Ready" for finished digs (the build had "Done"); map-f28, whose Where
+  // names v4.panel.unchecked.*: "Some points were not checked by a second AI" (the build had added "here").
+  "v4.rail.digsDone.one": "Ready",
+  "v4.rail.digsDone.other": "Ready",
+  "v4.panel.unchecked.other": "Some points were not checked by a second AI."
 });
 
 /**
