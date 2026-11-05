@@ -12,8 +12,12 @@ import type { DigTarget, OpenQuestionKind, V4DigPick, V4Goal, V4GoalAnswer } fro
  * A dig is a follow-up question written the same way.
  */
 
-/** The parts a person may add (D2), at most this many angles (spec: "max 5"). */
-const ANGLES_MAX = WEB_CONTRACT_LIMITS.anglesMax;
+/**
+ * V4 start step, Task 67 (decision 2): the own-angle box left step 2 and its catalogue keys retired in every language. Its
+ * English sentence stays known only so a dig sent off English still drops it from an old debate's added lines
+ * (offEnglishCarried); nothing writes it any more.
+ */
+export const RETIRED_ANGLES_SENTENCE_EN = "Please also look at: {list}.";
 
 /** First-shape sentences, only so an old debate's added lines are still recognised when a dig carries them (offEnglishCarried). */
 const PLACE_KEYS: readonly string[] = ["v4.askText.place.ANYWHERE", "v4.askText.place.ROMANIA", "v4.askText.place.EU"];
@@ -30,43 +34,23 @@ function oneLine(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-/** The angles as sent: trimmed, empty ones dropped, repeats dropped (ignoring case), at most five. */
-export function cleanAngles(angles: readonly string[]): readonly string[] {
-  const seen = new Set<string>();
-  const kept: string[] = [];
-  for (const angle of angles) {
-    const line = oneLine(angle);
-    const key = line.toLocaleLowerCase();
-    if (line.length === 0 || seen.has(key)) continue;
-    seen.add(key);
-    kept.push(line);
-    if (kept.length === ANGLES_MAX) break;
-  }
-  return kept;
-}
-
 /** Owner 2026-10-29 (Free plan shape): a Free ask carries at most this many D2 choices; a paid plan has no cap. */
 export const FREE_GOAL_CHOICES_MAX = 3;
 
-/**
- * How many D2 choices a goal carries: each question answered (a pressed "Other" counts), what matters (when not blank) and each angle as sent
- * (`cleanAngles`).
- */
+/** How many D2 choices a goal carries: each question answered (a pressed "Other" counts) and what matters (when not blank). */
 export function goalChoiceCount(goal: V4Goal): number {
-  return goal.answers.length + (oneLine(goal.matters).length === 0 ? 0 : 1) + cleanAngles(goal.angles).length;
+  return goal.answers.length + (oneLine(goal.matters).length === 0 ? 0 : 1);
 }
 
 /**
  * The goal a plan may send. A paid plan: the goal itself. Free: at most FREE_GOAL_CHOICES_MAX choices, the first ones in the order they are sent
- * (the answers, what matters, angles); the rest are dropped from the end. A goal already within the cap is returned as it is.
+ * (the answers, then what matters); the rest are dropped from the end. A goal already within the cap is returned as it is.
  */
 export function goalWithinPlan(goal: V4Goal, planTier: "free" | "premium"): V4Goal {
   if (planTier !== "free" || goalChoiceCount(goal) <= FREE_GOAL_CHOICES_MAX) return goal;
   const answers = goal.answers.slice(0, FREE_GOAL_CHOICES_MAX);
-  let left = FREE_GOAL_CHOICES_MAX - answers.length;
-  const keepsMatters = oneLine(goal.matters).length > 0 && left > 0;
-  if (keepsMatters) left -= 1;
-  return Object.freeze({ answers: Object.freeze(answers), matters: keepsMatters ? goal.matters : "", angles: Object.freeze(cleanAngles(goal.angles).slice(0, left)) });
+  const keepsMatters = oneLine(goal.matters).length > 0 && answers.length < FREE_GOAL_CHOICES_MAX;
+  return Object.freeze({ answers: Object.freeze(answers), matters: keepsMatters ? goal.matters : "" });
 }
 
 /** The answers as sent: one line each; a pressed "Other" with nothing typed says nothing. */
@@ -76,29 +60,25 @@ function sentAnswers(goal: V4Goal): readonly PurposeAnswer[] {
 }
 
 /**
- * The sentences the D2 choices add, in the spec's order: the answers ("Where? Bucharest."), what matters, angles. The answers are already in the
- * question's language; the two lead-ins are catalogue keys of `newDebate`, in all 35 languages, read from the page's language.
+ * The sentences the D2 choices add, in the spec's order: the answers ("Where? Bucharest."), then what matters. The answers are already in the
+ * question's language; the lead-in is a catalogue key of `newDebate`, in all 35 languages, read from the page's language.
  */
 function goalSentences(goal: V4Goal, catalog: MessageCatalog): readonly string[] {
   const sentences: string[] = sentAnswers(goal).map(purposeAnswerSentence);
   const matters = oneLine(goal.matters);
   if (matters.length > 0) sentences.push(t(catalog, "newDebate.askText.matters", { matters }));
-  const angles = cleanAngles(goal.angles);
-  // ASK-6: the template ends the sentence itself, so one closing mark the person typed is not doubled ("waste..").
-  if (angles.length > 0) sentences.push(t(catalog, "newDebate.askText.angles", { list: angles.join("; ").replace(/[.!?。]$/u, "") }));
   return sentences;
 }
 
 /**
  * Decisions 5 and 29: a goal as the ask's structured `purpose_lines`, whatever the page's language: the debate stores them encrypted and every
- * rewrite, answer update and report reads them. Undefined when none is set.
+ * rewrite, answer update and report reads them. Undefined when none is set. Decision 2: a new ask never sends `angles`; an old debate's stay readable.
  */
 export function purposeLinesOfGoal(goal: V4Goal): PurposeLines | undefined {
   const answers = sentAnswers(goal);
   const matters = oneLine(goal.matters).slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
-  const angles = [...cleanAngles(goal.angles)].map((angle) => angle.slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars));
-  if (answers.length === 0 && matters.length === 0 && angles.length === 0) return undefined;
-  return { ...(answers.length === 0 ? {} : { answers: [...answers] }), ...(matters.length === 0 ? {} : { matters }), ...(angles.length === 0 ? {} : { angles }) };
+  if (answers.length === 0 && matters.length === 0) return undefined;
+  return { ...(answers.length === 0 ? {} : { answers: [...answers] }), ...(matters.length === 0 ? {} : { matters }) };
 }
 
 /** The questions a reply puts on the page, in order: the AI's, the one about what the answer is for last; none when no AI could help (decision 31). */
@@ -285,12 +265,12 @@ const GOAL_SENTENCE_KEYS: readonly string[] = [
   "v4.askText.place.OTHER",
   ...HORIZON_KEYS,
   ...PURPOSE_KEYS,
-  "v4.askText.matters",
-  "v4.askText.angles"
+  "v4.askText.matters"
 ];
 
 function isGoalSentence(line: string, catalog: MessageCatalog): boolean {
-  return GOAL_SENTENCE_KEYS.some((key) => templatePattern(t(catalog, key), "").test(line));
+  return GOAL_SENTENCE_KEYS.some((key) => templatePattern(t(catalog, key), "").test(line))
+    || templatePattern(RETIRED_ANGLES_SENTENCE_EN, "").test(line);
 }
 
 /**
@@ -544,7 +524,12 @@ export function carriedMatch(dig: DigDetail, parentQuestionLine: string, catalog
   return dig.carried.length === lines.length ? "EQUAL" : "LEADS";
 }
 
-/** What the page's crisis check reads: the question as typed, or in a dig the person's own views (never the AI's suggestions or the dig's AI-written question). */
-export function crisisWordsOf(origin: "ask" | "dig", question: string, parent: Readonly<{ picks?: readonly Readonly<{ kind: string; text: string }>[] | undefined }> | null): readonly string[] {
-  return origin === "dig" ? (parent?.picks ?? []).filter((pick) => pick.kind === "OWN_VIEW").map((pick) => pick.text) : [question];
+/**
+ * What the page's crisis check reads: the question as typed, or in a dig the person's own views (never the AI's suggestions or the dig's AI-written question).
+ * V4 start step, Task 68: then the person's own words in the paths Start hands over (`V4StartHandOver.ownWords`), so everything the person wrote is read first.
+ */
+export function crisisWordsOf(origin: "ask" | "dig", question: string, parent: Readonly<{ picks?: readonly Readonly<{ kind: string; text: string }>[] | undefined }> | null,
+  startOwnWords: readonly string[] = []): readonly string[] {
+  const words = origin === "dig" ? (parent?.picks ?? []).filter((pick) => pick.kind === "OWN_VIEW").map((pick) => pick.text) : [question];
+  return startOwnWords.length === 0 ? words : [...words, ...startOwnWords];
 }

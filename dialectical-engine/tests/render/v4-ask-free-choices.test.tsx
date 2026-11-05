@@ -95,6 +95,14 @@ describe("V4 step 2: the AI's questions, in the same look", () => {
     expect(page.querySelector('[id$="-matters"]')).not.toBeNull();
   });
 
+  it("decision 2: the own-angle box is gone from step 2 (an own angle is a path added at the choosing step)", async () => {
+    const page = await atStepTwo("premium");
+    expect(page.querySelector('[id$="-angle"]')).toBeNull();
+    expect(page.querySelector(".v4AskAngles")).toBeNull();
+    expect(page.textContent).not.toContain("Add your own angle");
+    expect([...page.querySelectorAll("button")].map((button) => button.textContent?.trim())).not.toContain("Add");
+  });
+
   it("the answers show as plain text before Start, and go in the question and in the field every later AI reads", async () => {
     const page = await atStepTwo("premium");
     await press("The north");
@@ -155,10 +163,11 @@ describe("V4 step 2: the AI's questions, in the same look", () => {
 });
 
 describe("V4 step 2 on every language", () => {
-  it.each(["en", "ro", "de", "ar", "ja"])("%s: the step, what matters and the angles all show, and go in the question", async (locale) => {
+  it.each(["en", "ro", "de", "ar", "ja"])("%s: the step and what matters show, and go in the question; no own-angle box (decision 2)", async (locale) => {
     const page = await atStepTwo("premium", locale);
     expect(page.querySelectorAll('.v4AskBlock[role="group"]')).toHaveLength(3);
     expect(page.querySelector('[id$="-matters"]')).not.toBeNull();
+    expect(page.querySelector('[id$="-angle"]')).toBeNull();
     expect(page.textContent).not.toContain("only on the English site");
     await press("The north");
     const matters = page.querySelector('[id$="-matters"]') as HTMLInputElement;
@@ -179,7 +188,7 @@ describe("V4 step 2 never gets stuck", () => {
   function ownWordsOnly(page: HTMLDivElement) {
     expect(page.querySelectorAll('.v4AskBlock[role="group"]')).toHaveLength(0);
     expect(page.querySelector('[id$="-matters"]')).not.toBeNull();
-    expect(page.querySelector('[id$="-angle"]')).not.toBeNull();
+    expect(page.querySelector('[id$="-angle"]')).toBeNull();
     expect(page.textContent).not.toContain(CATALOG["v4.read.honestNote"]);
     expect(buttonNamed(startName()).disabled).toBe(false);
   }
@@ -243,7 +252,6 @@ describe("V4 step 2 on the Free plan: at most 3 choices", () => {
     expect(buttonNamed("Later").disabled).toBe(false);
     expect(buttonNamed("The south").disabled).toBe(false);
     expect(input(page, "v4.read.matters.placeholder").disabled).toBe(true);
-    expect(input(page, "v4.read.angles.placeholder").disabled).toBe(true);
     expect(sentLines(page)).toHaveLength(3);
     // Clearing one opens the others again.
     await press("To teach");
@@ -267,6 +275,5 @@ describe("V4 step 2 on the Free plan: at most 3 choices", () => {
     await press("Soon");
     await press("To teach");
     expect(input(page, "v4.read.matters.placeholder").disabled).toBe(false);
-    expect(input(page, "v4.read.angles.placeholder").disabled).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { askQuestionMaxBytes, detectCrisis, type ClarifyQuestion } from "@debateai/contract";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
@@ -43,8 +43,6 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
 const QUESTION_MIN = 7;
 /** The longest answer a person types under "Other". */
 const OTHER_MAX = 120;
-/** D2 "Add your own angle": at most five (V4Goal.angles). */
-const ANGLES_MAX = 5;
 
 /** Owner N6b (2026-10-29): what each level shows, in plain words (the earlier example sentences are gone). */
 const SHOWS_KEYS: Readonly<Record<ReadingLevel, string>> = Object.freeze({
@@ -213,7 +211,6 @@ function V4AskForm({
   const [step, setStep] = useState<Step>("ask");
   const [question, setQuestion] = useState(initialQuestion);
   const [goal, setGoal] = useState<V4Goal>(EMPTY_GOAL);
-  const [angleDraft, setAngleDraft] = useState("");
   const [mode, setMode] = useState<DigMode>("quick");
   const [refusal, setRefusal] = useState<string | null>(null);
   const [pressed, setPressed] = useState<"start" | "quick" | null>(null);
@@ -429,21 +426,6 @@ function V4AskForm({
     setGoal({ ...goal, answers: [...answers].sort((a, b) => place(a) - place(b)) });
   }
 
-  function addAngle() {
-    const angle = angleDraft.replace(/\s+/g, " ").trim();
-    if (angle.length === 0 || goal.angles.length >= ANGLES_MAX || choicesFull) return;
-    if (!goal.angles.some((existing) => existing.toLocaleLowerCase() === angle.toLocaleLowerCase())) {
-      setGoal({ ...goal, angles: [...goal.angles, angle] });
-    }
-    setAngleDraft("");
-  }
-
-  function onAngleKey(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    addAngle();
-  }
-
   // ask-d1 / ask-d6 A: the header knows the session from this page, so a signed-out visitor reads "Sign in" at its end (the
   // way back is this page) and a signed-in person the round account button. ask-f6 / journey-f19: no classic link here.
   const header = <V4Header catalog={catalog} readingLevel={savedLevel} onReadingLevel={chooseLevelNow} session={session} />;
@@ -633,51 +615,7 @@ function V4AskForm({
                     onChange={(event) => setGoal({ ...goal, matters: event.target.value })}
                   />
                 </div>
-
-                <div className="v4AskBlock">
-                  <label className="v4AskLabel" htmlFor={`${ids}-angle`}>{t(catalog, "v4.read.angles.label")}</label>
-                  <div className="v4AskAngleRow">
-                    <input
-                      id={`${ids}-angle`}
-                      className="v4AskInput"
-                      type="text"
-                      value={angleDraft}
-                      maxLength={200}
-                      disabled={goal.angles.length >= ANGLES_MAX || choicesFull}
-                      placeholder={t(catalog, "v4.read.angles.placeholder")}
-                      onChange={(event) => setAngleDraft(event.target.value)}
-                      onKeyDown={onAngleKey}
-                    />
-                    <button
-                      type="button"
-                      className="v4Btn"
-                      onClick={addAngle}
-                      disabled={angleDraft.trim().length === 0 || goal.angles.length >= ANGLES_MAX || choicesFull}
-                    >
-                      {t(catalog, "v4.read.angles.add")}
-                    </button>
-                  </div>
-                  {goal.angles.length === 0 ? null : (
-                    <ul className="v4AskAngles">
-                      {goal.angles.map((angle) => (
-                        <li key={angle} className="v4AskAngle">
-                          <span>{angle}</span>
-                          <button
-                            type="button"
-                            className="v4AskAngleRemove"
-                            aria-label={t(catalog, "v4.read.angles.remove", { angle })}
-                            onClick={() => setGoal({ ...goal, angles: goal.angles.filter((kept) => kept !== angle) })}
-                          >
-                            <span aria-hidden="true">×</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {goal.angles.length >= ANGLES_MAX ? (
-                    <p className="v4AskHint v4Muted">{t(catalog, "v4.read.angles.full")}</p>
-                  ) : null}
-                </div>
+                {/* V4 start step, Task 67 (decision 2): no own-angle box here; an own angle is a path added at the choosing step. */}
             </>
 
             <div className="v4AskBlock">

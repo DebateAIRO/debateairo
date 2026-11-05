@@ -456,7 +456,21 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.paths.movedUp",
   "v4.paths.yourPaths",
   "v4.paths.writingAnswer",
-  "v4.ready.shortAnswer"
+  "v4.ready.shortAnswer",
+  // V4 start step, Task 68 (draft wording): a plan change since Next (splice ruling), and fewer allowed paths after a site
+  // update (owner answer Q8). There is no out-of-date key: suggestions never go out of date by time.
+  "v4.start.readAgainNeeded",
+  "v4.start.narrowed.one",
+  "v4.start.narrowed.other",
+  // V4 start step, Task 69 (choose-f14, choose-f7, journey-f8, r2-2; draft wording, combine's share owner answer Q7): the
+  // one share line per path count, its grey change, and the shares beside combine and look wider (no period named there).
+  "v4.start.share.day",
+  "v4.start.share.month",
+  "v4.start.shareUp",
+  "v4.start.shareDown",
+  "v4.start.combineFrees.one",
+  "v4.start.combineFrees.other",
+  "v4.start.lookWider"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

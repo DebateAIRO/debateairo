@@ -9,7 +9,9 @@ import type {
   PointOfViewVerdict,
   RunPathPointState,
   RunPathStep,
+  StartCheck,
   StartPathAuthor,
+  StartPaths,
   StoryFate,
   WebOtherPage,
   WebSearchStatus,
@@ -311,11 +313,27 @@ export type V4Goal = Readonly<{
   answers: readonly V4GoalAnswer[];
   /** What matters most when the answers pull apart, in the person's words. */
   matters: string;
-  /** The person's own angles ("Add your own angle"), at most five: things to investigate, in their words. */
-  angles: readonly string[];
+  // V4 start step, Task 67 (decision 2): no own angles here. A person's own angle is a path added at the choosing step,
+  // never a sentence added to the question; an old debate's stored angles still read (PurposeLines keeps `angles`).
 }>;
 
-export const EMPTY_GOAL: V4Goal = Object.freeze({ answers: Object.freeze([]), matters: "", angles: Object.freeze([]) });
+export const EMPTY_GOAL: V4Goal = Object.freeze({ answers: Object.freeze([]), matters: "" });
+
+/**
+ * V4 start step, Task 68 (read-d2, read-d3, choose-d2): what Start hands to the ask. `questionLine` is the question box's
+ * line (the line read at Next, with the answer sentences and the person's typing); `startCheck` is the check of Next as it
+ * was given (`{ref}`, or `{ref, original_question_line}` after an accepted rewrite); `startPaths` the chosen paths;
+ * `carryOnToReport` the ticked carry-on box. Each is absent when the page has none: no member, today's ask. `ownWords`:
+ * everything the person wrote into the paths (titles and questions of their own paths, own texts), which the page's
+ * crisis check reads before anything is sent; it never goes on the wire as such.
+ */
+export type V4StartHandOver = Readonly<{
+  questionLine: string;
+  startCheck?: StartCheck;
+  startPaths?: StartPaths;
+  carryOnToReport?: true;
+  ownWords: readonly string[];
+}>;
 
 /**
  * What the page saw earlier, per item id: the item's word (a trust word, a fate or a dig state). In memory for this visit;

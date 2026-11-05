@@ -226,20 +226,6 @@
 }
 .v4AskInput:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
 .v4AskInput[disabled] { background: var(--surface-2); }
-.v4AskAngleRow { display: flex; gap: 8px; }
-.v4AskAngleRow .v4AskInput { flex: 1; min-width: 0; }
-.v4AskAngles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.v4AskAngle {
-  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
-  padding: 0 0 0 14px; border-radius: var(--r-pill); background: var(--con-bg); border: 1.5px solid var(--accent);
-  font-size: var(--t-ui); font-weight: 600;
-}
-.v4AskAngle > span { overflow-wrap: anywhere; }
-.v4AskAngleRemove {
-  flex: none; width: 44px; height: 44px; border: 0; border-radius: var(--r-dot); background: none;
-  cursor: pointer; font-size: 18px; line-height: 1;
-}
-.v4AskAngleRemove:hover { background: var(--surface); }
 .v4AskSent {
   margin: 0; padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere;
   background: var(--surface-2); border: 1px dashed var(--line-strong); border-radius: var(--r-btn);

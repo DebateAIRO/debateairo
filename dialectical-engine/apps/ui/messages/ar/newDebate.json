@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "إجابة أخرى…",
   "newDebate.askText.otherLabel": "توضيح إضافي بكلامك",
   "newDebate.askText.matters": "إذا تعارضت الإجابات، فما يهمني أكثر هو: {matters}",
-  "newDebate.askText.angles": "من فضلك ألقِ نظرة أيضاً على: {list}.",
   "newDebate.freePublicNotice": "في الخطة المجانية، يكون سؤالك والمناظرة حوله علنيَّين. لا تُدرج أي تفاصيل شخصية."
 }

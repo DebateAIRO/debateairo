@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Toinen vastaus…",
   "newDebate.askText.otherLabel": "Oma lisätarkennus",
   "newDebate.askText.matters": "Jos vastaukset vetävät eri suuntiin, minulle tärkeintä on: {matters}",
-  "newDebate.askText.angles": "Voisitteko katsoa myös: {list}.",
   "newDebate.freePublicNotice": "Maksuttomalla tasolla kysymyksesi ja sen väittely ovat julkisia. Älä sisällytä henkilötietoja."
 }

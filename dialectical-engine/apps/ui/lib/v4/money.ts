@@ -3,6 +3,7 @@ import {
   type ContractClient,
   type MonthPause,
   type RunProjection,
+  type StartStepRoom,
   type UsageBorrow
 } from "@debateai/contract";
 import { contractClient } from "../api.js";
@@ -82,12 +83,58 @@ export function digShareLine(room: AskRoom | null): MoneyLine | null {
 /**
  * Before a new question: its share, when the room read says one: "… of today", or of the window it is measured against
  * (read-f19, public-f14: "… of this month" on Free, "… of this week" when the server names the week).
+ * V4 start step, Task 69 (choose-f14: one share line, the same unit on step 1 and step 2): with the plan's own Free mark
+ * (`freePlan`, the page's planIsFree, read-f3) the unit is step 2's, decided by that mark alone: "… of this month" on Free,
+ * "… of today" otherwise. Without it (today's callers) the room read's window stands, as above.
  */
-export function startShareLine(room: AskRoom | null): MoneyLine | null {
+export function startShareLine(room: AskRoom | null, freePlan?: boolean): MoneyLine | null {
   const percent = room?.start_share_percent;
   if (percent === undefined || percent <= 0) return null;
-  const period = sharePeriodOf(room);
+  const period: SharePeriod = freePlan === undefined ? sharePeriodOf(room) : freePlan ? "PERSON_MONTH" : "PERSON_DAY";
   return Object.freeze({ key: period === "PERSON_DAY" ? "v4.room.startShare" : `v4.room.startShare.${period}`, values: { percent } });
+}
+
+/**
+ * V4 start step, Task 69 (journey-f8, read-d5, the owner's 2-second request): how long a share change shows its grey
+ * "+4%" / "−2%" after the number rolls to its new value. The one place this time lives (the bar, the rows, a dig's tray).
+ */
+export const SHARE_DELTA_SHOW_MS = 2_000;
+
+/**
+ * Task 69: the share of today (Free: of its month) a debate of `paths` paths takes, from the room read's start step
+ * (`share_by_paths`, entry i - 1 for i paths, the server's own figures). A count outside 1..widest reads the nearest entry.
+ * Null without the start step or its shares (an internal grant, billing off): the page then shows no share.
+ */
+export function startPathsShare(step: StartStepRoom | null, paths: number): number | null {
+  const shares = step?.share_by_paths;
+  if (shares === undefined || shares.length === 0 || !Number.isFinite(paths)) return null;
+  return shares[Math.min(shares.length, Math.max(1, Math.trunc(paths))) - 1] ?? null;
+}
+
+/**
+ * Task 69 (choose-f14, journey-f8): step 2's one share line, "about 18% of today", on Free "about 16% of this month". The
+ * period is named once, here; never a price and never what would be left (r2-2). Null without a share or at 0.
+ */
+export function startPathsShareLine(percent: number | null, freePlan: boolean): MoneyLine | null {
+  if (percent === null || !(percent > 0)) return null;
+  return Object.freeze({ key: freePlan ? "v4.start.share.month" : "v4.start.share.day", values: { percent } });
+}
+
+/** Task 69 (journey-f8): a share change as its grey mark, "+4%" or "−2%" (the real minus sign); null when nothing changed. */
+export function shareDeltaLine(delta: number): MoneyLine | null {
+  if (!Number.isFinite(delta) || delta === 0) return null;
+  return Object.freeze({ key: delta > 0 ? "v4.start.shareUp" : "v4.start.shareDown", values: { percent: Math.abs(delta) } });
+}
+
+/**
+ * Task 69 (choose-f7, owner answer Q7): the true share after a change of path count (`from` → `to`, each read as
+ * `startPathsShare` reads it) and the change, for the shares beside combine ("Combining frees 1 path (about 15%, −3%)") and
+ * look wider ("Look wider: 7 paths (about 24%, +6%)"). Null without the start step or its shares.
+ */
+export function startShareChange(step: StartStepRoom | null, from: number, to: number): Readonly<{ percent: number; delta: number }> | null {
+  const before = startPathsShare(step, from);
+  const after = startPathsShare(step, to);
+  return before === null || after === null ? null : Object.freeze({ percent: after, delta: after - before });
 }
 
 /** New starts wait for the reset of a full day, week or month: the line with the reset time; null otherwise. */

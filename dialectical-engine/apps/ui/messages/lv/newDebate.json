@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Cita atbilde…",
   "newDebate.askText.otherLabel": "Jūsu pašu papildu skaidrojums",
   "newDebate.askText.matters": "Ja atbildes ved dažādos virzienos, man vissvarīgākais ir: {matters}",
-  "newDebate.askText.angles": "Lūdzu, apskatiet arī šos aspektus: {list}.",
   "newDebate.freePublicNotice": "Bezmaksas plānā jūsu jautājums un tā debates ir publiskas. Neiekļaujiet personas datus."
 }

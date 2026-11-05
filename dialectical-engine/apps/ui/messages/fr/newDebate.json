@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Autre réponse…",
   "newDebate.askText.otherLabel": "Votre propre précision supplémentaire",
   "newDebate.askText.matters": "Si les réponses vont dans des directions différentes, ce qui compte le plus pour moi : {matters}",
-  "newDebate.askText.angles": "Pourriez-vous aussi jeter un œil à : {list}.",
   "newDebate.freePublicNotice": "Avec la formule Gratuite, votre question et son débat sont publics. N’indiquez aucune donnée personnelle."
 }
