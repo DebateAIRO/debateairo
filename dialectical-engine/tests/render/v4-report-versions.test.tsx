@@ -613,19 +613,21 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     }));
   afterEach(() => { vi.unstubAllGlobals(); fetches.length = 0; });
 
-  it("is one row: Back to the map, the reading level and Share; no quota share, and the classic view moves to the page foot", async () => {
+  it("is one row: Back to the map and Share, with no level menu (5 Nov ruling); no quota share, and the classic view moves to the page foot", async () => {
     answerFetch(200);
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => noInvestigation(runId));
     const node = await mountReport(runId);
     const row = node.querySelector(".v4RepHdr")!;
     // ask-d6 A / journey-f19: the row ends in the V4 header's round account button (no classic link in its menu here).
-    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepLevel", "v4RepMenu v4RepShare", "v4HdrAccount"]);
+    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepShare", "v4HdrAccount"]);
     // Browser check (4 Nov): the full words, and the short word a phone shows instead; the name is the full sentence.
     expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`←${CATALOG["v4.report.backToMap"]}${CATALOG["v4.report.backToMapShort"]}`);
     expect(row.querySelector(".v4RepHdrBack")!.getAttribute("aria-label")).toBe(CATALOG["v4.report.backToMap"]);
     expect(row.querySelector(".v4RepHdrBackShort")!.getAttribute("aria-hidden")).toBe("true");
-    expect(text(row.querySelector(".v4RepLevel .v4RepMenuButton"))).toBe(`${CATALOG["v4.readingLevel.background"]}▾`);
+    // The reading-level ruling (5 Nov): the level is chosen only when asking; the report's header names none.
+    expect(row.querySelector(".v4RepLevel")).toBeNull();
+    expect(text(row)).not.toContain(CATALOG["v4.readingLevel.background"]);
     expect(node.textContent).not.toMatch(/allowance|quota|% used/u);
     expect(row.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
     expect(node.querySelector(".v4RepFoot a")!.getAttribute("href")).toBe(`/debate/${runId}`);

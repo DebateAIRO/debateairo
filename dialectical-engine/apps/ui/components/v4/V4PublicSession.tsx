@@ -47,7 +47,7 @@ export function usePublicSignedIn(readSession: () => Promise<unknown> = validate
 export function V4PublicHeader({ catalog, children }: Readonly<{ catalog: MessageCatalog; children?: ReactNode }>) {
   const signedIn = usePublicSignedIn();
   return (
-    <V4Header catalog={catalog} readingLevel={null} showQuota={false} session={signedIn === null ? "CHECKING" : signedIn ? "IN" : "OUT"}>
+    <V4Header catalog={catalog} showQuota={false} session={signedIn === null ? "CHECKING" : signedIn ? "IN" : "OUT"}>
       {children}
     </V4Header>
   );

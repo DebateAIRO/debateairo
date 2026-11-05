@@ -136,6 +136,22 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.header.over.PERSON_MONTH",
   "v4.header.over.PERSON_GRANT",
   "v4.header.quotaDetails",
+  // The owner's answers of 5 Nov (questions 14 B and 15, with the follow-ups): the quota circle's figure and its spoken name
+  // ("Quota used: this week 70%"; past 100% it keeps the "Over" it shows), and the label of each bar it opens. The owner
+  // gave "Over" (HEADER_ANSWER_LINES below); these are drafts until the click-test.
+  "v4.header.circleShare",
+  "v4.header.circle.PERSON_DAY",
+  "v4.header.circle.PERSON_WEEK",
+  "v4.header.circle.PERSON_MONTH",
+  "v4.header.circle.PERSON_GRANT",
+  "v4.header.circleOver.PERSON_DAY",
+  "v4.header.circleOver.PERSON_WEEK",
+  "v4.header.circleOver.PERSON_MONTH",
+  "v4.header.circleOver.PERSON_GRANT",
+  "v4.header.bar.PERSON_DAY",
+  "v4.header.bar.PERSON_WEEK",
+  "v4.header.bar.PERSON_MONTH",
+  "v4.header.bar.PERSON_GRANT",
   "v4.room.startShare.PERSON_WEEK",
   "v4.room.startShare.PERSON_MONTH",
   "v4.dig.period.PERSON_WEEK",
@@ -259,8 +275,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // "← Back to the map" (report-f12) was cut off; the record gives no short form.
   "v4.report.backToMapShort",
   // ask-d6 A (owner's screen review, 3 Nov): the round account button's name for screen readers (and its menu's). The menu's
-  // own words ("Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not, and "My maps" is an
-  // owner question (below: ask-d6 A drew "My questions").
+  // own words ("Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not. "My questions" is the
+  // owner's answer to question 13 (HEADER_ANSWER_LINES below).
   "v4.header.account",
   // V4 screen review (3 Nov), map-d4 A: a point's sources folded into one line. The drawn option said "From 3 pages: …";
   // journey-f23 says nothing counts sources, so the line names every site and counts nothing ("From iea.org and
@@ -380,12 +396,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.public.flag.NOT_FOUND",
   "v4.public.dig.notJoined",
   // The same check (4 Nov): lines whose words differ from the record, held as owner questions until the click-test. The
-  // account menu's "My maps" (ask-d6 A drew "My questions" before ask-d5 B named the list "Your maps"); the dig result
-  // box's two sentences as drawn in dig-d4 (journey-f10's one win sentence is "Confirmed: the answer holds."); the map's
-  // "+N more" (map-f10 names "+3 open", but the fold also holds digs and suggestions since map-f22); the rail's failed
-  // digs (journey-f22's "Didn't finish" sits there beside another state word); one point not checked (map-f28 words only
-  // the plural); and a signed-out visitor's lead before "Create a free account · Sign in" (public-f3, then r2-21 A).
-  "v4.maps.menu",
+  // dig result box's two sentences as drawn in dig-d4 (journey-f10's one win sentence is "Confirmed: the answer holds.");
+  // the map's "+N more" (map-f10 names "+3 open", but the fold also holds digs and suggestions since map-f22); the rail's
+  // failed digs (journey-f22's "Didn't finish" sits there beside another state word); one point not checked (map-f28 words
+  // only the plural); and a signed-out visitor's lead before "Create a free account · Sign in" (public-f3, then r2-21 A).
   "v4.result.box.CONFIRMED_HOLDS",
   "v4.result.box.CONFIRMED",
   "v4.map.moreOpen",
@@ -624,6 +638,35 @@ const QUOTA_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.suggest.goToPicks": "Go to them",
   "v4.suggest.clearPicks": "Clear them",
   "v4.debate.questionShare.PERSON_DAY": "This question: {percent}% of today"
+});
+
+/**
+ * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers"), the header's words the owner gave,
+ * word for word: question 13 C names the account menu's way to the maps, and the second round of follow-ups to question 15
+ * gives the word inside the quota circle past 100%.
+ */
+const HEADER_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.menu": "My questions",
+  "v4.header.circleShareOver": "Over"
+});
+
+describe("the owner's 5 Nov answers: the header", () => {
+  it("the account menu's 'My questions' and the circle's 'Over' are the owner's words, and neither waits on the drafted list", () => {
+    expect(Object.fromEntries(Object.keys(HEADER_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(HEADER_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in HEADER_ANSWER_LINES)).toEqual([]);
+  });
+
+  it("no header line names the level any more, and every period the circle can show has its name, its 'over' name and its bar", () => {
+    // The reading-level ruling: no level menu in any header, so its two lines are gone.
+    expect(Object.keys(catalog).filter((key) => key.startsWith("v4.header.level"))).toEqual([]);
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]) {
+      expect(catalog[`v4.header.circle.${scope}`], scope).toMatch(/^Quota used: [a-z ]+ \{percent\}%$/u);
+      // Past 100% the name keeps the word the circle shows (WCAG 2.5.3, label in name).
+      expect(catalog[`v4.header.circleOver.${scope}`], scope).toMatch(/\bover\b/u);
+      // A bar's label is the period word of its read-out line ("Today", "This week", "This month", "In total").
+      expect(catalog[`v4.header.bar.${scope}`], scope).toBe(catalog[`v4.header.used.${scope}`]!.split(":")[0]);
+    }
+  });
 });
 
 describe("the owner's 3 Nov screen review", () => {

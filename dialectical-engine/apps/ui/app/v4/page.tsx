@@ -36,9 +36,10 @@ export default async function V4AskPage({
     loadNamespace(locale, "billing")
   ]);
   const query = await searchParams;
-  // ask-d5 B: "All my maps" is a view of this page (`?maps=all`), signed-in only.
+  // ask-d5 B: "All my maps" is a view of this page (`?maps=all`), signed-in only. It takes no level (the 5 Nov ruling: a
+  // debate keeps the level it was asked at, so its links carry none).
   if (firstParam(query.maps) === "all") {
-    return <V4AllMaps catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} initialLevel={parseReadingLevel(firstParam(query.level))} />;
+    return <V4AllMaps catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} />;
   }
   const topic = firstParam(query.topic);
   const initialQuestion = typeof topic === "string" ? topic.slice(0, TOPIC_MAX) : "";

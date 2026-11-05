@@ -77,3 +77,19 @@
 .v4Chip[aria-pressed="true"], .v4Chip[aria-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
 .v4Card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); padding: 16px; }
 .v4SrOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* The owner's answers of 5 Nov 2026 (question 15 A with 18 A and the follow-ups): on a phone every V4 header is ONE row.
+   The brand shows its mark alone: its name and the "V4 preview" badge are hidden on screen but stay the link's name. Then
+   the quota circle (v4-quota.css), the page's own extras and the round account button share the rest of the row; an
+   extra's words may wrap inside its own button rather than push the row onto a second line. A strip the page puts after
+   the row (the map's report strip, V4Header's `after`) keeps its own row below. Nothing here moves. Loaded by every V4
+   page and the public page, so their headers match. */
+@media (max-width: 767px) {
+  header.v4Hdr { column-gap: 8px; }
+  .v4Hdr .v4HdrBrand { position: relative; flex: none; justify-content: center; min-inline-size: 44px; }
+  .v4Hdr .v4HdrName, .v4Hdr .v4HdrBadge {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+    margin: -1px; padding: 0; border: 0;
+  }
+  .v4Hdr .v4HdrRight { flex: 1 1 0; min-inline-size: 0; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
+  .v4Hdr .v4HdrRight > .v4Btn { padding-inline: 12px; line-height: 1.2; text-align: center; }
+}

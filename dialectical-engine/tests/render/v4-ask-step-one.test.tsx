@@ -368,9 +368,10 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     const dig = shelf.querySelector<HTMLAnchorElement>(".v4ShelfDig")!;
     expect(dig.closest(".v4ShelfItem")?.querySelector(".v4ShelfQuestion")?.textContent).toBe("Should countries build new nuclear power?");
     expect(dig.querySelector(".v4ShelfDigText")?.textContent).toBe("Dig: Batteries can cover multi-day lulls.");
-    expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}?level=plain`);
-    expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}?level=plain`);
-    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all&level=plain");
+    // The reading-level ruling (5 Nov): a map keeps the level it was asked at, so no shelf link carries one.
+    expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}`);
+    expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}`);
+    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all");
     expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.textContent).toBe("All my maps");
     // No counts anywhere, and no seed: this account has maps.
     expect(shelf.textContent).not.toMatch(/\d+ (maps|questions|digs)/u);

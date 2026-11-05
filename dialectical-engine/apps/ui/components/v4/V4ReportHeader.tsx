@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
+import type { ReadingLevel } from "@/lib/v4/types";
 import { V4AccountMenu } from "./V4AccountMenu";
 import { V4Steps } from "./V4Steps";
 
 /*
  * report-f12 (owner screen review, 3 Nov 2026): the report's own header, ONE row. "← Back to the map" on the start side;
- * on the end side the reading level in its small "Plain words ▾" form and "Share" (Download PDF, Print, Copy link). No quota
+ * on the end side "Share" (Download PDF, Print, Copy link); no level menu (the owner's reading-level ruling, 5 Nov: the
+ * level is chosen only when asking, so `level` and `onLevel` are accepted and change nothing here). No quota
  * share on the report (row D cut it), no second brand row, and the classic-view link moves to the page foot. It is built
  * here rather than in the shared V4Header, so every other V4 page keeps its header as it is.
  * Below the row, one status line says what a Share choice is doing ("Making your PDF…", "Link copied.").
@@ -90,14 +91,16 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
   );
 }
 
-export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToMap", level, onLevel, share, status }: Readonly<{
+export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToMap", share, status }: Readonly<{
   catalog: MessageCatalog;
   /** null: there is no map to go back to (a report that cannot be found). */
   backHref: string | null;
   /** The back link's words: "Back to the map", or "Back to your question" for a debate that did not finish (map-f30). */
   backKey?: "v4.report.backToMap" | "v4.report.backToQuestion";
-  level: ReadingLevel;
-  onLevel: (level: ReadingLevel) => void;
+  /** Accepted and unused (the 5 Nov reading-level ruling: no level menu in the report's header). */
+  level?: ReadingLevel;
+  /** Accepted and unused (the 5 Nov reading-level ruling). */
+  onLevel?: (level: ReadingLevel) => void;
   /** The Share choices in their order; none: no Share button. */
   share: readonly ReportShareItem[];
   /** What a Share choice is doing, or null. */
@@ -120,33 +123,6 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
             ) : null}
           </Link>
         )}
-        <HeaderMenu
-          className="v4RepLevel"
-          buttonLabel={t(catalog, "v4.header.levelButton", { level: t(catalog, `v4.readingLevel.${level}`) })}
-          buttonText={t(catalog, `v4.readingLevel.${level}`)}
-          title={t(catalog, "v4.header.levelMenu")}
-        >
-          {(close) => (
-            <>
-              <p className="v4RepMenuTitle" aria-hidden="true">{t(catalog, "v4.header.levelMenu")}</p>
-              {READING_LEVELS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className="v4RepMenuItem"
-                  aria-pressed={option === level}
-                  onClick={() => {
-                    onLevel(option);
-                    close(true);
-                  }}
-                >
-                  <span className="v4RepMenuCheck" aria-hidden="true">{option === level ? "✓" : ""}</span>
-                  <span>{t(catalog, `v4.readingLevel.${option}`)}</span>
-                </button>
-              ))}
-            </>
-          )}
-        </HeaderMenu>
         {share.length === 0 ? null : (
           <HeaderMenu
             className="v4RepShare"
@@ -170,7 +146,7 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
             ))}
           </HeaderMenu>
         )}
-        <V4AccountMenu catalog={catalog} level={level} classicHref={null} />
+        <V4AccountMenu catalog={catalog} classicHref={null} />
       </header>
       <div className="v4StepsTop">
         <V4Steps current="report" shape="line" {...(backHref === null ? {} : { hrefs: { map: backHref } })} catalog={catalog} />
