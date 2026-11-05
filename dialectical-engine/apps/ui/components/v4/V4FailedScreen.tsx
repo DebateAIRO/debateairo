@@ -19,13 +19,14 @@ import { quotaUntouched, sayNothingTaken } from "@/lib/v4/failedRun";
  * it leads back to the map it was dug from, where its panel offers "Try this dig again".
  */
 
-export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, catalog, homeCatalog }: Readonly<{
+export function V4FailedScreen({ run, askAgainHref, askHref, dig, picksKept = false, catalog, homeCatalog }: Readonly<{
   run: RunProjection;
   /** The ask step, filled from this debate (lib/v4/failedRun.ts askAgainHref, with the reading level). */
   askAgainHref: string;
   /** The empty ask step. */
   askHref: string;
-  classicHref: string;
+  /** Still accepted, never drawn: the owner's answers of 5 Nov (question 12 B) put the classic view in the account menu only. */
+  classicHref?: string;
   /** This debate is a dig: the map it was dug from (null: not known), else null for a first debate. */
   dig: Readonly<{ backHref: string | null }> | null;
   /**
@@ -76,7 +77,6 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
         <Link className={dig !== null && dig.backHref === null ? "v4Btn v4BtnPrimary" : "v4Link v4DebFailedNew"} href={askHref}>
           {t(catalog, "v4.debate.askNew")}
         </Link>
-        <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
       </div>
     </section>
   );

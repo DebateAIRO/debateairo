@@ -11,10 +11,11 @@ import { useQuestionPublic } from "@/components/v4/V4ReportStrip";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { isNotFound } from "@/lib/api";
-import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pathTrustWord } from "@/lib/report/pathTrust";
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
+import { mayBeWaitedFor, reportWaitLineOf, waitingDigQuestionOf } from "@/lib/v4/reportWriting";
 import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import {
   loadDigView, loadInvestigation, loadStory, loadV4, reopenInvestigation, storyReadFailed, writeReport, type FinishedReportVersion
@@ -79,11 +80,6 @@ type ReportLoad =
 /** A dig as the report lists it; `view` is undefined while it loads and null when it could not be read just now. */
 type ReportDig = Readonly<{ link: DigLink; view: DigView | null | undefined }>;
 
-/** report-f7: a dig the report may still wait for: running, waiting for a spot, or done but still rewriting its path. */
-function mayBeWaitedFor(view: DigView): boolean {
-  return view.state === "RUNNING" || view.state === "WAITING" || (view.state === "DONE" && view.rewrite?.state === "WRITING");
-}
-
 /*
  * R2TIME-3 / R2TIME-7: the same rule as the map page's story poll. While the story is being written it is read again
  * on a chained timer (never two reads in flight), backing off 10 s → 20 s → 40 s → 60 s; there is no try cap while it
@@ -118,13 +114,6 @@ function aiProps(language: string | null): AiProps {
 }
 function aiListProps(language: string | null): AiListProps {
   return language === null ? { dir: "auto" } : { dir: "auto", lang: language };
-}
-
-/** A sign no AI text contains, so a sentence splits around its slot and only the AI's words in it are marked. */
-const TEXT_SLOT = "⁣⁣";
-function withAiText(sentence: string, text: string, ai: AiProps): ReactNode {
-  const [before = "", after = ""] = sentence.split(TEXT_SLOT);
-  return <>{before}<span {...ai}>{text}</span>{after}</>;
 }
 
 export function V4ReportClient({ id, locale, initialLevel, catalog, newDebateCatalog }: Props) {
@@ -560,9 +549,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       loadDigView(link).then(done, () => done(null));
     }
   }, [read]);
-  // The one dig the report still waits for, by its question, for "Your report starts when your dig on … finishes."
-  const running = digs.filter((dig) => dig.view !== undefined && dig.view !== null && mayBeWaitedFor(dig.view));
-  const runningDig = running.length === 1 ? running[0]!.link.questions[0] ?? null : null;
+  // The one dig the report still waits for, by its question, for "Your report starts when your dig on … finishes." (report-f7's
+  // rule, shared with the map since the owner's 5 Nov answer 23 A: lib/v4/reportWriting.ts).
+  const runningDig = waitingDigQuestionOf(digs);
 
   // The person's own words, not the added lines. R2TIME-8: the site's DocumentTitle names the tab (and a printed file)
   // after the h1, so the "Report:" prefix sits inside the h1 (hidden on screen) instead of a document.title write.
@@ -1232,12 +1221,12 @@ function VersionStatus({ version, investigation, runningDig, locale, language, c
   if (version.state === "FAILED") return <p className="v4RepNote" role="status">{t(catalog, "v4.investigation.failed")}</p>;
   const waiting = version.waiting_for_digs;
   if (waiting > 0) {
-    // report-f7: while a dig runs, only the line that says the report waits for it, by its question when it is the one.
+    // report-f7: while a dig runs, only the line that says the report waits for it, by its question when it is the one. The
+    // owner's 5 Nov answer 23 A: the same line as the map's (lib/v4/reportWriting.ts), and several digs carry no number.
+    const line = reportWaitLineOf(waiting, runningDig, catalog, locale);
     return (
       <p className="v4RepNote" role="status">
-        {waiting === 1 && runningDig !== null
-          ? withAiText(t(catalog, "v4.investigation.waitingDig", { dig: TEXT_SLOT }), runningDig, aiProps(language))
-          : tPlural(catalog, "v4.investigation.waitingDigs", waiting, locale, { n: waiting })}
+        {line.kind === "NAMED" ? <>{line.before}<span {...aiProps(language)}>{line.dig}</span>{line.after}</> : line.text}
       </p>
     );
   }

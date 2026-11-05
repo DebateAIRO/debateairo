@@ -7,7 +7,7 @@ import { openCount, V4MapTree } from "../../apps/ui/components/v4/V4MapTree.js";
 import { V4Outline } from "../../apps/ui/components/v4/V4Outline.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
 import { V4TrustBar } from "../../apps/ui/components/v4/V4TrustBar.js";
-import { t } from "../../apps/ui/lib/i18n/translate.js";
+import { formatDate, t } from "../../apps/ui/lib/i18n/translate.js";
 import type {
   DigState,
   DigView,
@@ -544,7 +544,8 @@ describe("W4-6: dig cards and rewritten paths", () => {
     expect(noteOf(tree(buildMap(), "root", { digs: [] }), ".v4MapBranch")).toBeNull();
     for (const [rewrite, expected] of [
       [writing, t(catalog, "v4.rewrite.state.WRITING")],
-      [rewritten(true), t(catalog, "v4.rewrite.rewrittenOnce", { date: new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date("2026-10-30T09:18:00.000Z")) })],
+      // The owner's answers of 5 Nov (question 4 A): the long form with the year, through the shared date helper.
+      [rewritten(true), t(catalog, "v4.rewrite.rewrittenOnce", { date: formatDate("en", "2026-10-30T09:18:00.000Z", { dateStyle: "long" }) })],
       [rewritten(false), t(catalog, "v4.rewrite.state.NO_CHANGE")],
       [{ ...writing, state: "FAILED", failed_at: "2026-10-30T09:20:00.000Z" } as PathRewrite, t(catalog, "v4.rewrite.card.FAILED")]
     ] as const) {

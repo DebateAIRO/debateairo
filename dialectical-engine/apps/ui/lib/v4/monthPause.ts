@@ -6,8 +6,10 @@ import type { DigView } from "./types.js";
  * Owner review 3 Nov 2026 (wait-f2, wait-f5, map-f31, public-f16, public-f17): one pause, said once, everywhere a debate
  * or a dig stopped at the month wall shows. The server decides both facts: until when (`month_pause.until`) and whether
  * it may continue now (`month_pause.can_continue`, true once the person's new month has started). The page never works
- * either out from the clock. Before the reset nothing can be pressed ("Continues on 1 Dec" is a plain label); after it
- * the person presses Continue. Nothing pulses while paused: the mark is a still, hollow dot. Nothing is kept anywhere.
+ * either out from the clock. The owner's answers of 5 Nov (question 19 A): before the reset a greyed "Continue on 1
+ * December" (public-d4 A's words) stays where Continue will be, with the pause's one sentence as the visible line that says
+ * why (journey-f14); pressing it sends nothing. After the reset the same button is the live Continue. Nothing pulses while
+ * paused: the mark is a still, hollow dot. Nothing is kept anywhere.
  */
 
 /** One pause as the pages show it. */
@@ -54,16 +56,18 @@ export function digPauseCardLine(pause: PauseState, catalog: MessageCatalog, loc
 }
 
 /**
- * For the phone's pinned bar (the bottom-stack track draws it): its word "Paused", then either the Continue button's
- * word (after the reset) or the plain "Continues on 1 Dec" label (before it). Together they read "Paused · Continue".
+ * For the phone's pinned bar (the bottom-stack track draws it): its word "Paused", then the button's words: "Continue"
+ * after the reset, the greyed "Continue on 1 December" before it (question 19 A), with `reason`, the pause's one sentence,
+ * as the visible line right above the bar (journey-f14; null after the reset). Together they read "Paused · Continue".
  */
-export type PausePhoneBar = Readonly<{ label: string; continueLabel: string | null; untilLabel: string | null }>;
+export type PausePhoneBar = Readonly<{ label: string; continueLabel: string | null; untilLabel: string | null; reason: string | null }>;
 
 export function pausePhoneBar(pause: PauseState, catalog: MessageCatalog, locale: string): PausePhoneBar {
   return Object.freeze({
     label: t(catalog, "v4.pause.phoneBar"),
     continueLabel: pause.canContinue ? t(catalog, "v4.money.continue") : null,
-    untilLabel: pause.canContinue ? null : t(catalog, "v4.pause.continuesOn", { date: pauseDay(pause.until, locale) })
+    untilLabel: pause.canContinue ? null : t(catalog, "v4.pause.continuesOn", { date: pauseDay(pause.until, locale) }),
+    reason: pause.canContinue ? null : pauseSentence(pause, catalog, locale)
   });
 }
 

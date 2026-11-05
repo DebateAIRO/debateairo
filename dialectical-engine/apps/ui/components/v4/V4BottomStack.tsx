@@ -18,6 +18,10 @@ import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
  *    above the bar (dig-f18). It never takes more than about a
  *    quarter of the screen, steps aside while the keyboard is open, and sits in the page while the cookie bar shows.
  *  - Computer: the Undo and ready notes bottom-left, then the tray, in one column.
+ * The owner's answers of 5 Nov 2026: a paused dig's "Continue on 1 December" is a greyed button in the bar before the new
+ * month, with the pause's sentence as the visible line above it; a press sends nothing and gives that line the highlight
+ * (question 19 A). The stack says whether it shows "Write my report" (`onReportShown`), so the page's top bar drops its own
+ * on a phone meanwhile: one on screen (question 18 A and its follow-up).
  */
 
 export type V4BarJob =
@@ -31,8 +35,14 @@ export type V4BarJob =
   /** dig-f31: with nothing picked, "Choose what to dig ›" takes the person to the choices instead of digging at once. */
   | Readonly<{ kind: "choose"; label: string; onChoose: () => void }>
   | Readonly<{ kind: "report"; href: string }>
-  /** wait-f2: "Paused · Continue" (after the reset) or "Paused · Continues on 1 Dec" (before it; nothing to press). */
-  | Readonly<{ kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; busy: boolean; onContinue: () => void }>
+  /**
+   * wait-f2: "Paused · Continue" (after the reset), or before it "Paused · Continue on 1 December" as a greyed button that
+   * sends nothing (question 19 A, 5 Nov), with `reason` (the pause's sentence) as the visible line above the bar.
+   */
+  | Readonly<{
+    kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; reason?: string | null; busy: boolean;
+    onContinue: () => void;
+  }>
   /**
    * V4 screen review (3 Nov 2026), report-d2: while the report waits or is written, the bar says so where the dig button
    * lives ("Your report · Being written", with the working dot); digging rests meanwhile.
@@ -124,6 +134,12 @@ export function V4BottomStack(props: Readonly<{
   onWriteReport?: () => void;
   /** report-d1: the report's strip, grown up from the bar while it is open (the bar's report button steps back). */
   strip?: ReactNode;
+  /**
+   * Question 18 A (the owner's answers of 5 Nov): told whether this stack shows "Write my report" now (the bar's own button,
+   * the slim "Good time" line, or the strip grown from the bar; never on a computer), and false once it goes. The page hands
+   * it to useMapReport's `bottomShowsReport`, so a phone's top bar drops its own meanwhile. Absent: nobody is told.
+   */
+  onReportShown?: (shown: boolean) => void;
   catalog: MessageCatalog;
 }>) {
   const { phone, catalog } = props;
@@ -140,6 +156,19 @@ export function V4BottomStack(props: Readonly<{
   // W2L-5: pressing the greyed dig button gives its visible reason, right above the bar, the shared highlight again.
   const [whyReplay, setWhyReplay] = useState(0);
 
+  const hasStrip = props.strip !== null && props.strip !== undefined && props.strip !== false;
+  const showGoodTime = props.goodTime && !goodTimeClosed && !hasStrip;
+  // Question 18 A: "Write my report" is at the bottom while the bar carries it, the slim line offers it, or its strip is open.
+  const reportShown = phone && (hasStrip || job.kind === "report" || showGoodTime);
+  const reportShownRef = useRef(props.onReportShown);
+  useEffect(() => {
+    reportShownRef.current = props.onReportShown;
+  });
+  useEffect(() => {
+    reportShownRef.current?.(reportShown);
+  }, [reportShown]);
+  useEffect(() => () => reportShownRef.current?.(false), []);
+
   if (!phone) {
     return (
       <div ref={ref} className="v4Stack v4StackWide">
@@ -149,8 +178,9 @@ export function V4BottomStack(props: Readonly<{
     );
   }
 
-  const hasStrip = props.strip !== null && props.strip !== undefined && props.strip !== false;
-  const showGoodTime = props.goodTime && !goodTimeClosed && !hasStrip;
+  const why = job.kind === "dig" && job.waiting === true && job.reason !== undefined
+    ? job.reason
+    : job.kind === "paused" && job.continueLabel === null && typeof job.reason === "string" ? job.reason : null;
   const writeReport = (className: string, ref?: RefObject<HTMLElement | null>): ReactNode => (props.onWriteReport === undefined ? (
     <Link ref={ref as RefObject<HTMLAnchorElement | null> | undefined} className={className} href={job.kind === "report" ? job.href : props.reportHref}>
       {t(catalog, "v4.rail.writeReport")}
@@ -192,10 +222,10 @@ export function V4BottomStack(props: Readonly<{
       {props.pinned ?? null}
       {props.status ?? null}
       {/* journey-f14 (the wave-2 checks, 4 Nov): the greyed button's reason is a visible line right above it, never only
-          for screen readers. */}
-      {job.kind === "dig" && job.waiting === true && job.reason !== undefined ? (
+          for screen readers (a dig that waits, or a paused dig before the new month: question 19 A). */}
+      {why !== null ? (
         <p key={whyReplay} id={reasonId} className={`v4PanelHint v4Muted v4DebPhoneWhy${whyReplay > 0 ? " v4Highlight" : ""}`} data-bar-why="">
-          {job.reason}
+          {why}
         </p>
       ) : null}
       <div className="v4DebPhoneBar">
@@ -224,24 +254,30 @@ export function V4BottomStack(props: Readonly<{
         {job.kind === "paused" ? (
           <p className="v4DebPhonePaused" role="status">
             <span className="v4DebPhonePausedWord">{job.label}</span>
-            {job.continueLabel !== null ? (
+            {job.continueLabel !== null || job.untilLabel !== null ? (
               <>
                 {" · "}
+                {/* Question 19 A: one button in one place, greyed "Continue on 1 December" before the reset (a press sends
+                    nothing and highlights the reason above the bar, focus stays), the live Continue after it. */}
                 <button
                   ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
                   type="button"
-                  className="v4Btn v4BtnPrimary v4DebPhoneDig"
+                  className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.continueLabel === null ? " v4DigWaiting" : ""}`}
                   // W2L-4: it keeps its focus while the press is on its way (never natively disabled); a press then does nothing.
-                  aria-disabled={job.busy ? "true" : undefined}
-                  aria-busy={job.busy ? "true" : undefined}
-                  onClick={() => { if (!job.busy) job.onContinue(); }}
+                  aria-disabled={job.continueLabel === null || job.busy ? "true" : undefined}
+                  aria-busy={job.continueLabel !== null && job.busy ? "true" : undefined}
+                  aria-describedby={job.continueLabel === null && why !== null ? reasonId : undefined}
+                  onClick={() => {
+                    if (job.continueLabel === null) setWhyReplay((count) => count + 1);
+                    else if (!job.busy) job.onContinue();
+                  }}
                   onFocus={pausedHandOff.onFocus}
                   onBlur={pausedHandOff.onBlur}
                 >
-                  {job.continueLabel}
+                  {job.continueLabel ?? job.untilLabel}
                 </button>
               </>
-            ) : job.untilLabel !== null ? <span className="v4Muted">{` · ${job.untilLabel}`}</span> : null}
+            ) : null}
           </p>
         ) : null}
         {job.kind === "choose" ? (

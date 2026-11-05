@@ -6,9 +6,11 @@ import { digGroupOf, useDigUndo, type DigUndoEntry } from "@/lib/v4/digUndo";
 import { DigFirstQuestion } from "./V4DigUndo";
 
 /*
- * V4 UX fixes (owner pick dig-d3 B): the map answers a dig at the click. A dashed card grows under the path at once
- * ("Your dig · Is storage cheap enough… · starting"), Undo pulls it back in, and once the dig is sent the real dig card
- * takes its place (solid, with its own state words). For people who ask for less motion it simply appears and goes.
+ * V4 UX fixes (owner pick dig-d3 B): the map answers a dig at the click. A card grows under the path at once ("Your dig ·
+ * Is storage cheap enough… · starting"), Undo pulls it back in, and once the dig is sent the real dig card takes its place
+ * (with its own state words). For people who ask for less motion it simply appears and goes. The owner's answers of 5 Nov
+ * (question 22 A): the card has journey-f2's "being looked into" look, hatched, never dashed, with no pulse until it starts
+ * (app/v4/v4-undo.css .v4DigSeed).
  * The map tree inserts these leaves at the end of a group's column (V4MapTree's Leaves); the card's final look is the
  * map's (journey-f2), so the classes here are plain and local.
  */

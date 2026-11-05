@@ -101,12 +101,12 @@ describe("Open in the classic view while the question waits (wait-f23)", () => {
     expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
   });
 
-  it("the failed page carries it once too: the header leaves it out", async () => {
+  it("the owner's 5 Nov answer 12 B: the failed screen itself no longer draws it (the account menu carries it)", async () => {
     const runId = crypto.randomUUID();
     harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
     await mountMap(1600, runId);
     expect(page().textContent).toContain(CATALOG["v4.debate.failedTitle"]);
-    expect(seen.headerLinks.at(-1)).toBeNull();
-    expect(classicLinks()).toHaveLength(1);
+    expect(page().querySelector(".v4DebFailed")).not.toBeNull();
+    expect([...page().querySelectorAll(".v4DebFailed a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"])).toEqual([]);
   });
 });

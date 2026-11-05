@@ -237,6 +237,8 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(railStep()!.querySelector(".v4WaitDot-PULSE")).not.toBeNull();
     expect(topButton()).toBeNull();
     expect(header().querySelector("a.v4DebReportLink")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    // The owner's answers of 5 Nov (question 2 A): once asked for, the link reads "See my report".
+    expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
     // Dig buttons rest, with the reason under them. journey-f14 (the wave-2 review): one pattern with the quota wait, so the
     // button stays focusable, points at the visible reason, and a press gives that line the highlight again.
     await openPath(PATHS.renew);
@@ -608,6 +610,8 @@ describe("report-d2: waiting for the report on the map", () => {
     // No "Good time to write your report" while it waits, and no mark on the button.
     expect(page().querySelector(".v4DebRailGoodTime")).toBeNull();
     expect(header().querySelector(".v4DebReportGood")).toBeNull();
+    // The owner's answers of 5 Nov (question 2 A): while it waits for a dig, the header's link reads "See my report".
+    expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
   });
 
   it("opened on a version already being written, with digs and no press here: no start time; 15 minutes on, the report page's line", async () => {
@@ -646,8 +650,66 @@ describe("report-d2: waiting for the report on the map", () => {
     await mountMap(1600, runId);
     expect(topButton()).toBeNull();
     expect(header().querySelector("a.v4DebReportLink")).not.toBeNull();
+    // The owner's answers of 5 Nov (question 2 A): a report that stands with nothing new to ask: "See my report".
+    expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
     expect(page().querySelector(".v4DebRailGoodTime")).toBeNull();
     expect(waitCard()).toBeNull();
+  });
+});
+
+describe("the owner's answers of 5 Nov 2026, question 2 A: \"See my report\" until something new can be asked", () => {
+  const hold = (): HTMLElement | null => header().querySelector<HTMLElement>("[data-report-hold]");
+
+  it("before the map's first report check answers, the button's place is held with no words; then it shows at once", async () => {
+    const runId = crypto.randomUUID();
+    let answer: (read: InvestigationReports | null) => void = () => undefined;
+    reports.load = () => new Promise((resolve) => { answer = resolve; });
+    await mountMap(1600, runId);
+    // The place is there (nothing moves when the button comes), with no words, no link and no button, hidden from readers.
+    expect(hold()).not.toBeNull();
+    expect(hold()!.textContent).toBe("");
+    expect(hold()!.getAttribute("aria-hidden")).toBe("true");
+    expect(header().querySelector(".v4DebReportLink")).toBeNull();
+    expect(flat(header())).not.toContain(CATALOG["v4.rail.writeReport"]);
+    await act(async () => answer(investigation(runId, "CLOSED", [finished(1)], 1)));
+    await settle(50);
+    expect(hold()).toBeNull();
+    expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
+  });
+
+  it("when that first check fails, today's \"Write my report\" link to the report page stays", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => null;
+    await mountMap(1600, runId);
+    expect(hold()).toBeNull();
+    const link = header().querySelector<HTMLAnchorElement>("a.v4DebReportLink")!;
+    expect(flat(link)).toBe(CATALOG["v4.rail.writeReport"]);
+    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+  });
+
+  it("a dig that reopens the investigation turns it back into \"Write my report\", which asks again", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "CLOSED", [finished(1)], 1);
+    await mountMap(1600, runId);
+    expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
+    // A dig started on this map reopens the investigation (the server's rule), so the versions are read again.
+    reports.load = async () => investigation(runId, "OPEN", [finished(1)], 2);
+    await openPath(PATHS.renew);
+    await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
+    await advance(10_100);
+    await settle(50);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect(header().querySelector("a.v4DebReportLink")).toBeNull();
+    expect(flat(topButton())).toBe(CATALOG["v4.rail.writeReport"]);
+    expect(flat(header())).not.toContain(CATALOG["v4.rail.seeReport"]);
+  });
+
+  it("after a version that did not finish it keeps \"Write it again\" (unchanged)", async () => {
+    const runId = crypto.randomUUID();
+    reports.load = async () => investigation(runId, "CLOSED", [finished(1), failedVersion(2)], 1);
+    await mountMap(1600, runId);
+    expect(flat(topButton())).toBe(CATALOG["v4.investigation.writeAgain"]);
+    expect(flat(header())).not.toContain(CATALOG["v4.rail.seeReport"]);
   });
 });
 

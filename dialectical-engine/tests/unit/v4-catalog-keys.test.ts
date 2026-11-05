@@ -168,6 +168,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.money.continueNote",
   "v4.money.continuing",
   "v4.money.continueTooEarly",
+  // The owner's answers of 5 Nov (question 19 A): before the new month the label becomes a greyed button in the same place,
+  // in public-d4 A's words ("Continue on 1 December"), confirmed in place at the click-test with the other changed lines.
+  "v4.pause.continuesOn",
   // Perplexity plan W3-4 (31 Oct): choosing what to dig on the map — the two lines a dig's question asks a suggestion and
   // the person's own view with, the panel's "Choose what to dig" (the one-path rule, Free's cap, edits, own view), and
   // Continue's failure line. No search-words label (the owner's correction of 31 Oct).
@@ -351,6 +354,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.result.box.NOTHING_NEW",
   "v4.rail.goodTimeStarDone",
   "v4.rail.goodTimeHint",
+  // The owner's answers of 5 Nov (question 2 A): once a report is asked for, the map's report button reads "See my report"
+  // (a new line, section 2c: approved in place at the click-test, L1 A).
+  "v4.rail.seeReport",
   "v4.answerCard.region",
   "v4.answerCard.folded",
   "v4.answerCard.fold",

@@ -282,8 +282,54 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     expect(rail).not.toContain(word("v4.rail.digsRunning.one", { count: 1 }));
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(word("v4.money.paused", { date }));
-    expect(panel().textContent).toContain(word("v4.pause.continuesOn", { date: day }));
     expect(buttonsNamed(CATALOG["v4.money.continue"]!, panel())).toEqual([]);
+    // The owner's answers of 5 Nov (question 19 A): a greyed "Continue on …" in Continue's place, named by the visible pause
+    // sentence; pressing it early sends nothing and adds no sentence, the reason line gets the 1-second highlight, focus stays.
+    const early = buttonNamed(word("v4.pause.continuesOn", { date: day }), panel());
+    expect(early.getAttribute("aria-disabled")).toBe("true");
+    expect(early.disabled).toBe(false);
+    const reason = document.getElementById(early.getAttribute("aria-describedby")!)!;
+    expect(reason.textContent).toBe(word("v4.money.paused", { date }));
+    const before = panel().textContent;
+    early.focus();
+    await click(early);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(panel().textContent).toBe(before);
+    expect(document.getElementById(early.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(document.activeElement).toBe(early);
+  });
+
+  it("question 19 A on a phone: the bar's greyed \"Continue on …\" with its visible reason above it; a press sends nothing", async () => {
+    const runId = crypto.randomUUID();
+    const child = crypto.randomUUID();
+    recordDig(runId, child, ["path:n-mix"]);
+    harness.digView = pausedDig(false);
+    harness.search = `?dig=${child}`;
+    await mountMap(375, runId);
+    const bar = (): HTMLElement => page().querySelector<HTMLElement>(".v4DebPhoneBar")!;
+    const early = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused button")!;
+    expect(early.textContent).toBe(word("v4.pause.continuesOn", { date: day }));
+    expect(early.getAttribute("aria-disabled")).toBe("true");
+    expect(early.classList.contains("v4DigWaiting")).toBe(true);
+    // journey-f14: the reason is a visible line right above the bar, never only for screen readers.
+    const why = page().querySelector<HTMLElement>("[data-bar-why]")!;
+    expect(why.textContent).toBe(word("v4.money.paused", { date }));
+    expect(why.classList.contains("v4SrOnly")).toBe(false);
+    expect(early.getAttribute("aria-describedby")).toBe(why.id);
+    early.focus();
+    await click(early);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(page().querySelector<HTMLElement>("[data-bar-why]")!.classList.contains("v4Highlight")).toBe(true);
+    expect(document.activeElement).toBe(bar().querySelector(".v4DebPhonePaused button"));
+    // On the day it is the same button, live: "Paused · Continue", with no reason line.
+    harness.digView = pausedDig(true);
+    await advance(15_000);
+    await settle(10);
+    const live = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused button")!;
+    expect(live.textContent).toBe(CATALOG["v4.money.continue"]);
+    expect(live.getAttribute("aria-disabled")).toBeNull();
+    expect(page().querySelector("[data-bar-why]")).toBeNull();
+    expect(document.activeElement).toBe(live);
   });
 
   it("once the server says its month has reset: 'Dig · ready to continue', and Continue resumes the dig's own run", async () => {

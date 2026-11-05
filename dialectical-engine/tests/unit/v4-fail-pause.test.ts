@@ -173,8 +173,24 @@ describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {
     expect(pauseSentence({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toBe("Your new month has started.");
     expect(digPauseCardLine({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en")).toBe(`Dig · paused until ${day}`);
     expect(digPauseCardLine({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toBe("Dig · ready to continue");
-    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toEqual({ label: "Paused", continueLabel: "Continue", untilLabel: null });
-    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en")).toEqual({ label: "Paused", continueLabel: null, untilLabel: `Continues on ${day}` });
+    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en"))
+      .toEqual({ label: "Paused", continueLabel: "Continue", untilLabel: null, reason: null });
+    // The owner's answers of 5 Nov (question 19 A): before the reset the bar's greyed button reads public-d4 A's "Continue on
+    // 1 December", with the pause's one sentence as the visible line that says why (journey-f14).
+    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en")).toEqual({
+      label: "Paused", continueLabel: null, untilLabel: `Continue on ${day}`,
+      reason: `Paused: this month's quota is used up. You can continue from ${date}.`
+    });
+  });
+});
+
+describe("the greyed Continue before the new month (the owner's answers of 5 Nov, question 19 A)", () => {
+  it("has no dashed outline: dashed is kept for \"New\" (journey-f2), and the old plain label's rule is gone", () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-debate.css"), "utf8");
+    const pauseRules = [...css.matchAll(/([^{}]*\.v4(?:Pause|DebPhonePaused)[^{}]*)\{([^}]*)\}/gu)];
+    expect(pauseRules.length).toBeGreaterThan(0);
+    for (const [, selector, body] of pauseRules) expect(body, selector!.trim()).not.toMatch(/dashed/u);
+    expect(css).not.toMatch(/\.v4PauseUntil\b/u);
   });
 });
 
@@ -194,7 +210,8 @@ describe("the owner's words (OWNER-PICKS-2026-11-03.md), word for word", () => {
       "v4.money.paused": "Paused: this month's quota is used up. You can continue from {date}.",
       "v4.money.pausedReady": "Your new month has started.",
       "v4.money.continueNote": "What is already done is not paid for again.",
-      "v4.pause.continuesOn": "Continues on {date}",
+      // public-d4 A, chosen in the owner's answers of 5 Nov (question 19 A): the greyed button's words before the reset
+      "v4.pause.continuesOn": "Continue on {date}",
       "v4.pause.digCard": "Dig · paused until {date}",
       "v4.pause.digCardReady": "Dig · ready to continue"
     };

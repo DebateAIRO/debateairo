@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { waitForDigs } from "@/lib/v4/digUndo";
 import { writeReport } from "@/lib/v4/load";
-import { loadRunPublished, REPORT_SLOW_MS, type ReportStage } from "@/lib/v4/reportWriting";
+import { loadRunPublished, REPORT_SLOW_MS, reportWaitLineOf, type ReportStage } from "@/lib/v4/reportWriting";
 import { quotaChanged } from "@/lib/v4/quotaPulse";
 import type { WaitState } from "@/lib/v4/stateWords";
 import { useFocusHandOff } from "@/lib/v4/useFocusHandOff";
@@ -306,6 +306,11 @@ function useLater(from: number | null, afterMs: number): boolean {
 
 export type V4ReportWaitProps = Readonly<{
   stage: ReportStage;
+  /**
+   * The owner's answers of 5 Nov (question 23 A): the question of the one dig the report waits for (report-f7's rule,
+   * lib/v4/reportWriting.ts waitingDigQuestionOf), named in the wait line as the report page does. Null or absent: no name.
+   */
+  waitingDig?: string | null;
   /** When writing started, only when this visit knows it (ms). */
   writingSince: number | null;
   /** report-f8: where the 15 minutes count from (ms), or null. */
@@ -325,6 +330,19 @@ export type V4ReportWaitProps = Readonly<{
   catalog: MessageCatalog;
   locale: string;
 }>;
+
+/**
+ * The report's wait line, the report page's (question 23 A): the one dig by its question, its words marked as AI text in
+ * their own direction; else "the dig in progress" or "the digs in progress", with no number.
+ */
+function WaitLine({ waiting, dig, catalog, locale }: Readonly<{ waiting: number; dig: string | null; catalog: MessageCatalog; locale: string }>) {
+  const line = reportWaitLineOf(waiting, dig, catalog, locale);
+  return (
+    <p className="v4DebReportWaitLine">
+      {line.kind === "NAMED" ? <>{line.before}<span data-ai-generated="true" dir="auto">{line.dig}</span>{line.after}</> : line.text}
+    </p>
+  );
+}
 
 /** report-d2: the report waiting for digs, being written, or not written, in the shared waiting card on the map. */
 export function V4ReportWait(props: V4ReportWaitProps) {
@@ -365,11 +383,7 @@ export function V4ReportWait(props: V4ReportWaitProps) {
         catalog={catalog}
         locale={locale}
       >
-        {stage.kind === "WAITING_DIGS" ? (
-          <p className="v4DebReportWaitLine">
-            {tPlural(catalog, "v4.investigation.waitingDigs", stage.waitingForDigs, locale, { n: stage.waitingForDigs })}
-          </p>
-        ) : null}
+        {stage.kind === "WAITING_DIGS" ? <WaitLine waiting={stage.waitingForDigs} dig={props.waitingDig ?? null} catalog={catalog} locale={locale} /> : null}
         {stage.kind === "FAILED" ? <p className="v4DebReportWaitLine">{t(catalog, "v4.investigation.failed")}</p> : null}
         {stage.kind === "WRITING" && slow ? (
           <div className="v4DebReportWaitSlow" data-report-slow="">
