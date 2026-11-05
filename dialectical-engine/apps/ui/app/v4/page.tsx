@@ -20,7 +20,8 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 /*
  * V4 initial (spec "/v4 — D1 Ask + D2"): the ask page, beside V3's /new. Locale exactly as app/new/page.tsx. The
  * reading level comes from the address (`?level=`, FIXES Decision A: V4 stores nothing in the browser). `?maps=all` is
- * "All my maps" (owner pick ask-d5 B): a view of this page, so the site's list of pages is unchanged.
+ * "All my maps" (owner pick ask-d5 B; "My questions" since the owner's third round, 5 Nov): a view of this page, so the
+ * site's list of pages is unchanged.
  */
 export default async function V4AskPage({
   searchParams = Promise.resolve({})

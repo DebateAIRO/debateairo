@@ -83,8 +83,8 @@ describe("the shared state words (journey-f22)", () => {
   it("no V4 line promises an unmeasured time (journey-f16, wait-f3): no \"usually\", no \"about N\" or \"N to M minutes\"", () => {
     const lines = Object.entries(CATALOG);
     expect(lines.filter(([, line]) => /\busually\b|\babout \d|\d+\s*(?:to|-|–)\s*\d+\s*(?:minutes?|hours?)/iu.test(line)).map(([key]) => key)).toEqual([]);
-    // wait-f3's words, naming the list by its new heading (ask-d5 B, the step-1 track: "Your maps").
-    expect(CATALOG["v4.debate.usually"]).toBe("This takes a while. You can leave this page. Your question will be under “Your maps”.");
+    // wait-f3's words, naming the list by its heading (ask-d5 B, renamed "My questions" in the owner's third round, 5 Nov).
+    expect(CATALOG["v4.debate.usually"]).toBe("This takes a while. You can leave this page. Your question will be under “My questions”.");
     // The report page's own line (t4 report track, report-f7) names when it started and promises no length.
     expect(CATALOG["v4.investigation.writingSince"]).toBe("Your report is being written. Started {time}. This takes a while. You can leave this page and come back later.");
   });

@@ -14,6 +14,8 @@ import type { ReadingLevel } from "@/lib/v4/types";
  * "New" dot when the server gives them — each dig under its question in the person's own words, and "All my maps". The
  * "All my maps" view lists them further back, with "Show more". No counts anywhere. Nothing moves except the one slow
  * pulse of a map being looked into (none with reduced motion).
+ * The owner's third round (5 Nov afternoon): the list and the page behind it are called "My questions" (the account
+ * menu's word), and the link to that page reads "All my questions" (v4.maps.title, v4.maps.all).
  * The reading-level ruling (owner, 5 Nov): a debate keeps the level it was asked at, so no link here carries a level; the
  * level props are accepted and unused. Until the run read names the debate's own level (the server field), the map still
  * shows and digs at the account's level, which it reads itself: the same level these links carried before (the ask page

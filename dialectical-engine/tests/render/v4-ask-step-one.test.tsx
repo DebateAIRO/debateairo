@@ -356,7 +356,8 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     }));
     await mount();
     const shelf = host!.querySelector(".v4Shelf")!;
-    expect(shelf.querySelector("h2")?.textContent).toBe("Your maps");
+    // Renamed in the owner's third round (5 Nov): the list and the page behind it are "My questions".
+    expect(shelf.querySelector("h2")?.textContent).toBe("My questions");
     const cards = [...shelf.querySelectorAll(".v4ShelfCard")];
     expect(cards.map((card) => card.querySelector(".v4ShelfQuestion")?.textContent)).toEqual([
       "Is a four-day week good for workers?", "Will AI tutors replace homework help?", "Should countries build new nuclear power?"
@@ -380,7 +381,7 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}`);
     expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}`);
     expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all");
-    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.textContent).toBe("All my maps");
+    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.textContent).toBe("All my questions");
     // No counts anywhere, and no seed: this account has maps.
     expect(shelf.textContent).not.toMatch(/\d+ (maps|questions|digs)/u);
     expect(host!.querySelector(".v4Seed")).toBeNull();

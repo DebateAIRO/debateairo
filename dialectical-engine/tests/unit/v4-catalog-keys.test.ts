@@ -363,6 +363,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.maps.ask",
   "v4.maps.failed",
   "v4.maps.more",
+  // The owner's third round (5 Nov afternoon): the sentences that name the page behind "My questions" follow its new name
+  // (MY_QUESTIONS_ANSWER_LINES below); the changed sentence is a draft. v4.public.dig.unconfirmed, the other one, is on
+  // this list already.
+  "v4.debate.usually",
   "v4.debate.askAgainNoteQuestion",
   "v4.debate.digFailedBackNote",
   "v4.state.WAITING.noTime",
@@ -706,6 +710,32 @@ const ASK_LEVEL_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.ask.levelHonest": "The AIs that write your answer and its story write for this level. It also changes how much detail we show you, and sometimes how long the answer is."
 });
 
+/**
+ * The owner's third round of follow-ups (5 Nov 2026 afternoon), word for word: the page behind the account menu's "My
+ * questions" is renamed "My questions" (its heading and its tab title), and the first screen's link to it becomes "All my
+ * questions".
+ */
+const MY_QUESTIONS_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.title": "My questions",
+  "v4.maps.all": "All my questions"
+});
+
+describe("the owner's third round (5 Nov afternoon): the page is called 'My questions'", () => {
+  it("its name and the first screen's link are the owner's words, wait on no list, and no V4 line names 'Your maps' any more", () => {
+    expect(Object.fromEntries(Object.keys(MY_QUESTIONS_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(MY_QUESTIONS_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in MY_QUESTIONS_ANSWER_LINES)).toEqual([]);
+    // The account menu's item and the page it opens carry one name.
+    expect(catalog["v4.maps.menu"]).toBe(catalog["v4.maps.title"]);
+    // The page's old names ("Your maps", "All my maps"); "your maps" for the maps themselves is not the page's name.
+    expect(Object.entries(catalog).filter(([, value]) => /\b(?:Your|All my) maps\b/u.test(value))).toEqual([]);
+    // The sentences that name the page name it by its new name, and wait on the drafted list.
+    for (const key of ["v4.debate.usually", "v4.public.dig.unconfirmed"]) {
+      expect(catalog[key], key).toContain(`“${catalog["v4.maps.title"]}”`);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+  });
+});
+
 describe("the owner's 5 Nov answers: the header", () => {
   it("the owner's header words ('My questions', '70%', 'Over', the bars, the full bar) are pinned and none waits on the drafted list", () => {
     expect(Object.fromEntries(Object.keys(HEADER_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(HEADER_ANSWER_LINES);
@@ -816,7 +846,7 @@ describe("the owner's 3 Nov screen review", () => {
       expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
       expect(catalog[key], key).toMatch(/This takes a while\./u);
     }
-    // ask-d5 B (the step-1 track): the list on the first page is "Your maps" now.
+    // ask-d5 B, renamed in the owner's third round (5 Nov): the list on the first page is "My questions" now.
     expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.maps.title"]}”`);
   });
 
