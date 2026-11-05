@@ -258,7 +258,8 @@ describe("the owner's words (OWNER-PICKS-2026-11-03.md), word for word", () => {
       "v4.money.pausedReady": "Your new month has started.",
       "v4.money.continueNote": "What is already done is not paid for again.",
       // The record's words (public-d4 A), which the owner's answers of 5 Nov (question 19 A) name for the greyed button before
-      // the reset. Not a click-test approval: the key waits on DRAFTED_UNTIL_CLICK_TEST (tests/unit/v4-catalog-keys.test.ts).
+      // the reset, and which the owner's third round quotes word for word ("Continue on 1 December"): owner-approved, pinned
+      // in PAUSE_ANSWER_LINES (tests/unit/v4-catalog-keys.test.ts) and on no drafted list.
       "v4.pause.continuesOn": "Continue on {date}",
       "v4.pause.digCard": "Dig · paused until {date}",
       "v4.pause.digCardReady": "Dig · ready to continue"

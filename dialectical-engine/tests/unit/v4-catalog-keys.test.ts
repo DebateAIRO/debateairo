@@ -211,8 +211,7 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.money.continuing",
   "v4.money.continueTooEarly",
   // The owner's answers of 5 Nov (question 19 A): before the new month the label becomes a greyed button in the same place,
-  // in public-d4 A's words ("Continue on 1 December"), confirmed in place at the click-test with the other changed lines.
-  "v4.pause.continuesOn",
+  // "Continue on 1 December", which the third round quotes word for word: PAUSE_ANSWER_LINES below, not a draft.
   // Perplexity plan W3-4 (31 Oct): choosing what to dig on the map — the two lines a dig's question asks a suggestion and
   // the person's own view with, the panel's "Choose what to dig" (the one-path rule, Free's cap, edits, own view), and
   // Continue's failure line. No search-words label (the owner's correction of 31 Oct).
@@ -718,6 +717,21 @@ const ASK_LEVEL_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
 const MY_QUESTIONS_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.maps.title": "My questions",
   "v4.maps.all": "All my questions"
+});
+
+/**
+ * The owner's third round of follow-ups (5 Nov 2026 afternoon), word for word: a paused dig's greyed button before the new
+ * month, "Continue on 1 December" (question 19 A had named public-d4 A's words; the third round quotes them itself).
+ */
+const PAUSE_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.pause.continuesOn": "Continue on {date}"
+});
+
+describe("the owner's third round (5 Nov afternoon): the greyed 'Continue on 1 December'", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(PAUSE_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PAUSE_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in PAUSE_ANSWER_LINES)).toEqual([]);
+  });
 });
 
 describe("the owner's third round (5 Nov afternoon): the page is called 'My questions'", () => {
