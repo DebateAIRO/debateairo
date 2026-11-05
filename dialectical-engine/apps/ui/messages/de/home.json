@@ -73,7 +73,7 @@
   "home.turn": "Zug {turn}",
   "home.sampleCoda": "Die Runde endet hier. Niemand wird zum Sieger erklärt. Sie erhalten das Transkript, die zwei Bewertungen pro Zug und die von Ihnen eingeräumte Schwachstelle.",
   "home.closingTitle": "Ihr Argument ist nur so stark wie sein schwächstes Glied.",
-  "home.closingLede": "Nehmen Sie an einer Runde teil. Vier Züge, etwa neun Minuten und ein Transkript, das Ihnen genau zeigt, wo Sie aufgehört haben, die Frage zu beantworten.",
+  "home.closingLede": "Nehmen Sie an einer Runde teil. Vier Züge und ein Transkript, das Ihnen genau zeigt, wo Sie aufgehört haben, die Frage zu beantworten.",
   "home.pricingCopyPlusTax": "Kostenlos starten. Kostenpflichtige Tarife ab {price} + {taxName} pro Monat. Jederzeit kündbar.",
   "home.pricingCopyNoTax": "Kostenlos starten. Kostenpflichtige Tarife ab {price} pro Monat, keine Steuer aufgeschlagen. Jederzeit kündbar.",
   "home.pricingCopyChoose": "Kostenlos starten. Kostenpflichtige Tarife ab {price} pro Monat, zzgl. Steuer, sofern anwendbar. Jederzeit kündbar.",

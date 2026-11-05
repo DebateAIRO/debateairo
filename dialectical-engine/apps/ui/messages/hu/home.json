@@ -73,7 +73,7 @@
   "home.turn": "{turn}. megszólalás",
   "home.sampleCoda": "A forduló itt ér véget. Senkit nem hirdetünk győztesnek. Megkapja az átiratot, a megszólalásonkénti két pontszámot és azt a pontot, amelyet feladott.",
   "home.closingTitle": "Az érve csak annyira erős, mint a leggyengébb láncszeme.",
-  "home.closingLede": "Tegyen meg egy fordulót. Négy megszólalás, körülbelül kilenc perc és egy átirat, amely pontosan megmutatja, hol hagyott fel a válaszadással.",
+  "home.closingLede": "Tegyen meg egy fordulót. Négy megszólalás és egy átirat, amely pontosan megmutatja, hol hagyott fel a válaszadással.",
   "home.pricingCopyPlusTax": "Kezdje ingyen. A fizetős csomagok havi {price} + {taxName} összegtől indulnak. Bármikor lemondható.",
   "home.pricingCopyNoTax": "Kezdje ingyen. A fizetős csomagok havi {price} összegtől indulnak, adó felszámítása nélkül. Bármikor lemondható.",
   "home.pricingCopyChoose": "Kezdje ingyen. A fizetős csomagok havi {price} összegtől indulnak, plusz adó, ahol alkalmazandó. Bármikor lemondható.",

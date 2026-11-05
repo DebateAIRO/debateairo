@@ -73,7 +73,7 @@
   "home.turn": "Tur {turn}",
   "home.sampleCoda": "Omgången slutar här. Ingen utses till vinnare. Du får transkriptionen, de två markeringarna per tur och den länk där du gav vika.",
   "home.closingTitle": "Ditt argument är bara så starkt som sin svagaste länk.",
-  "home.closingLede": "Genomför en omgång. Fyra turer, ungefär nio minuter och en transkription som visar exakt var du slutade svara.",
+  "home.closingLede": "Genomför en omgång. Fyra turer och en transkription som visar exakt var du slutade svara.",
   "home.pricingCopyPlusTax": "Börja kostnadsfritt. Betalabonnemang från {price} + {taxName} per månad. Säg upp när som helst.",
   "home.pricingCopyNoTax": "Börja kostnadsfritt. Betalabonnemang från {price} per månad, ingen skatt tillkommer. Säg upp när som helst.",
   "home.pricingCopyChoose": "Börja kostnadsfritt. Betalabonnemang från {price} per månad, plus skatt i förekommande fall. Säg upp när som helst.",

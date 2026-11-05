@@ -74,7 +74,7 @@
   "home.turn": "Gājiens {turn}",
   "home.sampleCoda": "Raunds beidzas šeit. Neviens netiek pasludināts par uzvarētāju. Jūs saņemat transkriptu, divus vērtējumus par katru gājienu un posmu, kurā piekāpāties.",
   "home.closingTitle": "Jūsu arguments ir tikai tik stiprs, cik tā vājākais posms.",
-  "home.closingLede": "Aizvadiet vienu raundu. Četri gājieni, aptuveni deviņas minūtes un transkripts, kas precīzi parāda, kur pārtraucāt atbildēt.",
+  "home.closingLede": "Aizvadiet vienu raundu. Četri gājieni un transkripts, kas precīzi parāda, kur pārtraucāt atbildēt.",
   "home.pricingCopyPlusTax": "Sāciet bez maksas. Maksas plāni sākas no {price} + {taxName} mēnesī. Abonementu varat atcelt jebkurā laikā.",
   "home.pricingCopyNoTax": "Sāciet bez maksas. Maksas plāni sākas no {price} mēnesī, bez pievienota nodokļa. Abonementu varat atcelt jebkurā laikā.",
   "home.pricingCopyChoose": "Sāciet bez maksas. Maksas plāni sākas no {price} mēnesī, plus nodoklis, kur tas piemērojams. Abonementu varat atcelt jebkurā laikā.",

@@ -482,9 +482,11 @@ describe("T9-C4 landing content", () => {
       "Scores, condition marks, and replay handles — every number traces to its source."
     );
     expect(pricing?.textContent).toContain("Your argument is only as strong as its weakest joint.");
+    // Owner's answer to question 9 (5 Nov 2026, A): the closing line names no time, in the owner's words.
     expect(pricing?.textContent).toContain(
-      "Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering."
+      "Take one round. Four turns, and a transcript that tells you exactly where you stopped answering."
     );
+    expect(pricing?.textContent).not.toMatch(/minute/iu);
   });
 
   it("renders both hero CTAs and sends the primary through the safe auth entry", async () => {

@@ -76,7 +76,7 @@
   "home.turn": "Seal {turn}",
   "home.sampleCoda": "Críochnaíonn an babhta anseo. Ní fhógraítear aon bhuaiteoir. Faigheann tú an tras-scríbhinn, an dá mharc in aghaidh an tseala agus an t-alt a ghéill tú.",
   "home.closingTitle": "Níl d’argóint níos láidre ná an t-alt is laige inti.",
-  "home.closingLede": "Déan babhta amháin. Ceithre sheal, thart ar naoi nóiméad, agus tras-scríbhinn a insíonn duit go beacht cén áit ar stop tú den fhreagairt.",
+  "home.closingLede": "Déan babhta amháin. Ceithre sheal agus tras-scríbhinn a insíonn duit go beacht cén áit ar stop tú den fhreagairt.",
   "home.pricingCopyPlusTax": "Tosaigh saor in aisce. Tosaíonn pleananna íoctha ag {price} + {taxName} sa mhí. Cealaigh am ar bith.",
   "home.pricingCopyNoTax": "Tosaigh saor in aisce. Tosaíonn pleananna íoctha ag {price} sa mhí, gan cáin curtha leis. Cealaigh am ar bith.",
   "home.pricingCopyChoose": "Tosaigh saor in aisce. Tosaíonn pleananna íoctha ag {price} sa mhí, móide cáin, más infheidhme. Cealaigh am ar bith.",
