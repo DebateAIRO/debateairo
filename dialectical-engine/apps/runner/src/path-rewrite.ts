@@ -15,7 +15,7 @@ import {
 import { engineContractHash } from "./engine-contracts.js";
 import { fitRewriteToTokenLine } from "./token-line.js";
 import {
-  pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
+  pathRewriteDigPathsOf, pathRewriteDigPathsOfRoots, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
   type PathRewriteParentPath, type PathRewritePick, type PathRewriteQuestion
 } from "./path-rewrite-material.js";
 import { holdRunPassages, releaseRunPassages } from "./passage-record.js";
@@ -614,9 +614,12 @@ export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string,
 /**
  * A first debate's suggestions, once its story is written (index.ts, the after-settle branch): the writer of the rewrite, on the same
  * never-walled seam. A run that was rewritten as a dig has its own (sealed with its rewrite). No settings, no store or no writer: none.
+ * V4 start step, Task 54: a path run hands its path roots (0158's `readPathRoots`, in force, by root index), and each path is read
+ * from its own root and keyed by its id, b<n> (`pathRewriteDigPathsOfRoots`); without them, R22's paths by their roots' node ids.
  * Never rejects.
  */
-export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput): Promise<void> {
+export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput,
+  pathRoots?: readonly Readonly<{ ref: string; rootNodeId: string }>[]): Promise<void> {
   const first = settings?.firstDebateSuggestions;
   if (settings === undefined || first === undefined) return;
   const log = safeLog(settings);
@@ -632,7 +635,8 @@ export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSetti
       nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
     const book = settings.replayBookOf === undefined ? null : await lease(() => settings.replayBookOf!(input.runId, input.workItemId));
     await writeFirstDebateSuggestions(Object.freeze({ runId: input.runId, workItemId: input.workItemId, free: false, question: input.questionLine,
-      language: null, paths: pathRewriteDigPathsOf(input, enrichment), wouldChangeIt: facts.wouldChangeIt, writer, log,
+      language: null, wouldChangeIt: facts.wouldChangeIt, writer, log,
+      paths: pathRoots === undefined ? pathRewriteDigPathsOf(input, enrichment) : pathRewriteDigPathsOfRoots(input, enrichment, new Map(), pathRoots),
       send: (maker, request) => {
         const gateway = book === null ? maker.provider : replayingGateway(book, maker.provider);
         return lease(() => gateway.call(request));

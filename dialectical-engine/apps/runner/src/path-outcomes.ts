@@ -8,7 +8,8 @@ import {
   type ReadingLevel
 } from "@debateai/kernel";
 import {
-  PREVIEW_V2_FINAL_SEATS, buildFramedPrompt, type FramedMaterialField, type PromptContract, type ProviderGateway, type TokenCounter
+  PREVIEW_V2_FINAL_SEATS, buildFramedPrompt, type FramedMaterialField, type PromptContract, type ProviderCallRequest, type ProviderCallResult,
+  type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
 import { PATH_REWRITE_POLICY } from "@debateai/register";
 import {
@@ -25,7 +26,7 @@ import { fitPathOutcomeToTokenLine } from "./token-line.js";
 
 /**
  * V4 start step, Task 49 (spec 2026-11-03 §4.3): EACH PATH'S ANSWER SO FAR, as soon as that path's own arguing and checks end (Task
- * 54 starts one chain per path). For one path: the material (below), the writer (Haiku) and the checker (GLM) rounds of
+ * 54 starts one chain per path, `runPathChains`, each on a one-path job, `pathOutcomesJobFor`). For one path: the material (below), the writer (Haiku) and the checker (GLM) rounds of
  * packages/story/src/path-outcome.ts on the served lane, 2 on a paid plan and 1 on Free, no backup writer; then code's outcome:
  *  - satisfied → READY; still objected after the last round → READY_WITH_RESERVATION; no root, no material that fits, or no
  *    draft → FAILED (no root and no fit: no call);
@@ -222,6 +223,8 @@ export function pathOutcomeMaterial(input: PathOutcomeMaterialInput, options: Re
 /* ----------------------------------------------------------------- one path, and every path */
 
 const FAILED: PathOutcome = Object.freeze({ state: "FAILED", text: null, what_changed: [], view: null, trust: null, rests_on: [] }) as PathOutcome;
+/** Task 54: a FAILED answer so far (no text, no changes, no view, no trust word, no evidence), as every failed path stores it. */
+export const PATH_OUTCOME_FAILED: PathOutcome = FAILED;
 
 const trustOf = (word: string | null): TrustWord | null => {
   const read = TrustWordSchema.safeParse(word);
@@ -319,4 +322,162 @@ export async function runPathOutcomeFor(job: PathOutcomesJob, pathId: PathId): P
 export async function runPathOutcomes(job: PathOutcomesJob): Promise<ReadonlyMap<PathId, PathOutcome>> {
   const outcomes = await Promise.all(job.paths.map((path) => runPathOutcomeFor(job, path.pathId)));
   return new Map(job.paths.map((path, at) => [path.pathId, outcomes[at]!] as const));
+}
+
+/* ----------------------------------------------------------------- Task 54: one chain per path, as soon as its own checks end */
+
+/**
+ * Review of Task 54: A STOP THAT ENDS THIS COPY IS NEVER A PATH'S ANSWER. The writer's and checker's loop (`runStoryLoop`) reads every
+ * failed call as a failed round, so a call refused because this copy of the run must stop (`endsCopy`: its claim taken, its time up,
+ * its release retiring, its lane stopped) would end FAILED, be stored, and be read back by the copy that takes the run on, which then
+ * never writes that path. Over the paths' gateway and store: the first such stop a call meets is kept (`stopped`), every later write
+ * is refused with it (so `runPathOutcomeFor` rejects with it, the chain rethrows it and stores nothing), and `throwIfStopped` throws
+ * it, for the main answer, whose loop ends FAILED the same way: the stop leaves as it came, as at every other step of the runner.
+ */
+export function pathCopyStops(gateway: ProviderGateway, store: PathOutcomesJob["store"], endsCopy: (error: unknown) => boolean): Readonly<{
+  gateway: ProviderGateway;
+  store: PathOutcomesJob["store"];
+  stopped: () => Readonly<{ error: unknown }> | null;
+  throwIfStopped: () => void;
+}> {
+  let stop: Readonly<{ error: unknown }> | null = null;
+  return Object.freeze({
+    gateway: Object.freeze({
+      call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+        try {
+          return await gateway.call(request);
+        } catch (error) {
+          if (stop === null && endsCopy(error)) stop = Object.freeze({ error });
+          throw error;
+        }
+      }
+    }),
+    // Read lazily: a run with no paths never reads or writes through it.
+    store: Object.freeze({
+      readPathOutcomes: (runId: string) => store.readPathOutcomes(runId),
+      recordPathOutcome: (input: Parameters<PathOutcomesJob["store"]["recordPathOutcome"]>[0]) =>
+        stop === null ? store.recordPathOutcome(input) : Promise.reject(stop.error)
+    }),
+    stopped: () => stop,
+    throwIfStopped: () => {
+      if (stop !== null) throw stop.error;
+    }
+  });
+}
+
+/** V4 start step, Task 54: a one-path job (each path's chain writes its own answer so far, never waiting for another path's). */
+export function pathOutcomesJobFor(input: Readonly<{ base: Omit<PathOutcomesJob, "paths">; path: PathOutcomesJob["paths"][number] }>): PathOutcomesJob {
+  return Object.freeze({ ...input.base, paths: Object.freeze([input.path]) });
+}
+
+/**
+ * Review of Task 54: A PATH'S OWN REVIEW FACTS (the brief: "facts from `engineNodeFactsOf` restricted to its nodes"). A path's chain
+ * reads the run's review lists (reviewed, disputed, cannot assess) one after another while other paths still record theirs, so the
+ * lists can disagree: a dispute recorded between two reads is "disputed but not reviewed" (ENGINE_FACTS_INVALID), and the path would
+ * end FAILED. Every review of the path's own nodes is recorded before its chain reads them (its checks are over), so the lists kept
+ * to those nodes agree. Each list keeps its order.
+ */
+export type PathReviewLists = Readonly<{
+  reviewedNodeIds: readonly string[]; disputedNodeIds: readonly string[]; cannotAssessNodeIds: readonly string[];
+}>;
+export function pathReviewFactsOf(lists: PathReviewLists, ownNodeIds: ReadonlySet<string>): PathReviewLists {
+  const own = (nodeIds: readonly string[]): readonly string[] => Object.freeze(nodeIds.filter((nodeId) => ownNodeIds.has(nodeId)));
+  return Object.freeze({
+    reviewedNodeIds: own(lists.reviewedNodeIds), disputedNodeIds: own(lists.disputedNodeIds), cannotAssessNodeIds: own(lists.cannotAssessNodeIds)
+  });
+}
+
+/** One FOUND mark per point of the path that has a trust word (code's, `trustOfPoint`), in the path's order. */
+export function pathFoundMarksOf(path: PathOutcomesPath): readonly Readonly<{ nodeId: string; trust: TrustWord }>[] {
+  return Object.freeze(path.points.flatMap((point) => {
+    const trust = trustOf(point.trust);
+    return trust === null ? [] : [Object.freeze({ nodeId: point.id, trust })];
+  }));
+}
+
+/**
+ * The debate's investigation cap (`engine.investigate.maxPerDebate`, which the admission priced once per debate), shared out by path
+ * in the person's order: each path its even share, the earlier paths one more each while a remainder is left. `first` is how many
+ * slots the earlier paths hold, so a path's k-th investigation is the debate's `VERDICT:investigate:<first + k>` whichever path ends
+ * first. A path with no slot investigates nothing (its points are recorded capped).
+ */
+export function pathInvestigationShares(cap: number, pathCount: number): readonly Readonly<{ first: number; slots: number }>[] {
+  if (!Number.isSafeInteger(cap) || cap < 0 || !Number.isSafeInteger(pathCount) || pathCount < 0) throw new TypeError("PATH_INVESTIGATION_SHARES_INVALID");
+  const even = pathCount === 0 ? 0 : Math.floor(cap / pathCount);
+  const shares: Readonly<{ first: number; slots: number }>[] = [];
+  let first = 0;
+  for (let at = 0; at < pathCount; at += 1) {
+    const slots = even + (at < cap - even * pathCount ? 1 : 0);
+    shares.push(Object.freeze({ first, slots }));
+    first += slots;
+  }
+  return Object.freeze(shares);
+}
+
+/**
+ * What one path's chain does (Task 54; the runner gives each step, a test scripts them). In order: (1) its own checks are over
+ * (Task 53's `pathChecksOver`); (2) its cannot-assess points investigated; (3) the path as its answer so far reads it, each point
+ * with code's trust word; (4) its answer so far, stored at once; (5) one FOUND mark per point with a trust word. A re-claimed run
+ * whose path already has its answer so far skips (2) and (4): no call, its marks only.
+ */
+export type PathChainSteps = Readonly<{
+  checksOver: () => Promise<void>;
+  /** The answer so far already stored for this path (a re-claimed run), else null. */
+  stored: () => Promise<PathOutcome | null>;
+  investigate: () => Promise<void>;
+  pathOf: () => Promise<PathOutcomesPath>;
+  /** `runPathOutcomeFor(pathOutcomesJobFor({ base, path }), pathId)`. */
+  outcomeOf: (path: PathOutcomesPath) => Promise<PathOutcome>;
+  /** One FOUND mark (best effort; never fails the chain). */
+  found: (pathId: PathId, nodeId: string, trust: TrustWord) => void;
+  /** A step failed: FAILED stored for this path (the stored row when another copy stored first), so every path has its row. */
+  failed: () => Promise<PathOutcome>;
+  /** An error that ends the run itself (a lost claim, an erased run, a stopped arguing): never one path's FAILED, rethrown. */
+  endsRun: (error: unknown) => boolean;
+  log: (event: string, detail: Record<string, unknown>) => void;
+}>;
+
+const codeOfError = (error: unknown): string =>
+  error instanceof TypedDomainError ? error.code : error instanceof Error ? error.name : "UNTYPED";
+
+/**
+ * One path's chain, as soon as its own checks end; it never waits for another path. A step that fails costs this path only: its
+ * FAILED is stored and the others go on. It rejects only when its checks never end (the run failed) or an error ends the run.
+ */
+export async function runPathChain(pathId: PathId, steps: PathChainSteps): Promise<PathOutcome> {
+  await steps.checksOver();
+  try {
+    const stored = await steps.stored();
+    if (stored === null) await steps.investigate();
+    const path = await steps.pathOf();
+    const outcome = stored ?? await steps.outcomeOf(path);
+    for (const mark of pathFoundMarksOf(path)) {
+      try {
+        steps.found(pathId, mark.nodeId, mark.trust);
+      } catch {
+        // A mark is best effort: the path keeps its answer so far.
+      }
+    }
+    return outcome;
+  } catch (error) {
+    if (steps.endsRun(error)) throw error;
+    try {
+      steps.log("PATH_CHAIN_FAILED", { pathId, code: codeOfError(error) });
+    } catch {
+      // A failing log sink never costs the path its row.
+    }
+    return await steps.failed();
+  }
+}
+
+/**
+ * Every path's chain, all at once (each held by the run's call lane like any other call); the map in the paths' order once every
+ * chain has ended. A chain that rejects (the run ended) rejects this, once every other chain has settled.
+ */
+export async function runPathChains(pathIds: readonly PathId[], stepsOf: (pathId: PathId) => PathChainSteps):
+  Promise<ReadonlyMap<PathId, PathOutcome>> {
+  const settled = await Promise.allSettled(pathIds.map((pathId) => runPathChain(pathId, stepsOf(pathId))));
+  const rejected = settled.find((entry): entry is PromiseRejectedResult => entry.status === "rejected");
+  if (rejected !== undefined) throw rejected.reason;
+  return new Map(pathIds.map((pathId, at) => [pathId, (settled[at] as PromiseFulfilledResult<PathOutcome>).value] as const));
 }

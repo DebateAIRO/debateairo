@@ -28,7 +28,8 @@ describe("R2b: the comparing judges in the run body", () => {
       // this copy's outcomes from memory (pre-flight PF-R2b3.6).
       "await recordPointInvestigationRows({",
       "const ladderLabel = deriveVerdictLabel(verdictLabelBasis);",
-      "const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);"
+      // V4 start step, Task 54: a path debate's label is its main trust word's (it has no comparing judge); every other run's as before.
+      "const verdictLabel = pathOutcomes !== null ? verdictDerivationOfPaths(pathsMainTrust)\n      : comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);"
     ].map((anchor) => [anchor, source.indexOf(anchor)] as const);
     for (const [anchor, index] of anchors) expect([anchor, index >= 0]).toEqual([anchor, true]);
     const indices = anchors.map(([, index]) => index);

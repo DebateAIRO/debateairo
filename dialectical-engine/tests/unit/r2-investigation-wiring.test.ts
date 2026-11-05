@@ -39,8 +39,10 @@ describe("engine 2: the investigation step's place in the runner", () => {
 
   it("sends each investigation under the engine seal and the investigator's bound, keeps it off the author's and the reviewer's makers, never stops the debate for money", async () => {
     const source = await readFile(RUNNER, "utf8");
-    const start = source.indexOf("const investigateCannotAssessPoints = async (");
-    const body = source.slice(start, source.indexOf("if (engine.engine === 2 && effectiveMakerCount > 1) {", start));
+    // V4 start step, Task 54: the step's body is `investigatePointsIn`, before the arguing (a path's chain investigates its own points as
+    // soon as its checks end); `investigateCannotAssessPoints` is the debate's call of it, over every node, the cap whole.
+    const start = source.indexOf("const investigatePointsIn = async (");
+    const body = source.slice(start, source.indexOf("let pathsArguingFailed = false;", start));
     expect(start).toBeGreaterThan(0);
     expect(body).toContain("contractHash: engineSeal,");
     expect(body).toContain("bound: guidedCallBound(settings.judgeBound, \"investigator\", lengthGuidance),");
@@ -57,8 +59,10 @@ describe("engine 2: the investigation step's place in the runner", () => {
   // (pre-flight PF-R2a5.6: 0121's contract scan alone under-reaches), and a row another write stored first stands.
   it("calls each investigator through the seat caller over the lane-wrapped members, never the cooldown book", async () => {
     const source = await readFile(RUNNER, "utf8");
-    const start = source.indexOf("const investigateCannotAssessPoints = async (");
-    const body = source.slice(start, source.indexOf("if (engine.engine === 2 && effectiveMakerCount > 1) {", start));
+    // V4 start step, Task 54: the step's body is `investigatePointsIn`, before the arguing (a path's chain investigates its own points as
+    // soon as its checks end); `investigateCannotAssessPoints` is the debate's call of it, over every node, the cap whole.
+    const start = source.indexOf("const investigatePointsIn = async (");
+    const body = source.slice(start, source.indexOf("let pathsArguingFailed = false;", start));
     expect(start).toBeGreaterThan(0);
     expect(body).toContain("const answered = await seatCaller.callSeat({");
     expect(body).toContain("call: (member, memberCallSiteKey) => member.judge.investigatePoint({");
@@ -95,8 +99,10 @@ describe("engine 2: the investigation step's place in the runner", () => {
   // A14 fix round 1: every unavailable investigation call leaves one content-free line, and one rule reads the statuses.
   it("logs each unavailable call by its code, and reads every investigation status through one helper", async () => {
     const source = await readFile(RUNNER, "utf8");
-    const start = source.indexOf("const investigateCannotAssessPoints = async (");
-    const body = source.slice(start, source.indexOf("if (engine.engine === 2 && effectiveMakerCount > 1) {", start));
+    // V4 start step, Task 54: the step's body is `investigatePointsIn`, before the arguing (a path's chain investigates its own points as
+    // soon as its checks end); `investigateCannotAssessPoints` is the debate's call of it, over every node, the cap whole.
+    const start = source.indexOf("const investigatePointsIn = async (");
+    const body = source.slice(start, source.indexOf("let pathsArguingFailed = false;", start));
     const lines = body.match(/logPointInvestigation\("INVESTIGATION_UNAVAILABLE", \{ runId: run\.runId, callSiteKey, code: [^}]*\}\);/gu) ?? [];
     expect(lines).toEqual([
       "logPointInvestigation(\"INVESTIGATION_UNAVAILABLE\", { runId: run.runId, callSiteKey, code: \"INVESTIGATOR_SEAT_UNPLANNED\" });",

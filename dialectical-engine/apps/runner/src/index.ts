@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes as cryptoRandomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
 import {
@@ -210,6 +210,22 @@ import {
   EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, START_STEP_LIMITS, debateShapeSettingsOf, purposeLinesUnsaid, questionWithPurposeLines, readingLevelOf,
   type PathId, type PathGapRound, type PurposeLines
 } from "@debateai/contract";
+// V4 start step, Task 54: each path's answer so far, the main answer's trust word and label, and the points' trust words.
+import {
+  cutQuoteAtWordEdge, mainAnswerTrustWordOf, purposeLinesMaterial, trustOfPoint, type PathOutcome, type TrustWord
+} from "@debateai/contract";
+import { LivenessRepository, verdictDerivationOfPaths } from "@debateai/serve";
+import { storyLengthField, storyPathsPointsOf, withoutStoryNodeIds } from "@debateai/story";
+import {
+  PATH_OUTCOME_FAILED, pathCopyStops, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathsFinalSeatsOf, runPathChains,
+  runPathOutcomeFor, type PathOutcomesJob, type PathOutcomesPath, type PathOutcomesSeat
+} from "./path-outcomes.js";
+import { runPathsMainAnswer, type PathsDossierPath } from "./paths-main-answer.js";
+import { fitStoryPathsToTokenLine } from "./token-line.js";
+import { closingRandomBytes } from "./investigation-close.js";
+// (Named for the paths here: the debate's own body never names the dig's rewrite, tests/unit/dig-no-story.test.ts.)
+import type { PathRewritePoint as PathPoint, PathRewriteQuestion as PathQuestion } from "./path-rewrite-material.js";
+import type { DossierSource } from "./investigation-dossier.js";
 import {
   MapChoiceRepository, START_STEP_HAIKU_MODEL, mapAnswersArgued, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapLimitsFor,
   mapRunPathGapRounds, type MapResult, type MapSeat
@@ -236,6 +252,7 @@ import {
   ENGINE2_REDUCER_VERSION,
   comparingJudgeCallSiteKey,
   engineMaterialOf,
+  pointInvestigationCallSiteKey,
   pointInvestigationMaterialOf,
   SERVED_ROOT_SELECTION_RULE,
   SERVED_ROOT_SELECTION_RULE_JUDGES,
@@ -277,7 +294,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyPathsInputOf, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
@@ -335,7 +352,7 @@ import { runnerSettingsOfVersion, type RunnerDebateMembers } from "./run-debate-
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
-import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
+import { createOrderedRecorder, createPartedOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
   assertFairInvestigator, engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates,
@@ -5873,7 +5890,15 @@ export class WalkingSkeletonRunner {
         | { readonly kind: "SNAPSHOT"; readonly input: StoryWriteInput }
         | ({ readonly kind: "SNAPSHOT_FAILED" } & StorySnapshotFailure)
         | null;
-    } = { story: null };
+      /** V4 start step, Task 54: a path debate's roots in force (b<n> → its root), read in the lease for its suggestions; null otherwise. */
+      pathRoots: readonly Readonly<{ ref: string; rootNodeId: string }>[] | null;
+    } = { story: null, pathRoots: null };
+    /**
+     * V4 start step, Task 54: the Haiku target's free token count near the 100K line (R22 decision 28, as the closing's: the counter the
+     * runner's Haiku seat was composed with), for a path debate's answers so far, its main answer and its story's fit; none: the byte
+     * guard alone.
+     */
+    const pathsTokenCount = settings.pathRewrite?.tokenCount;
     /** Reclaim resume: the replay book read inside the lease, closed when the lease ends (nothing replays after it). */
     let replayBookInLease: ReplayBook = EMPTY_REPLAY_BOOK;
     let executed: RunnerExecutionResult;
@@ -8084,6 +8109,8 @@ export class WalkingSkeletonRunner {
     let pathsQuestionLine = run.questionLine;
     let pathsPurposeLines: PurposeLines | null = null;
     let pathsSetStored: StoredStartPathSet | null = null;
+    /** V4 start step, Task 54: the gap round kept (paid plans), read for the story's "also raised"; null without one. */
+    let pathsGapRound: PathGapRound | null = null;
     if (pathsShape !== null && shapeRun !== null) {
       const startPaths = settings.startPaths!;
       const pathResults = settings.pathResults!;
@@ -8224,6 +8251,7 @@ export class WalkingSkeletonRunner {
       if (webSettled.status === "rejected") throw webSettled.reason;
       if (gapSettled.status === "rejected") throw gapSettled.reason;
       pathsRunPaths = pathsRunPathsOf(set, gapSettled.value);
+      pathsGapRound = gapSettled.value;
       const stepped = webSettled.value;
       // W4-1 (Task 48): every path reads every path's pack, each under its path's title (`pathsPackShares`), when any kept one.
       if (stepped !== null && stepped.paths.some((path) => path.packId !== null)) {
@@ -8290,10 +8318,12 @@ export class WalkingSkeletonRunner {
      * An ordered recorder (ordered-recorder.ts) whose positions are each claimed once: committed, or given up by a
      * chain that has nothing (more) to write there (`skip`, harmless for a position already claimed), so no later
      * position ever waits on a chain that stopped, was dropped or failed. `skipBelow` gives up every unclaimed
-     * earlier position — for the serial phases, where none of them can be claimed any more.
+     * earlier position — for the serial phases, where none of them can be claimed any more. V4 start step, Task 53b: with
+     * `partOf` (a path debate), one ordered recorder per path over that path's own positions (`createPartedOrderedRecorder`), so
+     * no path's saves wait on another's; without it (every other run), the one plan order, as before.
      */
-    const positionRecorder = (size: number) => {
-      const recorder: OrderedRecorder = createOrderedRecorder(size);
+    const positionRecorder = (size: number, partOf: ((position: number) => number | null) | null = null) => {
+      const recorder: OrderedRecorder = partOf === null ? createOrderedRecorder(size) : createPartedOrderedRecorder(size, partOf);
       const claimed = new Set<number>();
       /** Each position's turn, over: its write has settled, or it was given up. */
       const settled = Array.from({ length: size }, () => settable<void>());
@@ -8326,12 +8356,21 @@ export class WalkingSkeletonRunner {
       });
     };
     type PositionRecorder = ReturnType<typeof positionRecorder>;
-    /** Nodes, in plan order. */
-    const nodeRecorder = positionRecorder(totalPlannedNodes);
+    /**
+     * V4 start step, Task 53b (the coordinator's ruling of 5 Nov; spec §4.3, chat-first-round: a path "does not wait for the other
+     * paths") — ON A PATH DEBATE, THE PATH EACH PLAN POSITION ARGUES UNDER, by its root's index: root i itself, a leg its root's, a
+     * scrutiny slot its leg's root once scrutiny chose it (null for a slot no leg uses). The recorders below then keep each path's
+     * own plan order and no other: a slow path never holds back another path's saves, reviews or "over" signals. Null on every
+     * other run, which keeps the one plan order (parallel-calls spec §2.1).
+     */
+    const pathPartOf = pathsRunPaths === null || shapePlan === null ? null
+      : (position: number): number | null => position < rootCount ? position : shapeLegAt(position)?.rootIndex ?? null;
+    /** Nodes, in plan order (on a path debate, each path's in its own). */
+    const nodeRecorder = positionRecorder(totalPlannedNodes, pathPartOf);
     /** Each node's reviewer choice, in review order (spec §2.2: the reviewer turn never depends on who finished first). */
-    const reviewChoices = positionRecorder(totalPlannedNodes);
+    const reviewChoices = positionRecorder(totalPlannedNodes, pathPartOf);
     /** Each node's review, recorded in review order. */
-    const reviewRecorder = positionRecorder(totalPlannedNodes);
+    const reviewRecorder = positionRecorder(totalPlannedNodes, pathPartOf);
     /**
      * Spec §2.3 — A FAILURE THAT ENDS THE DEBATE, WITH CALLS IN FLIGHT. The chain that meets it records it with its
      * place in today's serial order (`rank`) and stops the lane: no new call starts, and a call still waiting for a
@@ -9121,7 +9160,8 @@ export class WalkingSkeletonRunner {
     };
     /** How one node's review call ended (nothing recorded yet): `recordReviewOutcome` records it in review order. */
     type ReviewCallOutcome =
-      | { readonly kind: "REVIEWED"; readonly review: Awaited<ReturnType<Judge["review"]>>; readonly callSiteKey: string }
+      // V4 start step, Task 53b: `reviewerMaker` is the maker of the member that ANSWERED (the one the ledger names as its reviewer).
+      | { readonly kind: "REVIEWED"; readonly review: Awaited<ReturnType<Judge["review"]>>; readonly callSiteKey: string; readonly reviewerMaker: string }
       | { readonly kind: "HIDDEN"; readonly record: HaltedExpansionRecord }
       /** Fix (d): the reviewer itself sat out during the call; the node is offered to another reviewer after this pass. */
       | { readonly kind: "GIVEN_BACK" }
@@ -9175,7 +9215,8 @@ export class WalkingSkeletonRunner {
           return { kind: "HIDDEN", record: reviewAttempt.record };
         }
         // A15: the key the ledger holds for this review, seat marker included.
-        return { kind: "REVIEWED", review: reviewAttempt.value.value, callSiteKey: reviewAttempt.value.callSiteKey };
+        return { kind: "REVIEWED", review: reviewAttempt.value.value, callSiteKey: reviewAttempt.value.callSiteKey,
+          reviewerMaker: reviewAttempt.value.member.maker };
       } catch (error) {
         const outcome = reviewFailureOutcome(error);
         if (outcome.kind === "RETHROW") throw error;
@@ -9321,7 +9362,20 @@ export class WalkingSkeletonRunner {
       readonly ready: Promise<void>;
       /** Fix (d): the nodes whose reviewer sat out during the call, in review order, offered again after the batch. */
       readonly givenBack: AuthoredDebateNode[];
+      /**
+       * V4 start step, Task 53b: on a path debate, the path (its root's index) whose batch this is; its turn book reads that path's
+       * own recorded reviews (`pathLatestReviewers`), never the ledger, which other paths write to at their own pace. Null: the
+       * ledger, as today.
+       */
+      readonly path: number | null;
     }
+    /**
+     * V4 start step, Task 53b — EACH PATH'S OWN TURN LEDGER: per path, the latest reviewer maker of each author maker's nodes in that
+     * path, set as each of its reviews is recorded (in that path's review order). It is what `readLatestReviewerMaker` reads, kept to
+     * the path's own nodes: this copy's nodes are written during this arguing, so before it the path has none. So a path's reviewer
+     * turn never depends on how far another path got.
+     */
+    const pathLatestReviewers = (pathsRunPaths ?? []).map(() => new Map<string, string>());
     /** Where one node's review chain stands: its position, its pass's two recorders, its batch. */
     interface ReviewSlot {
       readonly position: number;
@@ -9348,7 +9402,10 @@ export class WalkingSkeletonRunner {
         if (arguingStopped()) return null;
         const latest = slot.batch.latest;
         if (!latest.has(authoredNode.maker)) {
-          latest.set(authoredNode.maker, await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker));
+          // V4 start step, Task 53b: a path's batch reads its own path's recorded reviews, never the run's ledger.
+          latest.set(authoredNode.maker, slot.batch.path === null
+            ? await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker)
+            : pathLatestReviewers[slot.batch.path]!.get(authoredNode.maker) ?? null);
         }
         const chosen = chooseReviewer(authoredNode, latest.get(authoredNode.maker) ?? null);
         if (chosen.kind === "MEMBERS_SAT_OUT") {
@@ -9376,21 +9433,24 @@ export class WalkingSkeletonRunner {
           return;
         }
         await recordReviewOutcome(authoredNode, outcome);
+        // V4 start step, Task 53b: the path's own turn ledger, in its review order: who reviewed this author's node, as the ledger says.
+        if (slot.batch.path !== null && outcome.kind === "REVIEWED") pathLatestReviewers[slot.batch.path]!.set(authoredNode.maker, outcome.reviewerMaker);
       });
     };
     /**
      * Fix (d), kept: the nodes a batch gave back are offered again — together, each to a reviewer chosen in review
      * order — once that batch is over; each pass that gives one back marks one more member as sitting out, so this
      * ends. Each pass is a batch of its own, read off the ledger again, as today's recursion reads it. `rank` places a
-     * failure here after everything the batch itself did; it is thrown once every chain has settled.
+     * failure here after everything the batch itself did; it is thrown once every chain has settled. V4 start step, Task 53b:
+     * on a path debate a pass is one path's (`path`), read off that path's own turn ledger.
      */
-    const reviewGivenBack = async (givenBack: readonly AuthoredDebateNode[], rank: ChainRank): Promise<void> => {
+    const reviewGivenBack = async (givenBack: readonly AuthoredDebateNode[], rank: ChainRank, path: number | null = null): Promise<void> => {
       let pending = givenBack;
       for (let pass = 1; pending.length > 0 && !arguingStopped(); pass += 1) {
         const choices = positionRecorder(pending.length);
         const reviews = positionRecorder(pending.length);
         const batch: ReviewBatch = Object.freeze({
-          latest: new Map<string, string | null>(), ready: Promise.resolve(), givenBack: [] as AuthoredDebateNode[]
+          latest: new Map<string, string | null>(), ready: Promise.resolve(), givenBack: [] as AuthoredDebateNode[], path
         });
         await Promise.allSettled(pending.map((authoredNode, position) => runChain(
           () => reviewInChain({ position, choices, reviews, batch, rank: [...rank, pass, position] }, authoredNode),
@@ -9414,10 +9474,17 @@ export class WalkingSkeletonRunner {
     /** A reply's parent at `position`, saved later: its node id once saved, or null if it never is. */
     const laterParentAt = (position: number): LaterParentNode =>
       Object.freeze({ saved: savedNodes[position]!.promise.then((node) => node?.nodeId ?? null) });
-    /** The review batches, set up when the arguing runs together (`argueTogether`); a node's review slot is in one. */
-    let reviewBatches: readonly { readonly batch: ReviewBatch; readonly done: Promise<void> }[] = [];
+    /**
+     * The review batches, set up when the arguing runs together (`argueTogether`); a node's review slot is in one. V4 start step,
+     * Task 53b: on a path debate, each batch here only says when EVERY path's own batch of that stretch is over (a round boundary
+     * and scrutiny wait for that); its `batch` is null and no slot's.
+     */
+    let reviewBatches: readonly { readonly batch: ReviewBatch | null; readonly done: Promise<void> }[] = [];
+    /** V4 start step, Task 53b: on a path debate, each path's own review batches (by its root's index); a node's slot is in its path's. */
+    let pathReviewBatches: readonly (readonly { readonly batch: ReviewBatch; readonly done: Promise<void> }[])[] = [];
     const reviewSlot = (position: number): ReviewSlot => Object.freeze({
-      position, choices: reviewChoices, reviews: reviewRecorder, batch: reviewBatches[reviewBatchOf(position)]!.batch,
+      position, choices: reviewChoices, reviews: reviewRecorder,
+      batch: (pathPartOf === null ? reviewBatches : pathReviewBatches[pathPartOf(position)!]!)[reviewBatchOf(position)]!.batch!,
       rank: reviewRank(position)
     });
     /** A chain gives up whatever it did not commit at its position, so no later position waits on it. */
@@ -9430,16 +9497,17 @@ export class WalkingSkeletonRunner {
     };
     /**
      * V4 start step, Task 53 (chat-first-round, wait-d1; used by Task 54) — WHEN A PATH'S OWN ARGUING, THEN ITS OWN CHECKS, ARE OVER, on a
-     * path debate (root i argues path b<i+1>). Neither waits for another path itself; what the plan's order already ties together
-     * (nodes saved in plan order, a deeper round after the global round's decision) still holds.
-     *  · `pathArguingOver(b<n>)`: no global round boundary decision is still to come (depth 1: none; depth ≥ 2: the last boundary's
-     *    freeze/stop decision is taken) and every node of that root's chains is saved, given up or will never be asked (halted, frozen,
-     *    dropped, after the adaptive stop or a spend stop); with a scrutiny budget, once scrutiny chose and its legs under that root
-     *    settled too. Then CHECKING is written for that path. A root that dropped resolves it at once (and writes nothing).
+     * path debate (root i argues path b<i+1>). Neither waits for another path (Task 53b: each path saves and records in its own
+     * order); only a deeper round still waits for the global round's decision before it, as the plan ties them.
+     *  · `pathArguingOver(b<n>)`: every node of that root's chains is saved, given up or will never be asked (halted, frozen, dropped,
+     *    after the adaptive stop or a spend stop); a leg after a round boundary settles only once that boundary decided. Task 53b: the
+     *    LAST boundary (after the last planned round; at depth 1 the only one) is not waited for: it comes after every path's nodes
+     *    and reviews and changes none of them (nothing planned is left to freeze or stop), so waiting would tie each path to the
+     *    slowest. With a scrutiny budget, once scrutiny chose (after every boundary) and its legs under that root settled too. Then
+     *    CHECKING is written for that path. A root that dropped resolves it at once (and writes nothing).
      *  · `pathChecksOver(b<n>)`: after that, once every saved node under that root (the root's own included) has its review recorded or
      *    given up, a node given back once offered again (the review batches' rule).
      */
-    const boundariesDecided = settable<void>();
     const reviewsOver = new Map<string, ReturnType<typeof settable<void>>>();
     const reviewOverOf = (nodeId: string): ReturnType<typeof settable<void>> => {
       const known = reviewsOver.get(nodeId);
@@ -9463,7 +9531,6 @@ export class WalkingSkeletonRunner {
         const rootIndex = pathRootIndexOf(pathId);
         if (rootIndex < 0 || shapePlan === null) return false;
         if (await savedNodes[rootIndex]!.promise === null) return false;
-        await boundariesDecided.promise;
         await Promise.all(pathPlanPositionsOf(rootIndex).map((position) => nodeRecorder.at(position)));
         if (shapePlan.scrutiny.count > 0) {
           await scrutinyChosen.promise;
@@ -9880,17 +9947,47 @@ export class WalkingSkeletonRunner {
       // The review batches: each is over once every earlier one is, its own reviews are recorded, and the nodes it
       // gave back were offered again.
       let earlierBatches: Promise<void> = Promise.resolve();
-      reviewBatches = Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
-        const batch: ReviewBatch = Object.freeze({
-          latest: new Map<string, string | null>(), ready: earlierBatches, givenBack: [] as AuthoredDebateNode[]
-        });
-        earlierBatches = runChain(async () => {
-          await batch.ready;
-          await reviewRecorder.through(end);
-          await reviewGivenBack(batch.givenBack, [batchIndex, 2]);
-        }, [batchIndex, 2], () => undefined);
-        return Object.freeze({ batch, done: earlierBatches });
-      }));
+      if (pathPartOf === null) {
+        reviewBatches = Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
+          const batch: ReviewBatch = Object.freeze({
+            latest: new Map<string, string | null>(), ready: earlierBatches, givenBack: [] as AuthoredDebateNode[], path: null
+          });
+          earlierBatches = runChain(async () => {
+            await batch.ready;
+            await reviewRecorder.through(end);
+            await reviewGivenBack(batch.givenBack, [batchIndex, 2]);
+          }, [batchIndex, 2], () => undefined);
+          return Object.freeze({ batch, done: earlierBatches });
+        }));
+      } else {
+        // V4 start step, Task 53b: on a path debate the same batches, one set per path over that path's own positions: a path's batch
+        // is over once that path's earlier ones are, its own reviews in that stretch are recorded (a scrutiny slot's path known once
+        // scrutiny chose) and the nodes it gave back were offered again; it never waits on another path. A stretch is over for the
+        // debate (a round boundary, scrutiny) once every path's is.
+        const pathReviewsThrough = async (path: number, end: number): Promise<void> => {
+          if (shapePlan !== null && end > shapePlan.scrutiny.start) await scrutinyChosen.promise;
+          await Promise.all(Array.from({ length: end }, (_, position) => position)
+            .filter((position) => pathPartOf(position) === path).map((position) => reviewRecorder.at(position)));
+        };
+        pathReviewBatches = Object.freeze((pathsRunPaths ?? []).map((_path, path) => {
+          let earlierOfPath: Promise<void> = Promise.resolve();
+          return Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
+            const batch: ReviewBatch = Object.freeze({
+              latest: new Map<string, string | null>(), ready: earlierOfPath, givenBack: [] as AuthoredDebateNode[], path
+            });
+            earlierOfPath = runChain(async () => {
+              await batch.ready;
+              await pathReviewsThrough(path, end);
+              await reviewGivenBack(batch.givenBack, [batchIndex, 2], path);
+            }, [batchIndex, 2], () => undefined);
+            return Object.freeze({ batch, done: earlierOfPath });
+          }));
+        }));
+        reviewBatches = Object.freeze(reviewBatchEnds.map((_end, batchIndex) => Object.freeze({
+          batch: null, done: Promise.all(pathReviewBatches.map((batches) => batches[batchIndex]!.done)).then(() => undefined)
+        })));
+        earlierBatches = reviewBatches[reviewBatches.length - 1]?.done ?? Promise.resolve();
+      }
       /** Ruling R26: every spend stop raised so far comes at or after `rank` in today's order. */
       const spendStoppedFrom = (rank: ChainRank): boolean =>
         spendStopRanks.length > 0 && spendStopRanks.every((stopRank) => compareRanks(stopRank, rank) >= 0);
@@ -9920,9 +10017,8 @@ export class WalkingSkeletonRunner {
         boundaryDecisions.push([boundaryLegIndex, earlierDecisions] as const);
       }
       const everyBoundaryDecided = earlierDecisions;
-      // V4 start step, Task 53: a path's arguing is over only once no boundary decision is still to come; each path's CHECKING is
-      // written as soon as its own arguing is over (never rejects).
-      void everyBoundaryDecided.then(() => { boundariesDecided.resolve(); });
+      // V4 start step, Task 53: each path's CHECKING is written as soon as its own arguing is over (never rejects); Task 53b: never
+      // after the last boundary's decision, which waits for every path.
       if (pathsRunPaths !== null) for (const path of pathsRunPaths) void pathArguedOf(path.pathId);
       /** The decision a reply waits for: the last boundary before it in the plan (which waits for the ones before). */
       const decisionBefore = (legIndex: number): Promise<void> | undefined =>
@@ -10277,6 +10373,345 @@ export class WalkingSkeletonRunner {
       }
       throwBodyFailure();
     };
+    /**
+     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the investigations of "cannot assess" points, after every review and
+     * before the final propagation. Each qualifying point gets one row; its outcome is read as the review it lacked.
+     * It returns the statuses for `engineInvestigated` and keeps the facts and rows for the record, which is written
+     * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this. V4 start step, Task 54: over the points of
+     * `scope` only (a path's own nodes, its root left out), and with a path's `share` of the debate's cap; the debate's
+     * own step, after the arguing (below), is the whole debate with the cap whole, as before.
+     */
+    const investigatePointsIn = async (
+      engineSettings: EngineSettings,
+      facts: ReadonlyMap<string, EngineNodeFacts>,
+      materialisedSnapshot: EvaluationSnapshot,
+      scope: Readonly<{
+        rootIds: ReadonlySet<string>;
+        ownNodeIds: ReadonlySet<string>;
+        arguingMakers: ReadonlySet<string>;
+        share?: Readonly<{ first: number; slots: number }>;
+      }>
+    ): Promise<Readonly<{
+      statuses: ReadonlyMap<string, EngineReviewStatus>;
+      facts: ReadonlyMap<string, EngineNodeFacts>;
+      rows: readonly PointInvestigationRow[];
+    }>> => {
+      const { rootIds, ownNodeIds, share } = scope;
+      /** Task 54: a path's k-th investigation is the debate's `VERDICT:investigate:<first + k>`; without a share, the key as planned. */
+      const debateKey = (callSiteKey: string): string => share === undefined ? callSiteKey
+        : pointInvestigationCallSiteKey(share.first + Number(callSiteKey.slice(callSiteKey.lastIndexOf(":") + 1)));
+      const cannotAssess = [...facts.values()]
+        .filter((entry) => entry.status === "CANNOT_ASSESS" && ownNodeIds.has(entry.nodeId) && !rootIds.has(entry.nodeId))
+        .map((entry) => entry.nodeId);
+      if (cannotAssess.length === 0) return Object.freeze({ statuses: new Map(), facts, rows: Object.freeze([]) });
+      if (lengthGuidance === null) {
+        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
+      }
+      const engineSeal = settings.engine?.engineContractHash;
+      if (engineSeal === undefined) {
+        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
+      }
+      // Before the final propagation the points' honest scores (their base strengths) stand in for final strengths:
+      // they order the candidates; the investigator's material carries no number.
+      const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
+      const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
+      const source = engineSourceWithMap(engineMaterialSourceOf(engineMaterialGraphOf({
+        question: run.questionLine,
+        rootCount,
+        authored: authoredNodes,
+        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
+        snapshot: materialisedSnapshot,
+        facts,
+        honestFinalStrength: honestScores
+      }), reviews, new Map()), engineMapFactsNow());
+      const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
+        charactersPerWord: lengthGuidance.charactersPerWord });
+      /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
+      const investigatorSeat = new Map<PointInvestigationSeat, RunSeat>();
+      const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
+        member.maker !== authorMaker && member.maker !== reviewerMaker;
+      const investigated = await runPointInvestigations({
+        engine: share === undefined ? engineSettings
+          : Object.freeze({ ...engineSettings, investigate: Object.freeze({ maxPerDebate: share.slots }) }),
+        facts,
+        candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
+        spendStopped: runBodyBudgetStop !== null,
+        arguingMakers: scope.arguingMakers,
+        seatsFor: (candidate, callSiteKey) => {
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          return seatBook.reviewer.flatMap((seat) => {
+            if (seatSitsOut(seat)) return [];
+            const first = seatCaller.plan(seat, debateKey(callSiteKey), { eligible: fair });
+            if (first === null) return [];
+            const identity: PointInvestigationSeat = Object.freeze({ maker: first.maker, providerRef: first.providerRef });
+            investigatorSeat.set(identity, seat);
+            return [identity];
+          });
+        },
+        rotationOffsetOf: (callSiteKey) => seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: debateKey(callSiteKey) }),
+        materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
+        call: async ({ callSiteKey: plannedKey, investigator, candidate, material }) => {
+          const callSiteKey = debateKey(plannedKey);
+          const seat = investigatorSeat.get(investigator);
+          if (seat === undefined) {
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: "INVESTIGATOR_SEAT_UNPLANNED" });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
+          movedCallBars.set(callSiteKey, fair);
+          try {
+            const answered = await seatCaller.callSeat({
+              seat,
+              callSiteKey,
+              eligible: fair,
+              fair,
+              call: (member, memberCallSiteKey) => member.judge.investigatePoint({
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey: memberCallSiteKey,
+                providerRef: member.providerRef,
+                contractHash: engineSeal,
+                bound: guidedCallBound(settings.judgeBound, "investigator", lengthGuidance),
+                material,
+                length: lengthGuide,
+                argumentLanguageName: run.argumentLanguageName,
+                ...shapeLanguageInput,
+              })
+            });
+            // R2a W3: the maker that answered is neither the author's nor the reviewer's (a breach is a code defect).
+            assertFairInvestigator(answered.value.maker, candidate);
+            return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
+              reply: answered.value.reply,
+              rawArtifactRef: answered.value.provenanceRef,
+              maker: answered.value.maker,
+              providerRef: actualAuthor(callSiteKey, answered.member).providerRef,
+              modelId: answered.value.model
+            }) });
+          } catch (error) {
+            if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+        }
+      });
+      // A HOLDS or FAILS outcome is the review the point lacked (AGREE / DISPUTE); a dead end stays cannot-assess. A
+      // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
+      // weight on its score (pre-flight PF-R2a8.11).
+      return Object.freeze({
+        statuses: engineInvestigatedStatuses(investigated.rows),
+        facts: investigated.facts,
+        rows: investigated.rows
+      });
+    };
+    /**
+     * V4 start step, Task 54 (spec 2026-11-03 §4.3, the owner's "First round" answer; items chat-first-round, journey-f1, wait-d1,
+     * map-d2) — EACH PATH'S ANSWER SO FAR AS SOON AS ITS OWN CHECKS END. Beside the arguing, one chain per path, all at once
+     * (`runPathChains`; their calls go through the run's lane like any other call): it waits for its own path's checks
+     * (`pathChecksOver`); investigates the cannot-assess points under its root only, with its share of the debate's investigations
+     * (`pathInvestigationShares`: the keys and the cap never depend on which path ends first; each point once in the run); reads its
+     * points' trust words (the review, how fresh, how known, and a looked-up point's locator in the packs: `trustOfPoint`); writes its
+     * answer so far on a one-path job (Task 49; Haiku writes and GLM checks, else the run's answer seats), stored at once, so the run
+     * read shows it filled in; then one FOUND mark per point with a trust word. A path whose root dropped is FAILED with no call. A
+     * chain never waits for another path; a step that fails is FAILED for that path only; a re-claimed run's stored answer so far is
+     * read back with no investigation and no call, and its marks written again. The main answer waits for every chain (below).
+     * Nothing of this on every other run.
+     */
+    let pathsArguingFailed = false;
+    const PATHS_ARGUING_ENDED = "PATHS_ARGUING_ENDED";
+    /** Each path's investigations (its rows and the facts they settled), for the debate's record after the serve decision. */
+    const pathInvestigations = new Map<PathId, Awaited<ReturnType<typeof investigatePointsIn>>>();
+    /** Each path as its answer so far read it (its points with their trust words, its pages), for the main answer. */
+    const pathJobPaths = new Map<PathId, PathOutcomesPath>();
+    /** Each path's answer so far, once every chain has ended (null on every other run). */
+    let pathOutcomes: ReadonlyMap<PathId, PathOutcome> | null = null;
+    const pathsFree = pathsShape?.plan === "free";
+    /** The run's members a path's final calls may sit in (each with its model), and the gateway that routes by their refs. */
+    const pathsFinalMembers = (() => {
+      const listed = new Map<string, Readonly<{ providerRef: string; maker: string; model: string; provider: ProviderGateway }>>();
+      const add = (member: Readonly<{ providerRef: string; maker: string; provider: ProviderGateway }>): void => {
+        if (listed.has(member.providerRef) || (sitOut !== null && sitOut.sitsOut(member.providerRef))) return;
+        const model = panelModelIds.get(member.providerRef) ?? callSubjects?.subjectOf(member.providerRef).model ?? member.providerRef;
+        listed.set(member.providerRef, Object.freeze({ providerRef: member.providerRef, maker: member.maker, model, provider: member.provider }));
+      };
+      for (const maker of synthesisMakers) add(maker);
+      if (seatBook.answerWriter !== null) add(seatBook.answerWriter.main);
+      if (seatBook.answerChecker !== null) add(seatBook.answerChecker.main);
+      return [...listed.values()];
+    })();
+    /**
+     * Review of Task 54: a stop that ends this copy (a lost claim, the time limit, a retiring release, a stopped lane), met inside a
+     * path's answer so far or the main answer, is kept (`pathCopyStops`): nothing more is stored after it and it ends this copy, as
+     * R22's answer calls let it leave as it came; the writers' loop alone would have read it as a failed round, stored FAILED.
+     */
+    const pathsStops = pathCopyStops(Object.freeze({
+      call: (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+        const member = pathsFinalMembers.find((candidate) => candidate.providerRef === request.providerRef);
+        return member === undefined
+          ? Promise.reject(new TypedDomainError("PATHS_FINAL_SEAT_UNRESOLVED", "A path's final call names a member the run does not hold"))
+          : member.provider.call(request);
+      }
+    }), settings.pathResults!, (error) => endsThisCopy(error) || keepAliveStop(error));
+    const pathsGateway: ProviderGateway = pathsStops.gateway;
+    /** Haiku writes and GLM checks (two makers); else the run's own answer writer and checker, when they are two makers. */
+    const pathsFinalSeats = ((): PathOutcomesJob["seats"] | null => {
+      const seat = (member: (typeof pathsFinalMembers)[number]): PathOutcomesSeat =>
+        Object.freeze({ providerRef: member.providerRef, model: member.model, maker: member.maker });
+      const final = pathsFinalSeatsOf(pathsFinalMembers);
+      if (final !== null) return Object.freeze({ writer: seat(final.writer), checker: seat(final.checker) });
+      const writer = pathsFinalMembers.find((member) => member.providerRef
+        === (seatBook.answerWriter?.main.providerRef ?? synthesisRolePolicy.synthesizerRoleRef));
+      const checker = pathsFinalMembers.find((member) => member.providerRef
+        === (seatBook.answerChecker?.main.providerRef ?? synthesisRolePolicy.evaluatorRoleRef));
+      return writer === undefined || checker === undefined || writer.maker === checker.maker ? null
+        : Object.freeze({ writer: seat(writer), checker: seat(checker) });
+    })();
+    /**
+     * The question the paths' answers so far and the main answer read (Task 53 (a)): the run's line as the person asked it, the step-2
+     * place, time and purpose in their own fields, the reading level and the question's language lock.
+     */
+    const pathsQuestion: PathQuestion = (() => {
+      const lines = purposeLinesMaterial(run.questionLine, pathsPurposeLines);
+      return Object.freeze({ line: run.questionLine, place: lines.place, time: lines.time, purpose: lines.purpose, readingLevel, language: shapeLanguage });
+    })();
+    const pathsLog = (event: string, detail: Record<string, unknown>): void => {
+      console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_PATH_OUTCOME", event }));
+    };
+    const pathOutcomesBase: Omit<PathOutcomesJob, "paths"> | null = pathsFinalSeats === null ? null : Object.freeze({
+      runId: run.runId, free: pathsFree, question: pathsQuestion, readingLevel,
+      language: Object.freeze({ name: run.argumentLanguageName, tag: shapeLanguage === null ? "und" : run.argumentLanguageTag }),
+      seats: pathsFinalSeats, gateway: pathsGateway, store: pathsStops.store,
+      // R22 decision 28, as the closing's: the Haiku target's free count near the line (`pathsTokenCount`); none: the byte guard alone.
+      tokenCount: pathsTokenCount, log: pathsLog
+    });
+    /** A path's saved nodes: its root, then each saved leg of its chains (scrutiny legs too), in plan order. */
+    const pathNodesOf = (rootIndex: number): readonly AuthoredDebateNode[] => {
+      const legs = [...(shapePlan?.legs ?? []), ...[...scrutinyLegs.values()].sort((left, right) => left.childIndex - right.childIndex)]
+        .filter((leg) => leg.rootIndex === rootIndex);
+      return [rootIndex, ...legs.map((leg) => leg.childIndex)].flatMap((position) => {
+        const node = authoredNodes.get(position);
+        return node === undefined ? [] : [node];
+      });
+    };
+    /** The points' facts as the page reads them: each node's newest review, its trust word (code's rule), and nothing for none. */
+    const pathPointFactsOf = async (nodes: readonly AuthoredDebateNode[]): Promise<Readonly<{
+      words: ReadonlyMap<string, TrustWord>; outcomes: ReadonlyMap<string, string | null> }>> => {
+      const words = new Map<string, TrustWord>();
+      const outcomes = new Map<string, string | null>();
+      if (nodes.length === 0) return Object.freeze({ words, outcomes });
+      const rows = (await this.pool.query<{ node_id: string; relevant_as_of: Date; outcome: string | null }>(
+        `SELECT node.node_id::text AS node_id, node.relevant_as_of, review.outcome
+           FROM core.node AS node
+           LEFT JOIN LATERAL (SELECT outcome FROM ledger.node_review WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1) AS review ON true
+          WHERE node.run_id = $1 AND node.node_id = ANY($2::uuid[])`, [run.runId, nodes.map((node) => node.nodeId)])).rows;
+      const byId = new Map(nodes.map((node) => [node.nodeId.toLowerCase(), node] as const));
+      const cited = webCitedExtractsOf(webPacks, nodes);
+      const liveness = new LivenessRepository(this.pool);
+      for (const row of rows) {
+        const node = byId.get(row.node_id.toLowerCase());
+        if (node === undefined) continue;
+        outcomes.set(node.nodeId, row.outcome);
+        const staleness = await liveness.readSubjectStaleness({ runId: run.runId, subjectKind: "NODE", subjectRef: row.node_id,
+          relevantAsOf: row.relevant_as_of });
+        const placed = trustOfPoint({ review: row.outcome === null ? null : { outcome: row.outcome }, staleness_state: staleness.state,
+          way_of_knowing: node.wayOfKnowing, looked_up_checked: node.wayOfKnowing === "LOOKED_UP" && cited.has(node.nodeId) }, { free: pathsFree, fell: false });
+        if (placed.trust !== null) words.set(node.nodeId, placed.trust);
+      }
+      return Object.freeze({ words, outcomes });
+    };
+    /** The path as its answer so far reads it: its menu text, its root, its points (each right after the one it argues), its pages. */
+    const pathJobPathOf = async (path: PathsRunPath, rootIndex: number): Promise<PathOutcomesPath> => {
+      const root = rootIndex < 0 ? null : await savedNodes[rootIndex]!.promise;
+      const nodes = root === null ? [] : pathNodesOf(rootIndex);
+      const facts = await pathPointFactsOf(nodes.slice(1));
+      const legs = [...(shapePlan?.legs ?? []), ...[...scrutinyLegs.values()].sort((left, right) => left.childIndex - right.childIndex)]
+        .filter((leg) => leg.rootIndex === rootIndex);
+      const points: PathPoint[] = [];
+      const visit = (parentIndex: number): void => {
+        for (const leg of legs) {
+          if (leg.parentIndex !== parentIndex) continue;
+          const node = authoredNodes.get(leg.childIndex);
+          if (node === undefined) continue;
+          points.push(Object.freeze({ id: node.nodeId, text: withoutStoryNodeIds(node.statement),
+            onId: parentIndex === rootIndex ? null : authoredNodes.get(parentIndex)?.nodeId ?? null,
+            side: leg.polarity === "support" ? "for" as const : "against" as const,
+            trust: facts.words.get(node.nodeId) ?? null, disputed: facts.outcomes.get(node.nodeId) === "dispute" }));
+          visit(leg.childIndex);
+        }
+      };
+      if (root !== null) visit(rootIndex);
+      const pointIds = new Set(points.map((point) => point.id));
+      const sources: DossierSource[] = [...webCitedExtractsOf(webPacks, nodes.slice(1))].flatMap(([pointId, extract]) => pointIds.has(pointId)
+        ? [Object.freeze({ pointId, site: extract.site, link: null, title: extract.title, quote: cutQuoteAtWordEdge(extract.quote), line: extract.note ?? null })]
+        : []);
+      return Object.freeze({
+        pathId: path.pathId, pathNo: path.pathNo, title: path.title, question: path.question,
+        statement: root === null ? path.question : withoutStoryNodeIds(root.statement),
+        viewpoints: pathConsiderationsOf({ ...path, gapPoints: [] }), ownWords: path.ownWords, rootNodeId: root?.nodeId ?? null,
+        points: Object.freeze(points), sources: Object.freeze(sources)
+      });
+    };
+    /** Each path's share of the debate's investigations, in the person's order. */
+    const pathShares = pathsRunPaths === null ? [] : pathInvestigationShares(engine.engine === 2 ? engine.investigate.maxPerDebate : 0, pathsRunPaths.length);
+    const pathChains = pathsRunPaths === null || pathsSetStored === null ? null : runPathChains(pathsRunPaths.map((path) => path.pathId), (pathId) => {
+      const rootIndex = pathRootIndexOf(pathId);
+      const path = pathsRunPaths!.find((candidate) => candidate.pathId === pathId)!;
+      return Object.freeze({
+        checksOver: async () => {
+          await pathChecksOver(pathId);
+          if (pathsArguingFailed) throw new TypedDomainError(PATHS_ARGUING_ENDED, "The arguing ended in a failure: no path goes on");
+        },
+        stored: async () => (await settings.pathResults!.readPathOutcomes(run.runId)).get(pathId) ?? null,
+        investigate: async () => {
+          if (engine.engine !== 2 || effectiveMakerCount <= 1 || rootIndex < 0) return;
+          const root = await savedNodes[rootIndex]!.promise;
+          if (root === null) return;
+          // Every root is saved or dropped before any path's checks end: the debate's arguing makers, whichever path ends first.
+          const roots = (await Promise.all(Array.from({ length: rootCount }, (_unused, index) => savedNodes[index]!.promise)))
+            .filter((node): node is AuthoredDebateNode => node !== null);
+          // Review of Task 54: the facts of this path's own nodes only (the brief's "restricted to its nodes"): other paths still
+          // record their reviews while these lists are read one after another, so the run's whole lists can disagree.
+          const ownNodeIds = new Set(pathNodesOf(rootIndex).map((node) => node.nodeId));
+          const facts = engineNodeFactsOf({
+            ...pathReviewFactsOf({
+              reviewedNodeIds: await this.#judgements.readReviewedNodeIds(run.runId),
+              disputedNodeIds: await this.#judgements.readDisputedNodeIds(run.runId),
+              cannotAssessNodeIds: await this.#judgements.readCannotAssessNodeIds(run.runId)
+            }, ownNodeIds),
+            ownReplyEdgeIds
+          });
+          const { snapshot: pathSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId, settings.scoringOperator);
+          const share = pathShares[pathsRunPaths!.indexOf(path)]!;
+          pathInvestigations.set(pathId, await investigatePointsIn(engine, facts, pathSnapshot, {
+            rootIds: new Set([root.nodeId]), ownNodeIds,
+            arguingMakers: new Set(roots.map((node) => node.maker)), share
+          }));
+        },
+        pathOf: async () => {
+          const jobPath = await pathJobPathOf(path, rootIndex);
+          pathJobPaths.set(pathId, jobPath);
+          return jobPath;
+        },
+        outcomeOf: async (jobPath: PathOutcomesPath) => {
+          if (pathOutcomesBase === null) {
+            throw new TypedDomainError("PATHS_FINAL_SEATS_UNRESOLVED", "A path's answer so far needs a writer and a checker of two makers");
+          }
+          return runPathOutcomeFor(pathOutcomesJobFor({ base: pathOutcomesBase, path: jobPath }), pathId);
+        },
+        found: (foundPath: PathId, nodeId: string, trust: TrustWord) => { pathMarks.found(foundPath, nodeId, trust); },
+        failed: async () => {
+          const recorded = await pathsStops.store.recordPathOutcome({ runId: run.runId, pathId, outcome: PATH_OUTCOME_FAILED });
+          if (recorded === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+          return recorded === "ALREADY" ? (await settings.pathResults!.readPathOutcomes(run.runId)).get(pathId) ?? PATH_OUTCOME_FAILED : PATH_OUTCOME_FAILED;
+        },
+        endsRun: (error: unknown) => endsThisCopy(error) || keepAliveStop(error) || isMonthPausedStop(error) || namedCodeDefect(error)
+          || (error instanceof TypedDomainError && [PATHS_ARGUING_ENDED, CALL_LANE_STOPPED, "PRIVATE_CONTENT_ERASED"].includes(error.code)),
+        log: pathsLog
+      });
+    });
+    // Review of Task 54: a chain that ends this copy rejects, and the chains are awaited only after the arguing, so they are handled
+    // from the start: never an unhandled rejection meanwhile (awaiting `pathChains` below still throws).
+    void pathChains?.catch(() => undefined);
     if (chainsRun) {
       /**
        * Spec §2.3 (O6; Task 10 review carry, ruled) — NO AUTHOR OR REVIEW CALL STARTS ONCE THE ARGUING HAS STOPPED, not
@@ -10309,18 +10744,39 @@ export class WalkingSkeletonRunner {
         (ticket.priority !== "AUTHOR" && ticket.priority !== "REVIEW") || !(spendRefusalSeen || arguingStopped()));
       try {
         await argueTogether();
+      } catch (error) {
+        // V4 start step, Task 54: the arguing failed, so no path's chain goes on to its calls, and none is left to reject unhandled.
+        pathsArguingFailed = true;
+        pathChains?.catch(() => undefined);
+        throw error;
       } finally {
         // The answer's own calls follow: they are never held back.
         callLane?.guardStarts(null);
         laneCallFailed = null;
         // V4 start step, Task 53: the arguing is over, whatever ended it: nothing a path waits on is still to come.
-        boundariesDecided.resolve();
         for (const saved of authoredNodes.values()) reviewOverOf(saved.nodeId).resolve();
       }
-      // V4 start step, Task 53 (item wait-d1): every path's CHECKING and every point's marks are written before the answer.
+      // V4 start step, Task 53 (item wait-d1): every path's CHECKING and every point's marks are written before the answer. Task 54:
+      // and every path's chain has ended (its answer so far stored, its FOUND marks sent).
       if (pathsRunPaths !== null) {
         await Promise.all(pathsRunPaths.map((path) => pathArguingOver(path.pathId)));
+        pathOutcomes = pathChains === null ? null : await pathChains;
         await pathMarks.settled();
+      }
+      // V4 start step, Task 53b: on a path debate the paths saved and recorded side by side, so what their saves and reviews kept came
+      // in the order the paths happened to move. Each list is put back in plan order (by its node's position; a stable sort, so one
+      // node's entries keep theirs), so the answer reads the same whichever path ended first.
+      if (pathPartOf !== null) {
+        const positionOfNode = new Map([...authoredNodes].map(([position, node]) => [node.nodeId, position] as const));
+        const at = (nodeId: string | null): number => nodeId === null ? -1 : positionOfNode.get(nodeId) ?? -1;
+        panelDegradations.sort((left, right) => at(left.subjectRef) - at(right.subjectRef));
+        closeCallExtensions.sort((left, right) => at(left.nodeId) - at(right.nodeId));
+        wayOfKnowingDowngrades.sort((left, right) => at(left.subjectRef) - at(right.subjectRef));
+        hiddenReviewRecords.sort((left, right) => at(left.nodeId) - at(right.nodeId));
+        unassessedReviewRecords.sort((left, right) => at(left.nodeId) - at(right.nodeId));
+        // A halted leg has no node: by the node it answers, then its own call site (one per plan leg).
+        haltedExpansionRecords.sort((left, right) => at(left.parentNodeId) - at(right.parentNodeId)
+          || (left.callSiteKey < right.callSiteKey ? -1 : left.callSiteKey > right.callSiteKey ? 1 : 0));
       }
     } else {
       let activeExpansionRound = expansionPlan[0]?.round ?? null;
@@ -10565,124 +11021,18 @@ export class WalkingSkeletonRunner {
       return stored === undefined ? undefined : Object.freeze({ ...pointInvestigationRowOfStored(stored), nodeId: row.nodeId });
     };
     /**
-     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the investigations of "cannot assess" points, after every review and
-     * before the final propagation. Each qualifying point gets one row; its outcome is read as the review it lacked.
-     * It returns the statuses for `engineInvestigated` and keeps the facts and rows for the record, which is written
-     * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this.
+     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the debate's investigations of "cannot assess" points, after every review and
+     * before the final propagation, over every node this copy saved (the roots left out), the cap whole (`investigatePointsIn`).
      */
-    const investigateCannotAssessPoints = async (
+    const investigateCannotAssessPoints = (
       engineSettings: EngineSettings,
       facts: ReadonlyMap<string, EngineNodeFacts>,
       materialisedSnapshot: EvaluationSnapshot
-    ): Promise<Readonly<{
-      statuses: ReadonlyMap<string, EngineReviewStatus>;
-      facts: ReadonlyMap<string, EngineNodeFacts>;
-      rows: readonly PointInvestigationRow[];
-    }>> => {
-      const rootIds = new Set(authoredMakerPositions.map((root) => root.nodeId));
-      const ownNodeIds = new Set(authoredNodeList.map((node) => node.nodeId));
-      const cannotAssess = [...facts.values()]
-        .filter((entry) => entry.status === "CANNOT_ASSESS" && ownNodeIds.has(entry.nodeId) && !rootIds.has(entry.nodeId))
-        .map((entry) => entry.nodeId);
-      if (cannotAssess.length === 0) return Object.freeze({ statuses: new Map(), facts, rows: Object.freeze([]) });
-      if (lengthGuidance === null) {
-        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
-      }
-      const engineSeal = settings.engine?.engineContractHash;
-      if (engineSeal === undefined) {
-        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
-      }
-      // Before the final propagation the points' honest scores (their base strengths) stand in for final strengths:
-      // they order the candidates; the investigator's material carries no number.
-      const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
-      const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
-      const source = engineSourceWithMap(engineMaterialSourceOf(engineMaterialGraphOf({
-        question: run.questionLine,
-        rootCount,
-        authored: authoredNodes,
-        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
-        snapshot: materialisedSnapshot,
-        facts,
-        honestFinalStrength: honestScores
-      }), reviews, new Map()), engineMapFactsNow());
-      const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
-        charactersPerWord: lengthGuidance.charactersPerWord });
-      /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
-      const investigatorSeat = new Map<PointInvestigationSeat, RunSeat>();
-      const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
-        member.maker !== authorMaker && member.maker !== reviewerMaker;
-      const investigated = await runPointInvestigations({
-        engine: engineSettings,
-        facts,
-        candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
-        spendStopped: runBodyBudgetStop !== null,
-        arguingMakers: new Set(authoredMakerPositions.map((root) => root.maker)),
-        seatsFor: (candidate, callSiteKey) => {
-          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
-          return seatBook.reviewer.flatMap((seat) => {
-            if (seatSitsOut(seat)) return [];
-            const first = seatCaller.plan(seat, callSiteKey, { eligible: fair });
-            if (first === null) return [];
-            const identity: PointInvestigationSeat = Object.freeze({ maker: first.maker, providerRef: first.providerRef });
-            investigatorSeat.set(identity, seat);
-            return [identity];
-          });
-        },
-        rotationOffsetOf: (callSiteKey) => seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey }),
-        materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
-        call: async ({ callSiteKey, investigator, candidate, material }) => {
-          const seat = investigatorSeat.get(investigator);
-          if (seat === undefined) {
-            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: "INVESTIGATOR_SEAT_UNPLANNED" });
-            return Object.freeze({ kind: "UNAVAILABLE" as const });
-          }
-          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
-          // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
-          movedCallBars.set(callSiteKey, fair);
-          try {
-            const answered = await seatCaller.callSeat({
-              seat,
-              callSiteKey,
-              eligible: fair,
-              fair,
-              call: (member, memberCallSiteKey) => member.judge.investigatePoint({
-                runId: run.runId,
-                subjectItemId: claimed.workItemId,
-                callSiteKey: memberCallSiteKey,
-                providerRef: member.providerRef,
-                contractHash: engineSeal,
-                bound: guidedCallBound(settings.judgeBound, "investigator", lengthGuidance),
-                material,
-                length: lengthGuide,
-                argumentLanguageName: run.argumentLanguageName,
-                ...shapeLanguageInput,
-              })
-            });
-            // R2a W3: the maker that answered is neither the author's nor the reviewer's (a breach is a code defect).
-            assertFairInvestigator(answered.value.maker, candidate);
-            return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
-              reply: answered.value.reply,
-              rawArtifactRef: answered.value.provenanceRef,
-              maker: answered.value.maker,
-              providerRef: actualAuthor(callSiteKey, answered.member).providerRef,
-              modelId: answered.value.model
-            }) });
-          } catch (error) {
-            if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
-            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });
-            return Object.freeze({ kind: "UNAVAILABLE" as const });
-          }
-        }
-      });
-      // A HOLDS or FAILS outcome is the review the point lacked (AGREE / DISPUTE); a dead end stays cannot-assess. A
-      // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
-      // weight on its score (pre-flight PF-R2a8.11).
-      return Object.freeze({
-        statuses: engineInvestigatedStatuses(investigated.rows),
-        facts: investigated.facts,
-        rows: investigated.rows
-      });
-    };
+    ) => investigatePointsIn(engineSettings, facts, materialisedSnapshot, {
+      rootIds: new Set(authoredMakerPositions.map((root) => root.nodeId)),
+      ownNodeIds: new Set(authoredNodeList.map((node) => node.nodeId)),
+      arguingMakers: new Set(authoredMakerPositions.map((root) => root.maker))
+    });
     /** A14: the investigations' facts and rows, kept for the record after the serve decision (null: none ran). */
     let engineInvestigation: Readonly<{
       statuses: ReadonlyMap<string, EngineReviewStatus>;
@@ -10696,7 +11046,24 @@ export class WalkingSkeletonRunner {
         cannotAssessNodeIds: await this.#judgements.readCannotAssessNodeIds(run.runId),
         ownReplyEdgeIds
       });
-      engineInvestigation = await investigateCannotAssessPoints(engine, investigationFacts, snapshot);
+      if (pathsRunPaths === null) {
+        engineInvestigation = await investigateCannotAssessPoints(engine, investigationFacts, snapshot);
+      } else {
+        // V4 start step, Task 54: a path debate's points were investigated by their paths' chains (each once, each path its share);
+        // this step reads what they found and makes no call: their rows in the person's path order, numbered on, each settled fact.
+        const facts = new Map(investigationFacts);
+        const rows: PointInvestigationRow[] = [];
+        for (const path of pathsRunPaths) {
+          const found = pathInvestigations.get(path.pathId);
+          if (found === undefined) continue;
+          for (const row of found.rows) {
+            const fact = found.facts.get(row.nodeId);
+            if (fact !== undefined) facts.set(row.nodeId, fact);
+            rows.push(Object.freeze({ ...row, investigationOrder: rows.length + 1 }));
+          }
+        }
+        engineInvestigation = Object.freeze({ statuses: engineInvestigatedStatuses(rows), facts, rows: Object.freeze(rows) });
+      }
       for (const [nodeId, status] of engineInvestigation.statuses) engineInvestigated.set(nodeId, status);
     }
     /**
@@ -11021,7 +11388,12 @@ export class WalkingSkeletonRunner {
     // T11 / engine 1: the sealed ladder. Engine 2 (spec 2026-10-15 §4.4; R2b): the comparing judges' label, rung 5; the
     // ladder is still derived from the same numbers but never served.
     const ladderLabel = deriveVerdictLabel(verdictLabelBasis);
-    const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);
+    // V4 start step, Task 54 (spec §4.3): a path debate's label is code's, from its main answer's trust word, the weakest its paths'
+    // words hold, in the person's path order (`mainAnswerTrustWordOf`); no judge and no ladder chose it. It rides the receipt below.
+    const pathsMainTrust = pathOutcomes === null || pathsRunPaths === null ? null
+      : mainAnswerTrustWordOf(pathsRunPaths.map((path) => pathOutcomes!.get(path.pathId)?.trust ?? null));
+    const verdictLabel = pathOutcomes !== null ? verdictDerivationOfPaths(pathsMainTrust)
+      : comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);
     // R2 B11 (record only): today's ladder over the same honest final strengths, for the practice report's comparison.
     const engine1Ladder = engineTwo === null ? null
       : engine1LadderOf(servableMakerPositions, propagation.strengths, Object.freeze({
@@ -11679,8 +12051,93 @@ export class WalkingSkeletonRunner {
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       const candidateConfidenceBand = await servedCandidateConfidenceBand();
+      /**
+       * V4 start step, Task 54 (spec 2026-11-03 §4.3) — A PATH DEBATE'S MAIN ANSWER, in the synthesis chain's place, once every path's
+       * chain has ended: Task 50's writer (report.answer.v4) and checker over the paths' answers so far (Haiku writes and GLM checks,
+       * else the run's answer seats; the dossier's question is the person's whole line, their care sentence inside it), on the served
+       * lane at the first debate's own answer keys (the answer's own money, never walled; no serve.synthesizer.v4). Its segments are
+       * served as written. When it FAILED: one segment per path's line, on that path's root, in path order (composed by code from the
+       * paths' own answers so far); with no line at all, today's floor (components-only, NO_ARTIFACT). The label is the main trust
+       * word's (above); the band is the serve chain's own rule over the nodes the segments rest on (`deriveBandCeiling`).
+       */
+      type PathsServed = Readonly<{ segments: readonly ComposedSegment[]; artifactRef: string | null; attempt: number; checkRefs: readonly string[] }>;
+      let pathsServed: PathsServed | null = null;
+      const pathsServe = pathOutcomes === null || pathsRunPaths === null ? null : async (): Promise<ServeGateResult> => {
+        const outcomes = pathOutcomes!;
+        const paths: readonly PathsDossierPath[] = pathsRunPaths!.map((path) => {
+          const jobPath = pathJobPaths.get(path.pathId);
+          return Object.freeze({ pathId: path.pathId, rootNodeId: jobPath?.rootNodeId ?? null, title: path.title, question: path.question,
+            ownWords: path.ownWords, outcome: outcomes.get(path.pathId) ?? null, points: jobPath?.points ?? [], sources: jobPath?.sources ?? [] });
+        });
+        let main: Awaited<ReturnType<typeof runPathsMainAnswer>> | null = null;
+        if (pathsFinalSeats !== null) {
+          try {
+            main = await runPathsMainAnswer({ runId: run.runId, free: pathsFree,
+              answerWords: lengthGuidance?.steps.answer_writer ?? pathsShape!.answerWords,
+              // Task 50's note: the main answer reads the language lock and the reading level from its question.
+              question: pathsQuestion, paths, seats: pathsFinalSeats, gateway: pathsGateway, tokenCount: pathsTokenCount, log: pathsLog });
+            // Review of Task 54: its loop ends FAILED on a stop that ends this copy too; that stop ends the copy (no fallback served).
+            pathsStops.throwIfStopped();
+          } catch (error) {
+            // Task 50: bad input throws rather than ending FAILED; a stop that ends the run still ends it.
+            if (endsThisCopy(error) || keepAliveStop(error) || isMonthPausedStop(error)) throw error;
+            pathsLog("PATHS_MAIN_ANSWER_UNEXPECTED_ERROR", { runId: run.runId, code: pointInvestigationFailureCode(error) });
+          }
+        }
+        const written = main?.written.outcome ?? null;
+        const servedRoundOf = written !== null && written.outcome !== "FAILED" ? main!.written.rounds.find((round) => round.round === written.servedRound) : undefined;
+        if (main !== null && servedRoundOf !== undefined && main.segments.length > 0) {
+          pathsServed = Object.freeze({ segments: main.segments, artifactRef: servedRoundOf.writer.artifactRef, attempt: servedRoundOf.round,
+            checkRefs: Object.freeze(main.written.rounds.filter((round) => round.round <= servedRoundOf.round)
+              .flatMap((round) => round.checker === null ? [] : [round.checker.artifactRef])) });
+        } else {
+          const lines = paths.flatMap((path) => {
+            const line = path.outcome?.text?.line ?? null;
+            const root = path.rootNodeId === null ? undefined : authoredNodeList.find((node) => node.nodeId === path.rootNodeId);
+            return line === null || root === undefined ? [] : [{ line, root }];
+          });
+          pathsServed = Object.freeze({
+            segments: Object.freeze(lines.map(({ line, root }, at) => Object.freeze({ segmentId: `s${String(at + 1)}`, text: line, loadBearing: at === 0,
+              assertedNodeRefs: Object.freeze([root.nodeId]), servedNumberRefs: Object.freeze([]) }))),
+            // The paths' own lines: the composition's artifact is the writer's last reply when one came back, else the first line's root's.
+            artifactRef: main?.written.rounds.at(-1)?.writer.artifactRef ?? lines[0]?.root.provenanceRef ?? null, attempt: 1, checkRefs: Object.freeze([])
+          });
+        }
+        const projections = Object.freeze({ reversalPoint: factBundle.reversalPoint, buildsOnPrevious: factBundle.buildsOnPrevious,
+          memoryDisclosure: factBundle.memoryDisclosure });
+        const compositionBudget = servePolicy.compositionBudgets[run.compositionBudgetTier];
+        if (pathsServed.segments.length === 0) {
+          // Today's floor: nothing to serve, the components only, with its sealed cause (the persist then carries no composition).
+          pathsServed = null;
+          return Object.freeze({ terminal: "COMPONENTS_ONLY" as const, answerForm: null, factBundle,
+            gateTrace: Object.freeze(["COMPONENTS_ONLY_DEFECT" as const]),
+            conditionMarks: Object.freeze(factBundle.conditionMarks.includes("DEFECT") ? [...factBundle.conditionMarks] : [...factBundle.conditionMarks, "DEFECT"]),
+            conformance: Object.freeze([]), coverageMode: "NOT_RUN" as const, segments: Object.freeze([]), compositionBudget, confidenceBand: null,
+            bandCeiling: null, digest: null, loopRounds: Object.freeze([]), standingObjection: null, degradedDiversity: null, crashClass: "NO_ARTIFACT" as const,
+            projections });
+        }
+        const segments = pathsServed.segments;
+        const cited = new Set(segments.flatMap((segment) => [...segment.assertedNodeRefs]));
+        const citedNodes = authoredNodeList.filter((node) => cited.has(node.nodeId));
+        const ceiling = deriveBandCeiling({
+          basis: { LOOKED_UP: citedNodes.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
+            RAN: citedNodes.filter((node) => node.wayOfKnowing === "RAN").length,
+            REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length },
+          candidateConfidenceBand, row: servePolicy.bandCeiling
+        });
+        const checked = written !== null && written.outcome === "READY";
+        return Object.freeze({ terminal: "SERVED" as const, answerForm: Object.freeze({ kind: "VERDICT" as const, text: segments.map((segment) => segment.text).join("\n") }),
+          factBundle,
+          gateTrace: Object.freeze([pathsServed.attempt > 1 ? "RECOMPOSED_ONCE" as const : "COMPOSED" as const,
+            ceiling.kind === "CAPPED" ? "BAND_CEILING_CAPPED" as const : "BAND_CEILING_PASS" as const, "SERVE" as const]),
+          conditionMarks: Object.freeze([...factBundle.conditionMarks]),
+          conformance: Object.freeze(segments.map((segment) => Object.freeze({ segmentId: segment.segmentId, state: "JUDGED" as const, conforms: checked }))),
+          coverageMode: "EXHAUSTIVE" as const, segments, compositionBudget, confidenceBand: ceiling.confidenceBand, bandCeiling: ceiling.ceiling,
+          digest: null, loopRounds: Object.freeze([]), standingObjection: null, degradedDiversity: null, crashClass: null, projections });
+      };
       try {
-        result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
+        if (pathsServe !== null) result = await runnerStage("SERVE_GATE_CHAIN_FAILED", pathsServe);
+        else result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
       nodes: servedNodes,
       factBundle,
       compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
@@ -12080,7 +12537,16 @@ export class WalkingSkeletonRunner {
       // ('EXHAUSTIVE','SAMPLED')`, 23514): ANSWER_PERSIST_FAILED, and the whole
       // run failed instead of ending components-only / DEFECT.
       const servedRound = result.loopRounds.at(-1);
-      if (servedRound === undefined) {
+      // V4 start step, Task 54: a path debate's main answer (or its paths' lines) is served as composed above, its writer's reply the
+      // composition's artifact and its checker's replies the conformance's; the floor and the envelope's stop serve none.
+      // (Set inside `pathsServe`, which control flow does not follow.)
+      const pathsComposed = pathsServed as PathsServed | null;
+      if (pathsComposed !== null && result.terminal === "SERVED") {
+        finalSegments = pathsComposed.segments;
+        compositionRawArtifactRef = pathsComposed.artifactRef;
+        compositionAttempt = pathsComposed.attempt;
+        conformanceRawArtifactRefs.splice(0, conformanceRawArtifactRefs.length, ...pathsComposed.checkRefs);
+      } else if (servedRound === undefined) {
         finalSegments = [];
         compositionRawArtifactRef = null;
         compositionAttempt = 0;
@@ -12336,7 +12802,9 @@ export class WalkingSkeletonRunner {
       verdictLabelBasis: answerCarriesLabel && comparingJudges === null ? verdictLabelBasis : null,
       // Engine 2 (R2b): the judges' label record instead of a ladder basis (serve takes at most one of the two; an answer
       // that carries no label passes neither).
-      ...(answerCarriesLabel && comparingJudges !== null ? { judgesDerivation: verdictLabel } : {})
+      ...(answerCarriesLabel && comparingJudges !== null ? { judgesDerivation: verdictLabel } : {}),
+      // V4 start step, Task 54: a path debate's label record (its main trust word's) rides the same way, with no ladder basis.
+      ...(pathOutcomes === null ? {} : { verdictLabelBasis: null, ...(answerCarriesLabel ? { judgesDerivation: verdictLabel } : {}) })
     }));
     // Task M3 (spec §14.4.5): the owner-side disclosure row, once, after the
     // sealed persist, for every answer. It can never change the answer: the
@@ -12420,6 +12888,44 @@ export class WalkingSkeletonRunner {
        */
       const storyWriter = settings.story;
       const floorRecorded = floor !== null && disclosureRecorded;
+      /**
+       * V4 start step, Task 54 (Task 51's story v5): a path debate's story is told from its paths (each with its answer so far), the
+       * main answer and its trust word, and the gap round's points no path took up; Haiku tells it and GLM checks it (else the run's
+       * own story roles). Its material starts at the ladder step the Haiku target's real count lets through (`pathsFromStep`), and
+       * every round reads one fence. Its suggestions are its paths' (the roots in force, read here, in the lease). None on any other run.
+       */
+      let pathsStory: Readonly<{ paths: StoryWriteInput["paths"]; fromStep: number; randomBytes: (size: number) => Buffer }> | null = null;
+      if (pathOutcomes !== null && pathsSetStored !== null) {
+        try {
+          afterSettle.pathRoots = Object.freeze((await settings.pathResults!.readPathRoots(run.runId))
+            .map((root) => Object.freeze({ ref: root.pathId, rootNodeId: root.rootNodeId })));
+        } catch {
+          // No roots read: no suggestions, never the answer.
+        }
+      }
+      if (pathOutcomes !== null && pathsSetStored !== null && storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
+        try {
+          const storyPaths = storyPathsInputOf({ set: pathsSetStored, outcomes: pathOutcomes, mainAnswer: finalSegments.map((segment) => segment.text),
+            mainTrust: pathsMainTrust, gap: pathsGapRound });
+          const disputed = new Set(await this.#judgements.readDisputedNodeIds(run.runId));
+          const fitted = await fitStoryPathsToTokenLine({ ...storyPaths,
+            points: storyPathsPointsOf(authoredNodeList.map((node) => ({ nodeId: node.nodeId, claim: node.statement })), disputed).points,
+            questionLine: pathsQuestionLine,
+            length: lengthGuidance === null ? null : storyLengthField(lengthGuidance.story, run.argumentLanguageTag, lengthGuidance.charactersPerWord),
+            readingLevel, language: shapeLanguage }, pathsTokenCount, pathsLog);
+          pathsStory = Object.freeze({ paths: storyPaths, fromStep: fitted.ladderStep, randomBytes: closingRandomBytes(cryptoRandomBytes(32)) });
+        } catch (error) {
+          pathsLog("PATHS_STORY_INPUT_FAILED", { runId: run.runId, code: pointInvestigationFailureCode(error) });
+        }
+      }
+      /** Haiku tells a path debate's story and GLM checks it (the main answer's seats), when the run holds both. */
+      const pathsStoryRoles = pathsStory === null ? null : (() => {
+        const final = pathsFinalSeatsOf(pathsFinalMembers);
+        return final === null ? null : Object.freeze({
+          storyteller: Object.freeze({ provider: final.writer.provider, providerRef: final.writer.providerRef }),
+          checker: Object.freeze({ provider: final.checker.provider, providerRef: final.checker.providerRef })
+        });
+      })();
       if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
         try {
           afterSettle.story = {
@@ -12429,7 +12935,11 @@ export class WalkingSkeletonRunner {
               workItemId: claimed.workItemId,
               answerId: persisted.answerId,
               answerVersion: persisted.answerVersion,
-              questionLine: run.questionLine,
+              // V4 start step, Task 54 (Task 53 (b)): a path debate's story reads the question with the step-2 lines it does not
+              // already say, as its legs did; every other run's line, byte for byte.
+              questionLine: pathsQuestionLine,
+              // V4 start step, Task 54: a path debate's story is v5, told from its paths, at the runner's ladder step, one fence.
+              ...(pathsStory === null ? {} : { paths: pathsStory.paths, pathsFromStep: pathsStory.fromStep, randomBytes: pathsStory.randomBytes }),
               // The same language the debate's own prompts were told to write in
               // (argumentLanguageDirective), and the tag the story is stored with.
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
@@ -12546,6 +13056,8 @@ export class WalkingSkeletonRunner {
                       storytellerRef: rotationPin.storyteller.providerRef,
                       storyCheckerRef: rotationPin.storyChecker.providerRef
                     }),
+              // V4 start step, Task 54: a path debate's story sits where its main answer did, Haiku and GLM, when the run holds both.
+              ...(pathsStoryRoles === null ? {} : { roleMakers: pathsStoryRoles }),
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and
@@ -12596,7 +13108,8 @@ export class WalkingSkeletonRunner {
             await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
           }
           // W4-3: what the AI offers to dig into on a debate that got its story, now that it is written. Never rejects.
-          await runFirstDebateSuggestions(settings.pathRewrite, settled.input);
+          // V4 start step, Task 54: a path debate's suggestions are its paths', each read from its root and keyed b<n>.
+          await runFirstDebateSuggestions(settings.pathRewrite, settled.input, afterSettle.pathRoots ?? undefined);
           // W5-1 (owner F7 A): a closing waits for its running digs and their rewrites; this member is now settled, so a
           // closing of its investigation may start at once rather than at the next sweep. Never rejects.
           await pokeInvestigationClosing(settings.investigationClose, settled.input.runId);

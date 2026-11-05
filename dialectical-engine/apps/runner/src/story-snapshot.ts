@@ -1,8 +1,9 @@
 import {
-  DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineCitedExtract, type EngineQuestionKind, type ReadingLevel,
-  type WayOfKnowing
+  DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineCitedExtract, type EngineQuestionKind, type PathId,
+  type ReadingLevel, type WayOfKnowing
 } from "@debateai/kernel";
-import type { VerdictState } from "@debateai/contract";
+import type { PathGapRound, PathOutcome, TrustWord, VerdictState } from "@debateai/contract";
+import type { StoredStartPathSet } from "@debateai/db";
 import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
@@ -207,6 +208,29 @@ export interface StorySnapshotSource {
   readonly paths?: StoryPathsInput | undefined;
   readonly pathsFromStep?: number | undefined;
   readonly randomBytes?: ((size: number) => Buffer) | undefined;
+}
+
+/**
+ * V4 start step, Task 54: a path run's story input (Task 51's `StoryPathsInput`) from what the run kept: its paths in the person's
+ * order, each with its answer so far (none: null), the main answer's segments and its trust word, and the gap round's points no path
+ * took up ("also raised"). Pure.
+ */
+export function storyPathsInputOf(input: Readonly<{
+  set: StoredStartPathSet;
+  outcomes: ReadonlyMap<PathId, PathOutcome>;
+  mainAnswer: readonly string[];
+  mainTrust: TrustWord | null;
+  gap: PathGapRound | null;
+}>): StoryPathsInput {
+  return Object.freeze({
+    paths: Object.freeze([...input.set.paths].sort((left, right) => left.pathNo - right.pathNo).map((path) => Object.freeze({
+      pathId: path.pathId, title: path.title, question: path.question, author: path.author, ownWords: Object.freeze([...path.ownWords]),
+      outcome: input.outcomes.get(path.pathId) ?? null
+    }))),
+    mainAnswer: Object.freeze([...input.mainAnswer]),
+    mainTrust: input.mainTrust,
+    alsoRaised: Object.freeze((input.gap?.points ?? []).filter((point) => point.path_id === null).map((point) => point.text))
+  });
 }
 
 /**
