@@ -87,7 +87,8 @@ function fakeClock(): StartClock & { advance(ms: number): void } {
 
 describe("practice openings, arm S: the start-step card per plan (Task 91)", () => {
   it("names arm S and the four plans; S runs only when named, after the other arms; anything else is still refused", () => {
-    expect(OPENINGS_START_ARMS).toEqual(["S"]);
+    // Task 91c added arm Q (the clarifying call's time, tests/unit/practice-openings-clarify-arm.test.ts) beside S.
+    expect(OPENINGS_START_ARMS).toEqual(["S", "Q"]);
     expect(OPENINGS_START_PLANS).toEqual(["FREE", "PLUS", "PRO", "MAX"]);
     // Spec §4.1 "Which AIs" (S5): Free 2, Plus 4, Pro 5, Max 7 list writers.
     expect(OPENINGS_START_LIST_WRITERS).toEqual({ FREE: 2, PLUS: 4, PRO: 5, MAX: 7 });
@@ -100,7 +101,7 @@ describe("practice openings, arm S: the start-step card per plan (Task 91)", () 
     expect(openingsArmsFromFlag("S")).toEqual(["S"]);
     expect(openingsArmsFromFlag("S,T")).toEqual(["T", "S"]);
     for (const bad of ["s", "S,S", "S2"]) {
-      expect(() => openingsArmsFromFlag(bad)).toThrow("--arms (only T, A, B, C, C2, C2N, S, comma-separated, each once)");
+      expect(() => openingsArmsFromFlag(bad)).toThrow("--arms (only T, A, B, C, C2, C2N, S, Q, comma-separated, each once)");
     }
   });
 

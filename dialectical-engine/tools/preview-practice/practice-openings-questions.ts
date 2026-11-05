@@ -45,14 +45,17 @@ export const OPENINGS_ENGINE_ARMS = Object.freeze(["C2", "C2N"] as const);
 /**
  * V4 start step, Task 91 (spec 2026-11-03 §4.1): the step before Start, timed per plan (S); asked only when named. It runs
  * with --dry too: its dry gates answer the planner, the lists and the merges.
+ * Task 91c (owner card "As picked, on measured time"): the clarifying call of step 1's Next, timed per question (Q); asked
+ * only when named. With --dry it writes made-up times and calls nothing. Q, not the plan's C: C is the angle map's letter
+ * (OPENINGS_ARMS), which runs by default and asks all five AIs.
  */
-export const OPENINGS_START_ARMS = Object.freeze(["S"] as const);
+export const OPENINGS_START_ARMS = Object.freeze(["S", "Q"] as const);
 /** Arm S's plans, in the order each question runs them. */
 export const OPENINGS_START_PLANS = Object.freeze(["FREE", "PLUS", "PRO", "MAX"] as const);
 export type OpeningsStartPlan = typeof OPENINGS_START_PLANS[number];
 /**
  * T: today's opening. A: snowball. B: blind lists. C: the angle map. C2: the angle map on engine 2. C2N: C2 in wording N
- * (practice only). S: the step before Start, the card's wait on each plan.
+ * (practice only). S: the step before Start, the card's wait on each plan. Q: the clarifying call's time per question.
  */
 export type OpeningsArm = typeof OPENINGS_ARMS[number] | typeof OPENINGS_ENGINE_ARMS[number] | typeof OPENINGS_START_ARMS[number];
 
@@ -86,15 +89,15 @@ export function openingsQuestionsFromFlag(value: string | undefined): readonly O
 }
 
 /**
- * The arms a run uses: the four of OPENINGS_ARMS, or the arms named (in the order T, A, B, C, C2, C2N, S). The engine-2
- * arms (C2, C2N) and the start step's (S) run only when named, so a plain openings run never spends on them.
+ * The arms a run uses: the four of OPENINGS_ARMS, or the arms named (in the order T, A, B, C, C2, C2N, S, Q). The engine-2
+ * arms (C2, C2N) and the start step's (S, Q) run only when named, so a plain openings run never spends on them.
  */
 export function openingsArmsFromFlag(value: string | undefined): readonly OpeningsArm[] {
   if (value === undefined) return OPENINGS_ARMS;
   const ids = openingsIds(value);
   const known: readonly OpeningsArm[] = [...OPENINGS_ARMS, ...OPENINGS_ENGINE_ARMS, ...OPENINGS_START_ARMS];
   if (ids === null || ids.some((id) => !(known as readonly string[]).includes(id))) {
-    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, S, comma-separated, each once)");
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, S, Q, comma-separated, each once)");
   }
   return Object.freeze(known.filter((arm) => ids.includes(arm)));
 }

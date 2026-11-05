@@ -42,6 +42,7 @@ import {
   practiceShapeVersionRows,
   practiceVersionRows
 } from "../../tools/preview-practice/practice-register-import.js";
+import { practiceStartShapePolicyOf, practiceStartStepFromArgs } from "../../tools/preview-practice/practice-start-step.js";
 import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 const START_TEXT = readFileSync(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url), "utf8");
@@ -379,7 +380,18 @@ describe("README: the debate commands are real commands of this tool", () => {
   const commands = readme.split("\n").filter((line) => line.includes("tools/preview-practice/practice.ts debate "));
   const argvOf = (line: string): string[] => line.slice(line.indexOf("practice.ts ") + "practice.ts ".length).trim().split(/\s+/u)
     .map((word) => word.replace(/^"(.*)"$/u, "$1"));
-  const readFromEngine = (path: string): string => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  // V4 start step, Task 91b: Step 4's shape file is written outside the repository at the sitting ($P); it is read here as Step 4
+  // writes it (practiceStartShapePolicyOf), from a made-up export whose newest version holds the start values' row.
+  const STEP_4_SHAPE_FILE = "$P/start-step-shape.json";
+  const step4Shape = (): string => JSON.stringify(practiceStartShapePolicyOf(parsePracticeRegisterExport(JSON.stringify({
+    schema: PRACTICE_REGISTER_EXPORT_SCHEMA,
+    versions: [{ register_version: "5", row_count: 1, base_register_version: null, publication_id: null, request_sha256: null,
+      snapshot_sha256: null, publication_kind: null, recorded_at: null }],
+    rows: [{ register_version: "5", row_key: DEBATE_SHAPE_POLICY_ROW_KEY, value_json: JSON.stringify(debateShapePolicyStartValues()),
+      source_ref: "made up" }]
+  }))));
+  const readFromEngine = (path: string): string => path === STEP_4_SHAPE_FILE ? step4Shape()
+    : readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
   it("names the pass bar, the new shape and the comparison", () => {
     expect(commands.length).toBeGreaterThanOrEqual(4);
@@ -400,6 +412,11 @@ describe("README: the debate commands are real commands of this tool", () => {
       // fingerprints, every new-shape and comparison debate needs --register-next (S-6's own debate line carries it too:
       // P2d Task 7b, the progress ledger's NOTE for Task 7b).
       if (asked === "$Q" || args.flags.has("--shape-policy")) expect(args.switches.has("--register-next")).toBe(true);
+      // V4 start step, Task 91b: a start-step command's two flags parse, and it reads Step 4's shape file.
+      if (args.flags.has("--start-step")) {
+        expect(practiceStartStepFromArgs(args.mode, args.flags)).not.toBeNull();
+        expect(args.flags.get("--shape-policy")).toBe(STEP_4_SHAPE_FILE);
+      }
       if (asked === "$Q") {
         expect(args.flags.get("--depth")).toBe("1");
         expect(args.switches.has("--transcript")).toBe(true);

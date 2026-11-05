@@ -16,6 +16,13 @@
  * and one late merge for the lists after it (mapMergeStartLists, on Haiku), each call through the same gateway as every
  * other arm's, with the API's bound for its kind. Once every call a card asked has ended, `onStartCard` is told its
  * START_CARD line (the card's wait, the lists in by the cut, the late ones, each seat's list time; never a cost).
+ *
+ * Arm Q (V4 start step, Task 91c; owner card "As picked, on measured time"): the clarifying call of step 1's Next, timed per
+ * question. For each question, one reading through the API's own step (apps/api/src/ask-clarify.ts: createAskClarify over
+ * its preview transport, askClarifyTransportFor PREVIEW), so the call goes to the Anthropic gate exactly as the site sends
+ * it: the sealed contract, ASK_CLARIFY_MODEL_SETTINGS, the step's bound and its one retry, through this run's guarded fetch.
+ * `onClarify` is told its CLARIFY_TIME line (the time the page waited, AI or NONE, NONE's code; never a word, never a
+ * cost). With `dry` it writes made-up times and calls nothing. The plan named this arm C, the angle map's letter: Q here.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
@@ -48,6 +55,7 @@ import {
   type ProviderDiscoveryTarget,
   type ProviderGateway
 } from "@debateai/providers";
+import { askClarifyTransportFor, createAskClarify, type AskClarifyPort } from "../../apps/api/src/ask-clarify.js";
 import { startModelOfSeat, startSeatsFor } from "../../apps/api/src/start-step/seats.js";
 import { preStartKindOfCallSite, START_STEP_CALL_BOUNDS } from "../../apps/api/src/start-step/transport.js";
 import { abortableWait } from "./practice-concurrency.js";
@@ -72,6 +80,7 @@ import type {
   OpeningsBusyWait,
   OpeningsCall,
   OpeningsCallStatus,
+  OpeningsClarifyLine,
   OpeningsStartCardLine,
   OpeningsStep
 } from "./practice-openings-log.js";
@@ -100,13 +109,21 @@ export const OPENINGS_START_LIST_WRITERS: Readonly<Record<OpeningsStartPlan, num
 
 /**
  * The calls at once a run allows unless --max-in-flight says otherwise: with arm S, the most list writers of a plan and
- * the merge, so every list of a card starts at the same moment, as the API starts them (spec §4.1); else the formats'.
+ * the merge, so every list of a card starts at the same moment, as the API starts them (spec §4.1); else the formats'
+ * (arm Q asks one call at a time).
  */
 export function openingsMaxInFlightDefault(arms: readonly OpeningsArm[]): number {
-  return arms.some((arm) => (OPENINGS_START_ARMS as readonly string[]).includes(arm))
+  return arms.includes("S")
     ? Math.max(PRACTICE_FORMATS_DEFAULTS.maxInFlight, ...Object.values(OPENINGS_START_LIST_WRITERS)) + 1
     : PRACTICE_FORMATS_DEFAULTS.maxInFlight;
 }
+
+/**
+ * Arm Q's made-up times for --dry (Task 91c), in ms, by each question's fixed place among the twelve: --dry calls nothing,
+ * so every reading is AI at its time here. Made up; the sitting measures the real ones.
+ */
+export const OPENINGS_DRY_CLARIFY_MS: readonly number[] = Object.freeze([2_400, 3_100, 2_800, 3_600, 2_200, 4_100, 2_600, 3_300,
+  2_900, 3_800, 4_400, 2_500]);
 
 /** The hash of the contract a start-step call sends, as the API's transport records it (the drafts are sealed by Task 92). */
 const startContractHashOf = (contract: PromptContract): string =>
@@ -154,11 +171,17 @@ export type OpeningsRunInput = Readonly<{
   onStartCard?: (card: OpeningsStartCardLine) => void;
   /** Test seam, arm S: the step before Start's clock (its cut, its cap, the planner's race) and the card's times. */
   startClock?: StartClock;
+  /** --dry (Task 91c): arm Q writes made-up times (OPENINGS_DRY_CLARIFY_MS) and calls nothing; the other arms' dry answers are the ports'. */
+  dry?: boolean;
+  /** Arm Q (Task 91c): told each question's CLARIFY_TIME line once its reading has ended. */
+  onClarify?: (line: OpeningsClarifyLine) => void;
 }>;
 
 export type OpeningsRunResult = Readonly<{ calls: readonly OpeningsCall[]; arms: readonly OpeningsArmLine[]; busyModels: readonly string[];
   /** Arm S's card lines, in run order (none without arm S). */
-  startCards: readonly OpeningsStartCardLine[] }>;
+  startCards: readonly OpeningsStartCardLine[];
+  /** Arm Q's CLARIFY_TIME lines, in run order (none without arm Q). */
+  clarifyTimes: readonly OpeningsClarifyLine[] }>;
 
 /** The failures that are the reply's format: the gateway's last refusal, the judge's and the map's own readers. */
 const OPENINGS_FORMAT_ERRORS: ReadonlySet<string> = new Set(["JUDGE_SCHEMA_FAILURE", "JUDGE_PARSE_FAILURE", "MAP_REPLY_UNREADABLE"]);
@@ -185,11 +208,11 @@ export function openingsQuestionRotations(questions: readonly OpeningsQuestion[]
   return Object.freeze(rotations);
 }
 
-/** The arms asked: each one of T, A, B, C, C2, C2N, S, at most once (checked with the questions, before the first call). */
+/** The arms asked: each one of T, A, B, C, C2, C2N, S, Q, at most once (checked with the questions, before the first call). */
 function openingsAssertArms(arms: readonly OpeningsArm[]): void {
   const known: readonly string[] = [...OPENINGS_ARMS, ...OPENINGS_ENGINE_ARMS, ...OPENINGS_START_ARMS];
   if (arms.some((arm) => !known.includes(arm)) || new Set(arms).size !== arms.length) {
-    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, S, each once)");
+    throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--arms (only T, A, B, C, C2, C2N, S, Q, each once)");
   }
 }
 
@@ -231,7 +254,16 @@ export async function runPracticeOpenings(input: OpeningsRunInput): Promise<Open
 
 /** Arm S alone (Task 91): every question's card on Free, Plus, Pro and Max in turn; the card lines, as `onStartCard` is told them. */
 export async function runStartStepArm(input: OpeningsRunInput): Promise<readonly OpeningsStartCardLine[]> {
-  return (await runPracticeOpenings({ ...input, arms: OPENINGS_START_ARMS })).startCards;
+  return (await runPracticeOpenings({ ...input, arms: ["S"] })).startCards;
+}
+
+/**
+ * Arm Q alone (Task 91c): one clarifying call per question on the Anthropic gate, as apps/api/src/ask-clarify.ts sends it (the
+ * sealed contract, ASK_CLARIFY_MODEL_SETTINGS, its bound); the CLARIFY_TIME lines, as `onClarify` is told them. Codes and times
+ * only, never words.
+ */
+export async function runClarifyArm(input: OpeningsRunInput): Promise<readonly OpeningsClarifyLine[]> {
+  return (await runPracticeOpenings({ ...input, arms: ["Q"] })).clarifyTimes;
 }
 
 async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorage<PracticeWireEvent[]>): Promise<OpeningsRunResult> {
@@ -461,6 +493,52 @@ async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorag
       + `${String(card.late)} late`);
   };
 
+  /**
+   * Arm Q's reader (Task 91c): the API's own clarifying step, made once per run as the API makes it once per process, over its
+   * preview transport on this run's guarded fetch (the Anthropic gate, no key). The practice keeps no money row: the gate settles
+   * the money and its wire lines carry it, so the step's record does nothing. Its limits are the questions asked, so no reading is
+   * refused by them; one made-up person asks every question (the step's memory is per person and per line, and no line repeats).
+   * NONE's code is the step's own report line. At its bound the step lets its call go, as on the site (the gate delivers and
+   * settles it): the practice keeps each such call (`clarifyInFlight`) and waits for it after the reading is timed, so its gate
+   * line (its money) is in the log before the reading's line, and the next reading never shares the gate with it.
+   */
+  const clarifyOwner = randomUUID();
+  const clarifyNone: { code: string | null } = { code: null };
+  const clarifyInFlight = new Set<Promise<Response>>();
+  const clarifyFetch: typeof fetch = (url, init) => {
+    const call = guardedFetch(url, init);
+    clarifyInFlight.add(call);
+    const ended = (): void => { clarifyInFlight.delete(call); };
+    void call.then(ended, ended);
+    return call;
+  };
+  let clarifyPort: AskClarifyPort | null = null;
+  const clarifyReader = (): AskClarifyPort => {
+    clarifyPort ??= createAskClarify({ limits: { perHour: input.questions.length, perDay: input.questions.length },
+      transportFor: askClarifyTransportFor({ kind: "PREVIEW", fetch: clarifyFetch }), record: async () => undefined, clock: () => new Date(),
+      report: (line) => { if (line.event === "api.ask_clarify.none") clarifyNone.code = line.code; } });
+    return clarifyPort;
+  };
+  const clarifyLine = (questionId: string, ms: number, source: "AI" | "NONE", code: string | null): OpeningsClarifyLine =>
+    Object.freeze({ kind: "CLARIFY_TIME" as const, questionId, ms, source, code });
+  /** One reading: made up with --dry (nothing is called), else the step's answer, timed from the read to its end as the page waits. */
+  const clarifyReading = async (question: OpeningsQuestion, place: number): Promise<OpeningsClarifyLine> => {
+    if (input.dry === true) return clarifyLine(question.id, OPENINGS_DRY_CLARIFY_MS[place]!, "AI", null);
+    clarifyNone.code = null;
+    const started = performance.now();
+    const answer = await clarifyReader().read(clarifyOwner, question.questionLine, null);
+    const ms = Math.round(performance.now() - started);
+    // A call the step let go at its bound ends here, outside the time the page waited.
+    await Promise.allSettled([...clarifyInFlight]);
+    return answer.source === "AI" ? clarifyLine(question.id, ms, "AI", null) : clarifyLine(question.id, ms, "NONE", clarifyNone.code ?? "UNKNOWN");
+  };
+  const clarifyTimes: OpeningsClarifyLine[] = [];
+  const emitClarify = (line: OpeningsClarifyLine): void => {
+    clarifyTimes.push(line);
+    input.onClarify?.(line);
+    input.progress?.(`${line.questionId} Q: ${line.source}${line.code === null ? "" : ` ${line.code}`} ${String(line.ms)}ms`);
+  };
+
   const emit = (line: OpeningsArmLine) => { const frozen = Object.freeze(line); armLines.push(frozen); input.onArm?.(frozen); };
   /**
    * Ruling T11-m1: a stopped or halted gate (or the operator's interrupt) ends the run. The arm in progress finishes
@@ -496,6 +574,16 @@ async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorag
           }
           emitCard(card);
         }
+        continue;
+      }
+      if (arm === "Q") {
+        const reading = await clarifyReading(question, rotation);
+        // A reading a stop cut short (a stopped gate, the operator's interrupt) is not timed, as arm S's card is not.
+        if (stopNow() !== null) {
+          input.progress?.(`${question.id} Q: stopped, the reading is not timed`);
+          continue;
+        }
+        emitClarify(reading);
         continue;
       }
       const seats = mapRotateSeats(order, rotation).filter((target) => !busy.includes(target.model));
@@ -547,5 +635,5 @@ async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorag
     }
   }
   return Object.freeze({ calls: Object.freeze([...calls]), arms: Object.freeze([...armLines]), busyModels: Object.freeze([...busy]),
-    startCards: Object.freeze([...startCards]) });
+    startCards: Object.freeze([...startCards]), clarifyTimes: Object.freeze([...clarifyTimes]) });
 }

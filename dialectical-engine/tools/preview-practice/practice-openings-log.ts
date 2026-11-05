@@ -8,15 +8,17 @@
  * count for today's opening). The gates' watch adds one line per gate call. report.json and report.md are built from
  * these lines at the end and on every other way out. They hold counts, cost, time, slips, fallbacks and notes only:
  * the comparison of the openings is the owners' own method, outside this repository. Arm S (V4 start step, Task 91) adds
- * one START_CARD line per question and plan (the card's wait, never a cost), and report.json its `startStep` block.
+ * one START_CARD line per question and plan (the card's wait, never a cost), and report.json its `startStep` block. Arm Q
+ * (Task 91c) adds one CLARIFY_TIME line per question (the clarifying call's time and NONE's code, never a word or a cost),
+ * and report.json its `clarify` block.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai/map";
 import { previewModelRow } from "@debateai/providers";
 import { START_SEAT_SPEED_ORDER, startModelOfSeat } from "../../apps/api/src/start-step/seats.js";
-import type { PracticeAttempt } from "./practice-formats.js";
-import type { PracticeGateName } from "./practice-gate-observer.js";
+import { practiceWireUsage, type PracticeAttempt } from "./practice-formats.js";
+import type { PracticeGateName, PracticeWireEvent } from "./practice-gate-observer.js";
 import { practiceWordingRows, practiceWordingTotals } from "./practice-map-wording.js";
 import { OPENINGS_START_PLANS, type OpeningsArm, type OpeningsQuestionDigest, type OpeningsStartPlan } from "./practice-openings-questions.js";
 import {
@@ -40,6 +42,8 @@ import {
   type PracticeRemainingLine
 } from "./practice-samples-log.js";
 import {
+  clarifySummary,
+  clarifyWaitProposal,
   latencySummary,
   percentile,
   practiceModelCalls,
@@ -50,7 +54,8 @@ import {
 
 export const OPENINGS_SCHEMA = "preview-practice-openings-v1" as const;
 export const OPENINGS_FILE = "openings.jsonl" as const;
-const OPENINGS_LINE_KINDS: readonly string[] = ["start", "wire", "stop", "call", "arm", "busy", "busy-wait", "end", "abort", "START_CARD"];
+const OPENINGS_LINE_KINDS: readonly string[] = ["start", "wire", "stop", "call", "arm", "busy", "busy-wait", "end", "abort", "START_CARD",
+  "CLARIFY_TIME"];
 
 /** A map step, or POSITION: today's opening (arm T), one full position per AI. */
 export type OpeningsStep = MapStep | "POSITION";
@@ -117,6 +122,15 @@ export type OpeningsStartCardLine = Readonly<{
 }>;
 
 /**
+ * V4 start step, Task 91c (arm Q): one reading of the clarifying call of step 1's Next, written once it has ended.
+ *  - ms: from the reading's start to the step's answer, as the page waits for it (the step's one retry and its bound included);
+ *  - source: AI (the page gets questions) or NONE (it gets none); code: NONE's code from the step itself (DEADLINE, TRANSPORT,
+ *    UNREADABLE, ...), null with AI.
+ * Exactly these five fields: never a word of the question or the reply, never a cost (the gate's wire lines carry the money).
+ */
+export type OpeningsClarifyLine = Readonly<{ kind: "CLARIFY_TIME"; questionId: string; ms: number; source: "AI" | "NONE"; code: string | null }>;
+
+/**
  * The practice's own note on an arm (ruling T11-m1): a gate stopped, or the operator interrupted, while the arm ran;
  * `detail` names the stops (`gate:reason`). Its calls behind the stopped gate were not sent: they are not the models'
  * own fallbacks. The run starts nothing after it.
@@ -166,7 +180,8 @@ export type OpeningsLogLine =
   | Readonly<{ kind: "call"; call: OpeningsCall }>
   | Readonly<{ kind: "arm"; arm: OpeningsArmLine }>
   | (Readonly<{ kind: "busy-wait" }> & OpeningsBusyWait)
-  | OpeningsStartCardLine;
+  | OpeningsStartCardLine
+  | OpeningsClarifyLine;
 
 /**
  * Every string value inside a model-written structure, key-shape redacted (no cap: a map is short, and every field the
@@ -342,6 +357,19 @@ function openingsStartStepBlock(cards: readonly OpeningsStartCardLine[], calls: 
 }
 
 /**
+ * report.json's `clarify` (arm Q, Task 91c): the readings, their summary, the three values they propose (clarifyWaitProposal; the
+ * owner applies them, never code), the NONE readings by code, and the arm's money in a run of arm Q alone, where every gate line is
+ * its own (each priced as the call lines are, from the gate's own usage). Beside other arms the gate lines are shared: null.
+ */
+function openingsClarifyBlock(times: readonly OpeningsClarifyLine[], ownWire: readonly PracticeWireEvent[] | null) {
+  const summary = clarifySummary(times);
+  return Object.freeze({ readings: times.length, summary, proposal: clarifyWaitProposal(summary),
+    noneCodes: openingsCount(times.flatMap((line) => (line.source === "NONE" ? [line.code ?? "UNKNOWN"] : []))),
+    costUsd: ownWire === null ? null
+      : usd(ownWire.reduce((sum, event) => sum + BigInt(practiceWireUsage(event.model, [event]).costNanoUsd ?? "0"), 0n)) });
+}
+
+/**
  * The report from the log alone, with the tool's own verdict (practice-verdict.ts): a log with an end line gives the
  * run's own verdict; one with an abort line, or neither, gives ABORTED with every other rule listed after it.
  */
@@ -354,6 +382,10 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
   const armLines = lines.flatMap((line) => (line.kind === "arm" ? [line.arm] : []));
   // Task 91 (arm S): the start step's cards; one with no list by the cut was not shown (NOT_PROVEN, START_NO_CARD).
   const cards = lines.flatMap((line) => (line.kind === "START_CARD" ? [line] : []));
+  // Task 91c (arm Q): the clarifying call's readings. Arm Q asks only the clarifying call's own model, so a run of arm Q alone
+  // leaves none of the other arms' AIs "not exercised", has no per-arm row, and owns every gate line.
+  const clarifyTimes = lines.flatMap((line) => (line.kind === "CLARIFY_TIME" ? [line] : []));
+  const callArms = start.arms.filter((arm) => arm !== "Q");
   const busy = ending.busy;
   const tries = calls.filter((call) => call.attempts.length > 0).map((call) => Object.freeze({ model: call.model, tries: call.attempts }));
   const callsByModel = practiceModelCalls(tries);
@@ -382,10 +414,11 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     gateHalted: gateHalted(ending.observer, after),
     gateStopped: gateStopped(ending.observer),
     gatePauses: gatePauses(ending.observer),
-    notExercisedModels: start.models.filter((model) => !answeredModels.has(model) && !busy.includes(model)),
+    notExercisedModels: callArms.length === 0 ? [] : start.models.filter((model) => !answeredModels.has(model) && !busy.includes(model)),
     busyModels: busy,
     armsRefused: armsRefused.map((refused) => `${refused.arm}:${refused.questionId}:${refused.code}`),
     startNoCard: cards.filter((card) => card.listsIn === 0).map((card) => `${card.plan}:${card.questionId}`),
+    clarifyNone: clarifyTimes.filter((line) => line.source === "NONE").map((line) => `${line.questionId}:${line.code ?? "UNKNOWN"}`),
     unbilledRefusals: GATES.reduce((sum, gate) => sum + ending.observer.summary(gate).unbilled, 0),
     p90ByModel: p90ByModel(calls.map((call) => ({ model: call.model, latencies: call.attempts.map((attempt) => attempt.latencyMs) })))
   });
@@ -394,7 +427,7 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
   const nano = (rows: readonly OpeningsCall[]) => rows.reduce((sum, call) => sum + BigInt(call.costNanoUsd ?? "0"), 0n);
   const tokens = (rows: readonly OpeningsCall[], pick: (call: OpeningsCall) => number | null) =>
     rows.reduce((sum, call) => sum + (pick(call) ?? 0), 0);
-  const byArm = start.arms.map((arm) => {
+  const byArm = callArms.map((arm) => {
     const mine = calls.filter((call) => call.arm === arm);
     const ownLines = armLines.filter((line) => line.arm === arm);
     // Arm S writes card lines, not arm lines: its questions are its cards' questions, its time its cards' calls'.
@@ -432,6 +465,9 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
     // Task 91 (arm S), only when it ran: the waits per plan, each model's list time, the seat order they suggest, and the
     // cost per plan (here and in the call lines only; a card line never holds one).
     ...(cards.length === 0 ? {} : { startStep: openingsStartStepBlock(cards, calls.filter((call) => call.arm === "S"), nano) }),
+    // Task 91c (arm Q), only when it ran: the clarifying call's times, the three values they propose, and (arm Q alone) its money.
+    ...(clarifyTimes.length === 0 ? {} : { clarify: openingsClarifyBlock(clarifyTimes,
+      callArms.length === 0 ? lines.flatMap((line) => (line.kind === "wire" ? [line.event] : [])) : null) }),
     gates: Object.fromEntries(GATES.map((gate) => [gate, Object.freeze({ observed: ending.observer.summary(gate),
       remainingBefore: start.remainingBefore[gate], remainingAfter: after?.[gate] ?? null,
       // The formats report's own check (report.md prints it per gate): the gate's count before less after.

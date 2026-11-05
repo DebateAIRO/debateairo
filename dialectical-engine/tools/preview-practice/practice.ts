@@ -22,6 +22,8 @@
  *             --line-up FILE runs it with that line-up, in the throwaway register only (practice-settings.ts); every mode
  *             that reads the settings takes it (formats, openings, language and judge-order then ask with that line-up).
  *             --site-language and --language-choice set the site language and answer the one-language offer (default keep).
+ *             --start-step free:3|premium:5 starts it with the step before Start and the menu's top paths, --digs 0..2
+ *             digs it after; the month's lines go to <out>/start-month.jsonl only (practice-start-step.ts, V4 Task 91b).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
  *             once (practice-openings-log.ts) and the report is built from it, on every way out. --dry answers from a
@@ -120,6 +122,7 @@ import {
   remainingLine
 } from "./practice-samples-log.js";
 import { practiceShapeOverrideFromArgs } from "./practice-shape.js";
+import { PRACTICE_START_FLAGS, practiceStartStepFromArgs } from "./practice-start-step.js";
 import { practiceLengthOverrideFromArgs } from "./practice-length.js";
 import { PRACTICE_ENGINE_FLAGS, practiceEngineOverrideFromArgs, practiceRegisterHasLengthRow } from "./practice-engine.js";
 import { PRACTICE_PIN_FLAGS, practicePinsGiven, practiceWriterPinsFromArgs } from "./practice-pins.js";
@@ -173,6 +176,8 @@ const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-d
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
   "--answer-length", "--site-language", "--language-choice", "--transcripts", "--length-policy", "--engine-policy",
   "--answer-writer-model", "--storyteller-model", "--line-up",
+  // V4 start step, Task 91b (practice-start-step.ts): debate mode only.
+  ...PRACTICE_START_FLAGS,
   ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next", "--story-length", "--control"]);
 
@@ -405,7 +410,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       onBusy: (model) => opened.append({ kind: "busy", model }),
       onBusyWait: (wait) => opened.append({ kind: "busy-wait", ...wait }),
       // Task 91 (arm S): each card of the step before Start, once its calls have ended.
-      onStartCard: (card) => opened.append(card)
+      onStartCard: (card) => opened.append(card),
+      // Task 91c (arm Q): each reading of the clarifying call, once it has ended; with --dry, made-up times and no call.
+      dry: setup.dry,
+      onClarify: (line) => opened.append(line)
     });
     if (settled !== null) return settled;
     const after = setup.remainingPorts === null ? { deepinfra: null, anthropic: null } : {
@@ -442,6 +450,13 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         schema: PRACTICE_REPORT_SCHEMA, mode: "rescore", verdict: rescored.verdict, exitCode: rescored.exitCode,
         reasons: rescored.reasons, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString()
       }) });
+    }
+    // V4 start step, Task 91b: --start-step and --digs, debate mode only, refused in every other mode before anything is read (a
+    // bad value too, naming the flag only), so a mistyped plan or count can never start a paid run.
+    const startStep = practiceStartStepFromArgs(args.mode, args.flags);
+    if (startStep?.plan === "free" && PRACTICE_PIN_FLAGS.some((flag) => args.flags.has(flag))) {
+      // The pins steer the rotation's counts over the premium roster (practice-pins.ts): they hold only on the premium plan.
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--start-step (a free start takes no writer pin: pins hold only on premium)");
     }
     // Parallel AI calls: the debate's runner only; checked before anything is read or sent.
     const callConcurrencyText = args.flags.get("--call-concurrency");
@@ -839,6 +854,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
       ...(options.asOf === undefined ? {} : { asOf: options.asOf }),
+      // V4 start step, Task 91b: the step before Start, its digs, and the month's lines appended to start-month.jsonl in --out.
+      ...(startStep === null ? {} : { start: startStep, startMonthDirectory: directory }),
       progress: log,
       transcriptDirectory: args.switches.has("--transcript") ? directory : null
     });

@@ -16,7 +16,8 @@
  *    it gave a single accepted answer, or the practice paused a gate itself after four connection failures in a row, or
  *    the operator interrupted it once (the calls in flight finished, the rest were skipped), so some model was not
  *    tested to the end; or (openings arm S) a card of the step before Start got no list by the cut, so its wait was not
- *    measured (START_NO_CARD:<plan>:<question>).
+ *    measured (START_NO_CARD:<plan>:<question>); or (openings arm Q) a reading of the clarifying call answered NONE, so the
+ *    AI's time to its questions was not measured there (CLARIFY_NONE:<question>:<code>).
  *  - HARNESS_ERROR (exit 40): the practice itself could not run (a start check refused, or the tool broke). No verdict
  *    about the release.
  *  - ABORTED (exit 50): the practice started but did not get to its end (a second interrupt, or the tool broke midway).
@@ -231,6 +232,12 @@ export type PracticeVerdictInput = Readonly<{
    * already a failed call). Optional: none when absent.
    */
   startNoCard?: readonly string[];
+  /**
+   * Openings arm Q (V4 start step, Task 91c): each reading of the clarifying call that answered NONE, as `<question>:<code>`
+   * in run order (the step's own code: DEADLINE, TRANSPORT, UNREADABLE, ...). The page showed no questions, so the AI's time
+   * to its questions was not measured there: NOT_PROVEN. Optional: none when absent.
+   */
+  clarifyNone?: readonly string[];
   /** Refusals the gate proved unbilled (vendor busy, model cooling off, not reached) during a practice that went through. */
   unbilledRefusals: number;
   /** Each model's 90th-percentile latency in ms. */
@@ -272,6 +279,7 @@ export function practiceVerdict(input: PracticeVerdictInput): PracticeVerdictRes
   const notProven = [
     ...(input.armsRefused ?? []).map((refused) => `ARM_REFUSED:${refused}`),
     ...(input.startNoCard ?? []).map((card) => `START_NO_CARD:${card}`),
+    ...(input.clarifyNone ?? []).map((reading) => `CLARIFY_NONE:${reading}`),
     ...busy.filter((model) => answeredOf(model) < 1).map((model) => `MODEL_BUSY:${model}`),
     ...[...new Set(input.notExercisedModels)].filter((model) => !busy.includes(model)).sort().map((model) => `MODEL_NOT_EXERCISED:${model}`),
     ...[...(input.gatePauses ?? [])].sort().map((pause) => `GATE_PAUSED:${pause}`),
@@ -313,4 +321,89 @@ export function latencySummary(values: readonly number[]): LatencySummary {
     p50: percentile(values, 50), p90: percentile(values, 90),
     max: values.length === 0 ? null : Math.max(...values)
   });
+}
+
+/*
+ * V4 start step, Task 91b (spec 2026-11-03 §5; decision record 3 Nov): THE MONTH'S LINES. A practice debate with the start step
+ * (`--start-step`, practice-start-step.ts) measures what one question costs a person's month: the calls before Start (lists, merge,
+ * one combine), the debate, its end (each path's answer so far, the main answer and its check, the story) and each dig. Each line is a
+ * phase's calls and their money; the lines go to the --out folder only, never to the progress log, the report's markdown or the
+ * repository (made-up figures only in tests).
+ */
+
+/** The month's four phases, in the order a question spends them. */
+export const PRACTICE_START_MONTH_PHASES = Object.freeze(["PRE_START", "DEBATE", "END_OF_DEBATE", "DIG"] as const);
+export type PracticeStartMonthPhase = typeof PRACTICE_START_MONTH_PHASES[number];
+
+/**
+ * One phase of one question: PRE_START (no run yet: `runId` null), DEBATE and END_OF_DEBATE (the debate's run; END_OF_DEBATE is
+ * PATH_OUTCOME plus the main answer plus the story calls), DIG (one line per dig, its own run). `calls`: the ledger rows of its
+ * model calls; `costNanoUsd`: their money, plus the search fees the phase paid (a search is money, not a model call).
+ */
+export type PracticeStartMonthLine = Readonly<{ kind: "START_MONTH"; phase: PracticeStartMonthPhase; runId: string | null; calls: number;
+  costNanoUsd: string }>;
+
+/** One charge of the month: a model call (`call`) or a search fee (money only), with its phase and run. */
+export type PracticeStartMonthCharge = Readonly<{ phase: PracticeStartMonthPhase; runId: string | null; costNanoUsd: bigint; call: boolean }>;
+
+/**
+ * The month's lines of one question: PRE_START always; DEBATE and END_OF_DEBATE when a debate was admitted (`parentRunId`); one DIG
+ * line per dig run, in the order they ran. A phase with no charge is a line of 0 calls, so a line is never missing for a run.
+ */
+export function practiceStartMonthLines(input: Readonly<{ parentRunId: string | null; digRunIds: readonly string[];
+  charges: readonly PracticeStartMonthCharge[] }>): readonly PracticeStartMonthLine[] {
+  const lineOf = (phase: PracticeStartMonthPhase, runId: string | null): PracticeStartMonthLine => {
+    const mine = input.charges.filter((charge) => charge.phase === phase && charge.runId === runId);
+    return Object.freeze({ kind: "START_MONTH" as const, phase, runId, calls: mine.filter((charge) => charge.call).length,
+      costNanoUsd: String(mine.reduce((sum, charge) => sum + charge.costNanoUsd, 0n)) });
+  };
+  return Object.freeze([
+    lineOf("PRE_START", null),
+    ...(input.parentRunId === null ? [] : [lineOf("DEBATE", input.parentRunId), lineOf("END_OF_DEBATE", input.parentRunId)]),
+    ...input.digRunIds.map((runId) => lineOf("DIG", runId))
+  ]);
+}
+
+/*
+ * V4 start step, Task 91c (owner card "As picked, on measured time"; wait-f8's rule: never a guessed number): THE CLARIFYING CALL'S
+ * TIMES. Openings arm Q times the clarifying call of step 1's Next once per question (practice-openings.ts, CLARIFY_TIME lines). The
+ * page's "taking longer than usual" line may show only past the call's MEASURED usual time, and the page gives up a little after the
+ * server's own bound, so the three values move together: the usual top, the server's bound and the page's wait. These two functions
+ * only propose them; the owner applies them (plan Task 91c), never this code.
+ */
+
+/** One timed reading of the clarifying call (arm Q's CLARIFY_TIME line): its time, and whether the page got questions (AI) or none. */
+export type PracticeClarifyTime = Readonly<{ ms: number; source: "AI" | "NONE" }>;
+
+/** The readings' p50, p90 and max (nearest rank, as every practice report's) and how many answered NONE. */
+export type PracticeClarifySummary = Readonly<{ p50Ms: number; p90Ms: number; maxMs: number; none: number }>;
+
+/**
+ * Over every reading, a NONE one included: the page waited for it too, and a reading cut at the server's bound is exactly the
+ * slow end the bound must make room for. No reading, no figure (PRACTICE_CLARIFY_NO_TIMES).
+ */
+export function clarifySummary(lines: readonly PracticeClarifyTime[]): PracticeClarifySummary {
+  if (lines.length === 0) throw new TypeError("PRACTICE_CLARIFY_NO_TIMES");
+  const wait = latencySummary(lines.map((line) => line.ms));
+  return Object.freeze({ p50Ms: wait.p50!, p90Ms: wait.p90!, maxMs: wait.max!, none: lines.filter((line) => line.source === "NONE").length });
+}
+
+/** Today's server bound on the clarifying step (ASK_CLARIFY_DEADLINE_MS, apps/api/src/ask-clarify.ts): the proposal never goes below it. */
+const PRACTICE_CLARIFY_BOUND_FLOOR_MS = 8_000;
+
+const roundedUpTo = (ms: number, step: number): number => Math.ceil(ms / step) * step;
+
+/**
+ * The three values the owner applies together:
+ *  - usualTopMs: p90 rounded up to the next 500 ms (ASK_CLARIFY_USUAL_TOP_MS: past it, the page's longer line shows);
+ *  - serverBoundMs: the largest of the slowest reading, the usual top plus 5 s and today's 8 s, rounded up to the next 5 s (the API's
+ *    ASK_CLARIFY_DEADLINE_MS, which is also ASK_CLARIFY_MODEL_SETTINGS.timeoutMs), so the longer line has time to show before it;
+ *  - pageWaitMs: the server's bound plus 2 s (ASK_CLARIFY_PAGE_WAIT_MS: the page waits a little past the server, as today).
+ */
+export function clarifyWaitProposal(summary: Readonly<{ p90Ms: number; maxMs: number }>): Readonly<{ usualTopMs: number; serverBoundMs: number;
+  pageWaitMs: number }> {
+  if (![summary.p90Ms, summary.maxMs].every((ms) => Number.isFinite(ms) && ms >= 0)) throw new TypeError("PRACTICE_CLARIFY_TIMES_INVALID");
+  const usualTopMs = roundedUpTo(summary.p90Ms, 500);
+  const serverBoundMs = roundedUpTo(Math.max(summary.maxMs, usualTopMs + 5_000, PRACTICE_CLARIFY_BOUND_FLOOR_MS), 5_000);
+  return Object.freeze({ usualTopMs, serverBoundMs, pageWaitMs: serverBoundMs + 2_000 });
 }

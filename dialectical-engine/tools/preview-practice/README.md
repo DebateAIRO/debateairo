@@ -263,6 +263,33 @@ node_modules/.bin/tsx tools/preview-practice/practice.ts openings --dry --arms S
 echo "exit: $?"
 ```
 
+Arm `Q` (V4 start step, plan Task 91c; named only with `--arms`, and it runs with `--dry` too): the clarifying call of step
+1's Next, timed per question, so the page's "This is taking longer than usual" line can follow a MEASURED usual time,
+never a guessed one. The plan calls it arm C, but C is the angle map's letter (it runs by default and asks all five AIs),
+so here it is Q. For each question, one reading through the API's own step (`createAskClarify` in
+`apps/api/src/ask-clarify.ts`, over its preview transport), so the call goes to the Anthropic gate exactly as the site
+sends it: Haiku with `ASK_CLARIFY_MODEL_SETTINGS`, the sealed contract, the step's one retry for an unreadable reply and
+its bound (`ASK_CLARIFY_DEADLINE_MS`), one question at a time (a call the step let go at its bound, as the site does, is
+waited for after the reading is timed, so its gate line is in the log and the next question never shares the gate with
+it). After each reading one `CLARIFY_TIME` line holds exactly
+five fields: the question's id, the time the page waited for the step's answer (`ms`), whether questions came back
+(`source` `AI`) or none (`NONE`), and NONE's code from the step itself (`DEADLINE`, `TRANSPORT`, `UNREADABLE`, ...). It
+never holds a word of the question or the reply, and never a cost. `report.json` `clarify` gives the readings' p50, p90
+and max (every reading, a NONE one included: the page waited for it too), the NONE count and codes, and the three values
+they propose together (`proposal`): `usualTopMs` (p90 rounded up to the next 500 ms, for `ASK_CLARIFY_USUAL_TOP_MS`),
+`serverBoundMs` (the slowest reading, the usual top plus 5 s, or 8 s, whichever is largest, rounded up to the next 5 s, for
+`ASK_CLARIFY_DEADLINE_MS`) and `pageWaitMs` (the server's bound plus 2 s, for `ASK_CLARIFY_PAGE_WAIT_MS`). A run of arm
+Q alone also gives its money there (`costUsd`, from the gate's own lines, every one of which is then Q's); beside other
+arms the gate lines are shared, so run Q alone. report.md has no per-arm row for Q. A reading that answered NONE reads
+NOT_PROVEN (`CLARIFY_NONE:<question>:<code>`). Nothing here changes those three values: the owner decides from the report
+(plan Task 91c). Its dry run writes made-up times and calls nothing (no gate line):
+
+```sh
+O=$(mktemp -d /tmp/openings-dry.XXXXXX)
+node_modules/.bin/tsx tools/preview-practice/practice.ts openings --dry --arms Q --out "$O/clarify"
+echo "exit: $?"
+```
+
 The owner's thinking levels (the settings' `thinking_levels` table, deploy/preview-auth-dev/v1/README.md) apply to
 openings as to every other call: arm T's positions run at the `opening` step's level, and so do all the map's calls
 (angles, lists, merge, gap, choose), since the map builds the opening; a repair inside a call runs at `slip_fix` when
@@ -911,6 +938,9 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   need more room than today's shape (the map's merge and choose steps are each counted in full on both gates): read
   the first new-shape run's admission figures (S-8, "Room the estimate needs").
 - language: under $0.05, about 5 to 20 minutes.
+- openings arm Q alone (the clarifying call, plan Task 91c): 12 small Haiku calls on the Anthropic gate only (a second
+  one only for a reply the step could not read), one question at a time, so a few minutes at most; its money is
+  `report.json` `clarify.costUsd` and the `anthropic` gate line. `--dry` calls nothing.
 - the whole-debate comparison (S-8): eight depth-1 debates over at least five days, after day 1's language mode and
   `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
   day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
@@ -1079,6 +1109,64 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
+The clarifying call's time (arm Q, plan Task 91c, inside the same sitting; 12 small Haiku calls on the Anthropic gate, one
+per question, a second one only for a reply the step could not read): run it dry first (see "The openings record"), then,
+after S-3 again, on its own, into its own folder, so `report.json` `clarify` gives its money too. Like arm S, a real run
+needs both `--gate-status-*` files. Report to the owner in the chat only, never in the repository: p50, p90, max, the NONE
+count and `clarify.proposal`'s three values.
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts openings --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --arms Q --out "$P/clarify-timing"
+echo "exit: $?"
+```
+
+The Free month and the end-of-debate step (V4 start step, plan Task 91b Step 4; it spends real money from the test
+budget, so only within the sitting the owner said yes to): three practice debates that start the way a person's does on
+the new pages, all into ONE folder, `$P/start-month`. Each one (practice-start-step.ts): the step before Start on the
+real gates (the lists, the merge, a late merge if a list came after it, and one combine of the menu's first two paths,
+each call charged to the practice person as on the site); Start with the menu's top paths in the AIs' own words
+("Just answer it": How wide = the number given), with the check of Next and its hand-over, as POST /v1/asks gives them;
+the debate; then each dig (`--digs`): the debate's "+ N more to explore" first, else one path's code-found suggestions,
+at most as many picks as paths, each its own path, joined to the investigation as the site does, and settled. The
+practice asks without billing, so it asks as `free` or `premium`; Plus is measured as `premium` with the Plus row's sizes.
+
+First the shape file, outside the repository (never committed): the export's own debateShapePolicy row of its newest
+version (so Free is the release's own lean row, never the start values), the start step's start values added, and
+`plans.premium` given that row's Plus sizes. The line prints nothing (the file is its only output); it refuses an
+export without that row and never writes over an existing file:
+
+```sh
+P="$P" node_modules/.bin/tsx -e 'import("./tools/preview-practice/practice-start-step.ts").then((m) => m.writePracticeStartShapeFile(`${process.env.P}/register-export.json`, `${process.env.P}/start-step-shape.json`))'
+```
+
+Then, before EACH run, S-3 on the server and the two status files down again. The Romanian Free question, 3 paths, one
+dig:
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --register-next --shape-policy "$P/start-step-shape.json" --question ro --start-step free:3 --digs 1 --out "$P/start-month"
+echo "exit: $?"
+```
+
+Then the same with `--question en` (together the Free month: 2 questions at 3 paths and 2 digs), then the same with
+`--question ro --start-step premium:5 --digs 0` (one Plus Quick question at 5 paths). On the hosted preview the debate
+also needs `--hosted-billing '<the same JSON the plan will get>'` beside `--register-next`, as above (without it the
+practice refuses `PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED` before anything is spent).
+
+The figures are in `$P/start-month/start-month.jsonl` only, which every run appends to: one `START_MONTH_RUN` line (plan,
+paths, digs, question), then one `START_MONTH` line per phase, each with its `calls` (the ledger rows of its model
+calls) and `costNanoUsd` (their money, plus the search fees the phase paid): `PRE_START` (the calls before Start; no run
+yet, `runId` null), `DEBATE`, `END_OF_DEBATE` (each path's answer so far, the main answer and its check, the story) and
+one `DIG` line per dig. The progress log says only how many lines went where and how far apart the debate's paths filled
+in (seconds, never money); report.json and report.md carry none of it (each run writes its own report.json over the
+last one; the month file keeps all three). Report to the owner in the chat only, never in the repository: the Free month
+total against the Free credit, the 5-path Plus question's cost, and the end-of-debate step per debate against the owner's
+29 Oct line. The Free month total also holds one clarifying call per question (step 1's Next, counted in the person's
+quota like the calls before Start), which these debates do not make: add, for each of the two Free questions, arm Q's
+cost per reading from the same sitting (`clarify.costUsd` divided by `clarify.readings` in
+`$P/clarify-timing/report.json`), and say that you added it.
+
 Optional flags:
 
 - formats: `--samples N` (1 to 10, default 2), `--gap-ms MS` (between one model's calls, default 1000; with
@@ -1091,8 +1179,8 @@ Optional flags:
 - openings: `--dry` (scripted answers, nothing spent), `--questions ro-euro,en-rent-caps,...` (only the fixed ids:
   ro-euro, ro-autobuze, ro-final-viata, ro-ciuperci, ro-strainatate, ro-hpv, en-nuclear, en-four-day-week,
   en-phones-school, en-retirement-age, en-social-media-age, en-rent-caps; default all twelve), `--arms T,A,B,C`
-  (default all four; they always run in the order T, A, B, C, C2, C2N, S; C2, C2N and S run only when named, C2 and
-  C2N never with `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
+  (default all four; they always run in the order T, A, B, C, C2, C2N, S, Q; C2, C2N, S and Q run only when named, C2
+  and C2N never with `--dry`, see "The openings record"), `--busy-wait-minutes N` and `--max-in-flight N` as in
   formats (with `--dry` a busy AI sits out at once unless `--busy-wait-minutes` is given; with arm S `--max-in-flight`
   starts at 8). The questions themselves
   are fixed in the code and never read from the command line; a refused value is never repeated in the output.
@@ -1109,7 +1197,11 @@ Optional flags:
   formats, openings and report refuse it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
   debate, word for word" above), `--shape-policy FILE`, `--depth-mode fixed|adaptive`, `--scrutiny standard|deep|exhaustive`
   and `--answer-length short|standard|detailed` (see "The new debate shape"; debate only), `--line-up FILE` (see "Trying a
-  new line-up before an activation"; every mode that reads the settings). The register is copied only
+  new line-up before an activation"; every mode that reads the settings), `--start-step free:N|premium:N` (N paths: Free
+  1 to 3, premium 1 to 7, and How wide of the version must offer N) and `--digs 0|1|2` (with `--start-step` only; see
+  "The Free month and the end-of-debate step" above; debate only, refused in every other mode before anything is read,
+  naming the flag and never the value; the version must carry a debate-shape row with `startStep` and an engine row in
+  force, else `PRACTICE_START_STEP_NOT_IN_FORCE` before any AI is asked). The register is copied only
   through the register's own publication paths; an export holding a support-configuration version refuses
   (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
   `--register-next` practises a release that needs a NEW register version (new sealed prompts) before it is uploaded:
@@ -1465,6 +1557,9 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
 - `length-policy-start.json`: the owners' start values for `--length-policy`.
 - `practice-pins.ts`: `--answer-writer-model`, `--storyteller-model` (the report's `writerPins`).
+- `practice-start-step.ts`: `--start-step` and `--digs` (V4 Task 91b): the step before Start, Start with the menu's top
+  paths, the digs, Step 4's shape file, and the month's lines in `start-month.jsonl` (their builder is in
+  `practice-verdict.ts`). Test: `tests/unit/practice-start-step-flag.test.ts`.
 - `practice-story-length.ts`, `practice-story-rounds.ts`: the story tables (`storyLengthByField`, `storyJsonBreaks`) and
   the engine and story-round blocks (`ask.engine`, `storyRounds`, `storyBackups`, `storyReadyRate`).
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
