@@ -4,13 +4,15 @@
  * W12's (P2-I16) O3 (a legal document or an email that was never sent), and N9's O4 (NETOPIA's message about an open
  * charge could not be verified), and N14's O2_REFUND_DUE and O2_REFUND_REMINDER (a NETOPIA refund for the owner to make
  * in NETOPIA's admin, and the daily list of the open ones), and N17's M12 (a card is needed before a renewal), and
- * M10_ENDED (the owner's decision of 24 October 2026: a lost charge-back ended the plan).
+ * M10_ENDED (the owner's decision of 24 October 2026: a lost charge-back ended the plan), and 0156's three MODERATION_ notices
+ * (the owner's request of 5 November 2026: a person whose content a review took off the public page is told).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
   "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M10_ENDED", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
-  "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING"
+  "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
+  "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -368,6 +370,23 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     catalogue: "mail", subject: "mail.export.subject",
     paragraphs: ["mail.export.requested", "mail.export.linkLead", "mail.export.validity", "mail.export.notYou"],
     params: { requested: "date", expires: "datetime", downloadUrl: "url" }
+  }),
+  // 0156: what left the public page and when, and where the Terms are; no reason, no staff name, no text of the debate (decision 33).
+  MODERATION_DEBATE_HIDDEN: define({
+    catalogue: "mail", subject: "mail.moderation.debateSubject",
+    paragraphs: ["mail.moderation.debateHidden", "mail.moderation.kept", "mail.M1.termsCurrent", "mail.moderation.mistake"],
+    params: { happened: "date", termsUrl: "url" }
+  }),
+  MODERATION_CONTRIBUTION_REMOVED: define({
+    catalogue: "mail", subject: "mail.moderation.contributionSubject",
+    paragraphs: ["mail.moderation.contributionRemoved", "mail.moderation.kept", "mail.M1.termsCurrent", "mail.moderation.mistake"],
+    params: { happened: "date", termsUrl: "url" }
+  }),
+  // A report is its writer's request on someone else's debate, so nothing says it stays theirs.
+  MODERATION_REPORT_REMOVED: define({
+    catalogue: "mail", subject: "mail.moderation.reportSubject",
+    paragraphs: ["mail.moderation.reportRemoved", "mail.M1.termsCurrent", "mail.moderation.mistake"],
+    params: { happened: "date", termsUrl: "url" }
   }),
   THREAT_REPORT_WAITING: define({
     catalogue: "owner", subject: "owner.threatReport.subject",
