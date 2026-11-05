@@ -1046,6 +1046,7 @@ apps/ui/lib/v4/useReportVersions.ts
 apps/ui/lib/v4/useReveal.ts
 apps/ui/lib/v4/useSentDigs.ts
 apps/ui/lib/v4/useSheetFocusReturn.ts
+apps/ui/lib/v4/useStartPaths.ts
 apps/ui/lib/v4/useV4Ask.tsx
 apps/ui/lib/v4/useVisitMemory.ts
 apps/ui/lib/v4/useWaitPolling.ts
