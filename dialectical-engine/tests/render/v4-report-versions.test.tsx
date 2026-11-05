@@ -315,8 +315,8 @@ describe("the report page's versions", () => {
   });
 
   it("question 4 A (owner, 5 Nov): a start on another day names it in the long form with the year, the clock in 24 hours", async () => {
-    // The long form for start times waits on an owner question (the map's report line still says "4 Nov, 14:02"); this
-    // pins what the report page says until the answer, and changes with the map's whenText when it comes.
+    // The owner's third round (5 Nov afternoon): the long form everywhere, the same as the map's report line, the waiting
+    // card and the list of your questions (one helper, lib/v4/stateWords.ts whenText; v4-map-report-answers pins the map).
     // Pressed just before midnight, read just after it (local time): another day, still well inside the 15 minutes.
     const closed = new Date(2026, 10, 4, 23, 55).toISOString();
     vi.setSystemTime(new Date(2026, 10, 5, 0, 5));

@@ -23,6 +23,7 @@ import {
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { waitForDigs } from "@/lib/v4/digUndo";
+import { whenText } from "@/lib/v4/stateWords";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
@@ -68,9 +69,9 @@ import {
  *    Until the server's run read names that level (reading_level), the links to this debate's map and its digs' maps, and
  *    the address moves, still carry ?level=, so the map and its report keep one level both ways; they drop it in the same
  *    change that reads reading_level. "Ask a new question" carries none: a new question picks its own level.
- *  - 4 A: the version list in the long form with the year, clocks in 24 hours. The start of writing on another day in the
- *    long form too ("Started 4 November 2026, 14:02") waits on an owner question (the map's report line still says
- *    "4 Nov, 14:02"; whichever form stands, lib/v4/stateWords.ts whenText follows in the same change).
+ *  - 4 A: the version list in the long form with the year, clocks in 24 hours. The third round (5 Nov afternoon): the start
+ *    of writing on another day in the long form too ("Started 4 November 2026, 14:02"), through the same helper as the
+ *    map's report line, the waiting card and the list of your questions (lib/v4/stateWords.ts whenText).
  */
 
 type Props = Readonly<{
@@ -1022,25 +1023,16 @@ const finishedVersion = (version: InvestigationReportVersion | null | undefined)
 /** When a version is dated in the list: when it was written (or failed). */
 const versionDate = (version: Exclude<InvestigationReportVersion, { state: "WRITING" }>): string => version.written_at;
 
-/** journey-f15 / f16: the one V4 clock form, a 24-hour time (the hour cycle of lib/v4/clock.ts CLOCK_24H). */
-const CLOCK: Intl.DateTimeFormatOptions = { timeStyle: "short", hourCycle: "h23" };
 /** Question 4 A (owner, 5 Nov): a report's dates in the long form with the year ("4 November 2026", report-f13). */
 const LONG_DATE: Intl.DateTimeFormatOptions = { dateStyle: "long" };
 
-/** English page languages ("en", "en-GB", "en-US"): the ones whose date and clock the owner's record joins with ", ". */
-const ENGLISH = /^en(?:-|$)/iu;
-
 /**
  * report-f7: a clock time ("Started 14:02"); on another day the long date with the year before it ("Started 4 November
- * 2026, 14:02", the form question 4 A gives every date; still an open owner question for start times, see the header
- * note). English joins the two the way the owner's record writes them ("29 October 2026, 14:30"); every other language
- * lets its own date format join them (German "4. November 2026 um 14:02", Japanese "2026年11月4日 14:02"). Nothing ticks.
+ * 2026, 14:02", the owner's third round, 5 Nov). The one shared helper (lib/v4/stateWords.ts whenText), so the report
+ * page, the map's report line, the waiting card and the list of your questions always agree. Nothing ticks.
  */
 function clockTime(locale: string, at: number): string {
-  const sameDay = new Date(at).toDateString() === new Date().toDateString();
-  const time = formatDate(locale, at, CLOCK);
-  if (sameDay) return time;
-  return ENGLISH.test(locale) ? `${formatDate(locale, at, LONG_DATE)}, ${time}` : formatDate(locale, at, { ...LONG_DATE, ...CLOCK });
+  return whenText(at, locale) ?? "";
 }
 
 type PressKind = "write" | "reopen";

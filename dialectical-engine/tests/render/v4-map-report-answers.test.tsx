@@ -58,6 +58,7 @@ function Probe(props: Readonly<{ input: Partial<MapReportInput> }>) {
   return (
     <>
       <header className="probeHeader">{report.headerItem(false)}</header>
+      <p data-probe-rail="">{report.rail?.text ?? ""}</p>
       {report.waitCard}
       {/* The phone's pinned bar job button (V4BottomStack's), for focus handed on to it. */}
       <button ref={barJobRef as RefObject<HTMLButtonElement | null>} type="button" data-probe-bar="">Bar</button>
@@ -127,6 +128,18 @@ describe("question 23 A: the report's wait line on the map", () => {
     await mount(<Probe input={{ waitingDigQuestion: "Mostly renewables", isDig: true }} />);
     expect(flat(waitLine())).toBe(CATALOG["v4.investigation.waitingDigs.one"]);
     expect(waitLine()!.querySelector("[data-ai-generated]")).toBeNull();
+  });
+});
+
+describe("the owner's third round (5 Nov): a report started on an earlier day, on the map", () => {
+  it("the map's report line and the waiting card name the day in the long form with the year, as the report page does", async () => {
+    // Asked for just before midnight, read just after it (local time): another day. No digs, so it started when it closed.
+    const closed = new Date(2026, 10, 4, 23, 55).toISOString();
+    vi.setSystemTime(new Date(2026, 10, 5, 0, 5));
+    reads.load = async () => investigation("CLOSED", [{ report_version: 1, closed_at: closed, state: "WRITING", waiting_for_digs: 0 }], 0);
+    await mount(<Probe input={{}} />);
+    expect(flat(host!.querySelector("[data-wait-started]"))).toBe("Started 4 November 2026, 23:55");
+    expect(flat(host!.querySelector("[data-probe-rail]"))).toBe(`${CATALOG["v4.state.BEING_WRITTEN"]} · Started 4 November 2026, 23:55`);
   });
 });
 

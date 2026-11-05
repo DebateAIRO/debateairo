@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { shelfStateText } from "../../apps/ui/components/v4/V4MapShelf.js";
 import { stateWordText } from "../../apps/ui/lib/v4/stateWords.js";
 
@@ -29,6 +29,19 @@ describe("the shelf's state words are the waiting card's (WHOLE-12)", () => {
     const waiting = shelfStateText("WAITING", null, CATALOG, "en");
     expect(waiting).toBe(stateWordText({ kind: "WAITING", startsAfter: null }, CATALOG, "en"));
     expect(waiting).toBe(CATALOG["v4.state.WAITING.noTime"]);
+  });
+
+  it("third round (owner, 5 Nov): a question started on an earlier day names it in the long form with the year; today, the clock alone", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date(2026, 10, 5, 9, 0));
+      const earlier = new Date(2026, 10, 4, 14, 2).toISOString();
+      expect(shelfStateText("WORKING", earlier, CATALOG, "en")).toBe(`${CATALOG["v4.state.LOOKING"]} · Started 4 November 2026, 14:02`);
+      const today = new Date(2026, 10, 5, 8, 15).toISOString();
+      expect(shelfStateText("WORKING", today, CATALOG, "en")).toBe(`${CATALOG["v4.state.LOOKING"]} · Started 08:15`);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ready and didn't finish: the shared words", () => {

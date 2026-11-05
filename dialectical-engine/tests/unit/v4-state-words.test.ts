@@ -18,6 +18,7 @@ import {
 } from "../../apps/ui/lib/v4/stateWords.js";
 import { resetText, startsWaitLine, usedUpLine } from "../../apps/ui/lib/v4/money.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
+import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 
 /*
  * Owner's screen review, 3 Nov 2026 (journey-f22): one short list of state words for every wait, card, rail, "Your
@@ -94,8 +95,9 @@ describe("the shared state words (journey-f22)", () => {
       .toBe(`Waiting · starts after ${clock("2026-11-04T10:30:00.000Z")}`);
     expect(stateWordText({ kind: "WAITING", startsAfter: null }, CATALOG, "en", NOW)).toBe("Waiting");
     const later = stateWordText({ kind: "WAITING", startsAfter: "2026-11-06T12:00:00.000Z" }, CATALOG, "en", NOW);
-    // Day first on English pages (owner's answer to question 5, 5 Nov 2026): "6 Nov, 14:00".
-    expect(later).toMatch(/^Waiting · starts after [5-7] Nov, \d{2}:\d{2}$/u);
+    // Another day: the long form with the year, day first on English pages (owner's answers 4 A and 5 B, 5 Nov 2026, and
+    // the third round's "long form everywhere"): "6 November 2026, 14:00".
+    expect(later).toMatch(/^Waiting · starts after [5-7] November 2026, \d{2}:\d{2}$/u);
     expect(stateWordText({ kind: "SHORT_BREAK", continuesAbout: null }, CATALOG, "en", NOW)).toBe("Taking a short break");
     expect(stateWordText({ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, CATALOG, "en", NOW))
       .toBe(`Paused until ${dayText("2026-12-01T12:00:00.000Z", "en")!}`);
@@ -116,6 +118,22 @@ describe("the shared state words (journey-f22)", () => {
     expect(startsWaitLine(room, "en")?.values).toEqual({ time });
     // A week's reset names its date with the same clock.
     expect(resetText(at, "PERSON_WEEK", "en")).toContain(time);
+  });
+
+  it("third round (owner, 5 Nov): a start on an earlier day reads the long form with the year; a same-day start the clock alone", () => {
+    // Local times, so the day is the same wherever the test runs. One helper for the report page, the map's report line,
+    // the waiting card and the list of your questions: "Started 4 November 2026, 14:02", or "Started 14:02" today.
+    const earlier = new Date(2026, 10, 4, 14, 2).getTime();
+    const now = new Date(2026, 10, 5, 9, 0).getTime();
+    expect(whenText(earlier, "en", now)).toBe("4 November 2026, 14:02");
+    expect(whenText(new Date(earlier).toISOString(), "en-US", now)).toBe("4 November 2026, 14:02");
+    expect(whenText(new Date(2026, 10, 5, 8, 15).getTime(), "en", now)).toBe("08:15");
+    // Other languages join the date and the clock their own way (German "4. November 2026 um 14:02"), never with an
+    // English comma; the clock stays on 24 hours.
+    for (const locale of ["de", "ja", "ro"]) {
+      const joined = formatDate(locale, earlier, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" });
+      expect(whenText(earlier, locale, now), locale).toBe(joined);
+    }
   });
 
   it("clock and day texts are the page's language, and unreadable times give null", () => {

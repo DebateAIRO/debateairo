@@ -112,8 +112,9 @@ describe("the one waiting card", () => {
 
   it("names the day of a start that was not today; no start time, no line", async () => {
     await mount({ startedAt: "2026-11-02T09:31:00.000Z", checkedAt: Date.parse("2026-11-04T09:40:00.000Z") });
-    // Day first on English pages (owner's answer to question 5): "Started 2 Nov, 11:31".
-    expect(host!.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started [1-3] Nov, \d{2}:\d{2}$/u);
+    // The owner's third round (5 Nov): a start on an earlier day in the long form with the year, day first on English
+    // pages (question 5 B): "Started 2 November 2026, 11:31".
+    expect(host!.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started [1-3] November 2026, \d{2}:\d{2}$/u);
     await mount({ startedAt: null });
     expect(host!.querySelector("[data-wait-started]")).toBeNull();
   });
