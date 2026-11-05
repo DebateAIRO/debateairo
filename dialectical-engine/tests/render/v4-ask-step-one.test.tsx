@@ -171,7 +171,14 @@ describe("a signed-out visitor (ask-d1 D)", () => {
     expect(host!.querySelector(".v4SeedLabel")?.textContent).toBe("Your question");
     expect(host!.querySelector(".v4SeedWords")?.textContent).toBe(QUESTION);
     expect(host!.querySelectorAll(".v4SeedOpen")).toHaveLength(3);
-    expect([...host!.querySelectorAll(".v4SeedOpen")].every((card) => card.textContent === "★?")).toBe(true);
+    // The owner's answers of 5 Nov (question 22 A and its follow-up): each card is journey-f2's hatched "Open" ground, and
+    // keeps the star, the "?" and the word "Open" (the map's own word for it).
+    expect([...host!.querySelectorAll(".v4SeedOpen")].every((card) => card.textContent === `★?${CATALOG["v4.ground.open"]!}`)).toBe(true);
+    expect(host!.querySelectorAll(".v4SeedOpen .v4GroundWord")).toHaveLength(3);
+    const askCss = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-ask.css"), "utf8");
+    const seedRule = /\.v4SeedOpen \{([^}]*)\}/u.exec(askCss)![1]!;
+    expect(seedRule).not.toMatch(/dashed/u);
+    expect(seedRule).toMatch(/var\(--v4-look-hatch\)/u);
     expect(host!.querySelector(".v4Seed figcaption")?.textContent).toBe("Your map starts here. You'll choose which of these the AIs look into.");
     expect(host!.querySelector(".v4SeedPicture")?.getAttribute("aria-hidden")).toBe("true");
     await type("Should my town close its centre to cars?");

@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import { act, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
+import { V4FailedScreen } from "../../apps/ui/components/v4/V4FailedScreen.js";
+import { V4PausedScreen } from "../../apps/ui/components/v4/V4PausedScreen.js";
 import type { RunProjection } from "../../packages/contract/src/index.js";
 import { advance, CATALOG, harness, mountMap, page, resetHarness, settle, unmountMap } from "./v4-debate-harness.js";
 
@@ -101,12 +104,59 @@ describe("Open in the classic view while the question waits (wait-f23)", () => {
     expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
   });
 
-  it("the failed page carries it once too: the header leaves it out", async () => {
+  it("the failed page carries it once too: the header leaves it out (until the page's wiring for question 12 B lands)", async () => {
     const runId = crypto.randomUUID();
     harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
     await mountMap(1600, runId);
     expect(page().textContent).toContain(CATALOG["v4.debate.failedTitle"]);
     expect(seen.headerLinks.at(-1)).toBeNull();
     expect(classicLinks()).toHaveLength(1);
+    expect(page().querySelector(".v4DebFailed")!.contains(classicLinks()[0]!)).toBe(true);
+  });
+
+  // The owner's answers of 5 Nov, question 12 B (journey-f19): "Open in the classic view" in the account menu only. The
+  // screens draw it only when the page hands it to them; the page's own wiring (V4DebateClient, the start-step's file) still
+  // hands it to the screen and keeps it out of the header. This is the state once that wiring lands. It is marked as
+  // failing until then: when it starts to pass, turn it into a plain `it` and drop the test above.
+  it.fails("question 12 B, once the page's wiring lands: the failed screen's header carries it and the screen does not", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
+    await mountMap(1600, runId);
+    expect(page().textContent).toContain(CATALOG["v4.debate.failedTitle"]);
+    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(classicLinks()).toEqual([]);
+  });
+});
+
+describe("question 12 B on the screens themselves: the classic link only when the page hands one", () => {
+  const HOME: Record<string, string> = {};
+  async function draw(node: ReactNode): Promise<HTMLElement> {
+    const box = document.body.appendChild(document.createElement("div"));
+    const root = createRoot(box);
+    await act(async () => root.render(node));
+    const html = box.cloneNode(true) as HTMLElement;
+    await act(async () => root.unmount());
+    box.remove();
+    return html;
+  }
+  const classicIn = (box: HTMLElement): Element[] =>
+    [...box.querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
+
+  it("the failed screen and the paused screen draw none without one, and one when handed one", async () => {
+    const runId = crypto.randomUUID();
+    const failed = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" } as RunProjection;
+    const pausedRun = { ...running(runId), month_pause: { until: "2026-12-01T00:00:00.000Z", can_continue: false } } as RunProjection;
+    const failedScreen = (classicHref?: string) => (
+      <V4FailedScreen run={failed} askAgainHref="/v4?again=1" askHref="/v4" dig={null} catalog={CATALOG} homeCatalog={HOME}
+        {...(classicHref === undefined ? {} : { classicHref })} />
+    );
+    const pausedScreen = (classicHref?: string) => (
+      <V4PausedScreen run={pausedRun} runId={runId} reconnecting={false} catalog={CATALOG} locale="en"
+        {...(classicHref === undefined ? {} : { classicHref })} />
+    );
+    expect(classicIn(await draw(failedScreen()))).toEqual([]);
+    expect(classicIn(await draw(pausedScreen()))).toEqual([]);
+    expect(classicIn(await draw(failedScreen(`/debate/${runId}`))).map((link) => link.getAttribute("href"))).toEqual([`/debate/${runId}`]);
+    expect(classicIn(await draw(pausedScreen(`/debate/${runId}`))).map((link) => link.getAttribute("href"))).toEqual([`/debate/${runId}`]);
   });
 });

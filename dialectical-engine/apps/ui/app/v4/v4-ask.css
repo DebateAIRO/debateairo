@@ -157,9 +157,12 @@
   content: ""; position: absolute; top: 0; inset-inline: 16.6% 16.6%; height: 9px;
   border: 1px dashed var(--line-strong); border-bottom: 0; border-radius: 6px 6px 0 0; opacity: .7;
 }
+/* The owner's answers of 5 Nov (question 22 A): journey-f2's "Open" look, as on the map (v4-map-looks.css .v4GroundOPEN):
+   hatched gold paper, a solid gold edge, still faint; the star, the "?" and the word "Open" wrap at 375 px. */
 .v4SeedOpen {
-  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 52px; min-width: 0;
-  border: 1.5px dashed var(--line-strong); border-radius: var(--r-card); color: var(--text-3); opacity: .75; font-weight: 700;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 6px; min-height: 52px; min-width: 0;
+  padding: 6px; border: 1.5px solid var(--gold-border); border-radius: var(--r-card); background-color: var(--gold-bg);
+  background-image: var(--v4-look-hatch); color: var(--text-3); opacity: .75; font-weight: 700;
 }
 .v4SeedStar { color: var(--gold); }
 .v4SeedCaption { font-size: var(--t-ui); }

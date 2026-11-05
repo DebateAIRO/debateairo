@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { V4ShareChange } from "@/components/v4/V4ShareChange";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
@@ -18,6 +18,12 @@ import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
  *    above the bar (dig-f18). It never takes more than about a
  *    quarter of the screen, steps aside while the keyboard is open, and sits in the page while the cookie bar shows.
  *  - Computer: the Undo and ready notes bottom-left, then the tray, in one column.
+ * The owner's answers of 5 Nov 2026: a paused dig's "Continue on 1 December" is a greyed button in the bar before the new
+ * month (question 19 A). The pause's one sentence stays where it is, in the panel's pause block on the same screen (wait-f5:
+ * said once), and names the button; a press sends nothing, gives that sentence the 1-second highlight (brought into view
+ * only when it is off screen) and keeps focus on the button. The stack says whether it shows "Write my report"
+ * (`onReportShown`), before the browser paints, so the page's top bar drops its own on a phone meanwhile: one on screen;
+ * while the keyboard is open the stack is aside and shows none, so the top bar has it (question 18 A and its follow-up).
  */
 
 export type V4BarJob =
@@ -31,8 +37,15 @@ export type V4BarJob =
   /** dig-f31: with nothing picked, "Choose what to dig ›" takes the person to the choices instead of digging at once. */
   | Readonly<{ kind: "choose"; label: string; onChoose: () => void }>
   | Readonly<{ kind: "report"; href: string }>
-  /** wait-f2: "Paused · Continue" (after the reset) or "Paused · Continues on 1 Dec" (before it; nothing to press). */
-  | Readonly<{ kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; busy: boolean; onContinue: () => void }>
+  /**
+   * wait-f2: "Paused · Continue" (after the reset), or before it "Paused · Continue on 1 December" as a greyed button that
+   * sends nothing (question 19 A, 5 Nov). `reason` is the pause's one sentence: the bar finds it in the page's pause block
+   * (the panel's) and points there; only where no pause block on the page says it is it shown above the bar.
+   */
+  | Readonly<{
+    kind: "paused"; label: string; continueLabel: string | null; untilLabel: string | null; reason?: string | null; busy: boolean;
+    onContinue: () => void;
+  }>
   /**
    * V4 screen review (3 Nov 2026), report-d2: while the report waits or is written, the bar says so where the dig button
    * lives ("Your report · Being written", with the working dot); digging rests meanwhile.
@@ -55,6 +68,47 @@ function useStackRoom(ref: RefObject<HTMLDivElement | null>, phone: boolean): vo
       root.style.removeProperty("--v4-stack-room");
     };
   }, [ref, phone]);
+}
+
+/** useLayoutEffect in the browser, useEffect on the server (which has no layout), as V4DigTray.tsx does. */
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/**
+ * Question 19 A (wait-f5): the page's own pause block that says `reason` (V4MonthPause's sentence line, in the panel), by its
+ * id, or null when none on the page says it. Looked up before the browser paints, so no frame says the pause twice.
+ */
+function usePauseLineOnPage(reason: string | null): string | null {
+  const [id, setId] = useState<string | null>(null);
+  useBrowserLayoutEffect(() => {
+    const line = reason === null ? undefined
+      : [...document.querySelectorAll<HTMLElement>(".v4Pause .v4PauseLine[id]")].find((element) => element.textContent === reason);
+    const found = line?.id ?? null;
+    setId((previous) => (previous === found ? previous : found));
+  });
+  return id;
+}
+
+/** The shared 1-second highlight (v4-base.css .v4Highlight) on `line` again, without re-mounting it. */
+function replayHighlight(line: HTMLElement): void {
+  line.classList.remove("v4Highlight");
+  // Reading the layout restarts the animation when the class goes back on.
+  void line.offsetWidth;
+  line.classList.add("v4Highlight");
+  line.addEventListener("animationend", () => line.classList.remove("v4Highlight"), { once: true });
+}
+
+/**
+ * Question 19 A: an early press on the bar's greyed Continue brings the pause sentence into view only when it is off screen
+ * (above the phone's pinned top, or under this stack), gives it the highlight, and leaves focus on the button.
+ */
+function showPauseLine(line: HTMLElement, stack: HTMLElement | null): void {
+  const box = line.getBoundingClientRect();
+  const pinned = document.querySelector<HTMLElement>(".v4WhereBar")?.getBoundingClientRect().bottom ?? 0;
+  const stackTop = stack?.getBoundingClientRect().top ?? 0;
+  const bottom = stackTop > 0 ? Math.min(window.innerHeight, stackTop) : window.innerHeight;
+  const seen = box.top >= Math.max(0, pinned) && box.bottom <= bottom;
+  if (!seen && typeof line.scrollIntoView === "function") line.scrollIntoView({ block: "center" });
+  replayHighlight(line);
 }
 
 const TYPING = "textarea, input:not([type]), input[type=text], input[type=search], input[type=email], input[type=url], [contenteditable=true]";
@@ -124,6 +178,12 @@ export function V4BottomStack(props: Readonly<{
   onWriteReport?: () => void;
   /** report-d1: the report's strip, grown up from the bar while it is open (the bar's report button steps back). */
   strip?: ReactNode;
+  /**
+   * Question 18 A (the owner's answers of 5 Nov): told whether this stack shows "Write my report" now (the bar's own button,
+   * the slim "Good time" line, or the strip grown from the bar; never on a computer), and false once it goes. The page hands
+   * it to useMapReport's `bottomShowsReport`, so a phone's top bar drops its own meanwhile. Absent: nobody is told.
+   */
+  onReportShown?: (shown: boolean) => void;
   catalog: MessageCatalog;
 }>) {
   const { phone, catalog } = props;
@@ -140,6 +200,25 @@ export function V4BottomStack(props: Readonly<{
   // W2L-5: pressing the greyed dig button gives its visible reason, right above the bar, the shared highlight again.
   const [whyReplay, setWhyReplay] = useState(0);
 
+  const hasStrip = props.strip !== null && props.strip !== undefined && props.strip !== false;
+  const showGoodTime = props.goodTime && !goodTimeClosed && !hasStrip;
+  // Question 18 A and its follow-up: "Write my report" is at the bottom while the bar carries it, the slim line offers it, or
+  // its strip is open, and the stack is not aside for the keyboard (then the top bar shows it: "only when the bottom bar
+  // does not").
+  const reportShown = phone && !aside && (hasStrip || job.kind === "report" || showGoodTime);
+  const reportShownRef = useRef(props.onReportShown);
+  useBrowserLayoutEffect(() => {
+    reportShownRef.current = props.onReportShown;
+  });
+  // Before the browser paints, so the page hides its top button in the same frame (no frame with two, nothing moves).
+  useBrowserLayoutEffect(() => {
+    reportShownRef.current?.(reportShown);
+  }, [reportShown]);
+  useEffect(() => () => reportShownRef.current?.(false), []);
+  // Question 19 A: the paused dig's sentence, said once, in the page's pause block; the bar points to it.
+  const pauseReason = job.kind === "paused" && job.continueLabel === null && typeof job.reason === "string" ? job.reason : null;
+  const pauseLineId = usePauseLineOnPage(phone ? pauseReason : null);
+
   if (!phone) {
     return (
       <div ref={ref} className="v4Stack v4StackWide">
@@ -149,8 +228,11 @@ export function V4BottomStack(props: Readonly<{
     );
   }
 
-  const hasStrip = props.strip !== null && props.strip !== undefined && props.strip !== false;
-  const showGoodTime = props.goodTime && !goodTimeClosed && !hasStrip;
+  // The greyed button's reason, right above the bar: a dig that waits (journey-f14), or a paused dig only where no pause block
+  // on the page says it (question 19 A: the pause is said once, wait-f5).
+  const why = job.kind === "dig" && job.waiting === true && job.reason !== undefined
+    ? job.reason
+    : pauseLineId === null ? pauseReason : null;
   const writeReport = (className: string, ref?: RefObject<HTMLElement | null>): ReactNode => (props.onWriteReport === undefined ? (
     <Link ref={ref as RefObject<HTMLAnchorElement | null> | undefined} className={className} href={job.kind === "report" ? job.href : props.reportHref}>
       {t(catalog, "v4.rail.writeReport")}
@@ -192,10 +274,10 @@ export function V4BottomStack(props: Readonly<{
       {props.pinned ?? null}
       {props.status ?? null}
       {/* journey-f14 (the wave-2 checks, 4 Nov): the greyed button's reason is a visible line right above it, never only
-          for screen readers. */}
-      {job.kind === "dig" && job.waiting === true && job.reason !== undefined ? (
+          for screen readers (a dig that waits; a paused dig only where the page's pause block does not say it). */}
+      {why !== null ? (
         <p key={whyReplay} id={reasonId} className={`v4PanelHint v4Muted v4DebPhoneWhy${whyReplay > 0 ? " v4Highlight" : ""}`} data-bar-why="">
-          {job.reason}
+          {why}
         </p>
       ) : null}
       <div className="v4DebPhoneBar">
@@ -224,24 +306,35 @@ export function V4BottomStack(props: Readonly<{
         {job.kind === "paused" ? (
           <p className="v4DebPhonePaused" role="status">
             <span className="v4DebPhonePausedWord">{job.label}</span>
-            {job.continueLabel !== null ? (
+            {job.continueLabel !== null || job.untilLabel !== null ? (
               <>
                 {" · "}
+                {/* Question 19 A: one button in one place, greyed "Continue on 1 December" before the reset (a press sends
+                    nothing and highlights the pause sentence where it is said, focus stays), the live Continue after it. */}
                 <button
                   ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
                   type="button"
-                  className="v4Btn v4BtnPrimary v4DebPhoneDig"
+                  className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.continueLabel === null ? " v4DigWaiting" : ""}`}
                   // W2L-4: it keeps its focus while the press is on its way (never natively disabled); a press then does nothing.
-                  aria-disabled={job.busy ? "true" : undefined}
-                  aria-busy={job.busy ? "true" : undefined}
-                  onClick={() => { if (!job.busy) job.onContinue(); }}
+                  aria-disabled={job.continueLabel === null || job.busy ? "true" : undefined}
+                  aria-busy={job.continueLabel !== null && job.busy ? "true" : undefined}
+                  aria-describedby={job.continueLabel !== null ? undefined : pauseLineId ?? (why !== null ? reasonId : undefined)}
+                  onClick={() => {
+                    if (job.continueLabel !== null) {
+                      if (!job.busy) job.onContinue();
+                      return;
+                    }
+                    const line = pauseLineId === null ? null : document.getElementById(pauseLineId);
+                    if (line === null) setWhyReplay((count) => count + 1);
+                    else showPauseLine(line, ref.current);
+                  }}
                   onFocus={pausedHandOff.onFocus}
                   onBlur={pausedHandOff.onBlur}
                 >
-                  {job.continueLabel}
+                  {job.continueLabel ?? job.untilLabel}
                 </button>
               </>
-            ) : job.untilLabel !== null ? <span className="v4Muted">{` · ${job.untilLabel}`}</span> : null}
+            ) : null}
           </p>
         ) : null}
         {job.kind === "choose" ? (

@@ -348,7 +348,7 @@ describe("the report page's versions", () => {
     }
   });
 
-  it("f7: while a dig runs, ONLY the line that names it; with several, the line that says how many", async () => {
+  it("f7: while a dig runs, ONLY the line that names it; with several, the line with no number (the owner's 5 Nov answer 23 A)", async () => {
     const runId = crypto.randomUUID();
     const child = crypto.randomUUID();
     harness.records = { parent: null, children: [{ parent_run_id: runId, child_run_id: child, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-30T10:00:00.000Z" }] };
@@ -364,7 +364,7 @@ describe("the report page's versions", () => {
     host?.remove();
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
     const several = versionSection(await mountReport(runId))!;
-    expect(text(several.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the 2 digs in progress finish.");
+    expect(text(several.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the digs in progress finish.");
   });
 
   it("f8: after 15 minutes it says it is taking longer and keeps checking; Check again, the tab coming back and the network returning read at once", async () => {
@@ -949,7 +949,7 @@ describe("the report's digs (review F6, F7)", () => {
     const load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the 2 digs in progress finish.");
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the digs in progress finish.");
     // The first dig finishes; the report now waits only for the second one's rewrite.
     now.set(first, { state: "DONE", rewrite: null });
     load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 1)]));

@@ -214,9 +214,10 @@ describe("the borrowed notice in the usage area", () => {
 });
 
 describe("a debate paused at the month wall", () => {
-  // Owner review 3 Nov (wait-f5, map-f31, public-f17): the pause is said once, with a still mark; before the reset nothing
-  // looks pressable ("Continues on …" is a plain label); after it, Continue.
-  it("says it once, with a still mark and no Continue button before the reset", async () => {
+  // Owner review 3 Nov (wait-f5, public-f17): the pause is said once, with a still mark. The owner's answers of 5 Nov
+  // (question 19 A): before the reset a greyed "Continue on …" stays where Continue will be (public-d4 A's words), with the
+  // pause's sentence as the visible line that says why (journey-f14); after it, Continue.
+  it("says it once, with a still mark and a greyed \"Continue on …\" before the reset that sends nothing", async () => {
     const runId = crypto.randomUUID();
     harness.run = paused(runId, false);
     await mountMap(1600, runId);
@@ -225,12 +226,44 @@ describe("a debate paused at the month wall", () => {
     const day = date;
     expect(text()).toContain(word("v4.money.paused", { date }));
     expect(text()).not.toContain(word("v4.debate.state.PAUSED_MONTH", { date }));
-    expect(text()).toContain(word("v4.pause.continuesOn", { date: day }));
     expect(text()).toContain(CATALOG["v4.money.continueNote"]);
     expect(text()).not.toContain(CATALOG["v4.debate.usually"]);
     expect(buttonsNamed(CATALOG["v4.money.continue"]!)).toEqual([]);
     expect(page().querySelector(".v4DebPulse")).toBeNull();
     expect(page().querySelector(".v4PauseDot")).not.toBeNull();
+    // The greyed button, in the place Continue takes: focusable (never natively disabled), and named by the visible reason.
+    const early = buttonNamed(word("v4.pause.continuesOn", { date: day }));
+    expect(early.closest(".v4Pause")).not.toBeNull();
+    expect(early.disabled).toBe(false);
+    expect(early.getAttribute("aria-disabled")).toBe("true");
+    expect(early.classList.contains("v4DigWaiting")).toBe(true);
+    const reason = document.getElementById(early.getAttribute("aria-describedby")!)!;
+    expect(reason.textContent).toBe(word("v4.money.paused", { date }));
+    expect(reason.classList.contains("v4Highlight")).toBe(false);
+    // Pressing it early sends nothing and adds no sentence: the reason line gets the 1-second highlight, focus stays.
+    const before = text();
+    early.focus();
+    await click(early);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(text()).toBe(before);
+    expect(document.getElementById(early.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(document.activeElement).toBe(early);
+    // ask-f6: the classic view once, on this card, while the page hands it here (the owner's 5 Nov answer 12 B moves it to
+    // the account menu with the page's own wiring, the start-step's V4DebateClient).
+    const card = page().querySelector(".v4DebPausedCard");
+    expect(card).not.toBeNull();
+    const classic = [...page().querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
+    expect(classic).toHaveLength(1);
+    expect(card!.contains(classic[0]!)).toBe(true);
+  });
+
+  it("on a phone too, the pause is said once (wait-f5)", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = paused(runId, false);
+    await mountMap(375, runId);
+    const sentence = word("v4.money.paused", { date: formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" }) });
+    expect(page().querySelector(".v4DebPausedCard")).not.toBeNull();
+    expect(text().split(sentence).length - 1).toBe(1);
   });
 
   it("once the month has reset, Continue resumes it", async () => {
@@ -282,10 +315,19 @@ describe("a debate paused at the month wall", () => {
     harness.run = paused(runId, false);
     await mountMap(1600, runId);
     expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
+    // The owner's answers of 5 Nov (question 19 A): the greyed button is the one that becomes the live Continue on the day,
+    // so focus on it is never lost.
+    const early = page().querySelector<HTMLButtonElement>(".v4Pause button")!;
+    early.focus();
     harness.run = paused(runId, true);
     await advance(5_000);
     expect(text()).toContain(CATALOG["v4.money.pausedReady"]);
     expect(page().querySelector(".v4Pause.v4Highlight")).not.toBeNull();
+    const live = buttonNamed(CATALOG["v4.money.continue"]!);
+    expect(live).toBe(early);
+    expect(document.activeElement).toBe(live);
+    expect(live.getAttribute("aria-disabled")).toBeNull();
+    expect(live.classList.contains("v4DigWaiting")).toBe(false);
     await advance(1_000);
     expect(page().querySelector(".v4Pause.v4Highlight")).toBeNull();
   });

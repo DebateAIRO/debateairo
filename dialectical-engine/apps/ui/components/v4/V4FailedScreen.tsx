@@ -33,7 +33,12 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
   askAgainHref: string;
   /** The empty ask step. */
   askHref: string;
-  classicHref: string;
+  /**
+   * "Open in the classic view", small, under "Ask a new question", only when the page hands it here; absent or null: none.
+   * The owner's answers of 5 Nov (question 12 B, journey-f19) put it in the account menu only: the page stops handing it
+   * here when its header carries it (V4DebateClient), so the failed screen is never left without it in between.
+   */
+  classicHref?: string | null;
   /** This debate is a dig: the map it was dug from (null: not known), else null for a first debate. */
   dig: Readonly<{ backHref: string | null }> | null;
   /**
@@ -84,7 +89,7 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
         <Link className={dig !== null && dig.backHref === null ? "v4Btn v4BtnPrimary" : "v4Link v4DebFailedNew"} href={askHref}>
           {t(catalog, "v4.debate.askNew")}
         </Link>
-        <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
+        {classicHref === null || classicHref === undefined ? null : <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>}
       </div>
     </section>
   );

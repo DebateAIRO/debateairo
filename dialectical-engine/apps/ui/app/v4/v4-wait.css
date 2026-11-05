@@ -33,7 +33,8 @@
 .v4WaitLeave, .v4WaitLonger { display: flex; flex-direction: column; gap: 8px; }
 .v4WaitReconnect { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .v4WaitTryNow { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
-/* "Open in the classic view": once, small, at the bottom (wait-f23). */
+/* "Open in the classic view": once, small, at the bottom, while the page hands it (wait-f23; question 12 B moves it to the
+   account menu with the page's wiring). */
 .v4WaitClassic { font-size: var(--t-meta); }
 .v4WaitClassic .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
 .v4WaitBack { align-self: flex-start; }

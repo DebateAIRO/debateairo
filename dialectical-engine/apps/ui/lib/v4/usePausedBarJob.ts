@@ -8,9 +8,11 @@ import type { DigView, V4Selection } from "./types.js";
 
 /*
  * Owner review 3 Nov (wait-f2): the phone's pinned bar says "Paused · Continue" while the place open in the panel is a dig
- * paused at the month wall. Before the reset its second half is the plain "Continues on 1 Dec" label (nothing to press,
- * map-f31); once the server says the new month has started, Continue presses the run's own continue (as V4MonthPause
- * does). The words are lib/v4/monthPause.ts pausePhoneBar's. Memory only.
+ * paused at the month wall. The owner's answers of 5 Nov (question 19 A): before the reset its second half is a greyed
+ * "Continue on 1 December" that stays in place, named by the pause's sentence where the panel's pause block says it (said
+ * once, wait-f5); pressing it sends nothing (the bar gives that sentence the 1-second highlight, focus stays). Once the
+ * server says the new month has started, the same button presses the run's own continue (as V4MonthPause does). The words
+ * are lib/v4/monthPause.ts pausePhoneBar's. Memory only.
  */
 
 export type PausedBarJob = Readonly<{
@@ -19,8 +21,10 @@ export type PausedBarJob = Readonly<{
   label: string;
   /** "Continue" once the new month has started; null before. */
   continueLabel: string | null;
-  /** "Continues on 1 Dec" before the reset; null after. */
+  /** The greyed button's "Continue on 1 December" before the reset; null after. */
   untilLabel: string | null;
+  /** The pause's sentence before the reset, which says why the button is greyed (the bar points to where it is said); null after. */
+  reason: string | null;
   /** Continue was pressed and the dig still reads as paused. */
   busy: boolean;
   onContinue: () => void;
@@ -45,7 +49,8 @@ export function usePausedBarJob(dig: DigView | null, catalog: MessageCatalog, lo
     ...words,
     busy: pressed.has(childRunId),
     onContinue: () => {
-      if (pressed.has(childRunId)) return;
+      // Before the new month nothing is sent (question 19 A): the greyed button only shows its reason again.
+      if (!pause.canContinue || pressed.has(childRunId)) return;
       setPressed((before) => new Set([...before, childRunId]));
       void continueRun(childRunId).then((outcome) => {
         // CONTINUING: the dig's next read shows it running; anything else lets the person press again.
