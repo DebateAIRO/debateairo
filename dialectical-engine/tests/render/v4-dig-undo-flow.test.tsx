@@ -26,8 +26,8 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 
 /*
  * V4 UX fixes (owner picks 3 Nov 2026) on the map page, clicked through in jsdom: the shared Undo note on the dig side
- * (journey-f21), several digs each with its own Undo and the note travelling to other pages (dig-d3 A), the dashed seed
- * on the map (dig-d3 B), focus and Esc (dig-f7), the note's words (dig-f8), staying where the person is (dig-f10), and on
+ * (journey-f21), several digs each with its own Undo and the note travelling to other pages (dig-d3 A), the seed on the
+ * map (dig-d3 B; since the owner's 5 Nov answer 22 A, journey-f2's still "being looked into" look, never dashed), focus and Esc (dig-f7), the note's words (dig-f8), staying where the person is (dig-f10), and on
  * a phone the one bottom stack with its pinned bar (journey-d3, dig-f16, dig-f17).
  */
 
@@ -210,7 +210,7 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
 });
 
 describe("the seed on the map (dig-d3 B)", () => {
-  it("a dashed 'Your dig · … · starting' card grows under the path at the click; Undo pulls it back", async () => {
+  it("a 'Your dig · … · starting' card grows under the path at the click; Undo pulls it back", async () => {
     await mountMap();
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
@@ -222,6 +222,20 @@ describe("the seed on the map (dig-d3 B)", () => {
     expect(branch(PATHS.smr).querySelector(".v4DigSeedLeaving")).not.toBeNull();
     await advance(4_100);
     expect(branch(PATHS.smr).querySelector(".v4DigSeed")).toBeNull();
+  });
+
+  it("the owner's 5 Nov answer 22 A: the seed takes the hatched \"being looked into\" look, never dashed, with no pulse until it starts", () => {
+    const undoCss = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-undo.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    const rules = [...undoCss.matchAll(/([^{}]*\.v4DigSeed\b[^{}]*)\{([^}]*)\}/gu)];
+    const seed = rules.find(([, selector]) => selector!.trim() === ".v4DigSeed")![2]!;
+    expect(seed).toMatch(/background-image: var\(--v4-look-hatch\)/u);
+    expect(seed).toMatch(/solid/u);
+    for (const [, selector, body] of rules) {
+      expect(body, selector!.trim()).not.toMatch(/dashed/u);
+      // Only the approved grow-in and shrink-out (and, with reduced motion, the shared highlight): no pulse before it starts.
+      for (const animation of body!.matchAll(/animation:\s*([A-Za-z0-9-]+)/gu)) expect(["v4SeedIn", "v4SeedOut", "v4Highlight"], selector!.trim()).toContain(animation[1]);
+      expect(body, selector!.trim()).not.toMatch(/v4LookPulse|infinite/u);
+    }
   });
 
   it("once the dig is sent, the real dig card takes the seed's place", async () => {
@@ -315,12 +329,13 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     expect(harness.submit).not.toHaveBeenCalled();
     expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
     expect(bar.querySelector(".v4DebPhoneDig")!.textContent).toBe(CATALOG["v4.dig.chooseWhat"]);
-    // Once something is picked, the bar digs it: "Dig into your pick · up to 3%" (journey-f13 / dig-f5: "up to" while the
-    // server's deep-dig estimate still counts every rewrite above).
+    // Once something is picked, the bar digs it: "Dig into this · up to 3%" (journey-f13 / dig-f5: "up to" while the
+    // server's deep-dig estimate still counts every rewrite above; the owner's answer to question 1, 5 Nov: one pick reads
+    // "Dig into this" everywhere it is dug, the phone bar too).
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     const job = bar.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
     expect(job.textContent).toBe(`${CATALOG["v4.dig.yourPicks.one"]} · ${word("v4.undo.barShare", { percent: 3 })}`);
-    expect(job.textContent).toBe("Dig into your pick · up to 3%");
+    expect(job.textContent).toBe("Dig into this · up to 3%");
     await press(job);
     // The note sits inside the stack, above the bar; the bar's dig button steps back for the note's Undo.
     const note = stack()!.querySelector(".v4StackTop .v4Undo");

@@ -8,18 +8,21 @@ import { contractClient } from "@/lib/api";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
-import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { allMapsHref } from "./V4MapShelf";
 
 /*
  * V4 screen review (owner's picks, 3 Nov 2026):
  *   - ask-d6 A: the one V4 header ends in one round account button with the person's initial. It opens the site's account
- *     menu (AccountMenu: its keyboard, focus and sign-out rules) with the V4 items, in the record's order: "My maps"
- *     (ask-d5 B's "All my maps"), "Language", "Light or dark", "Settings", then "Sign out". Signed out: "Sign in" in its
- *     place, with the way back to this page.
- *   - journey-f19 / ask-f6: "Open in the classic view" lives in this menu, once, just above "Sign out"; a page that already
- *     shows it in its body (the waiting, paused and failed screens, the report's foot) passes none, so a page has it once.
+ *     menu (AccountMenu: its keyboard, focus and sign-out rules) with the V4 items, in the record's order: "My questions"
+ *     (the owner's answer to question 13, 5 Nov: C, ask-d6's own word; it opens ask-d5 B's "All my maps"), "Language",
+ *     "Light or dark", "Settings", then "Sign out". Signed out: "Sign in" in its place, with the way back to this page.
+ *   - journey-f19 / ask-f6: "Open in the classic view" lives in this menu, once, just above "Sign out", whenever the page
+ *     gives its classic address. Question 12 B (5 Nov: in the account menu only, the small links go) is not done yet on the
+ *     map: its waiting, paused and failed screens still show the link in their body and pass none here, until the map's
+ *     header is given the classic address on them (the start-step session's V4DebateClient wiring); then those screens
+ *     drop their link.
+ *   - The reading-level ruling (5 Nov): no link here carries a level; the level prop is accepted and unused.
  * Nothing is kept in the browser here: the language and the mode are the site's own existing choices (the language cookie,
  * the mode preference), changed the way the old top bar changed them.
  */
@@ -53,11 +56,11 @@ function AccountFace() {
     : <span className="v4HdrAccountInitial" aria-hidden="true">{initial}</span>;
 }
 
-export function V4AccountMenu({ catalog, level, classicHref, session }: Readonly<{
+export function V4AccountMenu({ catalog, classicHref, session }: Readonly<{
   catalog: MessageCatalog;
-  /** The reading level the page's links carry (null: none chosen). */
-  level: ReadingLevel | null;
-  /** The classic view of this page, shown once in the menu; null: the page shows it elsewhere, or has none. */
+  /** Accepted and unused (the 5 Nov reading-level ruling: no link carries a level). */
+  level?: ReadingLevel | null;
+  /** The classic view of this page, shown once in the menu; null: the page has none here. */
   classicHref: string | null;
   /** The page's own knowledge of the session; absent: the menu reads it itself. */
   session?: V4HeaderSession;
@@ -78,9 +81,9 @@ export function V4AccountMenu({ catalog, level, classicHref, session }: Readonly
         <AccountMenu
           catalog={chromeCatalog}
           {...(authenticated === undefined ? {} : { authenticated })}
-          // The way back keeps this page's address (its question, its picks) with the level the page's links carry. Only
-          // shown once the session is known, so never in the server's first paint.
-          signInHref={signInHrefFor(levelHref(currentReturnPath(), level))}
+          // The way back keeps this page's address as it is (its question, its picks). Only shown once the session is known,
+          // so never in the server's first paint.
+          signInHref={signInHrefFor(currentReturnPath())}
           signInClassName="v4Link v4HdrSignIn"
           look={{
             trigger: { className: "v4HdrAccountButton", label: t(catalog, "v4.header.account"), content: <AccountFace /> },
@@ -88,7 +91,7 @@ export function V4AccountMenu({ catalog, level, classicHref, session }: Readonly
             logoutLabel: t(catalog, "v4.header.menu.signOut"),
             items: (close) => (
               <>
-                <a role="menuitem" href={allMapsHref(level)} onClick={() => close(false)}>{t(catalog, "v4.maps.menu")}</a>
+                <a role="menuitem" href={allMapsHref()} onClick={() => close(false)}>{t(catalog, "v4.maps.menu")}</a>
                 <button
                   role="menuitem"
                   type="button"

@@ -25,6 +25,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { FAILED_DIGS } from "./failed-seed.js";
 
 const ROUTE = join("app", "api", "[...path]", "route.ts");
 function findUiDir(): string {
@@ -100,7 +101,11 @@ const RUNS = {
   digNoChange: "d5000000-0000-4000-8000-000000000005",
   paused: "e1000000-0000-4000-8000-000000000001",
   // W3-4: a dig at the deepest level (10).
-  deepest: "d1000000-0000-4000-8000-000000000010"
+  deepest: "d1000000-0000-4000-8000-000000000010",
+  // The owner's answers of 5 Nov (failed-seed.ts): the debate with a failed dig per reason group, and the failed question
+  // whose draft view says it used some of the quota.
+  failedDigs: "f0000000-0000-4000-8000-000000000000",
+  failedSome: "45000000-0000-4000-8000-000000000045"
 };
 const MOCK = process.env.DIALECTICAL_API_BASE!;
 /** A mock control or a draft read, straight from the mock (not part of the real API). */
@@ -277,7 +282,9 @@ await step("Free person: room and usage", async () => {
     const room: Loose = await client.getAskRoom({ plan_tier: "free", composition_budget_tier: "medium", depth: 1, answer_length: "short" });
     const usage: Loose = await client.getBillingUsage();
     must(room.plan_id === "FREE" && usage.plan_id === "FREE", `room ${room.plan_id}, usage ${usage.plan_id}`);
-    return "room plan FREE, usage plan FREE";
+    // Free counts the month alone (plan-windows.ts), so the header's circle opens one bar.
+    must(usage.windows.map((window: Loose) => window.scope).join() === "PERSON_MONTH", "Free's usage names the month alone");
+    return "room plan FREE, usage plan FREE, the month alone";
   } finally {
     await mock("/__mock/set?plan=PLUS");
   }
@@ -479,6 +486,26 @@ await step("a failed debate's quota_used, and the dig= switch", async () => {
   must(draft.quota_used === "NONE", "the draft view says nothing was taken");
   for (const dig of ["FAIL", "PAUSE", "SETTLE"]) must((await mock(`/__mock/set?dig=${dig}`)).dig === dig, `dig=${dig} is taken`);
   return `draft quota_used ${String(draft.quota_used)}; dig= FAIL, PAUSE, SETTLE`;
+}, (value: string) => value);
+// The owner's answers of 5 Nov (questions 3 A and 20 A): one failed dig per reason group on its own debate's map, sorted by
+// the website's own reason groups, and a failed question whose draft view says it used some of the quota.
+await step("a failed dig per reason group, and a failed question that used some (5 Nov answers)", async () => {
+  const failure: Loose = await import(pathToFileURL(join(UI, "lib", "v3", "runFailure.ts")).href);
+  const links: Loose = await client.readDigLinks(RUNS.failedDigs);
+  const kinds = new Set<string>();
+  for (const link of links.children) {
+    const run: Loose = await client.readRun(link.child_run_id);
+    must(run.state === "FAILED", `${link.child_run_id} failed`);
+    kinds.add(failure.runFailureKind(run.terminal_reason));
+    const draft: Loose = await mock(`/__mock/draft/v1/runs/${link.child_run_id}`);
+    must(draft.quota_used === "NONE" || draft.quota_used === "SOME", `${link.child_run_id}: the draft view says what it took`);
+  }
+  must(failure.RUN_FAILURE_KINDS.every((kind: string) => kinds.has(kind)), `every reason group has a failed dig (${[...kinds].join(", ")})`);
+  // The wave-4 browser check (5 Nov): each digs its own place, so none reads as one dig that failed twice.
+  must(new Set(links.children.map((link: Loose) => [...link.places].sort().join(" "))).size === links.children.length, "each failed dig digs its own place");
+  const some: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failedSome}`);
+  must(some.state === "FAILED" && some.quota_used === "SOME", "the second failed question's draft view says it used some");
+  return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}`;
 }, (value: string) => value);
 
 // Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any
@@ -703,7 +730,9 @@ await step("Your maps: digs left out by their dig links and hung under their que
   const { readFileSync } = await import("node:fs");
   const v4Catalog = JSON.parse(readFileSync(join(UI, "messages", "en", "v4.json"), "utf8"));
   const shelf: Loose = await shelfModule.readMapShelf(5, v4Catalog, { client });
-  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest];
+  const seededDigs = [RUNS.dig, RUNS.digOwnView, RUNS.digLevelTwo, RUNS.digLevelThree, RUNS.digFailed, RUNS.digNoChange, RUNS.deepest,
+    // The owner's answers of 5 Nov (failed-seed.ts): the seven failed digs hang under their debate, never as questions.
+    ...FAILED_DIGS.map((dig) => dig.runRef)];
   must(shelf.maps.length === 5 && shelf.maps.every((map: Loose) => !seededDigs.includes(map.runId)), "five real questions, no dig among them");
   const first: Loose = shelf.maps.find((map: Loose) => map.runId === RUNS.settled);
   must(first === undefined || first.digs.length > 0, "the first debate carries its digs");

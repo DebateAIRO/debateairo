@@ -25,6 +25,15 @@ export function loadArchiveCatalog(locale: string): ArchiveCatalog {
   return catalog as ArchiveCatalog;
 }
 
+/**
+ * The tag the readable page writes its dates in. Owner's answer to question 5 (5 Nov 2026) and its follow-up: the data
+ * download follows the pages, so English is day first on the 24-hour clock ("9 October 2026 at 00:15 UTC"); every
+ * other language keeps its own order.
+ */
+export function archiveDateTag(locale: string): string {
+  return /^en(?:-|$)/i.test(locale) ? "en-GB" : locale;
+}
+
 export function formatArchiveTime(at: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short", timeZone: "UTC" }).format(at) + " UTC";
+  return new Intl.DateTimeFormat(archiveDateTag(locale), { dateStyle: "long", timeStyle: "short", timeZone: "UTC" }).format(at) + " UTC";
 }

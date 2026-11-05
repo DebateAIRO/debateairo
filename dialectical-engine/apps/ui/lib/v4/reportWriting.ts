@@ -1,5 +1,7 @@
 import type { Answer, ContractClient, InvestigationReports } from "@debateai/contract";
 import { contractClient } from "../api.js";
+import { t, tPlural, type MessageCatalog } from "../i18n/translate.js";
+import type { DigView } from "./types.js";
 
 /*
  * V4 screen review (owner picks 3 Nov 2026), report-d1 A and report-d2 A: the report is asked for, and waited for, on the
@@ -51,6 +53,58 @@ export function reportStageOf(read: InvestigationReports | null): ReportStage {
   return newest.state === "FAILED"
     ? { kind: "FAILED", version: newest.report_version }
     : { kind: "DONE", version: newest.report_version };
+}
+
+/**
+ * The owner's answers of 5 Nov 2026, question 2 A: once a report is asked for, the map's report button reads "See my report"
+ * (and leads to the report page) while the report waits for a dig, while it is written, and once it stands with nothing
+ * reopened; "Write my report" comes back as soon as a dig reopens the investigation (NONE), and a version that did not
+ * finish keeps "Write it again" (FAILED). UNKNOWN keeps today's "Write my report" link (the read failed).
+ */
+export function reportSeenFor(stage: ReportStage): boolean {
+  return stage.kind === "WAITING_DIGS" || stage.kind === "WRITING" || stage.kind === "DONE";
+}
+
+/** A dig as the report's wait line looks at it: its questions, and its read (undefined or null: not read just now). */
+export type WaitedDig = Readonly<{
+  link: Readonly<{ questions: readonly string[] }>;
+  view: Pick<DigView, "state" | "rewrite"> | null | undefined;
+}>;
+
+/** report-f7: a dig the report may still wait for: running, waiting for a spot, or done but still rewriting its path. */
+export function mayBeWaitedFor(view: Pick<DigView, "state" | "rewrite">): boolean {
+  return view.state === "RUNNING" || view.state === "WAITING" || (view.state === "DONE" && view.rewrite?.state === "WRITING");
+}
+
+/**
+ * report-f7 (the report page's rule, shared with the map since the owner's question 23 A): the one dig the report may be
+ * waiting for, by its question (AI text), when exactly one READ dig may be waited for; null otherwise. A dig not read
+ * (a stand-in) is never counted, so the line never names a dig it cannot be sure of.
+ */
+export function waitingDigQuestionOf(digs: readonly WaitedDig[]): string | null {
+  const waited = digs.filter((dig) => dig.view !== undefined && dig.view !== null && mayBeWaitedFor(dig.view));
+  return waited.length === 1 ? waited[0]!.link.questions[0] ?? null : null;
+}
+
+/** A sign no AI text contains, so the wait line splits around the dig's question and only its words are marked. */
+const DIG_SLOT = "⁣⁣";
+
+/**
+ * The report's wait line, the same on the map and on the report page (the owner's answers of 5 Nov, question 23 A and its
+ * follow-up): when the server waits for one dig and the page knows it, "Your report starts when your dig on “…” finishes."
+ * (report-f7; `before` + the dig's own words + `after`, so the page marks the words as AI text); one dig it cannot name,
+ * "…when the dig in progress finishes."; several, "Your report starts when the digs in progress finish.", with no number.
+ */
+export type ReportWaitLine =
+  | Readonly<{ kind: "NAMED"; before: string; dig: string; after: string }>
+  | Readonly<{ kind: "PLAIN"; text: string }>;
+
+export function reportWaitLineOf(waitingForDigs: number, digQuestion: string | null, catalog: MessageCatalog, locale: string): ReportWaitLine {
+  if (waitingForDigs === 1 && digQuestion !== null && digQuestion.trim().length > 0) {
+    const [before = "", after = ""] = t(catalog, "v4.investigation.waitingDig", { dig: DIG_SLOT }).split(DIG_SLOT);
+    return { kind: "NAMED", before, dig: digQuestion, after };
+  }
+  return { kind: "PLAIN", text: tPlural(catalog, "v4.investigation.waitingDigs", Math.max(1, waitingForDigs), locale) };
 }
 
 /** "Write my report" (or "Write it again") opens the short check: nothing is being written, and no report stands. */

@@ -1,6 +1,6 @@
 import type { PublicDebate } from "@debateai/contract";
 import type { LocaleCode } from "@/lib/i18n/locales";
-import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { formatDateAndTime, t, type MessageCatalog } from "@/lib/i18n/translate";
 
 export function PublicAnswerDisclosure({
   answer,
@@ -26,8 +26,9 @@ export function PublicAnswerDisclosure({
     {engineLines && answer.tree_included !== true
       ? <p>{t(catalog, "public.disclosure.legacySummaryOnly")}</p>
       : null}
-    <p>{t(catalog, "public.disclosure.evidenceAsOf", {
-      date: formatDate(locale, answer.as_of, { dateStyle: "short", timeStyle: "short" })
-    })}</p>
+    {/* The owner's answer to question 4 (5 Nov 2026, A): the long form with the year, and its clock on the 24-hour form. The
+        third round: a page keeps the comma between them ("20 October 2026, 11:00"); only the data download, the sign-in link
+        email and the classic report PDF keep "at". */}
+    <p>{t(catalog, "public.disclosure.evidenceAsOf", { date: formatDateAndTime(locale, answer.as_of) })}</p>
   </div>;
 }

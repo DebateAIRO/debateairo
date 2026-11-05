@@ -41,7 +41,8 @@ export function waitingPublicDig(entries: readonly DigUndoEntry[], publicRef: st
  * dig. The read a public page makes today is a new question's (the server works a dig's share out only for the person's
  * own debate), so `dig_share_percent` is absent and nothing is shown: never a new question's share in its place, never
  * worked out here. The period it is of is named once by the switch, from the server's window (read-f19 / public-f14:
- * lib/v4/digQuota.ts digPeriodLine, "of this month" on Free), as on the map.
+ * lib/v4/digQuota.ts publicDigPeriodLine, the period alone: "of today", "of this month" on Free; the owner's answer to
+ * question 34 of 5 Nov, for every reader of a public page).
  */
 export function publicDigShare(room: AskRoom | null): number | null {
   const percent = room?.dig_share_percent;

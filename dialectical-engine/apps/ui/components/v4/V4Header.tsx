@@ -1,137 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
-import type { BillingUsage } from "@/lib/billing/usage";
+import type { MouseEvent, ReactNode } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { levelHref } from "@/lib/v4/storage";
-import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
+import type { ReadingLevel } from "@/lib/v4/types";
 import { V4QuotaPill } from "./V4QuotaPill";
 import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
 
 /*
- * V4 initial (spec "/v4", header everywhere): brand + badge to /v4, the reading level as a small menu (changing it
- * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A) and the page's own
- * extras. The quota is shown only as "N% used" of one window (no prices, no other numbers) and only when the usage read
- * succeeds: the steady pill of V4QuotaPill.tsx (public-d3 A, owner's screen review 3 Nov).
+ * V4 initial (spec "/v4", header everywhere): brand + badge to /v4 and the page's own extras.
  * V4 screen review (3 Nov 2026), ask-d6 A / ask-f5 / journey-f19: this is the V4 pages' one header row (the site's old top
  * bar steps back on them). It ends in the round account button (V4AccountMenu), whose menu also holds the classic-view
  * link, once; the header itself shows no classic link any more.
+ * The owner's answers of 5 Nov 2026:
+ *  - The reading level is chosen only when asking and is kept for that debate, its digs and its report, so no header has a
+ *    level menu or a "Plain words" label, and no header link carries a level. The level props stay accepted for the pages
+ *    that still pass them, and do nothing.
+ *    RELEASE ORDER: until the ask page offers the level choice for every question (the start-step session's V4AskClient
+ *    item: the choice on every question, starting on "Plain words", nothing kept in the account), this header was the
+ *    only way a person who already holds a level could change it. This header must not reach a release before that item.
+ *  - Questions 14 B and 15: the quota shows as one round circle that fills as quota is used (V4QuotaPill.tsx), the
+ *    fullest period the plan counts, at every screen size.
+ *  - Question 15: on a phone the header is one row, the brand's mark (its name stays its accessible name), the circle and
+ *    the round account button (app/v4/v4-base.css). Question 18 A (no "Write my report" in the top bar while the bottom
+ *    bar shows it) is built in the map's own report item (useMapReport's `bottomShowsReport`, V4BottomStack's
+ *    `onReportShown`); only the map page's wiring of the two remains (V4DebateClient, the start-step session's).
  */
-
-type QuotaScope = BillingUsage["windows"][number]["scope"];
-
-/**
- * V4 review ask-f4: the window that binds first, named by its own word ("Today", "This week", "This month", or "In
- * total" for a team grant). That is the fullest one; a tie goes to the longest window, as the server's room sentence
- * names a tie (packages/budget room.ts SCOPE_PRECEDENCE), so a Free person whose month is used up reads "This month"
- * here too, never today's share.
- */
-const LONGEST_FIRST: readonly QuotaScope[] = Object.freeze(["PERSON_GRANT", "PERSON_MONTH", "PERSON_WEEK", "PERSON_DAY"]);
-
-export function tightestWindow(usage: BillingUsage | null): Readonly<{ scope: QuotaScope; percent: number }> | null {
-  if (usage === null) return null;
-  let tightest: Readonly<{ scope: QuotaScope; percent: number }> | null = null;
-  for (const scope of LONGEST_FIRST) {
-    const window = usage.windows.find((candidate) => candidate.scope === scope);
-    if (window === undefined) continue;
-    // Past 100% is a running debate's finish leeway (UsageBars); the person reads "100% used".
-    const percent = Math.min(100, Math.max(0, Math.round(window.percent)));
-    if (tightest === null || percent > tightest.percent) tightest = Object.freeze({ scope, percent });
-  }
-  return tightest;
-}
-
-function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
-  catalog: MessageCatalog; level: ReadingLevel; onLevel: (level: ReadingLevel) => void;
-}>) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const toggle = useRef<HTMLButtonElement>(null);
-  const listId = useId();
-
-  // Close on a click outside, like any menu.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (root.current !== null && event.target instanceof Node && !root.current.contains(event.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  // Keyboard: opening puts focus on the current choice; Escape closes and returns focus to the button.
-  useEffect(() => {
-    if (!open) return;
-    root.current?.querySelector<HTMLButtonElement>("[aria-pressed=\"true\"]")?.focus();
-  }, [open]);
-
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== "Escape" || !open) return;
-    event.preventDefault();
-    setOpen(false);
-    toggle.current?.focus();
-  }
-
-  // UI-11: keyboard focus moving outside the menu closes it, like a click outside. A blur with no new target is left
-  // to the mousedown handler: Safari blurs without focusing the option being clicked, and closing then would lose it.
-  function onBlur(event: FocusEvent<HTMLDivElement>) {
-    const next = event.relatedTarget;
-    if (open && next instanceof Node && root.current !== null && !root.current.contains(next)) setOpen(false);
-  }
-
-  function choose(next: ReadingLevel) {
-    onLevel(next);
-    setOpen(false);
-    toggle.current?.focus();
-  }
-
-  return (
-    <div className="v4HdrLevel" ref={root} onKeyDown={onKeyDown} onBlur={onBlur}>
-      <button
-        ref={toggle}
-        type="button"
-        className="v4HdrLevelButton"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-label={t(catalog, "v4.header.levelButton", { level: t(catalog, `v4.readingLevel.${level}`) })}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span>{t(catalog, `v4.readingLevel.${level}`)}</span>
-        <span aria-hidden="true">▾</span>
-      </button>
-      {open ? (
-        <div className="v4HdrLevelList" id={listId} role="group" aria-label={t(catalog, "v4.header.levelMenu")}>
-          <p className="v4HdrLevelTitle" aria-hidden="true">{t(catalog, "v4.header.levelMenu")}</p>
-          {READING_LEVELS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="v4HdrLevelOption"
-              aria-pressed={option === level}
-              onClick={() => choose(option)}
-            >
-              <span className="v4HdrLevelCheck" aria-hidden="true">{option === level ? "✓" : ""}</span>
-              <span>{t(catalog, `v4.readingLevel.${option}`)}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 export function V4Header({
-  catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, showQuota = true, session, children, after
+  catalog, classicHref = null, showQuota = true, session, children, after, onBrandClick
 }: Readonly<{
   catalog: MessageCatalog;
-  /** The level the menu shows (a page may show its default when none was chosen). */
-  readingLevel: ReadingLevel | null;
-  /**
-   * R2REG-5: the level the brand link carries — only one the person chose (null: none, so /v4 still offers the choice).
-   * Left out, the link carries `readingLevel` as before.
-   */
+  /** Accepted and unused (the 5 Nov reading-level ruling: no level in any header). */
+  readingLevel?: ReadingLevel | null;
+  /** Accepted and unused (the 5 Nov reading-level ruling: no header link carries a level). */
   linkLevel?: ReadingLevel | null;
+  /** Accepted and unused (the 5 Nov reading-level ruling: the level is chosen only when asking). */
   onReadingLevel?: (level: ReadingLevel) => void;
   /** journey-f19 / ask-f6: this page's classic view, offered once, in the account menu (null: none, or the page shows it). */
   classicHref?: string | null;
@@ -151,35 +55,33 @@ export function V4Header({
    * check, 4 Nov: on a phone they jumped from the start side to the end side).
    */
   after?: ReactNode;
+  /**
+   * Called when the brand link is pressed, before the browser follows it to /v4; a handler may call event.preventDefault()
+   * to keep the page where it is. Asked for by the start-step session (5 Nov), which will pass it; not one of the owner's
+   * answers. Absent: the plain link it always was.
+   */
+  onBrandClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }>) {
   // ask-f16 with the wave-2 checks (4 Nov): the usage is read only for a signed-in person, and a page that knows the person
-  // is signed out reads nothing and holds nothing (they never get a pill). While the page is still checking, the pill's
+  // is signed out reads nothing and holds nothing (they never get a circle). While the page is still checking, the circle's
   // place is held from the first frame without reading, so a person who turns out signed in sees nothing jump; it closes
   // at once if they are signed out (ask-f16: "close it quickly if that part does not come").
   const quotaWanted = showQuota && (session === undefined || session === "IN");
   const quotaHeld = showQuota && session === "CHECKING";
   return (
     <header className="v4Hdr">
-      <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
+      <Link href="/v4" className="v4HdrBrand" onClick={onBrandClick}>
         <span className="v4HdrMark" aria-hidden="true" />
-        <span className="v4HdrName">Dialectical Engine</span>
+        {/* On a phone the name and the badge are hidden on screen (v4-base.css) and stay the link's name; the space keeps
+            the two words apart when it is read out (a flex row draws no space-only text). */}
+        <span className="v4HdrName">Dialectical Engine</span>{" "}
         <span className="v4HdrBadge">{t(catalog, "v4.brand.badge")}</span>
       </Link>
       <div className="v4HdrRight">
-        {readingLevel === null ? null : onReadingLevel === undefined ? (
-          <span className="v4HdrLevelStatic">{t(catalog, `v4.readingLevel.${readingLevel}`)}</span>
-        ) : (
-          <ReadingLevelMenu catalog={catalog} level={readingLevel} onLevel={onReadingLevel} />
-        )}
         <V4QuotaPill catalog={catalog} wanted={quotaWanted} hold={quotaHeld} />
         {children}
-        {/* ask-d6 A: the round account button ends the row; its links carry the level the brand link carries. */}
-        <V4AccountMenu
-          catalog={catalog}
-          level={linkLevel === undefined ? readingLevel : linkLevel}
-          classicHref={classicHref}
-          {...(session === undefined ? {} : { session })}
-        />
+        {/* ask-d6 A: the round account button ends the row. */}
+        <V4AccountMenu catalog={catalog} classicHref={classicHref} {...(session === undefined ? {} : { session })} />
       </div>
       {after}
     </header>

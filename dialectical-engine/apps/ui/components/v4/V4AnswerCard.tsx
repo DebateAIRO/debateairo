@@ -156,8 +156,9 @@ function VersionBody(props: Readonly<{ version: Version; map: V4Map; catalog: Me
   if (version.kind === "FIRST") return <FirstAnswer map={props.map} catalog={catalog} lead={props.lead} canDigNow={props.canDigNow} />;
   if (version.kind === "REPORT") return <Segments segments={version.segments} lead={props.lead} />;
   const name = props.pathName(version.positionRef);
-  const date = formatDate(props.locale, version.at, { dateStyle: "medium" });
-  // "Updated on 3 Nov because a dig changed “Whole-system costs”": the path's name is AI text, the rest the site's.
+  // The owner's answers of 5 Nov (question 4 A): the long form with the year, through the shared date helper.
+  const date = formatDate(props.locale, version.at, { dateStyle: "long" });
+  // "Updated on 3 November 2026 because a dig changed “Whole-system costs”": the path's name is AI text, the rest the site's.
   const [before = "", after = ""] = t(catalog, `v4.answerCard.updated.${version.trigger}`, { date, path: SLOT }).split(SLOT);
   return (
     <>
@@ -175,7 +176,8 @@ function VersionBody(props: Readonly<{ version: Version; map: V4Map; catalog: Me
 }
 
 function versionTitle(version: Version, catalog: MessageCatalog, locale: string): string {
-  const date = version.at === null ? null : formatDate(locale, version.at, { dateStyle: "medium" });
+  // Question 4 A (5 Nov): "Version 2, 3 November 2026" and "The first answer, 28 October 2026".
+  const date = version.at === null ? null : formatDate(locale, version.at, { dateStyle: "long" });
   if (version.kind === "MAIN") return t(catalog, "v4.mainAnswer.version", { version: version.version, date: date ?? "" });
   if (version.kind === "REPORT") return t(catalog, "v4.investigation.fromReport", { n: version.version });
   return date === null ? t(catalog, "v4.answerCard.first") : t(catalog, "v4.answerCard.firstOn", { date });

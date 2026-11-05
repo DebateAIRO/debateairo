@@ -34,8 +34,12 @@ function around(catalog: MessageCatalog, key: string, name: string, values: Read
   return { before, after };
 }
 
+/**
+ * The owner's answers of 5 Nov (question 4 A): "Rewritten after a dig on …" and "Before the dig on …" take the long form with
+ * the year, as the record writes dates ("3 November 2026", report-f13), through the shared date helper.
+ */
 function day(locale: string, iso: string): string {
-  return formatDate(locale, iso, { dateStyle: "medium" });
+  return formatDate(locale, iso, { dateStyle: "long" });
 }
 
 /** The newest rewrite of a path (the one whose state the path shows), or null when a dig only changed something below. */

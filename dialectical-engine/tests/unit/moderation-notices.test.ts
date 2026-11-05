@@ -48,7 +48,7 @@ describe("0156: the moderation notice sender", () => {
     const { mail, raw } = memory.messages[0]!;
     const rendered = renderMail(mail.templateId, mail.locale, mail.params);
     expect(rendered.subject).toBe("Your debate was taken off the public page");
-    expect(rendered.text).toContain("On November 5, 2026, your public debate was taken off the public page for a review against our Terms.");
+    expect(rendered.text).toContain("On 5 November 2026, your public debate was taken off the public page for a review against our Terms.");
     expect(rendered.text).toContain("It stays in your account, as your own.");
     expect(rendered.text).toContain("Our current Terms are online at https://debate.example.test/terms");
     expect(raw).toContain("Content-Language: en");

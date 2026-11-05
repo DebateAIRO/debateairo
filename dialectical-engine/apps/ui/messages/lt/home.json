@@ -75,7 +75,7 @@
   "home.turn": "Ėjimas {turn}",
   "home.sampleCoda": "Raundas čia baigiasi. Niekas neskelbiamas nugalėtoju. Gaunate stenogramą, po du kiekvieno ėjimo įverčius ir grandį, kurioje nusileidote.",
   "home.closingTitle": "Jūsų argumentas stiprus tik tiek, kiek jo silpniausia grandis.",
-  "home.closingLede": "Sužaiskite vieną raundą. Keturi ėjimai, maždaug devynios minutės ir stenograma, tiksliai parodanti, kur nustojote atsakyti.",
+  "home.closingLede": "Sužaiskite vieną raundą. Keturi ėjimai ir stenograma, tiksliai parodanti, kur nustojote atsakyti.",
   "home.pricingCopyPlusTax": "Pradėkite nemokamai. Mokami planai prasideda nuo {price} + {taxName} per mėnesį. Atšaukti galite bet kada.",
   "home.pricingCopyNoTax": "Pradėkite nemokamai. Mokami planai prasideda nuo {price} per mėnesį, mokestis nepridedamas. Atšaukti galite bet kada.",
   "home.pricingCopyChoose": "Pradėkite nemokamai. Mokami planai prasideda nuo {price} per mėnesį, plius mokestis, kur jis taikomas. Atšaukti galite bet kada.",

@@ -199,6 +199,12 @@ export function shelfPlaceOf(row: ShelfRow, links: ReadonlyMap<string, string | 
 /**
  * The cards: the first `want` question rows (newest first, rows with no words of their own left out), each with the digs
  * whose chain of parents leads to it, newest first. A dig whose question is not among the rows read hangs nowhere here.
+ *
+ * STILL DUE (the owner's answer to question 33, 5 Nov, A): a dig made on someone else's public page shows as its own card,
+ * "Dig: {its pick}" (dig-f30's words), the one case of a dig card of its own. It waits on the server: the answer list's
+ * rows must say the dig was made on a public page and carry its pick (`dug_on_public`, `dig_pick`: the start-step plan's
+ * Task 79c gives the data; the page part is this review's). Until then such a dig hangs nowhere and the list leaves it
+ * out, so the public dig box's "“My questions” will show it if it did." (v4.public.dig.unconfirmed) is not yet true for it.
  */
 export function buildShelf(
   rows: readonly ShelfRow[],

@@ -73,7 +73,7 @@
   "home.turn": "Käik {turn}",
   "home.sampleCoda": "Voor lõpeb siin. Võitjat ei kuulutata. Saate ärakirja, iga käigu kaks hinnet ja nõrga lüli, milles järele andsite.",
   "home.closingTitle": "Teie argument on vaid nii tugev kui selle nõrgim lüli.",
-  "home.closingLede": "Tehke üks voor. Neli käiku, umbes üheksa minutit ja ärakiri, mis näitab täpselt, kus te vastamise lõpetasite.",
+  "home.closingLede": "Tehke üks voor. Neli käiku ja ärakiri, mis näitab täpselt, kus te vastamise lõpetasite.",
   "home.pricingCopyPlusTax": "Alustage tasuta. Tasulised paketid algavad hinnast {price} + {taxName} kuus. Tühistage igal ajal.",
   "home.pricingCopyNoTax": "Alustage tasuta. Tasulised paketid algavad hinnast {price} kuus, maksu ei lisandu. Tühistage igal ajal.",
   "home.pricingCopyChoose": "Alustage tasuta. Tasulised paketid algavad hinnast {price} kuus, pluss maks, kus see kehtib. Tühistage igal ajal.",

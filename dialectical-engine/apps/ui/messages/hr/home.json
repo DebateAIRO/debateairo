@@ -74,7 +74,7 @@
   "home.turn": "Potez {turn}",
   "home.sampleCoda": "Runda ovdje završava. Ništa nije proglašeno dobivenim. Dobivate prijepis, dvije ocjene po potezu i kariku koju ste priznali.",
   "home.closingTitle": "Vaš je argument jak koliko i njegova najslabija karika.",
-  "home.closingLede": "Odigrajte jednu rundu. Četiri poteza, oko devet minuta i prijepis koji točno pokazuje gdje ste prestali odgovarati.",
+  "home.closingLede": "Odigrajte jednu rundu. Četiri poteza i prijepis koji točno pokazuje gdje ste prestali odgovarati.",
   "home.pricingCopyPlusTax": "Počnite besplatno. Plaćeni planovi počinju od {price} + {taxName} mjesečno. Otkažite bilo kada.",
   "home.pricingCopyNoTax": "Počnite besplatno. Plaćeni planovi počinju od {price} mjesečno, bez dodanog poreza. Otkažite bilo kada.",
   "home.pricingCopyChoose": "Počnite besplatno. Plaćeni planovi počinju od {price} mjesečno, plus porez gdje se primjenjuje. Otkažite bilo kada.",

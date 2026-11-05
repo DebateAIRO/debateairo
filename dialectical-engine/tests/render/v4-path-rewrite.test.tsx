@@ -39,7 +39,9 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 
 const word = (key: string, values: Record<string, string | number> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
-const day = (iso: string): string => formatDate("en", iso, { dateStyle: "medium" });
+// The owner's answers of 5 Nov (question 4 A): "Rewritten after a dig on …" takes the long form with the year, through the
+// shared date helper (so the expected words follow it if English goes day first: "30 October 2026").
+const day = (iso: string): string => formatDate("en", iso, { dateStyle: "long" });
 
 const ROOT = PATH_REWRITES[DIG_RUNS.root]!;
 const OWN_VIEW = ROOT.paths.find((path) => path.position_ref === "n-mix")!.history[0]! as Extract<PathRewrite, { state: "READY" }>;

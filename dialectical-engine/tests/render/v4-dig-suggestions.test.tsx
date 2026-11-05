@@ -78,7 +78,7 @@ describe("pick, combine, edit and add your own view", () => {
     await openPath(PATHS.renew);
     const [first, second] = panelBoxes();
     await click(first!);
-    // dig-f4: one pick shows no tray; the panel's own button reads "Dig into your pick" (dig-f5, dig-f31).
+    // dig-f4: one pick shows no tray; the panel's own button reads "Dig into this" (map-f14, question 1 B of 5 Nov).
     expect(tray()).toBeNull();
     expect(buttonsNamed(CATALOG["v4.dig.yourPicks.one"]!, panel())).toHaveLength(1);
     await click(second!);

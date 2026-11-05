@@ -73,7 +73,7 @@
   "home.turn": "Beurt {turn}",
   "home.sampleCoda": "De ronde eindigt hier. Er wordt geen winnaar uitgeroepen. U krijgt het transcript, de twee scores per beurt en de zwakke schakel die u hebt prijsgegeven.",
   "home.closingTitle": "Uw argument is slechts zo sterk als de zwakste schakel.",
-  "home.closingLede": "Doe één ronde. Vier beurten, ongeveer negen minuten, en een transcript dat u precies laat zien waar u niet langer antwoord gaf.",
+  "home.closingLede": "Doe één ronde. Vier beurten en een transcript dat u precies laat zien waar u niet langer antwoord gaf.",
   "home.pricingCopyPlusTax": "Begin gratis. Betaalde abonnementen beginnen bij {price} + {taxName} per maand. U kunt op elk moment opzeggen.",
   "home.pricingCopyNoTax": "Begin gratis. Betaalde abonnementen beginnen bij {price} per maand, zonder toegevoegde belasting. U kunt op elk moment opzeggen.",
   "home.pricingCopyChoose": "Begin gratis. Betaalde abonnementen beginnen bij {price} per maand, plus belasting waar van toepassing. U kunt op elk moment opzeggen.",

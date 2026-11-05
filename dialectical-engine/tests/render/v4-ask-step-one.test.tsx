@@ -171,7 +171,14 @@ describe("a signed-out visitor (ask-d1 D)", () => {
     expect(host!.querySelector(".v4SeedLabel")?.textContent).toBe("Your question");
     expect(host!.querySelector(".v4SeedWords")?.textContent).toBe(QUESTION);
     expect(host!.querySelectorAll(".v4SeedOpen")).toHaveLength(3);
-    expect([...host!.querySelectorAll(".v4SeedOpen")].every((card) => card.textContent === "★?")).toBe(true);
+    // The owner's answers of 5 Nov (question 22 A and its follow-up): each card is journey-f2's hatched "Open" ground, and
+    // keeps the star, the "?" and the word "Open" (the map's own word for it).
+    expect([...host!.querySelectorAll(".v4SeedOpen")].every((card) => card.textContent === `★?${CATALOG["v4.ground.open"]!}`)).toBe(true);
+    expect(host!.querySelectorAll(".v4SeedOpen .v4GroundWord")).toHaveLength(3);
+    const askCss = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-ask.css"), "utf8");
+    const seedRule = /\.v4SeedOpen \{([^}]*)\}/u.exec(askCss)![1]!;
+    expect(seedRule).not.toMatch(/dashed/u);
+    expect(seedRule).toMatch(/var\(--v4-look-hatch\)/u);
     expect(host!.querySelector(".v4Seed figcaption")?.textContent).toBe("Your map starts here. You'll choose which of these the AIs look into.");
     expect(host!.querySelector(".v4SeedPicture")?.getAttribute("aria-hidden")).toBe("true");
     await type("Should my town close its centre to cars?");
@@ -284,7 +291,8 @@ describe("the used-up quota (ask-f18, ask-d4 C)", () => {
   it("Free counts by the month and names the day", async () => {
     ask.room = { room: "FULL", scope: "PERSON_MONTH", resets_at: "2026-12-01T12:00:00.000Z", waiting_run_ref: null, plan_id: "FREE", new_starts: "BLOCKED_UNTIL_RESET" };
     await mount();
-    expect(host!.querySelector(".v4AskUsedUp")?.textContent).toBe("You've used this month's quota. New questions start on December 1.");
+    // Owner's answer to question 5 (5 Nov 2026): day first on English pages.
+    expect(host!.querySelector(".v4AskUsedUp")?.textContent).toBe("You've used this month's quota. New questions start on 1 December.");
   });
 });
 
@@ -348,7 +356,8 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     }));
     await mount();
     const shelf = host!.querySelector(".v4Shelf")!;
-    expect(shelf.querySelector("h2")?.textContent).toBe("Your maps");
+    // Renamed in the owner's third round (5 Nov): the list and the page behind it are "My questions".
+    expect(shelf.querySelector("h2")?.textContent).toBe("My questions");
     const cards = [...shelf.querySelectorAll(".v4ShelfCard")];
     expect(cards.map((card) => card.querySelector(".v4ShelfQuestion")?.textContent)).toEqual([
       "Is a four-day week good for workers?", "Will AI tutors replace homework help?", "Should countries build new nuclear power?"
@@ -367,10 +376,12 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     const dig = shelf.querySelector<HTMLAnchorElement>(".v4ShelfDig")!;
     expect(dig.closest(".v4ShelfItem")?.querySelector(".v4ShelfQuestion")?.textContent).toBe("Should countries build new nuclear power?");
     expect(dig.querySelector(".v4ShelfDigText")?.textContent).toBe("Dig: Batteries can cover multi-day lulls.");
-    expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}?level=plain`);
-    expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}?level=plain`);
-    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all&level=plain");
-    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.textContent).toBe("All my maps");
+    // The reading-level ruling (5 Nov): links carry no level; the map still uses the account's level until the run read
+    // names the debate's own level (the server field), as it did when these links carried the account's level.
+    expect(dig.getAttribute("href")).toBe(`/v4/debate/${DIG}`);
+    expect(cards[2]!.getAttribute("href")).toBe(`/v4/debate/${PARENT}`);
+    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.getAttribute("href")).toBe("/v4?maps=all");
+    expect(shelf.querySelector<HTMLAnchorElement>(".v4ShelfAll")?.textContent).toBe("All my questions");
     // No counts anywhere, and no seed: this account has maps.
     expect(shelf.textContent).not.toMatch(/\d+ (maps|questions|digs)/u);
     expect(host!.querySelector(".v4Seed")).toBeNull();

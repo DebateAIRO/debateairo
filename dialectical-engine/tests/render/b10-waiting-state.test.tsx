@@ -144,8 +144,9 @@ describe("the own-debates sentence in C's place", () => {
 
 describe("a twenty-day wait still says when to the minute (formatReset's date branch keeps the time)", () => {
   const TWENTY_DAYS = new Date(Date.now() + 20 * 86_400_000).toISOString();
-  // The clock time of the start in this machine's zone, as the browser would show it.
-  const clock = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(new Date(TWENTY_DAYS));
+  // The clock time of the start in this machine's zone, as the browser would show it: English pages use the
+  // 24-hour clock (owner's answer to question 5, 5 Nov 2026), so "14:30", never "02:30 PM".
+  const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(TWENTY_DAYS));
 
   async function mounted(element: React.ReactElement): Promise<HTMLElement> {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

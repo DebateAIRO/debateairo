@@ -32,6 +32,20 @@
 
 /* ---------- header extras, back link, notes ---------- */
 .v4DebReportLink { text-decoration: none; }
+/* The owner's answers of 5 Nov (question 2 A): before the map's first report check answers, the report button's place is
+   held with no words in the page: the hold draws "Write my report" and "See my report" (its data-hold-label and
+   data-hold-other) invisibly in one cell, with the button's own classes, so it is as wide as the wider of the two.
+   The button that comes draws the same two labels invisibly behind its own words (.v4DebReportLabel), so it is never
+   narrower, and nothing moves when it comes, whichever label the first check gives (ask-f16; the w6 browser check: the
+   quota circle moved 12 px when "See my report" came). Hidden pseudo-content is neither read out nor found as text. */
+.v4DebReportHold { display: inline-grid; visibility: hidden; pointer-events: none; }
+.v4DebReportHold::before { content: attr(data-hold-label); }
+.v4DebReportHold::after { content: attr(data-hold-other); }
+.v4DebReportHold::before, .v4DebReportHold::after { grid-area: 1 / 1; }
+.v4DebReportLabel { display: inline-grid; justify-items: center; }
+.v4DebReportLabel > span, .v4DebReportLabel::before, .v4DebReportLabel::after { grid-area: 1 / 1; }
+.v4DebReportLabel::before { content: attr(data-size-write); visibility: hidden; }
+.v4DebReportLabel::after { content: attr(data-size-see); visibility: hidden; }
 .v4DebBack {
   display: inline-flex; align-items: center; gap: 4px; min-height: 44px; max-width: 100%; align-self: flex-start;
   color: var(--link); font-size: var(--t-ui); font-weight: 600; text-decoration: none;
@@ -226,18 +240,15 @@ html:has(.appShell .consentBar):has(.v4DebPage) { scroll-padding-block-end: 188p
 .v4DebPaused { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .v4DebPaused p { margin: 0; }
 .v4DebPaused .v4Btn { min-height: 44px; }
-/* Owner review 3 Nov (wait-f2, wait-f5, map-f31): the one pause block. Its dot and sentence on one line; before the month
-   resets a plain grey label where Continue will be (not a button); after it, Continue. Motion (journey-d1 A): nothing
-   moves; a block that changes on screen gets the shared 1-second highlight (.v4Highlight, v4-base.css), kept as is with
-   reduced motion. */
+/* Owner review 3 Nov (wait-f2, wait-f5): the one pause block. Its dot and sentence on one line; before the month resets
+   a greyed "Continue on 1 December" where Continue will be (the owner's 5 Nov answer 19 A: .v4Btn.v4DigWaiting's greyed
+   look from v4-quota.css, never dashed: dashed is kept for "New", journey-f2); after it, the same button is Continue.
+   Motion (journey-d1 A): nothing moves; a block that changes on screen, or the sentence after an early press, gets the
+   shared 1-second highlight (.v4Highlight, v4-base.css), kept as is with reduced motion. */
 .v4Pause { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; border-radius: var(--r-card); min-width: 0; }
 .v4Pause p { margin: 0; }
 .v4PauseLine { display: flex; align-items: baseline; gap: 10px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
 .v4PauseLine .v4PauseDot { align-self: center; }
-.v4PauseUntil {
-  display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: var(--r-pill);
-  border: 1px dashed var(--line-strong); color: var(--text-2); font-weight: 600; font-size: var(--t-ui);
-}
 .v4PauseContinue { min-height: 44px; }
 /* W2L-4 (the wave-2 checks): a Continue on its way keeps its focus (aria-busy, never natively disabled), with the disabled
    .v4Btn's greyed look (v4-base.css) and the wait cursor; the phone bar's Continue too. */
@@ -385,6 +396,11 @@ html:has(.appShell .consentBar):has(.v4DebPage) { scroll-padding-block-end: 188p
 @media (max-width: 767px) {
   .v4Steps-line .v4StepsName { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .v4Steps-line .v4StepsStep + .v4StepsStep::before { width: 10px; margin-inline: 3px; }
+}
+/* The owner's answers of 5 Nov (question 18 A and its follow-up): on a phone the top bar drops its report button whenever
+   the bottom bar shows "Write my report" (useMapReport's `bottomShowsReport`), so one is on screen; a computer keeps it. */
+@media (max-width: 767px) {
+  .v4DebReportLink.v4DebReportAtBottom, .v4DebReportHold.v4DebReportAtBottom { display: none; }
 }
 /* The phone map's pinned top: the breadcrumb takes the room, the step dots sit at its end. */
 .v4WhereHead { display: flex; align-items: center; gap: 10px; min-width: 0; }

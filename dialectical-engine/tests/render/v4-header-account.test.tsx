@@ -9,18 +9,22 @@ import { setPathname } from "next/navigation";
 
 /*
  * V4 screen review (owner's picks, 3 Nov 2026, OWNER-PICKS-2026-11-03.md):
- *   ask-d6 A    one V4 header: brand, level menu, quota share, and one round account button with the person's initial. Its
- *               menu: "My maps" (ask-d5 B's All my maps), "Language", "Light or dark", "Settings", "Sign out". Signed out:
- *               "Sign in" in place of the round button.
+ *   ask-d6 A    one V4 header: brand, quota circle, and one round account button with the person's initial. Its menu:
+ *               "My questions" (the owner's answer to question 13, 5 Nov; it opens ask-d5 B's All my maps), "Language",
+ *               "Light or dark", "Settings", "Sign out". Signed out: "Sign in" in place of the round button.
  *   ask-f5      only one header row on the V4 pages: the site's old top bar steps back there.
  *   journey-f19 / ask-f6  "Open in the classic view" moves into the account menu, once; the header shows no classic link.
+ *               The menu shows it whenever the page gives its classic address. Question 12 B (5 Nov: in the menu only)
+ *               is not done on the map yet: its waiting, paused and failed screens still show it in their body.
+ *   The reading-level ruling (5 Nov): the menu's links and its way back carry no level, whatever the page hands it.
  */
 const server = vi.hoisted(() => ({
   session: "IN" as "IN" | "OUT",
   email: "maria@example.com" as string | null,
   sessionReads: 0,
   emailReads: 0,
-  pageReads: 0
+  pageReads: 0,
+  usageReads: 0
 }));
 vi.mock("@/lib/api", () => ({
   // The public lane's ask hook (a whole public page, W2L-8) imports these; a press would use them, and no test presses.
@@ -42,14 +46,18 @@ vi.mock("@/lib/api", () => ({
       if (server.email === null) throw new Error("503: EMAIL_CHANGE_UNAVAILABLE");
       return { email: server.email, recovery_email: null, pending: null };
     },
-    getBillingUsage: async () => { throw new Error("404: billing off"); },
+    // A paid person's usage, so a page that should show no quota is seen to read none and draw no circle.
+    getBillingUsage: async () => {
+      server.usageReads += 1;
+      return { plan_id: "PLUS", windows: [{ scope: "PERSON_DAY", percent: 15, resets_at: "2026-12-01T00:00:00.000Z" }] };
+    },
     logout: async () => undefined,
     revokeAllSessions: async () => ({ revoked: 0 })
   }
 }));
 
 import { V4Header } from "../../apps/ui/components/v4/V4Header.js";
-import { initialOf } from "../../apps/ui/components/v4/V4AccountMenu.js";
+import { initialOf, V4AccountMenu } from "../../apps/ui/components/v4/V4AccountMenu.js";
 import { TopBar } from "../../apps/ui/components/TopBar.js";
 import { V4PublicHeader, V4PublicSessionProvider } from "../../apps/ui/components/v4/V4PublicSession.js";
 import { PublicDebatePageClient } from "../../apps/ui/app/public/debate/[id]/PublicDebatePageClient.js";
@@ -66,6 +74,7 @@ beforeEach(() => {
   server.sessionReads = 0;
   server.emailReads = 0;
   server.pageReads = 0;
+  server.usageReads = 0;
   window.history.replaceState(null, "", "/v4/debate/11111111-1111-4111-8111-111111111111?level=plain");
   delete document.documentElement.dataset.mode;
 });
@@ -147,7 +156,7 @@ describe("ask-d6 A: the round account button", () => {
     expect(initialOf("@example.com")).toBeNull();
   });
 
-  it("the menu holds My maps, Language, Light or dark, Settings, the classic view once, then Sign out", async () => {
+  it("the menu holds My questions, Language, Light or dark, Settings, the classic view once, then Sign out", async () => {
     await mount(header({ classicHref: "/debate/11111111-1111-4111-8111-111111111111" }));
     // journey-f19: the header itself shows no classic link.
     expect(document.querySelector(".v4Hdr a[href^='/debate/']")).toBeNull();
@@ -160,20 +169,45 @@ describe("ask-d6 A: the round account button", () => {
       CATALOG["v4.common.classicView"],
       CATALOG["v4.header.menu.signOut"]
     ]);
-    expect(["My maps", "Language", "Light or dark", "Settings", "Sign out"].every((word) => items().some((item) => item.textContent === word))).toBe(true);
+    expect(["My questions", "Language", "Light or dark", "Settings", "Sign out"].every((word) => items().some((item) => item.textContent === word))).toBe(true);
     expect(menu()!.getAttribute("aria-label")).toBe(CATALOG["v4.header.account"]);
-    // ask-d5 B: "My maps" is All my maps, carrying the level the page's links carry.
-    expect(items()[0]!.getAttribute("href")).toBe("/v4?maps=all&level=plain");
+    // ask-d5 B: "My questions" is All my maps, with no level (the 5 Nov ruling), though the page hands the header one.
+    expect(items()[0]!.getAttribute("href")).toBe("/v4?maps=all");
     expect(items()[3]!.getAttribute("href")).toBe("/settings");
     expect(items()[4]!.getAttribute("href")).toBe("/debate/11111111-1111-4111-8111-111111111111");
     expect(document.querySelectorAll("[data-v4-menu=classic]")).toHaveLength(1);
   });
 
-  it("a page that shows the classic view elsewhere passes none, so the menu has no classic item", async () => {
+  it("a page that shows the classic view elsewhere (or has none) passes none, so the menu has no classic item", async () => {
     await mount(header({ classicHref: null }));
     await openMenu();
     expect(items().map((item) => item.textContent)).not.toContain(CATALOG["v4.common.classicView"]);
     expect(items()).toHaveLength(5);
+  });
+
+  it("given a classic address, the menu shows 'Open in the classic view' to it once, just above Sign out (what question 12 B builds on)", async () => {
+    // The account menu alone, as any page's header holds it (the map, its waiting, paused and failed screens, the report).
+    for (const classicHref of ["/debate/11111111-1111-4111-8111-111111111111", "/debate/22222222-2222-4222-8222-222222222222"]) {
+      await mount(<V4AccountMenu catalog={CATALOG} classicHref={classicHref} session="IN" />);
+      await openMenu();
+      const classic = items().filter((item) => item.textContent === CATALOG["v4.common.classicView"]);
+      expect(classic).toHaveLength(1);
+      expect(classic[0]!.getAttribute("href")).toBe(classicHref);
+      expect(classic[0]!.getAttribute("data-v4-menu")).toBe("classic");
+      expect(items().at(-2)).toBe(classic[0]);
+      expect(items().at(-1)!.textContent).toBe(CATALOG["v4.header.menu.signOut"]);
+      await act(async () => root!.unmount());
+      root = null;
+      host?.remove();
+    }
+  });
+
+  it("the reading-level ruling (5 Nov): a level handed to the menu goes on none of its links", async () => {
+    window.history.replaceState(null, "", "/v4/debate/11111111-1111-4111-8111-111111111111");
+    await mount(<V4AccountMenu catalog={CATALOG} level="expert" classicHref="/debate/11111111-1111-4111-8111-111111111111" session="IN" />);
+    await openMenu();
+    const hrefs = items().map((item) => item.getAttribute("href")).filter((href): href is string => href !== null);
+    expect(hrefs).toEqual(["/v4?maps=all", "/settings", "/debate/11111111-1111-4111-8111-111111111111"]);
   });
 
   it("Language closes the menu and opens the site's language list under the button; Escape gives focus back to it", async () => {
@@ -242,7 +276,8 @@ describe("W2L-8 (the wave-2 checks): a whole public page with the real account m
     expect(server.emailReads).toBe(emails);
     if (session === "IN") expect(accountButton()!.textContent).toBe("M");
     else expect(document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!.textContent).toBe(CATALOG["v4.ask.signIn"]);
-    expect(document.querySelector(".v4HdrQuotaHold, .v4HdrAllowance")).toBeNull();
+    expect(document.querySelector(".v4HdrQuotaHold, .v4HdrQuotaCircle")).toBeNull();
+    expect(server.usageReads).toBe(0);
   });
 });
 
@@ -256,19 +291,21 @@ describe("public-f13 with ask-d6 A: a public page reads the session once", () =>
     if (session === "IN") expect(accountButton()).not.toBeNull();
     else expect(document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!.textContent).toBe(CATALOG["v4.ask.signIn"]);
     // journey-f19: no quota on a public page.
-    expect(document.querySelector(".v4HdrAllowance")).toBeNull();
+    expect(document.querySelector(".v4HdrQuotaHold, .v4HdrQuotaCircle")).toBeNull();
+    expect(server.usageReads).toBe(0);
   });
 });
 
 describe("ask-d6 A: signed out, and while the page still checks", () => {
-  it("a page that knows the visitor is signed out shows Sign in in the button's place, with the way back to this page and its level", async () => {
+  it("a page that knows the visitor is signed out shows Sign in in the button's place, with the way back to this page as it is", async () => {
     window.history.replaceState(null, "", "/v4?topic=nuclear");
-    await mount(header({ session: "OUT" }));
+    await mount(header({ session: "OUT", readingLevel: "expert", linkLevel: "expert" }));
     expect(accountButton()).toBeNull();
     const signIn = document.querySelector<HTMLAnchorElement>(".v4HdrAccount a")!;
     expect(signIn.textContent).toBe(CATALOG["v4.ask.signIn"]);
     expect(signIn.className).toBe("v4Link v4HdrSignIn");
-    expect(signIn.getAttribute("href")).toBe(`/login?next=${encodeURIComponent("/v4?topic=nuclear&level=plain")}`);
+    // The 5 Nov reading-level ruling: no level is added to the way back, though the page hands the header one.
+    expect(signIn.getAttribute("href")).toBe(`/login?next=${encodeURIComponent("/v4?topic=nuclear")}`);
     // Nothing of the account is read for a stranger, and the page's own session answer is used.
     expect(server.sessionReads).toBe(0);
     expect(server.emailReads).toBe(0);

@@ -6,7 +6,6 @@ import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { readMapShelf, type DigLinkCache, type ShelfDig, type ShelfMap, type ShelfPause, type ShelfRead, type ShelfState } from "@/lib/v4/mapShelf";
 import { stateWordText, whenText } from "@/lib/v4/stateWords";
-import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 
 /*
@@ -15,6 +14,13 @@ import type { ReadingLevel } from "@/lib/v4/types";
  * "New" dot when the server gives them — each dig under its question in the person's own words, and "All my maps". The
  * "All my maps" view lists them further back, with "Show more". No counts anywhere. Nothing moves except the one slow
  * pulse of a map being looked into (none with reduced motion).
+ * The owner's third round (5 Nov afternoon): the list and the page behind it are called "My questions" (the account
+ * menu's word), and the link to that page reads "All my questions" (v4.maps.title, v4.maps.all).
+ * The reading-level ruling (owner, 5 Nov): a debate keeps the level it was asked at, so no link here carries a level; the
+ * level props are accepted and unused. Until the run read names the debate's own level (the server field), the map still
+ * shows and digs at the account's level, which it reads itself: the same level these links carried before (the ask page
+ * and All my maps held only the account's level). A debate's own links (its map and report, its digs) keep `?level=` until
+ * that field lands (the report page's rule on its sibling branch), so a round trip never leans on the account.
  */
 
 /** The ask page's shelf: this many questions. */
@@ -22,10 +28,13 @@ export const SHELF_MAX = 5;
 /** Digs shown under a card (the newest); the rest are on the map itself. */
 const SHELF_DIGS_MAX = 2;
 
-/** The address of "All my maps": a view of the ask page (`?maps=all`), so no new page route is needed. */
+/**
+ * The address of "All my maps": a view of the ask page (`?maps=all`), so no new page route is needed. A level handed in is
+ * accepted and unused (the 5 Nov reading-level ruling).
+ */
 export const ALL_MAPS_PARAM = "maps";
-export function allMapsHref(level: ReadingLevel | null): string {
-  return levelHref(`/v4?${ALL_MAPS_PARAM}=all`, level);
+export function allMapsHref(_level?: ReadingLevel | null): string {
+  return `/v4?${ALL_MAPS_PARAM}=all`;
 }
 
 export type ShelfLoad =
@@ -95,14 +104,14 @@ export function shelfStateText(
   }
 }
 
-function mapHref(runId: string, level: ReadingLevel | null): string {
-  return levelHref(`/v4/debate/${encodeURIComponent(runId)}`, level);
+function mapHref(runId: string): string {
+  return `/v4/debate/${encodeURIComponent(runId)}`;
 }
 
-function DigLine({ dig, catalog, locale, level }: Readonly<{ dig: ShelfDig; catalog: MessageCatalog; locale: string; level: ReadingLevel | null }>) {
+function DigLine({ dig, catalog, locale }: Readonly<{ dig: ShelfDig; catalog: MessageCatalog; locale: string }>) {
   return (
     <li>
-      <Link className="v4ShelfDig" href={mapHref(dig.runId, level)}>
+      <Link className="v4ShelfDig" href={mapHref(dig.runId)}>
         <span className="v4ShelfDigText" dir="auto" data-ai-generated="true">
           {t(catalog, dig.more ? "v4.maps.digMore" : "v4.maps.dig", { pick: dig.pick })}
         </span>
@@ -112,12 +121,12 @@ function DigLine({ dig, catalog, locale, level }: Readonly<{ dig: ShelfDig; cata
   );
 }
 
-function MapCard({ map, catalog, locale, level, digsMax }: Readonly<{
-  map: ShelfMap; catalog: MessageCatalog; locale: string; level: ReadingLevel | null; digsMax: number;
+function MapCard({ map, catalog, locale, digsMax }: Readonly<{
+  map: ShelfMap; catalog: MessageCatalog; locale: string; digsMax: number;
 }>) {
   return (
     <li className="v4ShelfItem">
-      <Link className="v4ShelfCard" href={mapHref(map.runId, level)}>
+      <Link className="v4ShelfCard" href={mapHref(map.runId)}>
         <span className="v4ShelfQuestion" dir="auto" data-ai-generated="true">{map.question}</span>
         {map.bar === null ? null : <V4TrustBar counts={map.bar} catalog={catalog} />}
         <span className="v4ShelfMeta">
@@ -132,34 +141,39 @@ function MapCard({ map, catalog, locale, level, digsMax }: Readonly<{
       </Link>
       {map.digs.length === 0 ? null : (
         <ul className="v4ShelfDigs">
-          {map.digs.slice(0, digsMax).map((dig) => <DigLine key={dig.runId} dig={dig} catalog={catalog} locale={locale} level={level} />)}
+          {map.digs.slice(0, digsMax).map((dig) => <DigLine key={dig.runId} dig={dig} catalog={catalog} locale={locale} />)}
         </ul>
       )}
     </li>
   );
 }
 
-export function MapList({ maps, catalog, locale, level, digsMax }: Readonly<{
-  maps: readonly ShelfMap[]; catalog: MessageCatalog; locale: string; level: ReadingLevel | null; digsMax: number;
+export function MapList({ maps, catalog, locale, digsMax }: Readonly<{
+  maps: readonly ShelfMap[]; catalog: MessageCatalog; locale: string;
+  /** Accepted and unused (the 5 Nov reading-level ruling). */
+  level?: ReadingLevel | null;
+  digsMax: number;
 }>) {
   return (
     <ul className="v4ShelfList">
-      {maps.map((map) => <MapCard key={map.runId} map={map} catalog={catalog} locale={locale} level={level} digsMax={digsMax} />)}
+      {maps.map((map) => <MapCard key={map.runId} map={map} catalog={catalog} locale={locale} digsMax={digsMax} />)}
     </ul>
   );
 }
 
 /** The ask page's "Your maps": shown once read with at least one map; quiet when there is none or the read failed. */
-export function V4MapShelf({ load, catalog, locale, level }: Readonly<{
-  load: ShelfLoad; catalog: MessageCatalog; locale: string; level: ReadingLevel | null;
+export function V4MapShelf({ load, catalog, locale }: Readonly<{
+  load: ShelfLoad; catalog: MessageCatalog; locale: string;
+  /** Accepted and unused (the 5 Nov reading-level ruling: no link carries a level). */
+  level?: ReadingLevel | null;
 }>) {
   const headingId = useId();
   if (load.status !== "READ" || load.read.maps.length === 0) return null;
   return (
     <section className="v4Shelf" aria-labelledby={headingId}>
       <h2 id={headingId} className="v4ShelfTitle">{t(catalog, "v4.maps.title")}</h2>
-      <MapList maps={load.read.maps} catalog={catalog} locale={locale} level={level} digsMax={SHELF_DIGS_MAX} />
-      <Link className="v4Link v4ShelfAll" href={allMapsHref(level)}>{t(catalog, "v4.maps.all")}</Link>
+      <MapList maps={load.read.maps} catalog={catalog} locale={locale} digsMax={SHELF_DIGS_MAX} />
+      <Link className="v4Link v4ShelfAll" href={allMapsHref()}>{t(catalog, "v4.maps.all")}</Link>
     </section>
   );
 }

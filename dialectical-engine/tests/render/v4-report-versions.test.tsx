@@ -10,6 +10,7 @@ import { InvestigationReportsSchema, type InvestigationReports, type Investigati
 import type { ReopenResult, WriteReportResult } from "../../apps/ui/lib/v4/load.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
+import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import { CATALOG, harness, mountMap, page, resetHarness, seededAnswer, seededStory, settle, unmountMap } from "./v4-debate-harness.js";
 
 const reports = vi.hoisted(() => ({
@@ -29,8 +30,12 @@ const reports = vi.hoisted(() => ({
 }));
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
 vi.mock("@/components/v4/V4Header", async () => (await import("./v4-debate-harness.js")).headerMock);
-// ask-d6 A: the report row's account button reads the session; its own test is v4-header-account.
-vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => <span className="v4HdrAccount" /> }));
+// ask-d6 A: the report row's account button reads the session; its own test is v4-header-account. Here it shows what the
+// report hands it (owner 5 Nov, question 12 B: the classic view; the level ruling: no level on its links).
+vi.mock("@/components/v4/V4AccountMenu", () => ({
+  V4AccountMenu: ({ classicHref, level }: { classicHref: string | null; level: string | null }) =>
+    <span className="v4HdrAccount" data-classic={classicHref ?? "none"} data-level={level ?? "none"} />
+}));
 vi.mock("@/components/billing/RoomNotice", async () => (await import("./v4-debate-harness.js")).roomNoticeMock);
 vi.mock("@/lib/v4/useV4Ask", async () => (await import("./v4-debate-harness.js")).useV4AskMock);
 vi.mock("@/lib/v4/load", async (original) => {
@@ -75,8 +80,10 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 const word = (key: string, values: Record<string, string | number> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const DIG = "22222222-2222-4222-8222-222222222222";
-const date = (iso: string, style: "medium" | "long" = "medium") => new Intl.DateTimeFormat("en", { dateStyle: style }).format(new Date(iso));
-const clock = (iso: string) => new Intl.DateTimeFormat("en", { timeStyle: "short", hourCycle: "h23" }).format(new Date(iso));
+// Owner 5 Nov, question 4 A: the report's dates in the long form with the year, a clock only in the 24-hour form. Built
+// with the site's own helper, so the expected words follow its English order (day first, question 5 B).
+const date = (iso: string) => formatDate("en", iso, { dateStyle: "long" });
+const clock = (iso: string) => formatDate("en", iso, { timeStyle: "short", hourCycle: "h23" });
 const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-report.css"), "utf8");
 
 const STORY = {
@@ -118,12 +125,12 @@ const noInvestigation = (runId: string): InvestigationReports =>
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
-async function mountReport(runId: string, level: "plain" | "background" | "expert" = "background"): Promise<HTMLDivElement> {
+async function mountReport(runId: string, level: "plain" | "background" | "expert" = "background", locale = "en"): Promise<HTMLDivElement> {
   const { V4ReportClient } = await import("../../apps/ui/components/v4/V4ReportClient.js");
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root?.render(<V4ReportClient id={runId} locale="en" initialLevel={level} catalog={CATALOG} newDebateCatalog={{}} />));
+  await act(async () => root?.render(<V4ReportClient id={runId} locale={locale} initialLevel={level} catalog={CATALOG} newDebateCatalog={{}} />));
   await settle();
   return host;
 }
@@ -179,6 +186,11 @@ describe("the report page's versions", () => {
       word("v4.investigation.version", { n: 1, date: date("2026-10-29T10:00:00.000Z") })
     ]);
     expect(node.querySelector(".v4RepVersion")!.textContent).toBe(`Version 2 · ${date("2026-10-31T10:00:00.000Z")} (current)`);
+    // Question 4 A: the long form with the year, whichever order the site's English puts it in.
+    for (const label of [...node.querySelectorAll(".v4RepVersion")].map((button) => button.textContent ?? "")) {
+      expect(label).toContain("October");
+      expect(label).toContain("2026");
+    }
     expect(node.querySelector(".v4RepVersion")!.getAttribute("aria-pressed")).toBe("true");
     // Version 2: shortened, and no story (the approved lines, word for word); its answer stands in.
     expect(node.textContent).toContain("The investigation was very large, so the report was written from a shortened version of it.");
@@ -220,7 +232,7 @@ describe("the report page's versions", () => {
     expect(source.querySelector(".v4RepSourceLine")!.textContent).toBe(SOURCE.line);
     expect(source.querySelector("blockquote")!.textContent).toBe(SOURCE.quote);
     // report-f13: "Version 1 · written <its own date>", printed above its body.
-    expect(node.querySelector(".v4RepVersionLine")!.textContent).toBe(`Version 1 · written ${date("2026-10-29T10:00:00.000Z", "long")}`);
+    expect(node.querySelector(".v4RepVersionLine")!.textContent).toBe(`Version 1 · written ${date("2026-10-29T10:00:00.000Z")}`);
   });
 
   it("f3 + r2-20: each version shows its OWN paths, each with one trust word and no outcome tag; a pre-R22 earlier version says it keeps only its answer", async () => {
@@ -302,7 +314,41 @@ describe("the report page's versions", () => {
     expect(node.querySelector(".v4RepVersion")!.textContent).toContain("(current)");
   });
 
-  it("f7: while a dig runs, ONLY the line that names it; with several, the line that says how many", async () => {
+  it("question 4 A (owner, 5 Nov): a start on another day names it in the long form with the year, the clock in 24 hours", async () => {
+    // The owner's third round (5 Nov afternoon): the long form everywhere, the same as the map's report line, the waiting
+    // card and the list of your questions (one helper, lib/v4/stateWords.ts whenText; v4-map-report-answers pins the map).
+    // Pressed just before midnight, read just after it (local time): another day, still well inside the 15 minutes.
+    const closed = new Date(2026, 10, 4, 23, 55).toISOString();
+    vi.setSystemTime(new Date(2026, 10, 5, 0, 5));
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => investigation(runId, "CLOSED", [{ ...writing(1, 0), closed_at: closed } as InvestigationReportVersion], 0));
+    const node = versionSection(await mountReport(runId))!;
+    const status = text(node.querySelector(".v4RepStatusBox"));
+    expect(status).toBe(word("v4.investigation.writingSince", { time: `${date(closed)}, ${clock(closed)}` }));
+    // The parts, whichever order the site's English puts the day and the month in.
+    for (const part of ["November", "2026", ", 23:55."]) expect(status).toContain(part);
+    expect(status).not.toMatch(/\b(?:AM|PM)\b/u);
+  });
+
+  it("question 4 A: on another day, a page in another language joins the date and the clock in its own way, not with an English comma", async () => {
+    const closed = new Date(2026, 10, 4, 23, 55).toISOString();
+    vi.setSystemTime(new Date(2026, 10, 5, 0, 5));
+    for (const locale of ["de", "ja"]) {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+        host?.remove();
+      }
+      const runId = crypto.randomUUID();
+      reports.load = vi.fn(async () => investigation(runId, "CLOSED", [{ ...writing(1, 0), closed_at: closed } as InvestigationReportVersion], 0));
+      const node = versionSection(await mountReport(runId, "background", locale))!;
+      const status = text(node.querySelector(".v4RepStatusBox"));
+      const joined = formatDate(locale, closed, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" });
+      expect(status, locale).toBe(word("v4.investigation.writingSince", { time: joined }));
+      expect(status, locale).not.toContain(`${formatDate(locale, closed, { dateStyle: "long" })}, `);
+    }
+  });
+
+  it("f7: while a dig runs, ONLY the line that names it; with several, the line with no number (the owner's 5 Nov answer 23 A)", async () => {
     const runId = crypto.randomUUID();
     const child = crypto.randomUUID();
     harness.records = { parent: null, children: [{ parent_run_id: runId, child_run_id: child, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-30T10:00:00.000Z" }] };
@@ -318,7 +364,7 @@ describe("the report page's versions", () => {
     host?.remove();
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
     const several = versionSection(await mountReport(runId))!;
-    expect(text(several.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the 2 digs in progress finish.");
+    expect(text(several.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the digs in progress finish.");
   });
 
   it("f8: after 15 minutes it says it is taking longer and keeps checking; Check again, the tab coming back and the network returning read at once", async () => {
@@ -527,7 +573,10 @@ describe("the report page's address and states", () => {
     await settle();
     expect(reports.reads).toEqual([dig, rootRun]);
     expect(window.location.pathname).toBe(`/v4/debate/${rootRun}/report`);
-    expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toMatch(new RegExp(`^/v4/debate/${rootRun}(?:\\?|$)`, "u"));
+    // The level ruling (owner, 5 Nov): until the server names the debate's own level, the moved address and the way back
+    // keep the level the report was opened at, so the map and its report agree both ways.
+    expect(window.location.search).toBe("?level=background");
+    expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${rootRun}?level=background`);
     expect(versionSection(node)).not.toBeNull();
   });
 
@@ -547,6 +596,7 @@ describe("the report page's address and states", () => {
       await settle();
       expect(reports.reads, state).toEqual([dig, rootRun]);
       expect(window.location.pathname, state).toBe(`/v4/debate/${rootRun}/report`);
+      expect(window.location.search, state).toBe("?level=background");
       expect(node.textContent, state).not.toContain(word("v4.report.notReady"));
       expect(node.textContent, state).not.toContain(word("v4.report.failed"));
       expect(versionSection(node), state).not.toBeNull();
@@ -574,8 +624,10 @@ describe("the report page's address and states", () => {
     expect(node.textContent).toContain(word("v4.report.notFound"));
     expect(node.textContent).not.toContain(word("v4.report.loadFailed"));
     const ask = [...node.querySelectorAll("a")].find((link) => link.textContent === CATALOG["v4.debate.askNew"])!;
-    expect(ask.getAttribute("href")).toMatch(/^\/v4(?:\?|$)/u);
+    expect(ask.getAttribute("href")).toBe("/v4");
     expect(node.querySelector(".v4RepHdrBack")).toBeNull();
+    // No such debate: no classic view to offer, in the menu or anywhere else.
+    expect(node.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe("none");
   });
 
   it("f10: a passing fault still offers Try again", async () => {
@@ -585,21 +637,23 @@ describe("the report page's address and states", () => {
     expect(buttonOf(node, "Try again")).not.toBeNull();
   });
 
-  it("f10: a failed debate offers Ask a new question, with the classic view small under it (after map-f30's way back)", async () => {
+  it("f10: a failed debate offers Ask a new question (after map-f30's way back); the classic view is in the account menu only", async () => {
     const runId = crypto.randomUUID();
     harness.run = { run_ref: runId, question_line: "Q?", state: "FAILED", terminal_reason: "RUNNER_FAILED", hold_until: null } as RunProjection;
     const node = await mountReport(runId);
     const state = node.querySelector(".v4RepState")!;
     expect(state.textContent).toContain(word("v4.report.failed"));
     const links = [...state.querySelectorAll("a")];
-    // map-f30 first: back to the debate's own page, where "Ask this again" is; then report-f10's two.
-    expect(links.map((link) => link.textContent)).toEqual([
-      CATALOG["v4.report.backToQuestion"], CATALOG["v4.debate.askNew"], CATALOG["v4.common.classicView"]
-    ]);
+    // map-f30 first: back to the debate's own page, where "Ask this again" is; then report-f10's Ask a new question.
+    expect(links.map((link) => link.textContent)).toEqual([CATALOG["v4.report.backToQuestion"], CATALOG["v4.debate.askNew"]]);
     expect(links[0]!.className).toContain("v4BtnPrimary");
-    expect(links[1]!.getAttribute("href")).toMatch(/^\/v4(?:\?|$)/u);
-    expect(links[2]!.getAttribute("href")).toBe(`/debate/${runId}`);
-    expect(links[2]!.className).not.toContain("v4Btn");
+    // The level ruling: the way back keeps the level the report was opened at (until the server names the debate's own);
+    // a new question picks its own level, so "Ask a new question" carries none.
+    expect(links[0]!.getAttribute("href")).toBe(`/v4/debate/${runId}?level=background`);
+    expect(links[1]!.getAttribute("href")).toBe("/v4");
+    // Owner 5 Nov, question 12 B (journey-f19, "nowhere else"): the small link under it went; the account menu has it.
+    expect(node.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
+    expect(node.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe(`/debate/${runId}`);
   });
 });
 
@@ -612,22 +666,36 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     }));
   afterEach(() => { vi.unstubAllGlobals(); fetches.length = 0; });
 
-  it("is one row: Back to the map, the reading level and Share; no quota share, and the classic view moves to the page foot", async () => {
+  it("is one row: Back to the map and Share, with no level menu (5 Nov ruling); no quota share, and the classic view is in the account menu only", async () => {
     answerFetch(200);
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => noInvestigation(runId));
     const node = await mountReport(runId);
     const row = node.querySelector(".v4RepHdr")!;
-    // ask-d6 A / journey-f19: the row ends in the V4 header's round account button (no classic link in its menu here).
-    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepLevel", "v4RepMenu v4RepShare", "v4HdrAccount"]);
+    // ask-d6 A / journey-f19: the row ends in the V4 header's round account button.
+    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepShare", "v4HdrAccount"]);
+    // The level ruling (owner, 5 Nov): until the server names the debate's own level, only the ways back to this debate's
+    // map keep the level the report was opened at; the account menu gets none.
+    expect(row.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${runId}?level=background`);
+    expect(row.querySelector(".v4HdrAccount")!.getAttribute("data-level")).toBe("none");
+    const levelled = [...node.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "").filter((href) => href.includes("level="));
+    expect(levelled.length).toBeGreaterThan(0);
+    expect(new Set(levelled)).toEqual(new Set([`/v4/debate/${runId}?level=background`]));
+    // ...and the line above the title says only "Report", with no level (a drafted line).
+    expect(node.querySelector(".v4RepMeta")!.textContent).toBe(CATALOG["v4.report.eyebrow"]);
+    expect(node.querySelector(".v4RepMeta")!.textContent).not.toContain(CATALOG["v4.readingLevel.background"]);
     // Browser check (4 Nov): the full words, and the short word a phone shows instead; the name is the full sentence.
     expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`←${CATALOG["v4.report.backToMap"]}${CATALOG["v4.report.backToMapShort"]}`);
     expect(row.querySelector(".v4RepHdrBack")!.getAttribute("aria-label")).toBe(CATALOG["v4.report.backToMap"]);
     expect(row.querySelector(".v4RepHdrBackShort")!.getAttribute("aria-hidden")).toBe("true");
-    expect(text(row.querySelector(".v4RepLevel .v4RepMenuButton"))).toBe(`${CATALOG["v4.readingLevel.background"]}▾`);
+    // The reading-level ruling (5 Nov): the level is chosen only when asking; the report's header names none.
+    expect(row.querySelector(".v4RepLevel")).toBeNull();
+    expect(text(row)).not.toContain(CATALOG["v4.readingLevel.background"]);
     expect(node.textContent).not.toMatch(/allowance|quota|% used/u);
-    expect(row.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
-    expect(node.querySelector(".v4RepFoot a")!.getAttribute("href")).toBe(`/debate/${runId}`);
+    // Owner 5 Nov, question 12 B (journey-f19, "nowhere else"): no foot link; the account menu holds the classic view.
+    expect(node.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
+    expect(node.querySelector(".v4RepFoot")).toBeNull();
+    expect(row.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe(`/debate/${runId}`);
     // report-f5: before a report, Share offers Print and Copy link, never the old V3 PDF.
     const items = await shareMenu(node);
     expect(Object.keys(items)).toEqual(["print", "copy"]);
@@ -647,10 +715,47 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     expect(print).toHaveBeenCalledTimes(1);
     await press((await shareMenu(node)).copy!);
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/v4/debate/${runId}/report`);
-    expect(node.querySelector(".v4RepHdrStatus")!.textContent).toBe(word("v4.report.linkCopied"));
-    await settle(5_000);
-    expect(node.querySelector(".v4RepHdrStatus")!.textContent).toBe("");
+    const status = () => node.querySelector(".v4RepHdrStatus")!.textContent;
+    expect(status()).toBe(word("v4.report.linkCopied"));
+    // Owner 5 Nov, question 35 A: "Link copied." stays until the next Share choice (as on the "Public" line), no timer.
+    await settle(60_000);
+    expect(status()).toBe(word("v4.report.linkCopied"));
+    // The next choice replaces it: Print clears it.
+    await press((await shareMenu(node)).print!);
+    expect(print).toHaveBeenCalledTimes(2);
+    expect(status()).toBe("");
+    // A copy that fails says so, and that line stays until the next choice (as before: the old timer only cleared "Link
+    // copied.", so this part guards what was already so).
+    writeText.mockImplementationOnce(async () => { throw new Error("denied"); });
+    await press((await shareMenu(node)).copy!);
+    expect(status()).toBe(word("v4.report.copyFailed"));
+    await settle(60_000);
+    expect(status()).toBe(word("v4.report.copyFailed"));
+    await press((await shareMenu(node)).copy!);
+    expect(status()).toBe(word("v4.report.linkCopied"));
     print.mockRestore();
+  });
+
+  it("question 35 A: a second Copy link clears the line first, so the status line says 'Link copied.' anew and is read out again", async () => {
+    answerFetch(200);
+    const runId = crypto.randomUUID();
+    reports.load = vi.fn(async () => noInvestigation(runId));
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const node = await mountReport(runId);
+    const status = () => node.querySelector(".v4RepHdrStatus")!.textContent;
+    await press((await shareMenu(node)).copy!);
+    expect(status()).toBe(word("v4.report.linkCopied"));
+    // The second press: while the copy is under way the line is empty, then it says "Link copied." again. Setting the same
+    // words twice would change nothing on the page, and a screen reader would say nothing the second time.
+    let release: () => void = () => undefined;
+    writeText.mockImplementationOnce(() => new Promise<undefined>((resolveCopy) => { release = () => resolveCopy(undefined); }));
+    await press((await shareMenu(node)).copy!);
+    expect(writeText).toHaveBeenCalledTimes(2);
+    expect(status()).toBe("");
+    await act(async () => release());
+    await settle();
+    expect(status()).toBe(word("v4.report.linkCopied"));
   });
 
   it("f11: once a report stands, Share offers that version's PDF, made inside the page with 'Making your PDF…'", async () => {
@@ -743,8 +848,18 @@ describe("the report on paper and in other languages", () => {
     // The shared web notes and source lists carry their own language (reader 1's) and are not the report's.
     const marked = [...node.querySelectorAll<HTMLElement>("[data-ai-generated]")].filter((element) => element.closest(".v4WebNote, .v4Sources, .v4OtherPages") === null);
     expect(marked.length).toBeGreaterThan(10);
-    expect(marked.filter((element) => element.lang !== "ar" || element.dir !== "auto")).toEqual([]);
-    expect(node.querySelector(".v4RepVersionBody .v4RepList")!.getAttribute("dir")).toBe("auto");
+    // The w6 browser check (5 Nov): an item of a list of AI text carries no direction of its own, so the list's dir="auto"
+    // reads the items' text and takes their direction, and its markers and padding sit on their reading side. With a
+    // direction on every item the list found no text of its own and stayed left to right on an English page, and an
+    // Arabic item's bullet went past the page's right edge (the page scrolled sideways at 375 px).
+    const items = marked.filter((element) => element.matches(".v4RepList > li, .v4RepDigQuestions > li"));
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.filter((element) => element.hasAttribute("dir"))).toEqual([]);
+    expect(marked.filter((element) => element.lang !== "ar" || (!items.includes(element) && element.dir !== "auto"))).toEqual([]);
+    for (const list of node.querySelectorAll<HTMLElement>(".v4RepList, .v4RepDigQuestions")) {
+      expect(list.getAttribute("dir")).toBe("auto");
+      expect(list.lang).toBe("ar");
+    }
     // Padding and rule lines sit on the reading side.
     expect(css).not.toMatch(/padding-left|border-left|margin-left/u);
   });
@@ -803,7 +918,8 @@ describe("the report's digs (review F6, F7)", () => {
 
   it("F6: the page is drawn once the digs are read, so 'Your digs' is there from the first draw, never popping in", async () => {
     const runId = crypto.randomUUID();
-    harness.records = { parent: null, children: [link(runId, crypto.randomUUID(), "n-mix", 0)] };
+    const child = crypto.randomUUID();
+    harness.records = { parent: null, children: [link(runId, child, "n-mix", 0)] };
     let release: () => void = () => undefined;
     const held = new Promise<void>((resolveHeld) => { release = resolveHeld; });
     reports.digView = async (dig) => {
@@ -820,6 +936,9 @@ describe("the report's digs (review F6, F7)", () => {
     const digs = node.querySelector(".v4RepDigs")!;
     expect(digs.querySelectorAll(".v4RepDig")).toHaveLength(1);
     expect(node.textContent).not.toContain(CATALOG["v4.common.loading"]);
+    // The level ruling (owner, 5 Nov): a dig keeps its first question's level; until the server names it, the dig's map
+    // link carries the level the report was opened at.
+    expect(digs.querySelector("a.v4RepDigLink")!.getAttribute("href")).toBe(`/v4/debate/${child}?level=background`);
   });
 
   it("F7: while the report waits, each dig is read again with the versions, so the line names the dig really still going", async () => {
@@ -840,7 +959,7 @@ describe("the report's digs (review F6, F7)", () => {
     const load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the 2 digs in progress finish.");
+    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the digs in progress finish.");
     // The first dig finishes; the report now waits only for the second one's rewrite.
     now.set(first, { state: "DONE", rewrite: null });
     load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 1)]));

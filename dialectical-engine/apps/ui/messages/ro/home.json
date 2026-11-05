@@ -74,7 +74,7 @@
   "home.turn": "Replica {turn}",
   "home.sampleCoda": "Runda se încheie aici. Nimeni nu este declarat câștigător. Primiți transcrierea, cele două marcaje pentru fiecare replică și veriga pe care ați cedat-o.",
   "home.closingTitle": "Argumentul dvs. este la fel de solid ca cea mai slabă verigă a sa.",
-  "home.closingLede": "Parcurgeți o rundă. Patru replici, aproximativ nouă minute și o transcriere care vă arată exact unde ați încetat să răspundeți.",
+  "home.closingLede": "Parcurgeți o rundă. Patru replici și o transcriere care vă arată exact unde ați încetat să răspundeți.",
   "home.pricingCopyPlusTax": "Începeți gratuit. Abonamentele plătite pornesc de la {price} + {taxName} pe lună. Anulați oricând.",
   "home.pricingCopyNoTax": "Începeți gratuit. Abonamentele plătite pornesc de la {price} pe lună, fără taxe adăugate. Anulați oricând.",
   "home.pricingCopyChoose": "Începeți gratuit. Abonamentele plătite pornesc de la {price} pe lună, plus taxe, unde se aplică. Anulați oricând.",

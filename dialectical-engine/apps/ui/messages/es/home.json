@@ -74,7 +74,7 @@
   "home.turn": "Turno {turn}",
   "home.sampleCoda": "La ronda termina aquí. No se declara ningún ganador. Usted recibe la transcripción, las dos notas de cada turno y el eslabón que cedió.",
   "home.closingTitle": "Su argumento es tan sólido como su eslabón más débil.",
-  "home.closingLede": "Complete una ronda. Cuatro turnos, unos nueve minutos y una transcripción que le indica exactamente dónde dejó de responder.",
+  "home.closingLede": "Complete una ronda. Cuatro turnos y una transcripción que le indica exactamente dónde dejó de responder.",
   "home.pricingCopyPlusTax": "Empiece gratis. Los planes de pago empiezan en {price} + {taxName} al mes. Cancele cuando quiera.",
   "home.pricingCopyNoTax": "Empiece gratis. Los planes de pago empiezan en {price} al mes, sin impuestos añadidos. Cancele cuando quiera.",
   "home.pricingCopyChoose": "Empiece gratis. Los planes de pago empiezan en {price} al mes, más impuestos cuando corresponda. Cancele cuando quiera.",

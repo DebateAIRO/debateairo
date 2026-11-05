@@ -10,7 +10,7 @@ import type {
 import type { RunProjection } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
-import { t, tPlural, type MessageCatalog } from "../i18n/translate.js";
+import { formatDate, t, tPlural, type MessageCatalog } from "../i18n/translate.js";
 import type {
   DebateAdaptiveDepthDryRunResponse,
   DebateCompletion,
@@ -680,7 +680,8 @@ export function debateDetailFromRunProjection(
     : Math.max(0, Math.ceil((holdUntilMs - Date.now()) / 60_000));
   const holdReason = run.state === "HOLDING" && run.hold_until !== null
     ? t(catalog, "compose.v3.providerHold", {
-        retryAt: new Date(run.hold_until).toLocaleString(),
+        // The site's language, not the browser's own form: English is day first on the 24-hour clock (question 5).
+        retryAt: formatDate(locale, run.hold_until, { dateStyle: "medium", timeStyle: "short" }),
         remaining: tPlural(catalog, "compose.v3.minutesRemaining", remainingMinutes ?? 0, locale)
       })
     : null;

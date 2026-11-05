@@ -13,6 +13,10 @@ import { pauseOfRun } from "@/lib/v4/monthPause";
  * its sentence is the only state line, so the pause is said once. No "usually takes" line and no ticking time: nothing
  * runs while it is paused.
  *
+ * "Open in the classic view" shows at its foot only when the page hands it here. The owner's answers of 5 Nov (question 12 B,
+ * journey-f19) put it in the account menu only: the page stops handing it here when its header carries it (V4DebateClient),
+ * so the card is never left without it in between.
+ *
  * Where it goes: V4DebateClient shows it in place of ProgressScreen while the run read carries `month_pause` (a thin
  * switch, so ProgressScreen itself is untouched). When the start-step's new wait view lands, this card's body (the block)
  * belongs inside that view in place of its state line; the switch then goes.
@@ -32,7 +36,8 @@ export function V4PausedScreen({ run, runId, reconnecting, classicHref, catalog,
   run: RunProjection;
   runId: string;
   reconnecting: boolean;
-  classicHref: string;
+  /** "Open in the classic view" at the foot; absent or null: none (question 12 B: the account menu carries it then). */
+  classicHref?: string | null;
   catalog: MessageCatalog;
   locale: string;
 }>) {
@@ -45,7 +50,7 @@ export function V4PausedScreen({ run, runId, reconnecting, classicHref, catalog,
       <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</h1>
       <V4MonthPause runId={runId} pause={pause} catalog={catalog} locale={locale} focusAfter={progressHeading} />
       {reconnecting ? <p className="v4Muted">{t(catalog, "v4.debate.reconnecting")}</p> : null}
-      <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
+      {classicHref === null || classicHref === undefined ? null : <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>}
     </section>
   );
 }

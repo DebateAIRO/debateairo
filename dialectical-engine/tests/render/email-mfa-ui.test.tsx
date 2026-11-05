@@ -288,4 +288,11 @@ describe("the 24-hour wait and the finish link", () => {
     expect(host.textContent).toContain(ja["finishWait.title"]); expect(ja["finishWait.title"]).not.toBe(en["finishWait.title"]);
     expect(host.querySelector("time")?.textContent).toBe(new Intl.DateTimeFormat("ja", { dateStyle: "medium", timeStyle: "short" }).format(new Date(not_before)));
   });
+  // Owner's answer to question 5 (5 Nov 2026): every English reader, United States English too, reads the day first on the 24-hour clock.
+  it.each(["en", "en-US", "en-GB"] as const)("shows the wait day first on the 24-hour clock in %s", async (locale) => {
+    const f = finishFixture([{ status: "waiting", not_before }]); await open(f, en, locale);
+    const shown = host.querySelector("time")?.textContent ?? "";
+    expect(shown).toBe(new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(not_before)));
+    expect(shown).not.toMatch(/\b(AM|PM)\b/);
+  });
 });

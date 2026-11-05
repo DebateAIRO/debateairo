@@ -6,8 +6,10 @@ import { digTargetQuestions } from "../../apps/ui/lib/v4/askText.js";
 import { digRetryOf, rebuildDigTarget, retryPending, sameDig } from "../../apps/ui/lib/v4/digRetry.js";
 import { rememberSentDig, sentDigOf } from "../../apps/ui/lib/v4/useSentDigs.js";
 import {
-  askAgainHref, askAgainQuestion, askAgainRunId, quotaUntouched, reasonSaysNothingUsed, sayNothingTaken
+  askAgainHref, askAgainQuestion, askAgainRunId, digFailureMessage, failedQuotaKey, quotaSomeUsed, quotaUntouched, reasonSaysNothingUsed,
+  sayNothingTaken, saySomeUsed
 } from "../../apps/ui/lib/v4/failedRun.js";
+import { RUN_FAILURE_KINDS } from "../../apps/ui/lib/v3/runFailure.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import {
   digPauseCardLine, pauseOfDig, pauseOfRun, pausePhoneBar, pausedDigCount, pauseSentence
@@ -62,6 +64,50 @@ describe("the failed page (wait-f11, map-f30)", () => {
     expect(sayNothingTaken("RUN_SET_ASIDE:BACKSTOP", true)).toBe(false);
     expect(sayNothingTaken("RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", true)).toBe(true);
     expect(sayNothingTaken("RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", false)).toBe(false);
+  });
+
+  it("question 20 A: a failed question says the server's NONE or SOME; a dig says only NONE; nothing without the field", () => {
+    expect(quotaSomeUsed(failedRun({ quota_used: "SOME" }))).toBe(true);
+    expect(quotaSomeUsed(failedRun({ quota_used: "NONE" }))).toBe(false);
+    expect(quotaSomeUsed(failedRun())).toBe(false);
+    expect(quotaSomeUsed({ ...failedRun({ quota_used: "SOME" }), state: "RUNNING", terminal_reason: null })).toBe(false);
+    expect(saySomeUsed("RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED", true)).toBe(true);
+    expect(saySomeUsed("RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED", false)).toBe(false);
+    // A waived run never reads SOME; if it did, the page would not contradict the reason's own "did not use your quota".
+    expect(saySomeUsed("RUN_SET_ASIDE:BACKSTOP", true)).toBe(false);
+    // The question's lines.
+    expect(failedQuotaKey(failedRun({ quota_used: "NONE" }), false)).toBe("v4.debate.failedNothingTaken");
+    expect(failedQuotaKey(failedRun({ quota_used: "SOME" }), false)).toBe("v4.debate.failedSomeTaken");
+    expect(failedQuotaKey(failedRun(), false)).toBeNull();
+    expect(failedQuotaKey(failedRun({ quota_used: "NONE" }, "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE"), false)).toBeNull();
+    expect(failedQuotaKey(failedRun({ quota_used: "SOME" }, "RUN_SET_ASIDE:BACKSTOP"), false)).toBeNull();
+    // The dig's lines: "nothing was taken" when confirmed, and nothing at all when some was used.
+    expect(failedQuotaKey(failedRun({ quota_used: "NONE" }), true)).toBe("v4.digFailed.nothingTaken");
+    expect(failedQuotaKey(failedRun({ quota_used: "SOME" }), true)).toBeNull();
+    expect(failedQuotaKey(failedRun(), true)).toBeNull();
+    expect(failedQuotaKey(failedRun({ quota_used: "NONE" }, "RUN_SET_ASIDE:BACKSTOP"), true)).toBeNull();
+    expect(CATALOG["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
+  });
+
+  it("question 3 A: a dig's reason is said about the dig, one line per reason group, never the code", () => {
+    const codes: Readonly<Record<string, string>> = {
+      NOT_STARTED: "RUN_ROLE_ASSIGNMENT_INVALID",
+      PLAN_ENDED: "RUN_SETUP_FAILED:PLAN_CHANGED",
+      MODELS_UNAVAILABLE: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
+      RUN_LIMIT_REACHED: "RUN_CEILING_BELOW_FIRST_CALL",
+      SET_ASIDE: "RUN_SET_ASIDE:BACKSTOP",
+      STOPPED: "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED",
+      CHOICE_GONE: "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE"
+    };
+    expect(Object.keys(codes).sort()).toEqual([...RUN_FAILURE_KINDS].sort());
+    const lines = RUN_FAILURE_KINDS.map((kind) => digFailureMessage(codes[kind], CATALOG));
+    expect(lines).toEqual(RUN_FAILURE_KINDS.map((kind) => CATALOG[`v4.digFailed.reason.${kind}`]));
+    expect(new Set(lines).size).toBe(RUN_FAILURE_KINDS.length);
+    expect(digFailureMessage("RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED", CATALOG)).toBe("This dig stopped partway because of a problem on our side.");
+    // A code nobody mapped, or none, reads as stopped partway (lib/v3/runFailure.ts); the code is never shown.
+    expect(digFailureMessage("SOMETHING_NEW:42", CATALOG)).toBe(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(digFailureMessage(null, CATALOG)).toBe(CATALOG["v4.digFailed.reason.STOPPED"]);
+    for (const line of lines) expect(line).not.toMatch(/[A-Z]{2,}_/u);
   });
 
   it("'Ask this again' names only the debate's id; the ask page reads the person's own words back", () => {
@@ -160,7 +206,8 @@ describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {
 
   it("says it once, in the owner's words, before and after the reset", () => {
     // journey-f22 / journey-f15 (the wave-2 checks): one date form for the month pause, in a sentence and on a label alike.
-    const date = new Intl.DateTimeFormat("en", { day: "numeric", month: "long" }).format(new Date(NEXT_MONTH));
+    // Day first on English pages (owner's answer to question 5, 5 Nov 2026): "1 December".
+    const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long" }).format(new Date(NEXT_MONTH));
     const day = date;
     // No year: the record's "Paused until 1 December" (the wave-2 checks, P6: asserted on what the code says, any year).
     for (const line of [
@@ -173,8 +220,24 @@ describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {
     expect(pauseSentence({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toBe("Your new month has started.");
     expect(digPauseCardLine({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en")).toBe(`Dig · paused until ${day}`);
     expect(digPauseCardLine({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toBe("Dig · ready to continue");
-    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en")).toEqual({ label: "Paused", continueLabel: "Continue", untilLabel: null });
-    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en")).toEqual({ label: "Paused", continueLabel: null, untilLabel: `Continues on ${day}` });
+    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: true }, CATALOG, "en"))
+      .toEqual({ label: "Paused", continueLabel: "Continue", untilLabel: null, reason: null });
+    // The owner's answers of 5 Nov (question 19 A): before the reset the bar's greyed button reads public-d4 A's "Continue on
+    // 1 December", with the pause's one sentence as the visible line that says why (journey-f14).
+    expect(pausePhoneBar({ until: NEXT_MONTH, canContinue: false }, CATALOG, "en")).toEqual({
+      label: "Paused", continueLabel: null, untilLabel: `Continue on ${day}`,
+      reason: `Paused: this month's quota is used up. You can continue from ${date}.`
+    });
+  });
+});
+
+describe("the greyed Continue before the new month (the owner's answers of 5 Nov, question 19 A)", () => {
+  it("has no dashed outline: dashed is kept for \"New\" (journey-f2), and the old plain label's rule is gone", () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-debate.css"), "utf8");
+    const pauseRules = [...css.matchAll(/([^{}]*\.v4(?:Pause|DebPhonePaused)[^{}]*)\{([^}]*)\}/gu)];
+    expect(pauseRules.length).toBeGreaterThan(0);
+    for (const [, selector, body] of pauseRules) expect(body, selector!.trim()).not.toMatch(/dashed/u);
+    expect(css).not.toMatch(/\.v4PauseUntil\b/u);
   });
 });
 
@@ -194,7 +257,10 @@ describe("the owner's words (OWNER-PICKS-2026-11-03.md), word for word", () => {
       "v4.money.paused": "Paused: this month's quota is used up. You can continue from {date}.",
       "v4.money.pausedReady": "Your new month has started.",
       "v4.money.continueNote": "What is already done is not paid for again.",
-      "v4.pause.continuesOn": "Continues on {date}",
+      // The record's words (public-d4 A), which the owner's answers of 5 Nov (question 19 A) name for the greyed button before
+      // the reset, and which the owner's third round quotes word for word ("Continue on 1 December"): owner-approved, pinned
+      // in PAUSE_ANSWER_LINES (tests/unit/v4-catalog-keys.test.ts) and on no drafted list.
+      "v4.pause.continuesOn": "Continue on {date}",
       "v4.pause.digCard": "Dig · paused until {date}",
       "v4.pause.digCardReady": "Dig · ready to continue"
     };

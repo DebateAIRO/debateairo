@@ -75,7 +75,7 @@
   "home.turn": "Tura {turn}",
   "home.sampleCoda": "Runda kończy się tutaj. Nikt nie zostaje ogłoszony zwycięzcą. Otrzymujesz transkrypcję, dwie oceny każdej tury oraz ogniwo, w którym ustępujesz.",
   "home.closingTitle": "Twój argument jest tylko tak mocny, jak jego najsłabsze ogniwo.",
-  "home.closingLede": "Rozegraj jedną rundę. Cztery tury, około dziewięciu minut i transkrypcja, która dokładnie wskaże, gdzie przestałeś odpowiadać.",
+  "home.closingLede": "Rozegraj jedną rundę. Cztery tury i transkrypcja, która dokładnie wskaże, gdzie przestałeś odpowiadać.",
   "home.pricingCopyPlusTax": "Zacznij bezpłatnie. Płatne plany od {price} + {taxName} miesięcznie. Możesz zrezygnować w dowolnej chwili.",
   "home.pricingCopyNoTax": "Zacznij bezpłatnie. Płatne plany od {price} miesięcznie, bez doliczonego podatku. Możesz zrezygnować w dowolnej chwili.",
   "home.pricingCopyChoose": "Zacznij bezpłatnie. Płatne plany od {price} miesięcznie, plus podatek, jeśli ma zastosowanie. Możesz zrezygnować w dowolnej chwili.",

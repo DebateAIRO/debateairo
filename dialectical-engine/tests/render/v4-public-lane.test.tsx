@@ -88,7 +88,7 @@ async function mount(page: PublicDebate, withLane = true): Promise<HTMLDivElemen
 }
 const text = (): string => host!.textContent ?? "";
 const buttons = (name: string): HTMLButtonElement[] => [...host!.querySelectorAll("button")].filter((candidate) => candidate.textContent?.trim() === name);
-/** journey-f13 / dig-f5: the box's Start reads as the map's picks button ("Dig into your pick · up to 3%"). */
+/** journey-f13 / dig-f5: the box's Start reads as the map's picks button ("Dig into this · up to 3%" for one pick, question 1 B). */
 const startButtons = (): HTMLButtonElement[] => [...host!.querySelectorAll<HTMLButtonElement>("button[data-public-dig-start]")];
 const click = async (target: HTMLElement): Promise<void> => { await act(async () => { target.click(); }); await flush(); };
 function type(field: HTMLTextAreaElement, value: string): void {
@@ -137,7 +137,9 @@ describe("what the public page shows", () => {
     await openRows();
     const paths = rows();
     expect(paths[0]!.querySelector(".v4PubRowHead")!.textContent).toContain("also in small towns");
-    expect(paths[0]!.textContent).toContain("Quiet Heron added to this on October 28, 2026");
+    // r2-17, kept by the owner's answer to question 4 (5 Nov): the credit line's day has no year.
+    expect(paths[0]!.textContent).toContain("Quiet Heron added to this on 28 October");
+    expect(paths[0]!.textContent).not.toContain("added to this on 28 October 2026");
     expect(paths[0]!.textContent).toContain("A dig looked at small towns");
     expect(paths[1]!.textContent).not.toContain("added to this");
     const first = host!.querySelector<HTMLDetailsElement>(".publicFirstAnswer")!;
@@ -173,7 +175,7 @@ describe("what the public page shows", () => {
     await mount(debate());
     const update = host!.querySelector(".publicMainUpdate")!.textContent!;
     expect(update).toContain("Better service first, and free fares for those who need them");
-    expect(update).toContain("The answer was updated on October 28, 2026.");
+    expect(update).toContain("The answer was updated on 28 October 2026.");
     // Outside the first answer, the first headline is not what is read first: the update leads the answer card.
     const card = host!.querySelector(".v4PubAnswer")!;
     expect(card.querySelector(".v4AnswerHeadline")!.textContent).toContain("Better service first, and free fares");
@@ -193,7 +195,8 @@ describe("what the public page shows", () => {
     const page = debate();
     await mount({ ...page, contributions: [{ ...page.contributions![0]!, contributor: null }], reports: [{ ...page.reports![0]!, writer: null }] });
     await openRows();
-    expect(text()).toContain("A contributor added to this on October 28, 2026");
+    expect(text()).toContain("A contributor added to this on 28 October");
+    expect(text()).not.toContain("added to this on 28 October 2026");
     expect(text()).toContain("Report written by a contributor");
     expect(text()).not.toContain("Quiet Heron");
   });
@@ -647,11 +650,12 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await openRows();
     await click(firstOpen());
     // journey-f8 / public-d3 A: the share on the button, the period once by the switch (read-f19: the server's window).
-    // W2L-9 (the wave-2 checks): the record's own line, with public-d3 A's approved reassurance, until the owner answers
-    // whether someone else's public page says the period alone (the drafted v4.public.dig.period.* lines).
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.dig.period.PERSON_DAY"]);
-    expect(V4["v4.dig.period.PERSON_DAY"]).toBe("of today · you can still finish your report");
-    expect(startButtons()[0]!.textContent).toBe("Dig into your pick · up to 5%");
+    // The owner's answer to question 34 (5 Nov, A, and its follow-up): every reader of a public page sees the period alone;
+    // only the person's own map adds "· you can still finish your report".
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe("of today");
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.public.dig.period.PERSON_DAY"]);
+    expect(text()).not.toContain(V4["v4.dig.period.PERSON_DAY"]);
+    expect(startButtons()[0]!.textContent).toBe("Dig into this · up to 5%");
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
     expect(notes()!.textContent).toContain("up to 5% of today");
@@ -663,7 +667,8 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await mount(debate());
     await openRows();
     await click(firstOpen());
-    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe(V4["v4.dig.period.PERSON_MONTH"]);
+    expect(host!.querySelector("[data-public-dig-share]")!.textContent).toBe("of this month");
+    expect(text()).not.toContain("you can still finish your report");
     // public-f14: the site's one note names the share's own window, so on Free it says the month too, never "of today".
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
@@ -719,7 +724,7 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await openRows();
     await click(firstOpen());
     const dug = host!.querySelector<HTMLButtonElement>("[data-public-chip-dug]")!;
-    expect(dug.textContent).toContain("Someone dug near here on Oct 28");
+    expect(dug.textContent).toContain("Someone dug near here on 28 Oct");
     expect(dug.hasAttribute("aria-pressed")).toBe(false);
     await click(dug);
     const result = document.getElementById(`public-dig-${PUBLIC_UPDATE_REF}`)!;

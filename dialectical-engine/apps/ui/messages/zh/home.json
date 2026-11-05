@@ -72,7 +72,7 @@
   "home.turn": "第 {turn} 回合",
   "home.sampleCoda": "本轮到此结束。不宣布胜负。您将获得文字记录、每回合的两项评分，以及您让步的薄弱环节。",
   "home.closingTitle": "您的论证强度取决于其中最薄弱的一环。",
-  "home.closingLede": "进行一轮辩论。四个回合，约九分钟，再加一份准确指出您从何处开始回避问题的文字记录。",
+  "home.closingLede": "进行一轮辩论。四个回合，再加一份准确指出您从何处开始回避问题的文字记录。",
   "home.pricingCopyPlusTax": "免费开始。付费方案每月 {price} + {taxName} 起。可随时取消。",
   "home.pricingCopyNoTax": "免费开始。付费方案每月 {price} 起（不另加税费）。可随时取消。",
   "home.pricingCopyChoose": "免费开始。付费方案每月 {price} 起（如适用，另加税费）。可随时取消。",

@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnswerSchema, type Answer, type MainAnswerVersion } from "../../packages/contract/src/index.js";
 import { answerVersions } from "../../apps/ui/components/v4/V4AnswerCard.js";
+import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import { CATALOG, click, harness, mountMap, openPath, page, PATHS, resetHarness, seededAnswer, unmountMap } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -62,6 +63,24 @@ describe("the answer card on the debate page", () => {
     expect(bodies[2]).toContain(FIRST_WORDS);
     // Only one answer is ever called current.
     expect(page().textContent).not.toContain(CATALOG["v4.mainAnswer.title"]);
+  });
+
+  it("the owner's 5 Nov answer 4 A: its dates take the long form with the year (\"Updated on 3 October 2026 …\")", async () => {
+    const runId = crypto.randomUUID();
+    const history = [version(1, "CHECK-first answer."), version(2, "CHECK-second answer."), version(3, "CHECK-third answer.")];
+    harness.answer = answerWith(runId, { current: history[2]!, history });
+    await mountMap(1600, runId);
+    // Through the shared date helper, so the words follow it when English goes day first.
+    const long = (iso: string): string => formatDate("en", iso, { dateStyle: "long" });
+    expect(long(history[2]!.updated_at)).toMatch(/2026/u);
+    const why = [...card().querySelectorAll(".v4AnswerNote")].find((line) => line.querySelector("[data-ai-generated]") !== null)!;
+    expect(why.textContent).toContain(`Updated on ${long(history[2]!.updated_at)} because`);
+    const titles = [...card().querySelectorAll(".v4AnswerEarlier .v4AnswerVersion > .v4AnswerSectionTitle")].map((title) => title.textContent);
+    expect(titles).toEqual([
+      CATALOG["v4.mainAnswer.version"]!.replace("{version}", "2").replace("{date}", long(history[1]!.updated_at)),
+      CATALOG["v4.mainAnswer.version"]!.replace("{version}", "1").replace("{date}", long(history[0]!.updated_at)),
+      CATALOG["v4.answerCard.firstOn"]!.replace("{date}", long(harness.answer!.as_of))
+    ]);
   });
 
   it("says when a change is being written, and marks a reservation", async () => {

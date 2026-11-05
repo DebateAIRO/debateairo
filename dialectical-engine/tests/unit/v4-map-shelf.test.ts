@@ -239,7 +239,7 @@ describe("the used-up line above the box (ask-f18, ask-d4 C)", () => {
     expect(day?.key).toBe("v4.ask.usedUp.PERSON_DAY");
     expect(String(day?.values.time)).toMatch(/^\d{2}:\d{2}$/u);
     const month = usedUpLine(room("PERSON_MONTH", "2026-12-01T12:00:00.000Z"), "en");
-    expect(month).toEqual({ key: "v4.ask.usedUp.PERSON_MONTH", values: { date: "December 1" } });
+    expect(month).toEqual({ key: "v4.ask.usedUp.PERSON_MONTH", values: { date: "1 December" } }); // day first (question 5)
     expect(CATALOG["v4.ask.usedUp.PERSON_DAY"]).toBe("You've used today's quota. New questions start after {time}.");
     expect(CATALOG["v4.ask.usedUp.PERSON_MONTH"]).toBe("You've used this month's quota. New questions start on {date}.");
   });

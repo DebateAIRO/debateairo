@@ -83,6 +83,25 @@ describe("the globe line", () => {
     expect(line()!.querySelector("[role=status]")!.textContent).toBe(CATALOG["v4.publicMark.copyFailed"]);
   });
 
+  it("question 35 A, in both places: a second Copy link clears the line first, so 'Link copied.' is said anew and read out again", async () => {
+    await show({ kind: "PUBLIC", publicRef: REF });
+    const status = (): string => line()!.querySelector("[role=status]")!.textContent ?? "";
+    await act(async () => { buttonNamed(CATALOG["v4.publicMark.copyLink"]!, host!).click(); });
+    await flush();
+    expect(status()).toBe(CATALOG["v4.publicMark.linkCopied"]);
+    // The second press: while the copy is under way the line is empty, then it says "Link copied." again. Setting the same
+    // words twice would change nothing on the page, and a screen reader would say nothing the second time.
+    let release: () => void = () => undefined;
+    clipboard.writeText = vi.fn(() => new Promise<undefined>((done) => { release = () => done(undefined); }));
+    await act(async () => { buttonNamed(CATALOG["v4.publicMark.copyLink"]!, host!).click(); });
+    await flush();
+    expect(clipboard.writeText).toHaveBeenCalledTimes(1);
+    expect(status()).toBe("");
+    await act(async () => release());
+    await flush();
+    expect(status()).toBe(CATALOG["v4.publicMark.linkCopied"]);
+  });
+
   it("on a phone, Copy link opens the phone's own share sheet; closing the sheet says nothing", async () => {
     const share = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "share", { value: share, configurable: true });

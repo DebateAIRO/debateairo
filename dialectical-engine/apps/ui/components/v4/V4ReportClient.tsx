@@ -11,10 +11,11 @@ import { useQuestionPublic } from "@/components/v4/V4ReportStrip";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { isNotFound } from "@/lib/api";
-import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pathTrustWord } from "@/lib/report/pathTrust";
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
+import { mayBeWaitedFor, reportWaitLineOf, waitingDigQuestionOf } from "@/lib/v4/reportWriting";
 import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import {
   loadDigView, loadInvestigation, loadStory, loadV4, reopenInvestigation, storyReadFailed, writeReport, type FinishedReportVersion
@@ -22,6 +23,7 @@ import {
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { waitForDigs } from "@/lib/v4/digUndo";
+import { whenText } from "@/lib/v4/stateWords";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
@@ -57,6 +59,19 @@ import {
  *    short honest half. f14: AI text carries the debate's language and follows its own direction. f16: the report's space
  *    is held while it loads; after a press focus moves to the status line. f17: under a written report, how digging goes
  *    on. f19: "How sure we are" at every reading level.
+ *
+ * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers" and its follow-ups):
+ *  - 12 B: "Open in the classic view" only in the header's account menu (journey-f19, "nowhere else"); the foot link and the
+ *    small link under "Ask a new question" went.
+ *  - 35 A: "Link copied." stays until the next Share choice, as the "Public" line's does (the copy-failed line already
+ *    did). Each choice first clears the line, so a second "Link copied." is read out again.
+ *  - The level ruling: a debate keeps the level it was asked at, and the line above the title says "Report" with no level.
+ *    Until the server's run read names that level (reading_level), the links to this debate's map and its digs' maps, and
+ *    the address moves, still carry ?level=, so the map and its report keep one level both ways; they drop it in the same
+ *    change that reads reading_level. "Ask a new question" carries none: a new question picks its own level.
+ *  - 4 A: the version list in the long form with the year, clocks in 24 hours. The third round (5 Nov afternoon): the start
+ *    of writing on another day in the long form too ("Started 4 November 2026, 14:02"), through the same helper as the
+ *    map's report line, the waiting card and the list of your questions (lib/v4/stateWords.ts whenText).
  */
 
 type Props = Readonly<{
@@ -79,11 +94,6 @@ type ReportLoad =
 /** A dig as the report lists it; `view` is undefined while it loads and null when it could not be read just now. */
 type ReportDig = Readonly<{ link: DigLink; view: DigView | null | undefined }>;
 
-/** report-f7: a dig the report may still wait for: running, waiting for a spot, or done but still rewriting its path. */
-function mayBeWaitedFor(view: DigView): boolean {
-  return view.state === "RUNNING" || view.state === "WAITING" || (view.state === "DONE" && view.rewrite?.state === "WRITING");
-}
-
 /*
  * R2TIME-3 / R2TIME-7: the same rule as the map page's story poll. While the story is being written it is read again
  * on a chained timer (never two reads in flight), backing off 10 s → 20 s → 40 s → 60 s; there is no try cap while it
@@ -99,8 +109,6 @@ const REPORT_SLOW_POLL_MS = 120_000;
  * server's clock against this computer's). Beyond it the page cannot tell that its press began the writing.
  */
 const PRESS_MATCH_MS = 5 * 60_000;
-/** report-f12: how long "Link copied." stays. */
-const COPIED_NOTE_MS = 4_000;
 /** A dig's path sits one step in per level, up to four steps (as in the PDF). */
 const PATH_LEVEL_STEPS = 4;
 /** Spec D5: the reading level defaults to "Some background" when none is chosen. */
@@ -110,6 +118,13 @@ const DEFAULT_LEVEL: ReadingLevel = "background";
 type AiProps = Readonly<{ "data-ai-generated": "true"; dir: "auto"; lang?: string }>;
 /** A list holding AI text only follows that text's direction too, so its markers and padding sit on the reading side. */
 type AiListProps = Readonly<{ dir: "auto"; lang?: string }>;
+/**
+ * An item of such a list: marked as AI text, in the debate's language, with no direction of its own. The list's dir="auto"
+ * then reads the items' text and takes their direction, and the items take the list's. With a direction on every item the
+ * list found no text of its own (dir="auto" skips elements that carry dir) and stayed left to right on an English page, so
+ * an Arabic item's bullet went past the page's edge (the w6 browser check, 5 Nov).
+ */
+type AiItemProps = Readonly<{ "data-ai-generated": "true"; lang?: string }>;
 
 const usableTag = (tag: string | null | undefined): string | null =>
   tag === undefined || tag === null || tag.trim().length === 0 || tag === "und" ? null : tag;
@@ -119,12 +134,8 @@ function aiProps(language: string | null): AiProps {
 function aiListProps(language: string | null): AiListProps {
   return language === null ? { dir: "auto" } : { dir: "auto", lang: language };
 }
-
-/** A sign no AI text contains, so a sentence splits around its slot and only the AI's words in it are marked. */
-const TEXT_SLOT = "⁣⁣";
-function withAiText(sentence: string, text: string, ai: AiProps): ReactNode {
-  const [before = "", after = ""] = sentence.split(TEXT_SLOT);
-  return <>{before}<span {...ai}>{text}</span>{after}</>;
+function aiItemProps(language: string | null): AiItemProps {
+  return language === null ? { "data-ai-generated": "true" } : { "data-ai-generated": "true", lang: language };
 }
 
 export function V4ReportClient({ id, locale, initialLevel, catalog, newDebateCatalog }: Props) {
@@ -337,6 +348,11 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   catalog: MessageCatalog;
 }>) {
   // Decision A: the level lives in the address; choosing one rewrites `?level=` (useReadingLevel does that).
+  // Owner's level ruling (5 Nov): the report shows its details at the level its debate was asked at. Until the server's run
+  // read names that level (reading_level, coming on the other session's branch), the details keep today's level (the
+  // address, else the account), and the links back to this debate's map and its digs, and the address moves below, keep
+  // carrying it (the map's links into this page carry it too), so the round trip never depends on the account's memory.
+  // The change that reads reading_level drops ?level= from all of them at once.
   const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
   const level: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
 
@@ -560,9 +576,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       loadDigView(link).then(done, () => done(null));
     }
   }, [read]);
-  // The one dig the report still waits for, by its question, for "Your report starts when your dig on … finishes."
-  const running = digs.filter((dig) => dig.view !== undefined && dig.view !== null && mayBeWaitedFor(dig.view));
-  const runningDig = running.length === 1 ? running[0]!.link.questions[0] ?? null : null;
+  // The one dig the report still waits for, by its question, for "Your report starts when your dig on … finishes." (report-f7's
+  // rule, shared with the map since the owner's 5 Nov answer 23 A: lib/v4/reportWriting.ts).
+  const runningDig = waitingDigQuestionOf(digs);
 
   // The person's own words, not the added lines. R2TIME-8: the site's DocumentTitle names the tab (and a printed file)
   // after the h1, so the "Report:" prefix sits inside the h1 (hidden on screen) instead of a document.title write.
@@ -572,7 +588,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
 
   const mapHref = levelHref(`/v4/debate/${encodeURIComponent(target)}`, chosenLevel);
   const classicHref = `/debate/${encodeURIComponent(target)}`;
-  const askHref = levelHref("/v4", chosenLevel);
+  // A new question picks its own level on the first screen (owner, 5 Nov: it starts on "Plain words"), so no ?level= here.
+  const askHref = "/v4";
   // Owner review 3 Nov (map-f30): a debate that did not finish has no map; the way back is to its page, which offers
   // "Ask this again". Review F5: only once the page knows it stays here (a failed dig's address moves to the first
   // question's report), so the header never names the wrong way back for a moment.
@@ -594,12 +611,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     return () => { active = false; };
   }, [current, pdfHref]);
 
+  // Question 35 A: what a Share choice says stays until the next Share choice, which replaces it (Print clears it). Copy
+  // link clears the line first, so a second "Link copied." is a new line the status region reads out again.
   const [shareNote, setShareNote] = useState<ShareNote | null>(null);
-  useEffect(() => {
-    if (shareNote !== "COPIED") return;
-    const timer = window.setTimeout(() => setShareNote(null), COPIED_NOTE_MS);
-    return () => window.clearTimeout(timer);
-  }, [shareNote]);
   const savePdfNow = async () => {
     if (pdfHref === null || current === null) return;
     setShareNote("MAKING");
@@ -608,6 +622,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   };
   const copyLink = async () => {
     if (runId === null) return;
+    setShareNote(null);
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/v4/debate/${encodeURIComponent(runId)}/report`);
       if (alive.current) setShareNote("COPIED");
@@ -628,7 +643,10 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   }
   if (ready) {
     // Until a report is written, Print is the way to keep the first answer (report-f5: the old V3 PDF is not offered).
-    share.push({ id: "print", label: t(catalog, "v4.report.print"), onSelect: () => window.print() });
+    share.push({ id: "print", label: t(catalog, "v4.report.print"), onSelect: () => {
+      setShareNote(null);
+      window.print();
+    } });
     share.push({ id: "copy", label: t(catalog, "v4.report.copyLink"), onSelect: () => void copyLink() });
   }
   const status = shareNote === null ? null : shareNote === "PDF_FAILED" ? (
@@ -650,13 +668,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       onLevel={chooseLevel}
       share={share}
       status={status}
+      classicHref={load.kind === "NOT_FOUND" ? null : classicHref}
     />
-  );
-  // report-f12: the classic-view link sits at the page foot, small.
-  const foot = (
-    <p className="v4RepFoot v4RepNoPrint">
-      <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
-    </p>
   );
 
   if (load.kind !== "SERVED" || map === null || ownQuestion === null) {
@@ -682,11 +695,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           {notReadyShown && load.kind === "NOT_READY" && load.failed ? (
             <>
               <p className="v4RepProse">{t(catalog, "v4.report.failed")}</p>
-              {/* map-f30: back to the debate's own page, where "Ask this again" is; report-f10: Ask a new question, and the
-                  classic view small under it. */}
+              {/* map-f30: back to the debate's own page, where "Ask this again" is; report-f10: Ask a new question. */}
               <Link className="v4Btn v4BtnPrimary" href={mapHref}>{t(catalog, "v4.report.backToQuestion")}</Link>
               <Link className="v4Btn" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
-              <Link className="v4Link v4RepSmallLink" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
             </>
           ) : null}
           {notReadyShown && load.kind === "NOT_READY" && !load.failed ? (
@@ -696,7 +707,6 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
             </>
           ) : null}
         </div>
-        {load.kind === "ERROR" || (notReadyShown && load.kind === "NOT_READY" && !load.failed) ? foot : null}
       </div>
     );
   }
@@ -726,7 +736,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       <article className="v4RepDoc" aria-labelledby="v4-report-title">
         <p className="v4RepPrintBrand" aria-hidden="true">Dialectical Engine</p>
         <header className="v4RepTop">
-          <p className="v4Eyebrow v4RepMeta">{t(catalog, "v4.report.eyebrow", { level: t(catalog, `v4.readingLevel.${level}`) })}</p>
+          <p className="v4Eyebrow v4RepMeta">{t(catalog, "v4.report.eyebrow")}</p>
           <h1 id="v4-report-title" className="v4RepTitle">
             <span className="v4SrOnly">{t(catalog, "v4.report.titlePrefix")} </span>
             <span {...ai}>{ownQuestion}</span>
@@ -766,7 +776,6 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </details>
         ) : null}
       </article>
-      {foot}
     </div>
   );
 }
@@ -835,7 +844,7 @@ function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs,
         <section className="v4RepSection" aria-labelledby="v4-report-why">
           <h2 id="v4-report-why" className="v4RepH2">{t(catalog, "v4.report.whyHeading")}</h2>
           <ul className="v4RepList" {...aiList}>
-            {map.why.map((reason, at) => <li key={at} {...ai}>{reason}</li>)}
+            {map.why.map((reason, at) => <li key={at} {...aiItemProps(language)}>{reason}</li>)}
           </ul>
         </section>
       ) : null}
@@ -851,7 +860,7 @@ function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs,
         <section className="v4RepSection" aria-labelledby="v4-report-objections">
           <h2 id="v4-report-objections" className="v4RepH2">{t(catalog, "v4.report.objectionsHeading")}</h2>
           <ul className="v4RepList" {...aiList}>
-            {map.objections.map((objection, at) => <li key={at} {...ai}>{objection}</li>)}
+            {map.objections.map((objection, at) => <li key={at} {...aiItemProps(language)}>{objection}</li>)}
           </ul>
         </section>
       ) : null}
@@ -996,7 +1005,7 @@ function ReportDigItem({ dig, level, catalog, language }: Readonly<{
   return (
     <li className="v4RepDig">
       <ul className="v4RepDigQuestions" {...aiListProps(language)}>
-        {dig.link.questions.map((question, at) => <li key={at} {...ai}>{question}</li>)}
+        {dig.link.questions.map((question, at) => <li key={at} {...aiItemProps(language)}>{question}</li>)}
       </ul>
       <p className="v4RepDigMeta">
         {/* A dig found again from the account list has no known mode: then only its state is shown. */}
@@ -1024,11 +1033,16 @@ const finishedVersion = (version: InvestigationReportVersion | null | undefined)
 /** When a version is dated in the list: when it was written (or failed). */
 const versionDate = (version: Exclude<InvestigationReportVersion, { state: "WRITING" }>): string => version.written_at;
 
-/** report-f7: a clock time ("Started 14:02"), with the day when it is not today; nothing ticks. */
+/** Question 4 A (owner, 5 Nov): a report's dates in the long form with the year ("4 November 2026", report-f13). */
+const LONG_DATE: Intl.DateTimeFormatOptions = { dateStyle: "long" };
+
+/**
+ * report-f7: a clock time ("Started 14:02"); on another day the long date with the year before it ("Started 4 November
+ * 2026, 14:02", the owner's third round, 5 Nov). The one shared helper (lib/v4/stateWords.ts whenText), so the report
+ * page, the map's report line, the waiting card and the list of your questions always agree. Nothing ticks.
+ */
 function clockTime(locale: string, at: number): string {
-  const sameDay = new Date(at).toDateString() === new Date().toDateString();
-  // journey-f15 / f16: the one V4 clock form, a 24-hour time (the hour cycle of lib/v4/clock.ts CLOCK_24H).
-  return formatDate(locale, at, sameDay ? { timeStyle: "short", hourCycle: "h23" } : { dateStyle: "medium", timeStyle: "short", hourCycle: "h23" });
+  return whenText(at, locale) ?? "";
 }
 
 type PressKind = "write" | "reopen";
@@ -1175,7 +1189,7 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfR
     ? t(catalog, "v4.investigation.versionWriting", { n: version.report_version })
     : t(catalog, version.report_version === current ? "v4.investigation.versionCurrent" : "v4.investigation.version", {
       n: version.report_version,
-      date: formatDate(locale, versionDate(version), { dateStyle: "medium" })
+      date: formatDate(locale, versionDate(version), LONG_DATE)
     });
   return (
     <section className="v4RepSection v4RepInvestigation" aria-labelledby="v4-report-versions">
@@ -1232,12 +1246,12 @@ function VersionStatus({ version, investigation, runningDig, locale, language, c
   if (version.state === "FAILED") return <p className="v4RepNote" role="status">{t(catalog, "v4.investigation.failed")}</p>;
   const waiting = version.waiting_for_digs;
   if (waiting > 0) {
-    // report-f7: while a dig runs, only the line that says the report waits for it, by its question when it is the one.
+    // report-f7: while a dig runs, only the line that says the report waits for it, by its question when it is the one. The
+    // owner's 5 Nov answer 23 A: the same line as the map's (lib/v4/reportWriting.ts), and several digs carry no number.
+    const line = reportWaitLineOf(waiting, runningDig, catalog, locale);
     return (
       <p className="v4RepNote" role="status">
-        {waiting === 1 && runningDig !== null
-          ? withAiText(t(catalog, "v4.investigation.waitingDig", { dig: TEXT_SLOT }), runningDig, aiProps(language))
-          : tPlural(catalog, "v4.investigation.waitingDigs", waiting, locale, { n: waiting })}
+        {line.kind === "NAMED" ? <>{line.before}<span {...aiProps(language)}>{line.dig}</span>{line.after}</> : line.text}
       </p>
     );
   }
@@ -1323,7 +1337,7 @@ function ReportVersion({ version, isCurrent, webNote, locale, language, catalog 
     <div className="v4RepVersionShown">
       {/* report-f13: which version this is and when it was written, on paper too (never today's date). */}
       <p className="v4RepVersionLine">
-        {t(catalog, "v4.investigation.versionWritten", { n: version.report_version, date: formatDate(locale, version.written_at, { dateStyle: "long" }) })}
+        {t(catalog, "v4.investigation.versionWritten", { n: version.report_version, date: formatDate(locale, version.written_at, LONG_DATE) })}
       </p>
       {webNote === "FREE" ? <ReportWebNote note={webNote} catalog={catalog} /> : null}
       <FinishedReportBody
@@ -1382,7 +1396,7 @@ export function FinishedReportBody({ version, state, catalog, language = null, p
             <>
               <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.stillOpen")}</h3>
               <ul className="v4RepList" {...aiListProps(language)}>
-                {story.still_open.map((open, at) => <li key={at} {...ai}>{open}</li>)}
+                {story.still_open.map((open, at) => <li key={at} {...aiItemProps(language)}>{open}</li>)}
               </ul>
             </>
           ) : null}

@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  canAskForReport, carryOnOf, digsRestFor, loadRunPublished, newWritingClock, noteWritingRead, PRESS_MATCH_MS, reportMomentAllowed,
-  reportSharePercentOf, reportStageOf, slowFromOf, writingStartOf
+  canAskForReport, carryOnOf, digsRestFor, loadRunPublished, mayBeWaitedFor, newWritingClock, noteWritingRead, PRESS_MATCH_MS,
+  reportMomentAllowed, reportSeenFor, reportSharePercentOf, reportStageOf, reportWaitLineOf, slowFromOf, waitingDigQuestionOf,
+  writingStartOf, type WaitedDig
 } from "../../apps/ui/lib/v4/reportWriting.js";
 import { InvestigationReportsSchema, type Answer, type InvestigationReports, type InvestigationReportVersion } from "../../packages/contract/src/index.js";
 
@@ -51,6 +54,48 @@ describe("where the report stands on the map (report-d1, report-d2)", () => {
     expect(stages.map(canAskForReport)).toEqual([false, true, false, false, true, false]);
     expect(stages.map(digsRestFor)).toEqual([false, false, true, true, false, false]);
     expect(stages.map(reportMomentAllowed)).toEqual([true, true, false, false, true, false]);
+  });
+});
+
+describe("the owner's answers of 5 Nov 2026 (questions 2 A and 23 A)", () => {
+  const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
+
+  it("question 2 A: \"See my report\" while the report waits for a dig, is written, or stands; never while one can be asked for", () => {
+    const stages = [null, read("OPEN", [], 0), read("CLOSED", [writing(1, 1)]), read("CLOSED", [writing(1, 0)]), read("CLOSED", [failed(1)]),
+      read("CLOSED", [ready(1)]), read("OPEN", [ready(1)])].map(reportStageOf);
+    expect(stages.map(reportSeenFor)).toEqual([false, false, true, true, false, true, false]);
+    // Every stage either asks (Write my report / Write it again), leads to the report (See my report), or is not known.
+    for (const stage of stages) expect([canAskForReport(stage), reportSeenFor(stage)].filter(Boolean).length).toBeLessThanOrEqual(1);
+  });
+
+  it("question 23 A: report-f7's rule names the one READ dig the report may wait for; a dig not read is never counted", () => {
+    const dig = (question: string, view: WaitedDig["view"]): WaitedDig => ({ link: { questions: [question] }, view });
+    expect(mayBeWaitedFor({ state: "RUNNING" })).toBe(true);
+    expect(mayBeWaitedFor({ state: "WAITING" })).toBe(true);
+    expect(mayBeWaitedFor({ state: "DONE", rewrite: { state: "WRITING" } as never })).toBe(true);
+    expect(mayBeWaitedFor({ state: "DONE", rewrite: null })).toBe(false);
+    expect(mayBeWaitedFor({ state: "FAILED" })).toBe(false);
+    expect(waitingDigQuestionOf([dig("Mostly renewables", { state: "RUNNING" }), dig("Old", { state: "DONE", rewrite: null })]))
+      .toBe("Mostly renewables");
+    // Two that may be waited for: no name. Not read (a stand-in, or a read that failed just now): not counted either way.
+    expect(waitingDigQuestionOf([dig("A", { state: "RUNNING" }), dig("B", { state: "WAITING" })])).toBeNull();
+    expect(waitingDigQuestionOf([dig("A", { state: "RUNNING" }), dig("B", undefined), dig("C", null)])).toBe("A");
+    expect(waitingDigQuestionOf([dig("B", undefined)])).toBeNull();
+    expect(waitingDigQuestionOf([])).toBeNull();
+  });
+
+  it("question 23 A: one wait line for the map and the report page: the dig by name, else no number at all", () => {
+    expect(reportWaitLineOf(1, "Mostly renewables", CATALOG, "en")).toEqual({
+      kind: "NAMED", before: "Your report starts when your dig on “", dig: "Mostly renewables", after: "” finishes."
+    });
+    expect(reportWaitLineOf(1, null, CATALOG, "en")).toEqual({ kind: "PLAIN", text: "Your report starts when the dig in progress finishes." });
+    expect(reportWaitLineOf(1, "  ", CATALOG, "en")).toEqual({ kind: "PLAIN", text: "Your report starts when the dig in progress finishes." });
+    // Several: the follow-up's words, with no number (a count that can only go down steers nothing).
+    for (const waiting of [2, 3, 7]) {
+      const line = reportWaitLineOf(waiting, "Mostly renewables", CATALOG, "en");
+      expect(line).toEqual({ kind: "PLAIN", text: "Your report starts when the digs in progress finish." });
+    }
+    expect(CATALOG["v4.investigation.waitingDigs.other"]).not.toMatch(/\{n\}|\d/u);
   });
 });
 

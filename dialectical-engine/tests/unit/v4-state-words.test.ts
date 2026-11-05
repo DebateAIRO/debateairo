@@ -18,6 +18,7 @@ import {
 } from "../../apps/ui/lib/v4/stateWords.js";
 import { resetText, startsWaitLine, usedUpLine } from "../../apps/ui/lib/v4/money.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
+import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 
 /*
  * Owner's screen review, 3 Nov 2026 (journey-f22): one short list of state words for every wait, card, rail, "Your
@@ -82,8 +83,8 @@ describe("the shared state words (journey-f22)", () => {
   it("no V4 line promises an unmeasured time (journey-f16, wait-f3): no \"usually\", no \"about N\" or \"N to M minutes\"", () => {
     const lines = Object.entries(CATALOG);
     expect(lines.filter(([, line]) => /\busually\b|\babout \d|\d+\s*(?:to|-|–)\s*\d+\s*(?:minutes?|hours?)/iu.test(line)).map(([key]) => key)).toEqual([]);
-    // wait-f3's words, naming the list by its new heading (ask-d5 B, the step-1 track: "Your maps").
-    expect(CATALOG["v4.debate.usually"]).toBe("This takes a while. You can leave this page. Your question will be under “Your maps”.");
+    // wait-f3's words, naming the list by its heading (ask-d5 B, renamed "My questions" in the owner's third round, 5 Nov).
+    expect(CATALOG["v4.debate.usually"]).toBe("This takes a while. You can leave this page. Your question will be under “My questions”.");
     // The report page's own line (t4 report track, report-f7) names when it started and promises no length.
     expect(CATALOG["v4.investigation.writingSince"]).toBe("Your report is being written. Started {time}. This takes a while. You can leave this page and come back later.");
   });
@@ -94,7 +95,9 @@ describe("the shared state words (journey-f22)", () => {
       .toBe(`Waiting · starts after ${clock("2026-11-04T10:30:00.000Z")}`);
     expect(stateWordText({ kind: "WAITING", startsAfter: null }, CATALOG, "en", NOW)).toBe("Waiting");
     const later = stateWordText({ kind: "WAITING", startsAfter: "2026-11-06T12:00:00.000Z" }, CATALOG, "en", NOW);
-    expect(later).toMatch(/^Waiting · starts after Nov [5-7], /u);
+    // Another day: the long form with the year, day first on English pages (owner's answers 4 A and 5 B, 5 Nov 2026, and
+    // the third round's "long form everywhere"): "6 November 2026, 14:00".
+    expect(later).toMatch(/^Waiting · starts after [5-7] November 2026, \d{2}:\d{2}$/u);
     expect(stateWordText({ kind: "SHORT_BREAK", continuesAbout: null }, CATALOG, "en", NOW)).toBe("Taking a short break");
     expect(stateWordText({ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, CATALOG, "en", NOW))
       .toBe(`Paused until ${dayText("2026-12-01T12:00:00.000Z", "en")!}`);
@@ -117,13 +120,29 @@ describe("the shared state words (journey-f22)", () => {
     expect(resetText(at, "PERSON_WEEK", "en")).toContain(time);
   });
 
+  it("third round (owner, 5 Nov): a start on an earlier day reads the long form with the year; a same-day start the clock alone", () => {
+    // Local times, so the day is the same wherever the test runs. One helper for the report page, the map's report line,
+    // the waiting card and the list of your questions: "Started 4 November 2026, 14:02", or "Started 14:02" today.
+    const earlier = new Date(2026, 10, 4, 14, 2).getTime();
+    const now = new Date(2026, 10, 5, 9, 0).getTime();
+    expect(whenText(earlier, "en", now)).toBe("4 November 2026, 14:02");
+    expect(whenText(new Date(earlier).toISOString(), "en-US", now)).toBe("4 November 2026, 14:02");
+    expect(whenText(new Date(2026, 10, 5, 8, 15).getTime(), "en", now)).toBe("08:15");
+    // Other languages join the date and the clock their own way (German "4. November 2026 um 14:02"), never with an
+    // English comma; the clock stays on 24 hours.
+    for (const locale of ["de", "ja", "ro"]) {
+      const joined = formatDate(locale, earlier, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" });
+      expect(whenText(earlier, locale, now), locale).toBe(joined);
+    }
+  });
+
   it("clock and day texts are the page's language, and unreadable times give null", () => {
     expect(clockText("2026-11-04T14:31:00.000Z", "en")).toBe(clock("2026-11-04T14:31:00.000Z"));
     expect(clockText("2026-11-04T14:31:00.000Z", "en")).toMatch(/^\d{2}:\d{2}$/u);
     expect(clockText("nope", "en")).toBeNull();
     expect(whenText("nope", "en", NOW)).toBeNull();
     expect(dayText("nope", "en")).toBeNull();
-    expect(dayText("2026-12-01T12:00:00.000Z", "en")).toBe("December 1");
+    expect(dayText("2026-12-01T12:00:00.000Z", "en")).toBe("1 December");
     expect(dayText("2026-12-01T12:00:00.000Z", "ro")).toBe("1 decembrie");
   });
 
