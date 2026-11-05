@@ -1,11 +1,14 @@
-import { PurposeLinesSchema, purposeLinesMaterial, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, trustOfPoint, type StoryFate, type TrustWord } from "@debateai/contract";
+import {
+  PATH_ID_PATTERN, PurposeLinesSchema, purposeLinesMaterial, cutQuoteAtWordEdge, readingLevelOf, StoryBodySchema, StoryFateSchema, trustOfPoint,
+  type PathId, type PathOutcome, type StoryFate, type TrustWord
+} from "@debateai/contract";
 import {
   INVESTIGATION_REPORT_CARRIER, PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
-  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository,
-  PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS,
+  PostgresInvestigationReportRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository, PostgresPathResultsRepository,
+  PostgresStartPathsStore, PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS,
   WEB_SHOWN_QUOTE_CARRIER, decryptContentForRun, decryptLeasedContentForRun, encryptAttestedContentForRun,
-  prepareLeasedContentEncryptionForRun, readMapRootsInForce, withRunContentLease, type CryptoEnvelope, type InvestigationReportsRead, type PathLineEntry,
-  type PathRewriteEntry, type Pool, type UnreportedClosing, type WebSealed
+  prepareLeasedContentEncryptionForRun, readMapRootsInForce, withRunContentLease, type CryptoEnvelope, type DigPicksRead, type InvestigationReportsRead,
+  type PathLineEntry, type PathRewriteEntry, type PathRootInForce, type Pool, type StoredStartPathSet, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/serve";
@@ -15,11 +18,11 @@ import {
   storedReportAnswerOf, type InvestigationCloseInput, type InvestigationCloseSettings, type InvestigationCloseSources,
   type InvestigationReportContent, type InvestigationReportPayer, type InvestigationReportSettled
 } from "./investigation-close.js";
-import type { DossierAddedPage, DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText } from "./investigation-dossier.js";
-import { pathRewriteBodyBytes, type PathRewriteDigPath } from "./path-rewrite-material.js";
+import type { DossierAddedPage, DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText, DossierView } from "./investigation-dossier.js";
+import { pathRewriteBodyBytes, type PathRewriteDigPath, type PathRewritePoint } from "./path-rewrite-material.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { backfillShownQuotes } from "./passage-sweep.js";
-import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
+import { pathOutcomeBaseOf, pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 import { addedPagesOf } from "./web-researched-read.js";
 
@@ -39,6 +42,13 @@ import { addedPagesOf } from "./web-researched-read.js";
  *    allow is left out whole);
  *  - the debate's place, time and purpose lines (0138, decision 5; an old debate has none);
  *  - the earlier report's answer (0136, opened under the root's key), from version 2 on (F8 A).
+ *
+ * V4 start step, Task 55b: on a path debate (its chosen paths stored, 0157) the first debate's paths are the paths the person chose,
+ * each by its path id, read from 0158 (`v2FirstPathsOf`): its points under its root in force, its text its answer so far unless a later
+ * climb or rewrite wrote a newer one, a FAILED path named as not finished, the person's own words beside the verdict on them, and what
+ * each version keeps (path id, trust word, own words). A path debate's path b<n> was first written as its answer so far, so that is the
+ * text a dig's rewrite of it was written on. A path left out before Start and dug under the main question ("+ N more", spec §4.4) is a
+ * new first-level path. An R22 debate is read as before, byte for byte.
  *
  * DECISION 6, AI TEXT ONLY: nothing here opens a passage. Quotes come from 0139's shown quotes, cut to 120 characters when
  * they were written, never from identity.web_extract or a pack; 0135's stored paths keep no words of their extracts (version 2). An extract
@@ -150,13 +160,19 @@ export async function trustWordsOf(pool: Pool, runId: string, free: boolean, poi
   return words;
 }
 
-/** W4-4: the investigation's added pages (the first debate's named by their path; a dig's by none), debate by debate, each opened under its own key. */
-async function addedPagesOfInvestigation(pool: Pool, root: string, digs: readonly string[]): Promise<readonly DossierAddedPage[]> {
+/**
+ * W4-4: the investigation's added pages (the first debate's named by their path; a dig's by none), debate by debate, each opened under its own key.
+ * V4 start step, Task 55b: a path debate's pages are kept by path id, which is its path's name in the dossier too: labelled through its roots
+ * in force (0158), so a path whose root dropped names none.
+ */
+async function addedPagesOfInvestigation(pool: Pool, root: string, digs: readonly string[], pathDebate: boolean): Promise<readonly DossierAddedPage[]> {
   const pages: DossierAddedPage[] = [];
   for (const runId of [root, ...digs]) {
     const evidence = await new PostgresWebEvidenceRepository(pool).read(runId);
     if (evidence === null || !evidence.researched.some((row) => row.outcome === "ADDS")) continue;
-    const rootOf = runId === root ? new Map((await readMapRootsInForce(pool, runId)).map((entry) => [entry.answerId, entry.rootNodeId] as const)) : null;
+    const rootOf = runId !== root ? null : pathDebate
+      ? new Map((await new PostgresPathResultsRepository(pool).readPathRoots(runId)).filter((entry) => !entry.stale).map((entry) => [entry.pathId as string, entry.pathId as string] as const))
+      : new Map((await readMapRootsInForce(pool, runId)).map((entry) => [entry.answerId, entry.rootNodeId] as const));
     const added = await withRunContentLease(pool, [runId], async () => {
       const cipher = await prepareLeasedContentEncryptionForRun(pool, runId);
       try {
@@ -172,8 +188,13 @@ async function addedPagesOfInvestigation(pool: Pool, root: string, digs: readonl
   return Object.freeze(pages);
 }
 
-/** Each path's newest text on one debate when a later update wrote it (0138), and the digs its line says are not to be read. */
-async function lineOf(pool: Pool, runId: string): Promise<Readonly<{ newest: ReadonlyMap<string, DossierText>; hiddenDigs: ReadonlySet<string> }>> {
+type LineRead = Readonly<{ newest: ReadonlyMap<string, DossierText>; hiddenDigs: ReadonlySet<string>; last: ReadonlyMap<string, PathLineEntry> }>;
+
+/**
+ * Each path's newest text on one debate when a later update wrote it (0138), and the digs its line says are not to be read. `last`: each
+ * path's newest finished, visible entry, a rewrite or an update (V4 start step, Task 55b, for a path debate's paths).
+ */
+async function lineOf(pool: Pool, runId: string): Promise<LineRead> {
   const line = (await new PostgresTreeUpdateRunnerRepository(pool).readLine(runId)) ?? [];
   const hiddenDigs = new Set(line.filter((entry) => entry.hidden || entry.held).map((entry) => entry.run_id.toLowerCase()));
   const lastOf = new Map<string, PathLineEntry>();
@@ -192,7 +213,78 @@ async function lineOf(pool: Pool, runId: string): Promise<Readonly<{ newest: Rea
       newest.set(ref, Object.freeze({ line: text.line, summary: typeof text.summary === "string" ? text.summary : null, fate: fate.data }));
     }
   }
-  return Object.freeze({ newest, hiddenDigs });
+  return Object.freeze({ newest, hiddenDigs, last: lastOf });
+}
+
+/**
+ * V4 start step, Task 55b: a path debate's path's newest text, by its id: a climb's (`newest`), or a dig's rewrite (its card's text after)
+ * when the line's newest entry is one; none when nothing came after its answer so far.
+ */
+function newestOfPaths(line: LineRead, digs: readonly DossierDig[]): ReadonlyMap<string, DossierText> {
+  const newest = new Map<string, DossierText>();
+  for (const [ref, entry] of line.last) {
+    const text = entry.source === "PATH_UPDATE" ? line.newest.get(ref) ?? null
+      : digs.find((dig) => dig.rewrite !== null && entry.entry_id !== null && dig.rewrite.rewriteId.toLowerCase() === entry.entry_id.toLowerCase())?.rewrite?.after ?? null;
+    if (text !== null) newest.set(ref, text);
+  }
+  return newest;
+}
+
+/**
+ * V4 start step, Task 55b: every point under a path's root, following the arrows from the root down (core.edge, in edge order), each
+ * right after the one it argues, the root itself left out (it is the path's own answer); each read as `pointsOf` reads a story path's.
+ */
+async function pointsUnderRoot(pool: Pool, runId: string, rootNodeId: string): Promise<readonly PathRewritePoint[]> {
+  const edges = (await pool.query<{ source_node_id: string; target_node_id: string }>(
+    `SELECT edge.source_node_id::text AS source_node_id, edge.target_node_id::text AS target_node_id
+       FROM core.edge AS edge
+      WHERE edge.run_id = $1 AND edge.target_node_id IS NOT NULL
+      ORDER BY edge.edge_id`, [runId])).rows;
+  const ordered: string[] = [];
+  const seen = new Set([rootNodeId.toLowerCase()]);
+  const visit = (target: string): void => {
+    for (const edge of edges) {
+      if (edge.target_node_id.toLowerCase() !== target.toLowerCase() || seen.has(edge.source_node_id.toLowerCase())) continue;
+      seen.add(edge.source_node_id.toLowerCase());
+      ordered.push(edge.source_node_id);
+      visit(edge.source_node_id);
+    }
+  };
+  visit(rootNodeId);
+  return pointsOf(pool, runId, ordered);
+}
+
+/**
+ * V4 start step, Task 55b (Task 50's dossier path rule): a path debate's first-level paths, the paths the person chose in their order,
+ * each by its path id. Its points are those under its root in force (0158; none when its root dropped). Its text is the newest climb's or
+ * rewrite's when one came (`newest`), else its answer so far (the outcome's line, summary and fate); a FAILED path, or one with no answer
+ * so far, is named as not finished: its question, SET_ASIDE. The person's own words go to `views` beside the outcome's verdict on them,
+ * and what each version keeps (`stored`) is beside them, never read by the material. Sources are left to the caller (none here).
+ */
+export async function v2FirstPathsOf(input: Readonly<{ set: StoredStartPathSet; roots: readonly PathRootInForce[]; outcomes: ReadonlyMap<PathId, PathOutcome>;
+  newest: ReadonlyMap<string, DossierText>; pointsOf(rootNodeId: string): Promise<readonly PathRewritePoint[]> }>): Promise<readonly DossierPath[]> {
+  const rootOf = new Map(input.roots.filter((root) => !root.stale).map((root) => [root.pathId as string, root.rootNodeId] as const));
+  const paths: DossierPath[] = [];
+  for (const path of input.set.paths) {
+    const outcome = input.outcomes.get(path.pathId) ?? null;
+    const text = outcome === null || outcome.state === "FAILED" ? null : outcome.text;
+    const rootNodeId = rootOf.get(path.pathId) ?? null;
+    const view: DossierView | null = outcome?.view === null || outcome?.view === undefined ? null
+      : Object.freeze({ outcome: outcome.view.outcome, scope: outcome.view.scope, reason: outcome.view.reason });
+    const ownWords = Object.freeze([...path.ownWords]);
+    paths.push(Object.freeze({
+      ref: path.pathId,
+      storyLine: text?.line ?? path.question,
+      storyFate: text?.fate ?? "SET_ASIDE",
+      points: rootNodeId === null ? Object.freeze([]) : await input.pointsOf(rootNodeId),
+      sources: Object.freeze([]),
+      current: input.newest.get(path.pathId) ?? (text === null ? null : Object.freeze({ line: text.line, summary: text.summary, fate: text.fate })),
+      ownWords,
+      ...(view === null ? {} : { view }),
+      stored: Object.freeze({ pathId: path.pathId, trust: outcome?.trust ?? null, ownWords, view })
+    }));
+  }
+  return Object.freeze(paths);
 }
 
 /** The debate's step-2 lines (decisions 5 and 29), opened under its key, as the material's three fields; all null for an old debate. */
@@ -234,6 +326,8 @@ export function postgresInvestigationCloseSources(pool: Pool, log?: (event: stri
   const picks = new PostgresDigPicksRunnerRepository(pool);
   const digModel = new PostgresDigModelRunnerRepository(pool);
   const investigations = new PostgresInvestigationRunnerRepository(pool);
+  const startPaths = new PostgresStartPathsStore(pool);
+  const pathResults = new PostgresPathResultsRepository(pool);
 
   const openRewrite = async (entry: PathRewriteEntry): Promise<StoredRewrite | null> => {
     if (entry.rewrite_id === null || entry.content === null || entry.content === undefined) return null;
@@ -242,32 +336,63 @@ export function postgresInvestigationCloseSources(pool: Pool, log?: (event: stri
     return storedRewriteOf(opened);
   };
 
-  /** The text a turn was written on: its base rewrite's, else the parent's story line for the path (or its stored fate). */
+  /**
+   * The text a turn was written on: its base rewrite's, else the parent's story line for the path (or its stored fate). V4 start step,
+   * Task 55b: on a path debate's path b<n>, its answer so far (`parentPathOf`'s base text).
+   */
   const beforeOf = async (entry: PathRewriteEntry, parentTurns: readonly PathRewriteEntry[], storyLine: (runId: string, ref: string) =>
-    Promise<Readonly<{ line: string; fate: StoryFate }> | null>): Promise<DossierText> => {
+    Promise<Readonly<{ line: string; summary: string | null; fate: StoryFate }> | null>): Promise<DossierText> => {
     if (entry.based_on_rewrite_id !== null) {
       const base = parentTurns.find((candidate) => candidate.rewrite_id?.toLowerCase() === entry.based_on_rewrite_id!.toLowerCase());
       const text = base === undefined ? null : await openRewrite(base);
       if (text !== null) return text.text;
     }
     const story = await storyLine(entry.parent_run_id, entry.position_ref);
-    return Object.freeze({ line: story?.line ?? "", summary: null, fate: story?.fate ?? entry.fate_before ?? "SET_ASIDE" });
+    return Object.freeze({ line: story?.line ?? "", summary: story?.summary ?? null, fate: story?.fate ?? entry.fate_before ?? "SET_ASIDE" });
+  };
+
+  /**
+   * V4 start step, Task 55b: a run's chosen paths and their answers so far; null for a run that is no path debate (ids read first, no lease).
+   * Review of Task 55b: one memo per read of the investigation, never one for the reader's life (main.ts composes it once): a dig's answers
+   * so far come in while it is argued, and the person's words are not kept in memory after the read.
+   */
+  const pathRunReader = () => {
+    const pathRuns = new Map<string, Promise<Readonly<{ set: StoredStartPathSet; outcomes: ReadonlyMap<PathId, PathOutcome> }> | null>>();
+    return (runId: string) => {
+      if (!pathRuns.has(runId.toLowerCase())) {
+        pathRuns.set(runId.toLowerCase(), (async () => {
+          if (await startPaths.readStartPathIds(runId) === null) return null;
+          const set = await startPaths.readStartPaths(runId);
+          return set === null ? null : Object.freeze({ set, outcomes: await pathResults.readPathOutcomes(runId) });
+        })());
+      }
+      return pathRuns.get(runId.toLowerCase())!;
+    };
   };
 
   const readInput = async (root: string, earlierAnswer: Parameters<InvestigationInputReader>[1], forReport: boolean): Promise<InvestigationCloseInput | null> => {
+    const pathRunOf = pathRunReader();
     const ask = await runs.readStoredAsk(root);
     const investigation = await investigations.ofRun(root);
     if (ask === null || investigation === null) return null;
     const story = await storyOf(pool, root);
     const stories = new Map<string, StoryRead | null>([[root.toLowerCase(), story]]);
     const storyLine = async (runId: string, ref: string) => {
+      // V4 start step, Task 55b: a path debate's path b<n> was first written as its answer so far.
+      const pathRun = PATH_ID_PATTERN.test(ref) ? await pathRunOf(runId).catch(() => null) : null;
+      const base = pathRun === null ? null : pathOutcomeBaseOf(pathRun.set, pathRun.outcomes, ref);
+      if (base !== null) return base;
       if (!stories.has(runId.toLowerCase())) stories.set(runId.toLowerCase(), await storyOf(pool, runId).catch(() => null));
       const path = stories.get(runId.toLowerCase())?.paths.find((candidate) => candidate.ref === ref);
-      return path === undefined ? null : Object.freeze({ line: path.line, fate: path.fate });
+      return path === undefined ? null : Object.freeze({ line: path.line, summary: null, fate: path.fate });
     };
     const rootLine = await lineOf(pool, root);
+    // V4 start step, Task 55b: a path debate's first-level paths are the paths the person chose (below, once the digs are read).
+    const chosen = await pathRunOf(root);
     const paths: DossierPath[] = [];
-    for (const path of story?.paths ?? []) {
+    /** Each first-level path's points by the run they were argued in: the root's, and a "+ N more" dig's own. */
+    const firstPointRuns: Array<readonly [string, readonly string[]]> = [];
+    for (const path of chosen === null ? story?.paths ?? [] : []) {
       const pointIds = path.nodeRefs.filter((id) => id.toLowerCase() !== path.positionNodeId.toLowerCase());
       const points = await pointsOf(pool, root, pointIds);
       paths.push(Object.freeze({ ref: path.ref, storyLine: path.line, storyFate: path.fate, points,
@@ -290,9 +415,11 @@ export function postgresInvestigationCloseSources(pool: Pool, log?: (event: stri
         }
       }
     }
+    const picksOf = new Map<string, DigPicksRead | null>();
     for (const member of members) {
       if (hidden.has(member.run_id.toLowerCase())) continue;
       const own = await picks.read(member.run_id);
+      picksOf.set(member.run_id.toLowerCase(), own);
       const level = await digModel.readDigLevel(member.run_id);
       const read = await digModel.readPathRewrites(member.run_id);
       const turn = read?.own ?? null;
@@ -353,13 +480,60 @@ export function postgresInvestigationCloseSources(pool: Pool, log?: (event: stri
         rewrite, ownMaterial
       }));
     }
+    let cards: readonly DossierDig[] = digs;
+    if (chosen === null) {
+      firstPointRuns.push([root, paths.flatMap((path) => path.points.map((point) => point.id))]);
+    } else {
+      // V4 start step, Task 55b (Task 50's dossier path rule): the paths the person chose, each by its path id, at its newest text.
+      const ofRoot = await v2FirstPathsOf({ set: chosen.set, roots: await pathResults.readPathRoots(root), outcomes: chosen.outcomes,
+        newest: newestOfPaths(rootLine, digs), pointsOf: (rootNodeId) => pointsUnderRoot(pool, root, rootNodeId) });
+      for (const path of ofRoot) paths.push(Object.freeze({ ...path, sources: await sourcesOfPoints(pool, root, path.points.map((point) => point.id)) }));
+      firstPointRuns.push([root, paths.flatMap((path) => path.points.map((point) => point.id))]);
+      // Spec §4.4: a path the person left out before Start ("+ N more") is dug under the main question, and shows up as a new first-level
+      // path: each of that dig's own paths joins the chosen ones (in the order the digs settled), named by the item its pick named, and
+      // the digs dug from it hang under it. The dig itself is no card. A dig there that is no path debate stays a card, as on R22.
+      const taken = new Set(paths.map((path) => path.ref));
+      const moved = new Map<string, Readonly<{ parentRunId: string; positionRef: string }>>();
+      const moreDigs = [...digs].filter((dig) => dig.positionRef === null && dig.parentRunId.toLowerCase() === root.toLowerCase())
+        .sort((a, b) => Date.parse(a.finishedAt) - Date.parse(b.finishedAt) || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0));
+      const asPaths = new Set<string>();
+      for (const dig of moreDigs) {
+        const pathRun = await pathRunOf(dig.runId).catch(() => null);
+        if (pathRun === null) continue;
+        // Review of Task 55b: a dig still being argued stays a card (its picks only, as a running dig on R22), so none of its points, which
+        // no AI has checked yet, are weighed; it is a first-level path once every path of it has its answer so far.
+        if (pathRun.set.paths.some((path) => !pathRun.outcomes.has(path.pathId))) continue;
+        asPaths.add(dig.runId.toLowerCase());
+        const ofDig = await v2FirstPathsOf({ set: pathRun.set, roots: await pathResults.readPathRoots(dig.runId), outcomes: pathRun.outcomes,
+          newest: newestOfPaths(lines.get(dig.runId.toLowerCase())!, digs), pointsOf: (rootNodeId) => pointsUnderRoot(pool, dig.runId, rootNodeId) });
+        const picked = picksOf.get(dig.runId.toLowerCase())?.picks ?? [];
+        for (const path of ofDig) {
+          const viewpoints = pathRun.set.paths.find((candidate) => candidate.pathId === path.ref)?.viewpoints ?? [];
+          const place = viewpoints.map((viewpoint) => picked.find((pick) => pick.pickNo === viewpoint.pickNo)?.place)
+            .find((candidate): candidate is string => candidate !== undefined && candidate.startsWith("more-"));
+          const name = place ?? `${path.ref}@${dig.runId.toLowerCase()}`;
+          let ref = name;
+          for (let times = 2; taken.has(ref); times += 1) ref = `${name}#${String(times)}`;
+          taken.add(ref);
+          moved.set(`${dig.runId.toLowerCase()}\u0000${path.ref}`, Object.freeze({ parentRunId: root, positionRef: ref }));
+          const ids = path.points.map((point) => point.id);
+          paths.push(Object.freeze({ ...path, ref, sources: await sourcesOfPoints(pool, dig.runId, ids),
+            ...(path.stored === undefined ? {} : { stored: Object.freeze({ ...path.stored, pathId: null }) }) }));
+          firstPointRuns.push([dig.runId, ids]);
+        }
+      }
+      cards = Object.freeze(digs.filter((dig) => !asPaths.has(dig.runId.toLowerCase())).map((dig) => {
+        const to = dig.positionRef === null ? undefined : moved.get(`${dig.parentRunId.toLowerCase()}\u0000${dig.positionRef}`);
+        return to === undefined ? dig : Object.freeze({ ...dig, ...to });
+      }));
+    }
     const purpose = await purposeLinesOf(pool, root, ask.questionLine);
     const trustWords = new Map<string, TrustWord>();
     if (forReport) {
       const free = ask.planTier === "free";
       try {
-        for (const [id, word] of await trustWordsOf(pool, root, free, paths.flatMap((path) => path.points.map((point) => point.id)))) trustWords.set(id, word);
-        for (const dig of digs) {
+        for (const [runId, ids] of firstPointRuns) for (const [id, word] of await trustWordsOf(pool, runId, free, ids)) trustWords.set(id, word);
+        for (const dig of cards) {
           const ids = dig.ownMaterial?.paths.flatMap((path) => path.points.map((point) => point.id)) ?? [];
           for (const [id, word] of await trustWordsOf(pool, dig.runId, free, ids)) trustWords.set(id, word);
         }
@@ -375,12 +549,13 @@ export function postgresInvestigationCloseSources(pool: Pool, log?: (event: stri
         question: Object.freeze({ line: ask.questionLine, place: purpose.place, time: purpose.time, purpose: purpose.purpose,
           readingLevel: readingLevelOf(ask.depthParams), language: null }),
         first: Object.freeze({ runId: root, answer: story?.answer ?? null, paths: Object.freeze(paths) }),
-        digs: Object.freeze(digs),
+        digs: Object.freeze(cards),
         earlier: earlierAnswer,
         ...(trustWords.size === 0 ? {} : { trustWords }),
         // W4-4 (owner Q-D9): the pages the person added to researched are weighed here. Absent when there are none, so a report without them keeps its bytes.
         ...await (async () => {
-          const addedPages = await addedPagesOfInvestigation(pool, root, members.filter((member) => !hidden.has(member.run_id.toLowerCase())).map((member) => member.run_id));
+          const addedPages = await addedPagesOfInvestigation(pool, root, members.filter((member) => !hidden.has(member.run_id.toLowerCase())).map((member) => member.run_id),
+            chosen !== null);
           return addedPages.length === 0 ? {} : { addedPages };
         })()
       })

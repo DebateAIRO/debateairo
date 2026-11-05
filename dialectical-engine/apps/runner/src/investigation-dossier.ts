@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { INVESTIGATION_REPORT_LIMITS, TRUST_WORDS, cutQuoteAtWordEdge, type StoryFate, type TrustWord } from "@debateai/contract";
+import { INVESTIGATION_REPORT_LIMITS, TRUST_WORDS, cutQuoteAtWordEdge, type PathId, type StoryFate, type TrustWord } from "@debateai/contract";
 import { TypedDomainError, withQuestionLanguageField, withReaderField } from "@debateai/kernel";
 import { buildFramedPrompt, type FramedMaterialField, type PromptPacket } from "@debateai/providers";
 import {
@@ -32,7 +32,7 @@ import {
  *    4: "every path of the debate and every point argued on it"). A FAILED rewrite (or none) brings in the dig's own
  *    material instead: its answer text and its paths' points (Q-D13: a dig keeps both);
  *  - the person's own views, each word for word beside its verdict (on a path run's main answer, V4 start step Task 50, first the
- *    person's own words on each path, by the path);
+ *    person's own words on each path, by the path; on a path run's reports and answer updates, Task 55b, beside the path's verdict);
  *  - the sources: each checked extract a point cites, as the quote people see (at most 120 characters, owner F9) and
  *    reader 1's line;
  *  - from version 2 on, the earlier report's answer (owner F8 A);
@@ -151,7 +151,21 @@ export type DossierPath = Readonly<{
    * `views`, marked as theirs, by the path's ref, never beside the path; absent or none: no entry (R22's bytes).
    */
   ownWords?: readonly string[];
+  /**
+   * V4 start step, Task 55b: the verdict on those words (a path run's answer so far), beside them in `views` as a dig card's verdict is;
+   * absent or null: the words alone (R22's bytes, and Task 50's main answer).
+   */
+  view?: DossierView | null;
+  /**
+   * V4 start step, Task 55b: what each stored version keeps of a path debate's first-level path (its path id, null on a path dug from
+   * "+ N more"; its answer so far's trust word; the person's own words; the verdict on them). Storage only: the material and the
+   * fingerprint never read it, so a dossier is the same bytes with or without it. Absent: an R22 path, nothing kept.
+   */
+  stored?: Readonly<{ pathId: PathId | null; trust: TrustWord | null; ownWords: readonly string[]; view: DossierView | null }>;
 }>;
+
+/** A verdict on the person's own words: helped, did not help or not settled, for the path or the main question, and why. */
+export type DossierView = Readonly<{ outcome: "HELPED" | "DID_NOT_HELP" | "NOT_SETTLED"; scope: "PATH" | "MAIN_QUESTION"; reason: string }>;
 
 /** W4-4 (owner Q-D9): a page the person added to researched that added to the argument: reader 1's note and its shown quotes. */
 export type DossierAddedPage = Readonly<{ path: string | null; site: string; title: string | null; note: string | null; quotes: readonly string[] }>;
@@ -192,9 +206,13 @@ export type DossierReportDig = Readonly<{
   view: Readonly<{ outcome: "HELPED" | "DID_NOT_HELP" | "NOT_SETTLED"; reason: string }> | null;
   changed: readonly string[];
 }>;
-/** One path in the stored version: level 0 is the first debate's, level k the paths of a dig at level k. */
+/**
+ * One path in the stored version: level 0 is the first debate's, level k the paths of a dig at level k. V4 start step, Task 55b: a path
+ * debate's first-level path also keeps, last, its path id, its trust word and the person's own words with the verdict on them.
+ */
 export type DossierReportPath = Readonly<{ line: string; summary: string | null; fate: StoryFate | null; level: number;
-  points?: readonly DossierReportPoint[]; dig?: DossierReportDig }>;
+  points?: readonly DossierReportPoint[]; dig?: DossierReportDig; path_id?: PathId; trust?: TrustWord | null;
+  own?: Readonly<{ own_words: readonly string[]; view: DossierView | null }> }>;
 
 export type Dossier = Readonly<{
   kind: "BUILT";
@@ -470,9 +488,11 @@ function fieldsAt(input: DossierInput, cards: readonly DossierDig[], refs: Refs,
     }
     followUps.push(cardJson(dig, form, step, input, refs, digPathRefOf));
   }
-  // V4 start step, Task 50: a path's own words first, by its ref, in map order (none on any path: R22's bytes), then the cards'.
+  // V4 start step, Task 50: a path's own words first, by its ref, in map order (none on any path: R22's bytes), then the cards'. Task
+  // 55b: beside the verdict on them when the path has one (a path run's answer so far), as a card's.
   const pathViews = input.first.paths.flatMap((path) => ((path.ownWords ?? []).length === 0 ? []
-    : [{ path: refs.pathRef.get(path.ref)!, words: [...path.ownWords!], marked: "PERSON" }]));
+    : [{ path: refs.pathRef.get(path.ref)!, words: [...path.ownWords!], marked: "PERSON",
+      ...((path.view ?? null) === null ? {} : { verdict: { outcome: path.view!.outcome, scope: path.view!.scope, reason: path.view!.reason } }) }]));
   const views = [...pathViews, ...cards.flatMap((dig) => {
     const words = dig.picks.filter((pick) => pick.by !== "AI_SUGGESTION").map((pick) => pick.text);
     const form = step.forms.get(lower(dig.runId)) ?? "WHOLE";
@@ -644,6 +664,26 @@ function reportDigOf(dig: DossierDig): DossierReportDig {
   });
 }
 
+/**
+ * V4 start step, Task 55b: what a path debate's first-level path keeps in the version, last (an R22 path: nothing). Its path id when it has
+ * one, its trust word, and on a path with the person's own words those words with the verdict: the newest one a dig of this path wrote
+ * (by its rewrite's time), else its answer so far's.
+ */
+function storedOf(path: DossierPath, cards: readonly DossierDig[], firstRunId: string): Pick<DossierReportPath, "path_id" | "trust" | "own"> {
+  const stored = path.stored;
+  if (stored === undefined) return {};
+  const dug = cards.filter((dig) => lower(dig.parentRunId) === lower(firstRunId) && dig.positionRef === path.ref && (dig.rewrite?.view ?? null) !== null)
+    .sort((left, right) => byTimeThenId({ at: left.rewrite!.recordedAt, id: lower(left.rewrite!.rewriteId) },
+      { at: right.rewrite!.recordedAt, id: lower(right.rewrite!.rewriteId) }));
+  const view = dug.at(-1)?.rewrite?.view ?? stored.view;
+  return {
+    ...(stored.pathId === null ? {} : { path_id: stored.pathId }),
+    trust: stored.trust,
+    ...(stored.ownWords.length === 0 ? {} : { own: Object.freeze({ own_words: Object.freeze([...stored.ownWords]),
+      view: view === null ? null : Object.freeze({ outcome: view.outcome, scope: view.scope, reason: view.reason }) }) })
+  };
+}
+
 /** The paths as the stored version lists them, each under the debate it was dug from: the page and the PDF show this tree. */
 function reportPathsOf(input: DossierInput, cards: readonly DossierDig[], refs: Refs): readonly DossierReportPath[] {
   const paths: DossierReportPath[] = [];
@@ -675,7 +715,8 @@ function reportPathsOf(input: DossierInput, cards: readonly DossierDig[], refs: 
   };
   for (const path of input.first.paths) {
     const current = path.current ?? newestOf.get(path.ref) ?? { line: path.storyLine, summary: null, fate: path.storyFate };
-    paths.push(Object.freeze({ line: current.line, summary: current.summary, fate: current.fate, level: 0, points: reportPointsOf(path.points, path.sources, refs, input.trustWords) }));
+    paths.push(Object.freeze({ line: current.line, summary: current.summary, fate: current.fate, level: 0, points: reportPointsOf(path.points, path.sources, refs, input.trustWords),
+      ...storedOf(path, cards, input.first.runId) }));
     under(input.first.runId, path.ref);
   }
   under(input.first.runId, null);

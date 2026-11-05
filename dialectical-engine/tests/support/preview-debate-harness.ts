@@ -91,6 +91,7 @@ import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-sha
 import type { EngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
 import type { RunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import type { WebStepRunnerSettings } from "../../apps/runner/src/web-step.js";
+import { composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import {
   createRunFinalWriterTerms,
   finalWriterTermsResolver,
@@ -418,6 +419,12 @@ export function previewDebateHarness(input: Readonly<{
        * call policy, so a final writer may get the FINAL_WRITER tier; absent, none (a final writer asks at the row's own bound).
        */
       gateRemaining?: Readonly<Partial<Record<GateProvider, () => Promise<PreviewGateRemaining>>>>;
+      /**
+       * V4 start step, Task 55: the path rewrite switched on, composed as main.ts composes it (`composePathRewrite` over the six targets
+       * and the topology's members, on the runner's pool), so a settled dig is rewritten in its story's place; absent, none (every
+       * settled run gets its story).
+       */
+      pathRewrite?: boolean;
     }> = {}
   ) {
     const own = await runnerPool();
@@ -565,6 +572,10 @@ export function previewDebateHarness(input: Readonly<{
       assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
     }
     const fixture = fixtureSettings();
+    // V4 start step, Task 55, as main.ts: the path rewrite over the configured members, on the runner's own pool.
+    const pathRewrite = options.pathRewrite !== true ? undefined : composePathRewrite({ pool: own, targets: TARGETS,
+      members: [topology.primary, ...(topology.critique === undefined ? [] : [topology.critique]), ...topology.additionalMakers], log: () => undefined });
+    if (options.pathRewrite === true && pathRewrite === undefined) throw new Error("test: the targets hold no Haiku or no GLM for the path rewrite");
     const runner = new WalkingSkeletonRunner(own, topology.primary.provider, {
       ...fixture,
       ...(options.stoppingPolicy === undefined ? {} : {
@@ -609,6 +620,7 @@ export function previewDebateHarness(input: Readonly<{
       pathResults: new PostgresPathResultsRepository(own),
       pathProgress: options.pathProgress ?? new PostgresPathProgressRepository(own),
       ...(options.webSearch === undefined ? {} : { webSearch: options.webSearch }),
+      ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
         record: async (event) => { holdRecords.push(event); },

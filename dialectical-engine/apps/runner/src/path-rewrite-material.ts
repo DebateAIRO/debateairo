@@ -287,6 +287,20 @@ export function pathRewriteDigPathsOf(
 }
 
 /**
+ * V4 start step, Task 55 (spec 2026-11-03 §4.4): a dig's own paths. A dig that is itself a path debate hands its roots in force (its
+ * paths b<n>, by root index): its own paths are those, each read from its own root and named by its id. An R22 dig hands none: its
+ * positions in the judges' order, by their node ids, exactly as before.
+ */
+export function pathRewriteDigPathsOfDig(
+  snapshot: Pick<StoryWriteInput, "nodes" | "arrows" | "verdictBasis">,
+  enrichment: ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>,
+  extracts: ReadonlyMap<string, readonly PathRewriteExtract[]>,
+  roots: readonly Readonly<{ ref: string; rootNodeId: string }>[]
+): readonly PathRewriteDigPath[] {
+  return roots.length === 0 ? pathRewriteDigPathsOf(snapshot, enrichment, extracts) : pathRewriteDigPathsOfRoots(snapshot, enrichment, extracts, roots);
+}
+
+/**
  * V4 start step, Task 49: the same walk from the roots given, in their order (a path run's roots, from 0158's `readPathRoots`), each
  * path named by its own ref (`b<n>`) instead of its root's node id. Each point is still given once across the paths. A root the
  * snapshot does not hold, or one set aside, is left out. Given the judges' order and each root's own id, it is

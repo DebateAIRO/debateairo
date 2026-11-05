@@ -215,7 +215,7 @@ import {
   cutQuoteAtWordEdge, mainAnswerTrustWordOf, purposeLinesMaterial, trustOfPoint, type PathOutcome, type TrustWord
 } from "@debateai/contract";
 import { LivenessRepository, verdictDerivationOfPaths } from "@debateai/serve";
-import { storyLengthField, storyPathsPointsOf, withoutStoryNodeIds } from "@debateai/story";
+import { storyLengthField, withoutStoryNodeIds } from "@debateai/story";
 import {
   PATH_OUTCOME_FAILED, pathCopyStops, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathsFinalSeatsOf, runPathChains,
   runPathOutcomeFor, type PathOutcomesJob, type PathOutcomesPath, type PathOutcomesSeat
@@ -294,7 +294,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyPathsInputOf, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyPathsInputOf, storyPathsPointsOfRun, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import { runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
@@ -12909,7 +12909,8 @@ export class WalkingSkeletonRunner {
             mainTrust: pathsMainTrust, gap: pathsGapRound });
           const disputed = new Set(await this.#judgements.readDisputedNodeIds(run.runId));
           const fitted = await fitStoryPathsToTokenLine({ ...storyPaths,
-            points: storyPathsPointsOf(authoredNodeList.map((node) => ({ nodeId: node.nodeId, claim: node.statement })), disputed).points,
+            // Task 54c (W1-5): the points the writer will send, each looked-up point with the extract it cites, so the extracts count in the fit.
+            points: storyPathsPointsOfRun(authoredNodeList, disputed, webCited),
             questionLine: pathsQuestionLine,
             length: lengthGuidance === null ? null : storyLengthField(lengthGuidance.story, run.argumentLanguageTag, lengthGuidance.charactersPerWord),
             readingLevel, language: shapeLanguage }, pathsTokenCount, pathsLog);

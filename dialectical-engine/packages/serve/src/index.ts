@@ -63,6 +63,7 @@ import {
   servePathRewrites, storyPathLinesOf, turnsOnTheLine, storyPathPointsOf, type DebatePoints, type PathTrustSources, type RewriteTurn,
   type StoryPathPoints
 } from "./path-rewrites.js";
+import { inPathOrder, pathNodePlacesOf } from "./path-order.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
@@ -3027,9 +3028,11 @@ export class ServeRepository {
       subjectRef: row.answer_id,
       relevantAsOf: row.relevant_as_of
     });
+    // V4 start step, Task 58b: a path debate's nodes and edges in one order, read once for both under this lease; null on R22 and v1.
+    const pathPlaces = await this.#pathPlacesOf(row.run_id);
     const [nodes, edges, servedWeb] = await Promise.all([
-      this.readNodesForRun(row.run_id, row.answer_id, row.answer_version),
-      this.readEdgesForRun(row.run_id),
+      this.readNodesForRun(row.run_id, row.answer_id, row.answer_version, pathPlaces),
+      this.readEdgesForRun(row.run_id, pathPlaces),
       this.#readServedWeb(row.run_id)
     ]);
     // V4 start step, Task 58 (Task 16's Answer.branches): a path debate's paths, each with its answer so far, opened under this lease; an
@@ -3294,7 +3297,10 @@ export class ServeRepository {
       ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison }),
       // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
       // W4-3: the kinds code finds on each path joined the AI's (`#readServedWeb`); none at level 10, which cannot be dug.
-      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions) }),
+      // V4 start step, Task 55b (owner F14): a path debate's web paths are its path ids, so code reads the points under each path's root in
+      // force (0158's, as the branches name them); an R22 answer hands none (today's bytes).
+      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions,
+        branches === null ? undefined : new Map(branches.paths.flatMap((path) => path.root_node_id === null ? [] : [[path.path_id, path.root_node_id] as const]))) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
       ...digModel,
       // V4 start step, Task 58: a path debate's paths (each its own branch); absent on every R22 answer.
@@ -4022,8 +4028,32 @@ export class ServeRepository {
     }
   }
 
-  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
-  private async readEdgesForRun(runId: string): Promise<Edge[]> {
+  /**
+   * V4 start step, Task 58b (Task 53b's rule, spec §4.3: the served answer is the same whichever path finishes first). Each path of a path
+   * debate saves in its own order, so created_at_seq across paths follows which path finished first: its nodes are served path by path in
+   * the order its branches list them, and its edges after their source nodes (./path-order.ts). Ids and codes only (0157's path ids,
+   * 0158's roots in force, each live node's parent), read under the caller's lease. Null on every R22 and v1 debate (no paths: one read
+   * of the ids), and on a path debate with no root in force: their nodes and edges keep the SQL's created_at_seq order.
+   */
+  async #pathPlacesOf(runId: string): Promise<ReadonlyMap<string, number> | null> {
+    const ports = postgresBranchReadPorts(this.pool);
+    const pathIds = await ports.readStartPathIds(runId);
+    if (pathIds === null) return null;
+    const rootOf = new Map((await ports.readPathRoots(runId)).filter((root) => !root.stale)
+      .map((root) => [root.pathId as string, root.rootNodeId] as const));
+    const roots = pathIds.flatMap((pathId) => rootOf.get(pathId) ?? []);
+    if (roots.length === 0) return null;
+    const nodes = await this.pool.query<{ node_id: string; parent_node_id: string | null }>(
+      `SELECT node_id::text AS node_id, parent_node_id::text AS parent_node_id FROM core.node
+        WHERE run_id = $1 AND generation_status <> 'stale' ORDER BY created_at_seq`, [runId]);
+    return pathNodePlacesOf(nodes.rows.map((row) => ({ nodeId: row.node_id, parentNodeId: row.parent_node_id })), roots);
+  }
+
+  /**
+   * Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's.
+   * Task 58b: `pathPlaces` is the caller's read of #pathPlacesOf (absent: read here).
+   */
+  private async readEdgesForRun(runId: string, pathPlaces?: ReadonlyMap<string, number> | null): Promise<Edge[]> {
     const result = await this.pool.query<{
       edge_id: string;
       source_node_id: string;
@@ -4049,7 +4079,10 @@ export class ServeRepository {
        ORDER BY edge.created_at_seq`,
       [runId]
     );
-    return result.rows.map((edge) => projectServeEdge({
+    // Task 58b: a path debate's edges after their source nodes, in the nodes' served order; R22 and v1 keep the SQL's order.
+    const places = pathPlaces === undefined ? await this.#pathPlacesOf(runId) : pathPlaces;
+    const rows = places === null ? result.rows : inPathOrder(result.rows, (edge) => edge.source_node_id, places);
+    return rows.map((edge) => projectServeEdge({
       edgeId: edge.edge_id,
       sourceNodeId: edge.source_node_id,
       sourceChildKind: edge.source_child_kind,
@@ -4063,8 +4096,12 @@ export class ServeRepository {
     }));
   }
 
-  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
-  private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number): Promise<Node[]> {
+  /**
+   * Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's.
+   * Task 58b: `pathPlaces` is the caller's read of #pathPlacesOf (absent: read here, under this lease).
+   */
+  private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number,
+    pathPlaces?: ReadonlyMap<string, number> | null): Promise<Node[]> {
     return withRunContentLease(this.pool,[runId],async () => {
     const result = await this.pool.query<{
       node_id: string;
@@ -4164,6 +4201,9 @@ export class ServeRepository {
        WHERE node.run_id = $1 AND node.generation_status <> 'stale' ORDER BY node.created_at_seq`,
       [runId]
     );
+    // Task 58b: a path debate's nodes path by path (./path-order.ts); R22 and v1 keep the SQL's created_at_seq order.
+    const places = pathPlaces === undefined ? await this.#pathPlacesOf(runId) : pathPlaces;
+    const rows = places === null ? result.rows : inPathOrder(result.rows, (row) => row.node_id, places);
     const markLinks = answerId === undefined || answerVersion === undefined
       ? []
       : (await this.pool.query<{ node_id: string; mark: string }>(
@@ -4176,10 +4216,10 @@ export class ServeRepository {
         [answerId, answerVersion]
       )).rows;
     const marksByNode = projectConditionMarksByNode(
-      result.rows.map((row) => row.node_id),
+      rows.map((row) => row.node_id),
       markLinks.map((link) => ({ nodeId: link.node_id, mark: link.mark }))
     );
-    return Promise.all(result.rows.map(async (row) => {
+    return Promise.all(rows.map(async (row) => {
       const [staleness, nodeContent, reviewContent] = await Promise.all([
         this.#liveness.readSubjectStaleness({
           runId,

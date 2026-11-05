@@ -112,10 +112,12 @@ async function shapeReports(read: InvestigationReportsOwnerRead, ports: Investig
       sources: content.sources, ...(content.paths === undefined ? {} : { paths: content.paths }), shortened: content.shortened };
   });
   // Decision 27: a path's points and what a dig changed are for the PDF, which prints only the current version; earlier versions stay
-  // as written in the store and light here.
+  // as written in the store and light here. V4 start step, review of Task 55b (spec §4.6, report-f4): a path debate's path id, trust word
+  // and the person's own words with their verdict are light, and the page shows "Your point of view" on every version: earlier ones keep them.
   const current = versions.filter(finished).at(-1)?.report_version ?? null;
   const served = versions.map((version) => version.report_version === current || !finished(version) || !("paths" in version) || version.paths === undefined ? version
-    : { ...version, paths: version.paths.map(({ line, summary, fate, level }) => ({ line, summary, fate, level })) });
+    : { ...version, paths: version.paths.map(({ line, summary, fate, level, path_id, trust, own }) => ({ line, summary, fate, level,
+      ...(path_id === undefined ? {} : { path_id }), ...(trust === undefined ? {} : { trust }), ...(own === undefined ? {} : { own }) })) });
   const digs = investigation.members.filter((member) => member.run_id.toLowerCase() !== rootRunId.toLowerCase()).length;
   return InvestigationReportsSchema.parse({
     investigation_id: investigation.investigation_id,

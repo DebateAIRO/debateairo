@@ -192,6 +192,22 @@ describe("GET /v1/runs/{id}/investigation", () => {
     await api.close();
   });
 
+  it("V4 start step, review of Task 55b (spec §4.6, report-f4): every version keeps a path debate's path ids, trust words and the person's own words with the verdict, earlier ones too", async () => {
+    const menu = { line: "A made-up menu path.", summary: null, fate: "HELD_UP", level: 0, path_id: "b1", trust: null };
+    const own = { line: "A made-up own path.", summary: "A made-up summary.", fate: "PARTLY_HELD", level: 0,
+      points: [{ text: "A made-up point.", trust: "SURE", side: "for", sources: [0] }], path_id: "b2", trust: "STILL_ARGUED",
+      own: { own_words: ["My made-up words on it."], view: { outcome: "HELPED", scope: "PATH", reason: "A made-up reason." } } };
+    const world = worldOf({ state: "closed", closings: [closing(1, 1), closing(2, 2)], reports: [report(1, "r-1", "READY", 3), report(2, "r-2", "READY", 4)],
+      sealed: new Map([["r-1", content({ paths: [menu, own] })], ["r-2", content({ paths: [menu, own] })]]) });
+    const { api } = apiOver(world);
+    const read = InvestigationReportsSchema.parse((await get(api, OWNER, ROOT)).json());
+    const [older, current] = read.versions as Array<{ paths: unknown[] }>;
+    const { points: _points, ...light } = own;
+    expect(older!.paths).toEqual([menu, light]);
+    expect(current!.paths).toEqual([menu, own]);
+    await api.close();
+  });
+
   it("a dig answers its investigation's versions too", async () => {
     const { api } = apiOver(threeVersions());
     const read = InvestigationReportsSchema.parse((await get(api, OWNER, DIG)).json());

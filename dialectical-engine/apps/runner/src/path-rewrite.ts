@@ -15,7 +15,7 @@ import {
 import { engineContractHash } from "./engine-contracts.js";
 import { fitRewriteToTokenLine } from "./token-line.js";
 import {
-  pathRewriteDigPathsOf, pathRewriteDigPathsOfRoots, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
+  pathRewriteDigPathsOf, pathRewriteDigPathsOfDig, pathRewriteDigPathsOfRoots, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
   type PathRewriteParentPath, type PathRewritePick, type PathRewriteQuestion
 } from "./path-rewrite-material.js";
 import { holdRunPassages, releaseRunPassages } from "./passage-record.js";
@@ -85,6 +85,11 @@ export type PathRewriteSources = Readonly<{
     => Promise<ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>>;
   /** The checked extracts the dig's own points cite, by point id; absent: none. */
   digExtractsOf?: (runId: string, pointIds: readonly string[]) => Promise<ReadonlyMap<string, readonly PathRewriteExtract[]>>;
+  /**
+   * V4 start step, Task 55: the dig's roots in force when it is itself a path debate (0158's `readPathRoots`, by root index), each by
+   * its path id b<n>; none (empty, or absent): an R22 dig, whose own paths are its positions in the judges' order.
+   */
+  pathRootsOf?: (runId: string) => Promise<readonly Readonly<{ ref: string; rootNodeId: string }>[]>;
   /** W3-7 (0135): stores the dig's own paths and its work item before it takes its turn; absent: nothing stored. */
   recordInput?: (runId: string, workItemId: string, digPaths: readonly PathRewriteDigPath[]) => Promise<string>;
   /** W3-7: what `recordInput` stored, for the sweep; null when nothing was. */
@@ -302,10 +307,12 @@ export async function digPathsOf(settings: PathRewriteRunnerSettings, input: Sto
   const digRunId = input.runId;
   const enrichment = await lease(() => settings.sources.readEnrichment({ runId: digRunId,
     nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
-  const pathsWithoutSources = pathRewriteDigPathsOf(input, enrichment);
+  // V4 start step, Task 55: a dig that is a path debate hands the rewrite its own paths b<n>, each from its root in force.
+  const roots = settings.sources.pathRootsOf === undefined ? [] : await lease(() => settings.sources.pathRootsOf!(digRunId));
+  const pathsWithoutSources = pathRewriteDigPathsOfDig(input, enrichment, new Map(), roots);
   const extracts = settings.sources.digExtractsOf === undefined ? new Map<string, readonly PathRewriteExtract[]>()
     : await lease(() => settings.sources.digExtractsOf!(digRunId, pathsWithoutSources.flatMap((path) => path.points.map((point) => point.id))));
-  return pathRewriteDigPathsOf(input, enrichment, extracts);
+  return pathRewriteDigPathsOfDig(input, enrichment, extracts, roots);
 }
 
 function safeLog(settings: PathRewriteRunnerSettings): (event: string, detail: Record<string, unknown>) => void {

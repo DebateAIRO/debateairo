@@ -7,12 +7,14 @@ import type { StoredStartPathSet } from "@debateai/db";
 import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
+  storyPathsPointsOf,
   withoutStoryNodeIds,
   type StoryAnswersNoteKind,
   type StoryBackupCandidate,
   type StoryBackupMaker,
   type StoryCostFallback,
   type StoryPathsInput,
+  type StoryPathsPoint,
   type StoryRoleMaker,
   type StoryRoleResolver,
   type StoryRunRoleMakers,
@@ -231,6 +233,20 @@ export function storyPathsInputOf(input: Readonly<{
     mainTrust: input.mainTrust,
     alsoRaised: Object.freeze((input.gap?.points ?? []).filter((point) => point.path_id === null).map((point) => point.text))
   });
+}
+
+/**
+ * V4 start step, Task 54c (W1-5 on a path run): the points of a path run's story as the runner's fit counts them
+ * (`fitStoryPathsToTokenLine`), built as the writer builds them from this module's snapshot (`storyPathsPointsOf` over its nodes):
+ * each authored node's words (a path run has no map, so a root's words are its statement), whether it is disputed, and the extract a
+ * looked-up node cites, exactly as `citedExtracts` hands it to the snapshot, so the extracts count in the fit. None: today's points. Pure.
+ */
+export function storyPathsPointsOfRun(authored: readonly Readonly<{ nodeId: string; statement: string }>[], disputed: ReadonlySet<string>,
+  citedExtracts?: ReadonlyMap<string, EngineCitedExtract>): readonly StoryPathsPoint[] {
+  return storyPathsPointsOf(authored.map((node) => {
+    const cited = citedExtracts?.get(node.nodeId);
+    return { nodeId: node.nodeId, claim: node.statement, ...(cited === undefined ? {} : { citedExtract: cited }) };
+  }), disputed).points;
 }
 
 /**

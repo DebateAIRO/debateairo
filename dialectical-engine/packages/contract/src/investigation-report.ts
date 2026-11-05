@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PathIdSchema } from "./start-paths.js";
 import { StoryFateSchema } from "./story.js";
 import { TrustWordSchema, WEB_CONTRACT_LIMITS } from "./web.js";
 
@@ -23,9 +24,13 @@ import { TrustWordSchema, WEB_CONTRACT_LIMITS } from "./web.js";
  *    optional: a version written before them has neither;
  *  - from R22's fuller PDF on (decision 27), each path also keeps its points with their trust words, and a dig's first path what
  *    was dug, the person's own words beside their verdict, and what the dig changed, all of it what the AIs already wrote, so the PDF
- *    reads at the time of the version. All optional. The API serves them only on the current version (the PDF prints only that one).
+ *    reads at the time of the version. All optional. The API serves them only on the current version (the PDF prints only that one);
+ *  - V4 start step, Task 55b (the owner's request for report-f4): on a path debate each first-level path also keeps its path id and its
+ *    trust word, and a path with the person's own words keeps those words with the verdict on them (its answer so far's, or the newest
+ *    dig's of that path), so the report page can show "Your point of view" for any version. Optional, last, on level 0 only.
  *
- * It imports only zod and the zod-only modules beside it (never ./index.js), for the module-cycle reason web.ts gives.
+ * It imports only zod and the modules beside it that never import ./index.js (start-paths.js for the path id), for the module-cycle
+ * reason web.ts gives.
  */
 export const INVESTIGATION_REPORT_LIMITS = Object.freeze({
   /** R4's answer form: at most two segments (the answer, then what evidence would decide it). */
@@ -43,6 +48,8 @@ export const INVESTIGATION_REPORT_LIMITS = Object.freeze({
   pathPointsMax: 200,
   pathChangedMax: 40,
   digPicksMax: 40,
+  /** V4 start step, Task 55b: a path's own words kept with a version (the plan's bound; the owner's "Four per path" card, Task 92c, may move it). */
+  pathOwnWordsMax: 4,
   versionsMax: WEB_CONTRACT_LIMITS.reportVersionsMax,
   digsMax: WEB_CONTRACT_LIMITS.investigationDigsMax
 });
@@ -106,8 +113,21 @@ export const InvestigationReportPathSchema = z.object({
     own_words: z.array(Part).max(INVESTIGATION_REPORT_LIMITS.digPicksMax),
     view: z.object({ outcome: z.enum(["HELPED", "DID_NOT_HELP", "NOT_SETTLED"]), reason: Part }).strict().nullable(),
     changed: z.array(Part).max(INVESTIGATION_REPORT_LIMITS.pathChangedMax)
+  }).strict().optional(),
+  /** V4 start step, Task 55b, on a path debate's first-level path only: its path id (b<n>; a path dug from "+ N more" has none). */
+  path_id: PathIdSchema.optional(),
+  /** Its answer so far's trust word (null: none), on a path debate's first-level path only. */
+  trust: TrustWordSchema.nullable().optional(),
+  /** The person's own words on it, in order, with the verdict on them (null: none written yet), on a path debate's first-level path only. */
+  own: z.object({
+    own_words: z.array(Part).min(1).max(INVESTIGATION_REPORT_LIMITS.pathOwnWordsMax),
+    view: z.object({ outcome: z.enum(["HELPED", "DID_NOT_HELP", "NOT_SETTLED"]), scope: z.enum(["PATH", "MAIN_QUESTION"]), reason: Part }).strict().nullable()
   }).strict().optional()
-}).strict();
+}).strict().superRefine((path, context) => {
+  if (path.level !== 0 && (path.path_id !== undefined || path.trust !== undefined || path.own !== undefined)) {
+    context.addIssue({ code: "custom", message: "a path's id, trust word and own words are kept on a first-level path only" });
+  }
+});
 export type InvestigationReportPath = z.infer<typeof InvestigationReportPathSchema>;
 
 const VersionBase = {

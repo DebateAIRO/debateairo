@@ -85,6 +85,8 @@ import {
   STORY_PATHS_CHECK_PROMPT_CONTRACT,
   STORY_PATHS_LIMITS,
   STORY_PATHS_PROMPT_CONTRACT,
+  storyPathsBlocksView,
+  storyPathsChartsFields,
   storyPathsGuard,
   storyPathsMaterial,
   storyPathsPointsOf,
@@ -980,44 +982,15 @@ export class StoryWriter {
     this.#logLoopOutcome(outcome, input);
     // R1d decision 5 (spec §7.2 item 11): under v4 only, when the first loop ended FAILED with no draft because round 1's
     // write failed with one of the four signals, ONE more loop with a backup storyteller of another maker, the same
-    // checker, rounds maxRounds+1.. (STORY:STORYTELLER:3/4 with 2 rounds) and its own tries.
-    let served: StoryLoopOutcome = outcome;
-    let backup: StoryBackupRecord | null = null;
-    if (v4 !== null && outcome.outcome === "FAILED" && outcome.rounds.length === 0 && firstWrite.failed) {
-      const signal = storyBackupSignalOf(firstWrite.error);
-      if (signal !== null) {
-        const chosen = pickBackupStoryteller({
-          candidates: input.backupCandidates ?? [],
-          firstRef: storyteller.providerRef,
-          checkerRef: checker.providerRef,
-          makers: input.backupMakers
-        });
-        const firstRound = policy.loopMaxRounds + 1;
-        const fits = firstRound + policy.loopMaxRounds - 1 <= STORY_BACKUP_ROUNDS.lastCallSiteRound;
-        if (chosen === null || !fits) {
-          this.#log(STORY_BACKUP_UNAVAILABLE, () => ({
-            answerId: input.answerId,
-            answerVersion: input.answerVersion,
-            signal,
-            reason: chosen === null ? "NO_CANDIDATE" : "NO_ROUND_LEFT"
-          }));
-        } else {
-          backup = Object.freeze({ code: STORY_BACKUP_USED, signal, firstModel: storyteller.providerRef });
-          this.#log(STORY_BACKUP_USED, () => ({
-            answerId: input.answerId,
-            answerVersion: input.answerVersion,
-            signal,
-            firstModel: storyteller.providerRef,
-            backupModel: chosen.providerRef
-          }));
-          served = await runStoryLoop(
-            { maxRounds: policy.loopMaxRounds, v4: true, firstRound },
-            { writeStory: writeStoryWith(chosen, true), checkStory }
-          );
-          this.#logLoopOutcome(served, input);
-        }
-      }
-    }
+    // checker, rounds maxRounds+1.. (STORY:STORYTELLER:3/4 with 2 rounds) and its own tries (`#withBackup`, which a path
+    // story shares since Task 54c).
+    const { served, backup } = v4 === null ? { served: outcome, backup: null } : await this.#withBackup(input, {
+      first: outcome, firstWrite, storyteller, checker, policy,
+      loop: (teller, firstRound) => runStoryLoop(
+        { maxRounds: policy.loopMaxRounds, v4: true, firstRound },
+        { writeStory: writeStoryWith(teller, true), checkStory }
+      )
+    });
     // R1d decision 4: a wording note (not satisfied, not misleading) is served READY with no reservation and never shown
     // to a reader; the checker's own artifact holds its text. Logged by code and round only.
     if (v4 !== null) {
@@ -1033,7 +1006,9 @@ export class StoryWriter {
     // that wrote the served draft, when the debate holds something worth showing. The story is stored as it is whatever
     // becomes of it.
     const blocks = served.outcome === "FAILED" || this.#deps.charts !== true ? NO_BLOCKS : await this.#blocksFor(input, {
-      material: built.material,
+      view: built.material,
+      fieldsOf: (body) => toChartsPromptMaterial(built.material, body, storyFiguresField(built.material)),
+      ranking: true,
       scoreTexts: built.index.scoreTexts,
       refMap: built.refMap,
       body: served.body,
@@ -1052,8 +1027,12 @@ export class StoryWriter {
    * the storyteller (story.paths.v5) and the check (story.paths-check.v5) run v4's rounds (only a misleading problem starts
    * round 2, which revises its own draft), every call under the story's one fence (`randomBytes`) with the shared fields
    * marked for the cache. The reader sentence and the language line are added as for every story. The shape is code's
-   * (`storyV4ShapeId`); each path's id stays its `position_ref`, the node refs are mapped back to node ids. No backup
-   * storyteller and no chart call: the first refusal of round 1 ends the story FAILED, as v3's does.
+   * (`storyV4ShapeId`); each path's id stays its `position_ref`, the node refs are mapped back to node ids.
+   * Task 54c (owner, 4 Nov, "Keep all three"): the three features v4's story has, by v4's own rules. On a debate that read the web
+   * (`webSources`), a looked-up point carries its extract and the storyteller is told item 7's two sentences
+   * (`storyContractForSources`, the check nothing new); a round-1 write that fails with one of the four signals hands the story to
+   * one backup storyteller of another maker (`#withBackup`, v4's rule, under the same fence and line); and an accepted story gets
+   * its charts and tables call (`#blocksFor`, over `storyPathsBlocksView`, every packet under the line, no ranking of paths).
    */
   async #composePaths(input: StoryWriteInput, paths: StoryPathsInput, args: Readonly<{
     pack: StoryPack;
@@ -1085,8 +1064,9 @@ export class StoryWriter {
       return failedRecord(input, "STORY_MATERIAL_TOO_LARGE", pack);
     }
     const index = storyPathsStoryIndex(materialInput, built, new Set(pack.shapes.map((shape) => shape.id)), storyV4ShapeId(input, pack));
-    const storytellerContract = storyContractInArgumentLanguage(
-      storyContractForReader(STORY_PATHS_PROMPT_CONTRACT, readingLevel, "STORYTELLER"), languageName, lock);
+    // Task 54c (W1-5): v4's order, the reader sentence, then item 7's two sentences when the debate read the web, then the language.
+    const storytellerContract = storyContractInArgumentLanguage(storyContractForSources(
+      storyContractForReader(STORY_PATHS_PROMPT_CONTRACT, readingLevel, "STORYTELLER"), input.webSources === true, "STORYTELLER"), languageName, lock);
     const checkerContract = storyContractInArgumentLanguage(
       storyContractForReader(STORY_PATHS_CHECK_PROMPT_CONTRACT, readingLevel, "CHECKER"), languageName, lock);
     const storytellerHash = storyContractHash(storytellerContract);
@@ -1109,27 +1089,40 @@ export class StoryWriter {
     const repairedRounds = new Set<number>();
     const storyInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_BODY_PROSE);
     const checkerInQuestionLanguage = replyLanguageCheckFor(input.questionLine, lock, STORY_CHECKER_PROSE);
-    const writeStory: StoryLoopDependencies["writeStory"] = async ({ round, priorObjection, priorDraft }) => {
-      const reading = rememberingAcceptedReply((content, reply) => classifyStoryContent(content, index, reply, storyInQuestionLanguage));
-      const revision: StoryRevisionTurn | null = priorDraft !== null && priorObjection !== null
-        ? Object.freeze({ ownDraft: storyDraftText(priorDraft), problems: priorObjection })
-        : null;
-      // A revision goes to the maker that wrote the draft it revises, never through the cost fallback (v4's rule).
-      const author = revision === null ? storyteller : (draftTellerByRound.get(round - 1) ?? storyteller);
-      const request = storyCallRequest({
-        story: input, site: "STORYTELLER", round, providerRef: author.providerRef, bound: storytellerBound,
-        contract: storytellerContract, contractHash: storytellerHash, material: built.fields, classifyContent: reading.classifyContent,
-        ...(revision === null ? {} : { revision }), ...storytellerWords, ...framing
-      });
-      const { result, servedBy } = await callStoryRole(author, request, null, revision !== null);
-      draftWriterByRound.set(round, servedBy.providerRef);
-      draftTellerByRound.set(round, servedBy);
-      const accepted = reading.acceptedAs(result.content);
-      const body: StoryBody = parseStoryBody(result.content, index, accepted.reply);
-      this.#logRepair("STORYTELLER", round, accepted.repairs, input);
-      if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
-      return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, servedBy.providerRef), body };
-    };
+    /** Task 54c (R1d decision 5, v4's holder): the first storyteller's round-1 write error, for the backup's signal. */
+    const firstWrite: { failed: boolean; error: unknown } = { failed: false, error: null };
+    /** `backupLoop`: the backup storyteller's loop, whose every call goes straight to `teller` (v4's PF-D6.2 rule). */
+    const writeStoryWith = (teller: StoryRoleMaker, backupLoop: boolean): StoryLoopDependencies["writeStory"] =>
+      async ({ round, priorObjection, priorDraft }) => {
+        try {
+          const reading = rememberingAcceptedReply((content, reply) => classifyStoryContent(content, index, reply, storyInQuestionLanguage));
+          const revision: StoryRevisionTurn | null = priorDraft !== null && priorObjection !== null
+            ? Object.freeze({ ownDraft: storyDraftText(priorDraft), problems: priorObjection })
+            : null;
+          // A revision goes to the maker that wrote the draft it revises; neither it nor a backup call goes through the cost fallback
+          // (v4's rule).
+          const author = revision === null ? teller : (draftTellerByRound.get(round - 1) ?? teller);
+          const request = storyCallRequest({
+            story: input, site: "STORYTELLER", round, providerRef: author.providerRef, bound: storytellerBound,
+            contract: storytellerContract, contractHash: storytellerHash, material: built.fields, classifyContent: reading.classifyContent,
+            ...(revision === null ? {} : { revision }), ...storytellerWords, ...framing
+          });
+          const { result, servedBy } = await callStoryRole(author, request, null, backupLoop || revision !== null);
+          draftWriterByRound.set(round, servedBy.providerRef);
+          draftTellerByRound.set(round, servedBy);
+          const accepted = reading.acceptedAs(result.content);
+          const body: StoryBody = parseStoryBody(result.content, index, accepted.reply);
+          this.#logRepair("STORYTELLER", round, accepted.repairs, input);
+          if ((result.repairAttempts ?? 0) > 0) repairedRounds.add(round);
+          return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, servedBy.providerRef), body };
+        } catch (error) {
+          if (round === 1) {
+            firstWrite.failed = true;
+            firstWrite.error = error;
+          }
+          throw error;
+        }
+      };
     const checkStory: StoryLoopDependencies["checkStory"] = async ({ round, candidate }) => {
       const reading = rememberingAcceptedReply((content, reply) => classifyStoryPathsCheckContent(content, reply, checkerInQuestionLanguage));
       const request = storyCallRequest({
@@ -1147,16 +1140,93 @@ export class StoryWriter {
         verdict: { satisfied: verdict.satisfied, objection: verdict.objection, misleading: verdict.misleading }
       };
     };
-    const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true }, { writeStory, checkStory });
+    const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true }, { writeStory: writeStoryWith(storyteller, false), checkStory });
     this.#logLoopOutcome(outcome, input);
-    for (const round of outcome.rounds) {
+    // Task 54c: v4's backup storyteller (R1d decision 5), its rounds after the first loop's, under the story's one fence and line.
+    const { served, backup } = await this.#withBackup(input, {
+      first: outcome, firstWrite, storyteller, checker, policy,
+      loop: (teller, firstRound) => runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true, firstRound },
+        { writeStory: writeStoryWith(teller, true), checkStory })
+    });
+    for (const round of served.rounds) {
       if (round.checker !== null && !round.satisfied && round.misleading === false) {
         this.#log("STORY_WORDING_NOTE_ONLY", () => ({ answerId: input.answerId, answerVersion: input.answerVersion, round: round.round }));
       }
     }
+    // Task 54c: v4's charts and tables call, after an accepted story, to the maker that wrote the served draft, over the points the
+    // story read (each path's root a position), every packet under the line; a path story gets no ranking. The story is stored as it
+    // is whatever becomes of the call.
+    let blocks: StoryBlocks = NO_BLOCKS;
+    if (served.outcome !== "FAILED" && this.#deps.charts === true) {
+      const view = storyPathsBlocksView({ nodes: input.nodes, arrows: input.arrows, refMap, pointRefs: built.pointRefs });
+      blocks = await this.#blocksFor(input, {
+        view,
+        fieldsOf: (body) => storyPathsChartsFields({ questionLine: input.questionLine, view, body }),
+        ranking: false,
+        scoreTexts: new Set<string>(),
+        refMap,
+        body: served.body,
+        teller: draftTellerByRound.get(served.servedRound) ?? storyteller,
+        bound: storytellerBound,
+        languageName,
+        lock,
+        call: (planned, request) => callStoryRole(planned, request, null),
+        sentLine: storyPathsGuard
+      });
+    }
     // Each path's id stays its position_ref; the point refs become node ids, and they alone are the story's point numbers.
     const restoreMap = new Map([...refMap, ...paths.paths.map((path) => [path.pathId, path.pathId] as const)]);
-    return recordFromOutcome(input, pack, outcome, refMap, repairedRounds.size, null, NO_BLOCKS, restoreMap);
+    return recordFromOutcome(input, pack, served, refMap, repairedRounds.size, backup, blocks, restoreMap);
+  }
+
+  /**
+   * R1d decision 5 (spec 2026-10-15 §7.2 item 11), one rule for a v4 story and, since Task 54c, a path story: when the first loop
+   * ended FAILED with no draft because round 1's write failed with one of the four signals, ONE more loop (`loop`) with a backup
+   * storyteller of another maker (`pickBackupStoryteller`), the same checker, rounds maxRounds+1.. (STORY:STORYTELLER:3/4 with 2
+   * rounds) and its own tries. Otherwise the first loop is served. Logs by code and refs only.
+   */
+  async #withBackup(input: StoryWriteInput, args: Readonly<{
+    first: StoryLoopOutcome;
+    /** The first storyteller's round-1 write, read after the first loop (the writer's holder). */
+    firstWrite: Readonly<{ failed: boolean; error: unknown }>;
+    storyteller: StoryRoleMaker;
+    checker: StoryRoleMaker;
+    policy: StoryPolicy;
+    loop: (teller: StoryRoleMaker, firstRound: number) => Promise<StoryLoopOutcome>;
+  }>): Promise<Readonly<{ served: StoryLoopOutcome; backup: StoryBackupRecord | null }>> {
+    const { first, firstWrite, storyteller, checker, policy } = args;
+    const none = Object.freeze({ served: first, backup: null });
+    if (first.outcome !== "FAILED" || first.rounds.length !== 0 || !firstWrite.failed) return none;
+    const signal = storyBackupSignalOf(firstWrite.error);
+    if (signal === null) return none;
+    const chosen = pickBackupStoryteller({
+      candidates: input.backupCandidates ?? [],
+      firstRef: storyteller.providerRef,
+      checkerRef: checker.providerRef,
+      makers: input.backupMakers
+    });
+    const firstRound = policy.loopMaxRounds + 1;
+    const fits = firstRound + policy.loopMaxRounds - 1 <= STORY_BACKUP_ROUNDS.lastCallSiteRound;
+    if (chosen === null || !fits) {
+      this.#log(STORY_BACKUP_UNAVAILABLE, () => ({
+        answerId: input.answerId,
+        answerVersion: input.answerVersion,
+        signal,
+        reason: chosen === null ? "NO_CANDIDATE" : "NO_ROUND_LEFT"
+      }));
+      return none;
+    }
+    const backup: StoryBackupRecord = Object.freeze({ code: STORY_BACKUP_USED, signal, firstModel: storyteller.providerRef });
+    this.#log(STORY_BACKUP_USED, () => ({
+      answerId: input.answerId,
+      answerVersion: input.answerVersion,
+      signal,
+      firstModel: storyteller.providerRef,
+      backupModel: chosen.providerRef
+    }));
+    const served = await args.loop(chosen, firstRound);
+    this.#logLoopOutcome(served, input);
+    return Object.freeze({ served, backup });
   }
 
   /**
@@ -1164,9 +1234,16 @@ export class StoryWriter {
    * made only when the debate holds figures, options or arguments for and against (`storyBlockNeeds`); then the ranking
    * of the answers, which code builds whatever became of the call. Never throws: a refused call, money, a reply that is
    * not a plan, or a plan with nothing that passes, all mean no planned blocks, logged by code and counts only.
+   * Task 54c: a path story's call too, over its own view of the debate (`storyPathsBlocksView`), with its own fields, no ranking and
+   * the 100K line on every packet; v4's call is unchanged.
    */
   async #blocksFor(input: StoryWriteInput, args: Readonly<{
-    material: StoryMaterial;
+    /** What the need test, the checks and the ranking read: v4's material, or a path story's view (Task 54c). */
+    view: Pick<StoryMaterial, "positions" | "points">;
+    /** The call's fields over the accepted story, before the language field: v4's `toChartsPromptMaterial`, or `storyPathsChartsFields`. */
+    fieldsOf: (body: StoryBody) => readonly FramedMaterialField[];
+    /** Owner decision Q5: code's ranking of three answers or more (v4). A path run ranks no path against another: false (Task 54c). */
+    ranking: boolean;
     scoreTexts: ReadonlySet<string>;
     refMap: ReadonlyMap<string, string>;
     body: StoryBody;
@@ -1175,8 +1252,10 @@ export class StoryWriter {
     languageName: string | null;
     lock: QuestionLanguage | null;
     call: (planned: StoryRoleMaker, request: ProviderCallRequest) => Promise<Readonly<{ result: ProviderCallResult }>>;
+    /** Task 54c: a path story's line on every packet of the call (`storyPathsGuard`); absent on v4's, today's request. */
+    sentLine?: (packet: PromptPacket) => PromptPacket;
   }>): Promise<StoryBlocks> {
-    const needs = storyBlockNeeds(args.material);
+    const needs = storyBlockNeeds(args.view);
     let planned: Readonly<{ form: StoryQuestionForm | null; charts: readonly StoryChart[]; tables: readonly StoryTable[] }> =
       { form: null, charts: [], tables: [] };
     if (storyBlockCallNeeded(needs)) {
@@ -1191,18 +1270,17 @@ export class StoryWriter {
           bound: args.bound,
           contract,
           contractHash: storyContractHash(contract),
-          material: withQuestionLanguageField(
-            toChartsPromptMaterial(args.material, args.body, storyFiguresField(args.material)), args.lock
-          ),
-          classifyContent: reading.classifyContent
+          material: withQuestionLanguageField(args.fieldsOf(args.body), args.lock),
+          classifyContent: reading.classifyContent,
+          ...(args.sentLine === undefined ? {} : { sentLine: args.sentLine })
         });
         const { result } = await args.call(args.teller, request);
         const accepted = reading.acceptedAs(result.content);
         const read = parseStoryBlocks(result.content, {
           body: args.body,
-          claims: storyMaterialClaims(args.material),
+          claims: storyMaterialClaims(args.view),
           scoreTexts: args.scoreTexts,
-          sides: storyArgumentSides(args.material)
+          sides: storyArgumentSides(args.view)
         }, accepted.reply);
         planned = { form: read.form, charts: restoreChartRefs(read.charts, args.refMap), tables: restoreTableRefs(read.tables, args.refMap) };
         this.#log("STORY_CHARTS_WRITTEN", () => ({
@@ -1217,7 +1295,7 @@ export class StoryWriter {
     }
     // Owner decision Q5: three answers or more always get their ranking, in the list of points for a question answered
     // in words, in "Why this answer" otherwise (an unknown kind included).
-    const ranking = needs.ranking ? storyRanking(args.material, storyFormIsProseOnly(planned.form) ? "appendix" : "why") : null;
+    const ranking = args.ranking && needs.ranking ? storyRanking(args.view, storyFormIsProseOnly(planned.form) ? "appendix" : "why") : null;
     let tables = planned.tables;
     if (ranking !== null) {
       try {

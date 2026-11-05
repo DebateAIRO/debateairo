@@ -27,7 +27,9 @@ export const CHECKED_TEXT_PATHS: readonly { path: string; kind: PublicationPartK
   // Decision 13: a contribution's path text, judged with the arguments. Its contributor's pseudonym and date stay out, as the author's do.
   ...["line", "summary", "what_changed[]", "dig_paths[].line", "dig_paths[].points[]"].map(path => ({ path: `contributions[].${path}`, kind: "ARGUMENTS" as const })),
   ...["sources[].site", "sources[].title", "sources[].quote", "sources[].line", "sources[].link", "paths[].line", "paths[].summary", "paths[].points[].text",
-    "paths[].dig.picks[]", "paths[].dig.own_words[]", "paths[].dig.view.reason", "paths[].dig.changed[]"].map(path => ({ path: `reports[].${path}`, kind: "ARGUMENTS" as const })),
+    "paths[].dig.picks[]", "paths[].dig.own_words[]", "paths[].dig.view.reason", "paths[].dig.changed[]",
+    // V4 start step, Task 55b: a path debate's own path keeps the person's words and the verdict on them, judged as a dig's are.
+    "paths[].own.own_words[]", "paths[].own.view.reason"].map(path => ({ path: `reports[].${path}`, kind: "ARGUMENTS" as const })),
   { path: "answer.nodes[].review.reasons[]", kind: "REVIEWS" },
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
     .map(path => ({ path: `story_short.${path}`, kind: "STORY" as const })),

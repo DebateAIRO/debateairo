@@ -14,7 +14,7 @@ import { selectDifferentMakerReviewer } from "@debateai/runner";
 import { ROLE_ROTATION_RULE, type RotatedRoles } from "@debateai/scorecard";
 import { LivenessRepository, ServeRepository, verdictDerivationOfPaths } from "@debateai/serve";
 // Part II (Task 54): the paths' answers so far, the main answer, the story, and the run's money.
-import { mainAnswerTrustWordOf, trustOfPoint, type PathOutcome, type PurposeLines } from "@debateai/contract";
+import { WEB_CONTRACT_LIMITS, mainAnswerTrustWordOf, trustOfPoint, type PathOutcome, type PurposeLines } from "@debateai/contract";
 import { CostEnvelopeGuard, PostgresModelSpendStore, attemptCeilingForPhase, parseCostEnvelopeBasis } from "@debateai/budget";
 import type { ProviderCostEnvelopeSeam } from "@debateai/providers";
 import { REPORT_ANSWER_V4_PROMPT_CONTRACT, StoryRepository } from "@debateai/story";
@@ -34,6 +34,10 @@ import { wirePacket } from "../support/framed-packet.js";
 import { provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { stubChatBody, type GateOverride, type GateRecord, type GateRequest } from "../support/preview-gate-stubs.js";
+// Part II, Task 54c: the path story's web quotes and its backup storyteller.
+import { WEB_WRITER_SENTENCES } from "@debateai/kernel";
+import { STORY_BACKUP_USED } from "@debateai/story";
+import { stubJudgement } from "../support/preview-gate-stubs.js";
 
 let database: TestDatabase;
 let owner: StoryEncryptedOwner | undefined;
@@ -150,6 +154,27 @@ describe("a path debate argues one branch per stored path (part I)", () => {
     expect((await steps(runId)).filter((row) => row.step === "FINDING_SOURCES")).toEqual([]);
     expect(await q(database.pool, `SELECT run_id FROM core.path_gap_round WHERE run_id=$1`, runId)).toEqual([]);
     expect(run.calls.some((call) => call.call_site_key.startsWith("MAP:"))).toBe(false);
+    // Review of Task 55b (owner F14): Free keeps what code finds on each path. The web part names its paths b<n>, which name no node, so
+    // serve reads the points under each path's root in force; every stand-in point rests on reasoning alone, so each path offers some,
+    // each hanging under its own path and made of one of that path's own points.
+    const answer = await new ServeRepository(database.pool).readAnswerProjection(run.result.answerId, { ownerRef: own().ownerRef, legacyAskerId: null });
+    expect(answer?.web?.paths.map((path) => path.position_ref)).toEqual(["b1", "b2", "b3"]);
+    const pointsUnder = async (pathId: string): Promise<Set<string>> => new Set((await q(database.pool, `WITH RECURSIVE under AS (
+        SELECT root.root_node_id AS node_id FROM core.path_root AS root WHERE root.run_id = $1 AND root.path_id = '${pathId}'
+        UNION SELECT edge.source_node_id FROM core.edge AS edge JOIN under ON edge.target_node_id = under.node_id WHERE edge.run_id = $1)
+      SELECT under.node_id::text AS node_id FROM under EXCEPT SELECT root.root_node_id::text FROM core.path_root AS root
+        WHERE root.run_id = $1 AND root.path_id = '${pathId}'`, runId)).map((row) => String(row.node_id).toLowerCase()));
+    for (const path of answer!.web!.paths) {
+      const own = await pointsUnder(path.position_ref);
+      const claims = new Set(answer!.nodes.filter((node) => own.has(node.node_id.toLowerCase()))
+        .map((node) => node.claim.trim().slice(0, WEB_CONTRACT_LIMITS.suggestionTextMaxChars)));
+      const found = path.suggestions.filter((suggestion) => suggestion.kind === "CONTRADICTING" || suggestion.kind === "UNDOCUMENTED");
+      expect(found.length).toBeGreaterThan(0);
+      for (const suggestion of found) {
+        expect(suggestion.places).toEqual([`path:${path.position_ref}`]);
+        expect(claims.has(suggestion.text)).toBe(true);
+      }
+    }
   }, 900_000);
 
   it("a path whose planner plans no search has no FINDING_SOURCES row", async () => {
@@ -459,9 +484,9 @@ describe("each path saves in its own order (Task 53b)", () => {
     SELECT tree.path_id FROM tree JOIN core.node AS node ON node.node_id = tree.node_id ORDER BY node.created_at_seq DESC LIMIT 1`, runId))[0]!.path_id);
   /**
    * The answer served to the run's owner, as two runs of one question can share it: each node named by its claim instead of its id,
-   * the run's own ids and times masked, and each review's reviewer seat left out (drawn by the run id). Serve lists the nodes and the
-   * edges in the order they were saved (core.node / core.edge created_at_seq), which across paths follows the paths' timing (Task
-   * 53b's open item), so both lists are put in one order here: within a path, the saved order is pinned by `pathNodesOf` above.
+   * the run's own ids and times masked, and each review's reviewer seat left out (drawn by the run id). Task 58b: serve lists a path
+   * debate's nodes path by path and its edges after their source nodes, so the nodes and the edges keep serve's own order here (Task
+   * 53b sorted both, when serve listed them in the order they were saved, which across paths followed the paths' timing).
    */
   const servedOf = async (answerId: string): Promise<string> => {
     const answer = await new ServeRepository(database.pool).readAnswerProjection(answerId, { ownerRef: own().ownerRef, legacyAskerId: null });
@@ -474,10 +499,29 @@ describe("each path saves in its own order (Task 53b)", () => {
     for (const node of served.nodes) if (node.review !== null && node.review !== undefined) delete node.review.reviewer_lineage;
     // Serve lists a record's nodes by their ids, which each run draws afresh.
     for (const record of served.condition_mark_records) record.affected_node_ids.sort();
-    served.nodes.sort((left, right) => left.claim < right.claim ? -1 : left.claim > right.claim ? 1 : 0);
-    const edgeKey = (edge: unknown): string => JSON.stringify(edge);
-    served.edges.sort((left, right) => edgeKey(left) < edgeKey(right) ? -1 : edgeKey(left) > edgeKey(right) ? 1 : 0);
     return JSON.stringify(served);
+  };
+  /**
+   * Task 58b: each live node's plan position (its path and its place in that path's tree, core.node.materialized_path) by node id: what
+   * two runs of one question share whichever path finished first (never the ids, which each run draws afresh).
+   */
+  const planPositionsOf = async (runId: string): Promise<Map<string, string>> => new Map((await q(database.pool, `WITH RECURSIVE tree AS (
+      SELECT root.path_id, root.root_node_id AS node_id FROM core.path_root AS root WHERE root.run_id = $1
+      UNION ALL
+      SELECT tree.path_id, child.node_id FROM tree JOIN core.node AS child ON child.parent_node_id = tree.node_id)
+    SELECT tree.path_id, tree.node_id::text AS node_id, node.materialized_path FROM tree JOIN core.node AS node ON node.node_id = tree.node_id`, runId))
+    .map((row) => [String(row.node_id), `${String(row.path_id)}:${String(row.materialized_path)}`] as const));
+  /** Task 58b: the served nodes and edges in serve's order, each node named by its plan position, each edge by its source's and target's. */
+  const servedPositionsOf = async (runId: string, answerId: string) => {
+    const answer = await new ServeRepository(database.pool).readAnswerProjection(answerId, { ownerRef: own().ownerRef, legacyAskerId: null });
+    expect(answer).not.toBeNull();
+    const positions = await planPositionsOf(runId);
+    const positionOf = (nodeId: string): string => positions.get(nodeId) ?? `outside-every-path:${nodeId}`;
+    return {
+      nodes: answer!.nodes.map((node) => positionOf(node.node_id)),
+      edges: answer!.edges.map((edge) => [positionOf(edge.from_node_ref), edge.relation,
+        edge.target_kind === "NODE" ? positionOf(edge.target_ref) : "an-edge"].join(" "))
+    };
   };
 
   it("b1 slow: b2's and b3's CHECKING come before b1's; b3 slow instead: the same nodes per path in the same order, and the same answer", async () => {
@@ -510,6 +554,54 @@ describe("each path saves in its own order (Task 53b)", () => {
     expect(firstNodes.length).toBeGreaterThan(3);
     expect(await pathNodesOf(b3Slow.debate.runId)).toEqual(firstNodes);
     expect(await servedOf(b3Slow.result.answerId)).toBe(await servedOf(b1Slow.result.answerId));
+  }, 900_000);
+
+  it("Task 58b: b2 saves before b1, then b1 before b2: both answers list every b1 node, then every b2 node, then b3's, each path in its saved order, the edges after their source nodes", async () => {
+    const b1Slow = await runWithSlowPath("paths-served-order-b1", "T1");
+    const first = await checkingAt(b1Slow.debate.runId);
+    expect(first.get("b2")!).toBeLessThan(first.get("b1")!);
+    // Saved last, b1's legs come after b2's and b3's in created_at_seq (the order serve listed before).
+    expect(await lastSavedPathOf(b1Slow.debate.runId)).toBe("b1");
+    const served = await servedPositionsOf(b1Slow.debate.runId, b1Slow.result.answerId);
+    // Path by path in plan order, each path's nodes in their saved order (pathNodesOf: by path, then created_at_seq), none outside a path.
+    expect(served.nodes.length).toBeGreaterThan(3);
+    expect(served.nodes).toEqual((await pathNodesOf(b1Slow.debate.runId)).map((row) => `${String(row.path_id)}:${String(row.materialized_path)}`));
+    // Each edge comes after the edges of the nodes served before its source node.
+    const sources = served.edges.map((edge) => served.nodes.indexOf(edge.split(" ")[0]!));
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources).not.toContain(-1);
+    expect(sources).toEqual([...sources].sort((left, right) => left - right));
+    // b2 slow instead: b1 saves before b2, and the same plan positions are served in the same order.
+    const b2Slow = await runWithSlowPath("paths-served-order-b2", "T2");
+    const second = await checkingAt(b2Slow.debate.runId);
+    expect(second.get("b1")!).toBeLessThan(second.get("b2")!);
+    expect(await lastSavedPathOf(b2Slow.debate.runId)).toBe("b2");
+    expect(await servedPositionsOf(b2Slow.debate.runId, b2Slow.result.answerId)).toEqual(served);
+  }, 900_000);
+
+  it("Task 58b: an R22 debate (receipt v1, no paths) serves its nodes and edges in the order they were saved", async () => {
+    const settings = PATHS_SETTINGS;
+    const length = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "pro", answerLength: settings.answerLength });
+    const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers: PANEL_REFS.length, mapOpening: true });
+    const debate = await harness.admittedRun("paths-r22-served-order", { panelRefs: PANEL_REFS, pin: HAIKU_TELLS, depth: 1,
+      shape: shapeForTest({ plan: "pro", makers: PANEL_REFS.length, settings }), settings, length, engine });
+    const gates = await harness.startGates({}, undefined, scriptedShapeAnswers(debate.question));
+    const composed = await harness.previewRunner(gates, "resend", { callConcurrency: OWNER_CALL_CONCURRENCY,
+      debateShape: { mapContractHash: mapPromptContractHash() }, engine: { engineContractHash: engineContractHash() },
+      gateRemaining: { anthropic: async () => FINAL_WRITER_ROOM } });
+    const result = await harness.completedRun(composed, debate, gates);
+    const { answer } = await harness.servedAnswer(debate, result.answerId);
+    expect(answer?.branches).toBeUndefined();
+    const savedNodes = (await q(database.pool, `SELECT node_id::text AS id FROM core.node WHERE run_id=$1 AND generation_status <> 'stale'
+      ORDER BY created_at_seq`, debate.runId)).map((row) => String(row.id));
+    const servedNodes = answer!.nodes.map((node) => node.node_id);
+    expect(servedNodes.length).toBeGreaterThan(1);
+    expect(servedNodes).toEqual(savedNodes.filter((id) => servedNodes.includes(id)));
+    const savedEdges = (await q(database.pool, `SELECT edge_id::text AS id FROM core.edge WHERE run_id=$1 ORDER BY created_at_seq`, debate.runId))
+      .map((row) => String(row.id));
+    const servedEdges = answer!.edges.map((edge) => edge.edge_id);
+    expect(servedEdges.length).toBeGreaterThan(0);
+    expect(servedEdges).toEqual(savedEdges.filter((id) => servedEdges.includes(id)));
   }, 900_000);
 });
 
@@ -807,5 +899,79 @@ describe("each path's answer so far as soon as its own checks end, then the main
     expect(roots.map((row) => String(row.path_id))).toEqual(["b1", "b2", "b3"]);
     const basis = answer!.band_ceiling!.basis;
     expect(basis.LOOKED_UP + basis.RAN + basis.REASONING).toBe(roots.length);
+  }, 900_000);
+
+  /*
+   * Task 54c (owner, 4 Nov, "Keep all three"): a path debate's story keeps v4's web quotes (W1-5) and its backup storyteller (R1d),
+   * through the runner as main.ts composes it. The third feature, the charts and tables call, is proven on the writer
+   * (tests/unit/story-paths-v5.test.ts): this file's runner composes its story writer without it, as it always has.
+   */
+  const systemOf = (request: GateRecord): string => wirePacket(stubChatBody(request.provider, request.body)).messages[0]!.content;
+  const storyPointsOf = (request: GateRecord) => JSON.parse(materialOf(request).fields.find((field) => field.name === "points")?.content ?? "[]") as
+    { ref: string; extract?: { id: string; quote: string; site: string } }[];
+
+  it("Task 54c: a Plus path debate that read the web tells its story with each looked-up root's extract and the two source sentences; a Free one with neither", async () => {
+    /** Each path's root answers as looked up, its locator the first extract of the packs it was shown (one of this debate's). */
+    const cited: string[] = [];
+    const lookedUp = (request: GateRequest): GateOverride | null => {
+      if (request.kind !== "JUDGE" || !materialOf(request).contractId.startsWith("judge.path-root.")) return null;
+      const sources = JSON.parse(materialOf(request).fields.find((field) => field.name === "sources")?.content ?? "[]") as { extracts?: { id: string }[] }[];
+      const id = sources.flatMap((pack) => pack.extracts ?? [])[0]?.id;
+      if (id === undefined) return null;
+      cited.push(id);
+      const statement = `The pier queues fell by a third, reading ${String(cited.length)}.`;
+      return { content: JSON.stringify({ ...(JSON.parse(stubJudgement(statement)) as object), way_of_knowing: "LOOKED_UP", locator: id }) };
+    };
+    const paid = await runPathsDebate(harness, database.pool, { label: "paths-story-web", owner: own(), web: { webPlan: "PLUS", planSearch: true },
+      before: lookedUp });
+    expect(cited.length).toBeGreaterThan(0);
+    const tellers = paid.gates.requests.filter((request) => request.kind === "STORY_PATHS" && request.answer === "OK");
+    expect(tellers.length).toBeGreaterThan(0);
+    for (const teller of tellers) {
+      const quoted = storyPointsOf(teller).filter((point) => point.extract !== undefined);
+      expect(quoted.length).toBeGreaterThan(0);
+      for (const point of quoted) expect(cited).toContain(point.extract!.id);
+      expect(systemOf(teller)).toContain(WEB_WRITER_SENTENCES);
+    }
+    const checks = paid.gates.requests.filter((request) => request.kind === "STORY_PATHS_CHECK" && request.answer === "OK");
+    expect(checks.length).toBeGreaterThan(0);
+    for (const check of checks) expect(systemOf(check)).not.toContain(WEB_WRITER_SENTENCES);
+    const story = await new StoryRepository(database.pool).readForAnswer({ answerId: paid.result.answerId, answerVersion: null,
+      ownership: { ownerRef: own().ownerRef } });
+    expect(story?.outcome).toBe("READY");
+    // Free: no web search, so no point carries an extract and nothing tells the storyteller to cite one.
+    const free = await runPathsDebate(harness, database.pool, { label: "paths-story-free", owner: own(), plan: "free",
+      web: { webPlan: "FREE", planSearch: true }, before: lookedUp });
+    const freeTellers = free.gates.requests.filter((request) => request.kind === "STORY_PATHS" && request.answer === "OK");
+    expect(freeTellers.length).toBeGreaterThan(0);
+    for (const teller of freeTellers) {
+      expect(storyPointsOf(teller).filter((point) => point.extract !== undefined)).toEqual([]);
+      expect(systemOf(teller)).not.toContain(WEB_WRITER_SENTENCES);
+    }
+  }, 900_000);
+
+  it("Task 54c: Haiku's path story that cannot be reached goes to one backup storyteller of another company, which writes it on STORY:STORYTELLER:3, under the line", async () => {
+    // The gate cannot reach Haiku's vendor for the story (unbilled, nothing sent): the first storyteller cannot be reached. (An
+    // unusable reply would make the call's repair packet, which this file's gate stand-in cannot read back on a cache-split
+    // story: its request would never be answered.)
+    const run = await runFive("paths-story-backup", { question: "preview-paths-story-backup-5404",
+      before: (request) => request.kind === "STORY_PATHS" && request.model === HAIKU ? { gateRefuses: "PROVIDER_NOT_REACHED" } : null });
+    const tellers = run.gates.requests.filter((request) => request.kind === "STORY_PATHS");
+    expect(tellers.filter((request) => request.model === HAIKU).length).toBeGreaterThan(0);
+    const backups = tellers.filter((request) => request.model !== HAIKU && request.answer === "OK");
+    expect(backups.length).toBeGreaterThan(0);
+    for (const request of backups) expect([HAIKU, GLM]).not.toContain(request.model);
+    expect(run.called.filter((call) => call.key === "STORY:STORYTELLER:3" && call.outcome === "OK").map((call) => call.actor))
+      .toEqual([expect.not.stringMatching(/haiku|glm|fixture-a/iu)]);
+    for (const request of [...tellers, ...run.gates.requests.filter((entry) => entry.kind === "STORY_PATHS_CHECK")]) {
+      expect(bodyBytes(request)).toBeLessThanOrEqual(LINE);
+    }
+    const story = await new StoryRepository(database.pool).readForAnswer({ answerId: run.result.answerId, answerVersion: null,
+      ownership: { ownerRef: own().ownerRef } });
+    expect(story).toMatchObject({ outcome: "READY", backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE" } });
+    expect(story!.backup!.firstModel).toMatch(/haiku/iu);
+    expect(story!.storytellerLineage!.provider_ref).not.toMatch(/haiku|glm|fixture-a/iu);
+    expect((story?.body as { short?: { paths?: { position_ref: string }[] } } | null | undefined)?.short?.paths?.map((path) => path.position_ref))
+      .toEqual(["b1", "b2", "b3"]);
   }, 900_000);
 });

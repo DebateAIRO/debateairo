@@ -10,11 +10,11 @@ import { describe, expect, it } from "vitest";
 import type { PathOutcome, StoryBody, StoryFate, TrustWord } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
 import {
-  READER_SENTENCE_STORY_CHECKER, READER_SENTENCE_WRITING, TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, questionLanguageFromRun,
-  questionLanguageSentence, type PathId
+  READER_SENTENCE_STORY_CHECKER, READER_SENTENCE_WRITING, TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, WEB_WRITER_SENTENCES, questionLanguageFromRun,
+  questionLanguageSentence, type EngineCitedExtract, type PathId
 } from "@debateai/kernel";
 import {
-  ANTHROPIC_TOKEN_COUNT, PREVIEW_FINAL_WRITER_LIMITS, PROVIDER_SENT_INPUT_OVER_LIMIT, ProviderContentUnacceptedError, buildFramedPrompt,
+  ANTHROPIC_TOKEN_COUNT, PREVIEW_FINAL_WRITER_LIMITS, PROVIDER_SENT_INPUT_OVER_LIMIT, ProviderCallFailedError, ProviderContentUnacceptedError, buildFramedPrompt,
   estimateWindowTokens, readPromptFrame, type PromptPacket, type ProviderCallRequest, type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
 import {
@@ -28,9 +28,16 @@ import {
   type StoryPathsInput,
   type StoryPathsMaterialInput, type StoryRecordInput, type StorySnapshotNode, type StoryWriteInput, type StoryWriterDependencies
 } from "@debateai/story";
+// Task 54c: the charts and tables, the backup storyteller and the web quotes on a path run, beside v4's own.
+import {
+  STORYTELLER_V4_CONTRACT_ID as V4_TELLER, STORY_BACKUP_UNAVAILABLE, STORY_BACKUP_USED, STORY_CHARTS_CALL_SITE_KEY, STORY_CHARTS_CONTRACT_ID,
+  STORY_PATHS_PROMPT_CONTRACT, buildStoryChartsContract, buildStoryMaterial, storyContractForSources, storyContractHash, storyContractInArgumentLanguage,
+  storyFiguresField, storyV4ShapeId, type StoryBackupCandidate, type StoryRoleResolver
+} from "@debateai/story";
+import { toChartsPromptMaterial } from "../../packages/story/src/material.js";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
 import { closingRandomBytes } from "../../apps/runner/src/investigation-close.js";
-import { buildStoryRunSnapshot, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
+import { buildStoryRunSnapshot, storyPathsPointsOfRun, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
 import { fitStoryPathsToTokenLine } from "../../apps/runner/src/token-line.js";
 
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
@@ -702,5 +709,383 @@ describe("the runner's snapshot", () => {
     const today = buildStoryRunSnapshot({ ...base, pathsFromStep: 3, randomBytes });
     for (const member of ["paths", "pathsFromStep", "randomBytes"]) expect(Object.hasOwn(today, member), member).toBe(false);
     expect(today).toEqual(buildStoryRunSnapshot(base));
+  });
+});
+
+/* ----------------------------------------------------------------- Task 54c: the three story features on a path run */
+
+/**
+ * Task 54c (owner, 4 Nov, "Keep all three"): a path debate's story keeps the three approved features today's v4 story has: the
+ * W1-5 web extracts (a looked-up point carries the extract it rests on, and the storyteller is told the two source sentences), the
+ * R1d backup storyteller when the first one fails, and the charts and tables call (designs of 2026-10-28 and 2026-10-30). Every
+ * v5 packet stays under the 195,904-byte line; a v4 story keeps its bytes. All data is made up.
+ */
+describe("Task 54c: a path story keeps the web quotes, the backup storyteller and the charts and tables", () => {
+  const EXTRACT: EngineCitedExtract = Object.freeze({ id: "S1-2", quote: "The neighbouring line filled its trams within its first year.",
+    title: "A made-up transit review", site: "transit.example", date: "2026-03-01", note: "The page reports one figure." });
+  const LOOKED_UP: readonly StorySnapshotNode[] = NODES.map((node) => node.nodeId === nodeId(4)
+    ? { ...node, wayOfKnowing: "LOOKED_UP" as const, citedExtract: EXTRACT } : node);
+  const WEB_RUN: StoryWriteInput = { ...PATH_RUN, nodes: LOOKED_UP, webSources: true, randomBytes: closingRandomBytes(SEED) };
+  const pointsOf = (request: ProviderCallRequest): unknown => JSON.parse(fieldOf(request, "points")!);
+  const systemOf = (request: ProviderCallRequest): string => request.packet.messages[0]!.content;
+
+  /** A writer over the given role resolver, with the chart call on or off; one provider for every role when none is given. */
+  function writerFor(options: Readonly<{ provider?: ProviderGateway; resolveProvider?: StoryRoleResolver; charts?: boolean }>) {
+    const inserted: StoryRecordInput[] = [];
+    const events: Array<[string, Record<string, unknown>]> = [];
+    const provider = options.provider;
+    const deps: StoryWriterDependencies = {
+      pool: {} as Pool, pack: PACK, policy: POLICY, hosted: false,
+      resolveProvider: options.resolveProvider ?? ((roleRef) => (provider === undefined ? null : { provider, providerRef: roleRef })),
+      log: (event, detail) => { events.push([event, detail]); },
+      repository: { insert: async (record) => { inserted.push(record); return "INSERTED" as const; } },
+      readEnrichment: async () => new Map(),
+      ...(options.charts === undefined ? {} : { charts: options.charts })
+    };
+    return { writer: new StoryWriter(deps), inserted, events };
+  }
+
+  /* --- the web quotes (W1-5) */
+
+  it("a paid path run that searched the web: the looked-up point carries its cited extract, and only the storyteller is told the two source sentences", async () => {
+    const { provider, calls } = scripted(answering([]));
+    const { writer, inserted } = harness(provider);
+    await writer.writeAfterSettle(WEB_RUN);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null });
+    const [teller, check] = calls as [ProviderCallRequest, ProviderCallRequest];
+    // v4's extract entry, member for member (`storyExtractOf`): its id, the quote word for word, the page's title, site and date, the note.
+    expect(pointsOf(teller)).toEqual([
+      { ref: "P1", text: "The tram's costs fit the budget." }, { ref: "P2", text: "Riders would come if fares stay low." },
+      { ref: "P3", text: "The works would close two streets for a year." },
+      { ref: "P4", text: "A similar line nearby filled its trams in the first year.",
+        extract: { id: "S1-2", quote: EXTRACT.quote, title: EXTRACT.title, site: "transit.example", date: "2026-03-01", note: EXTRACT.note } },
+      { ref: "P5", text: "Running costs rise when fares fall." }
+    ]);
+    // The check reads the same shared fields, and is told nothing new (v4's rule).
+    expect(fieldOf(check, "points")).toBe(fieldOf(teller, "points"));
+    expect(systemOf(teller)).toContain(WEB_WRITER_SENTENCES);
+    expect(systemOf(check)).not.toContain(WEB_WRITER_SENTENCES);
+    // v4's order: the instruction, then the two sentences, then the language line last.
+    expect(teller.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(
+      storyContractForSources(STORY_PATHS_PROMPT_CONTRACT, true, "STORYTELLER"), "English", null)));
+  });
+
+  it("a disputed looked-up point keeps its extract beside its dispute, and the ladder keeps or drops the two together", () => {
+    const material = storyPathsMaterial({ ...materialOf(PATH_RUN, new Set([nodeId(4)])),
+      points: storyPathsPointsOf(LOOKED_UP, new Set([nodeId(4)])).points });
+    const entry = (JSON.parse(fieldIn(material.fields, "points")!) as Record<string, unknown>[])[3];
+    expect(entry).toEqual({ ref: "P4", text: "A similar line nearby filled its trams in the first year.",
+      extract: { id: "S1-2", quote: EXTRACT.quote, title: EXTRACT.title, site: "transit.example", date: "2026-03-01", note: EXTRACT.note }, disputed: true });
+    const none = storyPathsMaterial({ ...materialOf(PATH_RUN, new Set()), points: storyPathsPointsOf(LOOKED_UP, new Set()).points }, { fromStep: 5 });
+    expect(fieldIn(none.fields, "points")).toBe("[]");
+  });
+
+  it("Free and no-search path runs: no extract and no source sentences; the storyteller's request is today's, byte for byte", async () => {
+    const today = scripted(answering([]));
+    await harness(today.provider).writer.writeAfterSettle({ ...PATH_RUN, randomBytes: closingRandomBytes(SEED) });
+    // A looked-up point whose locator is none of this debate's extracts carries none, and nothing tells the storyteller to cite.
+    const noSearch = scripted(answering([]));
+    const looked = NODES.map((node) => node.nodeId === nodeId(4) ? { ...node, wayOfKnowing: "LOOKED_UP" as const } : node);
+    await harness(noSearch.provider).writer.writeAfterSettle({ ...PATH_RUN, nodes: looked, randomBytes: closingRandomBytes(SEED) });
+    for (const calls of [today.calls, noSearch.calls]) {
+      expect(fieldOf(calls[0]!, "points")).not.toContain("\"extract\"");
+      for (const request of calls) expect(systemOf(request)).not.toContain(WEB_WRITER_SENTENCES);
+      expect(calls[0]!.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(STORY_PATHS_PROMPT_CONTRACT, "English", null)));
+    }
+    expect(JSON.stringify(noSearch.calls[0]!.packet)).toBe(JSON.stringify(today.calls[0]!.packet));
+  });
+
+  it("the runner's fit counts the extracts: its points are the writer's, extracts included, and the counted packet carries the quote", async () => {
+    const provider: ProviderGateway = { call: async () => { throw new Error("unused"); } };
+    const authored = NODES.map((node) => ({ nodeId: node.nodeId, statement: node.claim, provenanceRef: `artifact-${node.nodeId}`,
+      wayOfKnowing: node.nodeId === nodeId(4) ? "LOOKED_UP" as const : "REASONING" as const, reversalPoint: "Unless not.", maker: "maker-a",
+      panelDispersion: null }));
+    const cited = new Map([[nodeId(4), EXTRACT]]);
+    const disputed = new Set([nodeId(5)]);
+    const snapshot = buildStoryRunSnapshot({
+      runId: "run-1", workItemId: "work-1", answerId: "answer-1", answerVersion: 1, questionLine: PATH_RUN.questionLine,
+      argumentLanguage: { tag: "en", name: "English" }, compositionBudgetTier: "low", verdict: { label: "SPLIT", rung: 5, trigger: "JUDGES_NO_MAJORITY" },
+      servedRootNodeId: nodeId(1), servedStrength: 0.6, runnerUp: null, margin: { kind: "ABSENT", reason: "ONE_POSITION" },
+      disagreement: { kind: "ABSENT", reason: "ENGINE2_JUDGES" }, thresholds: { gamma: 0.05, highCut: 0.7, lowCut: 0.35, disagreementThreshold: 0.25 },
+      confidenceBand: null, answerMarks: [], servedSegments: [{ text: "Fund it." }], authored,
+      positionNodeIds: new Set([nodeId(1), nodeId(2), nodeId(3)]), baseStrengths: [], finalStrengths: [], arrows: [], arrowOrder: [], sensitivity: [],
+      conditionMarkRecords: [], resolveProvider: () => ({ provider, providerRef: "provider:a" }), stepLease: (use) => use(),
+      costFallback: async ({ planned, request, call }) => ({ result: await call(planned, request), servedBy: planned }),
+      citedExtracts: cited, paths: PATHS
+    });
+    expect(snapshot.webSources).toBe(true);
+    const fromRun = storyPathsPointsOfRun(authored, disputed, cited);
+    expect(fromRun).toEqual(storyPathsPointsOf(snapshot.nodes, disputed).points);
+    expect(fromRun[3]).toEqual({ ref: "P4", text: "A similar line nearby filled its trams in the first year.", disputed: false,
+      extract: { id: "S1-2", quote: EXTRACT.quote, title: EXTRACT.title, site: "transit.example", date: "2026-03-01", note: EXTRACT.note } });
+    // No extracts (Free, no search): the points as before.
+    expect(storyPathsPointsOfRun(authored, disputed)).toEqual(storyPathsPointsOf(NODES, disputed).points);
+    expect(storyPathsPointsOfRun(authored, disputed, new Map())).toEqual(storyPathsPointsOf(NODES, disputed).points);
+    // Near the line the real count is asked over the packet as it is sent: the extract's quote is in it.
+    const quoted: StoryPathsMaterialInput = { ...FULL_EIGHT, points: FULL_EIGHT.points.map((entry, at) => at === 0 ? { ...entry, extract: EXTRACT } : entry) };
+    const counted: string[] = [];
+    await fitStoryPathsToTokenLine(quoted, async ({ packet }) => { counted.push(JSON.stringify(packet.messages)); return 50_000; }, () => undefined);
+    expect(counted.length).toBeGreaterThan(0);
+    for (const text of counted) expect(text).toContain(EXTRACT.quote);
+  });
+
+  it("the runner fits a path story over the points the writer will send: the extracts the snapshot hands on (source scan)", () => {
+    const runner = readFileSync(join(process.cwd(), "apps/runner/src/index.ts"), "utf8");
+    const fit = runner.slice(runner.indexOf("const fitted = await fitStoryPathsToTokenLine("), runner.indexOf("pathsStory = Object.freeze({ paths: storyPaths"));
+    expect(fit).toContain("points: storyPathsPointsOfRun(authoredNodeList, disputed, webCited),");
+    // The snapshot's extracts are the same map (W4-1): the story reads what the fit counted.
+    expect(runner).toContain("...(webCited.size === 0 ? {} : { citedExtracts: webCited }),");
+  });
+
+  /* --- the backup storyteller (R1d) */
+
+  const FIRST = POLICY.storytellerRoleRef;
+  const CHECKER = POLICY.storyCheckerRoleRef;
+  const BACKUP = "provider:backup";
+  /** The first storyteller (maker-a), the checker (maker-b), a second ref of maker-a (never picked) and the backup (maker-c), in panel order. */
+  function backupWorld(first: (request: ProviderCallRequest) => Error | string) {
+    const firstCalls: ProviderCallRequest[] = [];
+    const firstProvider: ProviderGateway = { async call(request) {
+      firstCalls.push(request);
+      const reply = first(request);
+      if (reply instanceof Error) throw reply;
+      return { rawArtifactRef: "artifact:first", ledgerEntryRef: "ledger:first", content: reply, provider: "openai-compatible-http",
+        model: "unit/model", maker: "unit-maker", modelVersion: "unit/model" };
+    } };
+    const checker = scripted(answering([]));
+    const twin = scripted(answering([]));
+    const backup = scripted(answering([]));
+    const candidates: readonly StoryBackupCandidate[] = Object.freeze([
+      { provider: firstProvider, providerRef: FIRST, maker: "maker-a" }, { provider: checker.provider, providerRef: CHECKER, maker: "maker-b" },
+      { provider: twin.provider, providerRef: "provider:twin", maker: "maker-a" }, { provider: backup.provider, providerRef: BACKUP, maker: "maker-c" }
+    ]);
+    const resolveProvider: StoryRoleResolver = (roleRef) => roleRef === FIRST ? { provider: firstProvider, providerRef: roleRef }
+      : roleRef === CHECKER ? { provider: checker.provider, providerRef: roleRef } : null;
+    return { firstCalls, checker, twin, backup, candidates, resolveProvider };
+  }
+
+  it("a first storyteller that cannot be reached: one backup storyteller of another maker writes the path story on STORY:STORYTELLER:3", async () => {
+    const world = backupWorld(() => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead"));
+    const { writer, inserted, events } = writerFor({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...PATH_RUN, randomBytes: closingRandomBytes(SEED), backupCandidates: world.candidates });
+    expect(world.firstCalls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(world.backup.calls.map((call) => [call.callSiteKey, call.providerRef, contractOf(call)]))
+      .toEqual([["STORY:STORYTELLER:3", BACKUP, STORY_PATHS_CONTRACT_ID]]);
+    expect(world.checker.calls.map((call) => [call.callSiteKey, contractOf(call)])).toEqual([["STORY:CHECKER:3", STORY_PATHS_CHECK_CONTRACT_ID]]);
+    expect(world.twin.calls).toEqual([]);
+    // The same material, under the story's one fence, and under the line as every v5 packet is.
+    const [backupCall] = world.backup.calls as [ProviderCallRequest];
+    expect(readPromptFrame(backupCall.packet).fields).toEqual(readPromptFrame(world.firstCalls[0]!.packet).fields);
+    expect(readPromptFrame(backupCall.packet).fence).toBe(readPromptFrame(world.firstCalls[0]!.packet).fence);
+    expect(backupCall.sentInputTokensBelow).toBe(ANTHROPIC_TOKEN_COUNT.line);
+    expect(backupCall.sharedFirstFieldCount).toBe(6);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null, rounds: 1, storytellerLineage: { provider_ref: BACKUP },
+      checkerLineage: { provider_ref: CHECKER }, backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE", firstModel: FIRST } });
+    expect(inserted[0]!.body!.short.paths.map((path) => path.position_ref)).toEqual(["b1", "b2", "b3"]);
+    expect(events.find(([event]) => event === STORY_BACKUP_USED)).toEqual([STORY_BACKUP_USED, {
+      answerId: PATH_RUN.answerId, answerVersion: 1, signal: "UNREACHABLE", firstModel: FIRST, backupModel: BACKUP }]);
+  });
+
+  it("no candidate of another maker: no backup, logged by code; a story refused for anything but the four signals asks none", async () => {
+    const world = backupWorld(() => new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow"));
+    const { writer, inserted, events } = writerFor({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...PATH_RUN, randomBytes: closingRandomBytes(SEED), backupCandidates: world.candidates.slice(0, 3) });
+    expect(world.backup.calls).toEqual([]);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", rounds: 0 });
+    expect(inserted[0]).not.toHaveProperty("backup");
+    expect(events.find(([event]) => event === STORY_BACKUP_UNAVAILABLE)).toEqual([STORY_BACKUP_UNAVAILABLE, {
+      answerId: PATH_RUN.answerId, answerVersion: 1, signal: "TOO_SLOW", reason: "NO_CANDIDATE" }]);
+    // A story refused for its money is no signal: another AI would meet the same wall.
+    const money = backupWorld(() => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "money"));
+    const moneyRun = writerFor({ resolveProvider: money.resolveProvider });
+    await moneyRun.writer.writeAfterSettle({ ...PATH_RUN, randomBytes: closingRandomBytes(SEED), backupCandidates: money.candidates });
+    expect(money.backup.calls).toEqual([]);
+    expect(moneyRun.inserted[0]).toMatchObject({ outcome: "FAILED" });
+    expect(moneyRun.events.map(([event]) => event)).not.toContain(STORY_BACKUP_USED);
+  });
+
+  /* --- the charts and tables (designs of 2026-10-28 and 2026-10-30) */
+
+  /** Three paths whose roots state figures, a point for the first root and one against it. */
+  const FIGURE_NODES: readonly StorySnapshotNode[] = [
+    snapshotNode(1, "Building the line would cost 120 million euros.", true),
+    snapshotNode(2, "About 9,000 riders a day would use it.", true),
+    snapshotNode(3, "The works would close two streets for 14 months.", true),
+    snapshotNode(4, "A similar line nearby cost 95 million euros."),
+    snapshotNode(5, "Running costs rise by 3% when fares fall.")
+  ];
+  const FIGURE_RUN: StoryWriteInput = { ...PATH_RUN, nodes: FIGURE_NODES, randomBytes: closingRandomBytes(SEED), arrows: [
+    { sourceNodeId: nodeId(4), targetNodeId: nodeId(1), polarity: "support" }, { sourceNodeId: nodeId(5), targetNodeId: nodeId(1), polarity: "attack" }
+  ] };
+  const BLOCK_PLAN = JSON.stringify({
+    charts: [{ after: "why.1", kind: "bar", title: "Cost to build", x: null, y: { label: "Cost (million euros)", source: "figure", log: false },
+      items: [{ label: "This line", node_ref: "P1", x: null, y: { value: 120, text: "120 million" } },
+        { label: "The line nearby", node_ref: "P4", x: null, y: { value: 95, text: "95 million" } }] }],
+    tables: [{ after: "long.1.1", kind: "pros_cons", title: "For and against the costs", options: [{ label: "The costs fit", position_ref: "P1",
+      pros: [{ text: "A similar line nearby cost 95 million euros.", node_ref: "P4" }],
+      cons: [{ text: "Running costs rise by 3% when fares fall.", node_ref: "P5" }] }] }]
+  });
+  const withBlocks = (plan: string) => (request: ProviderCallRequest): string =>
+    contractOf(request) === STORY_CHARTS_CONTRACT_ID ? plan : answering([])(request);
+
+  it("a story whose numbers compare across paths gets its charts and tables call, and the blocks are stored as v4 stores them", async () => {
+    const { provider, calls } = scripted(withBlocks(BLOCK_PLAN));
+    const { writer, inserted, events } = writerFor({ provider, charts: true });
+    await writer.writeAfterSettle(FIGURE_RUN);
+    expect(calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1", STORY_CHARTS_CALL_SITE_KEY]);
+    const chart = calls[2]!;
+    expect(chart).toMatchObject({ lane: "story", role: "SYNTHESIZER", providerRef: FIRST });
+    expect(contractOf(chart)).toBe(STORY_CHARTS_CONTRACT_ID);
+    expect(chart.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(buildStoryChartsContract(), "English", null)));
+    // v4's chart material, in v4's words: the question, the positions (each path's root) and the points with what they argue for and
+    // against, the report's text and the figures; the language field only on a locked run.
+    expect(names(chart)).toEqual(["question", "positions", "points", "report_text", "figures"]);
+    expect(JSON.parse(fieldOf(chart, "question")!)).toBe(PATH_RUN.questionLine);
+    expect(JSON.parse(fieldOf(chart, "positions")!)).toEqual([
+      { id: "P1", claim: "Building the line would cost 120 million euros." }, { id: "P2", claim: "About 9,000 riders a day would use it." },
+      { id: "P3", claim: "The works would close two streets for 14 months." }
+    ]);
+    expect(JSON.parse(fieldOf(chart, "points")!)).toEqual([
+      { id: "P4", supports: ["P1"], claim: "A similar line nearby cost 95 million euros." },
+      { id: "P5", attacks: ["P1"], claim: "Running costs rise by 3% when fares fall." }
+    ]);
+    const story = JSON.parse(storyV5()) as { why: unknown; long: unknown };
+    expect(JSON.parse(fieldOf(chart, "report_text")!)).toEqual({ why: story.why, long: story.long });
+    expect(JSON.parse(fieldOf(chart, "figures")!)).toEqual(storyFiguresField({
+      positions: FIGURE_NODES.slice(0, 3).map((node, at) => ({ id: `P${String(at + 1)}`, place: at + 1, claim: node.claim, won: false })),
+      points: FIGURE_NODES.slice(3).map((node, at) => ({ id: `P${String(at + 4)}`, claim: node.claim, known_by: "REASONING" as const }))
+    }));
+    // Every v5 packet leaves under the line, the chart call's too; its material shares nothing with the story's, so a fresh fence.
+    expect(chart.sentInputTokensBelow).toBe(ANTHROPIC_TOKEN_COUNT.line);
+    expect(chart.vendorPacketOf?.(chart.packet)).toBe(chart.packet);
+    expect(Object.hasOwn(chart, "sharedFirstFieldCount")).toBe(false);
+    // Stored with node ids, as v4 stores them; a path run ranks no path, so code adds no ranking.
+    const record = inserted[0]!;
+    expect(record.outcome).toBe("READY");
+    expect(record.charts?.map((entry) => [entry.title, entry.items.map((item) => item.node_ref)])).toEqual([["Cost to build", [nodeId(1), nodeId(4)]]]);
+    expect(record.tables).toEqual([{ after: "long.1.1", kind: "pros_cons", title: "For and against the costs", options: [{ label: "The costs fit",
+      position_ref: nodeId(1), pros: [{ text: "A similar line nearby cost 95 million euros.", node_ref: nodeId(4) }],
+      cons: [{ text: "Running costs rise by 3% when fares fall.", node_ref: nodeId(5) }] }] }]);
+    expect(events.find(([event]) => event === "STORY_CHARTS_WRITTEN")).toEqual(["STORY_CHARTS_WRITTEN",
+      { answerId: PATH_RUN.answerId, answerVersion: 1, charts: 1, tables: 1, dropped: [] }]);
+  });
+
+  it("the chart call refuses a packet past the line before it leaves, and on a locked run carries the question's language last", async () => {
+    const EN = questionLanguageFromRun("en", "English")!;
+    const { provider, calls } = scripted(withBlocks(JSON.stringify({ charts: [] })));
+    const { writer, inserted } = writerFor({ provider, charts: true });
+    await writer.writeAfterSettle({ ...FIGURE_RUN, languageLocked: true });
+    const chart = calls.find((call) => call.callSiteKey === STORY_CHARTS_CALL_SITE_KEY)!;
+    expect(names(chart)).toEqual(["question", "positions", "points", "report_text", "figures", "question_language"]);
+    expect(readPromptFrame(chart.packet).fields.at(-1)).toEqual({ name: "question_language", content: JSON.stringify(EN) });
+    expect(systemOf(chart)).toContain(questionLanguageSentence(EN));
+    const over = buildFramedPrompt({ contract: buildStoryChartsContract(), material: [{ name: "points", content: "a".repeat(LINE) }] }).packet;
+    expect(() => chart.vendorPacketOf!(over)).toThrow(expect.objectContaining({ code: STORY_PATHS_INPUT_OVER_LIMIT }));
+    expect(inserted[0]).toMatchObject({ outcome: "READY" });
+    expect(inserted[0]).not.toHaveProperty("charts");
+    expect(inserted[0]).not.toHaveProperty("tables");
+  });
+
+  it("no block call when the writer has charts off or the story failed; a failed block call leaves the story as it is", async () => {
+    const off = scripted(withBlocks(BLOCK_PLAN));
+    await writerFor({ provider: off.provider }).writer.writeAfterSettle(FIGURE_RUN);
+    expect(off.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    const failed = scripted((request) => contractOf(request) === STORY_PATHS_CONTRACT_ID ? "not a story" : withBlocks(BLOCK_PLAN)(request));
+    const failedRun = writerFor({ provider: failed.provider, charts: true });
+    await failedRun.writer.writeAfterSettle(FIGURE_RUN);
+    expect(failedRun.inserted[0]?.outcome).toBe("FAILED");
+    expect(failed.calls.some((call) => call.callSiteKey === STORY_CHARTS_CALL_SITE_KEY)).toBe(false);
+    const broken = scripted(withBlocks("not a plan"));
+    const brokenRun = writerFor({ provider: broken.provider, charts: true });
+    await brokenRun.writer.writeAfterSettle(FIGURE_RUN);
+    expect(brokenRun.inserted[0]).toMatchObject({ outcome: "READY" });
+    expect(brokenRun.inserted[0]).not.toHaveProperty("charts");
+    expect(brokenRun.events.map(([event]) => event)).toContain("STORY_CHARTS_FAILED");
+  });
+
+  /*
+   * Review of Task 54c (test gaps, each proven by a temporary edit of the production line it guards): the chart call reads only the
+   * points the story's own ladder step kept (a step down the ladder drops points for the line, and the chart call must not carry them
+   * back), and the backup storyteller's calls go straight to it, never through the cost fallback (v4's PF-D6.2 rule), while the chart
+   * call goes to the maker that wrote the served draft: the backup.
+   */
+  it("the chart call reads only the points the story's ladder step kept, and only the arrows between them", async () => {
+    const many: readonly StorySnapshotNode[] = [...FIGURE_NODES.slice(0, 3),
+      ...Array.from({ length: 9 }, (_, at) => snapshotNode(at + 4, `A made-up point ${String(at + 4)} about the line.`))];
+    const { provider, calls } = scripted(withBlocks(JSON.stringify({ charts: [] })));
+    const { writer, inserted } = writerFor({ provider, charts: true });
+    await writer.writeAfterSettle({ ...FIGURE_RUN, nodes: many, pathsFromStep: 4, arrows: [
+      { sourceNodeId: nodeId(4), targetNodeId: nodeId(1), polarity: "support" },
+      { sourceNodeId: nodeId(11), targetNodeId: nodeId(1), polarity: "support" },
+      { sourceNodeId: nodeId(4), targetNodeId: nodeId(12), polarity: "attack" }
+    ] });
+    expect(inserted[0]).toMatchObject({ outcome: "READY" });
+    // Step 4 keeps ten points: P11 and P12 are left out of the story's material.
+    const told = (JSON.parse(fieldOf(calls[0]!, "points")!) as { ref: string }[]).map((point) => point.ref);
+    expect(told).toEqual(Array.from({ length: 10 }, (_, at) => `P${String(at + 1)}`));
+    const chart = calls.find((call) => call.callSiteKey === STORY_CHARTS_CALL_SITE_KEY)!;
+    expect((JSON.parse(fieldOf(chart, "positions")!) as { id: string }[]).map((position) => position.id)).toEqual(["P1", "P2", "P3"]);
+    // Neither P11 (which supports P1) nor P12 (which P4 attacks) reaches the chart call, nor an arrow to or from them.
+    expect(JSON.parse(fieldOf(chart, "points")!)).toEqual([
+      { id: "P4", supports: ["P1"], claim: "A made-up point 4 about the line." },
+      ...[5, 6, 7, 8, 9, 10].map((n) => ({ id: `P${String(n)}`, claim: `A made-up point ${String(n)} about the line.` }))
+    ]);
+  });
+
+  it("the backup storyteller's calls never go through the cost fallback, and the chart call goes to the backup that wrote the story", async () => {
+    const world = backupWorld(() => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead"));
+    const throughFallback: string[] = [];
+    const { writer, inserted } = writerFor({ resolveProvider: world.resolveProvider, charts: true });
+    await writer.writeAfterSettle({ ...PATH_RUN, randomBytes: closingRandomBytes(SEED), backupCandidates: world.candidates,
+      costFallback: async ({ planned, request, call }) => {
+        throughFallback.push(request.callSiteKey);
+        return { result: await call(planned, request), servedBy: planned };
+      } });
+    expect(inserted[0]).toMatchObject({ outcome: "READY", backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE", firstModel: FIRST } });
+    // The first storyteller's round 1 and the checker keep today's fallback; the backup's own write never meets it.
+    expect(throughFallback).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:3", STORY_CHARTS_CALL_SITE_KEY]);
+    expect(world.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:3", STORY_CHARTS_CALL_SITE_KEY]);
+    expect(world.firstCalls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+  });
+
+  /* --- a v4 story keeps its bytes */
+
+  it("a v4 story keeps its bytes: its chart call's material is v4's own, and no v4 call carries the v5 line or shared fields", async () => {
+    const ROOT = nodeId(301);
+    const v4Nodes: readonly StorySnapshotNode[] = [
+      { ...snapshotNode(301, "Adopt the extension: it would cost 120 million euros.", true), wayOfKnowing: "LOOKED_UP", citedExtract: EXTRACT },
+      snapshotNode(302, "Payroll costs rise by 8% a year."),
+      snapshotNode(303, "Ridership grew by 4% a year on the line nearby.")
+    ];
+    const { paths: _none, ...today } = PATH_RUN;
+    const v4: StoryWriteInput = { ...today, nodes: v4Nodes, webSources: true, verdictBasis: { ...PATH_RUN.verdictBasis, winner_node_id: ROOT },
+      arrows: [{ sourceNodeId: nodeId(302), targetNodeId: ROOT, polarity: "attack" }, { sourceNodeId: nodeId(303), targetNodeId: ROOT, polarity: "support" }] };
+    const v4Story = (): string => {
+      const parsed = JSON.parse(storyV5(["P1"])) as { short: { paths: { node_refs: string[] }[] }; why: { reasons: { node_refs: string[] }[] } };
+      parsed.short.paths[0]!.node_refs = ["P1", "P2"];
+      parsed.why.reasons[0]!.node_refs = ["P1", "P2"];
+      return JSON.stringify(parsed);
+    };
+    const CHECK_V4 = JSON.stringify({ satisfied: true, misleading: false, objection: null, criteria: {
+      faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: true, citations_correct: true,
+      reviewer_note_separate: true, goal_marked_as_reading: true, speaks_to_the_person: true } });
+    const { provider, calls } = scripted((request) => contractOf(request) === STORY_CHARTS_CONTRACT_ID ? JSON.stringify({ charts: [] })
+      : contractOf(request) === V4_TELLER ? v4Story() : CHECK_V4);
+    const { writer, inserted } = writerFor({ provider, charts: true });
+    await writer.writeAfterSettle(v4);
+    expect(inserted[0]?.outcome).toBe("READY");
+    expect(calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1", STORY_CHARTS_CALL_SITE_KEY]);
+    const built = buildStoryMaterial({ snapshot: v4, enrichment: new Map(), budgetBytes: POLICY.materialBudget.low,
+      shapeIds: new Set(PACK.shapes.map((shape) => shape.id)), alsoRaisedWhole: true, v4: { shapeId: storyV4ShapeId(v4, PACK) } });
+    if (built.kind !== "OK") throw new Error("test: the v4 material did not build");
+    const body = JSON.parse(v4Story()) as never;
+    expect(readPromptFrame(calls[2]!.packet).fields).toEqual(toChartsPromptMaterial(built.material, body, storyFiguresField(built.material)));
+    expect(systemOf(calls[0]!)).toContain(WEB_WRITER_SENTENCES);
+    // v4 lists each position once, in `positions`, with the extract its case rests on.
+    expect(fieldOf(calls[0]!, "positions")).toContain("\"extract\"");
+    for (const request of calls) {
+      for (const member of ["sharedFirstFieldCount", "sentInputTokensBelow", "vendorPacketOf"]) expect(Object.hasOwn(request, member), member).toBe(false);
+    }
   });
 });

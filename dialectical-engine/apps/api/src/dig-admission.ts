@@ -171,14 +171,19 @@ export interface DigPicksPort {
 /** The text of a dig suggestion the parent offers (W4-3), or null when it offers none under that id. */
 export type DigSuggestionTextReader = (ownerRef: string, parentRunId: string, suggestionId: string) => Promise<string | null>;
 
-/** A suggestion's text as the parent's answer serves it, whichever path offers it; null when none has that id. */
+/**
+ * A suggestion's text as the parent's answer serves it, whichever path offers it; null when none has that id.
+ * V4 start step, Task 55 (the page's contract, Task 62): on a path debate a "+ N more to explore" item is offered too; a pick of
+ * one names the item's `more_id` as its suggestion (and its place), and its text is the item's question.
+ */
 export function digSuggestionTextOf(answer: Readonly<{ web?: Readonly<{ paths: readonly Readonly<{ suggestions: readonly Readonly<{
-  suggestion_id: string; text: string }>[] }>[] }> | undefined }> | null, suggestionId: string): string | null {
+  suggestion_id: string; text: string }>[] }>[] }> | undefined;
+  branches?: Readonly<{ more: readonly Readonly<{ more_id: string; question: string }>[] }> | undefined }> | null, suggestionId: string): string | null {
   for (const path of answer?.web?.paths ?? []) {
     const found = path.suggestions.find((suggestion) => suggestion.suggestion_id === suggestionId);
     if (found !== undefined) return found.text;
   }
-  return null;
+  return answer?.branches?.more.find((item) => item.more_id === suggestionId)?.question ?? null;
 }
 
 /**

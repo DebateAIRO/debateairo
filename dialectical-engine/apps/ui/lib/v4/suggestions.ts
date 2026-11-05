@@ -211,6 +211,17 @@ export function isEdited(pick: V4DigPick): boolean {
   return pick.kind === "SUGGESTION" && oneLine(pick.text) !== oneLine(pick.suggestion.text);
 }
 
+/**
+ * V4 start step, Task 79a (owner answer Q18 A: code finds overlapping dig picks, no AI call, nothing counted): the points of the
+ * map a pick rests on. A suggestion: the points the server names (a path debate's; none on R22); a still-argued point's open
+ * question ("p:<node>"): that point; an own view, a "+ N more" item and the other open questions: none.
+ */
+export function pickPointsOf(pick: V4DigPick): readonly string[] {
+  if (pick.kind === "SUGGESTION") return pick.suggestion.points ?? [];
+  if (pick.kind === "OPEN" && pick.question.id.startsWith("p:") && pick.question.id.length > 2) return [pick.question.id.slice(2)];
+  return [];
+}
+
 /** The picks' open questions, in order (the page's pick boxes read these). */
 export function pickedOpenIds(draft: V4DigDraft): ReadonlySet<string> {
   return new Set(draft.picks.flatMap((pick) => (pick.kind === "OPEN" ? [pick.question.id] : [])));

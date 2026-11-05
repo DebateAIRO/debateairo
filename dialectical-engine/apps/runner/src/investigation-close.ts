@@ -386,8 +386,14 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
         sources: point.sources.flatMap((at) => { const place = places.get(at); return place === undefined ? [] : [place]; }) })) };
       const parsed = InvestigationReportPathSchema.safeParse(placed);
       if (parsed.success) return [parsed.data];
-      // A detail the contract refuses (a runaway text) costs the details, not the path.
-      const bare = InvestigationReportPathSchema.safeParse({ line: path.line, summary: path.summary, fate: path.fate, level: path.level });
+      // A detail the contract refuses (a runaway text) costs the details, not the path. V4 start step, Task 55b: a path debate's path
+      // id, trust word and own words stay, each when it parses.
+      const base = { line: path.line, summary: path.summary, fate: path.fate, level: path.level };
+      const kept = (["path_id", "trust", "own"] as const).reduce<Record<string, unknown>>((bare, member) => {
+        if (path[member] === undefined) return bare;
+        return InvestigationReportPathSchema.safeParse({ ...bare, [member]: path[member] }).success ? { ...bare, [member]: path[member] } : bare;
+      }, base);
+      const bare = InvestigationReportPathSchema.safeParse(kept);
       return bare.success ? [bare.data] : [];
     }),
     shortened: dossier.ladderStep > 1

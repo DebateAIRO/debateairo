@@ -43,6 +43,8 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
   sourcesPerPointMax: 8,
   otherPagesPerPathMax: 100,
   suggestionsPerPathMax: 20,
+  /** V4 start step, Task 79a: the points of the map one suggestion names (a path debate's). */
+  suggestionPointsMax: 40,
   pathsMax: 8,
   /** A dig's picks: as many as the places one dig link can name (0131). Free is capped lower (FREE_DIG_PICKS_MAX). */
   digPicksMax: ACCOUNT_MEMORY_LIMITS.digPlacesMax,
@@ -196,13 +198,19 @@ export const DigSuggestionKindSchema = z.enum(DIG_SUGGESTION_KINDS);
 export type DigSuggestionKind = z.infer<typeof DigSuggestionKindSchema>;
 export const DigSuggestionSideSchema = z.enum(["FOR", "AGAINST"]);
 
-/** One dig suggestion on a path: its text (the person may edit it before digging) and the map places it rests on. */
+/**
+ * One dig suggestion on a path: its text (the person may edit it before digging) and the map places it rests on.
+ * V4 start step, Task 79a (owner answer Q18 A: code finds overlapping dig picks): on a path debate's suggestions only, `points`
+ * names the points of the map (node ids) it rests on, so the page can see two picks resting on one point, with no AI call.
+ * Absent on every R22 suggestion and on a set stored before it, which still parses.
+ */
 export const DigSuggestionSchema = z.object({
   suggestion_id: WebRefSchema,
   kind: DigSuggestionKindSchema,
   side: DigSuggestionSideSchema.nullable(),
   text: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.suggestionTextMaxChars),
-  places: z.array(DigLinkPlaceSchema).min(1).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax)
+  places: z.array(DigLinkPlaceSchema).min(1).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax),
+  points: z.array(z.string().min(1).max(160)).max(WEB_CONTRACT_LIMITS.suggestionPointsMax).optional()
 }).strict().superRefine((suggestion, context) => {
   if ((suggestion.kind === "HELPS_MAIN_QUESTION") !== (suggestion.side !== null)) {
     context.addIssue({ code: "custom", message: "only a 'helps the main question' suggestion names a side, and it always does" });

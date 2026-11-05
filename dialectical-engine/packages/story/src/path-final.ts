@@ -2,11 +2,13 @@ import {
   STORY_BODY_LIMITS, StoryFateSchema, TRUST_WORDS, type PathOutcome, type StartPathAuthor, type StoryBody, type TrustWord
 } from "@debateai/contract";
 import {
-  START_PATH_AUTHORS, TypedDomainError, withQuestionLanguageField, withReaderField, type PathId, type QuestionLanguage, type ReadingLevel
+  START_PATH_AUTHORS, TypedDomainError, withQuestionLanguageField, withReaderField, type EngineCitedExtract, type PathId, type QuestionLanguage,
+  type ReadingLevel
 } from "@debateai/kernel";
 import { PREVIEW_FINAL_WRITER_LIMITS, buildFramedPrompt, type FramedMaterialField, type PromptContract, type PromptPacket } from "@debateai/providers";
+import { storyFiguresField } from "./blocks.js";
 import { STORY_QUOTE_SENTENCE, STORY_REVISION_FOLLOW_UP } from "./contracts.js";
-import { storyDraftText } from "./material.js";
+import { storyDraftText, type StoryMaterial, type StoryMaterialPoint } from "./material.js";
 import { STORY_PATHS_CHECK_CRITERIA, type StoryMaterialIndex } from "./validate.js";
 
 /**
@@ -29,6 +31,9 @@ import { STORY_PATHS_CHECK_CRITERIA, type StoryMaterialIndex } from "./validate.
  *    over the same fields) plus the room for one draft and the check's problems stays at or under 195,904 bytes. Every
  *    path, the main answer and the gap points stand whole on every step. The runner checks the real count near the line
  *    (`fitStoryPathsToTokenLine`) and hands its step to the writer (`pathsFromStep`), which never starts again at step 1.
+ * Task 54c (owner, 4 Nov, "Keep all three"): a looked-up point carries the extract it rests on (v4's entry, W1-5), whole with its
+ * point on every step; the charts and tables call reads the story's points as v4's reads its material (`storyPathsBlocksView`,
+ * `storyPathsChartsFields`).
  * Without paths nothing here is read: today's story, byte for byte.
  */
 
@@ -153,8 +158,11 @@ export type StoryPathsInput = Readonly<{
   alsoRaised: readonly string[];
 }>;
 
-/** A point as the models read it: its short ref, its words, and whether a second AI disputed it. */
-export type StoryPathsPoint = Readonly<{ ref: string; text: string; disputed: boolean }>;
+/**
+ * A point as the models read it: its short ref, its words, and whether a second AI disputed it. Task 54c (W1-5, design §7.1 item 7):
+ * on a debate that read the web, a looked-up point also carries the extract it rests on (only this debate's); none on any other.
+ */
+export type StoryPathsPoint = Readonly<{ ref: string; text: string; disputed: boolean; extract?: EngineCitedExtract }>;
 
 /**
  * Everything the material is built from: the run's paths, its points with their refs, and the question line, the `length`
@@ -225,17 +233,25 @@ export function storyPathsGuard(packet: PromptPacket): PromptPacket {
   return packet;
 }
 
+/** Task 54c: a cited extract as v4's material writes it (`storyExtractOf`, material.ts), member for member: none is added or dropped. */
+function storyPathsExtractOf(cited: EngineCitedExtract): EngineCitedExtract {
+  return Object.freeze({ id: cited.id, quote: cited.quote, title: cited.title, site: cited.site, date: cited.date,
+    ...(cited.note === undefined ? {} : { note: cited.note }) });
+}
+
 /**
  * The points of a path run, from the snapshot's nodes in their order: `P1`… each, with the node's words and whether a second
- * AI disputed it, and the map from each ref back to its node id. The writer and the runner build them the same way.
+ * AI disputed it, and the map from each ref back to its node id. The writer and the runner build them the same way. Task 54c: a
+ * node that cites one of this debate's extracts (`citedExtract`, a looked-up node on a debate that read the web) carries it.
  */
-export function storyPathsPointsOf(nodes: readonly Readonly<{ nodeId: string; claim: string }>[], disputed: ReadonlySet<string>):
-  Readonly<{ points: readonly StoryPathsPoint[]; refMap: ReadonlyMap<string, string> }> {
+export function storyPathsPointsOf(nodes: readonly Readonly<{ nodeId: string; claim: string; citedExtract?: EngineCitedExtract }>[],
+  disputed: ReadonlySet<string>): Readonly<{ points: readonly StoryPathsPoint[]; refMap: ReadonlyMap<string, string> }> {
   const refMap = new Map<string, string>();
   const points = nodes.map((node) => {
     const ref = `P${String(refMap.size + 1)}`;
     refMap.set(ref, node.nodeId);
-    return Object.freeze({ ref, text: node.claim, disputed: disputed.has(node.nodeId) });
+    return Object.freeze({ ref, text: node.claim, disputed: disputed.has(node.nodeId),
+      ...(node.citedExtract === undefined ? {} : { extract: storyPathsExtractOf(node.citedExtract) }) });
   });
   return Object.freeze({ points: Object.freeze(points), refMap });
 }
@@ -288,7 +304,9 @@ function atStep(input: StoryPathsMaterialInput, step: number): StoryPathsMateria
     field("question_line", input.questionLine),
     field("main_answer", JSON.stringify({ segments: [...input.mainAnswer], trust: input.mainTrust })),
     field("paths", JSON.stringify(input.paths.map(pathEntry))),
-    field("points", JSON.stringify(kept.map((point) => ({ ref: point.ref, text: point.text, ...(point.disputed ? { disputed: true } : {}) })))),
+    // Task 54c: a looked-up point's extract right after its words, as v4's sits right after the point's way of knowing.
+    field("points", JSON.stringify(kept.map((point) => ({ ref: point.ref, text: point.text,
+      ...(point.extract === undefined ? {} : { extract: point.extract }), ...(point.disputed ? { disputed: true } : {}) })))),
     field("also_raised", JSON.stringify([...input.alsoRaised])),
     ...(input.length === null ? [] : [field(input.length.name, input.length.content)])
   ]);
@@ -318,6 +336,81 @@ export function storyPathsMaterial(input: StoryPathsMaterialInput, options: Read
   let built = atStep(input, first);
   for (let step = first + 1; !built.fits && step <= STORY_PATHS_LADDER.length; step += 1) built = atStep(input, step);
   return built;
+}
+
+/* ----------------------------------------------------------------- the charts and tables (Task 54c) */
+
+/** The positions and points the charts and tables call reads (blocks.ts and charts.ts read v4's material through the same pick). */
+export type StoryPathsBlocksView = Pick<StoryMaterial, "positions" | "points">;
+
+/**
+ * Task 54c (owner, 4 Nov, "Keep all three"; designs of 2026-10-28 and 2026-10-30): a path story's charts and tables call is v4's,
+ * its need test, its checks and its storage unchanged (blocks.ts, charts.ts), read over the points the story itself read: each path's
+ * root (`isPosition`) is a position, every other point the ladder kept is a point, with the support and attack arrows between kept
+ * points (first recorded first, as v4's), all under the story's own refs, so a block cites what the story cites and is stored with
+ * node ids. A path run ranks no path against another: a position's `place` is only its order and none `won`, and code adds no
+ * ranking to a path story (the writer's `ranking: false`). Pure.
+ */
+export function storyPathsBlocksView(input: Readonly<{
+  nodes: readonly Readonly<{ nodeId: string; claim: string; isPosition: boolean; wayOfKnowing: StoryMaterialPoint["known_by"] }>[];
+  arrows: readonly Readonly<{ sourceNodeId: string; targetNodeId: string | null; polarity: "support" | "attack" }>[];
+  /** The story's refs (`storyPathsPointsOf`): each ref to its node id. */
+  refMap: ReadonlyMap<string, string>;
+  /** The refs the story's ladder step kept (`StoryPathsMaterial.pointRefs`). */
+  pointRefs: ReadonlySet<string>;
+}>): StoryPathsBlocksView {
+  const refOf = new Map([...input.refMap].map(([ref, nodeId]) => [nodeId, ref] as const));
+  const keptRef = (nodeId: string | null): string | null => {
+    const ref = nodeId === null ? undefined : refOf.get(nodeId);
+    return ref !== undefined && input.pointRefs.has(ref) ? ref : null;
+  };
+  const links = new Map<string, { supports: string[]; attacks: string[] }>();
+  for (const arrow of input.arrows) {
+    const source = keptRef(arrow.sourceNodeId);
+    const target = keptRef(arrow.targetNodeId);
+    if (source === null || target === null) continue;
+    const link = links.get(source) ?? { supports: [], attacks: [] };
+    const list = arrow.polarity === "support" ? link.supports : link.attacks;
+    if (!list.includes(target)) list.push(target);
+    links.set(source, link);
+  }
+  const kept = input.nodes.flatMap((node) => {
+    const ref = keptRef(node.nodeId);
+    return ref === null ? [] : [{ node, ref }];
+  });
+  const positions = kept.filter(({ node }) => node.isPosition)
+    .map(({ node, ref }, at) => Object.freeze({ id: ref, place: at + 1, claim: node.claim, won: false }));
+  const points = kept.filter(({ node }) => !node.isPosition).map(({ node, ref }) => {
+    const link = links.get(ref);
+    return Object.freeze({
+      id: ref,
+      ...(link === undefined || link.supports.length === 0 ? {} : { supports: Object.freeze([...link.supports]) }),
+      ...(link === undefined || link.attacks.length === 0 ? {} : { attacks: Object.freeze([...link.attacks]) }),
+      claim: node.claim,
+      known_by: node.wayOfKnowing
+    });
+  });
+  return Object.freeze({ positions: Object.freeze(positions), points: Object.freeze(points) });
+}
+
+/**
+ * Task 54c: the chart call's fenced fields on a path run, in v4's words (story.charts.v2 names them, `toChartsPromptMaterial`): the
+ * question, the positions and the points, each with its claim and a point with what it supports and attacks, then the report's
+ * text it may put a block under (the reasons and the long version, with the story's refs) and each claim's figures. v4's fields
+ * a path run has nothing for (its verdict, served statement, hinges, set-aside and omitted points) are not sent; the writer adds the
+ * question's language last, as on v4's.
+ */
+export function storyPathsChartsFields(input: Readonly<{ questionLine: string; view: StoryPathsBlocksView; body: StoryBody }>):
+  readonly FramedMaterialField[] {
+  return Object.freeze([
+    field("question", JSON.stringify(input.questionLine)),
+    field("positions", JSON.stringify(input.view.positions.map((position) => ({ id: position.id, claim: position.claim })))),
+    field("points", JSON.stringify(input.view.points.map((point) => ({ id: point.id,
+      ...(point.supports === undefined ? {} : { supports: point.supports }), ...(point.attacks === undefined ? {} : { attacks: point.attacks }),
+      claim: point.claim })))),
+    field("report_text", JSON.stringify({ why: input.body.why, long: input.body.long })),
+    field("figures", JSON.stringify(storyFiguresField(input.view)))
+  ]);
 }
 
 /* ----------------------------------------------------------------- the reading */
