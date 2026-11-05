@@ -13,10 +13,10 @@ const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps
 const NEXT_MONTH = "2026-12-01T00:00:00.000Z";
 
 describe("the shelf's state words are the waiting card's (WHOLE-12)", () => {
-  it("a month pause: 'Paused until December 1' before the reset, 'Ready to continue' after it, and a calm line with no date", () => {
+  it("a month pause: 'Paused until 1 December' before the reset, 'Ready to continue' after it, and a calm line with no date", () => {
     const before = shelfStateText("PAUSED", null, CATALOG, "en", { until: NEXT_MONTH, canContinue: false });
     expect(before).toBe(stateWordText({ kind: "PAUSED", until: NEXT_MONTH, canContinue: false }, CATALOG, "en"));
-    // journey-f22: a day and a month, no year ("Paused until December 1").
+    // journey-f22: a day and a month, no year ("Paused until 1 December", day first on English pages: question 5).
     expect(before).toMatch(/^Paused until \S+ \S+$/u);
     expect(before).not.toMatch(/\b\d{4}\b/u);
     const after = shelfStateText("PAUSED", null, CATALOG, "en", { until: NEXT_MONTH, canContinue: true });

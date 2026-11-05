@@ -31,7 +31,8 @@ describe("S8 duplicated public readers", () => {
         as_of: "2026-08-23T12:34:56.000Z"
       }
     }).answer;
-    const expectedEvidenceDate = new Intl.DateTimeFormat("en", {
+    // English pages write the day first on the 24-hour clock (owner's answer to question 5, 5 Nov 2026).
+    const expectedEvidenceDate = new Intl.DateTimeFormat("en-GB", {
       dateStyle: "short",
       timeStyle: "short"
     }).format(new Date(answer.as_of));

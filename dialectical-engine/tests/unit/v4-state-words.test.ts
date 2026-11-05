@@ -94,7 +94,8 @@ describe("the shared state words (journey-f22)", () => {
       .toBe(`Waiting · starts after ${clock("2026-11-04T10:30:00.000Z")}`);
     expect(stateWordText({ kind: "WAITING", startsAfter: null }, CATALOG, "en", NOW)).toBe("Waiting");
     const later = stateWordText({ kind: "WAITING", startsAfter: "2026-11-06T12:00:00.000Z" }, CATALOG, "en", NOW);
-    expect(later).toMatch(/^Waiting · starts after Nov [5-7], /u);
+    // Day first on English pages (owner's answer to question 5, 5 Nov 2026): "6 Nov, 14:00".
+    expect(later).toMatch(/^Waiting · starts after [5-7] Nov, \d{2}:\d{2}$/u);
     expect(stateWordText({ kind: "SHORT_BREAK", continuesAbout: null }, CATALOG, "en", NOW)).toBe("Taking a short break");
     expect(stateWordText({ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, CATALOG, "en", NOW))
       .toBe(`Paused until ${dayText("2026-12-01T12:00:00.000Z", "en")!}`);
@@ -123,7 +124,7 @@ describe("the shared state words (journey-f22)", () => {
     expect(clockText("nope", "en")).toBeNull();
     expect(whenText("nope", "en", NOW)).toBeNull();
     expect(dayText("nope", "en")).toBeNull();
-    expect(dayText("2026-12-01T12:00:00.000Z", "en")).toBe("December 1");
+    expect(dayText("2026-12-01T12:00:00.000Z", "en")).toBe("1 December");
     expect(dayText("2026-12-01T12:00:00.000Z", "ro")).toBe("1 decembrie");
   });
 

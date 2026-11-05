@@ -109,7 +109,8 @@ describe("the one waiting card", () => {
 
   it("names the day of a start that was not today; no start time, no line", async () => {
     await mount({ startedAt: "2026-11-02T09:31:00.000Z", checkedAt: Date.parse("2026-11-04T09:40:00.000Z") });
-    expect(host!.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started Nov [1-3], /u);
+    // Day first on English pages (owner's answer to question 5): "Started 2 Nov, 11:31".
+    expect(host!.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started [1-3] Nov, \d{2}:\d{2}$/u);
     await mount({ startedAt: null });
     expect(host!.querySelector("[data-wait-started]")).toBeNull();
   });
@@ -130,7 +131,7 @@ describe("the one waiting card", () => {
       [{ kind: "WAITING", startsAfter: "2026-11-04T10:00:00.000Z" }, word("v4.state.WAITING", { time: clock("2026-11-04T10:00:00.000Z") }), true],
       [{ kind: "WAITING_OWN" }, word("v4.state.WAITING_OWN"), true],
       [{ kind: "SHORT_BREAK", continuesAbout: null }, word("v4.state.SHORT_BREAK.noTime"), true],
-      [{ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, "Paused until December 1", false],
+      [{ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, "Paused until 1 December", false],
       [{ kind: "READY" }, word("v4.state.READY"), false],
       [{ kind: "DIDNT_FINISH" }, word("v4.state.DIDNT_FINISH"), false],
       [{ kind: "BEING_WRITTEN" }, word("v4.state.BEING_WRITTEN"), true]

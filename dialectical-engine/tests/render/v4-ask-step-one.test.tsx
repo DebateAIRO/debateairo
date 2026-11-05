@@ -284,7 +284,8 @@ describe("the used-up quota (ask-f18, ask-d4 C)", () => {
   it("Free counts by the month and names the day", async () => {
     ask.room = { room: "FULL", scope: "PERSON_MONTH", resets_at: "2026-12-01T12:00:00.000Z", waiting_run_ref: null, plan_id: "FREE", new_starts: "BLOCKED_UNTIL_RESET" };
     await mount();
-    expect(host!.querySelector(".v4AskUsedUp")?.textContent).toBe("You've used this month's quota. New questions start on December 1.");
+    // Owner's answer to question 5 (5 Nov 2026): day first on English pages.
+    expect(host!.querySelector(".v4AskUsedUp")?.textContent).toBe("You've used this month's quota. New questions start on 1 December.");
   });
 });
 

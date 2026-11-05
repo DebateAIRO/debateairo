@@ -52,15 +52,25 @@ export function tPlural(
   return interpolate(message, { ...vars, count });
 }
 
+/**
+ * The language tag a date or time is written in. Owner's answer to question 5 (5 Nov 2026, B, and its follow-ups):
+ * every English page writes the day first on the 24-hour clock ("5 November 2026", "1 December", "5 Nov 2026, 14:30"),
+ * whichever English the reader chose (plain, United States or United Kingdom), so English takes the British form.
+ * Every other language keeps its own order.
+ */
+export function dateLocale(locale: string): string {
+  return /^en(?:-|$)/i.test(locale) ? "en-GB" : locale;
+}
+
 export function formatDate(
   locale: string,
   value: string | number | Date,
   options?: Intl.DateTimeFormatOptions
 ): string {
   try {
-    return new Intl.DateTimeFormat(locale, options).format(new Date(value));
+    return new Intl.DateTimeFormat(dateLocale(locale), options).format(new Date(value));
   } catch {
-    return new Intl.DateTimeFormat("en", options).format(new Date(value));
+    return new Intl.DateTimeFormat(dateLocale("en"), options).format(new Date(value));
   }
 }
 

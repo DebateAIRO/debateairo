@@ -75,7 +75,8 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 const word = (key: string, values: Record<string, string | number> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const DIG = "22222222-2222-4222-8222-222222222222";
-const date = (iso: string, style: "medium" | "long" = "medium") => new Intl.DateTimeFormat("en", { dateStyle: style }).format(new Date(iso));
+// English pages write the day first (owner's answer to question 5, 5 Nov 2026): "29 Oct 2026", "29 October 2026".
+const date = (iso: string, style: "medium" | "long" = "medium") => new Intl.DateTimeFormat("en-GB", { dateStyle: style }).format(new Date(iso));
 const clock = (iso: string) => new Intl.DateTimeFormat("en", { timeStyle: "short", hourCycle: "h23" }).format(new Date(iso));
 const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-report.css"), "utf8");
 

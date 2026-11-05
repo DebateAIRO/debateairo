@@ -51,7 +51,8 @@ describe("P18 billing formatting helpers", () => {
   it("names countries and long dates in the reader's language", () => {
     expect(countryName("en", "RO")).toBe("Romania");
     expect(countryName("de", "RO")).toBe("Rumänien");
-    expect(formatLongDate("en", "2026-10-29T23:30:00.000Z")).toBe("October 29, 2026");
+    // Day first for every English reader (owner's answer to question 5, 5 Nov 2026).
+    for (const english of ["en", "en-US", "en-GB"]) expect(formatLongDate(english, "2026-10-29T23:30:00.000Z")).toBe("29 October 2026");
   });
 
   it("knows the four plan ids and which are paid", () => {

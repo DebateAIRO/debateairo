@@ -160,7 +160,8 @@ describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {
 
   it("says it once, in the owner's words, before and after the reset", () => {
     // journey-f22 / journey-f15 (the wave-2 checks): one date form for the month pause, in a sentence and on a label alike.
-    const date = new Intl.DateTimeFormat("en", { day: "numeric", month: "long" }).format(new Date(NEXT_MONTH));
+    // Day first on English pages (owner's answer to question 5, 5 Nov 2026): "1 December".
+    const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long" }).format(new Date(NEXT_MONTH));
     const day = date;
     // No year: the record's "Paused until 1 December" (the wave-2 checks, P6: asserted on what the code says, any year).
     for (const line of [
