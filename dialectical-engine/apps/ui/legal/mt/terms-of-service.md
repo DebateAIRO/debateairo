@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.15 · EFFETTIVI 1 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.16 · EFFETTIVI 1 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.15
+endMarker: TMIEM IT-TERMINI · v2.16
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.15 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.16 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -211,9 +211,7 @@ It-taqsimiet 8 (fir-rigward ta’ kontenut diġà ppubblikat), 15, 16 u 18 jibqg
 
 ## 12. Pjanijiet bi ħlas
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disponibbli, li jiftaħ il-lista sħiħa tal-mudelli u jħallik tistabbilixxi l-kontrolli tad-dibattitu int stess.
+Dialectical Engine toffri pjan bla ħlas. Se jkunu disponibbli tliet pjanijiet bi ħlas, **Plus**, **Pro** u **Max**; kull wieħed minnhom jiftaħ il-lista sħiħa tal-mudelli u jħallik tistabbilixxi l-kontrolli tad-dibattitu int stess.
 
 **Qabel ma tħallas** nuruk, direttament fuq il-buttuna tal-ħlas: il-pjan; il-prezz totali inkluża t-taxxa applikabbli; il-perjodu tal-fatturazzjoni; li l-pjan jiġġedded awtomatikament sakemm jiġi kkanċellat; id-data meta jintemm kwalunkwe perjodu ta’ prova bla ħlas u kemm imbagħad ikollok tħallas; u kif tikkanċella. Tikkonferma t-termini tat-tiġdid billi timmarka kaxxa separata. Fuq il-buttuna jkun hemm **Abbona u ħallas** (bir-Rumen, *Abonați-vă și plătiți*). Nibagħtulek konferma fuq mezz durabbli li jkun fiha l-istess informazzjoni, dawn it-Termini, u l-formola tal-irtirar.
 
@@ -233,7 +231,7 @@ Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disp
 
 **Treġġigħ lura ta’ ħlasijiet.** Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan.
 
-**L-ewwel id-drittijiet statutorji.** Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, jekk tikkanċella pjan bi ħlas matul perjodu tal-kontijiet, nagħtuk ħlas lura tas-sehem mill-prezz ta’ dak il-perjodu li ma użajtx, imkejjel skont l-użu tal-pjan, ikun xi jkun in-numru ta’ jiem li jkunu għaddew: jekk użajt 30 %, nagħtuk ħlas lura ta’ 70 %; jekk ma użajt xejn, nagħtuk ħlas lura tal-prezz kollu. Itlob il-ħlas lura fuq support@dezbatere.ro; ladarba nagħtu ħlas lura, il-pjan jintemm. Jekk japplika wkoll id-dritt ta’ rtirar fit-taqsima 13, tieħu l-akbar wieħed mill-ħlasijiet lura. Il-limiti tal-użu ta’ kull pjan jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment.
+**L-ewwel id-drittijiet statutorji.** Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, jekk tikkanċella pjan bi ħlas matul perjodu tal-kontijiet, nagħtuk ħlas lura tas-sehem mill-prezz ta’ dak il-perjodu li ma użajtx, imkejjel skont l-użu tal-pjan, ikun xi jkun in-numru ta’ jiem li jkunu għaddew: jekk użajt 30 %, nagħtuk ħlas lura ta’ 70 %; jekk ma użajt xejn, nagħtuk ħlas lura tal-prezz kollu. Itlob il-ħlas lura fuq support@dezbatere.ro; ladarba nagħtu ħlas lura, il-pjan jintemm. Jekk japplika wkoll id-dritt ta’ rtirar fit-taqsima 13, tieħu l-akbar wieħed mill-ħlasijiet lura. Il-limiti tal-użu tal-pjanijiet kollha jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment.
 
 ## 13. Id-dritt tiegħek għall-irtirar
 
@@ -250,6 +248,8 @@ Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perj
 Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien **30 jum** minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat.
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
+
+Il-Verżjoni 2.16 issostitwiet il-Verżjoni 2.15: it-taqsima 12 issemmi l-pjanijiet bi ħlas, Plus, Pro u Max, u t-taqsimiet 12 u 15 m’għadx fihom noti tal-abbozzar; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
 
 Il-Verżjoni 2.15 issostitwiet il-Verżjoni 2.14: it-taqsima 12 tgħid li l-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT, u li t-taxxa tiżdied fil-checkout.
 
@@ -278,8 +278,6 @@ Il-Verżjoni 2.7 issostitwiet il-verżjoni 2.6: iżżid il-verifika tal-mistoqsi
 **Il-kontenut tiegħek u l-użu tiegħek.** Int responsabbli għal dak li tissottometti u tippubblika, inkluż li jkollok id-dritt tissottomettih u li tikkonforma mat-taqsima 7.
 
 **Avvenimenti barra mill-kontroll tagħna.** Ma nkunux fi ksur meta xi ħaġa barra mill-kontroll raġonevoli tagħna żżommna milli nwettqu l-obbligi tagħna. Nuqqas jew irtirar minn fornitur ta’ mudell ta’ parti terza ma jkunx awtomatikament avveniment bħal dan; meta dan jagħmel is-servizz mhux disponibbli, tapplika t-taqsima 14 u tista’ tittermina u tirċievi ħlas lura kif tiddeskrivi hi.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Proprjetà intellettwali
 

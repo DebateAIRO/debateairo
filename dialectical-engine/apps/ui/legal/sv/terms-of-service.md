@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.15 · GÄLLER FRÅN 1 NOVEMBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.16 · GÄLLER FRÅN 1 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.15
+endMarker: SLUT PÅ VILLKOREN · v2.16
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.15 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.16 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. På det kostnadsfria abonnemanget är dina debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När en debatt är offentlig kan vem som helst läsa den, och den förblir offentlig. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -211,9 +211,7 @@ Avsnitten 8 (i fråga om innehåll som redan har publicerats), 15, 16 och 18 for
 
 ## 12. Betalabonnemang
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang kommer att bli tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
+Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Tre avgiftsbelagda abonnemang, **Plus**, **Pro** och **Max**, kommer att bli tillgängliga; vart och ett ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
 
 **Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Abonați-vă și plătiți*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
 
@@ -233,7 +231,7 @@ Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Pr
 
 **Kortreklamationer.** Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta.
 
-**Lagstadgade rättigheter först.** Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver, om du säger upp ett betalabonnemang under en faktureringsperiod, återbetalar vi den andel av periodens pris som du inte har använt, mätt efter abonnemangets användning, oavsett hur många dagar som har gått: har du använt 30 % av det återbetalar vi 70 %; har du inte använt något av det återbetalar vi hela priset. Fråga på support@dezbatere.ro; när vi har återbetalat upphör abonnemanget. Om ångerrätten i avsnitt 13 också gäller får du den återbetalning som är störst. Användningsgränserna för båda abonnemangen offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig.
+**Lagstadgade rättigheter först.** Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver, om du säger upp ett betalabonnemang under en faktureringsperiod, återbetalar vi den andel av periodens pris som du inte har använt, mätt efter abonnemangets användning, oavsett hur många dagar som har gått: har du använt 30 % av det återbetalar vi 70 %; har du inte använt något av det återbetalar vi hela priset. Fråga på support@dezbatere.ro; när vi har återbetalat upphör abonnemanget. Om ångerrätten i avsnitt 13 också gäller får du den återbetalning som är störst. Användningsgränserna för alla abonnemang offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig.
 
 ## 13. Din ångerrätt
 
@@ -250,6 +248,8 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+
+Version 2.16 ersatte version 2.15: avsnitt 12 anger de avgiftsbelagda abonnemangen, Plus, Pro och Max, och avsnitt 12 och 15 innehåller inte längre några utkastanteckningar; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat.
 
 Version 2.15 ersatte version 2.14: avsnitt 12 anger att våra priser visas exklusive skatt, som pris + moms, och att skatten läggs till i kassan.
 
@@ -278,8 +278,6 @@ Version 2.7 ersatte version 2.6: den lägger till frågekontrollen, som läser v
 **Ditt innehåll och din användning.** Du ansvarar för vad du skickar in och publicerar, däribland för att du har rätt att skicka in det och för att du följer avsnitt 7.
 
 **Händelser utanför vår kontroll.** Vi gör oss inte skyldiga till avtalsbrott om vi hindras från att fullgöra våra skyldigheter av något som ligger utanför vår rimliga kontroll. Ett fel eller ett tillbakadragande från en modelleverantör som är tredje part utgör inte automatiskt en sådan händelse; om det gör tjänsten otillgänglig gäller avsnitt 14, och du får säga upp avtalet och erhålla återbetalning på det sätt som anges där.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Immateriella rättigheter
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.15 · VELJAVNI OD 1. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v2.16 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.15
+endMarker: KONEC POGOJEV · v2.16
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.15 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.16 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -211,9 +211,7 @@ Razdelki 8 (glede že objavljene vsebine), 15, 16 in 18 ostanejo v veljavi tudi 
 
 ## 12. Plačljivi paketi
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Premium**, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave.
+Dialectical Engine ponuja brezplačen paket. Na voljo bodo trije plačljivi paketi, **Plus**, **Pro** in **Max**; vsak od njih bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave.
 
 **Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Abonați-vă și plătiți*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
 
@@ -233,7 +231,7 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 
 **Povratne bremenitve.** Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin.
 
-**Najprej zakonske pravice.** Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za oba paketa so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo.
+**Najprej zakonske pravice.** Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za vse pakete so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo.
 
 ## 13. Vaša pravica do odstopa
 
@@ -250,6 +248,8 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.16 je nadomestila različico 2.15: razdelek 12 navaja plačljive pakete, Plus, Pro in Max, razdelka 12 in 15 pa ne vsebujeta več opomb iz priprave osnutka; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni.
 
 Različica 2.15 je nadomestila različico 2.14: razdelek 12 navaja, da so naše cene prikazane brez davka, kot cena + DDV, in da se davek doda v blagajni.
 
@@ -278,8 +278,6 @@ Različica 2.7 je nadomestila različico 2.6: doda preverjanje vprašanja, ki pr
 **Vaša vsebina in vaša uporaba.** Odgovorni ste za vse, kar pošljete in objavite, vključno s tem, da imate pravico to poslati in da ravnate skladno z razdelkom 7.
 
 **Dogodki zunaj našega nadzora.** Pogodbe ne kršimo, kadar nam njeno izpolnjevanje prepreči nekaj zunaj našega razumnega nadzora. Neuspeh ali umik ponudnika modela tretje osebe samodejno ne pomeni takega dogodka; če storitev zaradi tega postane nedostopna, se uporablja razdelek 14, vi pa lahko pogodbo odpoveste in prejmete vračilo, kot je tam opisano.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Intelektualna lastnina
 

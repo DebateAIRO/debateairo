@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Platené programy",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený program Premium, ktorý sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty." },
+      { kind: "p", text: "Dialectical Engine ponúka bezplatný program. K dispozícii budú tri platené programy, Plus, Pro a Max; každý z nich sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty." },
       { kind: "p", text: "Pred zaplatením vám priamo nad platobným tlačidlom zobrazíme: program; celkovú cenu vrátane príslušnej dane; fakturačné obdobie; skutočnosť, že sa program automaticky obnovuje až do zrušenia; dátum skončenia prípadného bezplatného skúšobného obdobia a sumu, ktorá vám potom bude účtovaná; a spôsob zrušenia. Podmienky obnovenia potvrdíte začiarknutím samostatného políčka. Tlačidlo je označené slovami Predplatiť a zaplatiť (v rumunčine Abonați-vă și plătiți). Na trvanlivom médiu vám zašleme potvrdenie obsahujúce rovnaké informácie, tieto Podmienky a formulár na odstúpenie." },
       { kind: "p", text: "Pripomenutia. E-mail vám zašleme najmenej 5 dní pred prechodom bezplatného skúšobného obdobia na platený program; najmenej raz ročne pri pokračujúcich programoch; a 30 až 45 dní pred obnovením akéhokoľvek obdobia v dĺžke dvanástich mesiacov alebo viac. Každé pripomenutie obsahuje cenu, dátum a odkaz na zrušenie." },
       { kind: "p", text: "Zrušenie. Program môžete kedykoľvek zrušiť v ponuke Nastavenia → Predplatné jedným potvrdzovacím kliknutím alebo prostredníctvom stránky na zrušenie na adrese dezbatere.ro/cancel, ktorá nevyžaduje prihlásenie. Zrušenie nadobúda účinnosť na konci aktuálneho fakturačného obdobia a dovtedy vám prístup zostáva. Zrušenie predplatného nebude náročnejšie než jeho uzavretie." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Platobné metódy. Platíte kartou. Prijímame karty Visa a Mastercard; karty American Express neprijímame. Platby kartou spracúva NETOPIA Payments (netopia-payments.com) a celé číslo vašej karty sa k nám nikdy nedostane." },
       { kind: "p", text: "Dodanie. Dialectical Engine je online služba, preto vám nič nezasielame. Funkcie vášho plateného programu sú vo vašom účte k dispozícii hneď, ako je platba potvrdená." },
       { kind: "p", text: "Spätné zúčtovanie. Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky." },
-      { kind: "p", text: "Zákonné práva majú prednosť. Ak služba nezodpovedá tomu, čo sme sľúbili, máte právo na uvedenie do súladu alebo na primerané zníženie ceny či vrátenie peňazí podľa zákona. Nad tento rámec, ak platený program zrušíte počas fakturačného obdobia, vrátime vám tú časť ceny tohto obdobia, ktorú ste nevyužili, meranú využívaním programu, bez ohľadu na to, koľko dní uplynulo: ak ste využili 30 % programu, vrátime vám 70 %; ak ste nevyužili nič, vrátime vám celú cenu. Požiadajte o to na support@dezbatere.ro; po vrátení peňazí program zaniká. Ak sa uplatní aj právo na odstúpenie podľa časti 13, dostanete to z oboch vrátení, ktoré je vyššie. Limity používania jednotlivých programov sú zverejnené v produkte; pred ich sprísnením spôsobom, ktorý vás podstatne ovplyvní, vás upozorníme." }
+      { kind: "p", text: "Zákonné práva majú prednosť. Ak služba nezodpovedá tomu, čo sme sľúbili, máte právo na uvedenie do súladu alebo na primerané zníženie ceny či vrátenie peňazí podľa zákona. Nad tento rámec, ak platený program zrušíte počas fakturačného obdobia, vrátime vám tú časť ceny tohto obdobia, ktorú ste nevyužili, meranú využívaním programu, bez ohľadu na to, koľko dní uplynulo: ak ste využili 30 % programu, vrátime vám 70 %; ak ste nevyužili nič, vrátime vám celú cenu. Požiadajte o to na support@dezbatere.ro; po vrátení peňazí program zaniká. Ak sa uplatní aj právo na odstúpenie podľa časti 13, dostanete to z oboch vrátení, ktoré je vyššie. Limity používania všetkých programov sú zverejnené v produkte; pred ich sprísnením spôsobom, ktorý vás podstatne ovplyvní, vás upozorníme." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zmeny služby. Dialectical Engine priebežne vyvíjame a bežné zlepšenia, opravy a zmeny vo výbere modelov prebiehajú bez predchádzajúceho upozornenia. Ak vykonáme zmenu presahujúcu rámec zachovania funkčnosti služby podľa opisu, urobíme tak iba z niektorého z týchto dôvodov: splnenie právnej alebo regulačnej požiadavky; reakcia na bezpečnostný problém alebo zneužitie; zmena, obmedzenie alebo stiahnutie modelu či funkcie poskytovateľom modelu, od ktorých závisíme; prispôsobenie technickému prostrediu, ktoré neovládame; alebo pridanie, zlepšenie či ukončenie funkcie spôsobom, ktorý vám nezvyšuje náklady." },
       { kind: "p", text: "O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do 30 dní odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie." },
       { kind: "p", text: "Zmeny týchto Podmienok. Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej 30 dní pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Verzia 2.16 nahradila verziu 2.15: časť 12 uvádza platené programy, Plus, Pro a Max, a časti 12 a 15 už neobsahujú poznámky k návrhu; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení." },
       { kind: "p", text: "Verzia 2.15 nahradila verziu 2.14: časť 12 uvádza, že naše ceny zobrazujeme bez dane, v tvare cena + DPH, a že sa daň pripočíta v pokladni." },
       { kind: "p", text: "Verzia 2.14 nahradila verziu 2.13: časť 18 a príloha A uvádzajú ANPC (SAL) ako cestu k alternatívnemu riešeniu sporov." },
       { kind: "p", text: "Verzia 2.13 nahradila verziu 2.12: časť 12 uvádza rumunský text platobného tlačidla." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Čo neobmedzujeme. Nič v týchto Podmienkach nevylučuje ani neobmedzuje našu zodpovednosť za smrť alebo ujmu na zdraví spôsobenú našou nedbanlivosťou, za podvod alebo podvodné uvedenie do omylu, za hrubú nedbanlivosť alebo úmyselné protiprávne konanie ani za čokoľvek iné, čo zo zákona nemožno obmedziť. Ak ste spotrebiteľom, nič tu neodstraňuje vaše zákonné práva vrátane práva na uvedenie nevyhovujúcej služby do súladu, na zníženie ceny alebo vrátenie peňazí ani akúkoľvek záruku platnú podľa práva krajiny, v ktorej žijete." },
       { kind: "p", text: "Vygenerovaný obsah. Služba vytvára materiál, ktorý máte posúdiť, nie závery, podľa ktorých môžete konať bez overenia, čo časť 5 výslovne uvádza. S výhradou predchádzajúceho odseku nezodpovedáme za rozhodnutia, ktoré prijmete na základe vygenerovaných argumentov, hodnotení alebo verdiktov, ak ste neprijali primerané opatrenia na ich overenie opísané v časti 5." },
       { kind: "p", text: "Váš obsah a vaše používanie. Zodpovedáte za to, čo zadávate a zverejňujete, vrátane toho, že ste oprávnení obsah zadať a že dodržiavate časť 7." },
-      { kind: "p", text: "Udalosti mimo našej kontroly. Neporušujeme svoje povinnosti, ak nám plnenie znemožní okolnosť mimo našej primeranej kontroly. Zlyhanie alebo odstúpenie poskytovateľa modelu tretej strany automaticky nepredstavuje takúto udalosť; ak spôsobí nedostupnosť služby, uplatní sa časť 14 a môžete zmluvu ukončiť a získať vrátenie peňazí, ako je v nej opísané." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Udalosti mimo našej kontroly. Neporušujeme svoje povinnosti, ak nám plnenie znemožní okolnosť mimo našej primeranej kontroly. Zlyhanie alebo odstúpenie poskytovateľa modelu tretej strany automaticky nepredstavuje takúto udalosť; ak spôsobí nedostupnosť služby, uplatní sa časť 14 a môžete zmluvu ukončiť a získať vrátenie peňazí, ako je v nej opísané." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "2fc3aa08200fa5a2ecc8eef8377c836972f451f1bcc8836a9a2864227b175715",
-  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.15 · ÚČINNÉ OD 1. NOVEMBRA 2026",
+  version: "2.16",
+  sha256: "d8576183ad2aa8d3142b6775c1e626af00ef76e38f40d97de599ec1c7f669290",
+  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.16 · ÚČINNÉ OD 1. NOVEMBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",
-  endMarker: "KONIEC PODMIENOK · v2.15",
+  endMarker: "KONIEC PODMIENOK · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmienok poskytovania služby",
   sectionIdPrefix: "terms-section-",

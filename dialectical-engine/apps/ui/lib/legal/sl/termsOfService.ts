@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Plačljivi paketi",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket Premium, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave." },
+      { kind: "p", text: "Dialectical Engine ponuja brezplačen paket. Na voljo bodo trije plačljivi paketi, Plus, Pro in Max; vsak od njih bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave." },
       { kind: "p", text: "Pred plačilom vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše Naroči in plačaj (v romunščini Abonați-vă și plătiți). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop." },
       { kind: "p", text: "Opomniki. E-poštno sporočilo vam pošljemo najmanj 5 dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic." },
       { kind: "p", text: "Preklic. Naročnino lahko kadar koli prekličete v meniju Nastavitve → Naročnina z enim potrditvenim klikom ali na strani za preklic na dezbatere.ro/cancel, za katero se vam ni treba prijaviti. Preklic začne učinkovati ob koncu tekočega obračunskega obdobja, dostop pa obdržite do takrat. Preklica ne bomo otežili bolj, kot je bila otežena sklenitev naročnine." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Načini plačila. Plačate s kartico. Sprejemamo kartice Visa in Mastercard; kartic American Express ne sprejemamo. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com), celotna številka vaše kartice pa nikoli ne pride do nas." },
       { kind: "p", text: "Dostava. Dialectical Engine je spletna storitev, zato vam ničesar ne pošiljamo. Funkcije vašega plačljivega paketa so v vašem računu na voljo takoj, ko je plačilo potrjeno." },
       { kind: "p", text: "Povratne bremenitve. Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin." },
-      { kind: "p", text: "Najprej zakonske pravice. Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za oba paketa so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo." }
+      { kind: "p", text: "Najprej zakonske pravice. Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za vse pakete so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Spremembe storitve. Dialectical Engine nenehno razvijamo, zato običajne izboljšave, popravki in spremembe nabora modelov potekajo brez obvestila. Kadar uvedemo spremembo, ki presega ohranjanje delovanja storitve, kot je opisana, to storimo samo iz enega od naslednjih razlogov: zaradi skladnosti s pravno ali regulativno zahtevo; zaradi odziva na težavo z varnostjo ali zlorabo; ker ponudnik modela spremeni, omeji ali umakne model ali funkcijo, od katere smo odvisni; zaradi prilagoditve tehničnemu okolju, ki ga ne obvladujemo; ali zaradi dodajanja, izboljšanja ali ukinitve funkcije na način, ki vam ne povzroči stroškov." },
       { kind: "p", text: "Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v 30 dneh od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje." },
       { kind: "p", text: "Spremembe teh Pogojev. Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj 30 dni pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Različica 2.16 je nadomestila različico 2.15: razdelek 12 navaja plačljive pakete, Plus, Pro in Max, razdelka 12 in 15 pa ne vsebujeta več opomb iz priprave osnutka; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni." },
       { kind: "p", text: "Različica 2.15 je nadomestila različico 2.14: razdelek 12 navaja, da so naše cene prikazane brez davka, kot cena + DDV, in da se davek doda v blagajni." },
       { kind: "p", text: "Različica 2.14 je nadomestila različico 2.13: razdelek 18 in Priloga A navajata ANPC (SAL) kot pot za alternativno reševanje sporov." },
       { kind: "p", text: "Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja romunski napis na gumbu za plačilo." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Česa ne omejujemo. Nič v teh Pogojih ne izključuje ali omejuje naše odgovornosti za smrt ali telesno poškodbo, povzročeno iz naše malomarnosti, za goljufijo ali goljufivo zavajanje, za hudo malomarnost ali naklepno ravnanje ali za kar koli drugega, česar po zakonu ni mogoče omejiti. Če ste potrošnik, nič v tem dokumentu ne odpravlja vaših zakonskih pravic, vključno s pravico zahtevati vzpostavitev skladnosti neskladne storitve, znižanje cene ali vračilo oziroma katero koli jamstvo, ki velja po pravu države, v kateri živite." },
       { kind: "p", text: "Ustvarjena vsebina. Storitev ustvarja gradivo, ki ga morate presoditi, ne pa sklepov, na podlagi katerih lahko ukrepate brez preverjanja, kar je jasno navedeno v razdelku 5. Ob upoštevanju prejšnjega odstavka ne odgovarjamo za odločitve, ki jih sprejmete na podlagi ustvarjenih argumentov, ocen ali razsodb, če niste izvedli razumnih korakov za njihovo preverjanje, opisanih v razdelku 5." },
       { kind: "p", text: "Vaša vsebina in vaša uporaba. Odgovorni ste za vse, kar pošljete in objavite, vključno s tem, da imate pravico to poslati in da ravnate skladno z razdelkom 7." },
-      { kind: "p", text: "Dogodki zunaj našega nadzora. Pogodbe ne kršimo, kadar nam njeno izpolnjevanje prepreči nekaj zunaj našega razumnega nadzora. Neuspeh ali umik ponudnika modela tretje osebe samodejno ne pomeni takega dogodka; če storitev zaradi tega postane nedostopna, se uporablja razdelek 14, vi pa lahko pogodbo odpoveste in prejmete vračilo, kot je tam opisano." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Dogodki zunaj našega nadzora. Pogodbe ne kršimo, kadar nam njeno izpolnjevanje prepreči nekaj zunaj našega razumnega nadzora. Neuspeh ali umik ponudnika modela tretje osebe samodejno ne pomeni takega dogodka; če storitev zaradi tega postane nedostopna, se uporablja razdelek 14, vi pa lahko pogodbo odpoveste in prejmete vračilo, kot je tam opisano." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "4a5cab4278a943dde3e7e8f89f9c6451783348fe0519b63c6b4d180c34aa2a87",
-  eyebrow: "POGOJI UPORABE · v2.15 · VELJAVNI OD 1. NOVEMBRA 2026",
+  version: "2.16",
+  sha256: "7fe00cafc92c67380251c47ae60fe9488ad5eee365ae2b1e8d593b476bcf0145",
+  eyebrow: "POGOJI UPORABE · v2.16 · VELJAVNI OD 1. NOVEMBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.15",
+  endMarker: "KONEC POGOJEV · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.15 · KEHTIB ALATES 1. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.16 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.15
+endMarker: TINGIMUSTE LÕPP · v2.16
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.15 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.16 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -211,9 +211,7 @@ Jaotised 8 (juba avaldatud sisu kohta), 15, 16 ja 18 jäävad pärast lõpetamis
 
 ## 12. Tasulised paketid
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premium**-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata.
+Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval kolm tasulist paketti, **Plus**, **Pro** ja **Max**; igaüks neist annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata.
 
 **Enne maksmist** näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri **Tellige ja makske** (rumeenia keeles *Abonați-vă și plătiți*). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi.
 
@@ -233,7 +231,7 @@ Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premiu
 
 **Makse tagasinõuded.** Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu.
 
-**Seadusest tulenevad õigused on esikohal.** Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab.
+**Seadusest tulenevad õigused on esikohal.** Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Kõigi pakettide kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab.
 
 ## 13. Teie taganemisõigus
 
@@ -250,6 +248,8 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+
+Versioon 2.16 asendas versiooni 2.15: jaotis 12 nimetab tasulised paketid, Plus, Pro ja Max, ning jaotistes 12 ja 15 ei ole enam koostamismärkusi; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
 
 Versioon 2.15 asendas versiooni 2.14: jaotis 12 ütleb, et meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks, ja et maks lisatakse kassas.
 
@@ -278,8 +278,6 @@ Versioon 2.7 asendas versiooni 2.6: see lisab küsimuse kontrolli, mis loeb iga 
 **Teie sisu ja kasutus.** Vastutate selle eest, mida esitate ja avaldate, sealhulgas selle esitamise õiguse olemasolu ja jaotise 7 järgimise eest.
 
 **Meie kontrolli alt väljas olevad sündmused.** Me ei riku lepingut, kui meid takistab kohustust täitmast miski, mis ei allu mõistlikult meie kontrollile. Kolmandast isikust mudelipakkuja rikkumine või teenusest loobumine ei ole automaatselt selline sündmus; kui see muudab teenuse kättesaamatuks, kohaldatakse jaotist 14 ning võite seal kirjeldatud viisil lepingu lõpetada ja saada tagasimakse.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Intellektuaalomand
 

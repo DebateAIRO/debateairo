@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Paid plans",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine offers a free plan. A paid Premium plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself." },
+      { kind: "p", text: "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, will be available; each unlocks the full model roster and lets you set the debate gauges yourself." },
       { kind: "p", text: "Before you pay we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads Subscribe and pay (in Romanian, Abonați-vă și plătiți). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form." },
       { kind: "p", text: "Reminders. We email you at least 5 days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link." },
       { kind: "p", text: "Cancelling. Cancel at any time from Settings → Subscription with one confirmation click, or through the cancellation page at dezbatere.ro/cancel, which does not require you to log in. Cancellation takes effect at the end of the current billing period, and you keep access until then. We will not make cancelling harder than subscribing was." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Payment methods. You pay by card. We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments (netopia-payments.com), and your full card number never reaches us." },
       { kind: "p", text: "Delivery. Dialectical Engine is an online service, so nothing is shipped to you. The features of your paid plan are available in your account as soon as your payment is confirmed." },
       { kind: "p", text: "Chargebacks. If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this." },
-      { kind: "p", text: "Statutory rights first. Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on either plan are published in the product; we give notice before tightening them in a way that materially affects you." }
+      { kind: "p", text: "Statutory rights first. Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on every plan are published in the product; we give notice before tightening them in a way that materially affects you." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "To the service. We develop Dialectical Engine continuously, and routine improvements, fixes and model-roster changes happen without notice. Where we make a change that goes beyond keeping the service working as described, we do it only for one of these reasons: to comply with a legal or regulatory requirement; to respond to a security or abuse problem; because a model provider changes, restricts or withdraws a model or feature we depend on; to adapt to a technical environment we do not control; or to add, improve or retire a feature in a way that adds no cost to you." },
       { kind: "p", text: "We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within 30 days of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period." },
       { kind: "p", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Version 2.16 replaced version 2.15: section 12 names the paid plans, Plus, Pro and Max, and sections 12 and 15 no longer carry drafting notes; what we are liable for, and every right in these Terms, is unchanged." },
       { kind: "p", text: "Version 2.15 replaced version 2.14: section 12 says that our prices are shown before tax, as price + VAT, and that the tax is added at checkout." },
       { kind: "p", text: "Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution." },
       { kind: "p", text: "Version 2.13 replaced version 2.12: section 12 gives the payment button's Romanian wording." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "What we do not limit. Nothing in these Terms excludes or limits our liability for death or personal injury caused by our negligence, for fraud or fraudulent misrepresentation, for gross negligence or wilful misconduct, or for anything else that cannot lawfully be limited. If you are a consumer, nothing here removes your statutory rights, including the right to have a non-conforming service brought into conformity, or to a price reduction or refund, or any guarantee that applies under the law of the country where you live." },
       { kind: "p", text: "Generated content. The service produces material for you to judge, not conclusions you can act on unchecked, and section 5 says so plainly. Subject to the paragraph above, we are not liable for decisions you take on the basis of generated arguments, scores or verdicts where you have not taken the reasonable steps to verify them that section 5 describes." },
       { kind: "p", text: "Your content and your use. You are responsible for what you submit and publish, including for having the right to submit it and for complying with section 7." },
-      { kind: "p", text: "Events outside our control. We are not in breach where we are prevented from performing by something outside our reasonable control. A failure or withdrawal by a third-party model provider is not automatically such an event; where it makes the service unavailable, section 14 applies and you may terminate and be refunded as it describes." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Events outside our control. We are not in breach where we are prevented from performing by something outside our reasonable control. A failure or withdrawal by a third-party model provider is not automatically such an event; where it makes the service unavailable, section 14 applies and you may terminate and be refunded as it describes." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "765a7826b1045fabe77783e3a9bbe95a8f6dec9a48ff071e9c4a844a8317d925",
-  eyebrow: "TERMS OF SERVICE · v2.15 · EFFECTIVE 1 NOVEMBER 2026",
+  version: "2.16",
+  sha256: "4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70",
+  eyebrow: "TERMS OF SERVICE · v2.16 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.15",
+  endMarker: "END OF TERMS · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

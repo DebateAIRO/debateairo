@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Placené tarify",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif Premium, který zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty." },
+      { kind: "p", text: "Dialectical Engine nabízí bezplatný tarif. K dispozici budou tři placené tarify, Plus, Pro a Max; každý z nich zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty." },
       { kind: "p", text: "Před zaplacením vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní Předplatit a zaplatit (v rumunštině Abonați-vă și plătiți). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení." },
       { kind: "p", text: "Připomenutí. E-mail vám zašleme nejméně 5 dnů před přechodem bezplatného zkušebního období na placený tarif; nejméně jednou ročně u pokračujících tarifů; a 30 až 45 dnů před obnovením jakéhokoli období v délce dvanácti měsíců nebo delšího. Každé připomenutí obsahuje cenu, datum a odkaz ke zrušení." },
       { kind: "p", text: "Zrušení. Tarif můžete kdykoli zrušit v nabídce Nastavení → Předplatné jedním potvrzovacím kliknutím nebo prostřednictvím stránky pro zrušení na adrese dezbatere.ro/cancel, která nevyžaduje přihlášení. Zrušení nabývá účinku na konci aktuálního fakturačního období a do té doby vám přístup zůstává. Zrušení neučiníme obtížnějším, než bylo sjednání předplatného." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Platební metody. Platíte kartou. Přijímáme karty Visa a Mastercard; karty American Express nepřijímáme. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com) a celé číslo vaší karty se k nám nikdy nedostane." },
       { kind: "p", text: "Dodání. Dialectical Engine je online služba, takže vám nic nezasíláme. Funkce vašeho placeného tarifu jsou ve vašem účtu k dispozici, jakmile je platba potvrzena." },
       { kind: "p", text: "Reklamace platby. Pokud platbu zpochybníte u vydavatele karty, můžeme placené funkce po dobu řešení sporu pozastavit. Neúčtujeme za to žádné poplatky." },
-      { kind: "p", text: "Zákonná práva mají přednost. Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání jednotlivých tarifů jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme." }
+      { kind: "p", text: "Zákonná práva mají přednost. Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání každého tarifu jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Změny služby. Dialectical Engine průběžně vyvíjíme a běžná zlepšení, opravy a změny ve výběru modelů probíhají bez předchozího upozornění. Pokud provedeme změnu přesahující rámec zachování funkčnosti služby podle popisu, činíme tak pouze z některého z těchto důvodů: splnění právního nebo regulatorního požadavku; reakce na bezpečnostní problém nebo zneužití; změna, omezení nebo stažení modelu či funkce poskytovatelem modelu, na nichž jsme závislí; přizpůsobení technickému prostředí, které neovládáme; nebo přidání, zlepšení či ukončení funkce způsobem, který vám nezvyšuje náklady." },
       { kind: "p", text: "O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li změna více než nepodstatný nepříznivý dopad na váš přístup ke službě nebo její používání, můžete smlouvu bezplatně ukončit do 30 dnů ode dne, kdy jste byli informováni, nebo ode dne nabytí účinku změny, podle toho, který den nastane později, a vrátíme vám případnou předplacenou částku za nevyužité období." },
       { kind: "p", text: "Změny těchto Podmínek. Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně 30 dnů před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Verze 2.16 nahradila verzi 2.15: oddíl 12 uvádí placené tarify, Plus, Pro a Max, a oddíly 12 a 15 už neobsahují poznámky k návrhu; to, za co odpovídáme, ani žádné právo podle těchto Podmínek se nemění." },
       { kind: "p", text: "Verze 2.15 nahradila verzi 2.14: oddíl 12 uvádí, že naše ceny zobrazujeme bez daně, ve tvaru cena + DPH, a že se daň připočítá v pokladně." },
       { kind: "p", text: "Verze 2.14 nahradila verzi 2.13: oddíl 18 a příloha A uvádějí jako cestu k alternativnímu řešení sporů ANPC (SAL)." },
       { kind: "p", text: "Verze 2.13 nahradila verzi 2.12: oddíl 12 uvádí rumunské znění platebního tlačítka." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Co neomezujeme. Nic v těchto Podmínkách nevylučuje ani neomezuje naši odpovědnost za smrt nebo újmu na zdraví způsobenou naší nedbalostí, za podvod nebo podvodné uvedení v omyl, za hrubou nedbalost nebo úmyslné protiprávní jednání ani za cokoli jiného, co ze zákona nelze omezit. Jste-li spotřebitelem, nic zde neodstraňuje vaše zákonná práva, včetně práva na uvedení nevyhovující služby do souladu, na snížení ceny nebo vrácení peněz ani jakoukoli záruku platnou podle práva země, v níž žijete." },
       { kind: "p", text: "Vygenerovaný obsah. Služba vytváří materiál, který máte posoudit, nikoli závěry, podle nichž můžete jednat bez ověření, což oddíl 5 výslovně uvádí. S výhradou předchozího odstavce neodpovídáme za rozhodnutí, která učiníte na základě vygenerovaných argumentů, hodnocení nebo závěrů, pokud jste nepřijali přiměřená opatření k jejich ověření popsaná v oddílu 5." },
       { kind: "p", text: "Váš obsah a vaše užívání. Odpovídáte za to, co zadáváte a zveřejňujete, včetně toho, že jste oprávněni obsah zadat a že dodržujete oddíl 7." },
-      { kind: "p", text: "Události mimo naši kontrolu. Nejsme v prodlení, pokud nám plnění znemožní okolnost mimo naši přiměřenou kontrolu. Selhání nebo odstoupení poskytovatele modelu třetí strany nepředstavuje automaticky takovou událost; způsobí-li nedostupnost služby, použije se oddíl 14 a můžete smlouvu ukončit a získat vrácení peněz, jak je v něm popsáno." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Události mimo naši kontrolu. Nejsme v prodlení, pokud nám plnění znemožní okolnost mimo naši přiměřenou kontrolu. Selhání nebo odstoupení poskytovatele modelu třetí strany nepředstavuje automaticky takovou událost; způsobí-li nedostupnost služby, použije se oddíl 14 a můžete smlouvu ukončit a získat vrácení peněz, jak je v něm popsáno." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "1c80d5f78690f80e2076f3a6848a1898c4c289310c58fcf2a8a3577a68f2e790",
-  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.15 · ÚČINNÉ OD 1. LISTOPADU 2026",
+  version: "2.16",
+  sha256: "001fdae47da2e640bc89ffcaf26719f3c96351d07184082c3d0367de703aa5bf",
+  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.16 · ÚČINNÉ OD 1. LISTOPADU 2026",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
-  endMarker: "KONEC PODMÍNEK · v2.15",
+  endMarker: "KONEC PODMÍNEK · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmínek poskytování služby",
   sectionIdPrefix: "terms-section-",

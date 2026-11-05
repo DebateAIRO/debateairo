@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.15 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.16 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.15
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.16
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.15 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.16 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -211,9 +211,7 @@ Kohdat 8 (jo julkaistun sisällön osalta), 15, 16 ja 18 jäävät voimaan sopim
 
 ## 12. Maksulliset tilaukset
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **Premium**-tilaus, joka avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse.
+Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee kolme maksullista tilausta, **Plus**, **Pro** ja **Max**; jokainen niistä avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse.
 
 **Ennen maksamista** näytämme suoraan maksupainikkeen yläpuolella: tilauksen; kokonaishinnan sovellettavine veroineen; laskutuskauden; tiedon siitä, että tilaus uusiutuu automaattisesti peruuttamiseen asti; maksuttoman kokeilujakson päättymispäivän ja sen jälkeen veloitettavan määrän; sekä peruutustavan. Vahvistat uusimisehdot valitsemalla erillisen valintaruudun. Painikkeessa lukee **Tilaa ja maksa** (romaniaksi *Abonați-vă și plătiți*). Lähetämme sinulle pysyvällä välineellä vahvistuksen, joka sisältää samat tiedot, nämä käyttöehdot ja peruuttamislomakkeen.
 
@@ -233,7 +231,7 @@ Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **P
 
 **Takaisinveloitukset.** Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja.
 
-**Lakisääteiset oikeudet ensisijaisesti.** Jos palvelu ei vastaa lupaamaamme, sinulla on lain mukaisesti oikeus saada se saatetuksi vaatimusten mukaiseksi taikka oikeus hinnan suhteelliseen alentamiseen tai palautukseen. Tämän lisäksi, jos peruutat maksullisen tilauksen laskutuskauden aikana, palautamme sen osan kauden hinnasta, jota et ole käyttänyt, mitattuna tilauksen käytön mukaan, riippumatta siitä, kuinka monta päivää on kulunut: jos olet käyttänyt 30 %, palautamme 70 %; jos et ole käyttänyt mitään, palautamme koko hinnan. Pyydä palautusta kirjoittamalla osoitteeseen support@dezbatere.ro; kun olemme palauttaneet maksun, tilaus päättyy. Jos myös osion 13 peruuttamisoikeus soveltuu, saat suuremman palautuksen. Kummankin tilauksen käyttörajat julkaistaan tuotteessa; ilmoitamme ennen niiden tiukentamista tavalla, joka vaikuttaa sinuun olennaisesti.
+**Lakisääteiset oikeudet ensisijaisesti.** Jos palvelu ei vastaa lupaamaamme, sinulla on lain mukaisesti oikeus saada se saatetuksi vaatimusten mukaiseksi taikka oikeus hinnan suhteelliseen alentamiseen tai palautukseen. Tämän lisäksi, jos peruutat maksullisen tilauksen laskutuskauden aikana, palautamme sen osan kauden hinnasta, jota et ole käyttänyt, mitattuna tilauksen käytön mukaan, riippumatta siitä, kuinka monta päivää on kulunut: jos olet käyttänyt 30 %, palautamme 70 %; jos et ole käyttänyt mitään, palautamme koko hinnan. Pyydä palautusta kirjoittamalla osoitteeseen support@dezbatere.ro; kun olemme palauttaneet maksun, tilaus päättyy. Jos myös osion 13 peruuttamisoikeus soveltuu, saat suuremman palautuksen. Kaikkien tilausten käyttörajat julkaistaan tuotteessa; ilmoitamme ennen niiden tiukentamista tavalla, joka vaikuttaa sinuun olennaisesti.
 
 ## 13. Peruuttamisoikeutesi
 
@@ -250,6 +248,8 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+
+Versio 2.16 korvasi version 2.15: kohdassa 12 nimetään maksulliset tilaukset, Plus, Pro ja Max, eikä kohdissa 12 ja 15 ole enää luonnosteluhuomautuksia; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan.
 
 Versio 2.15 korvasi version 2.14: kohdassa 12 kerrotaan, että hintamme näytetään ilman veroa, muodossa hinta + ALV, ja että vero lisätään kassalla.
 
@@ -278,8 +278,6 @@ Versio 2.7 korvasi version 2.6: se lisää kysymystarkistuksen, joka lukee jokai
 **Sisältösi ja käyttötapasi.** Vastaat lähettämästäsi ja julkaisemastasi sisällöstä, mukaan lukien oikeudestasi lähettää se ja kohdan 7 noudattamisesta.
 
 **Vaikutusvaltamme ulkopuoliset tapahtumat.** Emme riko sopimusta, jos vaikutusvaltamme ulkopuolinen seikka estää meitä kohtuudella täyttämästä velvoitteitamme. Kolmannen osapuolen mallipalveluntarjoajan häiriö tai vetäytyminen ei automaattisesti ole tällainen tapahtuma; jos se estää palvelun saatavuuden, sovelletaan kohtaa 14, ja voit päättää sopimuksen ja saada siinä kuvatun palautuksen.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Immateriaalioikeudet
 
