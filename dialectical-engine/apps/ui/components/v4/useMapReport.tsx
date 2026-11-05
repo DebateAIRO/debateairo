@@ -204,14 +204,21 @@ export function useMapReport(input: MapReportInput): MapReport {
   const headerItem = (good: boolean): ReactNode => {
     if (start.at === "top") return null;
     // Question 2 A: before the first check answers, the place is held with no words (ask-f16: nothing moves when it comes).
-    // It is as wide as "Write my report", the label most first checks give: the CSS draws the label from the attribute,
-    // hidden (v4-debate.css), so nothing is read out or found as text.
+    // The CSS draws "Write my report" and "See my report" from the attributes in one cell, hidden (v4-debate.css), so the
+    // place is as wide as the wider of the two and nothing is read out or found as text. The button that comes draws both
+    // too, behind its own words (the w6 browser check: "See my report" was narrower, and the quota circle moved).
     if (stage.kind === "UNKNOWN" && !firstCheckAnswered) {
       return (
         <span className={`v4Btn v4DebReportHold${atBottom}`} aria-hidden="true" data-report-hold=""
-          data-hold-label={t(catalog, "v4.rail.writeReport")} />
+          data-hold-label={t(catalog, "v4.rail.writeReport")} data-hold-other={t(catalog, "v4.rail.seeReport")} />
       );
     }
+    // The button's words, with the two labels it can show drawn invisibly behind them (v4-debate.css .v4DebReportLabel).
+    const sized = (words: string): ReactNode => (
+      <span className="v4DebReportLabel" data-size-write={t(catalog, "v4.rail.writeReport")} data-size-see={t(catalog, "v4.rail.seeReport")}>
+        <span>{words}</span>
+      </span>
+    );
     const mark = good ? <span className="v4DebReportMark" aria-hidden="true" /> : null;
     const goodWords = good ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null;
     const className = `v4Btn v4BtnPrimary v4DebReportLink${good ? " v4DebReportGood" : ""}${atBottom}`;
@@ -230,7 +237,7 @@ export function useMapReport(input: MapReportInput): MapReport {
           }}
         >
           {mark}
-          {label}
+          {sized(label)}
           {goodWords}
         </button>
       );
@@ -240,7 +247,7 @@ export function useMapReport(input: MapReportInput): MapReport {
     return (
       <Link ref={headerRef as RefObject<HTMLAnchorElement | null>} className={className} href={href}>
         {mark}
-        {t(catalog, reportSeenFor(stage) ? "v4.rail.seeReport" : "v4.rail.writeReport")}
+        {sized(t(catalog, reportSeenFor(stage) ? "v4.rail.seeReport" : "v4.rail.writeReport"))}
         {goodWords}
       </Link>
     );

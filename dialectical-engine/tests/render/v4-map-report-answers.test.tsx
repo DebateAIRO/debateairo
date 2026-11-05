@@ -160,6 +160,36 @@ describe("question 2 A: the report button's place before the first report check 
     // No guessed width any more.
     expect(css).not.toMatch(/\.v4DebReportHold \{[^}]*inline-size/u);
   });
+
+  it("the w6 browser check: the place and the button that comes are both as wide as the wider of the two labels, so nothing moves", async () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-debate.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    reads.load = () => new Promise(() => undefined);
+    await mount(<Probe input={{}} />);
+    const hold = header().querySelector<HTMLElement>("[data-report-hold]")!;
+    // The place draws "Write my report" and "See my report" in one cell, invisibly: as wide as the wider of the two.
+    expect(hold.dataset.holdLabel).toBe(CATALOG["v4.rail.writeReport"]);
+    expect(hold.dataset.holdOther).toBe(CATALOG["v4.rail.seeReport"]);
+    expect(css).toMatch(/\.v4DebReportHold::after \{[^}]*content: attr\(data-hold-other\);[^}]*\}/u);
+    expect(css).toMatch(/\.v4DebReportHold::before, \.v4DebReportHold::after \{[^}]*grid-area: 1 \/ 1;[^}]*\}/u);
+    expect(css).toMatch(/\.v4DebReportHold \{[^}]*display: inline-grid;[^}]*\}/u);
+    // The button that comes ("See my report" once a report is asked for) draws both labels too, invisibly, behind its own
+    // words, so it is never narrower than the place was. Its words stay the only text in the page.
+    act(() => root?.unmount());
+    host?.remove();
+    root = undefined;
+    host = undefined;
+    reads.load = async () => investigation("CLOSED", [waiting(0)], 0);
+    await mount(<Probe input={{}} />);
+    const link = header().querySelector<HTMLElement>(".v4DebReportLink")!;
+    expect(flat(link)).toBe(CATALOG["v4.rail.seeReport"]);
+    const label = link.querySelector<HTMLElement>(".v4DebReportLabel")!;
+    expect(label.dataset.sizeWrite).toBe(CATALOG["v4.rail.writeReport"]);
+    expect(label.dataset.sizeSee).toBe(CATALOG["v4.rail.seeReport"]);
+    expect(css).toMatch(/\.v4DebReportLabel \{[^}]*display: inline-grid;[^}]*\}/u);
+    expect(css).toMatch(/\.v4DebReportLabel > span, \.v4DebReportLabel::before, \.v4DebReportLabel::after \{[^}]*grid-area: 1 \/ 1;[^}]*\}/u);
+    expect(css).toMatch(/\.v4DebReportLabel::before \{[^}]*content: attr\(data-size-write\);[^}]*visibility: hidden;[^}]*\}/u);
+    expect(css).toMatch(/\.v4DebReportLabel::after \{[^}]*content: attr\(data-size-see\);[^}]*visibility: hidden;[^}]*\}/u);
+  });
 });
 
 describe("question 18 A: one \"Write my report\" on a phone's screen", () => {

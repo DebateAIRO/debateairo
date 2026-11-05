@@ -33,11 +33,19 @@
 /* ---------- header extras, back link, notes ---------- */
 .v4DebReportLink { text-decoration: none; }
 /* The owner's answers of 5 Nov (question 2 A): before the map's first report check answers, the report button's place is
-   held with no words in the page: the hold draws the label most first checks give ("Write my report", from its
-   data-hold-label) invisibly, with the button's own classes, so it is exactly as wide and nothing moves when it comes
-   (ask-f16). A first check that gives "See my report" still moves the row by the two labels' difference. */
-.v4DebReportHold { visibility: hidden; pointer-events: none; }
+   held with no words in the page: the hold draws "Write my report" and "See my report" (its data-hold-label and
+   data-hold-other) invisibly in one cell, with the button's own classes, so it is as wide as the wider of the two.
+   The button that comes draws the same two labels invisibly behind its own words (.v4DebReportLabel), so it is never
+   narrower, and nothing moves when it comes, whichever label the first check gives (ask-f16; the w6 browser check: the
+   quota circle moved 12 px when "See my report" came). Hidden pseudo-content is neither read out nor found as text. */
+.v4DebReportHold { display: inline-grid; visibility: hidden; pointer-events: none; }
 .v4DebReportHold::before { content: attr(data-hold-label); }
+.v4DebReportHold::after { content: attr(data-hold-other); }
+.v4DebReportHold::before, .v4DebReportHold::after { grid-area: 1 / 1; }
+.v4DebReportLabel { display: inline-grid; justify-items: center; }
+.v4DebReportLabel > span, .v4DebReportLabel::before, .v4DebReportLabel::after { grid-area: 1 / 1; }
+.v4DebReportLabel::before { content: attr(data-size-write); visibility: hidden; }
+.v4DebReportLabel::after { content: attr(data-size-see); visibility: hidden; }
 .v4DebBack {
   display: inline-flex; align-items: center; gap: 4px; min-height: 44px; max-width: 100%; align-self: flex-start;
   color: var(--link); font-size: var(--t-ui); font-weight: 600; text-decoration: none;
