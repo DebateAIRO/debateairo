@@ -3249,7 +3249,13 @@
       "source": "migrations/0157_moderation_statements.sql",
       "grants": [
         "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
-        "EXECUTE ON FUNCTION identity.record_public_flag_quote(uuid,jsonb)"
+        "EXECUTE ON FUNCTION identity.record_public_flag_quote(uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.claim_moderation_statements(integer)",
+        "EXECUTE ON FUNCTION identity.read_moderation_statement(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.complete_moderation_statement(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_own_moderation_statements(uuid)",
+        "EXECUTE ON FUNCTION identity.delete_moderation_words_due()",
+        "EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid)"
       ]
     }
   ],

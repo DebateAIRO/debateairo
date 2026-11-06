@@ -198,6 +198,7 @@
   "settings.emailLink.continue": "Přejít do Nastavení",
   "settings.account.title": "Účet",
   "settings.security.title": "Zabezpečení",
+  "settings.notices.title": "Oznámení o moderování",
   "settings.phone.reveal": "Zobrazit telefon",
   "settings.phone.change": "Změnit telefon",
   "settings.phone.purpose": "V budoucnu vám můžeme poslat kód v SMS, který vám pomůže znovu se dostat do účtu, a pokud nás požádáte o pomoc, můžeme vám zavolat nebo napsat SMS. Uloženo šifrovaně; nikdy se nesdílí ani nepoužívá k marketingu.",

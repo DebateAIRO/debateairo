@@ -63,6 +63,7 @@ describe("Support catalog route coverage", () => {
       "/settings",
       "/settings/security",
       "/settings/card",
+      "/settings/notices",
       "/sign-up",
       "/terms",
       "/terms/versions",

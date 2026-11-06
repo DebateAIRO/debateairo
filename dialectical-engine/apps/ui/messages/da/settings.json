@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Gå til Indstillinger",
   "settings.account.title": "Konto",
   "settings.security.title": "Sikkerhed",
+  "settings.notices.title": "Moderationsmeddelelser",
   "settings.phone.reveal": "Vis telefonnummer",
   "settings.phone.change": "Skift telefonnummer",
   "settings.phone.purpose": "Senere sender vi dig måske en kode via sms, så du kan komme ind på din konto igen, og hvis du beder os om hjælp, kan vi ringe eller sende dig en sms. Gemmes krypteret; deles aldrig og bruges aldrig til markedsføring.",

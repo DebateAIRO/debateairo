@@ -11,13 +11,16 @@ import {
   type TemplatedMail
 } from "../../apps/api/src/mail-channel.js";
 
-// Every billing id is a package id; DATA_EXPORT, THREAT_REPORT_WAITING, R22's staff notices and 0156's moderation notices are the package ids outside billing.
+// Every billing id is a package id; DATA_EXPORT, THREAT_REPORT_WAITING, R22's staff notices, 0156's moderation notices and 0157's statements of reasons
+// are the package ids outside billing.
+type StatementIds = "MODERATION_STATEMENT_DEBATE_HIDDEN" | "MODERATION_STATEMENT_DEBATE_DECIDED" | "MODERATION_STATEMENT_CONTRIBUTION_REMOVED" | "MODERATION_STATEMENT_REPORT_REMOVED"
+  | "MODERATION_STATEMENT_CORRECTED" | "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED" | "MODERATION_STATEMENT_REPORT_AFFECTED";
 type BillingInMail = [BillingMailTemplateId] extends [MailTemplateId] ? true : false;
 type OutsideBilling = Exclude<MailTemplateId, BillingMailTemplateId>;
 type OnlyExport = [OutsideBilling] extends ["DATA_EXPORT" | "THREAT_REPORT_WAITING" | "TEAM_LIMIT_CHANGED" | "TEAM_LIMIT_PARTNER_CHANGED" | "TEAM_ALLOWANCE_CHANGED" | "TEAM_ALLOWANCE_YOURS" | "PUBLIC_REVIEW_CHANGED" | "PUBLIC_FLAG_HIDDEN" | "PUBLIC_FLAG_WAITING"
-  | "MODERATION_DEBATE_HIDDEN" | "MODERATION_CONTRIBUTION_REMOVED" | "MODERATION_REPORT_REMOVED"]
+  | "MODERATION_DEBATE_HIDDEN" | "MODERATION_CONTRIBUTION_REMOVED" | "MODERATION_REPORT_REMOVED" | StatementIds]
   ? (["DATA_EXPORT" | "THREAT_REPORT_WAITING" | "TEAM_LIMIT_CHANGED" | "TEAM_LIMIT_PARTNER_CHANGED" | "TEAM_ALLOWANCE_CHANGED" | "TEAM_ALLOWANCE_YOURS" | "PUBLIC_REVIEW_CHANGED" | "PUBLIC_FLAG_HIDDEN" | "PUBLIC_FLAG_WAITING"
-  | "MODERATION_DEBATE_HIDDEN" | "MODERATION_CONTRIBUTION_REMOVED" | "MODERATION_REPORT_REMOVED"] extends [OutsideBilling] ? true : false) : false;
+  | "MODERATION_DEBATE_HIDDEN" | "MODERATION_CONTRIBUTION_REMOVED" | "MODERATION_REPORT_REMOVED" | StatementIds] extends [OutsideBilling] ? true : false) : false;
 const BILLING_IN_MAIL: BillingInMail = true;
 const ONLY_EXPORT_OUTSIDE_BILLING: OnlyExport = true;
 
@@ -131,9 +134,9 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
     expect([BILLING_IN_MAIL, ONLY_EXPORT_OUTSIDE_BILLING]).toEqual([true, true]);
     // R-8's sixteen, ruling Q-5's owner template O2, W9's M8_RECEIVED and O2_WITHDRAWAL (P2-I11), and W12's O3 (P2-I16), N9's O4,
     // N14's O2_REFUND_DUE and O2_REFUND_REMINDER, N17's M12 (ruling PR-17), M10_ENDED (the owner's decision of
-    // 24 October 2026: a lost charge-back ended the plan) + DATA_EXPORT and S04's THREAT_REPORT_WAITING, and R22's team-limit, allowance, public review and report notices, and 0156's three moderation notices.
-    expect(MAIL_TEMPLATE_IDS).toHaveLength(37);
-    expect(MAIL_TEMPLATE_IDS.filter((id) => !["DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
+    // 24 October 2026: a lost charge-back ended the plan) + DATA_EXPORT and S04's THREAT_REPORT_WAITING, and R22's team-limit, allowance, public review and report notices, and 0156's three moderation notices, and 0157's seven statements of reasons.
+    expect(MAIL_TEMPLATE_IDS).toHaveLength(44);
+    expect(MAIL_TEMPLATE_IDS.filter((id) => !id.startsWith("MODERATION_STATEMENT_") && !["DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
       "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED"].includes(id))).toHaveLength(25);
     const memory = new MemoryTemplatedMailSender();
     const ports: BillingMailPort[] = [

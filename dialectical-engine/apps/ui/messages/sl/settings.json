@@ -198,6 +198,7 @@
   "settings.emailLink.continue": "Pojdi v Nastavitve",
   "settings.account.title": "Račun",
   "settings.security.title": "Varnost",
+  "settings.notices.title": "Obvestila o moderiranju",
   "settings.phone.reveal": "Prikaži telefon",
   "settings.phone.change": "Spremeni telefon",
   "settings.phone.purpose": "V prihodnje vam bomo morda poslali kodo po SMS-u, ki vam bo pomagala znova dostopati do računa, in če nas prosite za pomoč, vas lahko pokličemo ali vam pošljemo SMS. Shranjeno šifrirano; nikoli ni deljeno z drugimi ali uporabljeno za trženje.",

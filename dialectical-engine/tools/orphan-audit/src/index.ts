@@ -619,7 +619,8 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
 // Moderation notice (2026-11-05): one export line for the moderation notice repository (0156).
 // migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "6c3147fe4eb0d174b3f0ccb5bb112e36eed092ae5f65fc7b642b7cee851976a7";
+// Moderation statements (2026-11-06): one export line for the statements of reasons repository (0157); migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "dcdc950222d306036788351e7233eb0ecb950bcd45627e125611aaad64ce9e26";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

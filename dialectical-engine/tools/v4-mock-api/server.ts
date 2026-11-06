@@ -1027,6 +1027,12 @@ function investigationReports(investigation: Investigation) {
 // Startup check: every seeded body must pass the website's own schema, or the mock refuses to start.
 // ---------------------------------------------------------------------------------------------------------------
 
+// 0157 (D1): one statement of reasons, so Settings' notices page has something to show: a staff hide of the seeded debate, on a report, held for review.
+const MODERATION_STATEMENTS = Object.freeze({ statements: [{ statement_id: "57a7e000-0000-4000-8000-000000000001", kind: "DEBATE_HIDDEN", public_ref: PUBLIC_REF,
+  happened_at: "2026-11-05T10:00:00.000Z", piece_kind: null, hidden_now: true,
+  ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false },
+  facts: [], facts_deleted: false, quote: null, places: [] }] });
+
 function startupCheck(): number {
   let count = 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1042,6 +1048,7 @@ function startupCheck(): number {
   check("GET /v1/auth/age-confirmation", C.AgeConfirmationStatusSchema, { status: "confirmed" });
   check("GET /v1/account/sensitive-data-consent", C.SensitiveDataConsentStatusSchema, { status: "given" });
   check("GET /v1/account/legal-status", C.LegalStatusResponseSchema, { must_accept: [] });
+  check("GET /v1/account/moderation-statements", C.ModerationStatementsSchema, MODERATION_STATEMENTS);
   check("GET /v1/geo/availability", C.GeoAvailabilityResponseSchema, { signup: true, pay: true, service: true });
   check("GET /v1/public/ai-providers", C.PublicAiProvidersResponseSchema, { companies: ["anthropic", "openai", "xai"] });
   check("GET /v1/public/debates", C.PublicDebateListSchema, { items: [], total: 0 });
@@ -1700,6 +1707,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (path === "/v1/account/legal-status" && isGet) return sendJson(req, res, 200, { must_accept: [] }, C.LegalStatusResponseSchema);
   if (path === "/v1/account/legal-accept" && method === "POST") return sendEmpty(req, res, 204);
+  if (path === "/v1/account/moderation-statements" && isGet) {
+    return sessionOut ? sendJson(req, res, 401, { error: "SESSION_REQUIRED" }) : sendJson(req, res, 200, MODERATION_STATEMENTS, C.ModerationStatementsSchema);
+  }
   // ---- the account memory of migration 0131 ----
   if (path === "/v1/account/reading-level" && isGet) return sendJson(req, res, 200, { reading_level: readingLevel }, C.ReadingLevelStateSchema);
   if (path === "/v1/account/reading-level" && method === "POST") {

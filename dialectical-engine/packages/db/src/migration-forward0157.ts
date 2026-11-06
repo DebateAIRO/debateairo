@@ -12,7 +12,7 @@ const VERSION = "moderation-statement-forward0157-v1";
 const MANIFEST_PATH = "lineage/moderation-statement-forward0157.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0156_moderation_notice.sql";
-const TABLES: readonly string[] = ["identity.moderation_ground", "identity.moderation_decision", "identity.public_flag_quote"];
+const TABLES: readonly string[] = ["identity.moderation_ground", "identity.moderation_decision", "identity.public_flag_quote", "identity.moderation_statement", "identity.moderation_statement_seen", "identity.moderation_statement_since"];
 const FUNCTIONS: readonly string[] = [
   "identity.moderation_grounds_known(text[],boolean)",
   "identity.guard_moderation_words()",
@@ -23,7 +23,17 @@ const FUNCTIONS: readonly string[] = [
   "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
   "identity.record_public_flag_quote(uuid,jsonb)",
   "staff.public_review_body_grounded(text,jsonb)",
-  "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
+  "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
+  "identity.moderation_debate_owner(uuid)",
+  "identity.state_moderation(uuid,text,uuid,uuid,uuid,uuid[],text,uuid,jsonb,timestamptz)",
+  "identity.queue_moderation_statements()",
+  "identity.moderation_statement_ground(uuid)",
+  "identity.claim_moderation_statements(integer)",
+  "identity.read_moderation_statement(uuid,uuid)",
+  "identity.complete_moderation_statement(uuid,uuid,text)",
+  "identity.read_own_moderation_statements(uuid)",
+  "identity.delete_moderation_words_due()",
+  "identity.read_own_contribution_review(uuid,uuid)"
 ];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0157_${detail}`); };

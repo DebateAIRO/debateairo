@@ -244,6 +244,7 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 | `GET /v1/auth/age-confirmation` | `confirmed` (the age check is not asked). |
 | `GET`/`POST /v1/account/sensitive-data-consent` | `given` (no consent pop-up). |
 | `GET /v1/account/legal-status`, `POST /v1/account/legal-accept` | Nothing to accept / 204. |
+| `GET /v1/account/moderation-statements` | One statement of reasons (0157): a staff hide of the seeded debate, on a report, held for review. |
 | `GET`/`POST /v1/account/reading-level` | The reading level (0131), null until saved. |
 | `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
 | `POST /v1/asks` | See above. |

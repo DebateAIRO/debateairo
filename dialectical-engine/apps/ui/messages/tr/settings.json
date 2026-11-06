@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Ayarlar'a git",
   "settings.account.title": "Hesap",
   "settings.security.title": "Güvenlik",
+  "settings.notices.title": "Moderasyon bildirimleri",
   "settings.phone.reveal": "Telefonu göster",
   "settings.phone.change": "Telefonu değiştir",
   "settings.phone.purpose": "İleride hesabınıza yeniden girmenize yardımcı olmak için size SMS ile bir kod gönderebiliriz; bizden yardım isterseniz sizi arayabilir veya size SMS gönderebiliriz. Şifrelenmiş olarak saklanır; asla paylaşılmaz ve pazarlama için kullanılmaz.",
