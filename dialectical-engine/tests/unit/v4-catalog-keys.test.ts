@@ -363,7 +363,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.maps.more",
   // The owner's third round (5 Nov afternoon): the sentences that name the page behind "My questions" follow its new name
   // (MY_QUESTIONS_ANSWER_LINES below); the changed sentence is a draft. v4.public.dig.unconfirmed, the other one, is on
-  // this list already.
+  // this list already. Since the fourth round its second sentence is the owner's (FOURTH_ROUND_ANSWER_ENDINGS below), so
+  // only its first sentence is still a draft.
   "v4.debate.usually",
   "v4.debate.askAgainNoteQuestion",
   "v4.debate.digFailedBackNote",
@@ -743,6 +744,16 @@ const FOURTH_ROUND_ANSWER_LINES: Readonly<Record<string, string>> = Object.freez
 });
 
 /**
+ * The fourth round also says the public dig box keeps "“My questions” will show it if it did.", which is the second
+ * sentence of v4.public.dig.unconfirmed. That sentence is the owner's and is pinned here as the line's ending. The
+ * first sentence ("We couldn't confirm that this dig started.") is still a draft, so the key stays on
+ * DRAFTED_UNTIL_CLICK_TEST.
+ */
+const FOURTH_ROUND_ANSWER_ENDINGS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.public.dig.unconfirmed": " “My questions” will show it if it did."
+});
+
+/**
  * The place the owner's record calls "Your question" (OWNER-PICKS-2026-11-03.md: map-d1 A, "whenever you are on “Your
  * question”"; map-f7, the where-you-are line "Your question › Whole-system costs"; journey-f18, the rail "Your question ·
  * What we'll look into · The map · Your report"), word for word: the first step of a dig's trail and the place named in
@@ -762,6 +773,15 @@ describe("the owner's fourth round (6 Nov): the tab, the 'older than the map' bo
     // The waiting state's word is the tab's word followed by its time.
     expect(catalog["v4.state.WAITING"]).toBe(`${catalog["v4.state.WAITING.noTime"]} · starts after {time}`);
     expect(Object.values(catalog).filter((value) => /running dig/u.test(value))).toEqual([]);
+  });
+
+  it("the public dig box's line ends with the owner's sentence; its first sentence is still a draft", () => {
+    for (const [key, ending] of Object.entries(FOURTH_ROUND_ANSWER_ENDINGS)) {
+      expect(catalog[key], key).toBeDefined();
+      expect(catalog[key]!.endsWith(ending), `${key}: ${catalog[key]}`).toBe(true);
+      expect(catalog[key]!.slice(0, -ending.length).trim().length, key).toBeGreaterThan(0);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
   });
 });
 
@@ -798,7 +818,8 @@ describe("the owner's third round (5 Nov afternoon): the page is called 'My ques
     expect(catalog["v4.maps.menu"]).toBe(catalog["v4.maps.title"]);
     // The page's old names ("Your maps", "All my maps"); "your maps" for the maps themselves is not the page's name.
     expect(Object.entries(catalog).filter(([, value]) => /\b(?:Your|All my) maps\b/u.test(value))).toEqual([]);
-    // The sentences that name the page name it by its new name, and wait on the drafted list.
+    // The sentences that name the page name it by its new name, and wait on the drafted list (v4.public.dig.unconfirmed only
+    // for its first sentence: FOURTH_ROUND_ANSWER_ENDINGS).
     for (const key of ["v4.debate.usually", "v4.public.dig.unconfirmed"]) {
       expect(catalog[key], key).toContain(`“${catalog["v4.maps.title"]}”`);
       expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
