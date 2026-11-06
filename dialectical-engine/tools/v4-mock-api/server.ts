@@ -1755,7 +1755,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // The body carries the good-faith statement (D5): a press without it fails the schema above, as the API's does.
     const state = mockFlagStateOf(body.data.claim);
     mockFlags.push({ flag_id: crypto.randomUUID(), publication_ref: ref, reporter: "Quiet Heron", state: state === "HIDDEN" ? "HIDDEN" : state === "NOT_FOUND" ? "NOT_FOUND" : "QUEUED", verdict: state === "HIDDEN" ? "AGREE" : state === "NOT_FOUND" ? "NOT_FOUND" : null,
-      reason: state === "HIDDEN" ? "CONTENT" : null, created_at: new Date().toISOString(), judged_at: null, dismissed_at: null, where: body.data.where, claim: body.data.claim, debate_hidden: state === "HIDDEN" });
+      reason: state === "HIDDEN" ? "CONTENT" : null, created_at: new Date().toISOString(), judged_at: null, dismissed_at: null, where: body.data.where, claim: body.data.claim, debate_hidden: state === "HIDDEN", outcome: null });
     if (state === "HIDDEN") {
       const row = mockReview.get(ref) ?? { hidden: false, removed: false, corrected: new Map<string, string>(), log: [] };
       mockReview.set(ref, row);

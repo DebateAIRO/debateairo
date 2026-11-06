@@ -15,7 +15,8 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
   "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED",
   "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "MODERATION_STATEMENT_REPORT_REMOVED",
-  "MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED"
+  "MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED",
+  "PUBLIC_FLAG_ANSWER_RECEIPT", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -130,6 +131,10 @@ const statement = (kind: string): MailTemplateDefinition => define({
   ],
   params: statementParams,
   replyTo: "authorities"
+});
+const flagAnswer = (kind: string): MailTemplateDefinition => define({
+  catalogue: "mail", subject: `mail.flagAnswer.${kind}Subject`, paragraphs: [`mail.flagAnswer.${kind}`, "mail.flagAnswer.routes"],
+  params: { happened: "date", itemUrl: "url" }, replyTo: "authorities"
 });
 const retryOptional = Object.freeze({ confirmCard: "flag", bankAsked: "flag", endDate: "date" } as const);
 /**
@@ -425,6 +430,13 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   MODERATION_STATEMENT_CORRECTED: statement("corrected"),
   MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: statement("contributionAffected"),
   MODERATION_STATEMENT_REPORT_AFFECTED: statement("reportAffected"),
+  // 0157 (DSA Art 16(4)-(6); the owner's D4): the answers to the person who reported. The date and the debate's link only: no words of the report
+  // or the debate, no staff id. The receipt names no decision; each decision says how automated means were used and gives office@ and the routes.
+  PUBLIC_FLAG_ANSWER_RECEIPT: define({ catalogue: "mail", subject: "mail.flagAnswer.receiptSubject", paragraphs: ["mail.flagAnswer.receipt"], params: { happened: "date", itemUrl: "url" } }),
+  PUBLIC_FLAG_ANSWER_AUTO_HIDDEN: flagAnswer("autoHidden"),
+  PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: flagAnswer("autoNotFound"),
+  PUBLIC_FLAG_ANSWER_NO_BREACH: flagAnswer("noBreach"),
+  PUBLIC_FLAG_ANSWER_ACTED: flagAnswer("acted"),
   THREAT_REPORT_WAITING: define({
     catalogue: "owner", subject: "owner.threatReport.subject",
     paragraphs: ["owner.threatReport.waiting", "owner.threatReport.open"], params: {}

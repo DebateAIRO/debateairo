@@ -19,7 +19,7 @@ const pageOf = (hidden: boolean, removed = false): PublicReviewPage => PublicRev
 let root: Root | undefined, host: HTMLDivElement | undefined;
 afterEach(() => { act(() => root?.unmount()); host?.remove(); });
 function client(change: Partial<PublicReviewClient> = {}) {
-  return { cancel: vi.fn(), readReports: vi.fn(async () => ({ reports: [{ flag_id: LATER, publication_ref: REF, reporter: "Quiet Heron", state: "HIDDEN", verdict: "AGREE", reason: "PERSONAL", created_at: "2026-11-01T08:00:00.000Z", judged_at: null, dismissed_at: null, where: "A place.", claim: "A claim to read.", debate_hidden: true }] })), dismissReport: vi.fn(async () => ({})), list: vi.fn(async () => ({ hidden: [], log: [] })), read: vi.fn(async () => pageOf(false)), hide: vi.fn(async () => ({})), step: vi.fn(async () => ({})), ...change } as unknown as PublicReviewClient;
+  return { cancel: vi.fn(), readReports: vi.fn(async () => ({ reports: [{ flag_id: LATER, publication_ref: REF, reporter: "Quiet Heron", state: "HIDDEN", verdict: "AGREE", reason: "PERSONAL", created_at: "2026-11-01T08:00:00.000Z", judged_at: null, dismissed_at: null, where: "A place.", claim: "A claim to read.", debate_hidden: true, outcome: null }] })), closeReport: vi.fn(async () => ({})), list: vi.fn(async () => ({ hidden: [], log: [] })), read: vi.fn(async () => pageOf(false)), hide: vi.fn(async () => ({})), step: vi.fn(async () => ({})), ...change } as unknown as PublicReviewClient;
 }
 async function mount(api: PublicReviewClient) {
   host = document.body.appendChild(document.createElement("div"));
@@ -139,10 +139,13 @@ describe("the review panel", () => {
     expect(row.textContent).toContain("A claim to read.");
     await press("Open in the review tool");
     expect(api.read).toHaveBeenCalledWith(REF);
-    await press("Dismiss");
-    expect(api.dismissReport).not.toHaveBeenCalled();
+    // 0157 (D4): the close says what the person found; the confirm says the reporter is told.
+    expect(host!.textContent).not.toContain("Dismiss");
+    await press("Close: we acted on it");
+    expect(api.closeReport).not.toHaveBeenCalled();
+    expect(host!.textContent).toContain("The reporter is told by email that a person acted on it, with no detail.");
     await press("Confirm");
-    expect(api.dismissReport).toHaveBeenCalledWith(LATER);
+    expect(api.closeReport).toHaveBeenCalledWith(LATER, "ACTED");
   });
   it("a public link or a bare reference names the debate; anything else is nothing", () => {
     expect(publicationRefOf(`https://dezbatere.ro/public/debate/${REF}?x=1`)).toBe(REF);

@@ -139,6 +139,9 @@ const PublicReviewGroundShape = { grounds: ModerationGroundsSchema, source: Mode
 const PublicReviewHideShape = { publication_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape };
 const PublicReviewStepShape = { ...PublicReviewHideShape, step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
     pointer: PublicReviewPointerSchema.nullable(), text_sha256: Sha256HexSchema.nullable(), facts_sha256: Sha256HexSchema.nullable() };
+/** 0157 (D4): a close of a report: NO_BREACH (nothing to act on) or ACTED (a person acted on it). The reporter is told which. */
+export const PublicFlagOutcomeSchema = z.enum(["NO_BREACH", "ACTED"]);
+export type PublicFlagOutcome = z.infer<typeof PublicFlagOutcomeSchema>;
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -154,7 +157,8 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_PRACTICE_RECORD"), ...TeamPracticeShape }).strict(),
     z.object({ action: z.literal("PUBLIC_REVIEW_HIDE"), ...PublicReviewHideShape }).strict(),
     z.object({ action: z.literal("PUBLIC_REVIEW_STEP"), ...PublicReviewStepShape }).strict(),
-    z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), operation_id: z.uuid() }).strict()
+    // 0157 (D4): the close says what the person found; it is bound into the passkey's body.
+    z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), outcome: PublicFlagOutcomeSchema, operation_id: z.uuid() }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
@@ -206,9 +210,11 @@ export type PublicReviewList = z.infer<typeof PublicReviewListSchema>;
 /** Decision 35: the Report button's queue, for the same two accounts. The reporter's name is here and nowhere else, and each read is logged. `claim` and `where` go null six months after a report closed. */
 export const PublicFlagQueueSchema = z.object({ reports: z.array(z.object({
     flag_id: z.uuid(), publication_ref: z.uuid(), reporter: z.string().nullable(), state: z.enum(["CHECKING", "QUEUED", "NOT_FOUND", "HIDDEN"]), verdict: z.enum(["AGREE", "NOT_FOUND", "UNSURE", "UNAVAILABLE"]).nullable(), reason: z.enum(["CONTENT", "PERSONAL"]).nullable(),
-    created_at: z.iso.datetime({ offset: true }), judged_at: z.iso.datetime({ offset: true }).nullable(), dismissed_at: z.iso.datetime({ offset: true }).nullable(), where: z.string().nullable(), claim: z.string().nullable(), debate_hidden: z.boolean() }).strict()).max(200) }).strict();
+    created_at: z.iso.datetime({ offset: true }), judged_at: z.iso.datetime({ offset: true }).nullable(), dismissed_at: z.iso.datetime({ offset: true }).nullable(), where: z.string().nullable(), claim: z.string().nullable(), debate_hidden: z.boolean(),
+    /** 0157 (D4): what the close found; null while open, or closed by the release before's Dismiss. */
+    outcome: PublicFlagOutcomeSchema.nullable() }).strict()).max(200) }).strict();
 export type PublicFlagQueue = z.infer<typeof PublicFlagQueueSchema>;
-export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), outcome: PublicFlagOutcomeSchema, proof_handle: OpaqueHandleSchema }).strict();
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({

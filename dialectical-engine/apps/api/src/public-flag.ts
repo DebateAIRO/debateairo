@@ -83,7 +83,8 @@ export async function pressPublicFlag(input: Readonly<{ ownerRef: string; public
 export type PublicFlagIntent = Extract<contract.StaffActionIntent, { action: "PUBLIC_REPORT_DISMISS" }>;
 export const isPublicFlagIntent = (intent: { action: string }): intent is PublicFlagIntent => intent.action === "PUBLIC_REPORT_DISMISS";
 export function canonicalPublicFlagBinding(intent: PublicFlagIntent): ActionBinding {
-  const body = { action: intent.action, target_id: intent.flag_id, expected_revision: 0, operation_id: intent.operation_id };
+  // 0157 (D4): the outcome is in the body, as staff.public_flag_close checks it.
+  const body = { action: intent.action, target_id: intent.flag_id, outcome: intent.outcome, expected_revision: 0, operation_id: intent.operation_id };
   return { action: intent.action, targetId: intent.flag_id, expectedRevision: 0, operationId: intent.operation_id, bodySha256: createHash("sha256").update(parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))).digest("hex") };
 }
 export type PublicFlagStaffService = Readonly<{ repository: PostgresPublicFlagRepository; withKey: <T>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T) => Promise<T> }>;
@@ -98,7 +99,7 @@ export async function publicFlagQueueOf(service: PublicFlagStaffService, rows: A
       words = await service.withKey(row.publication_ref, row.run_id, (cipher) => cipher.decrypt(content) as { where: unknown; claim: unknown }).catch(() => null);
     }
     reports.push({ flag_id: row.flag_id, publication_ref: row.publication_ref, reporter: row.reporter, state: row.state, verdict: row.verdict, reason: row.reason, created_at: iso(row.created_at)!, judged_at: iso(row.judged_at), dismissed_at: iso(row.dismissed_at),
-      where: typeof words?.where === "string" ? words.where : null, claim: typeof words?.claim === "string" ? words.claim : null, debate_hidden: row.debate_hidden });
+      where: typeof words?.where === "string" ? words.where : null, claim: typeof words?.claim === "string" ? words.claim : null, debate_hidden: row.debate_hidden, outcome: row.outcome ?? null });
   }
   return contract.PublicFlagQueueSchema.parse({ reports });
 }

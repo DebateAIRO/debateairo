@@ -1386,7 +1386,13 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.complete_moderation_statement(uuid,uuid,text)",
     "EXECUTE ON FUNCTION identity.read_own_moderation_statements(uuid)",
     "EXECUTE ON FUNCTION identity.delete_moderation_words_due()",
-    "EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid)"
+    "EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_flag_queue_answered(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.claim_public_flag_mail(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_flag_mail(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.settle_stuck_public_flags()"
   ]
 }
 ]);

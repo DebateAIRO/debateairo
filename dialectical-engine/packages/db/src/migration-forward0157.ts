@@ -12,7 +12,7 @@ const VERSION = "moderation-statement-forward0157-v1";
 const MANIFEST_PATH = "lineage/moderation-statement-forward0157.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0156_moderation_notice.sql";
-const TABLES: readonly string[] = ["identity.moderation_ground", "identity.moderation_decision", "identity.public_flag_quote", "identity.moderation_statement", "identity.moderation_statement_seen", "identity.moderation_statement_since"];
+const TABLES: readonly string[] = ["identity.moderation_ground", "identity.moderation_decision", "identity.public_flag_quote", "identity.moderation_statement", "identity.moderation_statement_seen", "identity.moderation_statement_since", "identity.public_flag_answer", "identity.public_flag_mail", "identity.public_flag_mail_since"];
 const FUNCTIONS: readonly string[] = [
   "identity.moderation_grounds_known(text[],boolean)",
   "identity.guard_moderation_words()",
@@ -33,7 +33,17 @@ const FUNCTIONS: readonly string[] = [
   "identity.complete_moderation_statement(uuid,uuid,text)",
   "identity.read_own_moderation_statements(uuid)",
   "identity.delete_moderation_words_due()",
-  "identity.read_own_contribution_review(uuid,uuid)"
+  "identity.read_own_contribution_review(uuid,uuid)",
+  "identity.moderation_mail_locale(uuid)",
+  "identity.queue_public_flag_mail()",
+  "identity.claim_public_flag_mail(integer)",
+  "identity.read_public_flag_mail(uuid,uuid)",
+  "identity.complete_public_flag_mail(uuid,uuid,text)",
+  "identity.settle_stuck_public_flags()",
+  "identity.public_flag_close(uuid,text,uuid,uuid,text)",
+  "identity.public_flag_queue_answered()",
+  "staff.read_public_flag_queue_answered(jsonb,text)",
+  "staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)"
 ];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0157_${detail}`); };

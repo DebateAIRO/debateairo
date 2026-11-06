@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0157_moderation_statements.sql",
-    "sha256": "52156882559b7585e583e5e57b2ad26685466cd0e0793c6325e25acae925bda7"
+    "sha256": "394e9cf1823e020f83fcc8b92fe14302aeae10ede75be75ba75748bb317e3871"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

@@ -47,7 +47,7 @@ describe("0157: the moderation statements", () => {
     for (const match of SQL.matchAll(/^(?:CREATE TRIGGER \S+ BEFORE [A-Z ]+ ON|DROP TRIGGER IF EXISTS \S+ ON|ALTER TABLE|ALTER FUNCTION|REVOKE ALL ON FUNCTION|REVOKE ALL ON) ([a-z_]+\.[a-z_]+)/gmu)) {
       expect([...NEW_TABLES, ...NEW_FUNCTIONS], match[0]).toContain(match[1]);
     }
-    expect(SQL).not.toMatch(/^\s*DROP (?!TRIGGER IF EXISTS guard_moderation_words ON identity\.(?:moderation_ground|moderation_decision|public_flag_quote);|TRIGGER IF EXISTS reject_mutation ON identity\.moderation_statement_since;)/mu);
+    expect(SQL).not.toMatch(/^\s*DROP (?!TRIGGER IF EXISTS guard_moderation_words ON identity\.(?:moderation_ground|moderation_decision|public_flag_quote);|TRIGGER IF EXISTS reject_mutation ON identity\.(?:moderation_statement_since|public_flag_answer|public_flag_mail_since);)/mu);
     // 0156's queue is left alone: no new kind, no second notice per event, nothing the release before's sender would claim.
     expect(SQL).not.toMatch(/INSERT INTO identity\.moderation_notice\b(?!_)/u);
     // 0150's log and 0151's reports are only read.
@@ -59,7 +59,7 @@ describe("0157: the moderation statements", () => {
   it("staff's new door reuses the proof's three action names, binds the ground's digest and never the facts, and never refuses or slows a hide", () => {
     const act = bodyOf("staff.public_review_act_grounded");
     expect([...new Set([...SQL.matchAll(/'(PUBLIC_[A-Z_]+)'/gu)].map((match) => match[1]))].filter((name) => /^PUBLIC_(?:REVIEW|REPORT)_[A-Z]+$/u.test(name!) && !/_(?:INVALID|STALE|HIDDEN|PUBLIC|UNKNOWN|CHANGED|HOLD)$/u.test(name!)).sort())
-      .toEqual(["PUBLIC_REVIEW_HIDE", "PUBLIC_REVIEW_STEP"]);
+      .toEqual(["PUBLIC_REPORT_DISMISS", "PUBLIC_REVIEW_HIDE", "PUBLIC_REVIEW_STEP"]);
     expect(bodyOf("staff.public_review_body_grounded")).toContain("'facts_sha256',p_command->>'factsSha256'");
     expect(bodyOf("staff.public_review_body_grounded")).not.toContain("p_facts");
     // A hide is containment: its ground is recorded by a function that cannot raise, and only a hide skips the ground check and the alert.
@@ -84,6 +84,22 @@ describe("0157: the moderation statements", () => {
     // Words never enter the mail: the mail read gives the email, the kind, the dates, the ref and the ground's codes, never facts or quote.
     const mail = bodyOf("identity.read_moderation_statement");
     expect(mail).not.toMatch(/facts|quote|staff_id|reporter/u);
+  });
+
+  it("D4: the close is 0151's Dismiss with the outcome in the passkey's body; the reporter's mails carry no words and go only to a live reporter; a stuck check settles through 0151's own settle", () => {
+    const close = bodyOf("staff.public_flag_close");
+    expect(close).toContain("json_build_object('action','PUBLIC_REPORT_DISMISS','target_id',p_flag::text,'outcome',p_outcome,'expected_revision',0,'operation_id',p_operation::text)");
+    expect(close).toContain("staff.consume_action(p_context,p_proof,p_binding,'TEAM_LIMIT_SET','PUBLIC_REPORT_DISMISS',p_flag,p_operation)");
+    // The dismissal is 0151's own, the one move its guard allows, so the words' six months still start from it.
+    expect(bodyOf("identity.public_flag_close")).toContain("identity.public_flag_dismiss(p_flag_id, p_actor, p_operation, p_request_sha256)");
+    expect(bodyOf("identity.settle_stuck_public_flags")).toContain("identity.settle_public_flag(v_flag, 'UNAVAILABLE', NULL, NULL, NULL, NULL, NULL, NULL)");
+    expect(bodyOf("identity.settle_stuck_public_flags")).toContain("interval '5 minutes'");
+    const mail = bodyOf("identity.read_public_flag_mail");
+    expect(mail).not.toMatch(/content_ciphertext|reason|verdict|actor_staff_id|pseudonym/u);
+    expect(mail).toContain("identity_user.owner_ref = flag.reporter_ref AND identity_user.state IN ('active','suspended')");
+    // Only the sender's claim queues the mails.
+    expect([...SQL.matchAll(/PERFORM identity\.queue_public_flag_mail\(\)/gu)].length).toBe(1);
+    expect(bodyOf("identity.claim_public_flag_mail")).toContain("identity.queue_public_flag_mail()");
   });
 
   it("no runtime login reads a table of this step; the runtime calls only its doors", () => {

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { StaffAccessService, staffTokenHash } from "../../apps/api/src/staff/access.js";
 import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
+import { canonicalPublicFlagBinding } from "../../apps/api/src/public-flag.js";
 import { StaffAlertError } from "../../apps/api/src/staff/alerts.js";
 import { testHttpIdentity, testSessionApplication, testSessionHeaders, TEST_APP_ORIGIN } from "../support/httpSession.js";
 
@@ -53,8 +54,8 @@ function server(options: Readonly<{ allowed?: boolean; proof?: boolean; locked?:
     if (options.databaseSays !== undefined) throw new Error(options.databaseSays);
     return { operationId: input.operationId, outcome: "COMPLETED", recordedAt: new Date("2026-11-02T00:00:00Z") };
   };
-  const flags = { readQueue: async () => [{ flag_id: UPDATE, publication_ref: REF, run_id: RUN, reporter: "Quiet Heron", state: "QUEUED", verdict: null, reason: null, created_at: "2026-10-21T08:00:00.000Z", judged_at: null, dismissed_at: null, content: envelope({ where: "A place.", claim: "A claim." }), debate_hidden: false }],
-    dismiss: write("dismiss") };
+  const flags = { readQueue: async () => [{ flag_id: UPDATE, publication_ref: REF, run_id: RUN, reporter: "Quiet Heron", state: "QUEUED", verdict: null, reason: null, created_at: "2026-10-21T08:00:00.000Z", judged_at: null, dismissed_at: null, content: envelope({ where: "A place.", claim: "A claim." }), debate_hidden: false, outcome: null }],
+    close: write("close") };
   const repository = { readCommand: async () => STATE, read: async () => material, list: async () => ({ hidden: [], log: [] }), act: write("act") };
   const cipher = { decrypt: (value: { opened: unknown }) => value.opened, encrypt: (value: unknown) => ({ sealed: value }) };
   const built = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, staffAccess: access, staff: {
@@ -224,12 +225,19 @@ describe("the Report button's queue (decision 35)", () => {
     expect(refused.statusCode).toBe(403);
     expect(refused.body).not.toContain("Quiet Heron");
   });
-  it("a dismissal needs the passkey bound to that report; a delegate is refused; locked tools make it wait", async () => {
-    const dismiss = (built: ReturnType<typeof server>["built"]) => built.inject({ method: "POST", url: `/v1/admin/public-reports/${UPDATE}/dismiss`, headers: headers(true), payload: { operation_id: randomUUID(), proof_handle: handle() } });
+  it("a close (0157, D4) needs the passkey bound to that report and its outcome; a delegate is refused; locked tools make it wait", async () => {
+    const dismiss = (built: ReturnType<typeof server>["built"], body: Record<string, unknown> = { outcome: "ACTED" }) => built.inject({ method: "POST", url: `/v1/admin/public-reports/${UPDATE}/dismiss`, headers: headers(true), payload: { operation_id: randomUUID(), proof_handle: handle(), ...body } });
     const yes = server();
     expect((await dismiss(yes.built)).statusCode).toBe(200);
-    expect(yes.calls[0]).toMatchObject({ name: "dismiss", flagId: UPDATE });
+    expect(yes.calls[0]).toMatchObject({ name: "close", flagId: UPDATE, outcome: "ACTED" });
     expect(yes.bindings[0]).toMatchObject({ action: "PUBLIC_REPORT_DISMISS", targetId: UPDATE });
+    // The outcome is in the body the passkey signs: the same report closed the other way is another body.
+    const other = (outcome: "ACTED" | "NO_BREACH") => canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: UPDATE, outcome, operation_id: UPDATE }).bodySha256;
+    expect(other("ACTED")).not.toBe(other("NO_BREACH"));
+    // A close with no outcome, or another word, is not a close.
+    expect((await dismiss(yes.built, {})).statusCode).toBe(422);
+    expect((await dismiss(yes.built, { outcome: "DISMISSED" })).statusCode).toBe(422);
+    expect(yes.calls).toHaveLength(1);
     await close?.();
     const no = server({ allowed: false, designation: "DELEGATED" });
     expect((await dismiss(no.built)).statusCode).toBe(403);

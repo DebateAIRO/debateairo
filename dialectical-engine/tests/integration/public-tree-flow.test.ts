@@ -15,11 +15,11 @@ import {
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
   PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
-  decryptContentForRun, migrate, PostgresModerationStatementRepository, withRunContentLease, type Pool, type PublicFlagLimits
+  decryptContentForRun, migrate, PostgresModerationStatementRepository, PostgresPublicFlagMailRepository, withRunContentLease, type Pool, type PublicFlagLimits
 } from "@debateai/db";
 import { renderMail } from "@debateai/mail-templates";
 import { MemoryTemplatedMailSender } from "../../apps/api/src/mail-channel.js";
-import { ModerationStatementReconciler } from "../../apps/api/src/moderation-statements.js";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "../../apps/api/src/moderation-statements.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import { StoryRepository, type StoryWriteInput } from "@debateai/story";
@@ -1523,6 +1523,83 @@ async function delegate(): Promise<Actor> {
     await expect(q().query("UPDATE identity.moderation_ground SET source='OWN_INITIATIVE' WHERE publication_ref=$1", [debate.ref])).rejects.toMatchObject({ message: "MODERATION_RECORD_APPEND_ONLY" });
   }, 240_000);
 
+  it("0157, D4 (DSA Art 16(4)-(6)): the reporter hears each answer once: a receipt, the automatic hide and not-found, a person's close and a step naming the report; a stuck check goes to a person; an erased reporter hears nothing", async () => {
+    const [ana, rea, sam, tom, uma, vic] = [await account(), await account(), await account(), await account(), await account(), await account()];
+    const [first, second] = [await publishedDebate(ana), await publishedDebate(ana)];
+    const CLAIM = "This path names a private person's home address.";
+    // The automatic check hides; another finds nothing; a report of a debate already hidden goes to a person.
+    expect(await press(rea, first.ref, CLAIM, agree().port)).toBe("HIDDEN");
+    expect(await press(sam, second.ref, CLAIM, notFound().port)).toBe("NOT_FOUND");
+    expect(await press(tom, first.ref, CLAIM, agree().port)).toBe("WITH_A_PERSON");
+    expect(await press(vic, second.ref, "Another claim about this second debate.", notFound().port)).toBe("NOT_FOUND");
+    const flagOf = async (who: StoryEncryptedOwner) => (await q().query<{ flag_id: string }>("SELECT flag_id FROM identity.public_flag WHERE reporter_ref=$1", [who.ownerRef])).rows[0]!.flag_id;
+    const [reaFlag, tomFlag, vicFlag] = [await flagOf(rea), await flagOf(tom), await flagOf(vic)];
+    // A check the API never answered: left CHECKING six minutes ago (as if the API died between the press and the answer).
+    const stuck = randomUUID();
+    await q().query(`INSERT INTO identity.public_flag(flag_id,publication_ref,reporter_ref,state,content_ciphertext,created_at)
+      SELECT $1,publication_ref,$2,'CHECKING',content_ciphertext,clock_timestamp()-interval '6 minutes' FROM identity.public_flag WHERE flag_id=$3`, [stuck, uma.ownerRef, tomFlag]);
+    const fresh = randomUUID();
+    await q().query(`INSERT INTO identity.public_flag(flag_id,publication_ref,reporter_ref,state,content_ciphertext)
+      SELECT $1,publication_ref,$2,'CHECKING',content_ciphertext FROM identity.public_flag WHERE flag_id=$3`, [fresh, uma.ownerRef, tomFlag]);
+    const mailRepository = new PostgresPublicFlagMailRepository(api);
+    expect(await mailRepository.settleStuck()).toBe(1);
+    expect((await q().query("SELECT flag_id,state,verdict,judge_model_id FROM identity.public_flag WHERE flag_id=ANY($1::uuid[]) ORDER BY created_at", [[stuck, fresh]])).rows).toEqual([
+      { flag_id: stuck, state: "QUEUED", verdict: "UNAVAILABLE", judge_model_id: null }, { flag_id: fresh, state: "CHECKING", verdict: null, judge_model_id: null }]);
+    expect((await q().query("SELECT count(*)::int AS n FROM staff.public_flag_notice WHERE operation_id=$1 AND kind='PUBLIC_FLAG_WAITING'", [stuck])).rows[0].n).toBeGreaterThan(0);
+    expect(await mailRepository.settleStuck()).toBe(0);
+    // A person's decisions: the final decision on the first debate names rea's report; tom's report is closed, no breach found.
+    await act(owner, first, "DECIDE", { ground: { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: reaFlag, facts: "Kept hidden: a private address." } });
+    const flags = new PostgresPublicFlagRepository(api);
+    const operationId = randomUUID();
+    const binding = canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: tomFlag, outcome: "NO_BREACH", operation_id: operationId }) as unknown as Record<string, unknown>;
+    const proof = await storedProof(owner, binding, "PUBLIC_REVIEW_CHANGED");
+    expect((await flags.close({ actor: owner.context as never, proof: { proofId: proof.proofId, binding } as never, flagId: tomFlag, outcome: "NO_BREACH", operationId, alertIntent: proof.alert as never })).outcome).toBe("COMPLETED");
+    // vic's account is erased: 0151 takes the link, and nothing is mailed to anyone in its place.
+    await q().query("UPDATE identity.public_flag SET reporter_ref=NULL WHERE flag_id=$1", [vicFlag]);
+    await q().query(`UPDATE identity."user" SET state='deleted' WHERE user_id=$1`, [vic.userId]);
+    const people = [rea, sam, tom, uma, vic];
+    for (const who of people) {
+      const envelope = encrypt(await userDeks.load(who.userId), Buffer.from(`${pseudonymOf(who)}@example.test`, "utf8"), ["identity", "user.email_ciphertext", who.userId, "run:none", who.userId, `user-dek:${who.userId}`, "1"]);
+      await q().query(`UPDATE identity."user" SET email_ciphertext=$2 WHERE user_id=$1`, [who.userId, JSON.stringify(envelope)]);
+    }
+    await q().query(`INSERT INTO legal.acceptance(acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id)
+      VALUES($1,$2,'TERMS','1.0',$3,'ro','SIGN_UP',now(),$4,'0123456789abcdef')`, [randomUUID(), sam.ownerRef, createHash("sha256").update("ro").digest("hex"), randomBytes(40)]);
+    const memory = new MemoryTemplatedMailSender();
+    for (let pass = 0; pass < 3; pass += 1) await new PublicFlagAnswerReconciler(mailRepository, userDeks, memory, "https://debate.example.test").reconcile(100);
+    const mine = new Map(people.map((who) => [`${pseudonymOf(who)}@example.test`, who]));
+    const sent = memory.messages.filter(({ mail }) => mine.has(mail.to));
+    const to = (who: StoryEncryptedOwner) => sent.filter(({ mail }) => mail.to === `${pseudonymOf(who)}@example.test`).map(({ mail }) => mail.templateId).sort();
+    expect(to(rea)).toEqual(["PUBLIC_FLAG_ANSWER_ACTED", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN"]);
+    expect(to(sam)).toEqual(["PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND"]);
+    expect(to(tom)).toEqual(["PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_RECEIPT"]);
+    expect(to(uma)).toEqual(["PUBLIC_FLAG_ANSWER_RECEIPT"]);
+    expect(to(vic)).toEqual([]);
+    expect(sent.find(({ mail }) => mail.to === `${pseudonymOf(sam)}@example.test`)!.mail.locale).toBe("ro");
+    for (const { mail, raw } of sent) {
+      expect(mail.params.itemUrl).toMatch(/^https:\/\/debate\.example\.test\/public\/debate\/[0-9a-f-]{36}$/u);
+      if (mail.templateId === "PUBLIC_FLAG_ANSWER_RECEIPT") expect(raw).not.toMatch(/^Reply-To:/mu);
+      else expect(raw).toMatch(/^Reply-To: office@dezbatere\.ro\r?$/mu);
+      for (const locale of new Set([mail.locale, "en", "ro"])) {
+        const { subject, text } = renderMail(mail.templateId, locale, mail.params);
+        expect(text).toContain(mail.params.itemUrl!);
+        if (mail.templateId !== "PUBLIC_FLAG_ANSWER_RECEIPT") expect(text).toContain("office@dezbatere.ro");
+        for (const words of [CLAIM, "The first path", QUESTION, POINT_TEXT, "Kept hidden", owner.staffId, owner.userId, pseudonymOf(ana)]) expect(`${subject}\n${text}`, `${mail.templateId} ${locale}`).not.toContain(words);
+      }
+    }
+    const english = (id: string) => renderMail(id as never, "en", sent.find(({ mail }) => mail.templateId === id)!.mail.params).text;
+    expect(english("PUBLIC_FLAG_ANSWER_AUTO_HIDDEN")).toContain("with no person involved");
+    expect(english("PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND")).toContain("No person has read your report");
+    expect(english("PUBLIC_FLAG_ANSWER_NO_BREACH")).toContain("found no breach");
+    expect(english("PUBLIC_FLAG_ANSWER_ACTED")).toContain("acted on it");
+    expect(english("PUBLIC_FLAG_ANSWER_ACTED")).toContain("within six months");
+    // Once: a later pass sends none again; the runtime reads none of these tables.
+    const again = new MemoryTemplatedMailSender();
+    await new PublicFlagAnswerReconciler(mailRepository, userDeks, again, "https://debate.example.test").reconcile(100);
+    expect(again.messages.filter(({ mail }) => mine.has(mail.to))).toEqual([]);
+    for (const table of ["identity.public_flag_answer", "identity.public_flag_mail", "identity.public_flag_mail_since"]) await expect(api.query(`SELECT * FROM ${table}`), table).rejects.toMatchObject({ code: "42501" });
+    await expect(q().query("UPDATE identity.public_flag_answer SET outcome='ACTED'")).rejects.toBeDefined();
+  }, 300_000);
+
   it("a claim that gives orders is only data: the same frame, and a judge that obeyed it hides nothing because its words are not on the page", async () => {
     const [ana, rea, sam] = [await account(), await account(), await account()];
     const debate = await publishedDebate(ana);
@@ -1621,17 +1698,22 @@ async function delegate(): Promise<Actor> {
     await expect(q().query("DELETE FROM identity.public_flag")).rejects.toMatchObject({ message: "PUBLIC_FLAG_APPEND_ONLY" });
     await expect(q().query("UPDATE identity.public_flag SET publication_ref=publication_ref, created_at=now()")).rejects.toMatchObject({ message: "PUBLIC_FLAG_APPEND_ONLY" });
     await expect(q().query("DELETE FROM identity.public_flag_event")).rejects.toBeDefined();
-    // Dismissing: a delegate no; a proof for another report no; used once.
-    const dismiss = async (actor: Actor, flag: string, proofFlag = flag) => {
+    // Closing (0157, D4: 0151's Dismiss with what the person found): a delegate no; a proof for another report, or for the other outcome, no; used once.
+    const dismiss = async (actor: Actor, flag: string, proofFlag = flag, outcome: "NO_BREACH" | "ACTED" = "NO_BREACH", proofOutcome = outcome) => {
       const operationId = randomUUID();
-      const binding = canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: proofFlag, operation_id: operationId }) as unknown as Record<string, unknown>;
+      const binding = canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: proofFlag, outcome: proofOutcome, operation_id: operationId }) as unknown as Record<string, unknown>;
       const proof = await storedProof(actor, binding, "PUBLIC_REVIEW_CHANGED");
-      return repository.dismiss({ actor: actor.context as never, proof: { proofId: proof.proofId, binding } as never, flagId: flag, operationId, alertIntent: proof.alert as never });
+      return repository.close({ actor: actor.context as never, proof: { proofId: proof.proofId, binding } as never, flagId: flag, outcome, operationId, alertIntent: proof.alert as never });
     };
     await expect(dismiss(person, row.flag_id)).rejects.toMatchObject({ message: "STAFF_AUTHORITY_INVALID" });
     await expect(dismiss(owner, row.flag_id, randomUUID())).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+    await expect(dismiss(owner, row.flag_id, row.flag_id, "ACTED", "NO_BREACH")).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
     expect((await dismiss(owner, row.flag_id)).outcome).toBe("COMPLETED");
     await expect(dismiss(owner, row.flag_id)).rejects.toMatchObject({ message: "PUBLIC_FLAG_ALREADY_DISMISSED" });
+    // The close is 0151's dismissal too (the words' six months start), with its outcome beside it.
+    const closed = (await repository.readQueue(owner.context as never, hash(owner.sessionId))).find((entry) => entry.flag_id === row.flag_id)!;
+    expect(closed).toMatchObject({ outcome: "NO_BREACH" });
+    expect(closed.dismissed_at).not.toBeNull();
     // Erasure: the database takes the name and keeps the words (0151's foreign key), and a row can change that way only.
     expect((await q().query("SELECT confdeltype FROM pg_constraint WHERE conrelid='identity.public_flag'::regclass AND contype='f' AND confrelid='identity.\"user\"'::regclass")).rows[0].confdeltype).toBe("n");
     await q().query("UPDATE identity.public_flag SET reporter_ref=NULL WHERE flag_id=$1", [row.flag_id]);
@@ -1721,7 +1803,8 @@ async function delegate(): Promise<Actor> {
     const identity = { ...base, authenticated: { ...base.authenticated, userId: reporter.userId, ownerRef: reporter.ownerRef, session: { ...base.authenticated.session, session_id: reporter.sessionId, asker_id: `owner:${reporter.ownerRef}` } } };
     const judge = agree();
     const http = buildApi({ application: { withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"], sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, publicFlags: flagPorts(judge.port) as never });
-    const body = { where: "The first path", claim: "It names a private person's home." };
+    // D5: a press carries the good-faith statement; one without it is not a notice.
+    const body = { where: "The first path", claim: "It names a private person's home.", good_faith: true };
     const out = await http.inject({ method: "POST", url: `/v1/public/debates/${debate.ref}/flag`, headers: { origin: TEST_APP_ORIGIN }, payload: body });
     expect([401, 403]).toContain(out.statusCode);
     expect(judge.sent).toHaveLength(0);
@@ -1730,6 +1813,9 @@ async function delegate(): Promise<Actor> {
     const post = (url: string, payload: unknown) => http.inject({ method: "POST", url, headers: testSessionHeaders(identity, true), payload: payload as never });
     expect((await post(`/v1/public/debates/${debate.ref}/flag`, { where: "x", claim: "short" })).statusCode).toBe(400);
     expect((await post(`/v1/public/debates/${debate.ref}/flag`, { where: "x", claim: "y".repeat(2001) })).statusCode).toBe(400);
+    expect((await post(`/v1/public/debates/${debate.ref}/flag`, { where: body.where, claim: body.claim })).statusCode).toBe(400);
+    expect((await post(`/v1/public/debates/${debate.ref}/flag`, { ...body, good_faith: false })).statusCode).toBe(400);
+    expect(judge.sent).toHaveLength(0);
     const guessed = await post(`/v1/public/debates/${randomUUID()}/flag`, body);
     const notAnId = await post("/v1/public/debates/not-an-id/flag", body);
     expect(guessed.statusCode).toBe(200);

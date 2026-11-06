@@ -14,6 +14,10 @@
 --    affects (the author, the person who dug, the report's writer, those whose text a correction changed, and those whose content left the page
 --    with someone else's), then mails it once with a link to the full statement in their account. 0156's queue is left as it is: the new
 --    release stops calling its claim, so nobody is mailed twice by one release. The digger's own line is read again, truly (gap 5).
+-- 3. THE ANSWERS TO PEOPLE WHO REPORT (section 6). A receipt for a report a person will read, the automatic check's two decisions, and a
+--    person's (a close, which now says what they found, or a review step that names the report as its source), each mailed once to the
+--    reporter; a report left CHECKING is settled after five minutes as the check being unavailable, so a person reads it. The close is 0151's
+--    Dismiss with the outcome bound into the passkey's body, under the same action name.
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
@@ -595,3 +599,220 @@ GRANT EXECUTE ON FUNCTION identity.complete_moderation_statement(uuid,uuid,text)
 GRANT EXECUTE ON FUNCTION identity.read_own_moderation_statements(uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.delete_moderation_words_due() TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid) TO debateai_runtime;
+
+-- 6. The answers to people who report (D4) -----------------------------------------------------------------------------------------
+-- A person's close of a report says what they found: NO_BREACH (nothing to act on) or ACTED (they acted on it). It is kept here, beside
+-- 0151's dismissal, which the close also writes through identity.public_flag_dismiss (the one move 0151's guard allows; the words' six
+-- months run from it). Cannot be edited.
+CREATE TABLE IF NOT EXISTS identity.public_flag_answer (
+  flag_id uuid PRIMARY KEY REFERENCES identity.public_flag(flag_id),
+  outcome text NOT NULL CONSTRAINT public_flag_answer_outcome_check CHECK (outcome IN ('NO_BREACH','ACTED')),
+  actor_staff_id uuid NOT NULL,
+  operation_id uuid NOT NULL CONSTRAINT public_flag_answer_operation_once UNIQUE,
+  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+SELECT core.install_truncate_guard('identity.public_flag_answer');
+DROP TRIGGER IF EXISTS reject_mutation ON identity.public_flag_answer;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON identity.public_flag_answer FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+-- The mails to the reporter, one of each kind per report at most: RECEIPT (a stored report went to a person), AUTO_HIDDEN and AUTO_NOT_FOUND
+-- (the automatic check decided, with no person), NO_BREACH and ACTED (a person decided: a close, or a review step that names the report as its
+-- source). No address, no words and no name here: the reporter is read from 0151's row at sending time, so an erased reporter (whose link 0151
+-- sets to NULL) is never mailed.
+CREATE TABLE IF NOT EXISTS identity.public_flag_mail (
+  mail_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  flag_id uuid NOT NULL REFERENCES identity.public_flag(flag_id),
+  kind text NOT NULL CONSTRAINT public_flag_mail_kind_check CHECK (kind IN ('RECEIPT','AUTO_HIDDEN','AUTO_NOT_FOUND','NO_BREACH','ACTED')),
+  happened_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  claim_token uuid,
+  claim_expires_at timestamptz,
+  attempts integer NOT NULL DEFAULT 0 CONSTRAINT public_flag_mail_attempts_check CHECK (attempts BETWEEN 0 AND 20),
+  delivered_at timestamptz,
+  failed_at timestamptz,
+  CONSTRAINT public_flag_mail_once UNIQUE (flag_id, kind),
+  CONSTRAINT public_flag_mail_claim_pair CHECK ((claim_token IS NULL) = (claim_expires_at IS NULL)),
+  CONSTRAINT public_flag_mail_one_end CHECK (NOT (delivered_at IS NOT NULL AND failed_at IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS public_flag_mail_pending ON identity.public_flag_mail (created_at) WHERE delivered_at IS NULL AND failed_at IS NULL;
+SELECT core.install_truncate_guard('identity.public_flag_mail');
+-- What happens to a report from the moment this step applied is answered (a receipt, a decision); nothing before.
+CREATE TABLE IF NOT EXISTS identity.public_flag_mail_since (
+  only_row boolean PRIMARY KEY DEFAULT true CONSTRAINT public_flag_mail_since_one CHECK (only_row),
+  since timestamptz NOT NULL
+);
+SELECT core.install_truncate_guard('identity.public_flag_mail_since');
+DROP TRIGGER IF EXISTS reject_mutation ON identity.public_flag_mail_since;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON identity.public_flag_mail_since FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+INSERT INTO identity.public_flag_mail_since (since) VALUES (clock_timestamp()) ON CONFLICT (only_row) DO NOTHING;
+
+-- The language of a person's mail: their newest Terms acceptance in a language mail is written in, else English (as 0156's).
+CREATE OR REPLACE FUNCTION identity.moderation_mail_locale(p_owner_ref uuid) RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT COALESCE((SELECT acceptance.locale FROM legal.acceptance AS acceptance WHERE acceptance.owner_ref = p_owner_ref AND acceptance.kind = 'TERMS'
+      AND acceptance.locale = ANY (ARRAY['bg','hr','cs','da','nl','en','et','fi','fr','de','el','hu','ga','it','lv','lt','mt','pl','pt','ro','ru','sk','sl','es','sv','uk','zh','hi','id','ja','ko','vi','ar','he','tr'])
+    ORDER BY acceptance.accepted_at DESC, acceptance.recorded_at DESC LIMIT 1), 'en')
+$$;
+-- From 0151's rows, this step's answers and the review steps to the mails: what is new since the start, at most 200 of each a call.
+CREATE OR REPLACE FUNCTION identity.queue_public_flag_mail() RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_since timestamptz; v_rows integer; v_count integer := 0;
+BEGIN
+  SELECT start.since INTO v_since FROM identity.public_flag_mail_since AS start;
+  -- The receipt, and the automatic check's two decisions.
+  INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at)
+  SELECT due.flag_id, due.kind, due.happened_at FROM (
+    SELECT flag.flag_id, CASE flag.state WHEN 'QUEUED' THEN 'RECEIPT' WHEN 'HIDDEN' THEN 'AUTO_HIDDEN' ELSE 'AUTO_NOT_FOUND' END AS kind,
+      COALESCE(flag.judged_at, flag.created_at) AS happened_at, flag.created_at
+    FROM identity.public_flag AS flag WHERE COALESCE(flag.judged_at, flag.created_at) >= v_since AND flag.state IN ('QUEUED','HIDDEN','NOT_FOUND') AND flag.reporter_ref IS NOT NULL) AS due
+  WHERE NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+  ORDER BY due.created_at, due.flag_id LIMIT 200
+  ON CONFLICT (flag_id, kind) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
+  -- A person's decision: a close, a review step that names the report as its source, or the final decision on its debate that does.
+  INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at)
+  SELECT due.flag_id, due.kind, min(due.happened_at) FROM (
+      SELECT answer.flag_id, answer.outcome AS kind, answer.recorded_at AS happened_at FROM identity.public_flag_answer AS answer
+    UNION ALL
+      SELECT ground.flag_id, 'ACTED', ground.recorded_at FROM identity.moderation_ground AS ground
+      WHERE ground.flag_id IS NOT NULL AND ground.source = 'REPORT_BUTTON'
+    UNION ALL
+      SELECT decision.flag_id, 'ACTED', decision.recorded_at FROM identity.moderation_decision AS decision
+      WHERE decision.flag_id IS NOT NULL AND decision.source = 'REPORT_BUTTON') AS due
+    JOIN identity.public_flag AS flag ON flag.flag_id = due.flag_id
+  WHERE due.happened_at >= v_since AND flag.reporter_ref IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+  GROUP BY due.flag_id, due.kind ORDER BY min(due.happened_at), due.flag_id LIMIT 200
+  ON CONFLICT (flag_id, kind) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
+  RETURN v_count;
+END $$;
+CREATE OR REPLACE FUNCTION identity.claim_public_flag_mail(p_limit integer)
+RETURNS TABLE(mail_id uuid, claim_token uuid)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_LIMIT_INVALID'; END IF;
+  PERFORM identity.queue_public_flag_mail();
+  RETURN QUERY WITH picked AS (
+    SELECT mail.mail_id FROM identity.public_flag_mail AS mail
+    WHERE mail.delivered_at IS NULL AND mail.failed_at IS NULL AND (mail.claim_expires_at IS NULL OR mail.claim_expires_at <= clock_timestamp())
+    ORDER BY mail.created_at, mail.mail_id LIMIT p_limit FOR UPDATE SKIP LOCKED
+  ) UPDATE identity.public_flag_mail AS mail SET claim_token = gen_random_uuid(), claim_expires_at = clock_timestamp() + interval '5 minutes'
+    FROM picked WHERE mail.mail_id = picked.mail_id RETURNING mail.mail_id, mail.claim_token;
+END $$;
+-- Under a live claim: the reporter's own address (read now), the kind, the moment, the language and the debate. Never the report's words, the
+-- debate's text or a staff id. NULL: no live claim, or no reporter to send to now (erased, or no longer active or in their closure grace).
+CREATE OR REPLACE FUNCTION identity.read_public_flag_mail(p_mail_id uuid, p_claim uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT jsonb_build_object('userId', identity_user.user_id, 'mailId', mail.mail_id, 'kind', mail.kind, 'happenedAt', mail.happened_at,
+    'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref), 'publicationRef', flag.publication_ref, 'emailCiphertext', identity_user.email_ciphertext)
+  FROM identity.public_flag_mail AS mail JOIN identity.public_flag AS flag ON flag.flag_id = mail.flag_id
+    JOIN identity."user" AS identity_user ON identity_user.owner_ref = flag.reporter_ref AND identity_user.state IN ('active','suspended')
+  WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp()
+$$;
+CREATE OR REPLACE FUNCTION identity.complete_public_flag_mail(p_mail_id uuid, p_claim uuid, p_outcome text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_found boolean;
+BEGIN
+  IF p_outcome IS NULL OR p_outcome NOT IN ('SENT','RETRY','DROPPED') THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_OUTCOME_INVALID'; END IF;
+  UPDATE identity.public_flag_mail AS mail SET claim_token = NULL, claim_expires_at = NULL, attempts = least(mail.attempts + 1, 20),
+    delivered_at = CASE WHEN p_outcome = 'SENT' THEN clock_timestamp() END,
+    failed_at = CASE WHEN p_outcome = 'DROPPED' OR (p_outcome = 'RETRY' AND mail.attempts >= 19) THEN clock_timestamp() END
+  WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp();
+  v_found := FOUND;
+  RETURN v_found;
+END $$;
+-- A report left CHECKING (the API stopped between the press and the check's answer) is settled as the check being unavailable after five
+-- minutes, through 0151's own settle: it goes to a person, and the two accounts are told (PUBLIC_FLAG_WAITING). Returns how many.
+CREATE OR REPLACE FUNCTION identity.settle_stuck_public_flags() RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_flag uuid; v_count integer := 0;
+BEGIN
+  FOR v_flag IN SELECT flag.flag_id FROM identity.public_flag AS flag WHERE flag.state = 'CHECKING' AND flag.created_at < clock_timestamp() - interval '5 minutes'
+    ORDER BY flag.created_at, flag.flag_id LIMIT 100 LOOP
+    IF identity.settle_public_flag(v_flag, 'UNAVAILABLE', NULL, NULL, NULL, NULL, NULL, NULL) = 'QUEUED' THEN v_count := v_count + 1; END IF;
+  END LOOP;
+  RETURN v_count;
+END $$;
+-- The close's identity half: 0151's dismissal, then the outcome. Raises as 0151's does for an unknown or already-closed report.
+CREATE OR REPLACE FUNCTION identity.public_flag_close(p_flag_id uuid, p_outcome text, p_actor uuid, p_operation uuid, p_request_sha256 text) RETURNS timestamptz
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_at timestamptz;
+BEGIN
+  IF p_outcome IS NULL OR p_outcome NOT IN ('NO_BREACH','ACTED') THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_OUTCOME_INVALID'; END IF;
+  v_at := identity.public_flag_dismiss(p_flag_id, p_actor, p_operation, p_request_sha256);
+  INSERT INTO identity.public_flag_answer (flag_id, outcome, actor_staff_id, operation_id, recorded_at) VALUES (p_flag_id, p_outcome, p_actor, p_operation, v_at);
+  RETURN v_at;
+END $$;
+-- The queue as 0151 reads it, each report with its close's outcome (null: not closed by this release's close).
+CREATE OR REPLACE FUNCTION identity.public_flag_queue_answered() RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT COALESCE(jsonb_agg(row_found.value || jsonb_build_object('outcome', (SELECT answer.outcome FROM identity.public_flag_answer AS answer WHERE answer.flag_id = (row_found.value->>'flag_id')::uuid))
+    ORDER BY row_found.at), '[]'::jsonb)
+  FROM jsonb_array_elements(identity.public_flag_queue()) WITH ORDINALITY AS row_found(value, at)
+$$;
+-- Staff's two doors (0151's pair stays for the release before): the queue with its outcomes, and the close. The close is 0151's Dismiss with
+-- the outcome bound into the passkey's body, under the same action name (PUBLIC_REPORT_DISMISS), so the proof's action list does not move.
+CREATE OR REPLACE FUNCTION staff.read_public_flag_queue_answered(p_context jsonb,p_token text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v jsonb;
+BEGIN
+  PERFORM staff.require_http_authority(p_context,p_token,'TEAM_LIMIT_SET');
+  PERFORM identity.public_flag_mark_read((p_context->>'staffId')::uuid);
+  v := identity.public_flag_queue_answered();
+  PERFORM staff.require_http_authority(p_context,p_token,'TEAM_LIMIT_SET');
+  RETURN v;
+END $$;
+CREATE OR REPLACE FUNCTION staff.public_flag_close(p_context jsonb,p_proof uuid,p_binding jsonb,p_flag uuid,p_outcome text,p_operation uuid,p_alert jsonb) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_staff uuid:=(p_context->>'staffId')::uuid; v_user uuid:=(p_context->>'userId')::uuid; v_request jsonb; v_sha text; v_replay jsonb; v_at timestamptz;
+BEGIN
+  PERFORM identity.lock_security_subjects(ARRAY[v_user]);
+  IF staff.authorize_action(p_context,'TEAM_LIMIT_SET') IS DISTINCT FROM true THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_AUTHORITY_INVALID'; END IF;
+  IF p_alert IS NULL THEN RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='STAFF_ALERT_UNAVAILABLE'; END IF;
+  IF p_outcome IS NULL OR p_outcome NOT IN ('NO_BREACH','ACTED') THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_FLAG_OUTCOME_INVALID'; END IF;
+  IF p_binding->>'bodySha256' IS DISTINCT FROM encode(sha256(convert_to(register.canonical_json_text(json_build_object('action','PUBLIC_REPORT_DISMISS','target_id',p_flag::text,'outcome',p_outcome,'expected_revision',0,'operation_id',p_operation::text)::text),'UTF8')),'hex')
+    OR p_binding->'expectedRevision' IS DISTINCT FROM '0'::jsonb THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_PROOF_INVALID';
+  END IF;
+  v_request:=jsonb_build_array(v_staff,p_binding,p_flag,p_outcome,p_operation);
+  v_sha:=encode(sha256(convert_to(v_request::text,'UTF8')),'hex');
+  v_replay:=identity.public_flag_replay(p_operation,v_sha);
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  PERFORM staff.consume_action(p_context,p_proof,p_binding,'TEAM_LIMIT_SET','PUBLIC_REPORT_DISMISS',p_flag,p_operation);
+  v_at:=identity.public_flag_close(p_flag,p_outcome,v_staff,p_operation,v_sha);
+  PERFORM staff.record_mutation(p_operation,'PUBLIC_REVIEW_CHANGED',v_staff,v_staff,jsonb_build_object('code','SECURITY_RESPONSE'),v_user,p_alert,v_request);
+  RETURN jsonb_build_object('operationId',p_operation,'outcome','COMPLETED','recordedAt',v_at);
+END $$;
+
+-- 7. Ownership and the exact grants of section 6 ------------------------------------------------------------------------------------
+-- n1: reviewed gives only the new tables and the new functions their owners, the owners of 0150's identity and staff functions; touches no earlier object
+DO $public_flag_answer_owner$
+DECLARE v_owner name; v_name text;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  FOREACH v_name IN ARRAY ARRAY['identity.public_flag_answer','identity.public_flag_mail','identity.public_flag_mail_since'] LOOP
+    EXECUTE pg_catalog.format('ALTER TABLE %s OWNER TO %I', v_name, v_owner);
+    EXECUTE pg_catalog.format('REVOKE ALL ON %s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker', v_name);
+  END LOOP;
+  FOREACH v_name IN ARRAY ARRAY['identity.moderation_mail_locale(uuid)','identity.queue_public_flag_mail()','identity.claim_public_flag_mail(integer)',
+    'identity.read_public_flag_mail(uuid,uuid)','identity.complete_public_flag_mail(uuid,uuid,text)','identity.settle_stuck_public_flags()',
+    'identity.public_flag_close(uuid,text,uuid,uuid,text)','identity.public_flag_queue_answered()'] LOOP
+    EXECUTE pg_catalog.format('ALTER FUNCTION %s OWNER TO %I', v_name, v_owner);
+    EXECUTE pg_catalog.format('REVOKE ALL ON FUNCTION %s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker', v_name);
+  END LOOP;
+  -- Staff's doors call the identity side, as 0151's do.
+  FOREACH v_name IN ARRAY ARRAY['identity.public_flag_close(uuid,text,uuid,uuid,text)','identity.public_flag_queue_answered()'] LOOP
+    EXECUTE pg_catalog.format('GRANT EXECUTE ON FUNCTION %s TO debateai_staff_security_owner', v_name);
+  END LOOP;
+END
+$public_flag_answer_owner$;
+ALTER FUNCTION staff.read_public_flag_queue_answered(jsonb,text) OWNER TO debateai_staff_security_owner;
+ALTER FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.read_public_flag_queue_answered(jsonb,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+REVOKE ALL ON FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.read_public_flag_queue_answered(jsonb,text) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.claim_public_flag_mail(integer) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.read_public_flag_mail(uuid,uuid) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text) TO debateai_runtime;
+GRANT EXECUTE ON FUNCTION identity.settle_stuck_public_flags() TO debateai_runtime;

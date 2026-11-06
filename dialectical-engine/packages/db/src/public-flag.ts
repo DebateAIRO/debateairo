@@ -9,7 +9,9 @@ export type PublicFlagSettled = "HIDDEN" | "QUEUED" | "NOT_FOUND" | "CHECKING";
 export type PublicFlagVerdict = "AGREE" | "NOT_FOUND" | "UNSURE" | "UNAVAILABLE";
 export type PublicFlagLimits = Readonly<{ personHour: number; debateDay: number; siteDay: number }>;
 export type PublicFlagQueueRow = Readonly<{ flag_id: string; publication_ref: string; run_id: string; reporter: string | null; state: "CHECKING" | "QUEUED" | "NOT_FOUND" | "HIDDEN"; verdict: PublicFlagVerdict | null; reason: "CONTENT" | "PERSONAL" | null;
-  created_at: string; judged_at: string | null; dismissed_at: string | null; content: CryptoEnvelope | null; debate_hidden: boolean }>;
+  created_at: string; judged_at: string | null; dismissed_at: string | null; content: CryptoEnvelope | null; debate_hidden: boolean;
+  /** 0157 (D4): the close's outcome. */
+  outcome?: "NO_BREACH" | "ACTED" | null }>;
 export type PublicFlagNoticeClaim = Readonly<{ notice_id: string; kind: "PUBLIC_FLAG_HIDDEN" | "PUBLIC_FLAG_WAITING"; recipient_staff_id: string; claim_token: string }>;
 export type PublicReviewPurgeDue = Readonly<{ publication_ref: string; run_id: string; piece_kind: "SNAPSHOT" | "UPDATE" | "REPORT"; piece_id: string; mode: "BAKED" | "EMPTIED"; up_to_revision: number; content: CryptoEnvelope;
   corrections: readonly Readonly<{ pointer: string; content: CryptoEnvelope }>[] }>;
@@ -43,12 +45,13 @@ export class PostgresPublicFlagRepository {
     return await this.one("SELECT identity.record_public_flag_quote($1::uuid,$2::jsonb) AS value", [flagId, JSON.stringify(content)]) === true;
   }
   async readQueue(actor: StaffContext, token: string): Promise<readonly PublicFlagQueueRow[]> {
-    const value = (await guardedAuthorityQuery<{ value: PublicFlagQueueRow[] }>(this.pool, "SELECT staff.read_public_flag_queue($1::jsonb,$2) AS value", [actor, token])).rows[0]?.value;
+    const value = (await guardedAuthorityQuery<{ value: PublicFlagQueueRow[] }>(this.pool, "SELECT staff.read_public_flag_queue_answered($1::jsonb,$2) AS value", [actor, token])).rows[0]?.value;
     return value ?? [];
   }
-  async dismiss(input: Readonly<{ actor: StaffContext; proof: StaffProof; flagId: string; operationId: string; alertIntent: StaffAlertIntent }>): Promise<SecurityReceipt> {
-    return receiptOf(await this.one("SELECT staff.public_flag_dismiss($1::jsonb,$2::uuid,$3::jsonb,$4::uuid,$5::uuid,$6::jsonb) AS value",
-      [input.actor, input.proof.proofId, input.proof.binding, input.flagId, input.operationId, input.alertIntent]));
+  /** 0157 (D4): the close, 0151's Dismiss with what the person found; the reporter is told. */
+  async close(input: Readonly<{ actor: StaffContext; proof: StaffProof; flagId: string; outcome: "NO_BREACH" | "ACTED"; operationId: string; alertIntent: StaffAlertIntent }>): Promise<SecurityReceipt> {
+    return receiptOf(await this.one("SELECT staff.public_flag_close($1::jsonb,$2::uuid,$3::jsonb,$4::uuid,$5,$6::uuid,$7::jsonb) AS value",
+      [input.actor, input.proof.proofId, input.proof.binding, input.flagId, input.outcome, input.operationId, input.alertIntent]));
   }
   async deleteWordsDue(): Promise<number> {
     return await this.one("SELECT identity.delete_public_flag_words_due() AS value", []) as number;

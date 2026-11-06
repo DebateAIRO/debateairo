@@ -35,10 +35,11 @@ export function createPublicReviewClient({ fetchImplementation = fetch, apiBase 
     list: () => request("", contract.PublicReviewListSchema),
     /** Decision 35: the Report button's queue. Each read is logged: reporters' names are on it. */
     readReports: () => reports("", contract.PublicFlagQueueSchema),
-    async dismissReport(flagId: string) {
+    /** 0157 (D4): close a report with what the person found; the reporter is told. The route keeps 0151's name. */
+    async closeReport(flagId: string, outcome: contract.PublicFlagOutcome) {
       const operation_id = crypto.randomUUID();
-      const proof = await staff.proveAction({ action: "PUBLIC_REPORT_DISMISS", flag_id: flagId, operation_id });
-      return reports(`/${encodeURIComponent(flagId)}/dismiss`, contract.SecurityReceiptSchema, "POST", contract.PublicFlagDismissRequestSchema.parse({ operation_id, proof_handle: proof.proof_handle }));
+      const proof = await staff.proveAction({ action: "PUBLIC_REPORT_DISMISS", flag_id: flagId, outcome, operation_id });
+      return reports(`/${encodeURIComponent(flagId)}/dismiss`, contract.SecurityReceiptSchema, "POST", contract.PublicFlagDismissRequestSchema.parse({ operation_id, outcome, proof_handle: proof.proof_handle }));
     },
     read: (publicationRef: string) => request(`/${encodeURIComponent(publicationRef)}`, contract.PublicReviewPageSchema),
     async hide(publicationRef: string, revision: number, ground: PublicReviewGround = NO_GROUND) {

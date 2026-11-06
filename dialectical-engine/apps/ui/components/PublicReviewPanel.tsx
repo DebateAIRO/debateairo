@@ -156,7 +156,11 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
           <p className="setCardHint">{t(catalog, report.verdict === null ? "staff.publicReports.verdict.none" : `staff.publicReports.verdict.${report.verdict}`)}{report.reason === null ? "" : ` ${t(catalog, `staff.publicReports.reason.${report.reason}`)}`}{report.debate_hidden ? ` ${t(catalog, "staff.publicReports.debateHidden")}` : ""}</p>
           <div className="staffActions">
             <button className="setBtn" type="button" onClick={() => { setRef(report.publication_ref); void load(report.publication_ref); }}>{t(catalog, "staff.publicReports.open")}</button>
-            {report.dismissed_at === null ? <button className="setBtn" type="button" disabled={busy} onClick={() => ask({ line: t(catalog, "staff.publicReports.confirmDismiss"), need: "NONE", run: (client2) => client2.dismissReport(report.flag_id) })}>{t(catalog, "staff.publicReports.dismiss")}</button> : <span className="setCardHint">{t(catalog, "staff.publicReports.dismissed")}</span>}
+            {/* 0157 (D4): the close says what the person found, and the reporter is told. */}
+            {report.dismissed_at === null ? <>
+              <button className="setBtn" type="button" disabled={busy} onClick={() => ask({ line: t(catalog, "staff.publicReports.confirmNoBreach"), need: "NONE", run: (client2) => client2.closeReport(report.flag_id, "NO_BREACH") })}>{t(catalog, "staff.publicReports.closeNoBreach")}</button>
+              <button className="setBtn" type="button" disabled={busy} onClick={() => ask({ line: t(catalog, "staff.publicReports.confirmActed"), need: "NONE", run: (client2) => client2.closeReport(report.flag_id, "ACTED") })}>{t(catalog, "staff.publicReports.closeActed")}</button>
+            </> : <span className="setCardHint">{t(catalog, report.outcome === null ? "staff.publicReports.dismissed" : `staff.publicReports.closed.${report.outcome}`)}</span>}
           </div>
         </li>)}
       </ul>}

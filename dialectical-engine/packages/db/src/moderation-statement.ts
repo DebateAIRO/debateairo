@@ -48,3 +48,33 @@ export class PostgresModerationStatementRepository {
     return Number((await this.pool.query<{ value: number }>("SELECT identity.delete_moderation_words_due() AS value")).rows[0]?.value ?? 0);
   }
 }
+
+/**
+ * The answers to people who report (migration 0157; DSA Art 16(4)-(6); the owner's D4 of 6 November 2026), through 0157's definers only. The sender
+ * queues what is new since the step applied (a receipt, the automatic check's decisions, a person's) and mails each once.
+ */
+export type PublicFlagMailKind = "RECEIPT" | "AUTO_HIDDEN" | "AUTO_NOT_FOUND" | "NO_BREACH" | "ACTED";
+export type PublicFlagMailClaim = Readonly<{ mailId: string; claimToken: string }>;
+export type PublicFlagMail = Readonly<{ userId: string; mailId: string; kind: PublicFlagMailKind; happenedAt: string; mailLocale: string; publicationRef: string; emailCiphertext: CryptoEnvelope }>;
+
+export class PostgresPublicFlagMailRepository {
+  constructor(private readonly pool: Pool) {}
+
+  /** Queues what is new since the last call, then claims oldest first with five minutes to send. */
+  async claim(limit = 100): Promise<readonly PublicFlagMailClaim[]> {
+    return (await this.pool.query<{ mail_id: string; claim_token: string }>("SELECT * FROM identity.claim_public_flag_mail($1)", [limit]))
+      .rows.map((row) => Object.freeze({ mailId: row.mail_id, claimToken: row.claim_token }));
+  }
+  /** Null: the claim ran out, or the reporter is erased, or neither active nor in their closure grace. */
+  async read(claim: PublicFlagMailClaim): Promise<PublicFlagMail | null> {
+    return (await this.pool.query<{ value: PublicFlagMail | null }>("SELECT identity.read_public_flag_mail($1::uuid,$2::uuid) AS value", [claim.mailId, claim.claimToken])).rows[0]?.value ?? null;
+  }
+  /** False: the claim was no longer live, and nothing changed. */
+  async complete(claim: PublicFlagMailClaim, outcome: ModerationStatementOutcome): Promise<boolean> {
+    return (await this.pool.query<{ value: boolean }>("SELECT identity.complete_public_flag_mail($1::uuid,$2::uuid,$3) AS value", [claim.mailId, claim.claimToken, outcome])).rows[0]?.value === true;
+  }
+  /** A report left CHECKING for five minutes goes to a person, through 0151's own settle; returns how many. */
+  async settleStuck(): Promise<number> {
+    return Number((await this.pool.query<{ value: number }>("SELECT identity.settle_stuck_public_flags() AS value")).rows[0]?.value ?? 0);
+  }
+}

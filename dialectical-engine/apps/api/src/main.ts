@@ -23,8 +23,8 @@ import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
 import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
-import { PostgresModerationStatementRepository } from "@debateai/db";
-import { ModerationStatementReconciler } from "./moderation-statements.js";
+import { PostgresModerationStatementRepository, PostgresPublicFlagMailRepository } from "@debateai/db";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "./moderation-statements.js";
 import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
@@ -1288,8 +1288,17 @@ const moderationStatements = new ModerationStatementReconciler(moderationStateme
   from: environment.MAIL_FROM,
   timeoutMs: authPolicy.channel.transportTimeoutMs
 }), environment.PUBLIC_APP_URL);
+// 0157 (D4): the answers to people who report, and the sweep of a report left CHECKING (it goes to a person after five minutes).
+const publicFlagMailRepository = new PostgresPublicFlagMailRepository(pool);
+const publicFlagAnswers = new PublicFlagAnswerReconciler(publicFlagMailRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs
+}), environment.PUBLIC_APP_URL);
 const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(async () => {
   await moderationStatements.reconcile(100);
+  await publicFlagAnswers.reconcile(100);
+  await publicFlagMailRepository.settleStuck();
   await moderationStatementRepository.deleteWordsDue();
 }, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);

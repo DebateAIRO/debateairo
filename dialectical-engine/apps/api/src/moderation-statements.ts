@@ -1,6 +1,7 @@
 import * as contract from "@debateai/contract";
 import { decrypt, type CryptoEnvelope, type PreparedPublicationCipher, type ReadableUserDekStore } from "@debateai/crypto";
-import type { ModerationStatementClaim, ModerationStatementGround, ModerationStatementKind, ModerationStatementOutcome, OwnModerationStatementRead, PostgresModerationStatementRepository } from "@debateai/db";
+import type { ModerationStatementClaim, ModerationStatementGround, ModerationStatementKind, ModerationStatementOutcome, OwnModerationStatementRead, PostgresModerationStatementRepository,
+  PostgresPublicFlagMailRepository, PublicFlagMailClaim, PublicFlagMailKind } from "@debateai/db";
 import type { MailTemplateId } from "@debateai/mail-templates";
 import { isSingleDeliverableRecipient, type TemplatedMailChannel } from "./mail-channel.js";
 
@@ -72,6 +73,54 @@ export class ModerationStatementReconciler {
         params: statementMailParams({ happenedAt: statement.happenedAt, ground: statement.ground,
           itemUrl: new URL(`/public/debate/${encodeURIComponent(statement.publicationRef)}`, this.appUrl).toString(),
           statementUrl: new URL(`/settings/notices#${encodeURIComponent(statement.statementId)}`, this.appUrl).toString() }) });
+      return "SENT";
+    } finally {
+      plain?.fill(0);
+      dek?.fill(0);
+    }
+  }
+}
+
+/* ----------------------------------------------------------------- the answers to people who report (D4) */
+
+/**
+ * The reporter's answers (DSA Art 16(4)-(6)): the receipt of a report a person will read, the automatic check's two decisions, and a person's
+ * decision (a close, or a review step that names the report). Each says when and links to the debate; the decisions say how automated means were
+ * used and give office@ and the routes. No words of the report or of the debate, no staff id, and nothing of the reporter but their own address.
+ * Reply-To office@ on the decisions (D6); the receipt has none.
+ */
+const FLAG_TEMPLATE_OF: Readonly<Record<PublicFlagMailKind, MailTemplateId>> = Object.freeze({
+  RECEIPT: "PUBLIC_FLAG_ANSWER_RECEIPT",
+  AUTO_HIDDEN: "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN",
+  AUTO_NOT_FOUND: "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND",
+  NO_BREACH: "PUBLIC_FLAG_ANSWER_NO_BREACH",
+  ACTED: "PUBLIC_FLAG_ANSWER_ACTED"
+});
+
+export class PublicFlagAnswerReconciler {
+  constructor(private readonly repository: Pick<PostgresPublicFlagMailRepository, "claim" | "read" | "complete">, private readonly users: Pick<ReadableUserDekStore, "load">,
+    private readonly channel: Pick<TemplatedMailChannel, "sendTemplated">, private readonly appUrl: string) {}
+
+  /** One pass. A mail whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. */
+  async reconcile(limit = 100): Promise<void> {
+    for (const claim of await this.repository.claim(limit)) {
+      let outcome: ModerationStatementOutcome;
+      try { outcome = await this.send(claim); } catch { outcome = "RETRY"; }
+      await this.repository.complete(claim, outcome);
+    }
+  }
+
+  private async send(claim: PublicFlagMailClaim): Promise<ModerationStatementOutcome> {
+    const mail = await this.repository.read(claim);
+    if (mail === null) return "DROPPED";
+    let dek: Buffer | undefined, plain: Buffer | undefined;
+    try {
+      dek = await this.users.load(mail.userId);
+      plain = decrypt(dek, mail.emailCiphertext, ["identity", "user.email_ciphertext", mail.userId, "run:none", mail.userId, `user-dek:${mail.userId}`, "1"]);
+      const recipient = plain.toString("utf8");
+      if (!isSingleDeliverableRecipient(recipient)) return "DROPPED";
+      await this.channel.sendTemplated({ to: recipient, templateId: FLAG_TEMPLATE_OF[mail.kind], locale: mail.mailLocale, messageId: claim.mailId,
+        params: { happened: new Date(mail.happenedAt).toISOString(), itemUrl: new URL(`/public/debate/${encodeURIComponent(mail.publicationRef)}`, this.appUrl).toString() } });
       return "SENT";
     } finally {
       plain?.fill(0);
