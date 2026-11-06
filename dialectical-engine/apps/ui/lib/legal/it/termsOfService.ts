@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada e Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. Québec: le presenti Condizioni sono disponibili in francese; scegli il francese con il selettore della lingua; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano." }
+      { kind: "p", text: "Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. Québec: le presenti Condizioni sono disponibili in francese; se scegli il Canada al momento della registrazione, le ricevi prima in francese e puoi scegliere invece l'inglese; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "135e83d365e65bfdca8b3642f23080f3c7a30f8be690ff6907b3c904d9f28726",
+  sha256: "daa048216b144f01d85ac9e003176deab0c2489ed5caa5e02bb7fd333e9e2e4a",
   eyebrow: "CONDIZIONI DI SERVIZIO · v2.9 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",

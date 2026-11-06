@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada a Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. Quebec: tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania." }
+      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. Quebec: tieto Podmienky sú dostupné vo francúzštine; ak pri registrácii zvolíte Kanadu, zobrazia sa vám najprv vo francúzštine a namiesto toho si môžete zvoliť angličtinu; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "f0ddae16fbf945f334011ce2c218cdd2199adbe6170db8c4997bf7f744d2d10b",
+  sha256: "96cdb9317a7720fa6bb9dbe10de0e7eff926bce501f785cfefb0808fc8ce2add",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.9 · ÚČINNÉ OD 12. OKTÓBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

@@ -102,9 +102,10 @@ test("consent components contain no hard-coded user-visible English", () => {
 
   const policyModal = sources.get("components/consent/PrivacyPolicyModal.tsx");
   const legalModal = sources.get("components/consent/LegalDocumentModal.tsx");
+  // The optional locale is sign-up in Canada's French-first override (owner ruling 2026-11-02).
   assert.match(
     policyModal,
-    /return <LegalDocumentModal document=\{useLegalDocument\("privacy"\)\} \{\.\.\.props\} \/>;/
+    /return <LegalDocumentModal document=\{useLegalDocument\("privacy", props\.locale\)\} \{\.\.\.props\} \/>;/
   );
   assert.match(legalModal, /t\(catalog, "consent\.policy\./);
   assert.doesNotMatch(policyModal, /\blabelKey\b/);

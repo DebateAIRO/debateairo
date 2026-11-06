@@ -317,7 +317,7 @@ Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzli
 
 ### A.3 Kanada und Quebec
 
-Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. **Quebec:** Diese Nutzungsbedingungen sind auf Französisch verfügbar; wählen Sie Französisch über die Sprachauswahl; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen.
+Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. **Quebec:** Diese Nutzungsbedingungen sind auf Französisch verfügbar; wenn Sie bei der Registrierung Kanada wählen, erhalten Sie sie zuerst auf Französisch und können stattdessen Englisch wählen; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen.
 
 ### A.4 Australien und Neuseeland
 

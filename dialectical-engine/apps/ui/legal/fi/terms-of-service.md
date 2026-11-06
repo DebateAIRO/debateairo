@@ -317,7 +317,7 @@ Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nos
 
 ### A.3 Kanada ja Quebec
 
-Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. **Quebec:** nämä käyttöehdot ovat saatavilla ranskaksi; valitse ranska kielivalitsimesta; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta.
+Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. **Quebec:** nämä käyttöehdot ovat saatavilla ranskaksi; jos valitset rekisteröityessäsi Kanadan, saat ne ensin ranskaksi ja voit valita sen sijaan englannin; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta.
 
 ### A.4 Australia ja Uusi-Seelanti
 

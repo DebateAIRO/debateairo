@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada und Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wählen Sie Französisch über die Sprachauswahl; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen." }
+      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wenn Sie bei der Registrierung Kanada wählen, erhalten Sie sie zuerst auf Französisch und können stattdessen Englisch wählen; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "5220c0812958a5dc42bcc51d31260a3f7d8725559732c9fe86d08abfdc914e6e",
+  sha256: "fccc187345ae38ffaeefc45d95842bde882751fe06c2121e0bd18daacf36657b",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.9 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

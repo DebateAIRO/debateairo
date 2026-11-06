@@ -317,7 +317,7 @@ Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko za�
 
 ### A.3 Kanada in Quebec
 
-Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. **Quebec:** ti Pogoji so na voljo v francoščini; francoščino izberite v izbirniku jezika; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja.
+Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. **Quebec:** ti Pogoji so na voljo v francoščini; če ob registraciji izberete Kanado, jih najprej prejmete v francoščini, namesto tega pa lahko izberete angleščino; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja.
 
 ### A.4 Avstralija in Nova Zelandija
 

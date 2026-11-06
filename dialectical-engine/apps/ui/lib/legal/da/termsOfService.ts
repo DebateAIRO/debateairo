@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada og Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. Quebec: Disse vilkår findes på fransk; vælg fransk med sprogvælgeren; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig." }
+      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. Quebec: Disse vilkår findes på fransk; hvis du vælger Canada ved tilmelding, får du dem først på fransk og kan i stedet vælge engelsk; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "ff1dc8655492df0328c2a9ac5940900e13d70edb7a2e33039ea4b522384ac075",
+  sha256: "9e7085557f572e9dc6ad245359af031622e9102c846b64106b3f77520a4f4a77",
   eyebrow: "TJENESTEVILKÅR · v2.9 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

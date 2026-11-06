@@ -317,7 +317,7 @@ Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, 
 
 ### A.3 Kanāda un Kvebeka
 
-Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. **Kvebeka:** šie Noteikumi ir pieejami franču valodā; izvēlieties franču valodu ar valodas pārslēgu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem.
+Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. **Kvebeka:** šie Noteikumi ir pieejami franču valodā; ja reģistrējoties izvēlaties Kanādu, tos vispirms saņemat franču valodā, un tās vietā varat izvēlēties angļu valodu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem.
 
 ### A.4 Austrālija un Jaunzēlande
 

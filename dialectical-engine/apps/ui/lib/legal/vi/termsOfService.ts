@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada và Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; hãy chọn tiếng Pháp bằng bộ chuyển đổi ngôn ngữ; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình." }
+      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "70150998e4176ae3cd5f55557419afd58e9d6f433d867f7802866fdc3b9ee700",
+  sha256: "56a65cf08d9aaccacab6f954cf857fffb67f25fbe3b34ebf8cfa564e11a49b08",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.9 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

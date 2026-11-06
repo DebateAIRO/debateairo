@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Il-Kanada u Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. Quebec: dawn it-Termini huma disponibbli bil-Franċiż; agħżel il-Franċiż bis-selettur tal-lingwa; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek." }
+      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. Quebec: dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "d4530fb5aa9afd968607e5f08b82f9041d1218b660778dbd94cc8f3ed35108ea",
+  sha256: "5b94168977cdcb512dff12a85b02e773632cc6f9d9f55e223a9224e45454bd28",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.9 · EFFETTIVI 12 TA’ OTTUBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

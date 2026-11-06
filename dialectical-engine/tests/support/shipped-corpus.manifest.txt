@@ -602,6 +602,7 @@ apps/ui/components/consent/LegalDocumentModal.tsx
 apps/ui/components/consent/LegalDocumentsProvider.tsx
 apps/ui/components/consent/PrivacyPolicyModal.tsx
 apps/ui/components/consent/TermsOfServiceModal.tsx
+apps/ui/components/consent/canadaLegalLanguage.ts
 apps/ui/components/consent/modalSemantics.ts
 apps/ui/components/consent/useConsentCatalog.ts
 apps/ui/components/consent/useLegalDocument.ts

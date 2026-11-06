@@ -317,7 +317,7 @@ E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye sz
 
 ### A.3 Kanada és Québec
 
-Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. **Québec:** e Feltételek francia nyelven is elérhetők; a franciát a nyelvválasztóban választhatja ki; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását.
+Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. **Québec:** e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását.
 
 ### A.4 Ausztrália és Új-Zéland
 

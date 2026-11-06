@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "カナダおよびケベック州",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "当社のプライバシー責任者（ケベック州においては個人情報保護責任者）は、当社の取締役であり、privacy@dezbatere.ro 宛てにご連絡いただけます。お客様のデータについては、当社のプライバシーポリシー附属書B.3に定めます。ケベック州： 本規約はフランス語でも提供されており、言語切替えでフランス語を選択できます。ディベートを非公開に保つ設定は初期設定で有効です。お客様は、自身に関する個人情報を検索結果から除外するよう請求できます。" }
+      { kind: "p", text: "当社のプライバシー責任者（ケベック州においては個人情報保護責任者）は、当社の取締役であり、privacy@dezbatere.ro 宛てにご連絡いただけます。お客様のデータについては、当社のプライバシーポリシー附属書B.3に定めます。ケベック州： 本規約はフランス語でも提供されており、登録時にカナダを選択すると、まずフランス語で表示され、代わりに英語を選択することもできます。ディベートを非公開に保つ設定は初期設定で有効です。お客様は、自身に関する個人情報を検索結果から除外するよう請求できます。" }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "b9e4646e4a6c3fcc6916abfbfdf2e35e7d6af5e6754cb5f817d9c62eba68dffc",
+  sha256: "2bad9db76261f9971e11f18dcd4b285e8c05babc0ff9e280f4effb8845cb1d08",
   eyebrow: "利用規約 · v2.9 · 発効日 2026年10月12日",
   title: "お客様に同意いただく事項",
   lede: "お客様と DMS Merchandise Shop S.R.L. との間の契約を平易な言葉で説明します。全19条および附属書Aです。末尾までスクロールしてください。",

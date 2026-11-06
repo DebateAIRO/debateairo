@@ -317,7 +317,7 @@ Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouve
 
 ### A.3 Canada et Québec
 
-Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est notre administrateur, joignable à privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. **Québec :** les présentes Conditions sont disponibles en français ; choisissez le français dans le sélecteur de langue ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant.
+Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est notre administrateur, joignable à privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. **Québec :** les présentes Conditions sont disponibles en français ; si vous choisissez le Canada lors de l’inscription, elles vous sont d’abord présentées en français et vous pouvez choisir l’anglais à la place ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant.
 
 ### A.4 Australie et Nouvelle-Zélande
 

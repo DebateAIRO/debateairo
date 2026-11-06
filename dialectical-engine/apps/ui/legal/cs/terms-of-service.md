@@ -317,7 +317,7 @@ Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení m�
 
 ### A.3 Kanada a Quebec
 
-Naším pracovníkem pro ochranu soukromí, a v Quebecu osobou odpovědnou za ochranu osobních údajů, je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Na vaše údaje se vztahují naše Zásady ochrany osobních údajů, příloha B.3. **Quebec:** tyto Podmínky jsou dostupné ve francouzštině; francouzštinu zvolte v přepínači jazyků; nastavení, která zachovávají soukromí vašich debat, jsou ve výchozím stavu zapnuta; můžete požádat o odstranění osobních údajů, které se vás týkají, z výsledků vyhledávání.
+Naším pracovníkem pro ochranu soukromí, a v Quebecu osobou odpovědnou za ochranu osobních údajů, je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Na vaše údaje se vztahují naše Zásady ochrany osobních údajů, příloha B.3. **Quebec:** tyto Podmínky jsou dostupné ve francouzštině; pokud při registraci zvolíte Kanadu, zobrazí se vám nejprve ve francouzštině a místo toho si můžete zvolit angličtinu; nastavení, která zachovávají soukromí vašich debat, jsou ve výchozím stavu zapnuta; můžete požádat o odstranění osobních údajů, které se vás týkají, z výsledků vyhledávání.
 
 ### A.4 Austrálie a Nový Zéland
 

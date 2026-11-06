@@ -30,6 +30,7 @@ import { dobErrorMessage, resolveDobLocale } from '@/lib/dob/dobLocale';
 import { AuthShell } from '../AuthShell';
 import authEnglish from '@/messages/en/auth.json';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
+import { canadaLegalLocale, canadaLegalSwitch, type CanadaLegalLocale } from '../consent/canadaLegalLanguage';
 import { PrivacyPolicyModal } from '../consent/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../consent/TermsOfServiceModal';
 import { useLegalDocument } from '../consent/useLegalDocument';
@@ -108,9 +109,25 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const italyInputRef = useRef<HTMLInputElement | null>(null);
     const italyShown = region.country === ITALY_COUNTRY || italyRevealed;
     const italyMissing = italyShown && !italyApproved;
-    const privacyDocument = useLegalDocument('privacy');
-    const termsDocument = useLegalDocument('terms');
+    /* Canada (owner ruling 2026-11-02), as on email sign-up: while Region says Canada both documents open in French
+       whatever the page language, the switch at the top of either one moves both to English and back, and the
+       request's `locale` names the language of the pair it sends (emails and the account follow `ui_locale`). */
+    const [canadaChoice, setCanadaChoice] = useState<CanadaLegalLocale>('fr');
+    const legalOverride = canadaLegalLocale(region.country, canadaChoice);
+    const privacyDocument = useLegalDocument('privacy', legalOverride);
+    const termsDocument = useLegalDocument('terms', legalOverride);
     const chrome = useChromeI18n();
+    const documentsLocale = legalOverride ?? catalogLocale(chrome.locale);
+    // The documents the boxes accepted are no longer the ones on offer: every tick on them goes.
+    function withdrawAcceptance() {
+        setPrivacyAccepted(false);
+        setTermsAccepted(false);
+        setItalyApproved(false);
+    }
+    const languageSwitch = legalOverride === undefined ? undefined : canadaLegalSwitch(legalOverride, next => {
+        setCanadaChoice(next);
+        withdrawAcceptance();
+    });
     function replaceAuthority(nextToken: string, nextKind: SocialFlowKind | null) {
         authority.current = { token: nextToken, kind: nextKind };
         setToken(nextToken);
@@ -281,7 +298,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         const ownedToken = token;
         const ownedKind = kind;
         try {
-            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, ...(italyShown && italyApproved ? { italy_approval: true as const } : {}), locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, ...(italyShown && italyApproved ? { italy_approval: true as const } : {}), locale: documentsLocale, ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             if (!owns(owner, ownedToken, ownedKind))
                 return;
             startup.current = null;
@@ -293,6 +310,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             setItalyApproved(false);
             setItalyRevealed(false);
             setItalyError(null);
+            setCanadaChoice('fr');
             if ('status' in response) {
                 replaceAuthority(response.enrollment_token, 'enroll');
                 setFlowExpiry(response.expires_at);
@@ -435,6 +453,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
  <div className="authField"><label htmlFor="social-email">{t(catalog, "auth.email")}</label><input id="social-email" name="email" type="email" autoComplete="email" value={email} disabled={busy} onChange={e => setEmail(e.target.value)} aria-invalid={!!errors.email} aria-describedby={errors.email ? 'social-email-error' : undefined}/><InlineFieldMessage id="social-email-error" message={fieldError('email')}/></div>
  <PhoneField optional id="social-phone" catalog={catalog} value={phone} onChange={setPhone} error={fieldError('phone')} disabled={busy}/>
  <RegionField catalog={catalog} locale={chrome.locale} value={region} onChange={next => {
+                // Picking or leaving Canada changes the documents' language, and a tick on the old pair does not carry over.
+                if ((canadaLegalLocale(next.country, canadaChoice) ?? catalogLocale(chrome.locale)) !== documentsLocale)
+                    withdrawAcceptance();
                 setRegion(next);
                 setRegionMissing(false);
                 // Leaving Italy before any refusal revealed the box unmounts it, and its tick goes with it.
@@ -498,11 +519,11 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     }}>{recoveryMode ? t(catalog, "auth.login.useAuthenticatorCode") : t(catalog, "auth.login.useRecoveryCode")}</button> : null}</> : null}
  </div> : null}
  {!token && !stepUpResult && !busy && !secured ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
- {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => setPolicyOpen(false)} onAcknowledge={() => {
+ {policyOpen ? <PrivacyPolicyModal open mode="consent" locale={legalOverride} languageSwitch={languageSwitch} onClose={() => setPolicyOpen(false)} onAcknowledge={() => {
                 setPrivacyAccepted(true);
                 setPolicyOpen(false);
             }}/> : null}
- {termsOpen ? <TermsOfServiceModal open mode="consent" onClose={() => setTermsOpen(false)} onAcknowledge={() => {
+ {termsOpen ? <TermsOfServiceModal open mode="consent" locale={legalOverride} languageSwitch={languageSwitch} onClose={() => setTermsOpen(false)} onAcknowledge={() => {
                 setTermsAccepted(true);
                 setTermsOpen(false);
             }}/> : null}

@@ -328,7 +328,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada i Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. Quebec: niniejsze Warunki są dostępne w języku francuskim; wybierz język francuski w przełączniku języka; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą." }
+      { kind: "p", text: "Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. Quebec: niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą." }
     ]
   },
   {
@@ -368,7 +368,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.9",
-  sha256: "c5836e5a62fad50d1bc838c0dd106a2ead825b27f1a576ecd311b9ed7e81cf35",
+  sha256: "0302b00a23d6fe81d4c5da8cd26233f491c66031bd241c1cfead14d11e0e86cf",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.9 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
