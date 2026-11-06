@@ -161,6 +161,8 @@ function mockReviewStep(row: MockReview, action: string, pointer?: string, text?
   else if (!row.hidden) return "PUBLIC_REVIEW_NOT_HIDDEN";
   else if (action === "REMOVE_DIG") row.removed = true;
   else if (action === "CORRECT") row.corrected.set(pointer!, text!);
+  // 0157: DECIDE records the final ground of a debate kept hidden, and writes no log row (only REPUBLISH ends a hide).
+  else if (action === "DECIDE") return null;
   row.log.push({ revision: row.log.length + 1, action, piece_kind: null, actor_staff_id: MOCK_REVIEWER, at: new Date().toISOString() });
   return null;
 }

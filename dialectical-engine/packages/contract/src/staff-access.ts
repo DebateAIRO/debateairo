@@ -120,11 +120,25 @@ const TeamPracticeShape = { practice_ref: z.uuid(), charge_micros: TeamLimitMicr
  * Decision 33: a public debate under review. Each passkey is bound to the debate, the step, the piece and the log's revision (and to the text's digest for a correction, whose words never enter the proof).
  */
 export const PublicReviewPieceKindSchema = z.enum(["SNAPSHOT", "UPDATE", "REPORT", "DIG"]);
-export const PublicReviewStepSchema = z.enum(["REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT"]);
+export const PublicReviewStepSchema = z.enum(["REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT", "DECIDE"]);
+/**
+ * The DSA notices (migration 0157; DSA Art 17(3)): what a statement of reasons needs from each step. The ground is one or more fixed codes (Terms §7's rules, or
+ * the law), never free text; the source says where the facts came from (the Report button names its report). A removal, a hidden report, a correction and
+ * DECIDE (the final ground of a debate that stays hidden) need all of it and the facts a person typed; a hide may carry a suspected ground and a source, and
+ * never waits for them; a re-publish and a put-back carry none. The facts' words never enter the proof: their digest does, as a correction's text.
+ */
+export const ModerationGroundSchema = z.enum(["UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]);
+export type ModerationGround = z.infer<typeof ModerationGroundSchema>;
+export const ModerationSourceSchema = z.enum(["REPORT_BUTTON", "EMAIL_NOTICE", "OWN_INITIATIVE", "AUTHORITY_ORDER"]);
+export type ModerationSource = z.infer<typeof ModerationSourceSchema>;
+const ModerationGroundsSchema = z.array(ModerationGroundSchema).max(7).refine((grounds) => new Set(grounds).size === grounds.length, "MODERATION_GROUND_REPEATED");
+const Sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/u);
+const ModerationFactsSchema = z.string().trim().min(1).max(4000);
 const PublicReviewPointerSchema = z.string().regex(/^(\/[A-Za-z0-9_]{1,64}){1,12}$/u);
-const PublicReviewHideShape = { publication_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid() };
+const PublicReviewGroundShape = { grounds: ModerationGroundsSchema, source: ModerationSourceSchema.nullable(), flag_id: z.uuid().nullable() };
+const PublicReviewHideShape = { publication_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape };
 const PublicReviewStepShape = { ...PublicReviewHideShape, step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
-    pointer: PublicReviewPointerSchema.nullable(), text_sha256: z.string().regex(/^[0-9a-f]{64}$/u).nullable() };
+    pointer: PublicReviewPointerSchema.nullable(), text_sha256: Sha256HexSchema.nullable(), facts_sha256: Sha256HexSchema.nullable() };
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -164,9 +178,11 @@ export const TeamLimitPageSchema = z.object({
     log: z.array(TeamLimitLogEntrySchema).max(100)
 }).strict();
 export type TeamLimitPage = z.infer<typeof TeamLimitPageSchema>;
-export const PublicReviewHideRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+export const PublicReviewHideRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape, proof_handle: OpaqueHandleSchema }).strict();
 export const PublicReviewStepRequestSchema = z.object({ step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
-    pointer: PublicReviewPointerSchema.nullable(), text: z.string().trim().min(1).max(20000).nullable(), expected_revision: RevisionSchema, operation_id: z.uuid(), proof_handle: OpaqueHandleSchema }).strict();
+    pointer: PublicReviewPointerSchema.nullable(), text: z.string().trim().min(1).max(20000).nullable(), expected_revision: RevisionSchema, operation_id: z.uuid(),
+    ...PublicReviewGroundShape, facts: ModerationFactsSchema.nullable(), proof_handle: OpaqueHandleSchema }).strict();
+export type PublicReviewStepRequest = z.infer<typeof PublicReviewStepRequestSchema>;
 const PublicReviewPieceSchema = z.object({ pointer: PublicReviewPointerSchema, original: z.string(), corrected: z.string().nullable() }).strict();
 const PublicReviewLogEntrySchema = z.object({ revision: z.number().int().positive(), action: z.enum(["HIDE", "REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT"]), piece_kind: PublicReviewPieceKindSchema.nullable(),
     actor_staff_id: z.uuid(), at: z.iso.datetime({ offset: true }) }).strict();

@@ -38,6 +38,10 @@ export class PostgresPublicFlagRepository {
     return await this.one("SELECT identity.settle_public_flag($1::uuid,$2,$3,$4,$5,$6,$7,$8) AS value",
       [input.flagId, input.verdict, input.reason, input.providerRef, input.modelId, input.inputTokens, input.outputTokens, input.costUsd]) as PublicFlagSettled;
   }
+  /** 0157: the automatic hide's quote, the page's own words the check copied, sealed under the publication's key. False: the report did not hide its debate. */
+  async recordQuote(flagId: string, content: CryptoEnvelope): Promise<boolean> {
+    return await this.one("SELECT identity.record_public_flag_quote($1::uuid,$2::jsonb) AS value", [flagId, JSON.stringify(content)]) === true;
+  }
   async readQueue(actor: StaffContext, token: string): Promise<readonly PublicFlagQueueRow[]> {
     const value = (await guardedAuthorityQuery<{ value: PublicFlagQueueRow[] }>(this.pool, "SELECT staff.read_public_flag_queue($1::jsonb,$2) AS value", [actor, token])).rows[0]?.value;
     return value ?? [];

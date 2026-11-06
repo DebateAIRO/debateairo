@@ -74,6 +74,7 @@ const DIG_TREE_SETTLED = "0153_dig_tree_settled.sql";
 const REGION_WIDEN = "0154_region_iceland_liechtenstein.sql";
 const OWNER_ANSWER_WRITES = "0155_owner_answer_writes.sql";
 const MODERATION_NOTICE = "0156_moderation_notice.sql";
+const MODERATION_STATEMENTS = "0157_moderation_statements.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -106,40 +107,41 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(46);
-    expect(real.at(-27)).toBe(RLS);
-    expect(real.at(-26)).toBe(V4);
-    expect(real.at(-25)).toBe(WEB);
-    expect(real.at(-24)).toBe(INVESTIGATIONS);
-    expect(real.at(-23)).toBe(DIG_MODEL);
-    expect(real.at(-22)).toBe(DIG_PICKS);
-    expect(real.at(-21)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-20)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-19)).toBe(TREE_UPDATES);
-    expect(real.at(-18)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-17)).toBe(SPEND_KINDS);
-    expect(real.at(-16)).toBe(PATH_SUGGESTIONS);
-    expect(real.at(-15)).toBe(TEAM_LIMIT);
-    expect(real.at(-14)).toBe(RUN_HANDOVER);
-    expect(real.at(-13)).toBe(ASK_CLARIFY_CHARGE);
-    expect(real.at(-12)).toBe(WEB_RESEARCHED_UNSETTLED);
-    expect(real.at(-11)).toBe(TEAM_ALLOWANCES);
-    expect(real.at(-10)).toBe(PUBLIC_TREE);
-    expect(real.at(-9)).toBe(ERASURE_KEEPS_PUBLIC);
-    expect(real.at(-8)).toBe(PUBLIC_REPORT_TEAM_MONTH);
-    expect(real.at(-7)).toBe(PUBLIC_REVIEW);
-    expect(real.at(-6)).toBe(PUBLIC_FLAG);
-    expect(real.at(-5)).toBe(REPORT_EXPORT);
-    expect(real.at(-4)).toBe(DIG_TREE_SETTLED);
-    expect(real.at(-3)).toBe(REGION_WIDEN);
-    expect(real.at(-2)).toBe(OWNER_ANSWER_WRITES);
-    expect(real.at(-1)).toBe(MODERATION_NOTICE);
+    expect(real).toHaveLength(47);
+    expect(real.at(-28)).toBe(RLS);
+    expect(real.at(-27)).toBe(V4);
+    expect(real.at(-26)).toBe(WEB);
+    expect(real.at(-25)).toBe(INVESTIGATIONS);
+    expect(real.at(-24)).toBe(DIG_MODEL);
+    expect(real.at(-23)).toBe(DIG_PICKS);
+    expect(real.at(-22)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-21)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-20)).toBe(TREE_UPDATES);
+    expect(real.at(-19)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-18)).toBe(SPEND_KINDS);
+    expect(real.at(-17)).toBe(PATH_SUGGESTIONS);
+    expect(real.at(-16)).toBe(TEAM_LIMIT);
+    expect(real.at(-15)).toBe(RUN_HANDOVER);
+    expect(real.at(-14)).toBe(ASK_CLARIFY_CHARGE);
+    expect(real.at(-13)).toBe(WEB_RESEARCHED_UNSETTLED);
+    expect(real.at(-12)).toBe(TEAM_ALLOWANCES);
+    expect(real.at(-11)).toBe(PUBLIC_TREE);
+    expect(real.at(-10)).toBe(ERASURE_KEEPS_PUBLIC);
+    expect(real.at(-9)).toBe(PUBLIC_REPORT_TEAM_MONTH);
+    expect(real.at(-8)).toBe(PUBLIC_REVIEW);
+    expect(real.at(-7)).toBe(PUBLIC_FLAG);
+    expect(real.at(-6)).toBe(REPORT_EXPORT);
+    expect(real.at(-5)).toBe(DIG_TREE_SETTLED);
+    expect(real.at(-4)).toBe(REGION_WIDEN);
+    expect(real.at(-3)).toBe(OWNER_ANSWER_WRITES);
+    expect(real.at(-2)).toBe(MODERATION_NOTICE);
+    expect(real.at(-1)).toBe(MODERATION_STATEMENTS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All forty-six real steps were applied by that same run and stay committed; the probe left nothing.
+    // All forty-seven real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(46);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(47);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -180,7 +182,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(PUBLIC_REPORT_TEAM_MONTH);
     expect(await ledger()).not.toContain(PUBLIC_REVIEW);
     expect(await ledger()).not.toContain(PUBLIC_FLAG);
-    expect(await ledger()).not.toContain(MODERATION_NOTICE);
+    expect(await ledger()).not.toContain(MODERATION_STATEMENTS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

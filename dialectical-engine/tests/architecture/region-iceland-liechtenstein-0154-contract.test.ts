@@ -15,7 +15,7 @@ const codesOf = (sql: string): string[] => [...(/registration_region_country_cod
 
 describe("0154: the Region list's country CHECK widened by IS and LI", () => {
   it("follows 0153 in the chain, with its own loader, and is bound to its own bytes", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0153,loadForward0154,loadForward0155,loadForward0156]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157]");
     const previous = read("migrations/lineage/dig-tree-settled-forward0153.json");
     const manifest = JSON.parse(read("migrations/lineage/region-iceland-liechtenstein-forward0154.json")) as { previous: { manifestSha256: string }; migration: { sha256: string } };
     expect(manifest.previous.manifestSha256).toBe(sha256(previous));

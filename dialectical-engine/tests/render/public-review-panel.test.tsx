@@ -28,6 +28,24 @@ async function mount(api: PublicReviewClient) {
 }
 const button = (name: string) => [...host!.querySelectorAll("button")].find((entry) => entry.textContent === name);
 async function press(name: string) { await act(async () => { button(name)!.dispatchEvent(new MouseEvent("click", { bubbles: true })); }); }
+/** 0157's ground in the confirm box: tick a rule, pick where the facts came from, type the facts. */
+async function ground(rule: string, source: string, facts: string | null, report?: string) {
+  await act(async () => {
+    [...host!.querySelectorAll<HTMLInputElement>("[data-review-ground] input[type=checkbox]")].find((box) => box.labels?.[0]?.textContent === rule)!.click();
+    [...host!.querySelectorAll<HTMLInputElement>("[data-review-ground] input[type=radio]")].find((box) => box.labels?.[0]?.textContent === source)!.click();
+  });
+  if (report !== undefined) await act(async () => {
+    const select = host!.querySelector<HTMLSelectElement>("[data-review-ground] select")!;
+    select.value = report;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  if (facts !== null) await act(async () => {
+    const box = host!.querySelector<HTMLTextAreaElement>("[data-review-ground] textarea")!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(box, facts);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const NO_GROUND = { grounds: [], source: null, flagId: null, facts: null };
 async function open() {
   const input = host!.querySelector<HTMLInputElement>("#public-review-link")!;
   input.value = `https://dezbatere.ro/public/debate/${REF}`;
@@ -47,9 +65,39 @@ describe("the review panel", () => {
     expect(api.read).toHaveBeenCalledWith(REF);
     await press("Hide now");
     expect(host!.querySelector("[data-review-confirm]")!.textContent).toContain("Hide this debate now");
+    // 0157: a hide never waits for its ground; it says so, and Confirm is ready at once.
+    expect(host!.querySelector("[data-review-ground]")!.getAttribute("data-review-ground")).toBe("OPTIONAL");
+    expect(host!.querySelector("[data-review-ground] textarea")).toBeNull();
+    expect(button("Confirm")!.disabled).toBe(false);
     expect(hide).not.toHaveBeenCalled();
     await press("Confirm");
-    expect(hide).toHaveBeenCalledWith(REF, 0);
+    expect(hide).toHaveBeenCalledWith(REF, 0, NO_GROUND);
+  });
+  it("0157, gap 1: a hide can name what is suspected and the report it came from; a removal waits for a rule, a source and the facts; DECIDE keeps it hidden with its final ground", async () => {
+    const hide = vi.fn(async () => ({}));
+    await mount(client({ hide } as never));
+    await open();
+    await press("Hide now");
+    await ground("Terms §7: personal data about other people", "A report made with the Report button", null, LATER);
+    await press("Confirm");
+    expect(hide).toHaveBeenCalledWith(REF, 0, { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: LATER, facts: null });
+    act(() => root?.unmount()); host?.remove();
+    const step = vi.fn(async () => ({}));
+    await mount(client({ read: vi.fn(async () => pageOf(true)), step } as never));
+    await open();
+    await press("Take this dig out");
+    expect(host!.querySelector("[data-review-ground]")!.getAttribute("data-review-ground")).toBe("REQUIRED");
+    expect(button("Confirm")!.disabled).toBe(true);
+    await ground("Terms §7: unlawful content", "A report by email", "  The email named the street and the person.  ");
+    expect(button("Confirm")!.disabled).toBe(false);
+    await press("Confirm");
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG,
+      ground: { grounds: ["UNLAWFUL"], source: "EMAIL_NOTICE", flagId: null, facts: "The email named the street and the person." } });
+    await press("Decide: keep it hidden");
+    expect(host!.querySelector("[data-review-confirm]")!.textContent).toContain("stays hidden");
+    await ground("Terms §7: hate speech", "Our own initiative", "The whole question is hate speech.");
+    await press("Confirm");
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "DECIDE", ground: { grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flagId: null, facts: "The whole question is hate speech." } });
   });
   it("while hidden: each dig's text with what it changed and its state; a correction shows both texts; the steps name their piece", async () => {
     const step = vi.fn(async () => ({}));
@@ -62,9 +110,11 @@ describe("the review panel", () => {
     expect(host!.querySelector("[data-review-original]")!.textContent).toBe("Holds a name.");
     expect(host!.querySelector("[data-review-corrected]")!.textContent).toBe("A corrected summary.");
     await press("Take this dig out");
+    await ground("Terms §7: personal data about other people", "Our own initiative", "It names a person.");
     await press("Confirm");
-    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG });
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG, ground: { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flagId: null, facts: "It names a person." } });
     await press("Put this back");
+    expect(host!.querySelector("[data-review-ground]")).toBeNull();
     await press("Confirm");
     expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "PUT_BACK", pieceKind: "UPDATE", pieceId: LATER });
     await press("Put back");

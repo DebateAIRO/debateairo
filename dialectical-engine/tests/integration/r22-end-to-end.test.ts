@@ -14,7 +14,7 @@ import type { DigTarget, V4Path } from "../../apps/ui/lib/v4/types.js";
 import { stubJudgement } from "../support/preview-gate-stubs.js";
 import { publicDigAsk, publicPathViews } from "../../apps/ui/lib/v4/publicPage.js";
 import { composeQuestion, purposeLinesOfGoal } from "../../apps/ui/lib/v4/askText.js";
-import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
+import { canonicalPublicReviewBinding, groundFieldsOf } from "../../apps/api/src/staff/public-review.js";
 import { PostgresPublicReviewRepository } from "@debateai/db";
 import { TEAM_FEATURE_PLAN_ID, readAbuseLimits } from "@debateai/register";
 import { readWebRunPlan } from "../../apps/runner/src/run-settings.js";
@@ -400,16 +400,22 @@ describe("R22 on the real API", () => {
     const revision = (await q.query<{ n: number }>("SELECT coalesce(max(revision),0)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [debate.ref])).rows[0]!.n;
     const operationId = randomUUID();
     const textSha = piece.text === undefined ? null : createHash("sha256").update(piece.text).digest("hex");
-    const intent = step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: debate.ref, expected_revision: revision, operation_id: operationId }
-      : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: debate.ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null, text_sha256: textSha, expected_revision: revision, operation_id: operationId };
+    // 0157: a correction states its ground; a hide and a re-publish carry none.
+    const facts = step === "CORRECT" ? "It names a private person." : null;
+    const factsSha = facts === null ? null : createHash("sha256").update(facts).digest("hex");
+    const ground = step === "CORRECT" ? { grounds: ["PERSONAL_DATA" as const], source: "OWN_INITIATIVE" as const, flag_id: null } : { grounds: [], source: null, flag_id: null };
+    const intent = step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: debate.ref, expected_revision: revision, operation_id: operationId, ...ground }
+      : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: debate.ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null, text_sha256: textSha, expected_revision: revision, operation_id: operationId,
+        ...ground, facts_sha256: factsSha };
     const binding = canonicalPublicReviewBinding(intent as never, { expectedRevision: revision, hidden: false }) as unknown as Record<string, unknown>;
     const proofId = randomUUID(), c = actor.context as { securityEpoch: number; grantRevision: number; accountSecurityEpoch: number };
     await q.query(`INSERT INTO staff.action_proof(proof_id,staff_id,user_id,ordinary_session_id,privilege_session_id,security_epoch,account_security_epoch,grant_revision,binding,credential_id,verified_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'fixture-key',now(),now()+interval '5 minutes')`, [proofId, actor.staffId, actor.userId, actor.sessionId, actor.privilegeId, c.securityEpoch, c.accountSecurityEpoch, c.grantRevision, binding]);
     await authorizeStaffAlertFixture(q, operationId);
     const alert = { schema: "staff-alert-v1", event: "PUBLIC_REVIEW_CHANGED", operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } };
     const content = piece.text === undefined ? null : await world.withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ text: piece.text }));
+    const sealedFacts = facts === null ? null : await world.withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ facts }));
     return new PostgresPublicReviewRepository(world.fixtureSuperuserPool).act({ actor: actor.context as never, proof: { proofId, binding } as never, step, publicationRef: debate.ref, pieceKind: piece.kind ?? null, pieceId: piece.id ?? null,
-      pointer: piece.pointer ?? null, textSha256: textSha, content, expectedRevision: revision, operationId, alertIntent: alert as never });
+      pointer: piece.pointer ?? null, textSha256: textSha, content, ground: groundFieldsOf(intent as never), facts: sealedFacts, expectedRevision: revision, operationId, alertIntent: alert as never });
   }
   async function freePublic(who: R22Account, question: string): Promise<Readonly<{ ref: string; root: string }>> {
     const started = await ask(who, question, { settings: FREE, publicLane: { freePublicNotice: true } });

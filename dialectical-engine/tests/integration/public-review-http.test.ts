@@ -70,8 +70,11 @@ function server(options: Readonly<{ allowed?: boolean; proof?: boolean; locked?:
   return { built, asked, bindings, calls, intents };
 }
 const handle = () => randomBytes(32).toString("base64url");
-const proved = (change: Record<string, unknown> = {}) => ({ expected_revision: 3, operation_id: randomUUID(), proof_handle: handle(), ...change });
-const stepBody = (change: Record<string, unknown>) => proved({ step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text: null, ...change });
+const proved = (change: Record<string, unknown> = {}) => ({ expected_revision: 3, operation_id: randomUUID(), grounds: [], source: null, flag_id: null, proof_handle: handle(), ...change });
+const stepBody = (change: Record<string, unknown>) => proved({ step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text: null, facts: null, ...change });
+/** 0157: what a removal, a hidden report, a correction and DECIDE must carry. */
+const GROUNDED = { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flag_id: null, facts: "It names a private person and where they live." };
+const NO_GROUND = { grounds: [], source: null, flag_id: null };
 const post = (built: ReturnType<typeof server>["built"], path: string, payload: unknown) => built.inject({ method: "POST", url: `/v1/admin/public-review/${REF}/${path}`, headers: headers(true), payload: payload as never });
 
 describe("reading", () => {
@@ -105,7 +108,7 @@ describe("the steps", () => {
     const ok = await post(yes.built, "hide", body);
     expect(ok.statusCode).toBe(200);
     expect(yes.calls[0]).toMatchObject({ name: "act", step: "HIDE", publicationRef: REF, expectedRevision: 3, operationId: body.operation_id, content: null });
-    expect(yes.bindings[0]).toEqual(canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_HIDE", publication_ref: REF, expected_revision: 3, operation_id: body.operation_id }, STATE));
+    expect(yes.bindings[0]).toEqual(canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_HIDE", publication_ref: REF, expected_revision: 3, operation_id: body.operation_id, ...NO_GROUND }, STATE));
     expect(yes.intents[0]).toMatchObject({ event: "PUBLIC_REVIEW_CHANGED" });
     await close?.();
     const no = server({ allowed: false, designation: "DELEGATED" });
@@ -132,40 +135,74 @@ describe("the steps", () => {
     expect(waits.statusCode).toBe(503);
     expect(waits.json().error).toBe("STAFF_ALERT_UNAVAILABLE");
     expect(locked.calls).toHaveLength(1);
-    const ceremony = await locked.built.inject({ method: "POST", url: "/v1/admin/webauthn/action/options", headers: headers(true), payload: { intent: { action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text_sha256: null, expected_revision: 3, operation_id: randomUUID() } } });
+    const ceremony = await locked.built.inject({ method: "POST", url: "/v1/admin/webauthn/action/options", headers: headers(true), payload: { intent: { action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text_sha256: null, expected_revision: 3, operation_id: randomUUID(), ...NO_GROUND, facts_sha256: null } } });
     expect(ceremony.statusCode).toBe(503);
   });
   it("a correction binds the text's digest, never the words; only a string a person reads can be replaced; a proof for one piece differs from another's", async () => {
     const yes = server();
     const text = "A corrected question?";
-    const ok = await post(yes.built, "step", stepBody({ step: "CORRECT", piece_kind: "SNAPSHOT", piece_id: REF, pointer: "/question", text }));
+    const ok = await post(yes.built, "step", stepBody({ ...GROUNDED, step: "CORRECT", piece_kind: "SNAPSHOT", piece_id: REF, pointer: "/question", text }));
     expect(ok.statusCode, ok.body).toBe(422); // The made-up snapshot is no whole public debate: it would not read after the change, so nothing is recorded.
     expect(yes.calls).toEqual([]);
-    const row = await post(yes.built, "step", stepBody({ step: "CORRECT", piece_kind: "UPDATE", piece_id: UPDATE, pointer: "/line", text }));
+    const row = await post(yes.built, "step", stepBody({ ...GROUNDED, step: "CORRECT", piece_kind: "UPDATE", piece_id: UPDATE, pointer: "/line", text }));
     expect(row.statusCode).toBe(200);
     const digest = createHash("sha256").update(text).digest("hex");
     expect(yes.calls[0]).toMatchObject({ step: "CORRECT", pieceKind: "UPDATE", pieceId: UPDATE, pointer: "/line", textSha256: digest, content: { sealed: { text } } });
     expect(JSON.stringify(yes.bindings.at(-1))).not.toContain(text);
     for (const pointer of ["/fate", "/nothing"]) {
-      const not = await post(yes.built, "step", stepBody({ step: "CORRECT", piece_kind: "UPDATE", piece_id: UPDATE, pointer, text }));
+      const not = await post(yes.built, "step", stepBody({ ...GROUNDED, step: "CORRECT", piece_kind: "UPDATE", piece_id: UPDATE, pointer, text }));
       expect(not.statusCode, pointer).toBe(404);
       expect(not.json().error).toBe("PUBLIC_REVIEW_PIECE_UNKNOWN");
     }
-    const unknown = await post(yes.built, "step", stepBody({ step: "CORRECT", piece_kind: "UPDATE", piece_id: randomUUID(), pointer: "/line", text }));
+    const unknown = await post(yes.built, "step", stepBody({ ...GROUNDED, step: "CORRECT", piece_kind: "UPDATE", piece_id: randomUUID(), pointer: "/line", text }));
     expect(unknown.statusCode).toBe(404);
     expect(yes.calls).toHaveLength(1);
-    const of = (piece: string) => canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "PUT_BACK", piece_kind: "UPDATE", piece_id: piece, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN }, STATE).bodySha256;
+    const of = (piece: string) => canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "PUT_BACK", piece_kind: "UPDATE", piece_id: piece, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN, ...NO_GROUND, facts_sha256: null }, STATE).bodySha256;
     expect(of(UPDATE)).not.toBe(of(RUN));
+  });
+  it("gap 1 (DSA Art 17(3)): a removal names its ground, its source and its facts, or nothing is asked of the passkey; the facts are sealed and only their digest is bound", async () => {
+    const yes = server();
+    const bare = await post(yes.built, "step", stepBody({ step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+    expect(bare.statusCode).toBe(422);
+    expect(bare.json().error).toBe("PUBLIC_REVIEW_GROUND_INVALID");
+    for (const missing of [{ grounds: [] }, { source: null }, { facts: null }, { source: "REPORT_BUTTON" }, { flag_id: UPDATE }]) {
+      expect((await post(yes.built, "step", stepBody({ ...GROUNDED, ...missing, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }))).statusCode, JSON.stringify(missing)).toBe(422);
+    }
+    expect((await post(yes.built, "step", stepBody({ ...GROUNDED, step: "PUT_BACK", piece_kind: "UPDATE", piece_id: UPDATE }))).statusCode).toBe(422);
+    expect(yes.bindings).toEqual([]);
+    expect(yes.calls).toEqual([]);
+    const ok = await post(yes.built, "step", stepBody({ ...GROUNDED, grounds: ["UNLAWFUL", "PERSONAL_DATA"], step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+    expect(ok.statusCode, ok.body).toBe(200);
+    const digest = createHash("sha256").update(GROUNDED.facts).digest("hex");
+    expect(yes.calls[0]).toMatchObject({ step: "REMOVE_DIG", ground: { grounds: "PERSONAL_DATA,UNLAWFUL", source: "OWN_INITIATIVE", flag_id: "", facts_sha256: digest }, facts: { sealed: { facts: GROUNDED.facts } } });
+    expect(JSON.stringify(yes.bindings)).not.toContain(GROUNDED.facts);
+    const other = canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN,
+      grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flag_id: null, facts_sha256: digest }, STATE).bodySha256;
+    const same = canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN,
+      grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flag_id: null, facts_sha256: digest }, STATE).bodySha256;
+    expect(other).not.toBe(same);
+  });
+  it("gap 1: a hide may name a suspected ground and the report it came from, and never waits for them; DECIDE records the final ground of a debate kept hidden", async () => {
+    const locked = server({ locked: true });
+    const hide = await post(locked.built, "hide", proved({ grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flag_id: UPDATE }));
+    expect(hide.statusCode).toBe(200);
+    expect(locked.calls[0]).toMatchObject({ step: "HIDE", alertIntent: null, ground: { grounds: "PERSONAL_DATA", source: "REPORT_BUTTON", flag_id: UPDATE, facts_sha256: "" }, facts: null });
+    await close?.();
+    const yes = server();
+    const decide = await post(yes.built, "step", stepBody({ ...GROUNDED, step: "DECIDE" }));
+    expect(decide.statusCode, decide.body).toBe(200);
+    expect(yes.calls[0]).toMatchObject({ step: "DECIDE", pieceKind: null, pieceId: null, ground: { grounds: "PERSONAL_DATA", source: "OWN_INITIATIVE" } });
+    expect((await post(yes.built, "step", stepBody({ ...GROUNDED, step: "DECIDE", piece_kind: "DIG", piece_id: RUN }))).statusCode).toBe(422);
   });
   it("a body that does not fit its step is refused; the database's own words pass through plainly", async () => {
     const yes = server();
-    expect((await post(yes.built, "step", stepBody({ step: "CORRECT", piece_kind: "UPDATE", piece_id: UPDATE, pointer: "/line", text: null }))).statusCode).toBe(422);
-    expect((await post(yes.built, "step", stepBody({ step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN, text: "words" }))).statusCode).toBe(422);
-    expect((await post(yes.built, "step", stepBody({ step: "REMOVE_DIG", piece_kind: null, piece_id: null }))).statusCode).toBe(422);
+    expect((await post(yes.built, "step", stepBody({ ...GROUNDED, step: "CORRECT", piece_kind: "UPDATE", piece_id: UPDATE, pointer: "/line", text: null }))).statusCode).toBe(422);
+    expect((await post(yes.built, "step", stepBody({ ...GROUNDED, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN, text: "words" }))).statusCode).toBe(422);
+    expect((await post(yes.built, "step", stepBody({ ...GROUNDED, step: "REMOVE_DIG", piece_kind: null, piece_id: null }))).statusCode).toBe(422);
     await close?.();
     for (const [code, status] of [["PUBLIC_REVIEW_NOT_HIDDEN", 409], ["PUBLIC_REVIEW_ALREADY_HIDDEN", 409], ["PUBLIC_REVIEW_PIECE_UNKNOWN", 404], ["PUBLIC_REVIEW_NOT_PUBLIC", 404]] as const) {
       const says = server({ databaseSays: code });
-      const answer = await post(says.built, "step", stepBody({ step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+      const answer = await post(says.built, "step", stepBody({ ...GROUNDED, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
       expect(answer.statusCode, code).toBe(status);
       expect(answer.json().error).toBe(code);
       await close?.();

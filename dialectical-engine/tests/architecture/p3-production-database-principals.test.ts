@@ -1374,6 +1374,14 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.read_moderation_notice(uuid,uuid)",
     "EXECUTE ON FUNCTION identity.complete_moderation_notice(uuid,uuid,text)"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0157_moderation_statements.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.record_public_flag_quote(uuid,jsonb)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

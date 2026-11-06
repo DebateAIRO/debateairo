@@ -19,9 +19,9 @@ const bodyOf = (name: string): string => {
 };
 
 describe("0156: the moderation notice", () => {
-  it("follows 0155 last in the chain, with its own loader, and is bound to its own bytes", () => {
+  it("follows 0155 in the chain, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0155,loadForward0156]");
+    expect(chain).toContain("loadForward0155,loadForward0156,loadForward0157]");
     expect(chain).toContain("import { loadForward0156 } from './migration-forward0156.js';");
     const loader = read("packages/db/src/migration-forward0156.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
