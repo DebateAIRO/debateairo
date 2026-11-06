@@ -66,7 +66,8 @@ describe("the public page's words", () => {
     "v4.public.addedByGone": "A contributor added to this on {date}",
     // r2-14, r2-15, r2-16 and r2-21 (owner, 3 Nov), word for word.
     "v4.public.report": "Report a problem",
-    "v4.public.flag.NOT_FOUND": "An automatic check didn't find this. You can report again with more details, and a person will read it. You can also write to support@dezbatere.ro.",
+    // r2-15's line was untrue for a report stopped before any check (the DSA notices, D5 of 6 Nov): one line, true for every refusal.
+    "v4.public.flag.NOT_FOUND": "We have not acted on this report: it was stopped automatically, and no person has read it. If you think that is wrong, write to support@dezbatere.ro and a person will read it, or complain to office@dezbatere.ro within six months; you can also go to a certified out-of-court body or to court.",
     "v4.public.dig.terms": "This uses your own quota. An AI checks it before it can change this public page.",
     "v4.public.dig.howItWorks": "How this works",
     "v4.public.signedOut.createAccount": "Create a free account",

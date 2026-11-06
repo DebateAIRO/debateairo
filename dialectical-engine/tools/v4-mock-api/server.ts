@@ -38,7 +38,7 @@ import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor, type PlanId } from "../../packages/register/src/billing-plans.js";
 import { quadernoPricingFromKeyFile, type QuadernoPriced } from "./quaderno-tax.js";
 import {
-  contributionOf, contributionRewriteOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
+  contributionOf, contributionRewriteOf, mockFlagStateOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
   type PublicMode, type PublicState
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
@@ -1740,7 +1740,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!body.success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const ref = parts[3]!;
     if (!publicDebates.has(ref)) return sendJson(req, res, 200, { state: "NOT_FOUND" }, C.PublicFlagAnswerSchema);
-    const state = body.data.claim.includes("#person") ? "WITH_A_PERSON" as const : body.data.claim.includes("hide") ? "HIDDEN" as const : "NOT_FOUND" as const;
+    // The body carries the good-faith statement (D5): a press without it fails the schema above, as the API's does.
+    const state = mockFlagStateOf(body.data.claim);
     mockFlags.push({ flag_id: crypto.randomUUID(), publication_ref: ref, reporter: "Quiet Heron", state: state === "HIDDEN" ? "HIDDEN" : state === "NOT_FOUND" ? "NOT_FOUND" : "QUEUED", verdict: state === "HIDDEN" ? "AGREE" : state === "NOT_FOUND" ? "NOT_FOUND" : null,
       reason: state === "HIDDEN" ? "CONTENT" : null, created_at: new Date().toISOString(), judged_at: null, dismissed_at: null, where: body.data.where, claim: body.data.claim, debate_hidden: state === "HIDDEN" });
     if (state === "HIDDEN") {

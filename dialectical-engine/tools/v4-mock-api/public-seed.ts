@@ -182,3 +182,8 @@ export function contributionOf(positionRef: string, onRef: string | null, update
     dig_paths: [{ position_ref: `p-${updateRef.slice(0, 8)}`, line: "A path of this dig's own.", fate: "HELD_UP", points: ["A made-up point this dig argued."] }]
   };
 }
+
+/** Decision 35's pretend check: "hide" in the claim hides, "#person" goes to a person, anything else is the one refusal every refusal shares (the DSA notices, D5). */
+export function mockFlagStateOf(claim: string): "WITH_A_PERSON" | "HIDDEN" | "NOT_FOUND" {
+  return claim.includes("#person") ? "WITH_A_PERSON" : claim.includes("hide") ? "HIDDEN" : "NOT_FOUND";
+}

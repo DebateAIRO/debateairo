@@ -8,13 +8,14 @@ import { V4PublicFlag } from "../../apps/ui/components/v4/V4PublicFlag.js";
 import { V4PublicSessionProvider } from "../../apps/ui/components/v4/V4PublicSession.js";
 import { V4PublicTopMenu } from "../../apps/ui/components/v4/V4PublicPage.js";
 import { V4CopyLink } from "../../apps/ui/components/v4/V4PublicMark.js";
+import { pressPublicFlag, type PublicFlagPorts } from "../../apps/api/src/public-flag.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: unknown; className?: string }) => <a href={href} className={className}>{children as never}</a> }));
 /**
  * Decision 35, the button: signed out it offers sign-in and the address; signed in, a bound report and one line back. Owner screen review (3 Nov):
  * the label is "Report a problem" (r2-14); the form closes at once with a thank-you and the answer replaces it later in the same quiet line (public-f5);
- * a box left too short asks for a little more; focus goes into the form and back to the link; the "didn't find this" line gives the address (r2-15).
+ * a box left too short asks for a little more; focus goes into the form and back to the link; the line for a refusal gives the addresses and the routes, and is true whatever stopped the report (the DSA notices, D5).
  */
 const V4 = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
 const REF = "11111111-1111-4111-8111-111111111111";
@@ -34,10 +35,12 @@ function set(field: HTMLInputElement | HTMLTextAreaElement, value: string): void
   Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(field, value);
   field.dispatchEvent(new Event("input", { bubbles: true }));
 }
-async function fill(where: string, claim: string) {
+const goodFaith = (): HTMLInputElement => host!.querySelector<HTMLInputElement>("input[name=goodFaith]")!;
+async function fill(where: string, claim: string, inGoodFaith = true) {
   await act(async () => {
     set(host!.querySelector<HTMLInputElement>("input[name=where]")!, where);
     set(host!.querySelector<HTMLTextAreaElement>("textarea[name=claim]")!, claim);
+    if (goodFaith().checked !== inGoodFaith) goodFaith().click();
   });
   await act(async () => { host!.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
 }
@@ -56,14 +59,26 @@ describe("Report a problem on a public page", () => {
     expect(send).not.toHaveBeenCalled();
   });
   it.each([
-    ["NOT_FOUND", "An automatic check didn't find this. You can report again with more details, and a person will read it. You can also write to support@dezbatere.ro."],
-    ["HIDDEN", V4["v4.public.flag.HIDDEN"]],
+    ["NOT_FOUND", "We have not acted on this report: it was stopped automatically, and no person has read it. If you think that is wrong, write to support@dezbatere.ro and a person will read it, or complain to office@dezbatere.ro within six months; you can also go to a certified out-of-court body or to court."],
+    ["HIDDEN", "Thank you. An automatic check agreed with your report and hid this debate, with no person involved. A person will now review it."],
     ["WITH_A_PERSON", V4["v4.public.flag.WITH_A_PERSON"]]
   ] as const)("signed in, %s: its one line, word for word", async (state, words) => {
     const send = await mount(true, vi.fn(async () => ({ state })) as never);
     await fill("The first path", "It names a private person's home.");
-    expect(send).toHaveBeenCalledWith(REF, { where: "The first path", claim: "It names a private person's home." });
+    expect(send).toHaveBeenCalledWith(REF, { where: "The first path", claim: "It names a private person's home.", good_faith: true });
     expect(line()).toBe(words);
+  });
+  it("the good-faith box is required (DSA Art 16(2)(d)): left empty, a line under it asks for it, focus goes to it, and nothing is sent", async () => {
+    const send = await mount(true);
+    expect(goodFaith().required).toBe(true);
+    expect(host!.querySelector(`label[for="${goodFaith().id}"]`)!.textContent).toBe("I believe in good faith that this report is accurate and complete.");
+    await fill("Here", "A long enough claim.", false);
+    expect(send).not.toHaveBeenCalled();
+    expect([...host!.querySelectorAll("[data-public-flag-more]")].map((one) => one.textContent)).toEqual([V4["v4.public.flag.goodFaithMore"]]);
+    expect(goodFaith().getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(goodFaith());
+    await fill("Here", "A long enough claim.");
+    expect(send).toHaveBeenCalledTimes(1);
   });
   it("focus goes into the form when it opens, and back to the link when it closes", async () => {
     await mount(true);
@@ -121,6 +136,36 @@ describe("Report a problem on a public page", () => {
  * public-f4 (owner screen review, 3 Nov): the link sits in the page's top bar (on a phone, in the bar's menu) and at the foot of each path, where the
  * form already names the path; the form opens as a small window on a computer and as a sheet from the bottom on a phone, never as loose lines.
  */
+/*
+ * Gap 4 of the DSA notices (Art 16(5)-(6)): what the reporter reads must be true whatever stopped the report. The server answers every refusal with
+ * one state, so nothing about the limits leaks; each case below goes through the real press, and the line it ends on says that no person has read
+ * the report and gives the routes, and never that a person will read it or that a check ran.
+ */
+describe("Report a problem: the reporter's line is true in each case (DSA Art 16(5)-(6))", () => {
+  const debate = { question: "Should fares be free?" } as never;
+  const judge = (verdict: string) => () => ({ providerRef: "provider-a", modelId: "model-a", complete: async () => ({
+    text: JSON.stringify(verdict === "AGREE" ? { verdict, reason: "PERSONAL", quote: "Should fares be free?" } : { verdict, reason: null, quote: null }), usage: null }) }) as never;
+  const ports = (opened: string, settled: string | null, verdict = "NOT_FOUND"): PublicFlagPorts => ({
+    repository: { readTarget: async () => (opened === "NOT_PUBLIC" ? null : "22222222-2222-4222-8222-222222222222"), open: async () => opened as never, settle: async () => settled as never },
+    judge: judge(verdict), seal: async () => ({}) as never, readPublicDebate: async () => debate, limits: {} as never
+  });
+  const shared = "We have not acted on this report: it was stopped automatically, and no person has read it. If you think that is wrong, write to support@dezbatere.ro and a person will read it, or complain to office@dezbatere.ro within six months; you can also go to a certified out-of-court body or to court.";
+  it.each([
+    ["LIMITED (over the limit: nothing is stored, no check ran)", ports("LIMITED", null), shared],
+    ["NOT_PUBLIC (a guessed or private debate)", ports("NOT_PUBLIC", null), shared],
+    ["the check's NOT_FOUND", ports("CHECK", "NOT_FOUND"), shared],
+    ["HIDDEN (the check agreed; no person was involved)", ports("CHECK", "HIDDEN", "AGREE"), "Thank you. An automatic check agreed with your report and hid this debate, with no person involved. A person will now review it."]
+  ])("%s", async (_case, given, words) => {
+    const send = vi.fn(async (publicRef: string, body: { where: string; claim: string }) => ({
+      state: await pressPublicFlag({ ownerRef: "33333333-3333-4333-8333-333333333333", publicationRef: publicRef, flagId: "44444444-4444-4444-8444-444444444444", ...body }, given) }));
+    await mount(true, send as never);
+    await fill("The question", "It names a private person in its words.");
+    expect(line()).toBe(words);
+    expect(line()).not.toMatch(/limit|report again/iu);
+    if (words === shared) expect(line()).not.toMatch(/a person will read this|didn't find/iu);
+  });
+});
+
 describe("Report a problem: where it sits and how its form opens (public-f4)", () => {
   const css = readFileSync(resolve(process.cwd(), "apps/ui/app/public/debate/[id]/public-lane.css"), "utf8");
   it("at the foot of a path, the form already names that path, and the person can still change it", async () => {
@@ -133,9 +178,9 @@ describe("Report a problem: where it sits and how its form opens (public-f4)", (
     const where = host.querySelector<HTMLInputElement>("input[name=where]")!;
     expect(where.value).toBe("Better service first");
     expect(toggle().getAttribute("aria-controls")).toBe(host.querySelector(".v4PubFlagPanel")!.id);
-    await act(async () => { set(host!.querySelector<HTMLTextAreaElement>("textarea[name=claim]")!, "It names a private person's home."); });
+    await act(async () => { set(host!.querySelector<HTMLTextAreaElement>("textarea[name=claim]")!, "It names a private person's home."); goodFaith().click(); });
     await act(async () => { host!.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
-    expect(send).toHaveBeenCalledWith(REF, { where: "Better service first", claim: "It names a private person's home." });
+    expect(send).toHaveBeenCalledWith(REF, { where: "Better service first", claim: "It names a private person's home.", good_faith: true });
     // After sending, the next report on this path starts from the path's name again.
     await act(async () => { toggle().click(); });
     expect(host.querySelector<HTMLInputElement>("input[name=where]")!.value).toBe("Better service first");

@@ -443,27 +443,27 @@ describe("R22 on the real API", () => {
     const debate = await freePublic(bea, "Should Harbour Town move the fish market?");
     const words = (await world.stranger.readPublicDebate(debate.ref)).question;
     world.flag.reply = () => JSON.stringify({ verdict: "AGREE", reason: "PERSONAL", quote: words });
-    expect(await pressing.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It names a private person in its words." })).toEqual({ state: "HIDDEN" });
+    expect(await pressing.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It names a private person in its words.", good_faith: true })).toEqual({ state: "HIDDEN" });
     expect(await isGone(debate.ref)).toBe(true);
     expect(await flagsOf(debate.ref)).toEqual([{ state: "HIDDEN", verdict: "AGREE" }]);
     // Re-published: reports only go to a person, whatever the AI would say.
     await act(owner, debate, "REPUBLISH");
-    expect(await second.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It still names a private person." })).toEqual({ state: "WITH_A_PERSON" });
+    expect(await second.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It still names a private person.", good_faith: true })).toEqual({ state: "WITH_A_PERSON" });
     expect(await isGone(debate.ref)).toBe(false);
     // The AI does not agree: the plain sentence; a second report with details goes to the queue and hides nothing.
     const other = await freePublic(bea, "Should Harbour Town rebuild the sea wall?");
     world.flag.reply = () => JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null });
-    const notFound = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "It breaks the rules somewhere here." });
+    const notFound = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "It breaks the rules somewhere here.", good_faith: true });
     expect(notFound).toEqual({ state: "NOT_FOUND" });
-    expect(v4Catalog[`v4.public.flag.${notFound.state}`]).toContain("An automatic check didn't find this.");
-    const again = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "With more details: the second sentence breaks the rules." });
+    expect(v4Catalog[`v4.public.flag.${notFound.state}`]).toContain("We have not acted on this report: it was stopped automatically, and no person has read it.");
+    const again = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "With more details: the second sentence breaks the rules.", good_faith: true });
     expect(again).toEqual({ state: "WITH_A_PERSON" });
     expect(await isGone(other.ref)).toBe(false);
     // The rate limit: this person's reports an hour; past it, the one answer every refusal shares. No row is added.
     const limit = await new PostgresFlagLimit().personHour();
     const stranger3 = await world.account("gus");
     const answers: string[] = [];
-    for (let press = 0; press <= limit; press += 1) answers.push((await stranger3.client.flagPublicDebate(other.ref, { where: "Here", claim: `A claim number ${String(press)} about this page.` })).state);
+    for (let press = 0; press <= limit; press += 1) answers.push((await stranger3.client.flagPublicDebate(other.ref, { where: "Here", claim: `A claim number ${String(press)} about this page.`, good_faith: true })).state);
     expect(answers.at(-1)).toBe("NOT_FOUND");
     saw("11", `AGREE: HIDDEN, 410, row HIDDEN/AGREE; after re-publish WITH_A_PERSON, still public; NOT_FOUND answer: "${v4Catalog[`v4.public.flag.${notFound.state}`]!}"; second report WITH_A_PERSON, nothing hidden; ${String(limit)} an hour, then NOT_FOUND. The judge's reply is scripted; the mail is not sent here`);
   }, 300_000);
