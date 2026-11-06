@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AnswerSchema, type Answer, type AnswerPathRewrites, type PathRewrite } from "../../packages/contract/src/index.js";
+import {
+  AnswerSchema, type Answer, type AnswerPathRewrites, type PathRewrite, type PathsChangedSince
+} from "../../packages/contract/src/index.js";
+import { V4ChangedSince } from "../../apps/ui/components/v4/V4PathRewrite.js";
 import { cardLabel } from "../../apps/ui/lib/v4/mapLooks.js";
+import type { ReportStage } from "../../apps/ui/lib/v4/reportWriting.js";
 import { DIG_RUNS, PATH_REWRITES } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { advance, CATALOG, harness, mountMap, page, resetHarness, seededAnswer, settle, unmountMap } from "./v4-debate-harness.js";
 
@@ -20,8 +26,10 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
  * was written. V4 screen review (owner picks 3 Nov 2026), dig-f19 / map-f17: since the 31 Oct ruling the main answer
  * updates itself after each change, so the top of the map says something only once a report exists and the map has
  * moved on since it: "Your report is older than the map." with [Update my report], the changed paths named under it and
- * never a count, and "It will wait for your running dig." while one runs. A later rewrite brings the line back, read
- * while the page is open.
+ * never a count, and "It will wait for your dig in progress." while one runs (the owner's words, fourth round, 6 Nov). A
+ * later rewrite brings the line back, read while the page is open. The fourth round also hides the whole box while a new
+ * report version waits for digs or is written (it takes those changes in), until the map changes after that version: the
+ * box takes the map's report stage (useMapReport's `stage`) for that, and keeps today's behaviour without it.
  */
 
 const ROOT = PATH_REWRITES[DIG_RUNS.root]!;
@@ -138,5 +146,68 @@ describe("after a report", () => {
     const reads = harness.loadAnswer.mock.calls.length;
     await advance(60_000);
     expect(harness.loadAnswer.mock.calls.length).toBe(reads);
+  });
+});
+
+describe("the owner's fourth round (6 Nov): the box and the report's stage", () => {
+  let ownRoot: Root | undefined;
+  let ownHost: HTMLDivElement | undefined;
+  const SINCE_ONE: PathsChangedSince = { count: 2, since_report_version: 1 };
+
+  async function draw(changedSince: PathsChangedSince, reportStage?: ReportStage, digRunning = false): Promise<void> {
+    ownHost ??= document.body.appendChild(document.createElement("div"));
+    ownRoot ??= createRoot(ownHost);
+    await act(async () => {
+      ownRoot!.render(
+        <V4ChangedSince changedSince={changedSince} reportHref="/v4/debate/r/report" catalog={CATALOG} locale="en" digRunning={digRunning}
+          {...(reportStage === undefined ? {} : { reportStage })} />
+      );
+    });
+  }
+  const box = (): HTMLElement | null => ownHost!.querySelector<HTMLElement>(".v4ChangedSince");
+
+  afterEach(async () => {
+    await act(async () => { ownRoot?.unmount(); });
+    ownRoot = undefined;
+    ownHost?.remove();
+    ownHost = undefined;
+  });
+
+  it("without the stage, the box shows whenever the map moved on since the latest report, as before", async () => {
+    await draw(SINCE_ONE, undefined, true);
+    expect(box()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
+    expect(box()!.textContent).toContain("It will wait for your dig in progress.");
+  });
+
+  it("is hidden whole while a new version waits for digs, and while it is written", async () => {
+    await draw(SINCE_ONE, { kind: "WAITING_DIGS", version: 2, waitingForDigs: 1 }, true);
+    expect(box()).toBeNull();
+    expect(ownHost!.textContent).toBe("");
+    await draw(SINCE_ONE, { kind: "WRITING", version: 2 });
+    expect(box()).toBeNull();
+  });
+
+  it("comes back when the map changes after that version, and not before", async () => {
+    await draw(SINCE_ONE, { kind: "WRITING", version: 2 });
+    expect(box()).toBeNull();
+    // Version 2 is written; the map is read again after it: nothing changed since.
+    await draw({ count: 0, since_report_version: 2 }, { kind: "DONE", version: 2 });
+    expect(box()).toBeNull();
+    // A read of the map from before version 2 was written still counts against version 1: version 2 has those changes.
+    await draw(SINCE_ONE, { kind: "DONE", version: 2 });
+    expect(box()).toBeNull();
+    // A dig changes a path after version 2: the box is back.
+    await draw({ count: 1, since_report_version: 2 }, { kind: "DONE", version: 2 });
+    expect(box()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
+    // The investigation reopened (a dig started): as before.
+    await draw({ count: 1, since_report_version: 2 }, { kind: "NONE" });
+    expect(box()).not.toBeNull();
+  });
+
+  it("a version that did not finish hides nothing: the report that stands is older than the map", async () => {
+    await draw(SINCE_ONE, { kind: "FAILED", version: 2 });
+    expect(box()).not.toBeNull();
+    await draw(SINCE_ONE, { kind: "UNKNOWN" });
+    expect(box()).not.toBeNull();
   });
 });
