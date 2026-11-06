@@ -26,7 +26,9 @@ const V4 = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/m
 const RUN = "aaaa2222-2222-4222-8222-222222222222";
 const NO_NEWS: readonly V4Change[] = Object.freeze([]);
 const NOTHING_CHANGED: ReadonlySet<string> = new Set<string>();
-const PAUSED: WaitState = { kind: "PAUSED", until: "2026-12-01T00:00:00.000Z", canContinue: false };
+// Noon UTC: 1 December in every time zone the tests run in (midnight UTC is 30 November west of UTC), as
+// tests/unit/v4-state-words.test.ts does.
+const PAUSED: WaitState = { kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false };
 
 function servedMap(): V4Map {
   const seed = createSeed(fixture);
