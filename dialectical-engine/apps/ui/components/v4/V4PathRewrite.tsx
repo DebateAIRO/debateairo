@@ -386,6 +386,12 @@ export function V4ChangedSince(props: Readonly<{
  * written does (it reads every finished rewrite when it starts); so does one written since, when the map was read before
  * it was (the count then still names the older version). A version that did not finish takes nothing in, and an
  * investigation reopened by a dig (or not read) says nothing about versions: the count speaks for itself, as before.
+ *
+ * The DONE case is a stand-in for the map's next read of the answer, and it has one known gap. A rewrite that finishes
+ * after the new version began but before it was written is in that old count, yet the version does not have it. Until the
+ * answer is read again, the box stays hidden for it. The page closes that gap by reading the answer again as soon as a
+ * version is written (wiring list item 21, with the `reportStage` prop): the fresh count then names the new version, and
+ * this case only keeps the box from flashing between the version's end and that read.
  */
 function reportCoversChanges(stage: ReportStage, sinceVersion: number): boolean {
   switch (stage.kind) {
