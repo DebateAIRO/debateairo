@@ -186,7 +186,7 @@ describe("0159: a path debate's results per path", () => {
     const corpus = read("tests/support/shipped-corpus.manifest.txt").split("\n");
     for (const path of ["packages/db/src/migration-forward0159.ts", "packages/db/src/path-results.ts"]) expect(corpus, path).toContain(path);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0159, below) the forty-eighth", "## The path results per run (0159)", "`loadForward0159`", "MIGRATION_FORWARD0159_", "-- n1: expand", "-- n1: keeps-verifier"]) {
+    for (const needle of ["(0159, below) the forty-ninth", "## The path results per run (0159)", "`loadForward0159`", "MIGRATION_FORWARD0159_", "-- n1: expand", "-- n1: keeps-verifier"]) {
       expect(readme, needle).toContain(needle);
     }
     expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0159_path_results.sql` (after `0158_start_paths.sql`, `n1: expand`)");

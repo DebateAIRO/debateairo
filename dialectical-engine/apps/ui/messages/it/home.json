@@ -74,7 +74,7 @@
   "home.turn": "Turno {turn}",
   "home.sampleCoda": "Il round termina qui. Non viene dichiarato alcun vincitore. Ricevi la trascrizione, i due punteggi per turno e l’anello su cui hai ceduto.",
   "home.closingTitle": "La tua argomentazione è forte quanto il suo anello più debole.",
-  "home.closingLede": "Affronta un round. Quattro turni, circa nove minuti e una trascrizione che indica esattamente dove hai smesso di rispondere.",
+  "home.closingLede": "Affronta un round. Quattro turni e una trascrizione che indica esattamente dove hai smesso di rispondere.",
   "home.pricingCopyPlusTax": "Inizia gratis. I piani a pagamento partono da {price} + {taxName} al mese. Puoi disdire in qualsiasi momento.",
   "home.pricingCopyNoTax": "Inizia gratis. I piani a pagamento partono da {price} al mese, senza imposte aggiunte. Puoi disdire in qualsiasi momento.",
   "home.pricingCopyChoose": "Inizia gratis. I piani a pagamento partono da {price} al mese, più imposte ove applicabili. Puoi disdire in qualsiasi momento.",

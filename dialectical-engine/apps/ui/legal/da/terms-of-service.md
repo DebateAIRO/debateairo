@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.15 · GÆLDENDE FRA 1. NOVEMBER 2026
+eyebrow: TJENESTEVILKÅR · v2.16 · GÆLDENDE FRA 1. NOVEMBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.15
+endMarker: SLUT PÅ VILKÅRENE · v2.16
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.15 · Effective 1. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.16 · Effective 1. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. På det gratis abonnement er dine debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når en debat er offentlig, kan alle læse den, og den forbliver offentlig. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -211,9 +211,7 @@ Afsnit 8 (for så vidt angår allerede offentliggjort indhold), 15, 16 og 18 bes
 
 ## 12. Betalingsabonnementer
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine tilbyder et gratis abonnement. Et betalt **Premium**-abonnement bliver tilgængeligt og giver adgang til hele modeludvalget samt mulighed for selv at indstille debattens målere.
+Dialectical Engine tilbyder et gratis abonnement. Tre betalte abonnementer, **Plus**, **Pro** og **Max**, bliver tilgængelige; hvert af dem giver adgang til hele modeludvalget samt mulighed for selv at indstille debattens målere.
 
 **Før du betaler**, viser vi dig direkte over betalingsknappen: abonnementet; den samlede pris inklusive gældende afgifter; faktureringsperioden; at abonnementet fornys automatisk, indtil det opsiges; datoen, hvor en eventuel gratis prøveperiode udløber, og det beløb, du derefter skal betale; samt hvordan du opsiger. Du bekræfter vilkårene om fornyelse ved at markere et særskilt felt. På knappen står der **Abonner og betal** (på rumænsk *Abonați-vă și plătiți*). Vi sender dig en bekræftelse på et varigt medium med de samme oplysninger, disse vilkår og fortrydelsesformularen.
 
@@ -233,7 +231,7 @@ Dialectical Engine tilbyder et gratis abonnement. Et betalt **Premium**-abonneme
 
 **Tilbageførsler.** Hvis du bestrider en debitering hos din kortudsteder, kan vi suspendere betalingsfunktionerne, mens tvisten behandles. Vi opkræver ikke gebyrer herfor.
 
-**Lovbestemte rettigheder først.** Hvis tjenesten ikke er i overensstemmelse med det, vi har lovet, har du ret til at få den bragt i overensstemmelse eller til et forholdsmæssigt afslag eller en tilbagebetaling i henhold til lovgivningen. Derudover gælder det, at hvis du opsiger et betalt abonnement i løbet af en faktureringsperiode, refunderer vi den andel af periodens pris, som du ikke har brugt, målt efter abonnementets forbrug, uanset hvor mange dage der er gået: Har du brugt 30 %, refunderer vi 70 %; har du ikke brugt noget, refunderer vi hele prisen. Bed om det på support@dezbatere.ro; når vi har refunderet, ophører abonnementet. Gælder fortrydelsesretten i afsnit 13 også, får du den refusion, der er størst. Brugsgrænserne for begge abonnementer offentliggøres i produktet; vi giver meddelelse, før vi skærper dem på en måde, der påvirker dig væsentligt.
+**Lovbestemte rettigheder først.** Hvis tjenesten ikke er i overensstemmelse med det, vi har lovet, har du ret til at få den bragt i overensstemmelse eller til et forholdsmæssigt afslag eller en tilbagebetaling i henhold til lovgivningen. Derudover gælder det, at hvis du opsiger et betalt abonnement i løbet af en faktureringsperiode, refunderer vi den andel af periodens pris, som du ikke har brugt, målt efter abonnementets forbrug, uanset hvor mange dage der er gået: Har du brugt 30 %, refunderer vi 70 %; har du ikke brugt noget, refunderer vi hele prisen. Bed om det på support@dezbatere.ro; når vi har refunderet, ophører abonnementet. Gælder fortrydelsesretten i afsnit 13 også, får du den refusion, der er størst. Brugsgrænserne for alle abonnementer offentliggøres i produktet; vi giver meddelelse, før vi skærper dem på en måde, der påvirker dig væsentligt.
 
 ## 13. Din fortrydelsesret
 
@@ -250,6 +248,8 @@ Hvis du bor et andet sted, angiver bilag A den fortrydelsesret eller betænkning
 Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for **30 dage** efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode.
 
 **Disse vilkår.** Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst **30 dage**, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions.
+
+Version 2.16 erstattede version 2.15: afsnit 12 nævner de betalte abonnementer, Plus, Pro og Max, og afsnit 12 og 15 indeholder ikke længere redaktionelle noter; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede.
 
 Version 2.15 erstattede version 2.14: afsnit 12 oplyser, at vores priser vises uden afgifter, som pris + moms, og at afgiften lægges til ved betalingen.
 
@@ -278,8 +278,6 @@ Version 2.7 erstattede version 2.6: den tilføjer spørgsmålskontrollen, som l�
 **Dit indhold og din brug.** Du er ansvarlig for det, du indsender og offentliggør, herunder for at have ret til at indsende det og for at overholde afsnit 7.
 
 **Begivenheder uden for vores kontrol.** Vi misligholder ikke aftalen, hvis vi forhindres i at opfylde den på grund af forhold uden for vores rimelige kontrol. En tredjeparts modeludbyders svigt eller tilbagetrækning er ikke automatisk et sådant forhold; hvis det gør tjenesten utilgængelig, finder afsnit 14 anvendelse, og du kan opsige og få tilbagebetaling som beskrevet deri.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Immaterielle rettigheder
 

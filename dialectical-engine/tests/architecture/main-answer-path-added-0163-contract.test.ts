@@ -115,7 +115,7 @@ describe("0163: a dig under the main question of a path debate updates the main 
   it("C-R is documented and listed", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain(LOADER_PATH);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0163, below) the fifty-second", "## A dig under the main question updates the main answer (0163)", "`loadForward0163`",
+    for (const needle of ["(0163, below) the fifty-third", "## A dig under the main question updates the main answer (0163)", "`loadForward0163`",
       "MIGRATION_FORWARD0163_", "`-- n1: drained`", "`constraint_definition`"]) expect(readme, needle).toContain(needle);
     expect(read("deploy/preview-auth-dev/v1/README.md"))
       .toContain("`migrations/0163_main_answer_path_added.sql` (after `0162_carry_on_session_free_digs.sql`, `n1: drained`)");

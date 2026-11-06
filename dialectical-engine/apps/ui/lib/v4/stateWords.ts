@@ -1,5 +1,5 @@
 import type { RunProjection } from "@debateai/contract";
-import { formatDate, t, type MessageCatalog } from "../i18n/translate.js";
+import { formatDate, formatDateAndTime, t, type MessageCatalog } from "../i18n/translate.js";
 import { CLOCK_24H } from "./clock.js";
 import type { DigState } from "./types.js";
 
@@ -83,14 +83,19 @@ export function clockText(value: string | number | Date, locale: string): string
 }
 
 /**
- * A clock time that names its day only when it is not today: "14:31", or "3 Nov, 14:31" for a start or a reset on
- * another day (a question paused since last month, a reset after midnight). `now` is the moment the page compares with.
+ * A clock time that names its day only when it is not today: "14:31", or "3 November 2026, 14:31" on another day (a
+ * report or a question started before midnight, a wait that ends tomorrow). `now` is the moment the page compares with.
+ * The owner's answers of 5 Nov 2026: question 4 A (the long form with the year for every date but the month reset) and
+ * the third round ("Started 4 November 2026, 14:02" on the report page, the map's report line, the waiting card and the
+ * list of your questions alike; a same-day start stays "Started 14:02"). This is the one helper all of them use, so they
+ * always agree. English joins the date and the clock as the owner's record writes them ("29 October 2026, 14:30");
+ * every other language lets its own date format join them (German "4. November 2026 um 14:02"). 24 hours everywhere.
  */
 export function whenText(value: string | number | Date, locale: string, now: number = Date.now()): string | null {
   const when = validDate(value);
   if (when === null) return null;
   if (when.toDateString() === new Date(now).toDateString()) return clockText(when, locale);
-  return formatDate(locale, when, { day: "numeric", month: "short", ...CLOCK_24H });
+  return formatDateAndTime(locale, when);
 }
 
 /** "1 December": the day the month's pause ends, in the page's language. */

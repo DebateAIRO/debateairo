@@ -67,7 +67,12 @@ describe("S02 public debate answer surface", () => {
     expect.soft(text).toContain(publicDebate.question);
     expect(container.querySelector("h1")!.textContent).toBe(publicDebate.question);
     expect.soft(text).toContain(publicDebate.author_pseudonym);
-    expect.soft(text).toContain(new Date(publicDebate.published_at).toLocaleDateString());
+    // Owner's answer to question 5 (5 Nov 2026): English pages write the day first, whatever the browser's own form; and to
+    // question 4 (A): "published" takes the long form with the year ("24 August 2026"), never "24/08/2026".
+    const published = new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(new Date(publicDebate.published_at));
+    expect(published).toMatch(/^\d{1,2} August 2026$/u);
+    expect.soft(text).toContain(`published ${published}`);
+    expect.soft(text).not.toContain(new Intl.DateTimeFormat("en-GB").format(new Date(publicDebate.published_at)));
     expect.soft(text).toContain("The public summary remains readable.");
     expect.soft(text).toContain("A later primary source could change the result.");
     expect.soft(text).toContain("A replicated contrary result.");

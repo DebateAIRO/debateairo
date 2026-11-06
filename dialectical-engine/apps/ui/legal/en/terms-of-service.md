@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.15 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.16 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.15
+endMarker: END OF TERMS · v2.16
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.15 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.16 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -211,9 +211,7 @@ Sections 8 (as to content already published), 15, 16 and 18 survive termination.
 
 ## 12. Paid plans
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine offers a free plan. A paid **Premium** plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself.
+Dialectical Engine offers a free plan. Three paid plans, **Plus**, **Pro** and **Max**, will be available; each unlocks the full model roster and lets you set the debate gauges yourself.
 
 **Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Abonați-vă și plătiți*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
 
@@ -233,7 +231,7 @@ Dialectical Engine offers a free plan. A paid **Premium** plan will be available
 
 **Chargebacks.** If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this.
 
-**Statutory rights first.** Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on either plan are published in the product; we give notice before tightening them in a way that materially affects you.
+**Statutory rights first.** Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on every plan are published in the product; we give notice before tightening them in a way that materially affects you.
 
 ## 13. Your right of withdrawal
 
@@ -250,6 +248,8 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.16 replaced version 2.15: section 12 names the paid plans, Plus, Pro and Max, and sections 12 and 15 no longer carry drafting notes; what we are liable for, and every right in these Terms, is unchanged.
 
 Version 2.15 replaced version 2.14: section 12 says that our prices are shown before tax, as price + VAT, and that the tax is added at checkout.
 
@@ -278,8 +278,6 @@ Version 2.7 replaced version 2.6: it adds the question check, which reads each q
 **Your content and your use.** You are responsible for what you submit and publish, including for having the right to submit it and for complying with section 7.
 
 **Events outside our control.** We are not in breach where we are prevented from performing by something outside our reasonable control. A failure or withdrawal by a third-party model provider is not automatically such an event; where it makes the service unavailable, section 14 applies and you may terminate and be refunded as it describes.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Intellectual property
 

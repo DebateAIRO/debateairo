@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Plaćeni planovi",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan Premium, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave." },
+      { kind: "p", text: "Dialectical Engine nudi besplatni plan. Bit će dostupna tri plaćena plana, Plus, Pro i Max; svaki od njih otključat će cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave." },
       { kind: "p", text: "Prije plaćanja neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše Pretplatite se i platite (na rumunjskom Abonați-vă și plătiți). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak." },
       { kind: "p", text: "Podsjetnici. Šaljemo vam e-poruku najmanje 5 dana prije nego što se besplatno probno razdoblje pretvori u plaćeni plan; najmanje jednom godišnje za trajne planove; i između 30 i 45 dana prije svakog obnavljanja razdoblja od dvanaest mjeseci ili duljeg. Svaki podsjetnik sadržava cijenu, datum i poveznicu za otkazivanje." },
       { kind: "p", text: "Otkazivanje. Otkažite u bilo kojem trenutku u odjeljku Postavke → Pretplata jednim klikom za potvrdu ili putem stranice za otkazivanje na dezbatere.ro/cancel, za koju se ne morate prijaviti. Otkazivanje stupa na snagu na kraju tekućeg obračunskog razdoblja, a do tada zadržavate pristup. Otkazivanje nećemo učiniti težim od pretplate." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Načini plaćanja. Plaćate karticom. Prihvaćamo Visa i Mastercard; ne prihvaćamo American Express. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com), a puni broj vaše kartice nikada ne dolazi do nas." },
       { kind: "p", text: "Isporuka. Dialectical Engine je internetska usluga pa vam se ništa ne šalje. Značajke vašeg plaćenog plana dostupne su na vašem računu čim plaćanje bude potvrđeno." },
       { kind: "p", text: "Osporavanje kartičnih transakcija. Ako osporite terećenje kod izdavatelja kartice, možemo suspendirati plaćene značajke dok se spor ne riješi. Za to ne naplaćujemo naknade." },
-      { kind: "p", text: "Zakonska prava imaju prednost. Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za oba plana objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas." }
+      { kind: "p", text: "Zakonska prava imaju prednost. Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za sve planove objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Promjene usluge. Stalno razvijamo Dialectical Engine, a rutinska poboljšanja, ispravci i promjene popisa modela događaju se bez obavijesti. Ako napravimo promjenu koja nadilazi održavanje rada usluge kako je opisano, činimo to samo iz jednog od sljedećih razloga: radi usklađivanja sa zakonskim ili regulatornim zahtjevom; radi odgovora na sigurnosni problem ili zlouporabu; zato što pružatelj modela mijenja, ograničava ili povlači model ili značajku o kojoj ovisimo; radi prilagodbe tehničkom okruženju koje ne kontroliramo; ili radi dodavanja, poboljšavanja ili ukidanja značajke na način koji vam ne stvara dodatne troškove." },
       { kind: "p", text: "Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od 30 dana od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje." },
       { kind: "p", text: "Promjene ovih Uvjeta. Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje 30 dana prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Verzija 2.16 zamijenila je verziju 2.15: odjeljak 12. navodi plaćene planove, Plus, Pro i Max, a odjeljci 12. i 15. više ne sadrže napomene iz izrade nacrta; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni." },
       { kind: "p", text: "Verzija 2.15 zamijenila je verziju 2.14: odjeljak 12. navodi da su naše cijene prikazane bez poreza, kao cijena + PDV, i da se porez dodaje na naplati." },
       { kind: "p", text: "Verzija 2.14 zamijenila je verziju 2.13: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova." },
       { kind: "p", text: "Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi rumunjski tekst gumba za plaćanje." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Što ne ograničavamo. Ništa u ovim Uvjetima ne isključuje niti ograničava našu odgovornost za smrt ili tjelesnu ozljedu uzrokovanu našim nemarom, za prijevaru ili prijevarno lažno prikazivanje, za krajnju nepažnju ili namjerno protupravno postupanje, ni za bilo što drugo što se prema zakonu ne može ograničiti. Ako ste potrošač, ništa ovdje ne ukida vaša zakonska prava, uključujući pravo na usklađivanje neusklađene usluge, sniženje cijene ili povrat, odnosno bilo koje jamstvo koje se primjenjuje prema pravu države u kojoj živite." },
       { kind: "p", text: "Generirani sadržaj. Usluga proizvodi materijal koji vi trebate procijeniti, a ne zaključke prema kojima možete postupati bez provjere, što je jasno navedeno u odjeljku 5. Podložno prethodnom stavku, ne odgovaramo za odluke koje donesete na temelju generiranih argumenata, rezultata ili presuda ako niste poduzeli razumne korake za njihovu provjeru opisane u odjeljku 5." },
       { kind: "p", text: "Vaš sadržaj i vaša uporaba. Odgovorni ste za ono što šaljete i objavljujete, uključujući to da imate pravo to poslati i da postupate u skladu s odjeljkom 7." },
-      { kind: "p", text: "Događaji izvan naše kontrole. Ne kršimo ugovor ako nas u ispunjavanju sprječava nešto izvan naše razumne kontrole. Propust ili povlačenje pružatelja modela treće strane nije automatski takav događaj; ako zbog toga usluga postane nedostupna, primjenjuje se odjeljak 14. te možete raskinuti ugovor i dobiti povrat kako je u njemu opisano." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Događaji izvan naše kontrole. Ne kršimo ugovor ako nas u ispunjavanju sprječava nešto izvan naše razumne kontrole. Propust ili povlačenje pružatelja modela treće strane nije automatski takav događaj; ako zbog toga usluga postane nedostupna, primjenjuje se odjeljak 14. te možete raskinuti ugovor i dobiti povrat kako je u njemu opisano." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "f0cff8580a870e475599123d27eda310067629f89cdd2e4af97118b336e92c9e",
-  eyebrow: "UVJETI KORIŠTENJA · v2.15 · NA SNAZI OD 1. STUDENOGA 2026.",
+  version: "2.16",
+  sha256: "d97817ad7157d65cd0e8be8c19ee28b8d334f038944f4f96eec9b10deba1020c",
+  eyebrow: "UVJETI KORIŠTENJA · v2.16 · NA SNAZI OD 1. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
-  endMarker: "KRAJ UVJETA · v2.15",
+  endMarker: "KRAJ UVJETA · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst Uvjeta korištenja",
   sectionIdPrefix: "terms-section-",

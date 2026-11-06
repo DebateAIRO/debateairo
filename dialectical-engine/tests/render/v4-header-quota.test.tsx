@@ -1,19 +1,22 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * V4 review (owner picks 3 Nov; the word is "quota"). public-d3 A: the header's pill is steady: it always shows the plan's
- * own window, today on paid plans and the month on Free (public-f15), and another window only when that one blocks a
- * start because it is used up (ask-f4: a Free or paid person whose month is used up reads "This month: 100%", never
- * today's share; a tie names the longest window, as the server's room sentence does). A team grant names the window that
- * binds first. Past 100% it says "more than your quota" (map-f9). Tapping it shows today, this week and this month. It is
- * read again after each quota moment and when the tab is shown again (wait-f22, public-f15, map-f9). Nothing shows
- * without a read.
+ * The header's quota circle (the owner's answers of 5 Nov 2026, questions 14 B and 15 with both rounds of follow-ups; the
+ * word is "quota"). A round circle fills as quota is used, with the whole percentage inside, and shows the FULLEST period
+ * the plan counts, the longest on a tie (a Free or paid person whose month is used up reads the month). Past 100% (a
+ * running debate's finish leeway, map-f9: never "100%") it is a full ring with "Over" inside. Its name is the record's line
+ * for that period ("This week: 70% of your quota used", ask-f4), which holds the figure it shows; past 100% a drafted name
+ * that keeps the "Over" it shows. Tapping it opens one bar per period the plan counts (paid: today, this week, this month;
+ * Free: this month; a team grant: its own windows), each with its percentage; a bar past 100% says "Today: more than your
+ * quota used". Keyboard focus leaving the circle closes the bars, as a click outside does (UI-11). Never what is left. It
+ * is read again after each quota moment and when the tab is shown again (wait-f22, public-f15, map-f9), quietly, in
+ * place. Nothing shows without a read.
  */
 const server = vi.hoisted(() => ({ usage: null as unknown, reads: 0, answer: null as Promise<unknown> | null }));
 vi.mock("@/lib/api", () => ({
@@ -30,10 +33,10 @@ vi.mock("@/lib/api", () => ({
   }
 }));
 
-// ask-d6 A: the header's account button has its own test (v4-header-account); this one is about the quota line.
+// ask-d6 A: the header's account button has its own test (v4-header-account); this one is about the quota circle.
 vi.mock("@/components/v4/V4AccountMenu", () => ({ V4AccountMenu: () => null }));
-import { V4Header, tightestWindow } from "../../apps/ui/components/v4/V4Header.js";
-import { pillDetails, pillText, pillWindow } from "../../apps/ui/components/v4/V4QuotaPill.js";
+import { V4Header } from "../../apps/ui/components/v4/V4Header.js";
+import { circleName, circleShare, pillDetails, pillText, pillWindow } from "../../apps/ui/components/v4/V4QuotaPill.js";
 import { quotaChanged } from "../../apps/ui/lib/v4/quotaPulse.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -65,43 +68,78 @@ async function mountHeader(showQuota?: boolean): Promise<HTMLDivElement> {
   root = createRoot(host);
   await act(async () => {
     root!.render(showQuota === undefined
-      ? <V4Header catalog={CATALOG} readingLevel={null} />
-      : <V4Header catalog={CATALOG} readingLevel={null} showQuota={showQuota} />);
+      ? <V4Header catalog={CATALOG} />
+      : <V4Header catalog={CATALOG} showQuota={showQuota} />);
   });
   await flush();
   return host;
 }
 
-async function headerQuota(showQuota?: boolean): Promise<string | null> {
-  const host = await mountHeader(showQuota);
-  return host.querySelector(".v4HdrAllowance")?.textContent ?? null;
-}
+const circleOf = (host: ParentNode): HTMLButtonElement | null => host.querySelector<HTMLButtonElement>(".v4HdrQuotaCircle");
+/** What the circle shows inside, and its name; null when there is no circle. */
+const shownBy = (host: ParentNode): Readonly<{ share: string; name: string | null }> | null => {
+  const circle = circleOf(host);
+  return circle === null ? null : { share: circle.querySelector(".v4HdrQuotaShare")!.textContent ?? "", name: circle.getAttribute("aria-label") };
+};
+/** How much of the ring is drawn, out of 100. */
+const ringOf = (host: ParentNode): string | null => host.querySelector(".v4HdrQuotaFill")?.getAttribute("stroke-dasharray") ?? null;
 
-describe("the V4 header's quota line", () => {
+describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
   it.each([
-    ["a paid person mid-day reads today's share", paid(window_("PERSON_DAY", 15), window_("PERSON_WEEK", 5), window_("PERSON_MONTH", 2)), "Today: 15% of your quota used"],
-    // public-d3 A: steady. The fuller week is named where it blocks a start, never by the pill while it does not.
-    ["a paid person whose week is fuller still reads today (the pill is steady)", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 70), window_("PERSON_MONTH", 30)), "Today: 10% of your quota used"],
-    ["a Free person reads the month", free(60), "This month: 60% of your quota used"],
-    ["a Free person whose month is used up reads the month, not today", free(100), "This month: 100% of your quota used"],
-    ["a used-up month outweighs a lighter day", paid(window_("PERSON_DAY", 5), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 100)), "This month: 100% of your quota used"],
-    ["a used-up week is named on a paid plan", paid(window_("PERSON_DAY", 20), window_("PERSON_WEEK", 100), window_("PERSON_MONTH", 40)), "This week: 100% of your quota used"],
-    ["a tie names the longest window", paid(window_("PERSON_DAY", 100), window_("PERSON_WEEK", 100), window_("PERSON_MONTH", 100)), "This month: 100% of your quota used"],
-    // map-f9: past it, never "100%".
-    ["a finish leeway past 100% reads 'more than'", paid(window_("PERSON_DAY", 108), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 4)), "Today: more than your quota used"],
-    ["a team grant that binds reads 'In total'", team(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_GRANT", 90)), "In total: 90% of your quota used"]
-  ])("%s", async (_name, usage, line) => {
+    ["a paid person mid-day reads today", paid(window_("PERSON_DAY", 15), window_("PERSON_WEEK", 5), window_("PERSON_MONTH", 2)), "15%", "Today: 15% of your quota used", "15 100"],
+    // 14 B: always the fullest period, so a fuller week is named even while today is light.
+    ["a paid person whose week is fuller reads the week", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 70), window_("PERSON_MONTH", 30)), "70%", "This week: 70% of your quota used", "70 100"],
+    ["a paid person whose month is fuller reads the month", paid(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 45)), "45%", "This month: 45% of your quota used", "45 100"],
+    ["a Free person reads the month", free(60), "60%", "This month: 60% of your quota used", "60 100"],
+    ["a Free person whose month is used up reads a full month", free(100), "100%", "This month: 100% of your quota used", "100 100"],
+    ["a used-up month outweighs a lighter day", paid(window_("PERSON_DAY", 5), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 100)), "100%", "This month: 100% of your quota used", "100 100"],
+    ["a tie names the longest period", paid(window_("PERSON_DAY", 40), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 12)), "40%", "This week: 40% of your quota used", "40 100"],
+    ["a tie at the top names the longest period", paid(window_("PERSON_DAY", 100), window_("PERSON_WEEK", 100), window_("PERSON_MONTH", 100)), "100%", "This month: 100% of your quota used", "100 100"],
+    // The second round of follow-ups (5 Nov) with map-f9: past 100% a full ring with "Over", never "100%" or the real share.
+    ["a finish leeway past 100% is a full ring with 'Over'", paid(window_("PERSON_DAY", 108), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 4)), "Over", "Quota used: today, over your quota", "100 100"],
+    ["a team grant reads its fullest window, 'In total' here", team(window_("PERSON_DAY", 10), window_("PERSON_WEEK", 20), window_("PERSON_GRANT", 90)), "90%", "In total: 90% of your quota used", "90 100"]
+  ])("%s", async (_name, usage, share, name, ring) => {
     server.usage = usage;
-    expect(await headerQuota()).toBe(line);
+    const host = await mountHeader();
+    expect(shownBy(host)).toEqual({ share, name });
+    expect(ringOf(host)).toBe(ring);
+    // The old words ("Today: 14% of your quota used") are no longer shown on the header, at any size: the only words its
+    // row shows for the quota are the circle's share (the bars, hidden until tapped, hold the rest).
+    const row = host.querySelector(".v4HdrRight")!.cloneNode(true) as HTMLElement;
+    row.querySelector(".v4HdrQuotaBars")?.remove();
+    expect(row.textContent).toBe(share);
+    expect(circleOf(host)!.hasAttribute("data-quota-over")).toBe(share === "Over");
   });
 
-  it("journey-f19: a page that shows no quota (a public page's note) reads no usage and shows no share (review F8)", async () => {
+  it("the circle's name under 100% is the record's own line for its period (ask-f4), with no words of its own", () => {
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"] as const) {
+      for (const percent of [0, 31, 100]) expect(circleName({ scope, percent }, CATALOG)).toBe(pillText({ scope, percent }, CATALOG));
+    }
+    // Past 100% the name keeps the word the circle shows ("Over"), a drafted line, never the bar's "more than" line.
+    expect(circleName({ scope: "PERSON_DAY", percent: 104 }, CATALOG)).toBe(CATALOG["v4.header.circleOver.PERSON_DAY"]);
+    expect(Object.keys(CATALOG).filter((key) => key.startsWith("v4.header.circle."))).toEqual([]);
+  });
+
+  it("the circle's name keeps the figure it shows (WCAG 2.5.3), and never says 100% past it", () => {
+    for (const percent of [0, 7, 70, 100]) {
+      const window = { scope: "PERSON_WEEK" as const, percent };
+      expect(circleName(window, CATALOG)).toContain(circleShare(window, CATALOG));
+    }
+    const over = { scope: "PERSON_MONTH" as const, percent: 104 };
+    expect(circleShare(over, CATALOG)).toBe("Over");
+    expect(circleName(over, CATALOG).toLowerCase()).toContain(circleShare(over, CATALOG).toLowerCase());
+    expect(circleName(over, CATALOG)).not.toMatch(/\d/u);
+  });
+
+  it("journey-f19: a page that shows no quota (a public page's note) reads no usage and shows no circle (review F8)", async () => {
     server.usage = paid(window_("PERSON_DAY", 15));
-    expect(await headerQuota(false)).toBeNull();
+    const host = await mountHeader(false);
+    expect(circleOf(host)).toBeNull();
+    expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
     expect(server.reads).toBe(0);
   });
 
-  describe("ask-f16 with the wave-2 checks: the pill's place is held for a person who is, or may be, signed in", () => {
+  describe("ask-f16 with the wave-2 checks: the circle's place is held for a person who is, or may be, signed in", () => {
     async function mountWith(session: "CHECKING" | "IN" | "OUT" | undefined, answer: Promise<unknown>): Promise<HTMLDivElement> {
       const host = document.createElement("div");
       document.body.append(host);
@@ -109,13 +147,13 @@ describe("the V4 header's quota line", () => {
       server.answer = answer;
       await act(async () => {
         root!.render(session === undefined
-          ? <V4Header catalog={CATALOG} readingLevel={null} />
-          : <V4Header catalog={CATALOG} readingLevel={null} session={session} />);
+          ? <V4Header catalog={CATALOG} />
+          : <V4Header catalog={CATALOG} session={session} />);
       });
       return host;
     }
 
-    it("signed in (or a signed-in-only page): an empty, hidden place until the read answers, then the pill in it", async () => {
+    it("signed in (or a signed-in-only page): an empty, hidden place until the read answers, then the circle in it", async () => {
       for (const session of ["IN", undefined] as const) {
         let answer: (usage: unknown) => void = () => undefined;
         const host = await mountWith(session, new Promise((resolve) => { answer = resolve; }));
@@ -123,26 +161,27 @@ describe("the V4 header's quota line", () => {
         expect(hold).not.toBeNull();
         expect(hold!.getAttribute("aria-hidden")).toBe("true");
         expect(hold!.textContent).toBe("");
+        expect(circleOf(host)).toBeNull();
         await act(async () => answer(free(60)));
         await flush();
         expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-        expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("This month: 60% of your quota used");
+        expect(shownBy(host)).toEqual({ share: "60%", name: "This month: 60% of your quota used" });
         await act(async () => root!.unmount());
         root = null;
         host.remove();
       }
     });
 
-    it("signed out: no held place and no usage read (they never get a pill, so nothing jumps)", async () => {
+    it("signed out: no held place and no usage read (they never get a circle, so nothing jumps)", async () => {
       const host = await mountWith("OUT", Promise.resolve(free(60)));
       await flush();
       expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-      expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+      expect(circleOf(host)).toBeNull();
       expect(server.reads).toBe(0);
     });
 
     const render = async (session: "CHECKING" | "IN" | "OUT"): Promise<void> => {
-      await act(async () => root!.render(<V4Header catalog={CATALOG} readingLevel={null} session={session} />));
+      await act(async () => root!.render(<V4Header catalog={CATALOG} session={session} />));
     };
 
     it("the wave-2 checks (P2 / W2L-1): still checking, the place is held from the first frame and nothing is read; signed in, the same place waits for the read", async () => {
@@ -161,7 +200,7 @@ describe("the V4 header's quota line", () => {
       await act(async () => answer(free(60)));
       await flush();
       expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-      expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("This month: 60% of your quota used");
+      expect(shownBy(host)?.share).toBe("60%");
     });
 
     it("the wave-2 checks (P2): still checking and then signed out, the held place closes at once and nothing was read", async () => {
@@ -171,7 +210,7 @@ describe("the V4 header's quota line", () => {
       await render("OUT");
       await flush();
       expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-      expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+      expect(circleOf(host)).toBeNull();
       expect(server.reads).toBe(0);
     });
 
@@ -179,72 +218,163 @@ describe("the V4 header's quota line", () => {
       const host = await mountWith("IN", Promise.reject(new Error("404: billing off")));
       await flush();
       expect(host.querySelector(".v4HdrQuotaHold")).toBeNull();
-      expect(host.querySelector(".v4HdrAllowance")).toBeNull();
+      expect(circleOf(host)).toBeNull();
     });
   });
 
   it("shows nothing when the usage read fails (billing off, a local site)", async () => {
     server.usage = null;
-    expect(await headerQuota()).toBeNull();
+    const host = await mountHeader();
+    expect(circleOf(host)).toBeNull();
+    expect(host.querySelector(".v4HdrQuota")).toBeNull();
   });
 
   it("shows nothing when the read names no window", () => {
-    expect(tightestWindow({ plan_id: "PLUS", windows: [] } as never)).toBeNull();
-    expect(tightestWindow(null)).toBeNull();
     expect(pillWindow({ plan_id: "PLUS", windows: [] } as never)).toBeNull();
     expect(pillWindow(null)).toBeNull();
     expect(pillDetails(null)).toEqual([]);
   });
 
-  it("public-d3 A: tapping the pill shows today, this week and this month in words, and Escape or a click outside closes it", async () => {
+  /** The open circle's bars: what each shows, what each reads out, and how full each is drawn. */
+  const barsOf = (host: ParentNode) => [...host.querySelectorAll<HTMLLIElement>(".v4HdrQuotaBars > li")].map((bar) => ({
+    shows: bar.querySelector(".v4HdrQuotaBarHead")!.textContent,
+    says: bar.querySelector(".v4SrOnly")!.textContent,
+    fill: bar.querySelector<HTMLElement>(".v4HdrQuotaBarFill")!.style.width
+  }));
+
+  it("tapping the circle opens one bar per period, day first, each with its percentage; Escape or a click outside closes them", async () => {
     server.usage = paid(window_("PERSON_MONTH", 9), window_("PERSON_DAY", 14), window_("PERSON_WEEK", 31));
     const host = await mountHeader();
-    const pill = host.querySelector<HTMLButtonElement>(".v4HdrQuotaButton")!;
-    expect(pill.textContent).toBe("Today: 14% of your quota used");
-    const list = host.querySelector<HTMLUListElement>(".v4HdrQuotaList")!;
-    expect(list.hidden).toBe(true);
-    expect(pill.getAttribute("aria-expanded")).toBe("false");
-    await act(async () => pill.click());
-    expect(list.hidden).toBe(false);
-    expect(pill.getAttribute("aria-controls")).toBe(list.id);
-    expect([...list.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
-      "Today: 14% of your quota used", "This week: 31% of your quota used", "This month: 9% of your quota used"
+    const circle = circleOf(host)!;
+    expect(shownBy(host)).toEqual({ share: "31%", name: "This week: 31% of your quota used" });
+    const bars = host.querySelector<HTMLUListElement>(".v4HdrQuotaBars")!;
+    expect(bars.hidden).toBe(true);
+    expect(circle.getAttribute("aria-expanded")).toBe("false");
+    expect(circle.getAttribute("aria-controls")).toBe(bars.id);
+    expect(bars.getAttribute("aria-label")).toBe(CATALOG["v4.header.quotaDetails"]);
+    await act(async () => circle.click());
+    expect(bars.hidden).toBe(false);
+    expect(circle.getAttribute("aria-expanded")).toBe("true");
+    expect(barsOf(host)).toEqual([
+      { shows: "Today14%", says: "Today: 14% of your quota used", fill: "14%" },
+      { shows: "This week31%", says: "This week: 31% of your quota used", fill: "31%" },
+      { shows: "This month9%", says: "This month: 9% of your quota used", fill: "9%" }
     ]);
-    await act(async () => pill.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
-    expect(list.hidden).toBe(true);
-    await act(async () => pill.click());
+    await act(async () => circle.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(bars.hidden).toBe(true);
+    expect(document.activeElement).toBe(circle);
+    await act(async () => circle.click());
     await act(async () => document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
-    expect(list.hidden).toBe(true);
+    expect(bars.hidden).toBe(true);
     // Never what is left (r2-2 A, journey-f8).
     expect(host.textContent).not.toMatch(/\bleft\b/u);
   });
 
-  it("a Free read with its month only is plain text: nothing more to open", async () => {
-    server.usage = free(30);
-    const host = await mountHeader();
-    expect(host.querySelector(".v4HdrQuotaButton")).toBeNull();
-    expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("This month: 30% of your quota used");
-  });
-
-  it("wait-f22 / public-f15 / map-f9: read again after a quota moment and when the tab is shown again, quietly", async () => {
+  it("UI-11 (the wave-4 checks, 5 Nov): keyboard focus leaving the circle closes its bars, as a click outside does", async () => {
     server.usage = paid(window_("PERSON_DAY", 14), window_("PERSON_WEEK", 31), window_("PERSON_MONTH", 9));
     const host = await mountHeader();
+    // The next control the keyboard meets (the round account button, mocked away here).
+    const next = document.createElement("button");
+    document.body.append(next);
+    const circle = circleOf(host)!;
+    const bars = host.querySelector<HTMLUListElement>(".v4HdrQuotaBars")!;
+    await act(async () => circle.focus());
+    await act(async () => circle.click());
+    expect(bars.hidden).toBe(false);
+    // A blur with no new target (Safari's click) is left to the click-outside rule, so the bars stay.
+    await act(async () => circle.blur());
+    expect(bars.hidden).toBe(false);
+    await act(async () => circle.focus());
+    // Tab onward: the bars close and the focus stays where it went (never under an open panel).
+    await act(async () => next.focus());
+    expect(bars.hidden).toBe(true);
+    expect(circle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(next);
+  });
+
+  it("the browser check (5 Nov): a share of four characters ('100%', 'Over') is drawn smaller, so it never touches the ring", async () => {
+    for (const [usage, wide] of [[free(100), true], [paid(window_("PERSON_DAY", 108)), true], [free(70), false], [free(7), false]] as const) {
+      server.usage = usage;
+      const host = await mountHeader();
+      const share = host.querySelector(".v4HdrQuotaShare")!;
+      expect(share.hasAttribute("data-quota-wide"), share.textContent ?? "").toBe(wide);
+      await act(async () => root!.unmount());
+      root = null;
+      host.remove();
+    }
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-quota.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    expect(css).toMatch(/\.v4HdrQuotaShare\[data-quota-wide\] \{[^}]*font-size: calc\(var\(--t-micro\) - 1px\);/u);
+  });
+
+  it("Free opens too: one bar, this month", async () => {
+    server.usage = free(30);
+    const host = await mountHeader();
+    await act(async () => circleOf(host)!.click());
+    expect(barsOf(host)).toEqual([{ shows: "This month30%", says: "This month: 30% of your quota used", fill: "30%" }]);
+  });
+
+  it("a team grant opens its own windows, its total named 'In total'", async () => {
+    server.usage = team(window_("PERSON_GRANT", 50), window_("PERSON_DAY", 10));
+    const host = await mountHeader();
+    await act(async () => circleOf(host)!.click());
+    expect(barsOf(host).map((bar) => bar.says)).toEqual(["Today: 10% of your quota used", "In total: 50% of your quota used"]);
+  });
+
+  it("past 100%: the full bar says 'Today: more than your quota used', and nothing says 100% or the real share", async () => {
+    server.usage = paid(window_("PERSON_DAY", 108), window_("PERSON_WEEK", 20), window_("PERSON_MONTH", 4));
+    const host = await mountHeader();
+    await act(async () => circleOf(host)!.click());
+    expect(barsOf(host)[0]).toEqual({ shows: "Today: more than your quota used", says: "Today: more than your quota used", fill: "100%" });
+    expect(host.textContent).not.toMatch(/100%|108/u);
+  });
+
+  it("wait-f22 / public-f15 / map-f9: read again after a quota moment and when the tab is shown again, quietly and in place", async () => {
+    server.usage = paid(window_("PERSON_DAY", 14), window_("PERSON_WEEK", 31), window_("PERSON_MONTH", 9));
+    const host = await mountHeader();
+    const circle = circleOf(host)!;
     expect(server.reads).toBe(1);
     server.usage = paid(window_("PERSON_DAY", 34), window_("PERSON_WEEK", 40), window_("PERSON_MONTH", 12));
     await act(async () => quotaChanged());
     await flush();
     expect(server.reads).toBe(2);
-    expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("Today: 34% of your quota used");
+    // The same circle, redrawn at once: no new element, no highlight, no animation.
+    expect(circleOf(host)).toBe(circle);
+    expect(shownBy(host)).toEqual({ share: "40%", name: "This week: 40% of your quota used" });
+    expect(ringOf(host)).toBe("40 100");
+    expect(host.querySelector(".v4Highlight")).toBeNull();
     // A failed read keeps what was shown (no blinking out).
     server.usage = null;
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
     await act(async () => document.dispatchEvent(new Event("visibilitychange")));
     await flush();
     expect(server.reads).toBe(3);
-    expect(host.querySelector(".v4HdrAllowance")?.textContent).toBe("Today: 34% of your quota used");
+    expect(shownBy(host)?.share).toBe("40%");
   });
 
-  it("every window has its 'more than' line, and the pill's words come from the catalogue", () => {
+  it("the circle and its bars never move: no transition or animation in their styles, and the same circle at every screen size", () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-quota.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/gu)].filter(([, selector]) => /\.v4HdrQuota/u.test(selector!));
+    expect(rules.length).toBeGreaterThan(5);
+    for (const [, selector, body] of rules) expect(body, selector).not.toMatch(/transition|animation/u);
+    // No screen size hides it or swaps it for words.
+    expect(css).not.toMatch(/@media[^{]*\{[^@]*\.v4HdrQuota/u);
+    // The browser check (5 Nov): in dark mode the bars' empty part was nearly invisible; each bar's track is drawn with
+    // the ring's own track colour, so a bar reads as a share of a whole in both modes.
+    const ringTrack = /\.v4HdrQuotaTrack \{ stroke: ([^;]+); \}/u.exec(css)?.[1];
+    expect(ringTrack).toBe("var(--line-strong)");
+    expect(/\.v4HdrQuotaBarTrack \{[^}]*background: ([^;]+);/u.exec(css)?.[1]).toBe(ringTrack);
+  });
+
+  it("no V4 component draws the old words pill or a header level control any more", () => {
+    // The old pill's and level menu's rules still sit in v4-ask.css (the start-step session's file, theirs to remove); no
+    // component emits those classes, so they cannot match anything (a check on the stylesheet alone would pass anyway).
+    const dir = resolve(import.meta.dirname, "../../apps/ui/components/v4");
+    const sources = readdirSync(dir).filter((name) => name.endsWith(".tsx")).map((name) => [name, readFileSync(resolve(dir, name), "utf8")] as const);
+    expect(sources.length).toBeGreaterThan(20);
+    expect(sources.filter(([, text]) => /v4HdrAllowance|v4HdrLevel/u.test(text)).map(([name]) => name)).toEqual([]);
+  });
+
+  it("every window has its 'more than' line, and the bars' words come from the catalogue", () => {
     for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]) {
       expect(CATALOG[`v4.header.over.${scope}`], scope).toMatch(/^[A-Z][a-z ]+: more than your quota used$/u);
     }

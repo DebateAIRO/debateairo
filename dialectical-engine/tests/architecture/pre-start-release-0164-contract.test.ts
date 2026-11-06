@@ -132,7 +132,7 @@ describe("0164: a failed question gives back its path-list charge", () => {
     expect(actual).toEqual(declared);
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0164.ts");
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0164, below) the fifty-third", "## A failed question gives back its path-list charge (0164)", "`loadForward0164`",
+    for (const needle of ["(0164, below) the fifty-fourth", "## A failed question gives back its path-list charge (0164)", "`loadForward0164`",
       "MIGRATION_FORWARD0164_"]) {
       expect(readme, needle).toContain(needle);
     }

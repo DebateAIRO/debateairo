@@ -20,7 +20,7 @@ export type PhoneTarget = Readonly<{ target: DigTarget; again: boolean }>;
  * journey-d3 / dig-f31 (owner's screen review, 3 Nov): the phone's pinned bar, in the record's two states. On a path with
  * nothing picked, "Choose what to dig ›" takes the person to the path's choices (a whole path is never dug from the bar
  * before they have seen them and the share; whether the bar may then dig the whole path is an owner question). With
- * picks, it digs them ("Dig into your pick · up to 3%"); an open question's own screen digs that one question.
+ * picks, it digs them ("Dig into this · up to 3%" for one pick); an open question's own screen digs that one question.
  * dig-f11 / journey-f14: while new digs wait for a reset, or while the report is written (report-d2, `rest`), a button
  * that would dig stays where it is, greyed, with the visible line that says why (V4BottomStack), and pressing it shows
  * the panel's same line. A whole path keeps "Choose what to dig ›" then too (the wave-2 checks, 4 Nov): the choices show

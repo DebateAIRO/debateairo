@@ -23,6 +23,8 @@ import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
 import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
+import { PostgresModerationNoticeRepository } from "@debateai/db";
+import { ModerationNoticeReconciler } from "./moderation-notices.js";
 import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
@@ -1320,6 +1322,14 @@ const publicFlagNoticesTimer = startTeamLimitNotices({
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
+// 0156: the person whose debate, contribution or report a review took off the public page hears it, content-free.
+const moderationNotices = new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(pool), dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs
+}), environment.PUBLIC_APP_URL);
+const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(() => moderationNotices.reconcile(100),
+  () => console.error("[MODERATION_NOTICE_PENDING]")), 30_000);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
@@ -2065,6 +2075,7 @@ api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
+api.addHook("onClose",async () => clearInterval(moderationNoticesTimer));
 api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));

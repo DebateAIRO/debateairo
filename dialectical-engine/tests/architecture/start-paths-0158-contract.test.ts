@@ -209,7 +209,7 @@ describe("0158: the chosen paths, sealed per run", () => {
   it("C-R is documented and listed", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0158.ts");
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0158, below) the forty-seventh", "## The chosen paths, sealed per run (0158)", "`loadForward0158`", "MIGRATION_FORWARD0158_", "-- n1: expand", "-- n1: keeps-verifier"]) {
+    for (const needle of ["(0158, below) the forty-eighth", "## The chosen paths, sealed per run (0158)", "`loadForward0158`", "MIGRATION_FORWARD0158_", "-- n1: expand", "-- n1: keeps-verifier"]) {
       expect(readme, needle).toContain(needle);
     }
     expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0158_start_paths.sql` (after `0157_pre_start_charge.sql`, `n1: expand`)");

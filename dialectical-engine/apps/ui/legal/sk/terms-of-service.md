@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.15 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.16 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.15
+endMarker: KONIEC PODMIENOK · v2.16
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.15 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.16 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -211,9 +211,7 @@ Ak službu úplne ukončíme alebo ju prestaneme poskytovať vo vašej krajine, 
 
 ## 12. Platené programy
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený program **Premium**, ktorý sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty.
+Dialectical Engine ponúka bezplatný program. K dispozícii budú tri platené programy, **Plus**, **Pro** a **Max**; každý z nich sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty.
 
 **Pred zaplatením** vám priamo nad platobným tlačidlom zobrazíme: program; celkovú cenu vrátane príslušnej dane; fakturačné obdobie; skutočnosť, že sa program automaticky obnovuje až do zrušenia; dátum skončenia prípadného bezplatného skúšobného obdobia a sumu, ktorá vám potom bude účtovaná; a spôsob zrušenia. Podmienky obnovenia potvrdíte začiarknutím samostatného políčka. Tlačidlo je označené slovami **Predplatiť a zaplatiť** (v rumunčine *Abonați-vă și plătiți*). Na trvanlivom médiu vám zašleme potvrdenie obsahujúce rovnaké informácie, tieto Podmienky a formulár na odstúpenie.
 
@@ -233,7 +231,7 @@ Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený progr
 
 **Spätné zúčtovanie.** Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky.
 
-**Zákonné práva majú prednosť.** Ak služba nezodpovedá tomu, čo sme sľúbili, máte právo na uvedenie do súladu alebo na primerané zníženie ceny či vrátenie peňazí podľa zákona. Nad tento rámec, ak platený program zrušíte počas fakturačného obdobia, vrátime vám tú časť ceny tohto obdobia, ktorú ste nevyužili, meranú využívaním programu, bez ohľadu na to, koľko dní uplynulo: ak ste využili 30 % programu, vrátime vám 70 %; ak ste nevyužili nič, vrátime vám celú cenu. Požiadajte o to na support@dezbatere.ro; po vrátení peňazí program zaniká. Ak sa uplatní aj právo na odstúpenie podľa časti 13, dostanete to z oboch vrátení, ktoré je vyššie. Limity používania jednotlivých programov sú zverejnené v produkte; pred ich sprísnením spôsobom, ktorý vás podstatne ovplyvní, vás upozorníme.
+**Zákonné práva majú prednosť.** Ak služba nezodpovedá tomu, čo sme sľúbili, máte právo na uvedenie do súladu alebo na primerané zníženie ceny či vrátenie peňazí podľa zákona. Nad tento rámec, ak platený program zrušíte počas fakturačného obdobia, vrátime vám tú časť ceny tohto obdobia, ktorú ste nevyužili, meranú využívaním programu, bez ohľadu na to, koľko dní uplynulo: ak ste využili 30 % programu, vrátime vám 70 %; ak ste nevyužili nič, vrátime vám celú cenu. Požiadajte o to na support@dezbatere.ro; po vrátení peňazí program zaniká. Ak sa uplatní aj právo na odstúpenie podľa časti 13, dostanete to z oboch vrátení, ktoré je vyššie. Limity používania všetkých programov sú zverejnené v produkte; pred ich sprísnením spôsobom, ktorý vás podstatne ovplyvní, vás upozorníme.
 
 ## 13. Vaše právo na odstúpenie
 
@@ -250,6 +248,8 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.16 nahradila verziu 2.15: časť 12 uvádza platené programy, Plus, Pro a Max, a časti 12 a 15 už neobsahujú poznámky k návrhu; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
 
 Verzia 2.15 nahradila verziu 2.14: časť 12 uvádza, že naše ceny zobrazujeme bez dane, v tvare cena + DPH, a že sa daň pripočíta v pokladni.
 
@@ -278,8 +278,6 @@ Verzia 2.7 nahradila verziu 2.6: pridáva kontrolu otázky, ktorá číta každ�
 **Váš obsah a vaše používanie.** Zodpovedáte za to, čo zadávate a zverejňujete, vrátane toho, že ste oprávnení obsah zadať a že dodržiavate časť 7.
 
 **Udalosti mimo našej kontroly.** Neporušujeme svoje povinnosti, ak nám plnenie znemožní okolnosť mimo našej primeranej kontroly. Zlyhanie alebo odstúpenie poskytovateľa modelu tretej strany automaticky nepredstavuje takúto udalosť; ak spôsobí nedostupnosť služby, uplatní sa časť 14 a môžete zmluvu ukončiť a získať vrátenie peňazí, ako je v nej opísané.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Duševné vlastníctvo
 

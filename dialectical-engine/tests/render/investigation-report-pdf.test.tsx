@@ -99,7 +99,7 @@ describe("what the report's PDF prints", () => {
   it("the question, what the debate points to, the paths by level, the parts of the story, the sources", () => {
     const model = buildInvestigationReportPdfModel({ question: "Should the city build a pier?", version: versionWith(words), catalogs: english });
     expect(model).toMatchObject({
-      question: "Should the city build a pier?", versionLine: "Version 2 · October 31, 2026", shortened: null,
+      question: "Should the city build a pier?", versionLine: "Version 2 · 31 October 2026", shortened: null,
       pointsTo: { title: "What the debate points to", lead: words.path, paragraphs: [words.answer], reservation: null },
       wouldChange: { title: "What would change the answer", text: words.note },
       paths: { title: "The paths", items: [

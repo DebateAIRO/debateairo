@@ -73,7 +73,7 @@
   "home.turn": "Turn {turn}",
   "home.sampleCoda": "The round ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the joint you conceded.",
   "home.closingTitle": "Your argument is only as strong as its weakest joint.",
-  "home.closingLede": "Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering.",
+  "home.closingLede": "Take one round. Four turns, and a transcript that tells you exactly where you stopped answering.",
   "home.pricingCopyPlusTax": "Start free. Paid plans start at {price} + {taxName} a month. Cancel whenever.",
   "home.pricingCopyNoTax": "Start free. Paid plans start at {price} a month, no tax added. Cancel whenever.",
   "home.pricingCopyChoose": "Start free. Paid plans start at {price} a month, plus tax where it applies. Cancel whenever.",

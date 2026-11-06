@@ -1367,6 +1367,15 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 {
+  "roleName": "debateai_runtime",
+  "source": "migrations/0156_moderation_notice.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.claim_moderation_notices(integer)",
+    "EXECUTE ON FUNCTION identity.read_moderation_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_moderation_notice(uuid,uuid,text)"
+  ]
+},
+{
   "roleName": "debateai_staff_security_owner",
   "source": "migrations/0157_pre_start_charge.sql",
   "grants": [

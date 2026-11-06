@@ -27,6 +27,8 @@ On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer
 | `rewrite-seed.ts` | The new dig model's seeded rewrites, digs and dig trail, and the money rule's paused debate and borrow notice (task W2-7). |
 | `live-seed.ts` | Draft (owner review 3 Nov, dig-d1 B): a running dig's steps and checked findings, for `GET /v1/runs/:id/progress` (switch `live=ON`). |
 | `climb-seed.ts` | Draft (owner review 3 Nov, dig-f2): the played climb of the seeded level-3 dig up to the first debate (switch `climb=PLAY`). |
+| `failed-seed.ts` | The owner's answers of 5 Nov (questions 3 A and 20 A): a debate with one failed dig per reason group, and a failed question whose draft view says it used some of the quota. |
+| `plan-windows.ts` | Which quota windows the usage read names for each plan: Free the month alone, a paid plan its day, week and month (as the real API reads the register). |
 | `quaderno-tax.ts` | Prices `GET /v1/billing/plans` through Quaderno itself when `MOCK_QUADERNO_API_KEY_PATH` is set: the API's own tax reader (`DisplayedTaxReader`) over the production Quaderno client. See "Tax from Quaderno" below. |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
@@ -93,6 +95,8 @@ All the answers carry the same English debate: *"Should countries build new nucl
 | `d5000000-0000-4000-8000-000000000005` | **Finished dig** of 1111's path n-smr (task W4-6). Level 1. Answer id `aaaad500-…`. Its rewrite is ready but **changed nothing** ("The dig didn't change this path."). | paid, searched | member of 1111's |
 | `d1000000-0000-4000-8000-000000000010` | **Finished dig at the deepest level (10)**, hung under d300 (task W3-4). Answer id `aaaad110-…`. The six digs between levels 3 and 10 are not seeded: only its own answer says level 10, so its map offers no dig anywhere and shows the "deepest level" line. | paid, searched | member of 1111's |
 | `e1000000-0000-4000-8000-000000000001` | **Paused at the month wall** (running; its planned calls and searches wait). Continue is refused until the switch `pause=CAN_CONTINUE`. | – | open |
+| `f0000000-0000-4000-8000-000000000000` | **Finished**, with **seven digs that did not finish**, one for each reason group (owner's answers of 5 Nov, question 3 A; `failed-seed.ts`). Answer id `aaaaf000-…`. Each digs a place of its own (1, 2, 5 and 6 the whole paths n-mix, n-renew, n-nuclear and n-smr; 3 the open question on battery storage, 4 the first objection, 7 what would change the answer), asked word for word as the website asks it, so each panel offers "Try this dig again" (none reads as a dig that failed twice: see that with `dig=FAIL`). Each dig's panel, and its own page at `/v4/debate/f1000000-0000-4000-8000-00000000000N` (N = 1 to 7), says its reason about the dig: 1 stopped partway (draft view `quota_used: "SOME"`), 2 went wrong before it began, 3 the AIs were unavailable, 4 could not begin because of a problem on our side (its run's own ceiling), 5 the paid plan ended while it waited, 6 set aside by an update, 7 an option it used is gone (all others `"NONE"`). | paid, searched | open (the seven digs) |
+| `45000000-0000-4000-8000-000000000045` | **Failed**, stopped partway (question 20 A). Its draft view says `quota_used: "SOME"`, beside 4444's `"NONE"`: once the contract carries the field, its page says "The part that ran used some of your quota.". Until then that line, and "Nothing was taken for the failed try." on 4444, cannot be seen in place: today's contract refuses a run read that carries `quota_used`, so the normal view holds it back. | – | none |
 
 Example pages: `http://127.0.0.1:3011/v4/debate/11111111-1111-4111-8111-111111111111` (the map) and `…/report` (the report). An answer id also opens these pages.
 
@@ -151,7 +155,7 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/asks/room` | `start_share_percent`, `new_starts` | a new question's share of today (15% in the mock); `BLOCKED_UNTIL_RESET` when the day is used up (switch `room=WAIT_RESET`) |
 | `GET /v1/billing/usage` | `borrowed` | with `usage=BORROWED`: the day reads 104% and running work used 4% of tomorrow's allowance |
 | `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
-| `GET /v1/runs/:id` | `quota_used` (owner review 3 Nov; in the contract since Task 57c, 5 Nov) | on a failed run: `NONE` (nothing was taken from the person's quota: the failed question's path-list charge is given back) or `SOME`. The normal view sends it as the API does; a run that did not fail never carries it |
+| `GET /v1/runs/:id` | `quota_used` (owner review 3 Nov; in the contract since Task 57c, 5 Nov) | on a failed run: `NONE` (nothing was taken from the person's quota: the failed question's path-list charge is given back) or `SOME`. The normal view sends it as the API does; a run that did not fail never carries it. A failed question says "Nothing was taken for the failed try." (NONE) or "The part that ran used some of your quota." (SOME), and a failed dig says "Nothing was taken from your quota for this." (NONE only). Seeded: 4444 `NONE`, 4500…45 `SOME`, and the seven failed digs of f000 |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
 
 **The quota's windows (owner's screen review, 3 Nov 2026: read-f19, public-f14, map-f33, map-f9):** two more fields that are NOT in the contract yet, so, like `started_at`, they are sent on the draft view (`/__mock/draft/v1/…`) and on the normal view only once the contract's own (strict) schema accepts them (they never make a read fall back and lose its shares or its month pause):
@@ -183,7 +187,7 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 
 | Setting | Values | Effect |
 |---|---|---|
-| `MOCK_PLAN` / `plan=` | `PLUS` (default), `FREE` | The person's plan, as the room read and the usage read say it. |
+| `MOCK_PLAN` / `plan=` | `PLUS` (default), `FREE` | The person's plan, as the room read and the usage read say it. On `FREE` the usage read names the month alone (`plan-windows.ts`), so the header's circle opens one bar. |
 | `MOCK_ROOM` / `room=` | `FITS` (default), `CLOSE`, `FULL`, `ALREADY_WAITING`, `BLOCKED`, `WAIT_RESET` | What the "is there room today" read (`GET /v1/asks/room`) says. `BLOCKED` is a FULL day with the reserve word `BLOCKED` ("blocked until {reset}"); against a contract older than W1-6 the website sees a plain `FULL`. `WAIT_RESET` is a FULL day whose new starts wait for the reset (`new_starts`, W2-7). |
 | `MOCK_USAGE` / `usage=` | `NORMAL` (default), `BORROWED` | The usage read: as today, or after running work borrowed from tomorrow (W2-7). |
 | `MOCK_PAUSE` / `pause=` | `UNTIL_RESET` (default), `CAN_CONTINUE` | Whether the paused debate `e100…` may continue yet (W2-7). Setting it pauses that debate again. |

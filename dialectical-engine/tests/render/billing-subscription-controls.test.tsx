@@ -108,10 +108,10 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("says the plan, the renewal date and total, the actions, and the invoices", async () => {
     await render();
     expect(text()).toContain("Plan: Plus");
-    expect(text()).toContain("Renews on October 29, 2026 for $24.20");
+    expect(text()).toContain("Renews on 29 October 2026 for $24.20");
     for (const label of ["Change plan", "Cancel", "Withdraw from contract here"]) expect(button(label), label).toBeDefined();
     expect(container.querySelector('a[href="/settings/card"]')?.textContent).toBe("Update card");
-    expect(text()).toContain("DBAI 0042 · October 1, 2026 · $24.20");
+    expect(text()).toContain("DBAI 0042 · 1 October 2026 · $24.20");
     expect(container.querySelector('a[href="https://quadernoapp.com/i/abc"]')?.textContent).toBe("Open");
     expect(text()).toContain("Credit note");
   });
@@ -125,13 +125,13 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("cancels after a confirmation, then offers to undo it", async () => {
     await render();
     await click("Cancel");
-    expect(text()).toContain("Cancel your plan? You keep it until October 29, 2026.");
+    expect(text()).toContain("Cancel your plan? You keep it until 29 October 2026.");
     client.getBillingSubscription.mockResolvedValueOnce({
       subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true })
     });
     await click("Yes, cancel");
     expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
-    expect(text()).toContain("Your plan ends on October 29, 2026. You won't be charged again.");
+    expect(text()).toContain("Your plan ends on 29 October 2026. You won't be charged again.");
     await click("Undo cancellation");
     expect(client.revokeSubscriptionCancel).toHaveBeenCalledTimes(1);
   });
@@ -140,7 +140,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
     await render();
     await click("Withdraw from contract here");
-    expect(text()).toContain("You can withdraw until October 13, 2026.");
+    expect(text()).toContain("You can withdraw until 13 October 2026.");
     // Recital 37: a person already signed in is not asked to identify again.
     expect(container.querySelector('input[type="password"]')).toBeNull();
     expect(container.querySelector('input[autocomplete="one-time-code"]')).toBeNull();
@@ -192,8 +192,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     });
     await render();
     await click("Withdraw from contract here");
-    expect(text()).toContain("You can withdraw until November 15, 2026.");
-    expect(text()).not.toContain("November 16, 2026");
+    expect(text()).toContain("You can withdraw until 15 November 2026.");
+    expect(text()).not.toContain("16 November 2026");
   });
 
   it("upgrades with a quote for the rest of the month, the agreement with the new monthly total, then NETOPIA's page", async () => {
@@ -209,7 +209,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Change plan");
     await click("Upgrade to Pro");
     expect(text()).toContain(
-      "Pay $36.30 now for the rest of this month. From October 29, 2026, Pro costs $60.50 a month, tax included, until you cancel."
+      "Pay $36.30 now for the rest of this month. From 29 October 2026, Pro costs $60.50 a month, tax included, until you cancel."
     );
     expect(text()).toContain((billingEnglish as Record<string, string>)["billing.consent.renewal"]!.replace("{total}", "$60.50"));
     expect(upgradeButton()!.textContent).toBe("Upgrade and pay $36.30");
@@ -266,15 +266,15 @@ describe("P20 SubscriptionControls (S1)", () => {
     // The price is P8a's public net price, "+ tax", from the renewal date; nothing has changed yet.
     expect(client.getBillingPlans).toHaveBeenCalledTimes(1);
     expect(client.downgradeSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from October 29, 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 29 October 2026.");
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ plan_id: "MAX", scheduled_downgrade_plan_id: "PLUS" })
     });
     await click("Yes, move to Plus");
     expect(client.downgradeSubscription).toHaveBeenCalledWith("PLUS");
     const paragraphs = [...container.querySelectorAll("p")].map((paragraph) => paragraph.textContent);
-    expect(paragraphs).toContain("Done. You'll move to Plus on October 29, 2026, for $24.20 a month, tax included.");
-    expect(paragraphs).toContain("You'll move to Plus on October 29, 2026.");
+    expect(paragraphs).toContain("Done. You'll move to Plus on 29 October 2026, for $24.20 a month, tax included.");
+    expect(paragraphs).toContain("You'll move to Plus on 29 October 2026.");
   });
 
   it("offers a downgrade at the price in the subscription's currency, never the visitor's, and words its amounts in it (spec 2026-10-05 §2.16.3)", async () => {
@@ -287,12 +287,12 @@ describe("P20 SubscriptionControls (S1)", () => {
     });
     client.getBillingPlans.mockResolvedValue({ ...PLANS, currency: "EUR" });
     await render();
-    expect(text()).toContain(`Renews on October 29, 2026 for ${formatMoney("en", "1210.00", "RON")}`);
-    expect(text()).toContain(`DBAI 0044 · October 1, 2026 · ${formatMoney("en", "1210.00", "RON")}`);
+    expect(text()).toContain(`Renews on 29 October 2026 for ${formatMoney("en", "1210.00", "RON")}`);
+    expect(text()).toContain(`DBAI 0044 · 1 October 2026 · ${formatMoney("en", "1210.00", "RON")}`);
     await click("Change plan");
     await click("Move to Pro at renewal");
     expect(text()).toContain(`Move to Pro at your next renewal? It costs ${formatMoney("en", "250.00", "RON")} a month + tax,`
-      + " from October 29, 2026.");
+      + " from 29 October 2026.");
     expect(text()).not.toContain("€");
     expect(text()).not.toContain("$");
   });
@@ -323,7 +323,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Cancel");
     expect(text()).toContain("Cancel your plan? It ends now, and we stop trying to take the payment.");
     expect(text()).not.toContain("You keep it until");
-    expect(text()).not.toContain("September 28, 2026");
+    expect(text()).not.toContain("28 September 2026");
   });
 
   it("offers Undo only when the server says the undo would work: never for a sandbox plan on the live site (C-15)", async () => {
@@ -333,7 +333,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       withdrawal_open_until: null, withdrawal_last_day: null };
     client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ ...pending, can_revoke_cancel: false }) });
     await render();
-    expect(text()).toContain("Your plan ends on October 29, 2026. You won't be charged again.");
+    expect(text()).toContain("Your plan ends on 29 October 2026. You won't be charged again.");
     expect(button("Undo cancellation")).toBeUndefined();
     expect(button("Cancel")).toBeUndefined();
     // Control: the same plan on its own system, where the server offers the undo.
@@ -392,15 +392,15 @@ describe("P20 SubscriptionControls (S1)", () => {
     // INVOICES lists a credit note of October 2; no invoice here, so any "October 2, 2026" would be the promise.
     client.getBillingInvoices.mockResolvedValue({ invoices: [] });
     await render();
-    expect(text()).not.toContain("Renews on October 2");
+    expect(text()).not.toContain("Renews on 2 October");
     expect(text()).toContain("We're processing your renewal. Your plan stays active meanwhile.");
     await click("Change plan");
     await click("Move to Plus at renewal");
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from October 3, 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 3 October 2026.");
     await click("Keep my plan");
     await click("Cancel");
-    expect(text()).toContain("Cancel your plan? You keep it until October 3, 2026.");
-    expect(text()).not.toContain("October 2, 2026");
+    expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");
+    expect(text()).not.toMatch(/\b2 October 2026/u);
   });
 
   it("once the paid month is over, a pending cancel names today and offers no undo the server would refuse", async () => {
@@ -416,8 +416,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     expect(button("Undo cancellation")).toBeUndefined();
     expect(button("Cancel")).toBeUndefined();
-    expect(text()).toContain("Your plan ends on October 3, 2026.");
-    expect(text()).not.toContain("October 2, 2026");
+    expect(text()).toContain("Your plan ends on 3 October 2026.");
+    expect(text()).not.toMatch(/\b2 October 2026/u);
     expect(client.revokeSubscriptionCancel).not.toHaveBeenCalled();
   });
 
@@ -427,12 +427,12 @@ describe("P20 SubscriptionControls (S1)", () => {
       subscription: subscription({ current_period_end: "2026-10-02T10:00:00.000Z", renews_on: "2026-10-12T10:00:00.000Z" })
     });
     await render();
-    expect(text()).toContain("Renews on October 12, 2026 for $24.20");
+    expect(text()).toContain("Renews on 12 October 2026 for $24.20");
     expect(text()).not.toContain("We're processing your renewal.");
     await click("Cancel");
     // P12's requestCancelLocked ends a plan whose period end has passed today, so the confirm promises no more.
-    expect(text()).toContain("Cancel your plan? You keep it until October 3, 2026.");
-    expect(text()).not.toContain("You keep it until October 12, 2026");
+    expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");
+    expect(text()).not.toContain("You keep it until 12 October 2026");
   });
 
   it("says 'Nothing changed' only for a refusal made before any charge, and 'still confirming' when money may be moving", async () => {
@@ -688,7 +688,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
     expect(text()).toContain("Plan: Plus");
     expect(text()).toContain("That didn't work. Please try again.");
-    expect(text()).toContain("DBAI 0042 · October 1, 2026 · $24.20");
+    expect(text()).toContain("DBAI 0042 · 1 October 2026 · $24.20");
     expect(text()).not.toContain("You're on the Free plan.");
   });
 });

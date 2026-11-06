@@ -139,7 +139,7 @@ describe("V4DebateClient's dig flow", () => {
     // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
     await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-    // dig-f4: one pick has no tray; its path's panel digs it, "Dig into your pick" (dig-f5, dig-f31).
+    // dig-f4: one pick has no tray; its path's panel digs it, "Dig into this" (map-f14, question 1 B of 5 Nov).
     expect(tray()).toBeNull();
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));

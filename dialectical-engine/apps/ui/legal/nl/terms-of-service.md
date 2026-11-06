@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.15 · VAN KRACHT OP 1 NOVEMBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.16 · VAN KRACHT OP 1 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.15
+endMarker: EINDE VAN DE VOORWAARDEN · v2.16
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.15 · Effective 1 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.16 · Effective 1 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Op het gratis abonnement worden uw debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Eenmaal openbaar kan iedereen een debat lezen, en het blijft openbaar. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -211,9 +211,7 @@ De hoofdstukken 8 (voor reeds gepubliceerde inhoud), 15, 16 en 18 blijven na be�
 
 ## 12. Betaalde abonnementen
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
-
-Dialectical Engine biedt een gratis abonnement. Een betaald **Premium**-abonnement zal beschikbaar zijn, waarmee de volledige reeks modellen wordt ontsloten en u de debatmeters zelf kunt instellen.
+Dialectical Engine biedt een gratis abonnement. Er zullen drie betaalde abonnementen beschikbaar zijn, **Plus**, **Pro** en **Max**; met elk ervan wordt de volledige reeks modellen ontsloten en kunt u de debatmeters zelf instellen.
 
 **Voordat u betaalt**, tonen wij u direct boven de betaalknop: het abonnement; de totale prijs inclusief toepasselijke belastingen; de factureringsperiode; dat het abonnement automatisch wordt verlengd totdat het wordt opgezegd; de datum waarop een eventuele gratis proefperiode eindigt en welk bedrag daarna in rekening wordt gebracht; en hoe u kunt opzeggen. U bevestigt de verlengingsvoorwaarden door een afzonderlijk vakje aan te vinken. Op de knop staat **Abonneren en betalen** (in het Roemeens *Abonați-vă și plătiți*). Wij sturen u op een duurzame gegevensdrager een bevestiging met dezelfde informatie, deze Voorwaarden en het modelformulier voor herroeping.
 
@@ -233,7 +231,7 @@ Dialectical Engine biedt een gratis abonnement. Een betaald **Premium**-abonneme
 
 **Terugboeking.** Als u een afschrijving bij uw kaartuitgever betwist, kunnen wij betaalde functies opschorten terwijl het geschil wordt opgelost. Wij brengen hiervoor geen kosten in rekening.
 
-**Wettelijke rechten gaan voor.** Wanneer de dienst niet beantwoordt aan wat wij hebben beloofd, hebt u het recht hem in overeenstemming te laten brengen of, zoals de wet bepaalt, een evenredige prijsvermindering of terugbetaling te ontvangen. Daarnaast betalen wij, als u een betaald abonnement opzegt tijdens een factureringsperiode, het deel van de prijs van die periode terug dat u niet hebt gebruikt, gemeten naar het gebruik van het abonnement, ongeacht hoeveel dagen er zijn verstreken: hebt u 30 % gebruikt, dan betalen wij 70 % terug; hebt u niets gebruikt, dan betalen wij de volledige prijs terug. Vraag het aan via support@dezbatere.ro; zodra wij terugbetalen, eindigt het abonnement. Geldt ook het herroepingsrecht van hoofdstuk 13, dan ontvangt u de hoogste van beide terugbetalingen. Gebruiksbeperkingen voor elk abonnement worden in het product gepubliceerd; wij stellen u op de hoogte voordat wij ze aanscherpen op een wijze die u wezenlijk raakt.
+**Wettelijke rechten gaan voor.** Wanneer de dienst niet beantwoordt aan wat wij hebben beloofd, hebt u het recht hem in overeenstemming te laten brengen of, zoals de wet bepaalt, een evenredige prijsvermindering of terugbetaling te ontvangen. Daarnaast betalen wij, als u een betaald abonnement opzegt tijdens een factureringsperiode, het deel van de prijs van die periode terug dat u niet hebt gebruikt, gemeten naar het gebruik van het abonnement, ongeacht hoeveel dagen er zijn verstreken: hebt u 30 % gebruikt, dan betalen wij 70 % terug; hebt u niets gebruikt, dan betalen wij de volledige prijs terug. Vraag het aan via support@dezbatere.ro; zodra wij terugbetalen, eindigt het abonnement. Geldt ook het herroepingsrecht van hoofdstuk 13, dan ontvangt u de hoogste van beide terugbetalingen. Gebruiksbeperkingen voor alle abonnementen worden in het product gepubliceerd; wij stellen u op de hoogte voordat wij ze aanscherpen op een wijze die u wezenlijk raakt.
 
 ## 13. Uw herroepingsrecht
 
@@ -250,6 +248,8 @@ Als u elders woont, vermeldt Bijlage A welk herroepingsrecht of welke bedenktijd
 Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen **30 dagen** nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug.
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
+
+Versie 2.16 verving versie 2.15: hoofdstuk 12 noemt de betaalde abonnementen, Plus, Pro en Max, en de hoofdstukken 12 en 15 bevatten geen redactionele notities meer; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd.
 
 Versie 2.15 verving versie 2.14: hoofdstuk 12 zegt dat onze prijzen worden getoond zonder belasting, als prijs + btw, en dat de belasting bij het afrekenen wordt toegevoegd.
 
@@ -278,8 +278,6 @@ Versie 2.7 verving versie 2.6: zij voegt het volgende toe, namelijk de vraagcont
 **Uw inhoud en uw gebruik.** U bent verantwoordelijk voor wat u indient en publiceert, waaronder ervoor zorgen dat u het recht hebt dit in te dienen, en de naleving van hoofdstuk 7.
 
 **Gebeurtenissen buiten onze controle.** Wij schieten niet tekort wanneer iets buiten onze redelijke controle ons verhindert onze verplichtingen na te komen. Een storing bij of terugtrekking door een externe modelaanbieder is niet automatisch zo'n gebeurtenis; wanneer dit de dienst onbeschikbaar maakt, is hoofdstuk 14 van toepassing en kunt u de overeenkomst beëindigen en een terugbetaling ontvangen zoals daar beschreven.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Intellectuele eigendom
 

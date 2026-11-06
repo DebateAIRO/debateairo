@@ -70,6 +70,9 @@ function writingReport(runId: string) {
   });
 }
 
+/** A stored reason of the "the AIs it needs were unavailable" group (lib/v3/runFailure.ts MODELS_UNAVAILABLE). */
+const UNAVAILABLE = "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM";
+
 function failedDig(link: DigLink, extra: Partial<DigView> = {}): DigView {
   return { link, state: "FAILED", headline: null, counts: null, terminalReason: STOPPED, ...extra };
 }
@@ -105,6 +108,9 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(text()).toContain(CATALOG["v4.debate.askAgainNoteQuestion"]);
     const askNew = [...page().querySelectorAll("a")].find((link) => link.textContent?.trim() === CATALOG["v4.debate.askNew"])!;
     expect(askNew.className).not.toContain("v4BtnPrimary");
+    // A question's page names the question (a dig's page names the dig, below).
+    expect(page().querySelector("h1")!.textContent).toBe(CATALOG["v4.debate.failedTitle"]);
+    expect(page().querySelector(".v4DebFailed .v4Eyebrow")!.textContent).toBe(CATALOG["v4.debate.yourQuestion"]);
     // The server did not say whether anything was taken: nothing is said.
     expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
   });
@@ -123,6 +129,26 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
   });
 
+  // The harness hands the run read straight to the page, so `quota_used` here skips the contract's parse. Today's contract
+  // (RunProjectionSchema, strict) refuses a run read that carries it, so the two lines show on a real page only once the
+  // contract carries the field; the stand-in keeps it to its draft view until then (tools/v4-mock-api/README.md).
+  it("question 20 A: when the server says some was used, the question says 'The part that ran used some of your quota.'", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME" }, STOPPED);
+    await mountMap(1600, runId);
+    expect(text()).toContain(HOME["runFailure.STOPPED"]);
+    expect(text()).toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    expect(CATALOG["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
+    expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+    await unmountMap();
+    // A waived run never says it used some: its own sentence says it used none, and nothing contradicts it.
+    const other = crypto.randomUUID();
+    harness.run = failedRun(other, { quota_used: "SOME" }, "RUN_SET_ASIDE:BACKSTOP");
+    await mountMap(1600, other);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+  });
+
   it("a dig's own failed page leads back to its map instead of 'Ask this again'", async () => {
     const parent = crypto.randomUUID();
     const runId = crypto.randomUUID();
@@ -132,6 +158,38 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBeNull();
     expect(linkHref(CATALOG["v4.report.backToMap"]!)).toBe(`/v4/debate/${parent}?level=background`);
     expect(text()).toContain(CATALOG["v4.debate.digFailedBackNote"]);
+    // Question 3 A: its reason is said about the dig, never in the question's sentence.
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.MODELS_UNAVAILABLE"]);
+    expect(text()).not.toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
+    // The wave-4 browser check (5 Nov): the page names the dig too, in its heading (and so its tab) and the line above.
+    expect(page().querySelector("h1")!.textContent).toBe(CATALOG["v4.debate.digFailedTitle"]);
+    expect(page().querySelector(".v4DebFailed .v4Eyebrow")!.textContent).toBe(CATALOG["v4.seed.yourDig"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedTitle"]);
+  });
+
+  it("question 20 A: a dig's own failed page says the dig's 'nothing taken' when confirmed, and nothing when some was used", async () => {
+    const parent = crypto.randomUUID();
+    const mount = async (quota: "NONE" | "SOME", reason = STOPPED): Promise<void> => {
+      const runId = crypto.randomUUID();
+      harness.run = failedRun(runId, { quota_used: quota }, reason);
+      harness.records = { parent: { parent_run_id: parent, child_run_id: runId, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-29T10:05:00.000Z" }, children: [] };
+      await mountMap(1600, runId);
+    };
+    await mount("NONE");
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(text()).not.toContain(HOME["runFailure.STOPPED"]);
+    expect(text()).toContain(CATALOG["v4.digFailed.nothingTaken"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+    await unmountMap();
+    await mount("SOME");
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(text()).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    await unmountMap();
+    // An upload set the dig aside: its own line already says it did not use the quota, so it is not said twice.
+    await mount("NONE", "RUN_SET_ASIDE:BACKSTOP");
+    expect(text()).toContain(CATALOG["v4.digFailed.reason.SET_ASIDE"]);
+    expect(text()).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
   });
 });
 
@@ -145,7 +203,10 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(branch(PATHS.mix).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.FAILED"]);
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(CATALOG["v4.panel.digState.FAILED"]);
-    expect(panel().textContent).toContain(HOME["runFailure.STOPPED"]);
+    // Question 3 A (5 Nov): the reason is said about the dig, not in the question's words.
+    expect(panel().textContent).toContain(CATALOG["v4.digFailed.reason.STOPPED"]);
+    expect(panel().textContent).toContain("This dig stopped partway because of a problem on our side.");
+    expect(panel().textContent).not.toContain(HOME["runFailure.STOPPED"]);
     expect(panel().textContent).not.toContain(CATALOG["v4.digFailed.nothingTaken"]);
     // The page's own switch says Quick; the failed dig was Thorough, and is tried again as it was.
     await click(buttonNamed(CATALOG["v4.digFailed.retry"]!, panel()));
@@ -259,6 +320,31 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(panel().textContent).toContain(CATALOG["v4.digFailed.keepsFailing"]);
     expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
   });
+
+  it("the owner's third round (5 Nov): a dig that failed once because the AIs were unavailable keeps 'You can try it again in a while.'", async () => {
+    const runId = crypto.randomUUID();
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
+    harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix"), terminalReason: UNAVAILABLE });
+    await mountMap(1600, runId);
+    await openDig(PATHS.mix);
+    // The reason with its "try it again in a while", and the button to do so.
+    expect(panel().textContent).toContain(CATALOG["v4.digFailed.reason.MODELS_UNAVAILABLE"]);
+    expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toHaveLength(1);
+  });
+
+  it("the owner's third round (5 Nov): a dig that keeps failing because the AIs were unavailable drops 'You can try it again in a while.'", async () => {
+    const runId = crypto.randomUUID();
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
+    recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
+    harness.digView = (link) => failedDig(link, { questionLine: pathDigQuestion(runId, "n-mix"), terminalReason: UNAVAILABLE });
+    await mountMap(1600, runId);
+    await openDig(PATHS.mix);
+    // The reason without the promise, so it does not disagree with "This keeps failing. Write your report; ...".
+    const lines = [...panel().querySelectorAll(".v4DigFailed p")].map((line) => line.textContent).join(" | ");
+    expect(lines).toBe(`${CATALOG["v4.digFailed.unavailableKeepsFailing"]!} | ${CATALOG["v4.digFailed.keepsFailing"]!}`);
+    expect(panel().textContent).not.toContain("try it again in a while");
+    expect(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())).toEqual([]);
+  });
 });
 
 describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () => {
@@ -268,7 +354,7 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
   const pausedDig = (canContinue: boolean) => (link: DigLink): DigView =>
     ({ link, state: "RUNNING", headline: null, counts: null, pausedUntil: NEXT_MONTH, canContinue });
 
-  it("reads 'Dig · paused until …' with a still mark, the rail counts it as paused, and nothing can be pressed yet", async () => {
+  it("reads 'Dig · paused until …' with a still mark, the rail counts it as paused, and its greyed 'Continue on …' sends nothing", async () => {
     const runId = crypto.randomUUID();
     recordDig(runId, crypto.randomUUID(), ["path:n-mix"]);
     harness.digView = pausedDig(false);
@@ -283,8 +369,77 @@ describe("a dig paused at the month wall (wait-f2, public-f16, public-f17)", () 
     expect(rail).not.toContain(word("v4.rail.digsRunning.one", { count: 1 }));
     await openDig(PATHS.mix);
     expect(panel().textContent).toContain(word("v4.money.paused", { date }));
-    expect(panel().textContent).toContain(word("v4.pause.continuesOn", { date: day }));
     expect(buttonsNamed(CATALOG["v4.money.continue"]!, panel())).toEqual([]);
+    // The owner's answers of 5 Nov (question 19 A): a greyed "Continue on …" in Continue's place, named by the visible pause
+    // sentence; pressing it early sends nothing and adds no sentence, the reason line gets the 1-second highlight, focus stays.
+    const early = buttonNamed(word("v4.pause.continuesOn", { date: day }), panel());
+    expect(early.getAttribute("aria-disabled")).toBe("true");
+    expect(early.disabled).toBe(false);
+    const reason = document.getElementById(early.getAttribute("aria-describedby")!)!;
+    expect(reason.textContent).toBe(word("v4.money.paused", { date }));
+    const before = panel().textContent;
+    early.focus();
+    await click(early);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(panel().textContent).toBe(before);
+    expect(document.getElementById(early.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
+    expect(document.activeElement).toBe(early);
+  });
+
+  it("question 19 A on a phone: the bar's greyed \"Continue on …\" sends nothing; the pause is said once, in the panel, whose line a press highlights", async () => {
+    const runId = crypto.randomUUID();
+    const child = crypto.randomUUID();
+    recordDig(runId, child, ["path:n-mix"]);
+    harness.digView = pausedDig(false);
+    harness.search = `?dig=${child}`;
+    await mountMap(375, runId);
+    const sentence = word("v4.money.paused", { date });
+    const bar = (): HTMLElement => page().querySelector<HTMLElement>(".v4DebPhoneBar")!;
+    const early = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused button")!;
+    expect(early.textContent).toBe(word("v4.pause.continuesOn", { date: day }));
+    expect(early.getAttribute("aria-disabled")).toBe("true");
+    expect(early.classList.contains("v4DigWaiting")).toBe(true);
+    // wait-f5 and the owner's answer ("the one sentence stays as it is"): the panel's pause block says it, and the bar adds no
+    // second copy; the bar's greyed button is named by that visible line (journey-f14).
+    expect(text().split(sentence).length - 1).toBe(1);
+    expect(page().querySelector("[data-bar-why]")).toBeNull();
+    const line = panel().querySelector<HTMLElement>(".v4Pause .v4PauseLine")!;
+    expect(line.textContent).toBe(sentence);
+    expect(early.getAttribute("aria-describedby")).toBe(line.id);
+    // A press sends nothing and adds no sentence: the panel's line gets the 1-second highlight, scrolled to only when it is
+    // off screen, and focus stays on the bar's button.
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+    const box = vi.spyOn(line, "getBoundingClientRect");
+    const at = (top: number): void => {
+      box.mockReturnValue({ top, bottom: top + 40, left: 0, right: 300, width: 300, height: 40, x: 0, y: top, toJSON: () => ({}) } as DOMRect);
+    };
+    at(120);
+    const before = text();
+    early.focus();
+    await click(early);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(text()).toBe(before);
+    expect(panel().querySelector(".v4Pause .v4PauseLine")!.classList.contains("v4Highlight")).toBe(true);
+    expect(scroll).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(bar().querySelector(".v4DebPhonePaused button"));
+    at(-400);
+    await click(early);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(harness.continueRun).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(bar().querySelector(".v4DebPhonePaused button"));
+    box.mockRestore();
+    delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    // On the day it is the same button, live: "Paused · Continue", with no reason line.
+    harness.digView = pausedDig(true);
+    await advance(15_000);
+    await settle(10);
+    const live = bar().querySelector<HTMLButtonElement>(".v4DebPhonePaused button")!;
+    expect(live.textContent).toBe(CATALOG["v4.money.continue"]);
+    expect(live.getAttribute("aria-disabled")).toBeNull();
+    expect(live.getAttribute("aria-describedby")).toBeNull();
+    expect(page().querySelector("[data-bar-why]")).toBeNull();
+    expect(document.activeElement).toBe(live);
   });
 
   it("once the server says its month has reset: 'Dig · ready to continue', and Continue resumes the dig's own run", async () => {

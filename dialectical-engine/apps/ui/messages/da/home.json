@@ -73,7 +73,7 @@
   "home.turn": "Tur {turn}",
   "home.sampleCoda": "Runden slutter her. Ingen erklæres som vinder. Du får udskriften, de to bedømmelser pr. tur og det svage led, du gav efter på.",
   "home.closingTitle": "Dit argument er kun så stærkt som dets svageste led.",
-  "home.closingLede": "Tag en runde. Fire ture, cirka ni minutter og en udskrift, der præcist viser, hvor du holdt op med at svare.",
+  "home.closingLede": "Tag en runde. Fire ture og en udskrift, der præcist viser, hvor du holdt op med at svare.",
   "home.pricingCopyPlusTax": "Start gratis. Betalte planer starter ved {price} + {taxName} om måneden. Annuller når som helst.",
   "home.pricingCopyNoTax": "Start gratis. Betalte planer starter ved {price} om måneden uden tillagt skat. Annuller når som helst.",
   "home.pricingCopyChoose": "Start gratis. Betalte planer starter ved {price} om måneden plus skat, hvor det er relevant. Annuller når som helst.",

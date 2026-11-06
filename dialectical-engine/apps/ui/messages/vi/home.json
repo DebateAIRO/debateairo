@@ -72,7 +72,7 @@
   "home.turn": "Lượt {turn}",
   "home.sampleCoda": "Vòng kết thúc tại đây. Không bên nào được tuyên bố thắng. Bạn nhận được bản ghi, hai điểm cho mỗi lượt và mắt xích mà bạn đã nhượng bộ.",
   "home.closingTitle": "Lập luận của bạn chỉ mạnh bằng mắt xích yếu nhất của nó.",
-  "home.closingLede": "Thực hiện một vòng. Bốn lượt, khoảng chín phút và một bản ghi chỉ rõ chính xác nơi bạn đã ngừng trả lời.",
+  "home.closingLede": "Thực hiện một vòng. Bốn lượt và một bản ghi chỉ rõ chính xác nơi bạn đã ngừng trả lời.",
   "home.pricingCopyPlusTax": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} + {taxName} mỗi tháng. Hủy bất cứ lúc nào.",
   "home.pricingCopyNoTax": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng, không cộng thêm thuế. Hủy bất cứ lúc nào.",
   "home.pricingCopyChoose": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng, cộng thêm thuế nếu áp dụng. Hủy bất cứ lúc nào.",

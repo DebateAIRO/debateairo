@@ -16,7 +16,10 @@ vi.mock("next/link", () => ({
  * Owner's screen review, 3 Nov 2026 (journey-d2 A): the one waiting card, its parts in their order, and the fixes it
  * carries: clock times and nothing ticking (journey-f16), the shared state words (journey-f22), chips and no counts
  * (journey-f23), "taking longer" only past a measured time (wait-f8), the back link and level trail (wait-f12), the
- * reduced-motion line (wait-f17), [Try now] (wait-f19) and the classic link once at the bottom (wait-f23).
+ * reduced-motion line (wait-f17), [Try now] (wait-f19) and the classic link once at the bottom (wait-f23), drawn only when
+ * the page hands one. The owner's answers of 5 Nov (question 12 B, journey-f19) put "Open in the classic view" in the account
+ * menu only: that lands with the page's own wiring (the start-step's V4DebateClient and V4RunPaths stop handing it to the
+ * screens and give it to the header), so no screen goes without it before then.
  */
 const V4 = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
 const word = (key: string, values: Record<string, string> = {}): string =>
@@ -93,7 +96,7 @@ describe("the one waiting card", () => {
     const leave = section.querySelector("[data-wait-leave]")!;
     expect(leave.textContent).toContain("You can leave this page. It keeps going.");
     expect(leave.querySelector("[data-notify]")).not.toBeNull();
-    // The classic link once, at the very bottom.
+    // The classic link once, at the very bottom, while the page hands one (question 12 B: until its wiring stops handing it).
     expect(section.querySelectorAll("a[href='/debate/r-1']")).toHaveLength(1);
     expect(section.lastElementChild!.classList.contains("v4WaitClassic")).toBe(true);
   });
@@ -109,7 +112,9 @@ describe("the one waiting card", () => {
 
   it("names the day of a start that was not today; no start time, no line", async () => {
     await mount({ startedAt: "2026-11-02T09:31:00.000Z", checkedAt: Date.parse("2026-11-04T09:40:00.000Z") });
-    expect(host!.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started Nov [1-3], /u);
+    // The owner's third round (5 Nov): a start on an earlier day in the long form with the year, day first on English
+    // pages (question 5 B): "Started 2 November 2026, 11:31".
+    expect(host!.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started [1-3] November 2026, \d{2}:\d{2}$/u);
     await mount({ startedAt: null });
     expect(host!.querySelector("[data-wait-started]")).toBeNull();
   });
@@ -130,7 +135,7 @@ describe("the one waiting card", () => {
       [{ kind: "WAITING", startsAfter: "2026-11-04T10:00:00.000Z" }, word("v4.state.WAITING", { time: clock("2026-11-04T10:00:00.000Z") }), true],
       [{ kind: "WAITING_OWN" }, word("v4.state.WAITING_OWN"), true],
       [{ kind: "SHORT_BREAK", continuesAbout: null }, word("v4.state.SHORT_BREAK.noTime"), true],
-      [{ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, "Paused until December 1", false],
+      [{ kind: "PAUSED", until: "2026-12-01T12:00:00.000Z", canContinue: false }, "Paused until 1 December", false],
       [{ kind: "READY" }, word("v4.state.READY"), false],
       [{ kind: "DIDNT_FINISH" }, word("v4.state.DIDNT_FINISH"), false],
       [{ kind: "BEING_WRITTEN" }, word("v4.state.BEING_WRITTEN"), true]
@@ -288,11 +293,16 @@ describe("lost touch, the way back and the classic link", () => {
     expect(card().querySelector("h1, h2, h3")).toBeNull();
   });
 
-  it("no classic link unless the page passes one, and never two", async () => {
+  it("no classic link unless the page passes one, and never two (question 12 B: the page stops passing it, the menu has it)", async () => {
     await mount();
+    expect(host!.querySelector(".v4WaitClassic")).toBeNull();
+    expect(host!.textContent).not.toContain(V4["v4.common.classicView"]);
+    await mount({ classicHref: null });
     expect(host!.querySelector(".v4WaitClassic")).toBeNull();
     await mount({ classicHref: "/debate/r-1" });
     expect(host!.querySelectorAll("a").length).toBe(1);
     expect(host!.querySelector(".v4WaitClassic a")!.textContent).toBe(V4["v4.common.classicView"]);
+    // Its small rule stays while a screen may still draw it (the start-step's V4RunPaths uses it too).
+    expect(readFileSync(resolve(process.cwd(), "apps/ui/app/v4/v4-wait.css"), "utf8")).toMatch(/\.v4WaitClassic \.v4Link \{[^}]*min-height: 44px/u);
   });
 });

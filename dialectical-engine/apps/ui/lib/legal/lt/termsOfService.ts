@@ -209,8 +209,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Mokami planai",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "Dialectical Engine siūlo nemokamą planą. Mokamas planas Premium bus prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus." },
+      { kind: "p", text: "Dialectical Engine siūlo nemokamą planą. Bus prieinami trys mokami planai, Plus, Pro ir Max; kiekvienas iš jų suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus." },
       { kind: "p", text: "Prieš jums mokant tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta Prenumeruoti ir mokėti (rumunų kalba — Abonați-vă și plătiți). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma." },
       { kind: "p", text: "Priminimai. El. paštu jums primename bent prieš 5 dienas iki nemokamo bandomojo laikotarpio pakeitimo mokamu planu; bent kartą per metus, jei planas tęstinis; ir likus 30–45 dienoms iki dvylikos mėnesių ar ilgesnio laikotarpio atnaujinimo. Kiekviename priminime nurodoma kaina, data ir pateikiama atšaukimo nuoroda." },
       { kind: "p", text: "Atšaukimas. Galite bet kada atšaukti pasirinkę Nustatymai → Prenumerata ir vienu spustelėjimu patvirtinę arba naudodamiesi atšaukimo puslapiu adresu dezbatere.ro/cancel, prie kurio prisijungti nereikia. Atšaukimas įsigalioja einamojo atsiskaitymo laikotarpio pabaigoje, o iki tol prieiga išlieka. Atšaukimo nepadarysime sudėtingesnio, nei buvo prenumerata." },
@@ -220,7 +219,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Mokėjimo būdai. Mokate kortele. Priimame Visa ir Mastercard korteles; American Express kortelių nepriimame. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com), o visas jūsų kortelės numeris niekada nepasiekia mūsų." },
       { kind: "p", text: "Pristatymas. Dialectical Engine yra internetinė paslauga, todėl jums nieko nesiunčiame. Jūsų mokamo plano funkcijos jūsų paskyroje tampa prieinamos iškart, kai mokėjimas patvirtinamas." },
       { kind: "p", text: "Mokėjimo grąžinimo ginčai. Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome." },
-      { kind: "p", text: "Pirmiausia — įstatymų nustatytos teisės. Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, jei mokamą planą nutraukiate atsiskaitymo laikotarpiu, grąžiname tą laikotarpio kainos dalį, kurios nepanaudojote, matuojamą pagal plano naudojimą, nepaisant to, kiek dienų praėjo: jei panaudojote 30 %, grąžiname 70 %; jei nepanaudojote nieko, grąžiname visą kainą. Prašymą teikite adresu support@dezbatere.ro; kai grąžiname pinigus, planas baigiasi. Jei taikoma ir 13 skyriuje nustatyta atsisakymo teisė, gaunate didesnę iš šių grąžinamų sumų. Abiejų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame." }
+      { kind: "p", text: "Pirmiausia — įstatymų nustatytos teisės. Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, jei mokamą planą nutraukiate atsiskaitymo laikotarpiu, grąžiname tą laikotarpio kainos dalį, kurios nepanaudojote, matuojamą pagal plano naudojimą, nepaisant to, kiek dienų praėjo: jei panaudojote 30 %, grąžiname 70 %; jei nepanaudojote nieko, grąžiname visą kainą. Prašymą teikite adresu support@dezbatere.ro; kai grąžiname pinigus, planas baigiasi. Jei taikoma ir 13 skyriuje nustatyta atsisakymo teisė, gaunate didesnę iš šių grąžinamų sumų. Visų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame." }
     ]
   },
   {
@@ -241,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Paslaugos pakeitimai. Nuolat tobuliname Dialectical Engine, todėl apie įprastus patobulinimus, pataisas ir modelių sąrašo pakeitimus nepranešame. Pakeitimus, kuriais ne vien palaikomas aprašytas paslaugos veikimas, atliekame tik dėl vienos iš šių priežasčių: kad įvykdytume teisinį ar reguliavimo reikalavimą; reaguotume į saugumo ar piktnaudžiavimo problemą; kai modelio teikėjas pakeičia, apriboja ar pašalina modelį ar funkciją, nuo kurių priklausome; kad prisitaikytume prie mūsų nekontroliuojamos techninės aplinkos; arba kad pridėtume, patobulintume ar pašalintume funkciją taip, kad jums neatsirastų papildomų išlaidų." },
       { kind: "p", text: "Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per 30 dienų nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas." },
       { kind: "p", text: "Šių Sąlygų pakeitimai. Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš 30 dienų iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions." },
+      { kind: "p", text: "2.16 versija pakeitė 2.15 versiją: 12 skyriuje nurodyti mokami planai, Plus, Pro ir Max, o 12 ir 15 skyriuose nebėra rengimo pastabų; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė." },
       { kind: "p", text: "2.15 versija pakeitė 2.14 versiją: 12 skyriuje nurodyta, kad mūsų kainos rodomos be mokesčių, kaip kaina + PVM, ir kad mokestis pridedamas apmokėjimo metu." },
       { kind: "p", text: "2.14 versija pakeitė 2.13 versiją: 18 skyriuje ir A priede alternatyvaus ginčų sprendimo keliu nurodyta ANPC (SAL)." },
       { kind: "p", text: "2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodytas mokėjimo mygtuko užrašas rumunų kalba." },
@@ -260,8 +260,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ko neribojame. Jokia šių Sąlygų nuostata neatmeta ir neriboja mūsų atsakomybės už mirtį ar kūno sužalojimą dėl mūsų aplaidumo, sukčiavimą ar apgaulingą klaidingos informacijos pateikimą, didelį neatsargumą ar tyčinį netinkamą elgesį arba už bet ką kita, ko pagal teisės aktus negalima riboti. Jei esate vartotojas, jokia šių Sąlygų nuostata neatima jūsų įstatymų nustatytų teisių, įskaitant teisę reikalauti, kad sutarties neatitinkanti paslauga būtų suderinta su sutartimi, proporcingai sumažinti kainą ar susigrąžinti pinigus, arba bet kokią pagal jūsų gyvenamosios šalies teisę taikomą garantiją." },
       { kind: "p", text: "Sugeneruotas turinys. Paslauga teikia medžiagą, kurią turite įvertinti, o ne nepatikrintas išvadas, pagal kurias galite veikti, ir tai aiškiai nurodyta 5 skyriuje. Atsižvelgiant į pirmesnę pastraipą, neatsakome už sprendimus, kuriuos priimate remdamiesi sugeneruotais argumentais, įverčiais ar verdiktais, jei nesiėmėte 5 skyriuje aprašytų pagrįstų veiksmų jiems patikrinti." },
       { kind: "p", text: "Jūsų turinys ir naudojimasis. Atsakote už tai, ką pateikiate ir skelbiate, įskaitant teisę tai pateikti ir 7 skyriaus laikymąsi." },
-      { kind: "p", text: "Nuo mūsų nepriklausantys įvykiai. Sutarties nepažeidžiame, kai negalime jos vykdyti dėl pagrįstai mūsų nekontroliuojamų aplinkybių. Trečiosios šalies modelio teikėjo veiklos sutrikimas ar pasitraukimas savaime nėra tokia aplinkybė; jei dėl to paslauga tampa neprieinama, taikomas 14 skyrius, todėl galite nutraukti sutartį ir susigrąžinti pinigus jame nustatyta tvarka." },
-      { kind: "p", text: "[No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.]" }
+      { kind: "p", text: "Nuo mūsų nepriklausantys įvykiai. Sutarties nepažeidžiame, kai negalime jos vykdyti dėl pagrįstai mūsų nekontroliuojamų aplinkybių. Trečiosios šalies modelio teikėjo veiklos sutrikimas ar pasitraukimas savaime nėra tokia aplinkybė; jei dėl to paslauga tampa neprieinama, taikomas 14 skyrius, todėl galite nutraukti sutartį ir susigrąžinti pinigus jame nustatyta tvarka." }
     ]
   },
   {
@@ -377,12 +376,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.15",
-  sha256: "ac33f389fa43cbb5b948b4e45cb74b849e8fcb26080437edc8c3e355edb04694",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.15 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
+  version: "2.16",
+  sha256: "d84745c1d19f5dc450bd92f325b8b8f8fd4dc875833d9e2997be3ce64e27824f",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.16 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.15",
+  endMarker: "SĄLYGŲ PABAIGA · v2.16",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

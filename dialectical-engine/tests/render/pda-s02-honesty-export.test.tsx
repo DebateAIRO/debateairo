@@ -140,6 +140,15 @@ describe("S02 public honesty and export", () => {
     expect(tree.textContent).not.toContain("predates argument-tree publishing");
   });
 
+  it("other languages keep their own way of joining the evidence date and its clock (only English takes the comma)", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const german = await mount(
+      <PublicAnswerDisclosure answer={publicDebate.answer} catalog={publicEnglish} locale="de" engineLines={false} />
+    );
+    const expected = new Intl.DateTimeFormat("de", { dateStyle: "long", timeStyle: "short", hourCycle: "h23" }).format(new Date(publicDebate.answer.as_of));
+    expect(german.textContent).toContain(`Evidence as of ${expected}.`);
+  });
+
   it("on the V4 public page the disclosure says only the indexing and the evidence date, no engine state (public-f1)", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const plain = await mount(
@@ -147,6 +156,10 @@ describe("S02 public honesty and export", () => {
     );
     expect(plain.textContent).toContain(publicEnglish["public.disclosure.indexing"]);
     expect(plain.textContent).toContain("Evidence as of");
+    // The owner's third round (5 Nov afternoon): pages keep the comma between the date and the clock; only the data download,
+    // the sign-in link email and the classic report PDF keep "at". The long form with the year (question 4 A).
+    expect(plain.textContent).toMatch(/Evidence as of \d{1,2} August 2026, \d{2}:\d{2}\./u);
+    expect(plain.textContent).not.toMatch(/Evidence as of [^.]* at /u);
     expect(plain.textContent).not.toContain("DOWNGRADED");
     expect(plain.textContent).not.toContain("Answer status");
     expect(plain.textContent).not.toContain(publicEnglish["public.disclosure.verdictUnavailableMode"]);

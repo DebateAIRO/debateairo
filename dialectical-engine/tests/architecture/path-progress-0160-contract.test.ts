@@ -210,7 +210,7 @@ describe("0160: each path's step and points, the carry-on mark and the public re
     const corpus = read("tests/support/shipped-corpus.manifest.txt").split("\n");
     for (const path of ["packages/db/src/migration-forward0160.ts", "packages/db/src/path-progress.ts"]) expect(corpus, path).toContain(path);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0160, below) the forty-ninth", "## The path progress per run (0160)", "`loadForward0160`", "MIGRATION_FORWARD0160_"]) {
+    for (const needle of ["(0160, below) the fiftieth", "## The path progress per run (0160)", "`loadForward0160`", "MIGRATION_FORWARD0160_"]) {
       expect(readme, needle).toContain(needle);
     }
     expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0160_path_progress.sql` (after `0159_path_results.sql`, `n1: expand`)");

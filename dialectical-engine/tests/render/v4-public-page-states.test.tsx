@@ -89,7 +89,7 @@ describe("a debate that cannot be shown", () => {
     const note = page.querySelector("[data-public-note=could-not-load]")!;
     expect(note.querySelector("[role=status]")!.textContent).toBe("We couldn't load this debate just now.");
     expect(page.querySelector(".v4Hdr")).not.toBeNull();
-    expect(page.querySelector(".v4HdrAllowance")).toBeNull();
+    expect(page.querySelector(".v4HdrQuotaCircle, .v4HdrQuotaHold")).toBeNull();
     expect(mocks.readBillingUsage).not.toHaveBeenCalled();
     const retry = [...note.querySelectorAll("button")].find((button) => button.textContent === V4["v4.common.retry"])!;
     await act(async () => { retry.click(); });

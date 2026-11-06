@@ -7,7 +7,8 @@ import type { DigTarget } from "./types.js";
  * The owner's screen review (3 Nov 2026): what every dig button on the map says about the quota, in one place. Pure
  * functions: nothing here reads or keeps anything.
  *  - journey-f13 / public-d3 A: one dig button, "Dig here · up to 3%"; dig-f5: with picks, "Dig into your picks · up to
- *    6%" ("your pick" for one); the tray, "Dig into these · up to 5%". "Dig here too" and "Dig deeper here" are gone. The
+ *    6%" (one pick: map-f14's "Dig into this", the owner's answer to question 1 of 5 Nov, B, in the panel, the phone bar,
+ *    the tray and a public dig box alike); the tray, "Dig into these · up to 5%". "Dig here too" and "Dig deeper here" are gone. The
  *    share is on the button (the Undo note repeats it) and in no other line. dig-f5: "up to", not "about", until the
  *    server's estimate stops counting every rewrite above a deep dig as if every level changes (still so on 4 Nov:
  *    apps/api ask-room.ts #digUpdatesPartMicros); the word is one catalogue line (v4.undo.barShare), so the switch to
@@ -46,7 +47,7 @@ export function waitWords(wait: DigWait, catalog: MessageCatalog, locale: string
   return wait.scope === "PERSON_MONTH" ? t(catalog, "v4.dig.on", { date: when }) : t(catalog, "v4.dig.after", { time: when });
 }
 
-/** The button's own words: "Dig here", "Dig into your pick(s)", or in the tray, for several picks, "Dig into these". */
+/** The button's own words: "Dig here", "Dig into this" (one pick), "Dig into your picks", or in the tray, for several picks, "Dig into these". */
 export function digWords(target: DigTarget, catalog: MessageCatalog, locale: string, tray = false): string {
   if (target.kind !== "picks") return t(catalog, "v4.panel.dig");
   if (tray && target.picks.length >= 2) return t(catalog, "v4.dig.trayDigThese");
@@ -73,7 +74,7 @@ function withShare(words: string, share: number | null, catalog: MessageCatalog)
 
 /**
  * journey-f13 / dig-f5 on a public page's dig box (the wave-2 review, 4 Nov): the box digs the person's picks (its chips
- * and own views), so its button reads as the map's picks button, "Dig into your pick · up to 3%" ("your picks" for more).
+ * and own views), so its button reads as the map's picks button, "Dig into this · up to 3%" ("Dig into your picks" for more).
  */
 export function picksButtonLabel(count: number, share: number | null, catalog: MessageCatalog, locale: string): string {
   return withShare(tPlural(catalog, "v4.dig.yourPicks", count, locale), share, catalog);
@@ -82,6 +83,15 @@ export function picksButtonLabel(count: number, share: number | null, catalog: M
 /** public-d3 A: the period, once, by the Quick look / Thorough switch: "of today · you can still finish your report". */
 export function digPeriodLine(room: AskRoom | null, catalog: MessageCatalog): string {
   return t(catalog, `v4.dig.period.${sharePeriodOf(room)}`);
+}
+
+/**
+ * The owner's answer to question 34 (5 Nov 2026, A, and its follow-up): a public page's dig box names the period alone,
+ * "of today" ("of this month" on Free; the window the server names, read-f19 / journey-f8), for every reader of the page,
+ * its owner included. The person's own map keeps digPeriodLine's "of today · you can still finish your report".
+ */
+export function publicDigPeriodLine(room: AskRoom | null, catalog: MessageCatalog): string {
+  return t(catalog, `v4.public.dig.period.${sharePeriodOf(room)}`);
 }
 
 /**

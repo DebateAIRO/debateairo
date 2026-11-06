@@ -149,6 +149,8 @@ describe("the screens before the map (waiting, paused, failed)", () => {
     expect(marker.querySelector("a")).toBeNull();
   });
 
+  // The owner's answers of 5 Nov (question 12 B) move it to the account menu only; that lands with the page's own wiring
+  // (V4DebateClient, the start-step's file), which then hands it to the header and not to this screen.
   it("ask-f6: a debate that did not finish shows the classic view once, on its screen, and not in the header's menu too", async () => {
     const runId = crypto.randomUUID();
     harness.run = run(runId, "FAILED");

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import { clock24, CLOCK_24H } from "../../apps/ui/lib/v4/clock.js";
 import {
-  digButtonLabel, digPeriodLine, digWaitLine, digWaitOf, digWords, shareChangeText, shareOfTarget, waitWords
+  digButtonLabel, digPeriodLine, digWaitLine, digWaitOf, digWords, picksButtonLabel, publicDigPeriodLine, shareChangeText, shareOfTarget, waitWords
 } from "../../apps/ui/lib/v4/digQuota.js";
 import {
   limitLine, limitWindowOf, questionShareOf, resetText, sharePeriodOf, startShareLine, startsWaitLine, usedUpLine
@@ -17,7 +17,8 @@ import type { DigTarget, DigView, V4DigPick, V4OpenQuestion, V4Path } from "../.
  *  - journey-f15: one 24-hour clock form; a day's reset "after 08:00", a week's "after Monday 09:00", a month's "on 1 December".
  *  - read-f19 / public-f14 / map-f33: a share names its own window (the room read's optional share_scope; Free's month).
  *  - public-f24: one set of limit lines, whichever server switch is in force.
- *  - journey-f13 / dig-f5: "Dig here · up to 3%", "Dig into your pick(s) · …", the tray's "Dig into these · …"; each with
+ *  - journey-f13 / dig-f5: "Dig here · up to 3%", "Dig into this · …" for one pick (question 1 B, 5 Nov), "Dig into your
+ *    picks · …", the tray's "Dig into these · …"; each with
  *    its own share; dig-f11: the reset time on a button that waits; journey-f8: "+4%" / "−2%".
  *  - wait-f22 / map-f9: which changes on the map are quota moments.
  */
@@ -48,7 +49,8 @@ describe("journey-f15: one clock and one way to write a reset", () => {
     expect(clock24(null, "en")).toBeNull();
     expect(resetText(DAY_RESET, "PERSON_DAY", "en")).toMatch(/^\d{2}:\d{2}$/u);
     expect(resetText(WEEK_RESET, "PERSON_WEEK", "en")).toMatch(/^[A-Z][a-z]+day,? \d{2}:\d{2}$/u);
-    expect(resetText(MONTH_RESET, "PERSON_MONTH", "en")).toMatch(/^[A-Z][a-z]+ \d{1,2}$/u);
+    // Day first on English pages (owner's answer to question 5, 5 Nov 2026): "1 December".
+    expect(resetText(MONTH_RESET, "PERSON_MONTH", "en")).toMatch(/^\d{1,2} [A-Z][a-z]+$/u);
     // journey-f22 / journey-f15 (the wave-2 checks): a month pause is written the same way as the month's reset.
     expect(resetText(MONTH_RESET, "MONTH_PAUSE", "en")).toBe(resetText(MONTH_RESET, "PERSON_MONTH", "en"));
   });
@@ -83,6 +85,17 @@ describe("read-f19 / public-f14 / map-f33: the window a share is of", () => {
     expect(digPeriodLine(room({ plan_id: "FREE" }), CATALOG)).toBe("of this month · you can still finish your report");
     expect(digPeriodLine(room(), CATALOG)).toBe("of today · you can still finish your report");
     expect(digPeriodLine(room({ share_scope: "PERSON_WEEK" }), CATALOG)).toBe("of this week · you can still finish your report");
+  });
+
+  it("question 34 A (5 Nov): a public page's dig box names the period alone, for every reader; the map keeps the whole line", () => {
+    expect(publicDigPeriodLine(room(), CATALOG)).toBe("of today");
+    expect(publicDigPeriodLine(room({ plan_id: "FREE" }), CATALOG)).toBe("of this month");
+    expect(publicDigPeriodLine(room({ share_scope: "PERSON_WEEK" }), CATALOG)).toBe("of this week");
+    expect(publicDigPeriodLine(null, CATALOG)).toBe("of today");
+    // The map's own line is the same period with the record's reassurance after it.
+    for (const extra of [{}, { plan_id: "FREE" }, { share_scope: "PERSON_WEEK" }] as Array<Partial<AskRoom> & Record<string, unknown>>) {
+      expect(digPeriodLine(room(extra), CATALOG)).toBe(`${publicDigPeriodLine(room(extra), CATALOG)} · you can still finish your report`);
+    }
   });
 
   it("map-f9: this question's share from the run read's optional field, checked", () => {
@@ -130,10 +143,11 @@ describe("public-f24: one set of limit lines whichever server switch is in force
 describe("journey-f13 / dig-f5 / dig-f11: the dig buttons' words", () => {
   it("one button word, the picks' words, the tray's, each with its own share", () => {
     expect(digWords(whole, CATALOG, "en")).toBe("Dig here");
-    expect(digWords(one, CATALOG, "en")).toBe("Dig into your pick");
+    // The owner's answer to question 1 (5 Nov, B): one pick reads "Dig into this" everywhere; two or more keep "your picks".
+    expect(digWords(one, CATALOG, "en")).toBe("Dig into this");
     expect(digWords(two, CATALOG, "en")).toBe("Dig into your picks");
     expect(digWords(two, CATALOG, "en", true)).toBe("Dig into these");
-    expect(digWords(one, CATALOG, "en", true)).toBe("Dig into your pick");
+    expect(digWords(one, CATALOG, "en", true)).toBe("Dig into this");
     const shares = { whole: 4, picks: 6 };
     expect(shareOfTarget(whole, shares)).toBe(4);
     expect(shareOfTarget({ kind: "open", questions: [question] }, shares)).toBe(4);
@@ -142,12 +156,17 @@ describe("journey-f13 / dig-f5 / dig-f11: the dig buttons' words", () => {
     expect(digButtonLabel({ target: whole, share: 4, wait: null, catalog: CATALOG, locale: "en" })).toBe("Dig here · up to 4%");
     expect(digButtonLabel({ target: two, share: 5, wait: null, catalog: CATALOG, locale: "en", tray: true })).toBe("Dig into these · up to 5%");
     expect(digButtonLabel({ target: whole, share: null, wait: null, catalog: CATALOG, locale: "en" })).toBe("Dig here");
+    // A public dig box with one pick reads the same; two or more keep "Dig into your picks".
+    expect(picksButtonLabel(1, 5, CATALOG, "en")).toBe("Dig into this · up to 5%");
+    expect(picksButtonLabel(2, 5, CATALOG, "en")).toBe("Dig into your picks · up to 5%");
+    expect(digButtonLabel({ target: one, share: 3, wait: null, catalog: CATALOG, locale: "en" })).toBe("Dig into this · up to 3%");
+    expect(digButtonLabel({ target: two, share: 6, wait: null, catalog: CATALOG, locale: "en" })).toBe("Dig into your picks · up to 6%");
   });
 
   it("a button that waits for a reset carries the reset time, never a share", () => {
     const wait = digWaitOf(room({ room: "FULL", scope: "PERSON_DAY", resets_at: DAY_RESET, new_starts: "BLOCKED_UNTIL_RESET" }))!;
     expect(digButtonLabel({ target: one, share: 3, wait, catalog: CATALOG, locale: "en" }))
-      .toBe(`Dig into your pick · after ${resetText(DAY_RESET, "PERSON_DAY", "en")}`);
+      .toBe(`Dig into this · after ${resetText(DAY_RESET, "PERSON_DAY", "en")}`);
   });
 
   it("journey-f8: a change is a grey '+4%' or '−2%' (the real minus sign), and no change says nothing", () => {

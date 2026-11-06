@@ -12,8 +12,8 @@ import { auditMigrationReplaySafety, definedRelationNames } from "../../tools/or
 const NAME = "0157_pre_start_charge.sql";
 const SQL_PATH = `migrations/${NAME}`;
 const MANIFEST_PATH = "migrations/lineage/pre-start-charge-forward0157.json";
-const PREVIOUS = "0155_owner_answer_writes.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/owner-answer-writes-forward0155.json";
+const PREVIOUS = "0156_moderation_notice.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/moderation-notice-forward0156.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
@@ -23,10 +23,10 @@ const TABLE = "identity.pre_start_charge";
 const READERS = ["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"];
 
 describe("0157: the small AIs before Start in the person's quota", () => {
-  it("C-T is a step of the chain, after 0155, with its own loader", async () => {
+  it("C-T is a step of the chain, after 0156, with its own loader", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0157 } from './migration-forward0157.js';");
-    expect(chain).toContain("loadForward0155,loadForward0157,");
+    expect(chain).toContain("loadForward0156,loadForward0157,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
@@ -40,7 +40,7 @@ describe("0157: the small AIs before Start in the person's quota", () => {
     ]);
   });
 
-  it("C-M is bound to 0155's manifest and to the verifier in force, and declares what it changes of 0140's and 0144's digests", () => {
+  it("C-M is bound to 0156's manifest and to the verifier in force, and declares what it changes of 0140's and 0144's digests", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string };
     expect(manifest).toEqual({
@@ -107,9 +107,9 @@ describe("0157: the small AIs before Start in the person's quota", () => {
 
   it("C-R is documented", () => {
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0157, below) the forty-sixth", "## The small AIs before Start in the quota (0157)", "`loadForward0157`", "MIGRATION_FORWARD0157_", "-- n1: drained", "-- n1: keeps-verifier"]) {
+    for (const needle of ["(0157, below) the forty-seventh", "## The small AIs before Start in the quota (0157)", "`loadForward0157`", "MIGRATION_FORWARD0157_", "-- n1: drained", "-- n1: keeps-verifier"]) {
       expect(readme, needle).toContain(needle);
     }
-    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0157_pre_start_charge.sql` (after `0155_owner_answer_writes.sql`, `n1: drained`)");
+    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0157_pre_start_charge.sql` (after `0156_moderation_notice.sql`, `n1: drained`)");
   });
 });

@@ -73,7 +73,7 @@
   "home.turn": "Söz sırası {turn}",
   "home.sampleCoda": "Tur burada sona erer. Kimsenin kazandığı ilan edilmez. Tutanak, her söz sırasına ait iki işaret ve taviz verdiğiniz halka size sunulur.",
   "home.closingTitle": "Argümanınız ancak en zayıf halkası kadar güçlüdür.",
-  "home.closingLede": "Bir tura katılın. Dört söz sırası, yaklaşık dokuz dakika ve tam olarak nerede yanıt vermeyi bıraktığınızı gösteren bir tutanak.",
+  "home.closingLede": "Bir tura katılın. Dört söz sırası ve tam olarak nerede yanıt vermeyi bıraktığınızı gösteren bir tutanak.",
   "home.pricingCopyPlusTax": "Ücretsiz başlayın. Ücretli planlar ayda {price} + {taxName} tutarından başlar. İstediğiniz zaman iptal edin.",
   "home.pricingCopyNoTax": "Ücretsiz başlayın. Ücretli planlar ayda {price} tutarından başlar, vergi eklenmez. İstediğiniz zaman iptal edin.",
   "home.pricingCopyChoose": "Ücretsiz başlayın. Ücretli planlar ayda {price} tutarından başlar, geçerli olduğu yerlerde vergi eklenir. İstediğiniz zaman iptal edin.",

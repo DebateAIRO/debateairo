@@ -617,6 +617,7 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // row-security lines and the R22 CONTENT_REFUSED cause above. migrate() is byte-identical.
 // Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
 // Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
+// Moderation notice (2026-11-05): one export line for the moderation notice repository (0156).
 // migrate() is byte-identical.
 // V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0158). migrate() is
 // byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
@@ -633,7 +634,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Renumber before merging origin V4 16f621dc7 (2026-11-06): V4 took 0156 (the moderation notice), so the start step's eight
 // migrations moved up one (0156-0163 → 0157-0164) and the module's comments, like the Task 20, 21, 53a and 56a lines above,
 // now name 0158, 0159, 0160 and 0162. Comments only; migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
-const NATIVE_MIGRATE_MODULE_SHA256 = "e7d7c4f0275ea3eb2eb496c19c56a746d067350c5d30aac95cc2129510c5827b";
+// Merge of origin V4 16f621dc7 (2026-11-06): the module carries V4's moderation-notice export line (0156) and the start
+// step's comments above. migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+const NATIVE_MIGRATE_MODULE_SHA256 = "9608474cae15ed190cb89ad093314dfaf126c326cc39810ee9962369f0483b1d";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

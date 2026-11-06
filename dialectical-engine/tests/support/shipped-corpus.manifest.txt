@@ -141,6 +141,7 @@ apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/map-views.ts
 apps/api/src/mfa.ts
+apps/api/src/moderation-notices.ts
 apps/api/src/month-pause.ts
 apps/api/src/onboarding-evidence.ts
 apps/api/src/owner-read.ts
@@ -1013,6 +1014,7 @@ apps/ui/lib/v4/digUndo.ts
 apps/ui/lib/v4/digsBelow.ts
 apps/ui/lib/v4/failedRun.ts
 apps/ui/lib/v4/foldMove.ts
+apps/ui/lib/v4/highlight.ts
 apps/ui/lib/v4/load.ts
 apps/ui/lib/v4/mapLooks.ts
 apps/ui/lib/v4/mapModel.ts
@@ -1040,6 +1042,7 @@ apps/ui/lib/v4/types.ts
 apps/ui/lib/v4/useAskAgain.ts
 apps/ui/lib/v4/useAskClarify.ts
 apps/ui/lib/v4/useBorrowed.ts
+apps/ui/lib/v4/useBrowserLayoutEffect.ts
 apps/ui/lib/v4/useDigClickCheck.ts
 apps/ui/lib/v4/useDigProgress.ts
 apps/ui/lib/v4/useDigQueue.tsx
@@ -1258,6 +1261,7 @@ packages/db/src/migration-forward0152.ts
 packages/db/src/migration-forward0153.ts
 packages/db/src/migration-forward0154.ts
 packages/db/src/migration-forward0155.ts
+packages/db/src/migration-forward0156.ts
 packages/db/src/migration-forward0157.ts
 packages/db/src/migration-forward0158.ts
 packages/db/src/migration-forward0159.ts
@@ -1273,6 +1277,7 @@ packages/db/src/migration-forward115.ts
 packages/db/src/migration-lineage.ts
 packages/db/src/migration-n1.ts
 packages/db/src/migration-transaction.ts
+packages/db/src/moderation-notice.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
 packages/db/src/owner-recovery.ts

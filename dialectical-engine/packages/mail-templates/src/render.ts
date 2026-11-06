@@ -144,6 +144,15 @@ export function mailLinkOf(value: string): string | null {
   return canonical.length <= 2_048 ? canonical : null;
 }
 
+/**
+ * The tag a mail writes its dates in. Owner's answer to question 5 (5 Nov 2026) and its follow-up: dates the server
+ * writes follow the pages, so English is day first on the 24-hour clock ("29 October 2026, 14:30"); every other
+ * language keeps its own order.
+ */
+function dateTagOf(locale: MailLocale): string {
+  return locale === "en" ? "en-GB" : locale;
+}
+
 /** The shown segment of a param, or null for a flag (checked, never printed). */
 function formatParam(
   kind: MailParamKind, name: string, value: string, locale: MailLocale, catalogue: Catalogue, currency: PriceCurrency
@@ -160,7 +169,7 @@ function formatParam(
     case "date": {
       const at = new Date(value);
       if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
-      return { kind: "text", value: new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at) };
+      return { kind: "text", value: new Intl.DateTimeFormat(dateTagOf(locale), { dateStyle: "long", timeZone: "UTC" }).format(at) };
     }
     case "datetime": {
       const at = new Date(value);
@@ -172,8 +181,8 @@ function formatParam(
         }).format(at) };
       }
       // Q5 pins the English comma; the existing Romanian export mail contract also pins that form.
-      const date = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at);
-      const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(at);
+      const date = new Intl.DateTimeFormat(dateTagOf(locale), { dateStyle: "long", timeZone: "UTC" }).format(at);
+      const time = new Intl.DateTimeFormat(dateTagOf(locale), { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(at);
       return { kind: "text", value: `${date}, ${time}` };
     }
     case "url":
