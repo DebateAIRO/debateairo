@@ -891,9 +891,10 @@ describe("the first debate's answer on the report", () => {
     expect(node.textContent).not.toMatch(/points? here (?:was|were) not checked/u);
   });
 
-  it("a report opened with no level (none in the address, none in the account) reads as Plain words, the server's rule", async () => {
-    // The server reads a debate with no stored level as Plain words; the report's details follow that level until the run
-    // read names the debate's own one (the wiring list's item 19 b).
+  it("with no level in the address or the account, the report's level is Plain words, where the first screen's choice starts", async () => {
+    // The owner's 5 Nov ruling: the level choice on the first screen always starts on Plain words. This is the page's own
+    // default, not a server rule (the server gives a debate with no level no reader sentence). It holds until the run read
+    // names the debate's own level (the wiring list's item 19 b); the map page's default moves with it (item 20).
     const { reportLevelOf } = await import("../../apps/ui/components/v4/V4ReportClient.js");
     expect(reportLevelOf(null)).toBe("plain");
     for (const level of ["plain", "background", "expert"] as const) expect(reportLevelOf(level), level).toBe(level);

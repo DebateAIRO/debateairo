@@ -112,9 +112,13 @@ const PRESS_MATCH_MS = 5 * 60_000;
 /** A dig's path sits one step in per level, up to four steps (as in the PDF). */
 const PATH_LEVEL_STEPS = 4;
 /**
- * A report opened with no level (none in the address, none in the account) reads as Plain words: the server's rule for a
- * debate with no stored level (the owner's 5 Nov level ruling: the level is chosen when asking and starts on Plain words).
- * Spec D5's "Some background" default is gone.
+ * A report opened with no level (none in the address, none in the account) shows its details at Plain words, because the
+ * owner ruled on 5 Nov that the level choice on the first screen always starts on Plain words (second round of follow-ups).
+ * This is the page's own default, not a server rule: the server gives a debate asked without a level no reader sentence at
+ * all (packages/kernel/src/reading-level.ts). Spec D5's "Some background" default is gone here. The map page's default
+ * (V4DebateClient's DEFAULT_LEVEL, still "Some background") moves to Plain words in the start-step session's first-screen
+ * change (wiring list item 20), so a debate's map and report agree. Until then the two differ only on the map: this page
+ * draws Plain words and Some background alike (only Expert adds to it).
  */
 const DEFAULT_LEVEL: ReadingLevel = "plain";
 
