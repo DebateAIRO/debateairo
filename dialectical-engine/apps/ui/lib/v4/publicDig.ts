@@ -124,6 +124,10 @@ export type PublicDigProgress =
   | Readonly<{ kind: "KEPT_PRIVATE" }>
   /** It was on the page and was taken off after a review. */
   | Readonly<{ kind: "REMOVED" }>
+  /** 0157 (gap 5): kept with the digger because the debate was hidden for a review, not for anything in the dig. */
+  | Readonly<{ kind: "KEPT_BY_REVIEW" }>
+  /** 0157 (gap 5): off the page while a review checks the debate; nothing was found in the dig. */
+  | Readonly<{ kind: "OFF_FOR_REVIEW" }>
   | Readonly<{ kind: "FAILED" }>;
 
 /** Whether the card is settled (nothing more to read). */
@@ -161,6 +165,10 @@ export function progressOfAnswer(answer: Answer, before: string): PublicDigProgr
       return { kind: "KEPT_PRIVATE" };
     case "REMOVED_AFTER_REVIEW":
       return { kind: "REMOVED" };
+    case "KEPT_PRIVATE_BY_REVIEW":
+      return { kind: "KEPT_BY_REVIEW" };
+    case "OFF_THE_PAGE_FOR_REVIEW":
+      return { kind: "OFF_FOR_REVIEW" };
     case "ON_THE_PAGE": {
       const rewrite = contribution.rewrite ?? null;
       // On the page, its new text not given yet: said as on the page, without a "before and after".

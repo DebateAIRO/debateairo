@@ -38,7 +38,7 @@ import { paymentRegionsOf } from "../../packages/kernel/src/payment-regions.js";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurrencyFor, type PlanId } from "../../packages/register/src/billing-plans.js";
 import { quadernoPricingFromKeyFile, type QuadernoPriced } from "./quaderno-tax.js";
 import {
-  contributionOf, contributionRewriteOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
+  contributionOf, contributionRewriteOf, mockFlagStateOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
   type PublicMode, type PublicState
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
@@ -161,6 +161,8 @@ function mockReviewStep(row: MockReview, action: string, pointer?: string, text?
   else if (!row.hidden) return "PUBLIC_REVIEW_NOT_HIDDEN";
   else if (action === "REMOVE_DIG") row.removed = true;
   else if (action === "CORRECT") row.corrected.set(pointer!, text!);
+  // 0157: DECIDE records the final ground of a debate kept hidden, and writes no log row (only REPUBLISH ends a hide).
+  else if (action === "DECIDE") return null;
   row.log.push({ revision: row.log.length + 1, action, piece_kind: null, actor_staff_id: MOCK_REVIEWER, at: new Date().toISOString() });
   return null;
 }
@@ -1025,6 +1027,12 @@ function investigationReports(investigation: Investigation) {
 // Startup check: every seeded body must pass the website's own schema, or the mock refuses to start.
 // ---------------------------------------------------------------------------------------------------------------
 
+// 0157 (D1): one statement of reasons, so Settings' notices page has something to show: a staff hide of the seeded debate, on a report, held for review.
+const MODERATION_STATEMENTS = Object.freeze({ statements: [{ statement_id: "57a7e000-0000-4000-8000-000000000001", kind: "DEBATE_HIDDEN", public_ref: PUBLIC_REF,
+  happened_at: "2026-11-05T10:00:00.000Z", piece_kind: null, hidden_now: true,
+  ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false },
+  facts: [], facts_deleted: false, quote: null, places: [] }] });
+
 function startupCheck(): number {
   let count = 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1040,6 +1048,7 @@ function startupCheck(): number {
   check("GET /v1/auth/age-confirmation", C.AgeConfirmationStatusSchema, { status: "confirmed" });
   check("GET /v1/account/sensitive-data-consent", C.SensitiveDataConsentStatusSchema, { status: "given" });
   check("GET /v1/account/legal-status", C.LegalStatusResponseSchema, { must_accept: [] });
+  check("GET /v1/account/moderation-statements", C.ModerationStatementsSchema, MODERATION_STATEMENTS);
   check("GET /v1/geo/availability", C.GeoAvailabilityResponseSchema, { signup: true, pay: true, service: true });
   check("GET /v1/public/ai-providers", C.PublicAiProvidersResponseSchema, { companies: ["anthropic", "openai", "xai"] });
   check("GET /v1/public/debates", C.PublicDebateListSchema, { items: [], total: 0 });
@@ -1698,6 +1707,9 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
   if (path === "/v1/account/legal-status" && isGet) return sendJson(req, res, 200, { must_accept: [] }, C.LegalStatusResponseSchema);
   if (path === "/v1/account/legal-accept" && method === "POST") return sendEmpty(req, res, 204);
+  if (path === "/v1/account/moderation-statements" && isGet) {
+    return sessionOut ? sendJson(req, res, 401, { error: "SESSION_REQUIRED" }) : sendJson(req, res, 200, MODERATION_STATEMENTS, C.ModerationStatementsSchema);
+  }
   // ---- the account memory of migration 0131 ----
   if (path === "/v1/account/reading-level" && isGet) return sendJson(req, res, 200, { reading_level: readingLevel }, C.ReadingLevelStateSchema);
   if (path === "/v1/account/reading-level" && method === "POST") {
@@ -1740,9 +1752,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!body.success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const ref = parts[3]!;
     if (!publicDebates.has(ref)) return sendJson(req, res, 200, { state: "NOT_FOUND" }, C.PublicFlagAnswerSchema);
-    const state = body.data.claim.includes("#person") ? "WITH_A_PERSON" as const : body.data.claim.includes("hide") ? "HIDDEN" as const : "NOT_FOUND" as const;
+    // The body carries the good-faith statement (D5): a press without it fails the schema above, as the API's does.
+    const state = mockFlagStateOf(body.data.claim);
     mockFlags.push({ flag_id: crypto.randomUUID(), publication_ref: ref, reporter: "Quiet Heron", state: state === "HIDDEN" ? "HIDDEN" : state === "NOT_FOUND" ? "NOT_FOUND" : "QUEUED", verdict: state === "HIDDEN" ? "AGREE" : state === "NOT_FOUND" ? "NOT_FOUND" : null,
-      reason: state === "HIDDEN" ? "CONTENT" : null, created_at: new Date().toISOString(), judged_at: null, dismissed_at: null, where: body.data.where, claim: body.data.claim, debate_hidden: state === "HIDDEN" });
+      reason: state === "HIDDEN" ? "CONTENT" : null, created_at: new Date().toISOString(), judged_at: null, dismissed_at: null, where: body.data.where, claim: body.data.claim, debate_hidden: state === "HIDDEN", outcome: null });
     if (state === "HIDDEN") {
       const row = mockReview.get(ref) ?? { hidden: false, removed: false, corrected: new Map<string, string>(), log: [] };
       mockReview.set(ref, row);

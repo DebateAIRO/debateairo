@@ -384,12 +384,12 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         const input = parse(contract.PublicFlagDismissRequestSchema, request.body);
         const service = application!.publicFlags;
         if (service === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
-        const { authentication, binding } = await actionAuthority(request, { action: 'PUBLIC_REPORT_DISMISS', flag_id: flagId, operation_id: input.operation_id });
+        const { authentication, binding } = await actionAuthority(request, { action: 'PUBLIC_REPORT_DISMISS', flag_id: flagId, outcome: input.outcome, operation_id: input.operation_id });
         const proof = await application!.access.readActionProof(authentication, input.proof_handle, binding);
         if (proof === null) throw new StaffHttpRefusal(403, 'STAFF_REQUEST_REFUSED');
         const alertIntent = await application!.intents.mutation({ event: 'PUBLIC_REVIEW_CHANGED', operationId: binding.operationId, keyUserId: authentication.context.userId, actorStaffId: authentication.context.staffId, subjectStaffId: authentication.context.staffId, reason: { code: 'SECURITY_RESPONSE' } });
         try {
-            const done = await service.repository.dismiss({ actor: authentication.context, proof, flagId, operationId: input.operation_id, alertIntent });
+            const done = await service.repository.close({ actor: authentication.context, proof, flagId, outcome: input.outcome, operationId: input.operation_id, alertIntent });
             return { operation_id: done.operationId, outcome: done.outcome, recorded_at: done.recordedAt.toISOString() };
         } catch (error) {
             const message = error instanceof Error ? error.message : '';

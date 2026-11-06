@@ -198,6 +198,7 @@
   "settings.emailLink.continue": "Przejdź do Ustawień",
   "settings.account.title": "Konto",
   "settings.security.title": "Bezpieczeństwo",
+  "settings.notices.title": "Powiadomienia o moderacji",
   "settings.phone.reveal": "Pokaż telefon",
   "settings.phone.change": "Zmień telefon",
   "settings.phone.purpose": "W przyszłości możemy wysłać Ci kod SMS-em, aby pomóc Ci wrócić do konta, a jeśli poprosisz nas o pomoc, możemy do Ciebie zadzwonić lub wysłać SMS. Przechowywany w formie zaszyfrowanej; nigdy nie jest udostępniany ani używany do celów marketingowych.",

@@ -21,6 +21,16 @@ const BASE = Object.freeze({
 });
 
 describe("P17 MIME assembly", () => {
+  it("writes one Reply-To right after Subject when asked (0157, D6), and refuses one that is not a plain address", () => {
+    const message = buildTemplatedMessage({ ...BASE, replyTo: "office@dezbatere.ro" } as never);
+    expect(message).toMatch(/\r\nSubject: [^\r]*\r\nReply-To: office@dezbatere\.ro\r\n/u);
+    expect(message.match(/^Reply-To:/gmu)).toHaveLength(1);
+    expect(buildTemplatedMessage(BASE as never)).not.toContain("Reply-To:");
+    for (const bad of ["office@dezbatere.ro\r\nBcc: x@example.com", "Office <office@dezbatere.ro>", "a@b.ro, c@d.ro"]) {
+      expect(() => buildTemplatedMessage({ ...BASE, replyTo: bad } as never)).toThrow("MAIL_REPLY_TO_INVALID");
+    }
+  });
+
   it("keeps an ASCII subject as it is and encodes any other in words of at most 75 characters", () => {
     expect(encodeHeaderText("Your Plus plan is active")).toBe("Your Plus plan is active");
     const subject = "Ваш план Plus активен — спасибо, что выбрали Dialectical Engine для своих дебатов";

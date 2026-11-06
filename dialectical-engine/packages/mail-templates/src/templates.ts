@@ -5,14 +5,18 @@
  * charge could not be verified), and N14's O2_REFUND_DUE and O2_REFUND_REMINDER (a NETOPIA refund for the owner to make
  * in NETOPIA's admin, and the daily list of the open ones), and N17's M12 (a card is needed before a renewal), and
  * M10_ENDED (the owner's decision of 24 October 2026: a lost charge-back ended the plan), and 0156's three MODERATION_ notices
- * (the owner's request of 5 November 2026: a person whose content a review took off the public page is told).
+ * (the owner's request of 5 November 2026: a person whose content a review took off the public page is told), and 0157's seven
+ * MODERATION_STATEMENT_ kinds (the DSA statements of reasons, the owner's D1 of 6 November 2026).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
   "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M10_ENDED", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
   "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
-  "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED"
+  "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED",
+  "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "MODERATION_STATEMENT_REPORT_REMOVED",
+  "MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED",
+  "PUBLIC_FLAG_ANSWER_RECEIPT", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -79,6 +83,8 @@ export type MailTemplateDefinition = Readonly<{
   subject: string;
   paragraphs: ReadonlyArray<MailParagraph>;
   params: Readonly<Record<string, MailParamKind>>;
+  /** 0157 (D6): a reply goes to the complaints route, SELLER_COMPANY.emails.authorities (office@), not to the noreply@ sender. */
+  replyTo?: "authorities";
   /** Params a caller may leave out. Only the `then` sentence of a `present` test on that param reads one. */
   optional?: Readonly<Record<string, MailParamKind>>;
 }>;
@@ -102,6 +108,34 @@ const define = (template: MailTemplateDefinition): MailTemplateDefinition => Obj
  * again after "we won't try this card again". `confirmCard` wins over it; it wins over the bank's refusal.
  */
 const retry = Object.freeze({ plan: "plan", retryDate: "date", cardPageUrl: "url", bankDeclined: "flag" } as const);
+/** A sentence shown only when its flag is "true", else `otherwise` (which may be another condition, or nothing). */
+const when = (ifParam: string, then: string, otherwise: string | MailParamCondition | null = null): MailParamCondition => Object.freeze({ ifParam, test: "true", then, otherwise });
+/**
+ * 0157's statement of reasons (DSA Art 17(3)): what was done, where and for how long (the kind's own sentence, with the item's link); where the facts came
+ * from; how automated means were used; the ground, one flag a rule; the link to the full statement; and the routes, office@ within six months among them.
+ * Every fact is a flag or a link, so nothing the person did not see on the page is ever in the mail. The ground lines are each shown alone when true.
+ */
+const STATEMENT_GROUNDS = Object.freeze([["groundHold", "Hold"], ["groundUnlawful", "Unlawful"], ["groundHate", "Hate"], ["groundWeapons", "Weapons"], ["groundSuicide", "Suicide"],
+  ["groundReligious", "Religious"], ["groundPersonal", "Personal"], ["groundIllegal", "Illegal"]] as const);
+const statementParams = Object.freeze({ happened: "date", itemUrl: "url", statementUrl: "url", sourceReport: "flag", sourceEmail: "flag", sourceAuthority: "flag", sourceOwn: "flag",
+  automatedDecision: "flag", automatedDetection: "flag", groundNone: "flag", ...Object.fromEntries(STATEMENT_GROUNDS.map(([name]) => [name, "flag"])) } as Record<string, MailParamKind>);
+const statement = (kind: string): MailTemplateDefinition => define({
+  catalogue: "mail", subject: `mail.statement.${kind}Subject`,
+  paragraphs: [
+    `mail.statement.${kind}`,
+    when("sourceReport", "mail.statement.sourceReport", when("sourceEmail", "mail.statement.sourceEmail", when("sourceAuthority", "mail.statement.sourceAuthority", when("sourceOwn", "mail.statement.sourceOwn")))),
+    when("automatedDecision", "mail.statement.automatedDecision", when("automatedDetection", "mail.statement.automatedDetection", "mail.statement.noAutomation")),
+    when("groundNone", "mail.statement.groundNone", "mail.statement.groundIntro"),
+    ...STATEMENT_GROUNDS.map(([name, key]) => when(name, `mail.statement.ground${key}`)),
+    "mail.statement.readFull", "mail.statement.routes"
+  ],
+  params: statementParams,
+  replyTo: "authorities"
+});
+const flagAnswer = (kind: string): MailTemplateDefinition => define({
+  catalogue: "mail", subject: `mail.flagAnswer.${kind}Subject`, paragraphs: [`mail.flagAnswer.${kind}`, "mail.flagAnswer.routes"],
+  params: { happened: "date", itemUrl: "url" }, replyTo: "authorities"
+});
 const retryOptional = Object.freeze({ confirmCard: "flag", bankAsked: "flag", endDate: "date" } as const);
 /**
  * W10 (P2-I21): the first M5 sentence is true in every case (B2: without the retry promise when there is none); then
@@ -388,6 +422,21 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: ["mail.moderation.reportRemoved", "mail.M1.termsCurrent", "mail.moderation.mistake"],
     params: { happened: "date", termsUrl: "url" }
   }),
+  // 0157 (the owner's D1 of 6 November 2026): the statement of reasons, one template a kind, each the same parts (above). Its Reply-To is office@ (D6).
+  MODERATION_STATEMENT_DEBATE_HIDDEN: statement("debateHidden"),
+  MODERATION_STATEMENT_DEBATE_DECIDED: statement("debateDecided"),
+  MODERATION_STATEMENT_CONTRIBUTION_REMOVED: statement("contributionRemoved"),
+  MODERATION_STATEMENT_REPORT_REMOVED: statement("reportRemoved"),
+  MODERATION_STATEMENT_CORRECTED: statement("corrected"),
+  MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: statement("contributionAffected"),
+  MODERATION_STATEMENT_REPORT_AFFECTED: statement("reportAffected"),
+  // 0157 (DSA Art 16(4)-(6); the owner's D4): the answers to the person who reported. The date and the debate's link only: no words of the report
+  // or the debate, no staff id. The receipt names no decision; each decision says how automated means were used and gives office@ and the routes.
+  PUBLIC_FLAG_ANSWER_RECEIPT: define({ catalogue: "mail", subject: "mail.flagAnswer.receiptSubject", paragraphs: ["mail.flagAnswer.receipt"], params: { happened: "date", itemUrl: "url" } }),
+  PUBLIC_FLAG_ANSWER_AUTO_HIDDEN: flagAnswer("autoHidden"),
+  PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: flagAnswer("autoNotFound"),
+  PUBLIC_FLAG_ANSWER_NO_BREACH: flagAnswer("noBreach"),
+  PUBLIC_FLAG_ANSWER_ACTED: flagAnswer("acted"),
   THREAT_REPORT_WAITING: define({
     catalogue: "owner", subject: "owner.threatReport.subject",
     paragraphs: ["owner.threatReport.waiting", "owner.threatReport.open"], params: {}

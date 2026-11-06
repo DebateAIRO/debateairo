@@ -19,7 +19,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 const PUBLIC_REF = "f1000000-0000-4000-8000-000000000001";
 const RUN = "c1000000-0000-4000-8000-000000000009";
 const REWRITE = { line: "A rewritten line.", summary: "What the rewrite says.", fate: "PARTLY_HELD", what_changed: ["One thing changed."] };
-const dig = (state: "CHECKING" | "ON_THE_PAGE" | "KEPT_PRIVATE" | "REMOVED_AFTER_REVIEW", rewrite: typeof REWRITE | null = null, part: object = { dig: digPart("11111111-1111-4111-8111-111111111111", 1) }): Answer => {
+const dig = (state: Answer["contribution"] extends infer C ? C extends { state: infer S } ? S : never : never, rewrite: typeof REWRITE | null = null, part: object = { dig: digPart("11111111-1111-4111-8111-111111111111", 1) }): Answer => {
   const answer = seededAnswer(RUN, { ...part, contribution: { public_ref: PUBLIC_REF, state, rewrite } } as never);
   // The seeded debate has a page still being read, which reads the answer again for its own reason: settled here, so a read below is the check's.
   return { ...answer, web: { paths: answer.web!.paths.map((path) => ({ ...path, other_pages: path.other_pages.map((other) =>
@@ -72,9 +72,24 @@ describe("the digger's view of a dig on a public debate", () => {
     await unmountMap();
     harness.answer = dig("REMOVED_AFTER_REVIEW", null, {});
     await mountMap(1600, RUN);
-    expect(note()!.textContent).toBe(CATALOG["v4.contribution.REMOVED_AFTER_REVIEW"]);
+    // 0157 (D1): the line, then the link to the person's statement of reasons, which gives the ground and the routes.
+    expect(note()!.textContent).toBe(`${CATALOG["v4.contribution.REMOVED_AFTER_REVIEW"]} ${CATALOG["v4.contribution.statement"]}`);
+    expect(note()!.querySelector("a")!.getAttribute("href")).toBe("/settings/notices");
     expect(page().querySelector("[data-contribution-rewrite]")).toBeNull();
   });
+
+  // 0157, gap 5: a dig the review took off the page, or kept private, for something else is told so truly, and is pointed to its statement.
+  for (const [state, line] of [["KEPT_PRIVATE_BY_REVIEW", "This stayed private because its debate was hidden for a review, not because of anything in it. Only you can see it."],
+    ["OFF_THE_PAGE_FOR_REVIEW", "This is off the public page while a review checks the debate. It was not found to break any rule, and it stays here, as your own."]] as const) {
+    it(`${state} says the review, not the dig, is the reason, and links to the statement`, async () => {
+      harness.answer = dig(state, null, {});
+      await mountMap(1600, RUN);
+      expect(note()!.textContent).toBe(`${line} Why, and what you can do`);
+      expect(note()!.dataset.state).toBe(state);
+      expect(note()!.querySelector("a")!.getAttribute("href")).toBe("/settings/notices");
+      expect(note()!.textContent).not.toContain("did not pass the check");
+    });
+  }
 
   it("KEPT_PRIVATE says it stayed private and only they see it, with no reason and no link", async () => {
     harness.answer = dig("KEPT_PRIVATE");

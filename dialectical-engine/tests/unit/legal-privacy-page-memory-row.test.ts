@@ -56,9 +56,10 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
   const englishRetain = tableRows("en", 7).length;
 
   it("English has the new rows where the owner placed them", () => {
-    expect(englishCollect).toBe(15);
+    // 0157: the moderation notices row in section 2, and its two rows in section 7.
+    expect(englishCollect).toBe(16);
     expect(cells(tableRows("en", 2)[COLLECT_AT - 1]!)[0]).toBe("**Debate content**");
-    expect(englishRetain).toBe(27);
+    expect(englishRetain).toBe(29);
     const names = tableRows("en", 7).map((row) => cells(row)[0]);
     expect(names.indexOf("Page settings and visits")).toBeGreaterThan(names.indexOf("Provider return records and retrieval references"));
     expect(names.indexOf("Provider return records and retrieval references")).toBeGreaterThanOrEqual(0);

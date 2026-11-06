@@ -197,6 +197,7 @@
   "settings.emailLink.continue": "Idi na Postavke",
   "settings.account.title": "Račun",
   "settings.security.title": "Sigurnost",
+  "settings.notices.title": "Obavijesti o moderiranju",
   "settings.phone.reveal": "Prikaži telefon",
   "settings.phone.change": "Promijeni telefon",
   "settings.phone.purpose": "Ubuduće vam možda pošaljemo kod SMS-om kako bismo vam pomogli da se vratite u svoj račun, a ako nas zamolite za pomoć, možemo vas nazvati ili vam poslati SMS. Pohranjuje se šifrirano; nikad se ne dijeli niti koristi za marketing.",

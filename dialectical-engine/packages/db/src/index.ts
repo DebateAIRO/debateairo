@@ -3120,4 +3120,6 @@ export * from "./onboarding-evidence.js";
 
 export {PostgresConsumerSecurityNoticeRepository,type ConsumerSecurityNotice,type ConsumerSecurityNoticeClaim} from "./consumer-security-mail.js";
 export * from "./moderation-notice.js";
+// 0157: the statements of reasons repository.
+export * from "./moderation-statement.js";
 export * from './social-identity.js';

@@ -22,7 +22,7 @@ const PUBLIC_FLAG_TEXT_CODE_POINTS = 60_000;
 
 export type PublicFlagAnswer = contract.PublicFlagAnswer["state"];
 export type PublicFlagPorts = Readonly<{
-  repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open" | "settle">;
+  repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open" | "settle"> & Partial<Pick<PostgresPublicFlagRepository, "recordQuote">>;
   judge: () => PublicationJudgePort | null;
   /** Seals under the publication's key, public or hidden. */
   seal: (publicationRef: string, runId: string, value: unknown) => Promise<CryptoEnvelope>;
@@ -34,7 +34,8 @@ const squeezed = (text: string): string => text.replace(/\s+/gu, " ").trim().toL
 
 /** Reads the page and asks. Whatever goes wrong is UNAVAILABLE: no automatic hide, and a person reads the report. */
 async function judged(input: Readonly<{ where: string; claim: string; debate: PublicDebate | null }>, judge: PublicationJudgePort | null) {
-  const none = { verdict: "UNAVAILABLE" as PublicFlagVerdict, reason: null as "CONTENT" | "PERSONAL" | null, providerRef: null as string | null, modelId: null as string | null, inputTokens: null as number | null, outputTokens: null as number | null, costUsd: null as number | null };
+  const none = { verdict: "UNAVAILABLE" as PublicFlagVerdict, reason: null as "CONTENT" | "PERSONAL" | null, providerRef: null as string | null, modelId: null as string | null, inputTokens: null as number | null, outputTokens: null as number | null, costUsd: null as number | null,
+    quote: null as string | null };
   if (judge === null || input.debate === null || !isJudgeIdentifier(judge.providerRef) || !isJudgeIdentifier(judge.modelId)) return none;
   const named = { ...none, providerRef: judge.providerRef, modelId: judge.modelId };
   const all = textPiecesOf(input.debate).map((piece) => piece.text).filter((text) => text.trim() !== "");
@@ -52,7 +53,7 @@ async function judged(input: Readonly<{ where: string; claim: string; debate: Pu
     const metered = { ...named, inputTokens: answer.usage?.input_tokens ?? null, outputTokens: answer.usage?.output_tokens ?? null, costUsd: answer.usage?.cost_usd ?? null };
     const reply = PublicReportCheckReplySchema.parse(JSON.parse(answer.text) as unknown);
     if (reply.verdict === "AGREE" && !squeezed(publicText.join(" ")).includes(squeezed(reply.quote!))) return { ...metered, verdict: "UNSURE" as PublicFlagVerdict, reason: null };
-    return { ...metered, verdict: reply.verdict as PublicFlagVerdict, reason: reply.reason };
+    return { ...metered, verdict: reply.verdict as PublicFlagVerdict, reason: reply.reason, quote: reply.verdict === "AGREE" ? reply.quote ?? null : null };
   } catch {
     return named;
   }
@@ -67,8 +68,12 @@ export async function pressPublicFlag(input: Readonly<{ ownerRef: string; public
   if (opened === "LIMITED" || opened === "NOT_PUBLIC") return "NOT_FOUND";
   if (opened === "QUEUE") return "WITH_A_PERSON";
   const debate = await ports.readPublicDebate(input.publicationRef).catch(() => null);
-  const result = await judged({ where: input.where, claim: input.claim, debate }, ports.judge());
+  const { quote, ...result } = await judged({ where: input.where, claim: input.claim, debate }, ports.judge());
   const settled = await ports.repository.settle({ flagId: input.flagId, ...result });
+  // 0157: the statement of the automatic hide shows its owner the words the check relied on, sealed as the report's were. The hide has happened; nothing here can undo or delay its answer.
+  if (settled === "HIDDEN" && quote !== null && ports.repository.recordQuote !== undefined) {
+    try { await ports.repository.recordQuote(input.flagId, await ports.seal(input.publicationRef, runId, { quote })); } catch { try { ports.log?.("PUBLIC_FLAG_QUOTE_NOT_KEPT", { flagId: input.flagId }); } catch { /* As below. */ } }
+  }
   try { ports.log?.("PUBLIC_FLAG_CHECKED", { flagId: input.flagId, verdict: result.verdict, settled }); } catch { /* A failing log sink costs nothing. */ }
   return settled === "HIDDEN" ? "HIDDEN" : settled === "NOT_FOUND" ? "NOT_FOUND" : "WITH_A_PERSON";
 }
@@ -78,7 +83,8 @@ export async function pressPublicFlag(input: Readonly<{ ownerRef: string; public
 export type PublicFlagIntent = Extract<contract.StaffActionIntent, { action: "PUBLIC_REPORT_DISMISS" }>;
 export const isPublicFlagIntent = (intent: { action: string }): intent is PublicFlagIntent => intent.action === "PUBLIC_REPORT_DISMISS";
 export function canonicalPublicFlagBinding(intent: PublicFlagIntent): ActionBinding {
-  const body = { action: intent.action, target_id: intent.flag_id, expected_revision: 0, operation_id: intent.operation_id };
+  // 0157 (D4): the outcome is in the body, as staff.public_flag_close checks it.
+  const body = { action: intent.action, target_id: intent.flag_id, outcome: intent.outcome, expected_revision: 0, operation_id: intent.operation_id };
   return { action: intent.action, targetId: intent.flag_id, expectedRevision: 0, operationId: intent.operation_id, bodySha256: createHash("sha256").update(parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))).digest("hex") };
 }
 export type PublicFlagStaffService = Readonly<{ repository: PostgresPublicFlagRepository; withKey: <T>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T) => Promise<T> }>;
@@ -93,7 +99,7 @@ export async function publicFlagQueueOf(service: PublicFlagStaffService, rows: A
       words = await service.withKey(row.publication_ref, row.run_id, (cipher) => cipher.decrypt(content) as { where: unknown; claim: unknown }).catch(() => null);
     }
     reports.push({ flag_id: row.flag_id, publication_ref: row.publication_ref, reporter: row.reporter, state: row.state, verdict: row.verdict, reason: row.reason, created_at: iso(row.created_at)!, judged_at: iso(row.judged_at), dismissed_at: iso(row.dismissed_at),
-      where: typeof words?.where === "string" ? words.where : null, claim: typeof words?.claim === "string" ? words.claim : null, debate_hidden: row.debate_hidden });
+      where: typeof words?.where === "string" ? words.where : null, claim: typeof words?.claim === "string" ? words.claim : null, debate_hidden: row.debate_hidden, outcome: row.outcome ?? null });
   }
   return contract.PublicFlagQueueSchema.parse({ reports });
 }

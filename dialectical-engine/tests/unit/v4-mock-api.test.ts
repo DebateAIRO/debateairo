@@ -699,6 +699,22 @@ describe("the public dig flow and the public state (owner screen review, 3 Nov: 
   });
 });
 
+describe("the Report button on the mock (decision 35; the DSA notices, D5)", () => {
+  it("a press without the good-faith statement is refused as the API refuses it; the pretend check answers one of three states, each with its true line", async () => {
+    const { mockFlagStateOf } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicFlagRequestSchema, PublicFlagAnswerSchema } = await import("../../packages/contract/src/web.js");
+    expect(PublicFlagRequestSchema.safeParse({ where: "The question", claim: "It names a private person." }).success).toBe(false);
+    expect(PublicFlagRequestSchema.safeParse({ where: "The question", claim: "It names a private person.", good_faith: false }).success).toBe(false);
+    expect(PublicFlagRequestSchema.safeParse({ where: "The question", claim: "It names a private person.", good_faith: true }).success).toBe(true);
+    const states = ["Please hide this one.", "Read by #person please.", "Nothing to see here."].map(mockFlagStateOf);
+    expect(states).toEqual(["HIDDEN", "WITH_A_PERSON", "NOT_FOUND"]);
+    for (const state of states) expect(PublicFlagAnswerSchema.safeParse({ state }).success).toBe(true);
+    expect(catalog["v4.public.flag.NOT_FOUND"]).toMatch(/^We have not acted on this report: it was stopped automatically, and no person has read it\./u);
+    const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
+    expect(server).toContain("mockFlagStateOf(body.data.claim)");
+  });
+});
+
 describe("V4 mock API: every switch is named where people look for it (the wave-2 checks)", () => {
   const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
   const readme = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/README.md"), "utf8");

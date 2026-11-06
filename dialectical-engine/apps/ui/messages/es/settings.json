@@ -197,6 +197,7 @@
   "settings.emailLink.continue": "Ir a Configuración",
   "settings.account.title": "Cuenta",
   "settings.security.title": "Seguridad",
+  "settings.notices.title": "Avisos de moderación",
   "settings.phone.reveal": "Mostrar teléfono",
   "settings.phone.change": "Cambiar teléfono",
   "settings.phone.purpose": "Más adelante, podríamos enviarle un código por SMS para ayudarle a recuperar el acceso a su cuenta y, si nos pide ayuda, podemos llamarle o escribirle por SMS. Se guarda cifrado; nunca se comparte ni se usa con fines de marketing.",

@@ -1351,6 +1351,13 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 {
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0157_moderation_statements.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_moderation(uuid,uuid)"
+  ]
+},
+{
   "roleName": "debateai_runtime",
   "source": "migrations/0153_dig_tree_settled.sql",
   "grants": [
@@ -1373,6 +1380,26 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.claim_moderation_notices(integer)",
     "EXECUTE ON FUNCTION identity.read_moderation_notice(uuid,uuid)",
     "EXECUTE ON FUNCTION identity.complete_moderation_notice(uuid,uuid,text)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0157_moderation_statements.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.record_public_flag_quote(uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.claim_moderation_statements(integer)",
+    "EXECUTE ON FUNCTION identity.read_moderation_statement(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_moderation_statement(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_own_moderation_statements(uuid)",
+    "EXECUTE ON FUNCTION identity.delete_moderation_words_due()",
+    "EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_flag_queue_answered(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.claim_public_flag_mail(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_flag_mail(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.settle_stuck_public_flags()"
   ]
 }
 ]);

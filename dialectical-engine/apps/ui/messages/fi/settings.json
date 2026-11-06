@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Siirry Asetuksiin",
   "settings.account.title": "Tili",
   "settings.security.title": "Turvallisuus",
+  "settings.notices.title": "Moderointitiedotteet",
   "settings.phone.reveal": "Näytä puhelinnumero",
   "settings.phone.change": "Vaihda puhelinnumero",
   "settings.phone.purpose": "Myöhemmin voimme lähettää sinulle tekstiviestillä koodin, joka auttaa sinua pääsemään takaisin tilillesi, ja jos pyydät meiltä apua, voimme soittaa sinulle tai lähettää tekstiviestin. Tallennetaan salattuna; numeroa ei koskaan jaeta eikä käytetä markkinointiin.",

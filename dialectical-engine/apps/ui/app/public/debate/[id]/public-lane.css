@@ -51,6 +51,9 @@
 /* public-f5: "Report a problem": the quiet line next to the link that says it was sent, then the check's answer; the short line under a box left too short. */
 .v4PubFlagLine { color: var(--text-2); font-size: 13px; }
 .v4PubFlagMore { margin: 0; color: var(--text-2); font-size: 12.5px; }
+/* The DSA good-faith box (D5): the box and its sentence on one line that wraps under the words, never under the box. */
+.v4PubFlagGoodFaith { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; }
+.v4PubFlagGoodFaith input { flex: none; margin: 2px 0 0; }
 
 /* public-f6: the grey outline shown at once while a public debate loads. Still: no shimmer, so reduced motion needs nothing more. */
 .v4PubSkel { display: flex; flex-direction: column; }

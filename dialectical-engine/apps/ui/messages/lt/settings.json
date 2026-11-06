@@ -198,6 +198,7 @@
   "settings.emailLink.continue": "Eiti į nustatymus",
   "settings.account.title": "Paskyra",
   "settings.security.title": "Saugumas",
+  "settings.notices.title": "Moderavimo pranešimai",
   "settings.phone.reveal": "Rodyti telefoną",
   "settings.phone.change": "Keisti telefoną",
   "settings.phone.purpose": "Ateityje galime atsiųsti jums kodą SMS žinute, kad padėtume vėl patekti į paskyrą, o jei paprašysite mūsų pagalbos, galime jums paskambinti arba parašyti SMS žinutę. Saugoma užšifruota; niekada neperduodama kitiems ir nenaudojama rinkodarai.",

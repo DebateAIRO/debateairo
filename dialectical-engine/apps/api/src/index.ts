@@ -28,6 +28,7 @@ import type { AuthSourceAdmission } from "./registration.js";
 import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
+import { moderationStatementsOf, type ModerationStatementPorts } from "./moderation-statements.js";
 import { pressPublicFlag, type PublicFlagPorts } from "./public-flag.js";
 import type { PostgresPublicDebateRepository, PostgresPublicTreeRepository, ProfileSession, PublicContributionRead } from "@debateai/db";
 import { runInRequestScope, setRequestCredential } from "@debateai/db";
@@ -1501,6 +1502,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
   { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "GET /v1/account/moderation-statements", auth: "user", resource: "identity", action: "read-moderation-statements" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
@@ -1927,6 +1929,8 @@ export interface ApiOptions {
   /** Decision 13: digs and reports on a public debate, by anyone with credit (./public-tree.ts); absent: only the first snapshot is readable. */
   readonly publicTree?: PublicTreeOptions;
   readonly publicFlags?: PublicFlagPorts;
+  /** 0157 (D1): the signed-in person's own statements of reasons, their facts opened under each debate's key. */
+  readonly moderationStatements?: ModerationStatementPorts;
   /** Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key at the ask. */
   readonly purposeLines?: PurposeLinesPort;
   /** Decision 29: dynamic step 2's small call. Absent: every page gets the generic purpose options. */
@@ -3864,6 +3868,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
     }
   );
+  // 0157 (DSA Art 17; D1): the person's own statements of reasons, with the facts the mail leaves out. Theirs only; no-store.
+  api.get("/v1/account/moderation-statements", routePolicy("GET /v1/account/moderation-statements"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (options.moderationStatements === undefined) return reply.status(503).send({ error: "MODERATION_STATEMENTS_UNAVAILABLE" });
+    reply.header("Cache-Control", "no-store");
+    return reply.send(await moderationStatementsOf(authenticated.ownerRef, options.moderationStatements));
+  });
   // Decision 35: Report on a public debate, signed in. One answer shape; every refusal reads the same, so nothing about the check, the limits or the debate leaks.
   api.post<{ Params: { id: string } }>("/v1/public/debates/:id/flag", credentialRoutePolicy("POST /v1/public/debates/{id}/flag"), async (request, reply) => {
     const ownerRef = request.authenticatedSession?.ownerRef;
@@ -4673,7 +4685,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (contribution === undefined) return reply.send(answer);
     const rewrite = await ownDigRewriteOf(options.publicTree!.pool, contribution.dig_run_id, contribution.parent_run_id);
     return reply.send({ ...answer, contribution: { public_ref: contribution.publication_ref, rewrite,
-      state: contribution.removed_after_review === true ? "REMOVED_AFTER_REVIEW" : contribution.outcome === null ? "CHECKING" : contribution.outcome === "ALLOWED" && contribution.kept_private_after_review !== true ? "ON_THE_PAGE" : "KEPT_PRIVATE" } });
+      state: contributionStateOf(contribution) } });
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",
@@ -7494,4 +7506,13 @@ function webOfAsk(settings: Pick<RunCreationSettings, "previewProviderTestConfig
   const config = settings.previewProviderTestConfig;
   return webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape, engine,
     depth: Number(ask.depth_params.depth), parent: ask.parent });
+}
+
+/** Decision 13's line for the digger, true in each case (0157, gap 5): a review that kept it private or holds it off the page says so; its check is not blamed. */
+export function contributionStateOf(contribution: PublicContributionRead): import("@debateai/contract").AnswerContribution["state"] {
+  if (contribution.removed_after_review === true) return "REMOVED_AFTER_REVIEW";
+  if (contribution.kept_private_after_review === true) return "KEPT_PRIVATE_BY_REVIEW";
+  if (contribution.outcome === null) return "CHECKING";
+  if (contribution.outcome !== "ALLOWED") return "KEPT_PRIVATE";
+  return contribution.off_for_review === true ? "OFF_THE_PAGE_FOR_REVIEW" : "ON_THE_PAGE";
 }

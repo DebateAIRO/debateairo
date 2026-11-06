@@ -22,6 +22,8 @@ const ACCOUNT_MAIL_MAX_BYTES=262144;
 export const TEMPLATED_MAIL_MAX_BYTES=12*1024*1024;
 const TEMPLATED_ATTACHMENTS_MAX=4,TEMPLATED_ATTACHMENT_BYTES_MAX=8*1024*1024;
 const FROM='noreply@dezbatere.ro';
+// 0157 (D6): the moderation mails' one Reply-To, the complaints route of Terms §10 (SELLER_COMPANY.emails.authorities).
+const REPLY_TO='office@dezbatere.ro';
 /** One base64 body: 76-character lines of the base64 alphabet, the last one possibly shorter. */
 function base64Body(lines){
  if(lines.length<1||lines.some((line,index)=>!/^[A-Za-z0-9+/=]{1,76}$/.test(line)||(index<lines.length-1&&line.length!==76)))refuse();
@@ -57,7 +59,11 @@ function selectTemplatedMail(message,text,end,lines,options){
  const languageAt=lines.findIndex(line=>line.startsWith('Content-Language: '));
  const contentLanguage=languageAt<0?undefined:/^Content-Language: ([a-z]{2})$/.exec(lines[languageAt])?.[1];
  if(languageAt>=0&&(contentLanguage===undefined||languageAt!==lines.length-3))refuse();
- const core=languageAt<0?lines:lines.filter((_,index)=>index!==languageAt);
+ // 0157 (D6): a moderation mail answers to office@; the selector admits that one address, right after Subject, and rebuilds it.
+ const replyAt=lines.findIndex(line=>line.startsWith('Reply-To: '));
+ const replyTo=replyAt<0?undefined:lines[replyAt]===`Reply-To: ${REPLY_TO}`?REPLY_TO:undefined;
+ if(replyAt>=0&&(replyTo===undefined||!lines[replyAt-1]?.startsWith('Subject: ')))refuse();
+ const core=lines.filter((_,index)=>index!==languageAt&&index!==replyAt);
  const withId=core.length===6;
  if(!boundary||![5,6].includes(core.length)||core[0]!==`From: ${FROM}`||!core[1].startsWith('To: ')||core.at(-2)!=='MIME-Version: 1.0')refuse();
  const messageId=withId?/^Message-ID: <([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})@debateai\.local>$/i.exec(core[2])?.[1]:null;
@@ -83,7 +89,7 @@ function selectTemplatedMail(message,text,end,lines,options){
  }
  take(`${mixed}--`);take('');
  if(at!==body.length||attachments.reduce((sum,file)=>sum+file.content.length,0)>TEMPLATED_ATTACHMENT_BYTES_MAX)refuse();
- const rebuilt=Buffer.from(options.buildTemplatedMessage({from:FROM,to,messageId,subject,text:plain,html,attachments,boundary,...(contentLanguage===undefined?{}:{contentLanguage})}),'utf8');
+ const rebuilt=Buffer.from(options.buildTemplatedMessage({from:FROM,to,messageId,subject,text:plain,html,attachments,boundary,...(replyTo===undefined?{}:{replyTo}),...(contentLanguage===undefined?{}:{contentLanguage})}),'utf8');
  if(!rebuilt.equals(message))refuse();
  const recipient=templatedRecipient(options.recipientPolicy,to);
  // Only To changes, as the account transport does (the forward aliases go to the installed forward target).

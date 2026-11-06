@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Gå till Inställningar",
   "settings.account.title": "Konto",
   "settings.security.title": "Säkerhet",
+  "settings.notices.title": "Modereringsbesked",
   "settings.phone.reveal": "Visa telefonnummer",
   "settings.phone.change": "Ändra telefonnummer",
   "settings.phone.purpose": "Längre fram kan vi komma att skicka en kod via sms för att hjälpa dig tillbaka in på ditt konto, och om du ber oss om hjälp kan vi ringa eller sms:a dig. Lagras krypterat; delas aldrig och används aldrig för marknadsföring.",

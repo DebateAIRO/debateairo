@@ -14,6 +14,9 @@ import { correctedPiece, textPiecesOf } from "../public-tree.js";
  * A PUBLIC DEBATE UNDER REVIEW over HTTP (plan 2026-10-31-r22-owner-changes decision 33; migration 0150). The two accounts of decision 24 only, the same authority and no other role. Every change needs that
  * person's passkey, bound by the server to the debate, the piece, the step and the log's revision (`canonicalPublicReviewBinding`); the database recomputes the same digest under the debate's lock.
  * A hide is containment: it goes on while team tools are locked, and no money and no check is ever asked. Everything else waits for the tools.
+ * THE GROUND (migration 0157; DSA Art 17(3)): each step also carries what its statement of reasons needs, in the same proof: the ground's fixed codes, the
+ * source of the facts (with the report, for the Report button) and the digest of the facts a person typed, which are sealed under the debate's key here and
+ * never enter the proof or a mail. A hide never waits for them: whatever it carries that does not hold becomes Terms §9's hold, in the database.
  */
 export type PublicReviewIntent = Extract<contract.StaffActionIntent, { action: "PUBLIC_REVIEW_HIDE" | "PUBLIC_REVIEW_STEP" }>;
 export type PublicReviewKey = <T>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T) => Promise<T>;
@@ -24,11 +27,15 @@ export class PublicReviewHttpError extends Error {
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
 export const isPublicReviewIntent = (intent: { action: string }): intent is PublicReviewIntent => intent.action === "PUBLIC_REVIEW_HIDE" || intent.action === "PUBLIC_REVIEW_STEP";
 
+/** The ground's four fields as the proof's body and 0157's command carry them: the codes sorted and comma-joined, and "" for none. */
+export function groundFieldsOf(intent: PublicReviewIntent): Readonly<{ grounds: string; source: string; flag_id: string; facts_sha256: string }> {
+  return { grounds: [...intent.grounds].sort().join(","), source: intent.source ?? "", flag_id: intent.flag_id ?? "", facts_sha256: intent.action === "PUBLIC_REVIEW_HIDE" ? "" : intent.facts_sha256 ?? "" };
+}
 export function canonicalPublicReviewBinding(intent: PublicReviewIntent, state: PublicReviewCommandState): ActionBinding {
   if (intent.expected_revision !== state.expectedRevision) throw new PublicReviewHttpError(409, "PUBLIC_REVIEW_STALE");
   const step = intent.action === "PUBLIC_REVIEW_HIDE" ? null : intent;
   const body = { action: intent.action, target_id: intent.publication_ref, step: step?.step ?? "HIDE", piece_kind: step?.piece_kind ?? "", piece_id: step?.piece_id ?? "", pointer: step?.pointer ?? "",
-    text_sha256: step?.text_sha256 ?? "", expected_revision: intent.expected_revision, operation_id: intent.operation_id };
+    text_sha256: step?.text_sha256 ?? "", expected_revision: intent.expected_revision, operation_id: intent.operation_id, ...groundFieldsOf(intent) };
   return { action: intent.action, targetId: intent.publication_ref, expectedRevision: intent.expected_revision, operationId: intent.operation_id,
     bodySha256: sha(parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))) };
 }
@@ -77,7 +84,14 @@ function parsed<T>(schema: { safeParse(value: unknown): { success: true; data: T
   if (!result.success) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
   return result.data;
 }
-const PLAIN_REFUSALS: Readonly<Record<string, number>> = Object.freeze({ PUBLIC_REVIEW_STALE: 409, PUBLIC_REVIEW_ALREADY_HIDDEN: 409, PUBLIC_REVIEW_NOT_HIDDEN: 409, PUBLIC_REVIEW_NOT_PUBLIC: 404, PUBLIC_REVIEW_PIECE_UNKNOWN: 404 });
+const PLAIN_REFUSALS: Readonly<Record<string, number>> = Object.freeze({ PUBLIC_REVIEW_STALE: 409, PUBLIC_REVIEW_ALREADY_HIDDEN: 409, PUBLIC_REVIEW_NOT_HIDDEN: 409, PUBLIC_REVIEW_NOT_PUBLIC: 404, PUBLIC_REVIEW_PIECE_UNKNOWN: 404,
+  PUBLIC_REVIEW_GROUND_INVALID: 422 });
+/** A step's ground, before any passkey is spent (the database checks it again): a removal, a hidden report, a correction and DECIDE need a ground, a source, the
+ * report for the Report button and the facts; a re-publish and a put-back carry none. Whether the report is this debate's is the database's to say. */
+function groundHolds(input: contract.PublicReviewStepRequest): boolean {
+  if (input.step === "REPUBLISH" || input.step === "PUT_BACK") return input.grounds.length === 0 && input.source === null && input.flag_id === null && input.facts === null;
+  return input.grounds.length > 0 && input.source !== null && (input.source === "REPORT_BUTTON") === (input.flag_id !== null) && input.facts !== null;
+}
 /** The database's own words for a step it would not take; anything else stays the generic refusal. */
 async function plainRefusals<T>(work: () => Promise<T>): Promise<T> {
   try { return await work(); } catch (error) {
@@ -130,9 +144,12 @@ export function registerPublicReviewRoutes(route: Route, service: () => PublicRe
     const publicationRef = publicationOf(request);
     const input = parsed(contract.PublicReviewHideRequestSchema, request.body);
     return plainRefusals(async () => {
-      const common = await proved(request, { action: "PUBLIC_REVIEW_HIDE", publication_ref: publicationRef, expected_revision: input.expected_revision, operation_id: input.operation_id }, input.proof_handle);
+      const intent = { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: publicationRef, expected_revision: input.expected_revision, operation_id: input.operation_id,
+        grounds: input.grounds, source: input.source, flag_id: input.flag_id };
+      const common = await proved(request, intent, input.proof_handle);
+      // No facts and no seal on a hide: nothing is read first, so containment waits for nothing (0150).
       return answer(await present().repository.act({ ...common, step: "HIDE", publicationRef, pieceKind: null, pieceId: null, pointer: null, textSha256: null, content: null,
-        expectedRevision: input.expected_revision, operationId: input.operation_id }));
+        ground: groundFieldsOf(intent), facts: null, expectedRevision: input.expected_revision, operationId: input.operation_id }));
     });
   });
   route("POST", "/v1/admin/public-review/:id/step", async (request, reply) => {
@@ -140,19 +157,27 @@ export function registerPublicReviewRoutes(route: Route, service: () => PublicRe
     const publicationRef = publicationOf(request);
     const input = parsed(contract.PublicReviewStepRequestSchema, request.body);
     if ((input.step === "CORRECT") !== (input.text !== null) || (input.step === "CORRECT") !== (input.pointer !== null)) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
-    if ((input.step === "REPUBLISH") !== (input.piece_id === null) || (input.step === "REPUBLISH") !== (input.piece_kind === null)) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
+    const whole = input.step === "REPUBLISH" || input.step === "DECIDE";
+    if (whole !== (input.piece_id === null) || whole !== (input.piece_kind === null)) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
+    if (!groundHolds(input)) throw new PublicReviewHttpError(422, "PUBLIC_REVIEW_GROUND_INVALID");
     const textSha256 = input.text === null ? null : sha(input.text);
+    const factsSha256 = input.facts === null ? null : sha(input.facts);
     return plainRefusals(async () => {
-      const common = await proved(request, { action: "PUBLIC_REVIEW_STEP", publication_ref: publicationRef, step: input.step, piece_kind: input.piece_kind, piece_id: input.piece_id, pointer: input.pointer,
-        text_sha256: textSha256, expected_revision: input.expected_revision, operation_id: input.operation_id }, input.proof_handle);
+      const intent = { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: publicationRef, step: input.step, piece_kind: input.piece_kind, piece_id: input.piece_id, pointer: input.pointer,
+        text_sha256: textSha256, expected_revision: input.expected_revision, operation_id: input.operation_id, grounds: input.grounds, source: input.source, flag_id: input.flag_id, facts_sha256: factsSha256 };
+      const common = await proved(request, intent, input.proof_handle);
       const { repository, withKey } = present();
       let content: CryptoEnvelope | null = null;
-      if (input.text !== null) {
+      let facts: CryptoEnvelope | null = null;
+      if (input.text !== null || input.facts !== null) {
         // Only a string a person reads can be replaced, and the page must still read after it. Read under the same authority; a read here is logged as any other.
         const material = await repository.read(common.actor, auth(request).baseSession.tokenHash, publicationRef);
         if (material === null) throw new PublicReviewHttpError(404, "PUBLIC_REVIEW_NOT_PUBLIC");
+        const typed = input.facts;
+        // The facts go under the debate's key, beside the statement; only their digest is in the proof and the log.
+        if (typed !== null) facts = await withKey(publicationRef, material.snapshot.run_id, (cipher) => cipher.encrypt({ facts: typed }));
         const text = input.text;
-        content = await withKey(publicationRef, material.snapshot.run_id, (cipher) => {
+        if (text !== null) content = await withKey(publicationRef, material.snapshot.run_id, (cipher) => {
           const target = input.piece_kind === "SNAPSHOT" ? material.snapshot.content
             : input.piece_kind === "UPDATE" ? material.updates.find((row) => row.update_id === input.piece_id)?.content
               : material.reports.find((row) => row.report_id === input.piece_id)?.content;
@@ -164,7 +189,7 @@ export function registerPublicReviewRoutes(route: Route, service: () => PublicRe
         });
       }
       return answer(await repository.act({ ...common, step: input.step, publicationRef, pieceKind: input.piece_kind, pieceId: input.piece_id, pointer: input.pointer, textSha256, content,
-        expectedRevision: input.expected_revision, operationId: input.operation_id }));
+        ground: groundFieldsOf(intent), facts, expectedRevision: input.expected_revision, operationId: input.operation_id }));
     });
   });
 }

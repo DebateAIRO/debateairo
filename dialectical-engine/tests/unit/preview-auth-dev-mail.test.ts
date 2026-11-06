@@ -94,6 +94,15 @@ describe('templated mail (billing and legal) to the allow-listed recipients only
   await sender.sendTemplated({ to, templateId: 'M6', locale: 'en', params: { plan: 'PLUS', pricingUrl: 'https://v3-preview.dezbatere.ro/pricing' }, messageId: ID });
   return Buffer.from(sender.messages[0]!.raw, 'utf8');
  }
+ // 0157 (D6): a statement of reasons, with its Reply-To office@.
+ async function statementMail(to: string) {
+  const sender = new MemoryTemplatedMailSender('noreply@dezbatere.ro');
+  const flags = Object.fromEntries(['automatedDecision', 'automatedDetection', 'groundNone', 'groundHold', 'groundUnlawful', 'groundHate', 'groundWeapons', 'groundSuicide', 'groundReligious', 'groundPersonal', 'groundIllegal',
+   'sourceReport', 'sourceEmail', 'sourceAuthority', 'sourceOwn'].map((name) => [name, name === 'groundHold' || name === 'sourceOwn' ? 'true' : 'false']));
+  await sender.sendTemplated({ to, templateId: 'MODERATION_STATEMENT_DEBATE_HIDDEN', locale: 'en', messageId: ID,
+   params: { happened: '2026-11-05T09:30:00.000Z', itemUrl: 'https://v3-preview.dezbatere.ro/public/debate/x', statementUrl: 'https://v3-preview.dezbatere.ro/settings/notices#x', ...flags } });
+  return Buffer.from(sender.messages[0]!.raw, 'utf8');
+ }
  const pdf = (bytes: number) => Buffer.alloc(bytes, 0x25);
  const withFiles = (to: string, attachments: { filename: string; contentType: 'application/pdf' | 'text/plain; charset=UTF-8'; content: Buffer }[], subject = 'Confirmare plată — Plus', messageId: string | null = null) =>
   Buffer.from(buildTemplatedMessage({ from: 'noreply@dezbatere.ro', to, messageId, subject, text: 'Plan activ.\r\nMulțumim.', html: '<p>Plan activ.</p>', attachments, boundary: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6' }), 'utf8');
@@ -101,6 +110,13 @@ describe('templated mail (billing and legal) to the allow-listed recipients only
   const message = await apiMail('proof@example.test');
   const selected = mail.selectCanonicalMail(message, templated);
   expect(selected).toMatchObject({ family: 'templated', recipient: 'proof@example.test' });
+  expect(selected.message.equals(message)).toBe(true);
+ });
+ it('admits a statement of reasons with its one Reply-To, office@, unchanged', async () => {
+  const message = await statementMail('proof@example.test');
+  expect(message.toString()).toMatch(/\r\nSubject: [^\r]+\r\nReply-To: office@dezbatere\.ro\r\n/u);
+  const selected = mail.selectCanonicalMail(message, templated);
+  expect(selected.recipient).toBe('proof@example.test');
   expect(selected.message.equals(message)).toBe(true);
  });
  it('admits a Terms PDF beyond the account mail bound, with a UTF-8 subject and no Message-ID', () => {
@@ -120,7 +136,11 @@ describe('templated mail (billing and legal) to the allow-listed recipients only
   ['another sender', async () => swap(await apiMail('proof@example.test'), 'From: noreply@dezbatere.ro', 'From: billing@dezbatere.ro')],
   ['a display-name sender', async () => swap(await apiMail('proof@example.test'), 'From: noreply@dezbatere.ro', 'From: dezbatere.ro <noreply@dezbatere.ro>')],
   ['a Message-ID on another domain', async () => swap(await apiMail('proof@example.test'), `<${ID}@debateai.local>`, `<${ID}@example.com>`)],
-  ['an extra header', async () => swap(await apiMail('proof@example.test'), 'MIME-Version: 1.0', 'Reply-To: x@example.com\r\nMIME-Version: 1.0')],
+  // 0157 (D6) admits one Reply-To, office@, right after Subject; any other extra header, or any other Reply-To, is still refused.
+  ['an extra header', async () => swap(await apiMail('proof@example.test'), 'MIME-Version: 1.0', 'X-Priority: 1\r\nMIME-Version: 1.0')],
+  ['a Reply-To to another address', async () => swap(await statementMail('proof@example.test'), 'Reply-To: office@dezbatere.ro', 'Reply-To: x@example.com')],
+  ['a Reply-To away from its place', async () => swap(await apiMail('proof@example.test'), 'MIME-Version: 1.0', 'Reply-To: office@dezbatere.ro\r\nMIME-Version: 1.0')],
+  ['a second Reply-To', async () => swap(await statementMail('proof@example.test'), 'Reply-To: office@dezbatere.ro', 'Reply-To: office@dezbatere.ro\r\nReply-To: x@example.com')],
   ['a second recipient', async () => swap(await apiMail('proof@example.test'), 'To: proof@example.test', 'To: proof@example.test, stranger@example.com')],
   ['a text/html attachment', async () => swap(withFiles('proof@example.test', [{ filename: 'a.pdf', contentType: 'application/pdf', content: pdf(10) }]), 'Content-Type: application/pdf; name="a.pdf"', 'Content-Type: text/html; name="a.pdf"')],
   ['a renamed attachment (disposition differs)', async () => swap(withFiles('proof@example.test', [{ filename: 'a.pdf', contentType: 'application/pdf', content: pdf(10) }]), 'filename="a.pdf"', 'filename="b.pdf"')],

@@ -643,7 +643,7 @@ await step("Write a report that never arrives (public=REPORT_STUCK)", async () =
 }, (value: string) => value);
 // Decision 35: the Report button, through the website's own client, and the queue through the contract's schema. It hides the first public debate, so it reads the 410 and puts it back.
 await step("Report: not found, with a person, hidden (the page answers 410), and the queue holds them", async () => {
-  const report = (claim: string, ref: string = PUBLIC.debate) => client.flagPublicDebate(ref, { where: "The main answer.", claim });
+  const report = (claim: string, ref: string = PUBLIC.debate) => client.flagPublicDebate(ref, { where: "The main answer.", claim, good_faith: true });
   const plain: Loose = await report("A plain claim about the answer.");
   must(plain.state === "NOT_FOUND", `plain: ${JSON.stringify(plain)}`);
   const person: Loose = await report("Someone should read this #person.");

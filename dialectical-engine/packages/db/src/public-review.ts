@@ -7,7 +7,9 @@ import { guardedAuthorityQuery, type StaffAlertIntent } from "./staff-access.js"
  * A public debate under review (migration 0150; plan 2026-10-31-r22-owner-changes decision 33), through 0150's definers only: the runtime reads no table. SQL owns who may act, the clock, the revision, the
  * proof and the log.
  */
-export type PublicReviewStepName = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT";
+export type PublicReviewStepName = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT" | "DECIDE";
+/** 0157: the ground's fields as the proof's body carries them: the codes sorted and comma-joined, and "" for none. */
+export type PublicReviewGroundFields = Readonly<{ grounds: string; source: string; flag_id: string; facts_sha256: string }>;
 export type PublicReviewCommandState = Readonly<{ expectedRevision: number; hidden: boolean }>;
 export type PublicReviewMaterial = Readonly<{
   snapshot: Readonly<{ run_id: string; created_at: string; content: CryptoEnvelope; latest_state: string | null }>; hidden: boolean; revision: number;
@@ -50,13 +52,17 @@ export class PostgresPublicReviewRepository {
     if (value === undefined) throw refusal();
     return value;
   }
-  /** `alertIntent` null only for a hide while team tools are locked; the database refuses it for any other step. */
+  /**
+   * `alertIntent` null only for a hide while team tools are locked; the database refuses it for any other step. Through 0157's door: the ground's four fields as the
+   * proof bound them ("" for none), and the typed facts sealed under the debate's key. 0150's door stays for the release before.
+   */
   async act(input: Readonly<{ actor: StaffContext; proof: StaffProof; step: PublicReviewStepName; publicationRef: string; pieceKind: string | null; pieceId: string | null; pointer: string | null;
-    textSha256: string | null; content: CryptoEnvelope | null; expectedRevision: number; operationId: string; alertIntent: StaffAlertIntent | null }>): Promise<SecurityReceipt> {
+    textSha256: string | null; content: CryptoEnvelope | null; ground: PublicReviewGroundFields; facts: CryptoEnvelope | null; expectedRevision: number; operationId: string;
+    alertIntent: StaffAlertIntent | null }>): Promise<SecurityReceipt> {
     const command = { targetId: input.publicationRef, step: input.step, pieceKind: input.pieceKind ?? "", pieceId: input.pieceId ?? "", pointer: input.pointer ?? "", textSha256: input.textSha256 ?? "",
-      expectedRevision: input.expectedRevision, operationId: input.operationId };
-    return receiptOf(await this.one("SELECT staff.public_review_act($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb) AS value",
-      [input.actor, input.proof.proofId, input.proof.binding, command, input.content === null ? null : JSON.stringify(input.content), input.alertIntent]));
+      expectedRevision: input.expectedRevision, operationId: input.operationId, grounds: input.ground.grounds, source: input.ground.source, flagId: input.ground.flag_id, factsSha256: input.ground.facts_sha256 };
+    return receiptOf(await this.one("SELECT staff.public_review_act_grounded($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb) AS value",
+      [input.actor, input.proof.proofId, input.proof.binding, command, input.content === null ? null : JSON.stringify(input.content), input.facts === null ? null : JSON.stringify(input.facts), input.alertIntent]));
   }
   async readOverlay(publicationRef: string): Promise<PublicReviewOverlayRead | null> {
     return (await this.one("SELECT identity.read_public_review_overlay($1::uuid) AS value", [publicationRef]) as PublicReviewOverlayRead | null) ?? null;

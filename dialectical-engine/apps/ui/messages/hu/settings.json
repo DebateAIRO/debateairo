@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Tovább a Beállításokhoz",
   "settings.account.title": "Fiók",
   "settings.security.title": "Biztonság",
+  "settings.notices.title": "Moderálási értesítések",
   "settings.phone.reveal": "Telefonszám megjelenítése",
   "settings.phone.change": "Telefonszám módosítása",
   "settings.phone.purpose": "Később SMS-ben küldhetünk Önnek egy kódot, amely segít visszajutni a fiókjába, és ha segítséget kér tőlünk, felhívhatjuk, vagy SMS-t küldhetünk Önnek. Titkosítva tároljuk; soha nem adjuk ki, és nem használjuk marketingcélokra.",

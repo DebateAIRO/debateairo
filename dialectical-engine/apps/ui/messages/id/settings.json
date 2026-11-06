@@ -195,6 +195,7 @@
   "settings.emailLink.continue": "Buka Pengaturan",
   "settings.account.title": "Akun",
   "settings.security.title": "Keamanan",
+  "settings.notices.title": "Pemberitahuan moderasi",
   "settings.phone.reveal": "Tampilkan telepon",
   "settings.phone.change": "Ubah telepon",
   "settings.phone.purpose": "Nanti kami mungkin mengirimkan kode lewat SMS untuk membantu Anda masuk kembali ke akun Anda, dan jika Anda meminta bantuan kepada kami, kami dapat menelepon atau mengirim SMS kepada Anda. Disimpan dalam bentuk terenkripsi; tidak pernah dibagikan atau digunakan untuk pemasaran.",

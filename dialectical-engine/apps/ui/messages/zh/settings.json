@@ -195,6 +195,7 @@
   "settings.emailLink.continue": "前往设置",
   "settings.account.title": "账户",
   "settings.security.title": "安全",
+  "settings.notices.title": "审核通知",
   "settings.phone.reveal": "显示电话号码",
   "settings.phone.change": "更改电话号码",
   "settings.phone.purpose": "日后我们可能会通过短信向您发送验证码，帮助您重新进入账户；如果您向我们求助，我们可以给您打电话或发短信。号码经加密存储，绝不会被共享，也绝不会用于营销。",
