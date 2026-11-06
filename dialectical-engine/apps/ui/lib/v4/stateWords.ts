@@ -138,6 +138,31 @@ export function stateWordText(state: WaitState, catalog: MessageCatalog, locale:
   return t(catalog, word.key, word.values);
 }
 
+/**
+ * The browser tab's word for a question that is not finished (the owner's fourth round, 6 Nov 2026: the tab follows the
+ * page's state word, "Waiting · …" while a question waits for a free spot, "Looking into it · …" while it runs). It is the
+ * state's own word without its clock time (the page says the time; a tab has no room for it): "Waiting", "Taking a short
+ * break", "Waiting for your other question to finish first", and the month's pause with its day ("Paused until 1
+ * December", then "Ready to continue"). Null while the AIs work, and once it is ready or over: the tab then keeps its own
+ * words ("Looking into it", "Ready").
+ */
+export function tabStateWordOf(state: WaitState, locale: string): StateWord | null {
+  switch (state.kind) {
+    case "WAITING":
+      return { key: "v4.state.WAITING.noTime", values: {} };
+    case "SHORT_BREAK":
+      return { key: "v4.state.SHORT_BREAK.noTime", values: {} };
+    case "WAITING_OWN":
+    case "PAUSED":
+      return stateWordOf(state, locale);
+    case "LOOKING":
+    case "READY":
+    case "DIDNT_FINISH":
+    case "BEING_WRITTEN":
+      return null;
+  }
+}
+
 /** The fields of a question's status read that say what it is doing (RunProjection). */
 export type RunStateFields = Pick<RunProjection, "state" | "hold_until" | "waits_until" | "waits_for" | "month_pause">;
 

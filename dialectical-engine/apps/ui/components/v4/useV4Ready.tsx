@@ -5,6 +5,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   newsHeadlineOf, readyNewsOf, sinceLastLookedOf, stopsOfChanges, type DigResult, type NewsHeadline
 } from "@/lib/v4/readyMoment";
+import { tabStateWordOf, type WaitState } from "@/lib/v4/stateWords";
 import type { V4Change, V4Map, V4Selection } from "@/lib/v4/types";
 import { newsHeadlineText } from "./V4ChangesBar";
 import { readyPlain, readyText, V4ReadyAnnouncer, V4ReadyNote, type ReadyNoteText } from "./V4ReadyNote";
@@ -17,6 +18,8 @@ import { V4TourBar } from "./V4TourBar";
  *   are here, and the report being written: one small note with [See it] (several digs: [Show me], the tour), one line
  *   for screen readers, the tab title ("Looking into it · …", "Ready · …", "(1) changed · …"), and focus kept where it
  *   was. The dots on the map stay until each place is opened (the page keeps that with the account, V4DebateClient).
+ *   The owner's fourth round (6 Nov): before the answer, the tab follows the page's state word ("Waiting · …" while the
+ *   question waits for a free spot, "Looking into it · …" while it runs) when the page hands the question's state.
  * - dig-f3 / journey-f10: what the "What your digs did" notice says and does ("See it" for one place, "Show me" for more).
  * - dig-f18: the tour walks the news place by place with a pinned "Next change › · Done"; Done, or reaching the last
  *   place, puts the notice away. dig-f1: the question itself (the main answer) is the last place.
@@ -38,6 +41,13 @@ export type V4ReadyInput = Readonly<{
   map: V4Map | null;
   /** The wait screen shows (the debate runs and has not failed). */
   waiting: boolean;
+  /**
+   * The owner's fourth round (6 Nov 2026): the unfinished question's state (lib/v4/stateWords.ts waitStateOfRun of its
+   * status read), so the tab follows the page's state word until the answer is served: "Waiting" while it waits for a free
+   * spot, "Taking a short break", the month's pause ("Paused until 1 December", even when `waiting` is false), and "Looking
+   * into it" while it runs. Absent or null: "Looking into it" while `waiting`, as before.
+   */
+  waitState?: WaitState | null;
   /** This debate is a dig: its arrival says "Your dig is done." */
   isDigPage: boolean;
   /** All news so far, and how much of it "Hide this" (or the tour) put away. */
@@ -258,11 +268,16 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
   );
 
   // ── The tab title ──
-  const tabPrefix = input.waiting
-    ? t(catalog, "v4.ready.tab.waiting")
-    : readyUnseen !== null
-      ? t(catalog, "v4.ready.tab.ready")
-      : input.changed.size > 0 ? tPlural(catalog, "v4.ready.tab.changed", input.changed.size, locale) : "";
+  // Before the answer is served, the question's own state word when it has one for the tab (never once the map is here).
+  const waitState = map === null ? input.waitState ?? null : null;
+  const stateTab = waitState === null ? null : tabStateWordOf(waitState, locale);
+  const tabPrefix = stateTab !== null
+    ? t(catalog, stateTab.key, stateTab.values)
+    : input.waiting
+      ? t(catalog, "v4.ready.tab.waiting")
+      : readyUnseen !== null
+        ? t(catalog, "v4.ready.tab.ready")
+        : input.changed.size > 0 ? tPlural(catalog, "v4.ready.tab.changed", input.changed.size, locale) : "";
 
   return {
     tabPrefix,
