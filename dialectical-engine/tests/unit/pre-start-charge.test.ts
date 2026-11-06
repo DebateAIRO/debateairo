@@ -1,7 +1,7 @@
 /**
  * V4 start step, Task 17 (spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the
  * merges, the combine and the fit check) are charged as PRE_START: run-less, written only by
- * identity.record_pre_start_charge (0156), in the person's windows through their own reader, and in the person's export
+ * identity.record_pre_start_charge (0157), in the person's windows through their own reader, and in the person's export
  * as the time and the kind only, never the cost or the person's key.
  */
 import { describe, expect, it } from "vitest";
@@ -37,8 +37,8 @@ describe("the pre-Start charge", () => {
     await expect(store.recordSpend({ spendSource: "PRE_START", runId: null } as never)).rejects.toMatchObject({ code: "MODEL_SPEND_PRE_START_FUNCTION_ONLY" });
   });
 
-  // V4 start step, Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): a call made for a try names it (0163).
-  it("a call made for a try is written by 0163's writer with the try, in one call; the link at Start and the failed debate's quota read are 0163's", async () => {
+  // V4 start step, Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): a call made for a try names it (0164).
+  it("a call made for a try is written by 0164's writer with the try, in one call; the link at Start and the failed debate's quota read are 0164's", async () => {
     const TRY = "a".repeat(64);
     const calls: unknown[][] = [];
     const pool = { query: async (text: string, values: unknown[]) => {

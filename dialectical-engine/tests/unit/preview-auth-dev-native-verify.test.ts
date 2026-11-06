@@ -54,9 +54,9 @@ describe('native verify and pending forward steps',()=>{
 // Side-by-side spec §5 ("database ahead", G6): an older release's verify accepts a database a newer release moved forward
 // by n1-expand steps only against the newer release's root-pinned database-ahead file, and says so in its proof.
 const H='e'.repeat(64),S1='1'.repeat(64),S2='2'.repeat(64);
-// Probe names after this source's chain head (0163, a failed question giving back its path-list charge, after a dig under the main question updating the main answer 0162, after the carry-on digs without a live sign-in 0161, after the saved questions 0160, after each path's step and points per run 0159, the path results per run 0158, the chosen paths sealed per run 0157, the small AIs before Start in the quota 0156, the owner's two writes on their own answer 0155, Iceland and Liechtenstein in the Region list 0154, a finished dig's mark 0153, a reporter's reports in their export 0152, the Report button 0151, a public debate under review 0150, a funded person's public report in the team's month 0149, an erased account keeping a public debate 0148, the public tree 0147, the Owner's allowances for team members 0146, the pages waiting after "Add to researched" 0145, the small AI's quota charge 0144, the hand-over 0143, the team's one limit 0142, the path suggestions 0141 and the funded spend
+// Probe names after this source's chain head (0164, a failed question giving back its path-list charge, after a dig under the main question updating the main answer 0163, after the carry-on digs without a live sign-in 0162, after the saved questions 0161, after each path's step and points per run 0160, the path results per run 0159, the chosen paths sealed per run 0158, the small AIs before Start in the quota 0157, the owner's two writes on their own answer 0155, Iceland and Liechtenstein in the Region list 0154, a finished dig's mark 0153, a reporter's reports in their export 0152, the Report button 0151, a public debate under review 0150, a funded person's public report in the team's month 0149, an erased account keeping a public debate 0148, the public tree 0147, the Owner's allowances for team members 0146, the pages waiting after "Add to researched" 0145, the small AI's quota charge 0144, the hand-over 0143, the team's one limit 0142, the path suggestions 0141 and the funded spend
 // kinds 0140): a newer release's steps.
-const NEXT='0164_side_next.sql',MORE='0165_more.sql';
+const NEXT='0165_side_next.sql',MORE='0166_more.sql';
 const ROW={rowKey:'fixtureRow',valueJsonText:'1',sourceRef:'native verify fixture'};
 const SNAPSHOT=computeRegisterSnapshotSha256([ROW] as unknown as Parameters<typeof computeRegisterSnapshotSha256>[0]);
 const publication={publicationId:'11111111-1111-4111-8111-111111111111',publicationKind:'GENERAL',baseRegisterVersion:'11',registerVersion:'12',requestSha256:'a'.repeat(64),snapshotSha256:SNAPSHOT,rowCount:1,recordedAt:'2026-10-21T12:00:00.000Z'} as const;
@@ -135,7 +135,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
  });
  it('refuses an extra step that is not in the pinned list, or out of its order',async()=>{
   const verifyDatabaseAhead=vi.fn();
-  for(const ledger of [[...KNOWN,'0164_other.sql'],[...KNOWN,MORE],[...KNOWN,NEXT,MORE,'0166_third.sql']]){
+  for(const ledger of [[...KNOWN,'0165_other.sql'],[...KNOWN,MORE],[...KNOWN,NEXT,MORE,'0167_third.sql']]){
    const refusal=await verifyNativeState(poolWithLedger(ledger),binding,{databaseAhead:pinned(),verifyDatabaseAhead}).then(()=>undefined,(error:unknown)=>error);
    expect(refusal).toMatchObject({code:'DATABASE_AHEAD_NOT_ACCEPTED'});
    expect((refusal as Error).message).toMatch(/^DATABASE_AHEAD_NOT_ACCEPTED NOT_PINNED \d{4}_[a-z0-9_]+\.sql$/);
@@ -143,7 +143,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
   expect(verifyDatabaseAhead).not.toHaveBeenCalled();
  });
  it('passes plan A\'s refusal through, and refuses a report that names other steps than the ledger',async()=>{
-  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED CHAIN_BROKEN 0164_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
+  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED CHAIN_BROKEN 0165_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:vi.fn(async()=>{throw refusal;})})).rejects.toBe(refusal);
   const other=vi.fn(async()=>({mode:'AHEAD' as const,knownSteps:OWN_CHAIN.length,extraSteps:[NEXT,MORE]}));
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:other})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
@@ -156,7 +156,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
   }
   migrate.mockResolvedValueOnce({appliedSteps:['0123_side_by_side_releases.sql'],extraSteps:[]});
   await expect(verifyNativeState(poolWithLedger(KNOWN),binding)).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
-  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED NEWER_CHAIN_MISMATCH 0164_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
+  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED NEWER_CHAIN_MISMATCH 0165_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
   migrate.mockRejectedValueOnce(refusal);
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:accepted})).rejects.toBe(refusal);
  });
@@ -219,7 +219,7 @@ describe('the database-ahead file (preview-database-ahead-v1, side-by-side spec 
    {steps:[]},{steps:[{name:MORE,sha256:S2},{name:NEXT,sha256:S1}]},{steps:[{name:NEXT,sha256:S1},{name:NEXT,sha256:S1}]},{steps:[{name:'124_x.sql',sha256:S1}]},{steps:[{name:NEXT,sha256:'x'}]},
    {steps:Array.from({length:65},(_,index)=>({name:`${String(1000+index)}_x.sql`,sha256:S1}))},
    {newerChain:[]},{newerChain:[declaration(NEXT,S1)]},{newerChain:[...OWN_CHAIN,declaration(NEXT,S2),declaration(MORE,S2)]},{newerChain:[...OWN_CHAIN,declaration(NEXT,S1,{n1Expand:false}),declaration(MORE,S2)]},
-   {newerChain:[...OWN_CHAIN,declaration(NEXT,S1),declaration(MORE,S2,{keepsVerifier:false})]},{newerChain:[...OWN_CHAIN,declaration(NEXT,S1),declaration(MORE,S2),declaration('0164_after.sql',S2)]},
+   {newerChain:[...OWN_CHAIN,declaration(NEXT,S1),declaration(MORE,S2,{keepsVerifier:false})]},{newerChain:[...OWN_CHAIN,declaration(NEXT,S1),declaration(MORE,S2),declaration('0165_after.sql',S2)]},
    {newerChain:[...OWN_CHAIN,declaration(NEXT,S1,{outsideTransaction:'no'}),declaration(MORE,S2)]},{newerChain:[...OWN_CHAIN,{...declaration(NEXT,S1),extra:1},declaration(MORE,S2)]},
    {newerChain:[declaration(MORE,S2),...OWN_CHAIN,declaration(NEXT,S1),declaration(MORE,S2)]},{newerChain:Array.from({length:129},(_,index)=>declaration(`${String(1000+index)}_x.sql`,S1))},{unknown:true}])
    expect(()=>ahead.validateDatabaseAheadFile(file(patch)),JSON.stringify(Object.keys(patch))).toThrow('PREVIEW_DATABASE_AHEAD_REFUSED');

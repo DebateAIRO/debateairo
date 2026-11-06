@@ -698,7 +698,7 @@ export function logComparingJudge(event: string, detail: Readonly<Record<string,
 
 /**
  * V4 start step, Task 56 ("Let the AIs carry on to the report"): the story stage of a first debate marks it DUE for the API's
- * carry-on tick (0157's core.record_carry_on_due: NOT_ASKED for a run with no chosen paths, with the box not ticked or with a dig's
+ * carry-on tick (0158's core.record_carry_on_due: NOT_ASKED for a run with no chosen paths, with the box not ticked or with a dig's
  * set). NONE without a store. It never rejects: a failure is FAILED with one line holding its code only (no id, no words).
  */
 export async function recordCarryOnDueSafely(store: Pick<StartPathsStore, "recordCarryOnDue"> | undefined, runId: string,
@@ -2976,8 +2976,8 @@ export interface WalkingSkeletonSettings {
    */
   readonly runFinalWriterTerms?: RunFinalWriterTerms;
   /**
-   * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate's stores, on the runner's pool: the paths sealed at Start (0157), each
-   * path's root and the gap round (0158), and each path's step and points (0159). A run admitted with shape receipt v2 needs the first
+   * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate's stores, on the runner's pool: the paths sealed at Start (0158), each
+   * path's root and the gap round (0159), and each path's step and points (0160). A run admitted with shape receipt v2 needs the first
    * two (PATHS_RUNNER_UNCONFIGURED otherwise, before any call); without `pathProgress` nothing of the progress is written. A v1 run
    * never reads them.
    */
@@ -9607,7 +9607,7 @@ export class WalkingSkeletonRunner {
      * is the same stop. Nothing on today's run, or on a root that argues no map answer.
      */
     const writeMapPosition = async (rootIndex: number, node: AuthoredDebateNode): Promise<void> => {
-      // V4 start step, Task 53: a path debate's root is written as its path's root (0158), in the same save turn; an erased run stops.
+      // V4 start step, Task 53: a path debate's root is written as its path's root (0159), in the same save turn; an erased run stops.
       const path = pathsRunPaths?.[rootIndex];
       if (path !== undefined) {
         const rooted = await settings.pathResults!.writePathRoot({ runId: run.runId, pathId: path.pathId, rootIndex, rootNodeId: node.nodeId,

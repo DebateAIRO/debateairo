@@ -1,6 +1,6 @@
 // tests/integration/path-progress-repository.test.ts
 // V4 start step, Task 53a (spec 2026-11-03 §2 item 7, §4.6; items wait-d1, chat-first-round, journey-f1, wait-f16, public-f25): each path's
-// step and each point's marks on real PostgreSQL through 0159's definers, on the runner's login; the carry-on mark as 0157's marks are
+// step and each point's marks on real PostgreSQL through 0160's definers, on the runner's login; the carry-on mark as 0158's marks are
 // written; a public debate's report counts on the API's billing login (owner answer Q20: B); erasure; the refusals; and no role reading a
 // table. Ids and codes only. Data is made up.
 import { randomUUID } from "node:crypto";
@@ -206,7 +206,7 @@ describe("an erased debate", () => {
 });
 
 describe("the carry-on mark", () => {
-  it("NONE, then DUE, BEGUN and DONE as 0157's marks are written", async () => {
+  it("NONE, then DUE, BEGUN and DONE as 0158's marks are written", async () => {
     const runId = await pathDebate({ carryOnToReport: true });
     expect(await store.readCarryOnMark(runId)).toBe("NONE");
     expect(await paths.recordCarryOnDue(runId)).toBe("RECORDED");

@@ -1,7 +1,7 @@
 // V4 start step, Task 86: THE R22 WORLD'S API IS COMPOSED AS apps/api/src/main.ts COMPOSES IT, for the step before Start and
 // the chosen paths (tests/integration/r22-end-to-end.test.ts and the start-step end-to-end files run on that world). This test
 // reads both sides and fails when they stop matching: the step's members (createStartStep and its charges), its route (a
-// preview gate AND 0156's pre-Start charge writer), the three things buildApi gets with it (the step, its key and the chosen
+// preview gate AND 0157's pre-Start charge writer), the three things buildApi gets with it (the step, its key and the chosen
 // paths store; Task 56b adds a fourth, the person's own closings reader), and the settings PostgresAskApplication gets (the chosen paths store and the purpose lines among them:
 // without them every v2 ask is refused START_PATHS_STORE_UNAVAILABLE). The world's runner is the practice's composition,
 // which tests/unit/preview-practice-wiring-drift.test.ts keeps equal to apps/runner/src/main.ts; here only the parts the
@@ -35,7 +35,7 @@ describe("r22-world composes the step before Start as apps/api/src/main.ts compo
     expect(sorted(objectAfter(R22_WORLD, "createStartCharges({"))).toEqual(sorted(charges));
   });
 
-  it("both key the route on the preview gate and 0156's writer, sign with the step's key and charge each call at the runner's price", () => {
+  it("both key the route on the preview gate and 0157's writer, sign with the step's key and charge each call at the runner's price", () => {
     for (const [name, source] of [["main.ts", API_MAIN], ["r22-world.ts", R22_WORLD]] as const) {
       const code = flat(source);
       for (const statement of [
@@ -60,7 +60,7 @@ describe("r22-world composes the step before Start as apps/api/src/main.ts compo
     for (const [name, source] of [["main.ts", API_MAIN], ["r22-world.ts", R22_WORLD]] as const) {
       const api = objectAfter(source, "buildApi({");
       for (const key of ["startStep", "startStepKey", "startPaths", "ownClosings", "carryOn", "carryOnRoom"]) expect(api.has(key), `${name}: ${key}`).toBe(true);
-      // Task 53a's counts, read on the API's own pool (the one login 0159 grants identity.count_public_reports).
+      // Task 53a's counts, read on the API's own pool (the one login 0160 grants identity.count_public_reports).
       expect(flat(source), name).toContain("ownClosings: new PostgresOwnClosingsReader(");
       // Task 56: the carry-on's marks are the ONE chosen paths store, and its room the one room the API reads (`askRoom`).
       expect(flat(source), name).toContain("carryOn: startPaths,");

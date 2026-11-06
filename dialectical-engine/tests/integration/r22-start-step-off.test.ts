@@ -1,6 +1,6 @@
 // V4 start step, Task 89 (plan 2026-11-03, Global Constraints: "absent switch = R22 byte for byte"): with the register's
 // start-step switch absent, R22 path 1's question runs as R22 against the REAL API of tests/support/r22-world.ts, sending
-// what the page sends over real HTTP. The step itself is wired as on the test site (a preview gate and 0156's writer), so
+// what the page sends over real HTTP. The step itself is wired as on the test site (a preview gate and 0157's writer), so
 // only the switch keeps it off: the lists answer none OFF, the run's receipt is not v2, R22's map step opens the debate
 // (MAP:angles) and the start step's (START:) never runs, the answer carries no `branches` and the classic map view answers.
 // No vendor is contacted; all data is made up. Integration suites are skipped by the CI gate: run this file by hand, alone.
@@ -58,7 +58,7 @@ describe("R22 on the real API with the start-step switch absent", () => {
     expect(events).toEqual([{ event: "none", data: { reason: "OFF" } }, { event: "end", data: { reason: "NONE" } }]);
     expect((await world.database.pool.query("SELECT 1 FROM identity.pre_start_charge WHERE owner_ref=$1", [ana.ownerRef])).rows).toEqual([]);
     // Why: the switch is absent from the active version's shape row, while the step is wired as on the test site (a preview gate and
-    // 0156's writer), so only the switch keeps it off.
+    // 0157's writer), so only the switch keeps it off.
     const shape = await readDebateShapePolicy(world.database.pool, world.nextVersion);
     expect(shape).not.toBeNull();
     expect(shape).not.toHaveProperty("startStep");

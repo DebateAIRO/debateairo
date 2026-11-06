@@ -1,7 +1,7 @@
 /**
  * V4 start step, Task 27 (spec 2026-11-03 §4.1 "Allowance"): THE PREVIEW TRANSPORT AND THE PER-PERSON CHARGE. Every
  * call before Start goes through one fresh preview gateway (the gates, the preview call policy), with no debate and
- * nothing written but the money rows. Each call is charged to the person (0156's writer) from the vendor's real counts
+ * nothing written but the money rows. Each call is charged to the person (0157's writer) from the vendor's real counts
  * only: on the preview the gate settles the money, so a call with no readable counts costs the person nothing. A
  * record that cannot be written stops the calls until a restart (never spend unrecorded). A busy model's call ends at
  * once and the model sits out the next two minutes.
@@ -76,7 +76,7 @@ describe("the start step's call sites and bounds", () => {
   });
 });
 
-describe("the per-person charge (0156)", () => {
+describe("the per-person charge (0157)", () => {
   it("charges one call from the vendor's counts, named by kind, provider and model, with a team member's grant", async () => {
     const { book, entries } = charges();
     const seam = book.seamFor({ ownerRef: OWNER, funding: GRANT, kind: "LIST", target: GLM_TARGET });
@@ -87,7 +87,7 @@ describe("the per-person charge (0156)", () => {
       grant: { grantId: GRANT.grantId, grantEventId: GRANT.grantEventId } }]);
   });
 
-  // Task 57c (owner, 5 Nov): a call made for a try names it, so a failed debate can give its charges back (0163); a call without one does not.
+  // Task 57c (owner, 5 Nov): a call made for a try names it, so a failed debate can give its charges back (0164); a call without one does not.
   it("a call made for a try carries the try to its record", async () => {
     const { book, entries } = charges();
     const TRY = "b".repeat(64);

@@ -230,7 +230,7 @@ export function startRefVersionOf(key: StartStepKey, ref: string): number | null
  * call before Start is charged to. One person's one question as they typed it at Next (an accepted rewrite's original, which the planner
  * reads first): an HMAC under this key of the owner hash and the words' hash, so it never reads back as words, is the same for every call
  * of that question (the planner, the lists, the merges, a combine on its menu, a fit) and for its Start, and differs for other words or
- * another person. A combine over a dig's picks is charged to the dig's parent instead. 64 lower-case hex characters (0163's shape).
+ * another person. A combine over a dig's picks is charged to the dig's parent instead. 64 lower-case hex characters (0164's shape).
  */
 const tryOf = (key: StartStepKey, part: string): string =>
   createHmac("sha256", key.bytes).update(`debateai:start-step-try:v1\0${part}`, "utf8").digest("hex");

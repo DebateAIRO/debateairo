@@ -1,5 +1,5 @@
 // tests/integration/start-paths-database.test.ts
-// V4 start step, Task 20 (spec 2026-11-03 §4): the paths a person chose at Start, on real PostgreSQL through 0157's definers, sealed under the
+// V4 start step, Task 20 (spec 2026-11-03 §4): the paths a person chose at Start, on real PostgreSQL through 0158's definers, sealed under the
 // debate's own key by PostgresStartPathsStore on the runner's login; the carry-on marks; the definers' refusals; and no role reading a table.
 // Data is made up.
 import { randomUUID } from "node:crypto";
@@ -189,7 +189,7 @@ describe("a debate's chosen paths, sealed under its own key", () => {
   });
 });
 
-describe("a merged path of any size (Task 92b: 0157 holds 0..54 members and a sealed path up to 256 KiB)", () => {
+describe("a merged path of any size (Task 92b: 0158 holds 0..54 members and a sealed path up to 256 KiB)", () => {
   /** The menu's viewpoint ids in order, pt11..pt96 (VIEWPOINT_ID_PATTERN), the first `count` of them. */
   const viewpointIds = (count: number): readonly string[] =>
     Array.from({ length: 9 }, (_row, list) => Array.from({ length: 6 }, (_one, no) => `pt${list + 1}${no + 1}`)).flat().slice(0, count);

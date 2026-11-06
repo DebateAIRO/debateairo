@@ -138,7 +138,7 @@ function apiOver(over: Over = {}) {
   const application = {
     submit: async (...args: unknown[]) => { submitted.push(args); return { run_ref: RUN_ID, status: "QUEUED" as const }; },
     readRunAnswer: async () => null,
-    // Task 57c: the try's charges before Start given to the new debate (0163's link).
+    // Task 57c: the try's charges before Start given to the new debate (0164's link).
     linkPreStartTry: async (...args: unknown[]) => {
       linked.push(args);
       if (over.linkFails === true) throw Object.assign(new Error("database down"), { code: "57P01" });
@@ -629,7 +629,7 @@ describe("startQuestionCheckText: the one check at Start", () => {
 /*
  * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): once the debate is
  * accepted, it takes the charges before Start of each try this Start names, the question's (its check) and a dig's combine (its parent),
- * so 0163 gives them back if it fails. A link that fails never changes the 202, and its one line names no word.
+ * so 0164 gives them back if it fails. A link that fails never changes the 202, and its one line names no word.
  */
 describe("the charges before Start go to the new debate (Task 57c)", () => {
   it("a Start from Next: the check's try, linked to the accepted debate once", async () => {

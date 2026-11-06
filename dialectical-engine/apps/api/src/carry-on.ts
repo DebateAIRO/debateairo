@@ -16,7 +16,7 @@ import type { RoomPreview } from "./ask-room.js";
  * Pure over its ports: a dig is admitted only by POST /v1/asks's own steps and the report only by POST /v1/runs/{id}/report's
  * (`askPreflight`, `askAsOwner`, `writeReportAsOwner`, built inside buildApi), never through a side door. The carry-on acts as the
  * person with no live sign-in (owner ruling 3 Nov, night): the first debate's own identity session, and each dig's key provisioned
- * through 0161 from that debate's binding. Marks, so nothing runs twice: DUE (the runner's story stage) → BEGUN (the tick's claim)
+ * through 0162 from that debate's binding. Marks, so nothing runs twice: DUE (the runner's story stage) → BEGUN (the tick's claim)
  * → DONE. Logs carry codes and counts only: never an id, a word of a question or a figure.
  */
 
@@ -345,7 +345,7 @@ export type CarryOnTick = Readonly<{ begun: number; digs: number; pressed: numbe
  * line of counts. A run whose pass throws is logged by code and left for the next tick. A pass that stops OWNER_GONE is not
  * pressed after it (Task 56e, owner answer 11: "If the account is no longer active, the digs stop and the report is still
  * written"): the person's own report step writes only for an active account, so the run stays BEGUN and the BEGUN reader, which
- * reads only active accounts, hands it to the press once the account is active again; 0157's claim closes an erased one.
+ * reads only active accounts, hands it to the press once the account is active again; 0158's claim closes an erased one.
  */
 export async function carryOnTick(ports: CarryOnPorts, now: Date): Promise<CarryOnTick> {
   const counts = { begun: 0, digs: 0, pressed: 0, waiting: 0 };

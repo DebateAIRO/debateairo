@@ -360,8 +360,8 @@ export async function composePracticeAsk(input: Readonly<{
     Object.freeze({ server: input.serverAdmissionPool, legacy: input.legacyAdmissionPool }));
   /**
    * V4 start step, Task 91b, as main.ts (Task 31): THE STEP BEFORE START and the key it signs with, for `--start-step`
-   * (practice-start-step.ts). The route is the preview's only with a gate part AND 0156's writer (the throwaway database's own); each
-   * call goes through the practice's guarded fetch, so the gates settle it, and is the person's charge through 0156's writer at the
+   * (practice-start-step.ts). The route is the preview's only with a gate part AND 0157's writer (the throwaway database's own); each
+   * call goes through the practice's guarded fetch, so the gates settle it, and is the person's charge through 0157's writer at the
    * price the runner charges the same target at. Differences, on purpose: the key is per process (`newStartStepKey`: one process, no
    * blind-index key); the question check passes every line (`PRACTICE_QUESTION_CHECK`); the step's content-free lines go to the log.
    */

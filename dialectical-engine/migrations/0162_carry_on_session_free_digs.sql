@@ -1,4 +1,4 @@
--- 0161 · Carry-on digs without a live sign-in (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 56a, spec
+-- 0162 · Carry-on digs without a live sign-in (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 56a, spec
 -- 2026-11-03 §2 item 8; decision record START-STEP-DECISIONS-2026-11-03 answer 11, owner ruling 3 Nov night).
 --
 -- Plain words. With "Let the AIs carry on to the report" ticked, the server digs each of the debate's chosen paths and then writes the
@@ -22,8 +22,8 @@
 -- n1: drained
 -- n1: keeps-verifier
 --   drained         it redefines 0123's core.create_encrypted_run in place (declared as an amendment of 0123's postcondition) and adds
---                   CHECKs and a UNIQUE index to two existing tables, so it is uploaded drained, as 0123 and 0156 were: no debate waits
---                   or runs while it applies. No expand step could say this. The V4 start step's release is drained already (0156).
+--                   CHECKs and a UNIQUE index to two existing tables, so it is uploaded drained, as 0123 and 0157 were: no debate waits
+--                   or runs while it applies. No expand step could say this. The V4 start step's release is drained already (0157).
 --   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql stays in force.
 --   row security    no table of its own; the two tables it widens are read by definers only, as before.
 --
@@ -37,16 +37,16 @@
 -- carry-on dig is never tried again (owner ruling 3 Nov night). The prepare decides the same rule under the account's lock first (§2).
 ALTER TABLE core.run_key_provision_intent ADD COLUMN IF NOT EXISTS carry_on_parent_run_id uuid NULL;
 COMMENT ON COLUMN core.run_key_provision_intent.carry_on_parent_run_id IS
-  'V4 start step (0161): set only by core.prepare_carry_on_run_key_provision, the debate whose carry-on this provision digs; the commit then needs no live session. NULL for every other provision.';
+  'V4 start step (0162): set only by core.prepare_carry_on_run_key_provision, the debate whose carry-on this provision digs; the commit then needs no live session. NULL for every other provision.';
 ALTER TABLE core.run_key_provision_intent DROP CONSTRAINT IF EXISTS run_key_provision_intent_one_marker;
 ALTER TABLE core.run_key_provision_intent ADD CONSTRAINT run_key_provision_intent_one_marker
   CHECK (readmitted_from_run_id IS NULL OR carry_on_parent_run_id IS NULL);
 ALTER TABLE identity.run_execution_binding ADD COLUMN IF NOT EXISTS carry_on_parent_run_id uuid NULL;
 ALTER TABLE identity.run_execution_binding ADD COLUMN IF NOT EXISTS carry_on_path_id text NULL;
 COMMENT ON COLUMN identity.run_execution_binding.carry_on_parent_run_id IS
-  'V4 start step (0161): the debate whose carry-on this run digs, written by core.prepare_carry_on_run_key_provision; NULL for every other run. An id, never content.';
+  'V4 start step (0162): the debate whose carry-on this run digs, written by core.prepare_carry_on_run_key_provision; NULL for every other run. An id, never content.';
 COMMENT ON COLUMN identity.run_execution_binding.carry_on_path_id IS
-  'V4 start step (0161): the chosen path (b1..b8) of that debate this run digs; set with carry_on_parent_run_id or not at all. A code, never content.';
+  'V4 start step (0162): the chosen path (b1..b8) of that debate this run digs; set with carry_on_parent_run_id or not at all. A code, never content.';
 ALTER TABLE identity.run_execution_binding DROP CONSTRAINT IF EXISTS run_execution_binding_carry_on_pair;
 ALTER TABLE identity.run_execution_binding ADD CONSTRAINT run_execution_binding_carry_on_pair
   CHECK ((carry_on_parent_run_id IS NULL AND carry_on_path_id IS NULL) OR (carry_on_parent_run_id IS NOT NULL AND carry_on_path_id IS NOT NULL AND carry_on_path_id ~ '^b[1-8]$'));
@@ -202,7 +202,7 @@ $$;
 -- still takes 0123's lock, and every unmarked intent 0040's (a live session). The two markers never stand on one intent (§1's CHECK), and
 -- the CASE evaluates one branch. 0063's rule ("never CREATE OR REPLACE a function another migration defines") is broken here, for this
 -- one function, as 0067, 0072 and 0123 broke it before: the encrypted insert path has exactly one writer. This step declares it as an
--- amendment of 0123's postcondition (packages/db/src/migration-forward0161.ts), so every later migrate() compares 0123 against this
+-- amendment of 0123's postcondition (packages/db/src/migration-forward0162.ts), so every later migrate() compares 0123 against this
 -- definition. startRun's capability probe still finds 'planTier' and 'argumentLanguageTag'. CREATE OR REPLACE keeps 0040's owner;
 -- SECURITY DEFINER, the pinned search_path and the EXECUTE set (debateai_content_provision only) are written again below, as 0123
 -- writes them, and checked by the closing block.
@@ -345,19 +345,19 @@ BEGIN
     'core.lock_carry_on_run_key_provision_for_commit(uuid,uuid,uuid,uuid)', 'core.create_encrypted_run(jsonb,uuid,uuid,jsonb)'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p WHERE p.oid = pg_catalog.to_regprocedure(v_name)
         AND p.prosecdef AND p.proconfig = '{search_path=pg_catalog}'::text[]) THEN
-      RAISE EXCEPTION 'CARRY_ON_0161_CONTRACT %', v_name;
+      RAISE EXCEPTION 'CARRY_ON_0162_CONTRACT %', v_name;
     END IF;
     FOREACH v_role IN ARRAY ARRAY['public', 'debateai_runtime', 'debateai_authorization_runtime', 'debateai_erasure_runtime',
       'debateai_replay', 'debateai_publication_cleanup', 'debateai_billing_runtime', 'debateai_data_export_worker'] LOOP
       IF pg_catalog.has_function_privilege(v_role, v_name, 'EXECUTE') THEN
-        RAISE EXCEPTION 'CARRY_ON_0161_CONTRACT % %', v_name, v_role;
+        RAISE EXCEPTION 'CARRY_ON_0162_CONTRACT % %', v_name, v_role;
       END IF;
     END LOOP;
   END LOOP;
   IF NOT pg_catalog.has_function_privilege('debateai_content_provision', 'core.prepare_carry_on_run_key_provision(uuid,uuid,text)', 'EXECUTE')
     OR NOT pg_catalog.has_function_privilege('debateai_content_provision', 'core.create_encrypted_run(jsonb,uuid,uuid,jsonb)', 'EXECUTE')
     OR pg_catalog.has_function_privilege('debateai_content_provision', 'core.lock_carry_on_run_key_provision_for_commit(uuid,uuid,uuid,uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'CARRY_ON_0161_CONTRACT content provision';
+    RAISE EXCEPTION 'CARRY_ON_0162_CONTRACT content provision';
   END IF;
   IF (SELECT count(*) FROM pg_catalog.pg_constraint AS k
       WHERE k.convalidated AND k.contype = 'c' AND (
@@ -367,7 +367,7 @@ BEGIN
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_index AS i
       WHERE i.indexrelid = pg_catalog.to_regclass('identity.run_execution_binding_one_carry_on_dig_idx') AND i.indisunique AND i.indisvalid
         AND i.indrelid = 'identity.run_execution_binding'::regclass) THEN
-    RAISE EXCEPTION 'CARRY_ON_0161_CONTRACT markers';
+    RAISE EXCEPTION 'CARRY_ON_0162_CONTRACT markers';
   END IF;
 END
 $carry_on_digs_contract$;

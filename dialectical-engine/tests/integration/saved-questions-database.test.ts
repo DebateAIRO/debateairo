@@ -9,7 +9,7 @@ import {
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * 0160 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.14; owner answers S3 A, S4 A):
+ * 0161 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.14; owner answers S3 A, S4 A):
  * the questions a person has not started yet. The API's own role (debateai_billing_runtime) creates, saves, lists, reads and deletes the
  * account's rows; at most 20 per account; every part is an envelope naming the row's own key; the export worker reads them behind 0128's
  * lease; deleting the account (0110's finalize) removes them; no request role reads the table, and the shared runtime role calls nothing.
@@ -100,7 +100,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe("0160 saves and revisions", () => {
+describe("0161 saves and revisions", () => {
   it("D1 create is revision 1; a save on the current revision is the next; a save on an old one answers the current revision", async () => {
     const person = await account();
     const id = randomUUID();
@@ -154,7 +154,7 @@ describe("0160 saves and revisions", () => {
   });
 });
 
-describe("0160 at most 20 per account (S3 A)", () => {
+describe("0161 at most 20 per account (S3 A)", () => {
   it("D4 with 20 rows a create answers FULL and writes nothing", async () => {
     const person = await account();
     await fill(person.ownerRef, 20);
@@ -199,7 +199,7 @@ describe("0160 at most 20 per account (S3 A)", () => {
   });
 });
 
-describe("0160 the envelopes", () => {
+describe("0161 the envelopes", () => {
   it("D6 refuses 23514 a non-envelope, a sixth key, a key name that is not this row's own, a missing part and an oversized one", async () => {
     const person = await account();
     const other = randomUUID();
@@ -238,7 +238,7 @@ describe("0160 the envelopes", () => {
   });
 });
 
-describe("0160 the account", () => {
+describe("0161 the account", () => {
   it("D7 an account that is not active (suspended, as 0110's prepare leaves it) is refused on create and on save", async () => {
     const person = await account();
     const id = randomUUID();
@@ -272,7 +272,7 @@ describe("0160 the account", () => {
   });
 });
 
-describe("0160 the export reader", () => {
+describe("0161 the export reader", () => {
   it("D9 answers every row of the leased export's account with both parts, oldest first, and [] when there is none; refused without the lease", async () => {
     const person = await account();
     const other = await account();
@@ -295,7 +295,7 @@ describe("0160 the export reader", () => {
   });
 });
 
-describe("0160 who may reach it", () => {
+describe("0161 who may reach it", () => {
   it("D10 no request role reads the table; the shared runtime role, the authorization, export and erasure roles call no API function", async () => {
     const person = await account();
     for (const [who, pool] of [["runtime", shared], ["authorization", authorization], ["billing", api], ["export worker", worker], ["erasure", erasure]] as const) {
@@ -329,7 +329,7 @@ describe("0160 who may reach it", () => {
   });
 });
 
-describe("0160 the store through the API's pool", () => {
+describe("0161 the store through the API's pool", () => {
   it("D12 savedQuestionStoreFrom maps every answer to its typed result, and the account refusal to SavedQuestionAccountInvalidError", async () => {
     const person = await account();
     const id = randomUUID();

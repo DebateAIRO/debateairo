@@ -19,7 +19,7 @@ const bodyOf = (name: string): string => {
 };
 
 describe("0155: the gap-investigation request and the memory-link unlink as the owner's definers", () => {
-  // A step of the chain, found by name: the V4 start step's three steps (0156 to 0158) come after it.
+  // A step of the chain, found by name: the V4 start step's three steps (0157 to 0159) come after it.
   it("follows 0154 in the chain, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("loadForward0154,loadForward0155,");

@@ -11,24 +11,24 @@ import {
 } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0161 (V4 start step, plan 2026-11-03 Task 56a; decision record answer 11, owner ruling 3 Nov night): the carry-on's digs run even when
+ * 0162 (V4 start step, plan 2026-11-03 Task 56a; decision record answer 11, owner ruling 3 Nov night): the carry-on's digs run even when
  * the person has signed out or their session has lapsed. Built like 0123's re-admission (the readmitted run's key provision and its commit
  * lock), with tighter limits: one dig per path of the debate's own chosen paths, never retried; Free one in all; only while the carry-on is
  * BEGUN and not DONE; only while the account is active and still the debate's owner. 0123's core.create_encrypted_run is redefined with one
  * more branch and declared as an amendment of 0123's postcondition. No database here: the behaviour is
  * tests/integration/carry-on-dig-key-provision.test.ts.
  */
-const NAME = "0161_carry_on_session_free_digs.sql";
+const NAME = "0162_carry_on_session_free_digs.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/carry-on-forward0161.json";
-const LOADER_PATH = "packages/db/src/migration-forward0161.ts";
-const PREVIOUS = "0160_saved_questions.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/saved-questions-forward0160.json";
+const MANIFEST_PATH = "migrations/lineage/carry-on-forward0162.json";
+const LOADER_PATH = "packages/db/src/migration-forward0162.ts";
+const PREVIOUS = "0161_saved_questions.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/saved-questions-forward0161.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
-/** The SQL without its `--` comments (no literal or body of 0161 contains `--`). */
+/** The SQL without its `--` comments (no literal or body of 0162 contains `--`). */
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const PREPARE = "core.prepare_carry_on_run_key_provision(uuid,uuid,text)";
 const LOCK = "core.lock_carry_on_run_key_provision_for_commit(uuid,uuid,uuid,uuid)";
@@ -56,7 +56,7 @@ const encryptedRunText = (sql: string): string => {
   const grant = "GRANT EXECUTE ON FUNCTION core.create_encrypted_run(jsonb,uuid,uuid,jsonb) TO debateai_content_provision;";
   return at < 0 ? "" : sql.slice(at, sql.indexOf(grant, at) + grant.length);
 };
-/** The one carry-on branch 0161 puts between 0123's two, with the space before 0123's ELSE that it ends on. */
+/** The one carry-on branch 0162 puts between 0123's two, with the space before 0123's ELSE that it ends on. */
 const CARRY_ON_BRANCH = new RegExp([
   String.raw`WHEN EXISTS \(\n`,
   String.raw` {8}SELECT 1 FROM core\.run_key_provision_intent AS marked\n`,
@@ -66,33 +66,33 @@ const CARRY_ON_BRANCH = new RegExp([
   String.raw` {6}\) `
 ].join(""), "gu");
 
-describe("0161: carry-on digs provision their key without a live sign-in", () => {
-  it("C-T is the step right after 0160, found by name, with its own loader and its one declared amendment of 0123", async () => {
+describe("0162: carry-on digs provision their key without a live sign-in", () => {
+  it("C-T is the step right after 0161, found by name, with its own loader and its one declared amendment of 0123", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0161 } from './migration-forward0161.js';");
-    expect(chain).toContain("loadForward0160,loadForward0161");
+    expect(chain).toContain("import { loadForward0162 } from './migration-forward0162.js';");
+    expect(chain).toContain("loadForward0161,loadForward0162");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
     expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual(AMENDS);
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
-    expect(loader).toContain('const VERSION = "carry-on-forward0161-v1";');
+    expect(loader).toContain('const VERSION = "carry-on-forward0162-v1";');
     expect(loader).toContain(`const PREVIOUS = "${PREVIOUS}";`);
     for (const name of [...FUNCTIONS, ...COLUMNS]) expect(loader, name).toContain(`"${name}"`);
-    expect(loader).toContain("MIGRATION_FORWARD0161_");
+    expect(loader).toContain("MIGRATION_FORWARD0162_");
     // Declared as 0144 declares its own amendment: frozen, the step, the functions and the field.
     expect(loader).toContain('const AMENDS: readonly PostconditionAmendment[] = Object.freeze([Object.freeze({\n  step: "0123_side_by_side_releases.sql",');
     expect(loader).toContain('functions: Object.freeze(["core.create_encrypted_run(jsonb,uuid,uuid,jsonb)"]),');
     expect(loader).toContain('field: "function_definition" as const');
   });
 
-  it("C-M is bound to 0160's manifest and to the verifier in force (0130's, which 0160 keeps), and carries the amendment", () => {
+  it("C-M is bound to 0161's manifest and to the verifier in force (0130's, which 0161 keeps), and carries the amendment", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string; verifier: { sha256: string } };
     expect(Object.keys(manifest)).toEqual(["version", "baseRecipeSha256", "previous", "migration", "verifier", "amendsPostconditionsOf"]);
     expect(manifest).toEqual({
-      version: "carry-on-forward0161-v1",
+      version: "carry-on-forward0162-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -103,7 +103,7 @@ describe("0161: carry-on digs provision their key without a live sign-in", () =>
     expect(sha256(read("migrations/lineage/verify-effective-capabilities-130.sql"))).toBe(VERIFIER_130);
   });
 
-  it("C-H says truthfully that it redefines an earlier step's function (drained, as 0123 and 0156) and keeps the verifier; both audits pass", async () => {
+  it("C-H says truthfully that it redefines an earlier step's function (drained, as 0123 and 0157) and keeps the verifier; both audits pass", async () => {
     const sql = read(SQL_PATH);
     expect(parseN1Header(NAME, sql)).toEqual({ expand: false, drained: true, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
     expect(sql).toMatch(/^-- n1: drained$/mu);
@@ -164,7 +164,7 @@ describe("0161: carry-on digs provision their key without a live sign-in", () =>
     }
     expect(headOf(code(sql), nameOf(PREPARE))).toContain("(p_parent_run_id uuid, p_new_run_id uuid, p_path_id text)\nRETURNS TABLE(execution_ref uuid, user_id uuid)");
     expect(headOf(code(sql), nameOf(LOCK))).toContain("p_run_id uuid, p_user_id uuid, p_owner_ref uuid, p_execution_ref uuid\n)\nRETURNS boolean");
-    // 0040 and 0123 keep every other function; 0161's new two are new everywhere.
+    // 0040 and 0123 keep every other function; 0162's new two are new everywhere.
     for (const earlier of ["0040_account_erasure.sql", "0085_staff_access_foundation.sql", "0123_side_by_side_releases.sql"]) {
       const theirs = definedFunctionNames(read(`migrations/${earlier}`));
       expect(theirs.length, earlier).toBeGreaterThan(0);
@@ -236,17 +236,17 @@ describe("0161: carry-on digs provision their key without a live sign-in", () =>
     expect(sql.indexOf(`REVOKE ALL ON FUNCTION ${PREPARE}`)).toBeLessThan(sql.indexOf(`GRANT EXECUTE ON FUNCTION ${PREPARE}`));
     // The closing block checks the contract instead of assuming it.
     const contract = sql.slice(sql.indexOf("DO $carry_on_digs_contract$"), sql.indexOf("$carry_on_digs_contract$;"));
-    expect(contract).toContain("CARRY_ON_0161_CONTRACT");
+    expect(contract).toContain("CARRY_ON_0162_CONTRACT");
     for (const signature of FUNCTIONS) expect(contract, signature).toContain(`'${signature}'`);
   });
 
   it("C-R is documented and listed", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain(LOADER_PATH);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0161, below) the fifty-first", "## The carry-on digs without a live sign-in (0161)", "`loadForward0161`",
-      "MIGRATION_FORWARD0161_", "`-- n1: drained`"]) expect(readme, needle).toContain(needle);
+    for (const needle of ["(0162, below) the fifty-first", "## The carry-on digs without a live sign-in (0162)", "`loadForward0162`",
+      "MIGRATION_FORWARD0162_", "`-- n1: drained`"]) expect(readme, needle).toContain(needle);
     expect(read("deploy/preview-auth-dev/v1/README.md"))
-      .toContain("`migrations/0161_carry_on_session_free_digs.sql` (after `0160_saved_questions.sql`, `n1: drained`)");
+      .toContain("`migrations/0162_carry_on_session_free_digs.sql` (after `0161_saved_questions.sql`, `n1: drained`)");
   });
 
   it("C-D startRun takes the carry-on's prepare for a server principal's carryOn, and the content-provision login may run it", () => {

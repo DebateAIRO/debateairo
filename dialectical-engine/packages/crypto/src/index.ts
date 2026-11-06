@@ -2453,11 +2453,11 @@ export const CONTENT_CARRIERS = Object.freeze([
   "identity.public_dig_input",
   "identity.public_answer_update",
   "identity.public_report",
-  // 0157 (V4 start step): the menu a person chose from at Start and each chosen path's words, sealed under the debate's own key; the set bound to
+  // 0158 (V4 start step): the menu a person chose from at Start and each chosen path's words, sealed under the debate's own key; the set bound to
   // its run, a path to its path id. The carry-on marks are ids and codes only, no carrier.
   "core.start_path_set",
   "core.start_path",
-  // 0158 (V4 start step): each chosen path's answer so far, bound to its path id, and the debate's gap round, bound to its run, sealed under the
+  // 0159 (V4 start step): each chosen path's answer so far, bound to its path id, and the debate's gap round, bound to its run, sealed under the
   // debate's own key. The roots and their moves are ids and codes only, no carrier.
   "core.path_outcome",
   "core.path_gap_round"

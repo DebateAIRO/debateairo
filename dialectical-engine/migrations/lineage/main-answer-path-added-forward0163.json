@@ -1,14 +1,14 @@
 {
-  "version": "main-answer-path-added-forward0162-v1",
+  "version": "main-answer-path-added-forward0163-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0161_carry_on_session_free_digs.sql",
-    "manifestSha256": "4da2c5ccfb4b3cdc712ff8cc3ab014090151f247c1439bcfb1e4d10587a38231",
+    "name": "0162_carry_on_session_free_digs.sql",
+    "manifestSha256": "8959b7d3ee2f7b4ff6c78415f9b6bcab8f9d4b6322f4b0255871ce9e946fcb04",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
-    "name": "0162_main_answer_path_added.sql",
-    "sha256": "ec097e033ae0dec1eb1bbcfc818e729fecfcd3d339cabf076104a059ba28ac1f"
+    "name": "0163_main_answer_path_added.sql",
+    "sha256": "96495685db0b2d69f9ce8ad09bff558a4dbe86288093552db701e887b3b48cae"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

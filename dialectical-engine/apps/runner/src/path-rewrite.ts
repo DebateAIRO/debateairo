@@ -86,7 +86,7 @@ export type PathRewriteSources = Readonly<{
   /** The checked extracts the dig's own points cite, by point id; absent: none. */
   digExtractsOf?: (runId: string, pointIds: readonly string[]) => Promise<ReadonlyMap<string, readonly PathRewriteExtract[]>>;
   /**
-   * V4 start step, Task 55: the dig's roots in force when it is itself a path debate (0158's `readPathRoots`, by root index), each by
+   * V4 start step, Task 55: the dig's roots in force when it is itself a path debate (0159's `readPathRoots`, by root index), each by
    * its path id b<n>; none (empty, or absent): an R22 dig, whose own paths are its positions in the judges' order.
    */
   pathRootsOf?: (runId: string) => Promise<readonly Readonly<{ ref: string; rootNodeId: string }>[]>;
@@ -626,7 +626,7 @@ export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string,
 /**
  * A first debate's suggestions, once its story is written (index.ts, the after-settle branch): the writer of the rewrite, on the same
  * never-walled seam. A run that was rewritten as a dig has its own (sealed with its rewrite). No settings, no store or no writer: none.
- * V4 start step, Task 54: a path run hands its path roots (0158's `readPathRoots`, in force, by root index), and each path is read
+ * V4 start step, Task 54: a path run hands its path roots (0159's `readPathRoots`, in force, by root index), and each path is read
  * from its own root and keyed by its id, b<n> (`pathRewriteDigPathsOfRoots`); without them, R22's paths by their roots' node ids.
  * Never rejects.
  */

@@ -146,7 +146,7 @@ describe("Task 56 on the real API: the AIs carry on to the report", () => {
     const ana = await world.account("carry-none", PAID);
     const { runId } = await startPathDebate(ana, "Should Harbour Town paint the ferry blue?", { settings: PREMIUM, width: 5, carryOn: false });
     // Task 57c (independent review, 5 Nov): on the real API each charge before Start names the question's try, and Start gave every one
-    // of them to this debate (0163), so a failure would give them back. The stand-in answers every list at once: nothing is charged after.
+    // of them to this debate (0164), so a failure would give them back. The stand-in answers every list at once: nothing is charged after.
     const tries = await q<{ run_id: string | null }>(`SELECT t.run_id::text AS run_id FROM identity.pre_start_charge AS c
       LEFT JOIN identity.pre_start_try AS t USING (charge_id) WHERE c.owner_ref = $1`, [ana.ownerRef]);
     expect(tries.length).toBeGreaterThan(0);

@@ -58,7 +58,7 @@ describe("S04 data export", () => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
     // 0131 (the V4 account memory) adds a tenth worker function, its page-memory reader; 0132 and 0133 (the web evidence
     // store and the investigations) an eleventh and a twelfth; 0134 (the dig model) a thirteenth; 0135 (the dig picks) a
-    // fourteenth; 0136 (the investigation reports) a fifteenth; 0137 to 0139 (the public debates, the tree updates and the passage retention) the sixteenth to the eighteenth; 0141 (the path suggestions) a nineteenth; 0144 (the small AI's charges) a twentieth; 0147 (the public tree) a twenty-first; 0152 (a reporter's own reports) a twenty-second; 0156 (the small AIs before Start) a twenty-third; 0160 (the questions not started yet, Task 39e) a twenty-fourth.
+    // fourteenth; 0136 (the investigation reports) a fifteenth; 0137 to 0139 (the public debates, the tree updates and the passage retention) the sixteenth to the eighteenth; 0141 (the path suggestions) a nineteenth; 0144 (the small AI's charges) a twentieth; 0147 (the public tree) a twenty-first; 0152 (a reporter's own reports) a twenty-second; 0157 (the small AIs before Start) a twenty-third; 0161 (the questions not started yet, Task 39e) a twenty-fourth.
     await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_threat_reports(uuid,uuid)");
     expect(seen[1]?.[1]).toContain("identity.read_data_export_web_evidence(uuid,uuid)");

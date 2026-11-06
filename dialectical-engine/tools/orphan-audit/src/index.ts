@@ -618,19 +618,22 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
 // Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
 // migrate() is byte-identical.
-// V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0157). migrate() is
+// V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0158). migrate() is
 // byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
-// V4 start step Task 21 (2026-11-03): one comment and one export line for the path results repository (0158). migrate() is byte-identical.
+// V4 start step Task 21 (2026-11-03): one comment and one export line for the path results repository (0159). migrate() is byte-identical.
 // Merge of origin V4 bbd16f888 (2026-11-04): V4 took 0154, so the two comments above name 0156 and 0157 (the start step's three
 // migrations moved up one). Comments only; migrate() is byte-identical.
 // Merge of origin V4 5cef1764d (2026-11-04): V4 took 0155 (the owner's two writes on their own answer), so the Task 20 and
 // Task 21 comments above now name 0157 and 0158 (the start step's three migrations moved up one again). Comments only;
 // migrate() is byte-identical.
-// V4 start step Task 53a (2026-11-04): one comment and one export line for the path progress repository (0159). migrate() is byte-identical.
-// V4 start step Task 56a (2026-11-05): startRun's carry-on dig (0161: RunCreationPrincipal's carryOn, CARRY_ON_DIG_REFUSALS, the
+// V4 start step Task 53a (2026-11-04): one comment and one export line for the path progress repository (0160). migrate() is byte-identical.
+// V4 start step Task 56a (2026-11-05): startRun's carry-on dig (0162: RunCreationPrincipal's carryOn, CARRY_ON_DIG_REFUSALS, the
 // content-provision list's new prepare). migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
 // V4 start step Task 55d (2026-11-05): withOwnRunContentLease (another run's content under a short lease of its own). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "6bf0309262f61ccdc2cd75082b006768af66658d581f859e1c192019a6a1fcb5";
+// Renumber before merging origin V4 16f621dc7 (2026-11-06): V4 took 0156 (the moderation notice), so the start step's eight
+// migrations moved up one (0156-0163 → 0157-0164) and the module's comments, like the Task 20, 21, 53a and 56a lines above,
+// now name 0158, 0159, 0160 and 0162. Comments only; migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+const NATIVE_MIGRATE_MODULE_SHA256 = "e7d7c4f0275ea3eb2eb496c19c56a746d067350c5d30aac95cc2129510c5827b";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

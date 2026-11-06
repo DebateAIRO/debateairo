@@ -8,7 +8,7 @@ import {
 
 /**
  * V4 start step, Task 53 (spec 2026-11-03 §4.2-§4.3; plan Task 53) — A PATH DEBATE'S SET, AS THE RUNNER FINDS IT. A run admitted with
- * shape receipt v2 argues the paths sealed for it at Start (0157): read first, always. A menu's or a dig's set that is missing refuses
+ * shape receipt v2 argues the paths sealed for it at Start (0158): read first, always. A menu's or a dig's set that is missing refuses
  * the run before any call (PATHS_SET_MISSING): Start sealed it before the first job, so it cannot come later. A run that builds its own
  * list (RUN_BUILT: "Just answer it", an old page's ask on a v2 version) writes its lists and their merge itself, as the step before
  * Start does (the same calls: the angle planner, the list writers, one merge on Haiku), takes the menu's top paths at How wide, and

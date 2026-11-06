@@ -295,14 +295,14 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
 
   /**
    * Task 55e (spec §4.4, held by Task 55b as `it.fails`): a dig under the main question writes no rewrite, so nothing climbs; once its
-   * story is written the runner updates the main answer with the dig itself as the trigger (0162's PATH_ADDED), over every path, the new
+   * story is written the runner updates the main answer with the dig itself as the trigger (0163's PATH_ADDED), over every path, the new
    * one named by its place. One version per trigger.
    */
   it("the dig of more-kp07 records a main-answer update", async () => {
     const parent = await parentDebate();
     expect(moreDig).not.toBeNull();
     const moreId = moreDig!.runId.toLowerCase();
-    // 0162: the CHECK on what made a version lists exactly three kinds.
+    // 0163: the CHECK on what made a version lists exactly three kinds.
     const [check] = await q(database.pool, `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
       WHERE conrelid = 'identity.main_answer_update'::regclass AND conname = $1`, "main_answer_update_trigger_check");
     expect([...String(check?.definition).matchAll(/'([A-Z_]+)'/gu)].map((match) => match[1])).toEqual(["PATH_REWRITE", "PATH_UPDATE", "PATH_ADDED"]);

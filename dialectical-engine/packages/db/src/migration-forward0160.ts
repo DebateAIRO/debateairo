@@ -4,20 +4,19 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0160, a person's questions not started yet (V4 start step; plan 2026-11-03 Task 39d; owner answers S3 A, S4 A and S5 A; expand): the one
- * identity table whose two parts are envelopes under each question's own key, the five definers the API's billing role calls and the
- * export reader the export worker calls. It keeps 0130's verifier and amends no earlier step.
+ * 0160, each path's step and points, the carry-on mark and a public debate's report counts (V4 start step; plan 2026-11-03 Task 53a;
+ * expand): the two tables the runner writes as a path's work moves on (ids and codes only), the four definers the runtime calls and the
+ * report counts the API's billing role reads. It keeps 0130's verifier and amends no earlier step.
  */
-const NAME = "0160_saved_questions.sql";
-const VERSION = "saved-questions-forward0160-v1";
-const MANIFEST_PATH = "lineage/saved-questions-forward0160.json";
+const NAME = "0160_path_progress.sql";
+const VERSION = "path-progress-forward0160-v1";
+const MANIFEST_PATH = "lineage/path-progress-forward0160.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0159_path_progress.sql";
-const TABLES: readonly string[] = ["identity.saved_question"];
+const PREVIOUS = "0159_path_results.sql";
+const TABLES: readonly string[] = ["core.path_step", "core.path_point_mark"];
 const FUNCTIONS: readonly string[] = [
-  "identity.create_saved_question(uuid,uuid,jsonb,jsonb)", "identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
-  "identity.read_saved_questions(uuid,integer)", "identity.read_saved_question(uuid,uuid)", "identity.delete_saved_question(uuid,uuid)",
-  "identity.read_data_export_saved_questions(uuid,uuid)"
+  "core.record_path_step(uuid,text,text)", "core.record_path_point_mark(uuid,text,uuid,text,text)", "core.read_path_progress(uuid)",
+  "core.read_carry_on_mark(uuid)", "identity.count_public_reports(uuid,uuid)"
 ];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0160_${detail}`); };

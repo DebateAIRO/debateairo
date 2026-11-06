@@ -30,9 +30,9 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *    one; its points are the story path's points (each node's own words), each pointing at the point it argues when that
  *    point is on the path too (core.edge), disputed when the second AI disputed it (ledger.node_review), no trust word;
  *    and only the checked extracts their locators name (0132, W3-3's rule). V4 start step, Task 55: on a path debate the
- *    path is named by its id b<n>, and the point left out is that path's root in force (0158), its own answer. Task 55b: with
- *    no rewrite or climb written on it yet, a path b<n>'s text is its answer so far (0158; a FAILED one: its question, SET_ASIDE).
- *  - `pathRootsOf`: a run's roots in force (0158), each by its path id; none for a run that is no path debate.
+ *    path is named by its id b<n>, and the point left out is that path's root in force (0159), its own answer. Task 55b: with
+ *    no rewrite or climb written on it yet, a path b<n>'s text is its answer so far (0159; a FAILED one: its question, SET_ASIDE).
+ *  - `pathRootsOf`: a run's roots in force (0159), each by its path id; none for a run that is no path debate.
  *  - `digExtractsOf`: the same extract rule on the dig's own points, whose passages it may read (decision 6).
  *  - `recordInput` / `storedInputOf`: 0135's identity.path_rewrite_input, the dig's own paths as `{ v: 2, dig_paths }`.
  *  - `parentCodesOf`: clear codes only, for a FAILED row (the base rewrite's version and fate, else the story's).

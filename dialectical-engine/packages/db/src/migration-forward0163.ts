@@ -4,32 +4,24 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from "./migration-forward-chain.js";
 
 /**
- * 0163, a failed question gives back its path-list charge (V4 start step; plan 2026-11-03 Task 57c; the owner's 5 Nov answer Q20 A and its
- * second-round follow-up; drained): each charge before Start names its try, Start gives the try's charges to the debate once, the person's
- * readers leave out a charge whose debate failed, and a reader says whether a debate used any quota. It pins the objects it creates and the
- * three readers it redefines; it keeps 0130's verifier.
+ * 0163, a dig under the main question of a path debate updates the main answer (V4 start step; plan 2026-11-03 Task 55e; spec 2026-11-03
+ * §4.4; drained): 0138's CHECK on identity.main_answer_update.trigger_kind widened by PATH_ADDED. No table, function or grant is added.
+ * 0138's postcondition digests the CHECK, so the step declares that amendment, and keeps 0130's verifier.
  */
-const NAME = "0163_pre_start_release.sql";
-const VERSION = "pre-start-release-forward0163-v1";
-const MANIFEST_PATH = "lineage/pre-start-release-forward0163.json";
+const NAME = "0163_main_answer_path_added.sql";
+const VERSION = "main-answer-path-added-forward0163-v1";
+const MANIFEST_PATH = "lineage/main-answer-path-added-forward0163.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0162_main_answer_path_added.sql";
-const TABLES = ["identity.pre_start_try"] as const;
-const SPENT = "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)";
-/** 0140's, 0144's and 0156's digests pin the two funded readers; 0156's pins the person's. The manifest carries the same list. */
-const READERS = Object.freeze(["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"]);
-const FUNCTIONS = [
-  "identity.guard_pre_start_try()",
-  "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
-  "identity.link_pre_start_try(uuid,text,uuid)",
-  "identity.read_run_quota_used(uuid,uuid)",
-  SPENT,
-  ...READERS
-] as const;
-const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
-  ...["0140_internal_spend_kinds.sql", "0144_ask_clarify_charge.sql"].map((step) => Object.freeze({ step, functions: READERS, field: "function_definition" as const })),
-  Object.freeze({ step: "0156_pre_start_charge.sql", functions: Object.freeze([SPENT, ...READERS]), field: "function_definition" as const })
-]);
+const PREVIOUS = "0162_carry_on_session_free_digs.sql";
+const TABLE = "identity.main_answer_update";
+const CONSTRAINT = "main_answer_update_trigger_check";
+/** 0138's digest pins the CHECK this step widens, so it declares that (as 0162 declares its own). The manifest carries the same list. */
+const AMENDS: readonly PostconditionAmendment[] = Object.freeze([Object.freeze({
+  step: "0138_tree_updates.sql",
+  relations: Object.freeze([TABLE]),
+  constraints: Object.freeze([CONSTRAINT]),
+  field: "constraint_definition" as const
+})]);
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0163_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
@@ -37,24 +29,17 @@ const exactKeys = (value: unknown, keys: readonly string[]): value is Record<str
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
-/** The 1 table (owner, ACL, columns, constraints, indexes, triggers) and the 7 functions (owner, definer, body, ACL), as 0156's. */
+/**
+ * The CHECK's name, table, kind and whether it is validated. Its kinds are pinned by tests (main-answer-path-added-0163-contract and the
+ * v2 report suite), not digested, as 0154 leaves its own list, so a later step may widen it again without a postcondition drift on 0163
+ * (it still declares the amendment of 0138's, whose digest holds the definition).
+ */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
-  const tables = (await client.query(`
-    SELECT relation,pg_get_userbyid(c.relowner) owner,c.relkind,c.relpersistence,c.relrowsecurity rls,c.relforcerowsecurity force_rls,
-      (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT pg_get_userbyid(a.grantee)||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a) g) acl,
-      (SELECT jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'required',a.attnotnull,'acl',a.attacl::text,'default',pg_get_expr(d.adbin,d.adrelid)) ORDER BY a.attnum) FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped) columns,
-      (SELECT jsonb_agg(k.conname||':'||pg_get_constraintdef(k.oid) ORDER BY k.conname) FROM pg_constraint k WHERE k.conrelid=c.oid) constraints,
-      (SELECT jsonb_agg(pg_get_indexdef(i.indexrelid) ORDER BY pg_get_indexdef(i.indexrelid)) FROM pg_index i WHERE i.indrelid=c.oid) indexes,
-      (SELECT jsonb_agg(t.tgname||':'||t.tgenabled::text||':'||pg_get_triggerdef(t.oid) ORDER BY t.tgname) FROM pg_trigger t WHERE t.tgrelid=c.oid AND NOT t.tgisinternal) triggers
-    FROM unnest($1::text[]) relation JOIN pg_class c ON c.oid=to_regclass(relation) ORDER BY relation`, [TABLES])).rows;
-  if (tables.length !== TABLES.length) return fail("POSTCONDITION_OBJECTS");
-  const functions = (await client.query(`
-    SELECT signature,pg_get_userbyid(p.proowner) owner,p.prosecdef definer,p.proconfig config,p.provolatile volatility,
-      encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') definition,
-      (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
-    FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
-  if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions }));
+  const rows = (await client.query(`
+    SELECT k.conname,k.contype,k.convalidated validated,c.oid::regclass::text relation FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid
+    WHERE k.conrelid=to_regclass($1) AND k.conname=$2`, [TABLE, CONSTRAINT])).rows;
+  if (rows.length !== 1) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify(rows));
 }
 
 export async function loadForward0163(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {

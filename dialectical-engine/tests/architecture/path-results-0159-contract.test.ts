@@ -9,15 +9,15 @@ import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationReplaySafety, definedRelationNames } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0158 (V4 start step, plan 2026-11-03 Task 21; spec §2.7, §4.3): a path debate's results per path. Which root argued each chosen path (and
+ * 0159 (V4 start step, plan 2026-11-03 Task 21; spec §2.7, §4.3): a path debate's results per path. Which root argued each chosen path (and
  * where it moved after a reclaim), each path's answer so far and the gap round, the last two sealed under the debate's own key. Tables and
- * guards on 0117's model with this file's own guard functions; access on 0157's: definers only, no role reads a table. Expand: new objects only.
+ * guards on 0117's model with this file's own guard functions; access on 0158's: definers only, no role reads a table. Expand: new objects only.
  */
-const NAME = "0158_path_results.sql";
+const NAME = "0159_path_results.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/path-results-forward0158.json";
-const PREVIOUS = "0157_start_paths.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/start-paths-forward0157.json";
+const MANIFEST_PATH = "migrations/lineage/path-results-forward0159.json";
+const PREVIOUS = "0158_start_paths.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/start-paths-forward0158.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
@@ -44,25 +44,25 @@ const bodyOf = (sql: string, name: string): string => {
   return at < 0 ? "" : sql.slice(at, sql.indexOf("$$;", sql.indexOf("AS $$", at)));
 };
 
-describe("0158: a path debate's results per path", () => {
-  it("C-T is a step of the chain, after 0157, with its own loader and no amendment", async () => {
+describe("0159: a path debate's results per path", () => {
+  it("C-T is a step of the chain, after 0158, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0158 } from './migration-forward0158.js';");
-    expect(chain).toContain("loadForward0157,loadForward0158,");
+    expect(chain).toContain("import { loadForward0159 } from './migration-forward0159.js';");
+    expect(chain).toContain("loadForward0158,loadForward0159,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
     expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([]);
-    const loader = read("packages/db/src/migration-forward0158.ts");
+    const loader = read("packages/db/src/migration-forward0159.ts");
     for (const name of [...TABLES, ...DEFINERS]) expect(loader, name).toContain(`"${name}"`);
-    expect(loader).toContain("MIGRATION_FORWARD0158_");
+    expect(loader).toContain("MIGRATION_FORWARD0159_");
   });
 
-  it("C-M is bound to 0157's manifest and to the verifier in force", () => {
+  it("C-M is bound to 0158's manifest and to the verifier in force", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string };
     expect(manifest).toEqual({
-      version: "path-results-forward0158-v1",
+      version: "path-results-forward0159-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -184,11 +184,11 @@ describe("0158: a path debate's results per path", () => {
 
   it("C-R is documented and listed", () => {
     const corpus = read("tests/support/shipped-corpus.manifest.txt").split("\n");
-    for (const path of ["packages/db/src/migration-forward0158.ts", "packages/db/src/path-results.ts"]) expect(corpus, path).toContain(path);
+    for (const path of ["packages/db/src/migration-forward0159.ts", "packages/db/src/path-results.ts"]) expect(corpus, path).toContain(path);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0158, below) the forty-eighth", "## The path results per run (0158)", "`loadForward0158`", "MIGRATION_FORWARD0158_", "-- n1: expand", "-- n1: keeps-verifier"]) {
+    for (const needle of ["(0159, below) the forty-eighth", "## The path results per run (0159)", "`loadForward0159`", "MIGRATION_FORWARD0159_", "-- n1: expand", "-- n1: keeps-verifier"]) {
       expect(readme, needle).toContain(needle);
     }
-    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0158_path_results.sql` (after `0157_start_paths.sql`, `n1: expand`)");
+    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0159_path_results.sql` (after `0158_start_paths.sql`, `n1: expand`)");
   });
 });

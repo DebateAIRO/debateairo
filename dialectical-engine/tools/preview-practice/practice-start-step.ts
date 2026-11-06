@@ -164,7 +164,7 @@ function unmergedOf(menu: SignedStartMenu, held: readonly SignedStartList[]): re
 /**
  * Reads the lists and merges them as the page does: the first merge at the cut, with the lists in by then; then one late merge of
  * every list the menu does not hold, with the menu so far (asked once more if it answers none). Then ONE combine: the menu's first two
- * paths put together (a menu of fewer paths asks none). Every call goes through `step`, so each is charged to the person (0156).
+ * paths put together (a menu of fewer paths asks none). Every call goes through `step`, so each is charged to the person (0157).
  */
 export async function drivePracticeStartStep(input: Readonly<{ step: StartStepPort; context: StartStepContext; questionLine: string;
   siteLanguage: SiteLanguage | undefined; readingLevel: AccountReadingLevel }>): Promise<PracticeStartDrive> {
@@ -430,7 +430,7 @@ export function practicePathFillSpread(calls: readonly Readonly<{ callSiteKey: s
 }
 
 /**
- * The month's lines of one question, from the throwaway ledger: every call before Start (0156's run-less rows, at their charge), each
+ * The month's lines of one question, from the throwaway ledger: every call before Start (0157's run-less rows, at their charge), each
  * model call of the debate and of each dig (its stored usage, priced as the practice prices every call), and each run's search fees
  * when they were paid (`searchFeesPaid`; the stand-in pays none).
  */

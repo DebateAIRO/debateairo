@@ -110,11 +110,11 @@ const heldByEstimate = async (): Promise<number> => (await world.database.pool.q
 /** Every model call's site key on the run, in the ledger's order. */
 const runSites = async (runId: string): Promise<readonly string[]> => (await world.database.pool.query<{ call_site_key: string }>(
   "SELECT call_site_key FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence", [runId])).rows.map((row) => row.call_site_key);
-/** The calls before Start booked to the person (0156), each with its ledger row: the kind, the person's cost, the row's source and run. */
+/** The calls before Start booked to the person (0157), each with its ledger row: the kind, the person's cost, the row's source and run. */
 const preStart = async (ownerRef: string) => (await world.database.pool.query<{ kind: string; charge_micros: string; spend_source: string | null; run_id: string | null }>(
   `SELECT c.kind, c.charge_micros::text AS charge_micros, s.spend_source, s.run_id::text AS run_id
      FROM identity.pre_start_charge AS c LEFT JOIN ledger.model_spend AS s ON s.spend_id = c.charge_id WHERE c.owner_ref=$1 ORDER BY c.recorded_at`, [ownerRef])).rows;
-/** Who chose the run's sealed paths (0157): PERSON or AIS; null: no set. */
+/** Who chose the run's sealed paths (0158): PERSON or AIS; null: no set. */
 const chosenByOf = async (runId: string): Promise<string | null> => (await world.database.pool.query<{ chosen_by: string }>(
   "SELECT chosen_by FROM core.start_path_set WHERE run_id=$1", [runId])).rows[0]?.chosen_by ?? null;
 /** What the lists are read with at Next: the line, the page's language and the reading level the ask config sends ("plain"). */

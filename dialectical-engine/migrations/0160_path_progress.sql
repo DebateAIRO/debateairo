@@ -1,11 +1,11 @@
--- 0159 · Each path's step and points, the carry-on mark and a public debate's report counts (V4 start step; plan
+-- 0160 · Each path's step and points, the carry-on mark and a public debate's report counts (V4 start step; plan
 -- docs/superpowers/plans/2026-11-03-v4-start-step.md Task 53a, spec 2026-11-03 §2 item 7, §4.6; owner answer Q20: B).
 --
 -- Plain words. While a path debate runs, the page shows each path's step (finding sources, arguing, checking) and a few quiet dots, one per
 -- point put forward; once a point's checks are done, what was found and how sure. The step line must change only when the work really moves
 -- on, which only the runner knows, so the runner writes it down here as it happens: each step a path reaches, once, and each mark a point
 -- gets, once. Ids and codes only, never words: nothing here is sealed. Two small reads go with it: how far a debate's carry-on has gone
--- (0157's marks), and how many reports of a public debate did not fail, the owner's own and everyone's (0147's reports), so only a debate's
+-- (0158's marks), and how many reports of a public debate did not fail, the owner's own and everyone's (0147's reports), so only a debate's
 -- very first report uses the kept reserve.
 --
 --   §1 core.path_step: one row per path of a debate's chosen paths (b1..b8) and step it reached.
@@ -16,17 +16,17 @@
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
 --   expand          additive only: two new tables and five new functions; the release before reads and writes none of them, and no earlier
---                   object is changed (0157's chosen paths and carry-on marks and 0147's reports and copies are read; 0040's erasure
+--                   object is changed (0158's chosen paths and carry-on marks and 0147's reports and copies are read; 0040's erasure
 --                   barrier and liveness, 0132's run owner, 0056's truncate guard and 0000's guards are called, not redefined).
 -- n1: keeps-verifier
 --   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql stays in force.
 --   row security    outside 0130's scope rule: no request role can SELECT these tables.
 --
 -- THE RULE 0063 WROTE DOWN, obeyed here: never CREATE OR REPLACE a function another migration defines. Replay-safe in the repository's form,
--- as 0117 and 0158.
+-- as 0117 and 0159.
 
 -- 1. Each path's step -----------------------------------------------------------------------------------------------------------
--- A debate's chosen paths only: the set is 0157's, so a debate without paths keeps no step.
+-- A debate's chosen paths only: the set is 0158's, so a debate without paths keeps no step.
 CREATE TABLE IF NOT EXISTS core.path_step (
   run_id uuid NOT NULL REFERENCES core.start_path_set(run_id),
   path_id text NOT NULL CONSTRAINT path_step_id_check CHECK (path_id ~ '^b[1-8]$'),
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS core.path_point_mark (
   recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   PRIMARY KEY (run_id, node_id, mark),
   CONSTRAINT path_point_mark_found_has_trust CHECK ((mark = 'FOUND') = (trust IS NOT NULL)),
-  -- The point is a node of THIS debate (core.node's UNIQUE (run_id, node_id), 0000), as 0158's path roots: never another debate's node.
+  -- The point is a node of THIS debate (core.node's UNIQUE (run_id, node_id), 0000), as 0159's path roots: never another debate's node.
   CONSTRAINT path_point_mark_node_same_run FOREIGN KEY (run_id, node_id) REFERENCES core.node(run_id, node_id)
 );
 SELECT core.install_truncate_guard('core.path_point_mark');
@@ -70,7 +70,7 @@ FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
 
 -- 3. The writers and the reads ---------------------------------------------------------------------------------------------------
 -- A debate is erased (for these definers) when it is sealed and its private content is no longer live (0040): both writers answer
--- RUN_ERASED and the progress read NULL. Path debates are sealed debates (0157's set needs one).
+-- RUN_ERASED and the progress read NULL. Path debates are sealed debates (0158's set needs one).
 
 -- A path's step, once: RECORDED, ALREADY (that path reached that step before), RUN_ERASED. Refusals, 22023 PATH_PROGRESS_INVALID: a missing
 -- value, a path id or step that is not a code of this file, before any read; a path the debate did not choose (none of its core.start_path).
@@ -151,8 +151,8 @@ BEGIN
 END;
 $$;
 
--- How far a debate's carry-on has gone: the newest of DUE, BEGUN and DONE in 0157's core.carry_on_mark (each is written once and in that
--- order, so a tie goes to the later one), 'NONE' without. Codes only, so no liveness check, as 0157's core.read_start_path_ids.
+-- How far a debate's carry-on has gone: the newest of DUE, BEGUN and DONE in 0158's core.carry_on_mark (each is written once and in that
+-- order, so a tie goes to the later one), 'NONE' without. Codes only, so no liveness check, as 0158's core.read_start_path_ids.
 CREATE OR REPLACE FUNCTION core.read_carry_on_mark(p_run_id uuid) RETURNS text
 LANGUAGE sql
 STABLE
@@ -184,7 +184,7 @@ AS $$
 $$;
 
 -- 4. The grants ---------------------------------------------------------------------------------------------------------------------
--- The tables and the functions keep the migrator, as 0158's. No role reads a table. Every function leaves PUBLIC first: a new core function
+-- The tables and the functions keep the migrator, as 0159's. No role reads a table. Every function leaves PUBLIC first: a new core function
 -- PUBLIC could run would change the content-provision login's core function count, which the API checks at boot. The counts go to the API's
 -- billing role, as 0147's tree reads do.
 REVOKE ALL ON core.path_step FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
@@ -216,12 +216,12 @@ BEGIN
       OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass(v_table)
         AND t.tgname = 'enforce_erasure_barrier' AND NOT t.tgisinternal AND t.tgenabled = 'O'
         AND t.tgfoid = 'core.enforce_erasure_barrier()'::regprocedure) THEN
-      RAISE EXCEPTION 'PATH_PROGRESS_0159_CONTRACT table %', v_table;
+      RAISE EXCEPTION 'PATH_PROGRESS_0160_CONTRACT table %', v_table;
     END IF;
     FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
       'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker', 'debateai_content_provision'] LOOP
       IF pg_catalog.has_table_privilege(v_role, v_table, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-        RAISE EXCEPTION 'PATH_PROGRESS_0159_CONTRACT table privilege % %', v_table, v_role;
+        RAISE EXCEPTION 'PATH_PROGRESS_0160_CONTRACT table privilege % %', v_table, v_role;
       END IF;
     END LOOP;
   END LOOP;
@@ -234,7 +234,7 @@ BEGIN
       OR pg_catalog.has_function_privilege('debateai_data_export_worker', v_name, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_runtime', v_name, 'EXECUTE') <> (v_name LIKE 'core.%')
       OR (v_name LIKE 'identity.%' AND NOT pg_catalog.has_function_privilege('debateai_billing_runtime', v_name, 'EXECUTE')) THEN
-      RAISE EXCEPTION 'PATH_PROGRESS_0159_CONTRACT %', v_name;
+      RAISE EXCEPTION 'PATH_PROGRESS_0160_CONTRACT %', v_name;
     END IF;
   END LOOP;
 END

@@ -1,6 +1,6 @@
 // tests/integration/answer-branches-database.test.ts
 // V4 start step, Task 58 (spec 2026-11-03 §2 items 7 and 8, §4.3; items map-d2, journey-f1, wait-d1): a path debate's paths as the run read
-// and the served answer give them, on real PostgreSQL. The chosen paths (0157), each path's root and answer so far (0158) are written
+// and the served answer give them, on real PostgreSQL. The chosen paths (0158), each path's root and answer so far (0159) are written
 // through the runner's own login and stores, the web step's rows through the runner's own store and key; the reads go through
 // ServeRepository on the API's login. Pinned: before any root the run read names every path LOOKING with its title; the served answer
 // names each path's state from its outcome (ARGUED, FAILED, FAILED) and its web path by its path id ("b1"), also inside a caller's lease
@@ -82,7 +82,7 @@ function pathDebate(): Promise<string> {
   });
 }
 
-/** The runner names the debate's three paths (0157, the runner's login). */
+/** The runner names the debate's three paths (0158, the runner's login). */
 async function recordPaths(runId: string): Promise<void> {
   expect(await new PostgresStartPathsStore(runner).recordStartPaths({ runId, source: "RUN_BUILT", width: 3, chosenBy: "AIS",
     carryOnToReport: false, paths: PATHS, menu: null })).toBe("RECORDED");

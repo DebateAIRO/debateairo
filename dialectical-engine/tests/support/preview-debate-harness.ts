@@ -412,7 +412,7 @@ export function previewDebateHarness(input: Readonly<{
       perVersion?: Readonly<{ cache: RunnerSettingsCache; versions: RunSettingsVersions; site: RunnerSiteContext }>;
       /** V4 start step, Task 53: the web step's settings (its plan read, its search port), as main.ts passes them; absent, no web step. */
       webSearch?: WebStepRunnerSettings;
-      /** V4 start step, Task 53: a path debate's progress store; absent, 0159's on the runner's pool, as main.ts composes it. */
+      /** V4 start step, Task 53: a path debate's progress store; absent, 0160's on the runner's pool, as main.ts composes it. */
       pathProgress?: PathProgressStore;
       /**
        * V4 start step, Task 53 (Review Focus 2): each gate's read-only `/remaining`, as main.ts passes `previewGateRemaining` to the

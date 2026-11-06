@@ -1,14 +1,14 @@
 {
-  "version": "saved-questions-forward0160-v1",
+  "version": "path-progress-forward0160-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0159_path_progress.sql",
-    "manifestSha256": "fffba77d48593c818cf575b8f15d40cd782b9323a06df903462fcbca1fc83173",
+    "name": "0159_path_results.sql",
+    "manifestSha256": "a42a4ec1ef4f6db8a6e3c13f69164e011b51ca2328f72b5934895626af5ee1d6",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
-    "name": "0160_saved_questions.sql",
-    "sha256": "3b7e3fd4aa5b9604d1a2a175ecf1cef9999d31fcbb46deed6f5c9839209f4786"
+    "name": "0160_path_progress.sql",
+    "sha256": "8bf97fed6a686a53c8db4671f0a358ea3dd8b59ad663496f2b6784f6ac7b8299"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

@@ -163,7 +163,7 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
       `EXECUTE ON FUNCTION ${EXPORT_READER} TO ${WORKER}`
     ]);
     expect(read("packages/db/src/data-export.ts")).toContain(`"${EXPORT_READER}"`);
-    // V4 start step, Task 39e: 0160's export reader is the twenty-fourth worker function.
+    // V4 start step, Task 39e: 0161's export reader is the twenty-fourth worker function.
     expect(read("packages/db/src/data-export.ts")).toContain("worker.worker_count !== 24");
   });
 

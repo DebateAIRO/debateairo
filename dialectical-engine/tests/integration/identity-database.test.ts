@@ -98,9 +98,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "path_suggestions",
       // 0138 tree updates: a path's rewrites that a dig did not start, and the turns that order them.
       "path_update", "path_update_turn",
-      // 0156: one row per small AI call before Start, naming the person, the kind, the cost and the time.
+      // 0157: one row per small AI call before Start, naming the person, the kind, the cost and the time.
       "pre_start_charge",
-      // 0163: which try each of those calls was made for, and the debate it was given to at Start.
+      // 0164: which try each of those calls was made for, and the debate it was given to at Start.
       "pre_start_try",
       "private_erasure_audit_binding",
       // 0137 public debates: the public debates' contributions, updates and report charges. 0147 the public tree: the sealed copy, a dig's paths, the
@@ -124,7 +124,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0138 tree updates: a run's purpose lines.
       "run_purpose_lines",
       "runtime_audit_attempt",
-      // 0160 saved questions: a person's questions not started yet, each part sealed under the question's own key.
+      // 0161 saved questions: a person's questions not started yet, each part sealed under the question's own key.
       "saved_question",
       "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
       "verification_delivery_reservation", "verification_token_credential",

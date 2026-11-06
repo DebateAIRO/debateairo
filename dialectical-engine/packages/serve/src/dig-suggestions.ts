@@ -78,7 +78,7 @@ export function digPointSuggestions(positionRef: string, points: readonly Node[]
  * The answer's web part with what code finds joined to each path's suggestions, each id once, within the contract's count.
  * At level 10 no path offers any. A web part with no suggestions to add comes back as the same paths.
  * V4 start step, Task 55b (owner F14): a path debate names its web paths by path id (b<n>), which names no node, so `rootOf` (each
- * path id's root in force, 0158) says where its points hang; each suggestion still hangs under its path, "path:b<n>". Absent (R22):
+ * path id's root in force, 0159) says where its points hang; each suggestion still hangs under its path, "path:b<n>". Absent (R22):
  * the path's own ref is its root, as today.
  * Task 79a: a path the root map names is a path debate's, so what code finds on it names its point (`points`); an R22 path never.
  */

@@ -43,11 +43,11 @@ export * from "./web-evidence.js";
 export * from "./investigations.js";
 // The new dig model and the month pause (migration 0134, dig-model revision task W2-8).
 export * from "./dig-model.js";
-// The paths a person chose at Start and the carry-on marks (migration 0157, V4 start step Task 20).
+// The paths a person chose at Start and the carry-on marks (migration 0158, V4 start step Task 20).
 export * from "./start-paths.js";
-// A path debate's results per path (migration 0158, V4 start step Task 21).
+// A path debate's results per path (migration 0159, V4 start step Task 21).
 export * from "./path-results.js";
-// Each path's step and points, the carry-on mark and a public debate's report counts (migration 0159, V4 start step Task 53a).
+// Each path's step and points, the carry-on mark and a public debate's report counts (migration 0160, V4 start step Task 53a).
 export * from "./path-progress.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
@@ -288,7 +288,7 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   "core.complete_run_key_provision_cleanup(uuid,uuid)",
   // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
   "core.prepare_readmitted_run_key_provision(uuid,uuid)",
-  // V4 start step (0161, plan 2026-11-03 Task 56a): a carry-on dig of a debate's chosen path, without a live sign-in.
+  // V4 start step (0162, plan 2026-11-03 Task 56a): a carry-on dig of a debate's chosen path, without a live sign-in.
   "core.prepare_carry_on_run_key_provision(uuid,uuid,text)"
 ] as const);
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
@@ -1891,7 +1891,7 @@ export type StoredAsk = Readonly<{
 }>;
 
 /**
- * Whose new run `startRun` writes. A server principal's `carryOn` (V4 start step, 0161, plan 2026-11-03 Task 56a) makes the run a carry-on
+ * Whose new run `startRun` writes. A server principal's `carryOn` (V4 start step, 0162, plan 2026-11-03 Task 56a) makes the run a carry-on
  * dig of `parentRunId`'s chosen path `pathId`: its key is provisioned from the debate's own binding (the same user and identity session,
  * signed out or not), so no live session is needed and `sessionId` is not read; the debate must be the principal's own.
  */
@@ -1920,7 +1920,7 @@ const READMISSION_REFUSALS: ReadonlySet<string> = new Set([
   "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_READMISSION_TAKEN"
 ]);
 
-/** The codes 0161's carry-on dig key provision refuses with (55000, MESSAGE = code), surfaced typed as the re-admission's are. */
+/** The codes 0162's carry-on dig key provision refuses with (55000, MESSAGE = code), surfaced typed as the re-admission's are. */
 const CARRY_ON_DIG_REFUSALS: ReadonlySet<string> = new Set([
   "CARRY_ON_DIG_INVALID", "CARRY_ON_DIG_OWNER_GONE", "CARRY_ON_DIG_TAKEN"
 ]);
@@ -2360,8 +2360,8 @@ export class RunRepository {
     const principal = input.principal;
     const carryOn = principal.kind === "server" ? principal.carryOn : undefined;
     if (principal.kind === "server" && carryOn !== undefined) {
-      // 0161 (V4 start step, Task 56a): the debate a carry-on digs is the principal's own encrypted run, read before anything is
-      // provisioned, as startReadmittedRun reads the run it re-admits. 0161's prepare checks the rest under the account's lock.
+      // 0162 (V4 start step, Task 56a): the debate a carry-on digs is the principal's own encrypted run, read before anything is
+      // provisioned, as startReadmittedRun reads the run it re-admits. 0162's prepare checks the rest under the account's lock.
       const parent = UUID_V4.test(carryOn.parentRunId) ? (await this.pool.query<{ asker_id: string; encrypted: boolean }>(
         `SELECT asker_id, content_encryption_version IS NOT DISTINCT FROM 1 AS encrypted
          FROM core.run WHERE run_id = $1`,
@@ -2377,7 +2377,7 @@ export class RunRepository {
           kind: "encrypted", ownerRef: principal.ownerRef, callerScope: input.callerScope,
           prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
             if (carryOn !== undefined) {
-              // 0161: the key is provisioned from the debate's own binding (its user and identity session, signed out or not), so
+              // 0162: the key is provisioned from the debate's own binding (its user and identity session, signed out or not), so
               // no live session is needed and the session id is not read. Refused typed, as the re-admission's provision is.
               let rows: ReadonlyArray<{ execution_ref: string | null; user_id: string | null }>;
               try {

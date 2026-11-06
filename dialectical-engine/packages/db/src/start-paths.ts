@@ -5,7 +5,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import { decryptLeasedContentForRun, encryptAttestedContentForRun, prepareLeasedContentEncryptionForRun, withRunContentLease } from "./index.js";
 
 /**
- * The paths a person chose at Start (migration 0157; V4 start step, spec 2026-11-03 §4), through 0157's definers only, on the
+ * The paths a person chose at Start (migration 0158; V4 start step, spec 2026-11-03 §4), through 0158's definers only, on the
  * runner's pool (debateai_runtime). The set's menu and each path's words are sealed under the debate's own run key inside
  * withRunContentLease and opened through prepareLeasedContentEncryptionForRun; the counts, authors and ids stay readable.
  *
@@ -58,7 +58,7 @@ const notSealed = (): TypedDomainError =>
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The set's sealed part (0157 §1): the menu the paths were chosen from, {menu, lateLists}, or {} for a set built without one. */
+/** The set's sealed part (0158 §1): the menu the paths were chosen from, {menu, lateLists}, or {} for a set built without one. */
 function menuOf(opened: unknown): StoredStartMenu | null {
   if (!isObject(opened)) throw new TypeError("START_PATHS_CONTENT_INVALID");
   if (Object.keys(opened).length === 0) return null;

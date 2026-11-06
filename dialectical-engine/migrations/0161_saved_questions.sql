@@ -1,4 +1,4 @@
--- 0160 · A person's questions not started yet, each under a key of its own (V4 start step; plan
+-- 0161 · A person's questions not started yet, each under a key of its own (V4 start step; plan
 -- docs/superpowers/plans/2026-11-03-v4-start-step.md Task 39d; spec docs/superpowers/specs/2026-11-04-v4-start-step-saved-questions.md
 -- §3.1, §3.8, §3.14; owner answers S3 A, S4 A and S5 A of 4 Nov 2026).
 --
@@ -25,7 +25,7 @@
 --                   running beside it. No earlier function, table or trigger changes: 0040, 0110 and 0131 are untouched (the account's
 --                   closing removes the rows through the cascade, and destroys the question keys in its own key step, in the API).
 -- n1: keeps-verifier
---   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql (0130's, which 0159 keeps)
+--   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql (0130's, which 0160 keeps)
 --                   stays in force and the manifest names it.
 --   row security    Row security: outside 0130's scope rule: no request role can SELECT this table.
 --
@@ -82,7 +82,7 @@ SELECT core.install_truncate_guard('identity.saved_question');
 
 -- The first save. Refusals, each 22023: SAVED_QUESTION_ACCOUNT_INVALID (no active account with that owner_ref) and SAVED_QUESTION_ID_TAKEN
 -- (the id is already a row, this account's or another's). With 20 rows already, it writes nothing and answers FULL (owner answer S3 A).
--- One account's creates run one at a time under a transaction lock ('identity:saved-questions:<owner_ref>', as 0157's
+-- One account's creates run one at a time under a transaction lock ('identity:saved-questions:<owner_ref>', as 0158's
 -- core.record_start_paths takes one per run), so the count and the insert see each other: two creates at once on 19 rows keep one.
 CREATE OR REPLACE FUNCTION identity.create_saved_question(p_owner_ref uuid, p_id uuid, p_title jsonb, p_content jsonb) RETURNS jsonb
 LANGUAGE plpgsql
@@ -282,19 +282,19 @@ BEGIN
     OR (SELECT c.relowner FROM pg_catalog.pg_class AS c WHERE c.oid = v_table) IS DISTINCT FROM v_owner
     OR (SELECT c.relrowsecurity FROM pg_catalog.pg_class AS c WHERE c.oid = v_table)
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = v_table AND t.tgname = 'reject_truncate' AND NOT t.tgisinternal) THEN
-    RAISE EXCEPTION 'SAVED_QUESTIONS_0160_CONTRACT table';
+    RAISE EXCEPTION 'SAVED_QUESTIONS_0161_CONTRACT table';
   END IF;
   -- The account link deletes with the account; both envelope checks and the revision check are in place.
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = v_table AND k.contype = 'f'
       AND k.confrelid = 'identity."user"'::regclass AND k.confdeltype = 'c')
     OR (SELECT count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = v_table AND k.contype = 'c'
       AND k.conname IN ('saved_question_title_envelope', 'saved_question_content_envelope', 'saved_question_revision_check')) <> 3 THEN
-    RAISE EXCEPTION 'SAVED_QUESTIONS_0160_CONTRACT constraints';
+    RAISE EXCEPTION 'SAVED_QUESTIONS_0161_CONTRACT constraints';
   END IF;
   FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
     'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker'] LOOP
     IF pg_catalog.has_table_privilege(v_role, v_table, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-      RAISE EXCEPTION 'SAVED_QUESTIONS_0160_CONTRACT table privilege %', v_role;
+      RAISE EXCEPTION 'SAVED_QUESTIONS_0161_CONTRACT table privilege %', v_role;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY[
@@ -304,7 +304,7 @@ BEGIN
   ] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p WHERE p.oid = pg_catalog.to_regprocedure(v_name)
         AND p.prosecdef AND p.proowner = v_owner AND p.proconfig = '{search_path=pg_catalog}'::text[]) THEN
-      RAISE EXCEPTION 'SAVED_QUESTIONS_0160_CONTRACT definers %', v_name;
+      RAISE EXCEPTION 'SAVED_QUESTIONS_0161_CONTRACT definers %', v_name;
     END IF;
     -- Exactly one of the six roles may call each: the export worker the reader, the API's role the rest.
     FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
@@ -312,7 +312,7 @@ BEGIN
       IF pg_catalog.has_function_privilege(v_role, v_name, 'EXECUTE') IS DISTINCT FROM (v_role = CASE v_name
           WHEN 'identity.read_data_export_saved_questions(uuid,uuid)' THEN 'debateai_data_export_worker'
           ELSE 'debateai_billing_runtime' END) THEN
-        RAISE EXCEPTION 'SAVED_QUESTIONS_0160_CONTRACT privileges % %', v_role, v_name;
+        RAISE EXCEPTION 'SAVED_QUESTIONS_0161_CONTRACT privileges % %', v_role, v_name;
       END IF;
     END LOOP;
   END LOOP;

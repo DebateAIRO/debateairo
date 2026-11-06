@@ -1,4 +1,4 @@
--- 0162 · A dig under the main question of a path debate updates the main answer (V4 start step; plan 2026-11-03 Task 55e; spec
+-- 0163 · A dig under the main question of a path debate updates the main answer (V4 start step; plan 2026-11-03 Task 55e; spec
 -- 2026-11-03 §4.4).
 --
 -- Plain words. Digging a path the person left out before Start ("+ N more") is today's dig under the main question: it shows up as a
@@ -12,7 +12,7 @@
 -- n1: drained
 --   drained         0138's CHECK on identity.main_answer_update is replaced, and 0138's postcondition digest pins it, so this step
 --                   declares an amendment of 0138's postcondition; a release that does not know this step refuses an amendment by
---                   it (AMENDMENT_BINDING_DRIFT), so it never runs beside it. The V4 start step's release is a drained upload (0156).
+--                   it (AMENDMENT_BINDING_DRIFT), so it never runs beside it. The V4 start step's release is a drained upload (0157).
 -- n1: keeps-verifier
 --   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql stays in force.
 --

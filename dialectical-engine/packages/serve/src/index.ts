@@ -3298,7 +3298,7 @@ export class ServeRepository {
       // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
       // W4-3: the kinds code finds on each path joined the AI's (`#readServedWeb`); none at level 10, which cannot be dug.
       // V4 start step, Task 55b (owner F14): a path debate's web paths are its path ids, so code reads the points under each path's root in
-      // force (0158's, as the branches name them); an R22 answer hands none (today's bytes).
+      // force (0159's, as the branches name them); an R22 answer hands none (today's bytes).
       ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions,
         branches === null ? undefined : new Map(branches.paths.flatMap((path) => path.root_node_id === null ? [] : [[path.path_id, path.root_node_id] as const]))) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
@@ -4031,8 +4031,8 @@ export class ServeRepository {
   /**
    * V4 start step, Task 58b (Task 53b's rule, spec §4.3: the served answer is the same whichever path finishes first). Each path of a path
    * debate saves in its own order, so created_at_seq across paths follows which path finished first: its nodes are served path by path in
-   * the order its branches list them, and its edges after their source nodes (./path-order.ts). Ids and codes only (0157's path ids,
-   * 0158's roots in force, each live node's parent), read under the caller's lease. Null on every R22 and v1 debate (no paths: one read
+   * the order its branches list them, and its edges after their source nodes (./path-order.ts). Ids and codes only (0158's path ids,
+   * 0159's roots in force, each live node's parent), read under the caller's lease. Null on every R22 and v1 debate (no paths: one read
    * of the ids), and on a path debate with no root in force: their nodes and edges keep the SQL's created_at_seq order.
    */
   async #pathPlacesOf(runId: string): Promise<ReadonlyMap<string, number> | null> {

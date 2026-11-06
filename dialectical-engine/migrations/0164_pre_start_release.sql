@@ -1,8 +1,8 @@
--- 0163 · A failed question gives back its path-list charge (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 57c;
+-- 0164 · A failed question gives back its path-list charge (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 57c;
 -- the owner's 5 Nov answer Q20 A and its second-round follow-up).
 --
 -- Plain words. Before Start, small AIs plan the angles, write the lists, merge them, combine two paths and check that a path fits; each call
--- is charged to the person (0156). When the debate they were for fails, that charge is given back: the person's day, week and month no
+-- is charged to the person (0157). When the debate they were for fails, that charge is given back: the person's day, week and month no
 -- longer count it, so a question that failed before any round ran took nothing. The site's day still counts it (the money was spent), as a
 -- debate set aside by an update keeps its spend in the site's day (0123's waiver). Each call names the try it was made for: one person's one
 -- question, as a keyed hash the API derives (it never reads back as words). At Start the API gives the try's charges to the new debate, once.
@@ -10,23 +10,23 @@
 --
 --   §1 identity.pre_start_try: which try a charge was made for, and (from Start) the debate it was given to, at most once. Append-only but
 --      for that one link. An erased account takes its rows, as it takes the charges.
---   §2 identity.record_pre_start_try_charge, 0156's writer and the try's row in one transaction, or neither.
+--   §2 identity.record_pre_start_try_charge, 0157's writer and the try's row in one transaction, or neither.
 --   §3 identity.link_pre_start_try: at Start, the person's charges of that try not yet given to a debate, given to the person's new debate.
---   §4 the readers: 0156's identity.read_pre_start_spent and its two funded readers leave out a charge whose debate failed.
+--   §4 the readers: 0157's identity.read_pre_start_spent and its two funded readers leave out a charge whose debate failed.
 --   §5 identity.read_run_quota_used: whether a person's debate used any of their quota (its own counted spend, or a charge before Start
 --      not given back), for the failed debate's read.
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: drained
 -- n1: keeps-verifier
---   drained         it redefines 0156's three readers in place (declared as amendments of the postconditions of 0140, 0144 and 0156), so it
---                   is uploaded drained, as 0156 was: no debate waits or runs while it applies. No expand step could say this. The V4
---                   start step's release is drained already (0156).
+--   drained         it redefines 0157's three readers in place (declared as amendments of the postconditions of 0140, 0144 and 0157), so it
+--                   is uploaded drained, as 0157 was: no debate waits or runs while it applies. No expand step could say this. The V4
+--                   start step's release is drained already (0157).
 --   keeps-verifier  no new billing relation or billing function (the same name and signature; the table and the new functions are the
 --                   identity schema's), so lineage/verify-effective-capabilities-130.sql stays in force.
---   row security    outside 0130's scope rule, as 0131 to 0162: no request role can SELECT this table.
+--   row security    outside 0130's scope rule, as 0131 to 0163: no request role can SELECT this table.
 --
--- Replay-safe in the repository's form, as 0156.
+-- Replay-safe in the repository's form, as 0157.
 
 -- 1. The try of each charge ---------------------------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS identity.pre_start_try (
@@ -64,8 +64,8 @@ CREATE TRIGGER guard_pre_start_try BEFORE UPDATE OR DELETE ON identity.pre_start
 FOR EACH ROW EXECUTE FUNCTION identity.guard_pre_start_try();
 
 -- 2. The writer of a charge with its try --------------------------------------------------------------------------------------
--- 0156's writer, then the try's row when the charge was recorded (a person who is gone: GONE, and no try row). Refuses (23514) a try
--- reference that is not 64 lower-case hex characters; 0156's writer refuses the rest as before.
+-- 0157's writer, then the try's row when the charge was recorded (a person who is gone: GONE, and no try row). Refuses (23514) a try
+-- reference that is not 64 lower-case hex characters; 0157's writer refuses the rest as before.
 CREATE OR REPLACE FUNCTION identity.record_pre_start_try_charge(p_charge_id uuid, p_owner uuid, p_grant uuid, p_event uuid, p_kind text,
   p_provider_ref text, p_charged_on date, p_charge_micros bigint, p_input_tokens bigint, p_output_tokens bigint, p_try_ref text) RETURNS text
 LANGUAGE plpgsql
@@ -116,7 +116,7 @@ END;
 $$;
 
 -- 4. The readers --------------------------------------------------------------------------------------------------------------
--- 0156's, less a charge given to a debate that failed (a FAILED work item: a debate's failure is final).
+-- 0157's, less a charge given to a debate that failed (a FAILED work item: a debate's failure is final).
 CREATE OR REPLACE FUNCTION identity.read_pre_start_spent(p_owner uuid, p_from timestamptz, p_to timestamptz) RETURNS numeric
 LANGUAGE sql
 STABLE
@@ -128,7 +128,7 @@ AS $$
  AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=c.charge_id AND w.state='FAILED')
 $$;
 
--- 0156's, likewise. Same signature, language, owner, definer, path and grants.
+-- 0157's, likewise. Same signature, language, owner, definer, path and grants.
 CREATE OR REPLACE FUNCTION billing.read_internal_grant_spent(p_owner uuid,p_grant uuid,p_event uuid,p_from timestamptz,p_to timestamptz,p_total boolean) RETURNS numeric
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT (SELECT coalesce(sum(s.charge_micros),0) FROM billing.run_charge_scope c JOIN ledger.model_spend s ON s.run_id=c.run_id
@@ -145,7 +145,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=b.charge_id AND w.state='FAILED'))
 $$;
 
--- 0156's, likewise.
+-- 0157's, likewise.
 CREATE OR REPLACE FUNCTION staff.read_team_internal_spent(p_from timestamptz, p_to timestamptz) RETURNS numeric
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT (SELECT coalesce(sum(s.charge_micros),0) FROM billing.run_charge_scope c JOIN ledger.model_spend s ON s.run_id=c.run_id
@@ -185,8 +185,8 @@ AS $$
 $$;
 
 -- 6. Owners, then the grants --------------------------------------------------------------------------------------------------
--- The table and its guard are 0115's export owner's, as 0156's charge table. The writer, the link and the quota reader are
--- debateai_staff_security_owner's, as 0156's writer: it owns 0156's writer and the readers, and reads core.run_ownership_event,
+-- The table and its guard are 0115's export owner's, as 0157's charge table. The writer, the link and the quota reader are
+-- debateai_staff_security_owner's, as 0157's writer: it owns 0157's writer and the readers, and reads core.run_ownership_event,
 -- core.work_item and ledger.model_spend (0093) and the waiver (0123) already.
 -- n1: reviewed gives only the new table and functions their owners; touches no earlier object
 DO $pre_start_try_owner$
@@ -224,12 +224,12 @@ BEGIN
       AND t.tgname = 'reject_truncate' AND NOT t.tgisinternal)
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass('identity.pre_start_try')
       AND t.tgname = 'guard_pre_start_try' AND NOT t.tgisinternal AND t.tgenabled = 'O') THEN
-    RAISE EXCEPTION 'PRE_START_TRY_0163_CONTRACT table';
+    RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT table';
   END IF;
   FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
     'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker'] LOOP
     IF pg_catalog.has_table_privilege(v_role, 'identity.pre_start_try', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-      RAISE EXCEPTION 'PRE_START_TRY_0163_CONTRACT table privilege %', v_role;
+      RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT table privilege %', v_role;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY['identity.read_pre_start_spent(uuid,timestamptz,timestamptz)',
@@ -240,7 +240,7 @@ BEGIN
         AND p.prosecdef AND pg_catalog.pg_get_userbyid(p.proowner) = 'debateai_staff_security_owner'
         AND p.proconfig = '{search_path=pg_catalog}'::text[]
         AND pg_catalog.pg_get_functiondef(p.oid) LIKE '%pre_start_try%') THEN
-      RAISE EXCEPTION 'PRE_START_TRY_0163_CONTRACT %', v_name;
+      RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT %', v_name;
     END IF;
   END LOOP;
 END

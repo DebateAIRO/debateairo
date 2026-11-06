@@ -152,7 +152,7 @@ describe("the question's own key (S4 A)", () => {
     expect(await w.opened(written.id, ANA, "title")).toBe(SAVED_Q);
   });
 
-  it("the largest document a save lets through seals under 0160's content cap, and the longest title under its title cap", async () => {
+  it("the largest document a save lets through seals under 0161's content cap, and the longest title under its title cap", async () => {
     // The whole document is at most docMaxBytes of JSON; sealed, its envelope (as jsonb prints it, a space after each : and ,) fits 917_504.
     const key = generateDek();
     const id = "3f2c1a9e-7b4d-4c2a-9e8f-1a2b3c4d5e6f";
