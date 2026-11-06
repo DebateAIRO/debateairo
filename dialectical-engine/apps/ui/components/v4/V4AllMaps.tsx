@@ -9,9 +9,10 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { ReadingLevel } from "@/lib/v4/types";
 
 /*
- * "All my maps" (owner pick ask-d5 B, 3 Nov 2026): the person's maps further back than the ask page's shelf, the same
- * cards, 20 more with each "Show more". It is a view of the ask page's address (`/v4?maps=all`), so the site's list of
- * pages stays as it is; the account menu's "My questions" links here. Signed-in only, as every V4 page but the ask page.
+ * "My questions" (owner pick ask-d5 B, 3 Nov 2026, then named "All my maps"): the person's maps further back than the
+ * ask page's shelf, the same cards, 20 more with each "Show more". It is a view of the ask page's address
+ * (`/v4?maps=all`), so the site's list of pages stays as it is; the account menu's "My questions" links here. Signed-in
+ * only, as every V4 page but the ask page.
  * The owner's third round (5 Nov afternoon): the page is called "My questions" too (its heading, so its tab title), and
  * the first screen's link to it reads "All my questions".
  * The reading-level ruling (owner, 5 Nov): no level menu here, the account's level is not read, and no link carries one.
@@ -27,7 +28,7 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
   const { load, busy, retry } = useMapShelf({ enabled: true, want, catalog });
   return (
     <>
-      {/* journey-f19: the quota share shows only on the ask, choosing and map pages; All my maps is none of them. */}
+      {/* journey-f19: the quota share shows only on the ask, choosing and map pages; My questions is none of them. */}
       <V4Header catalog={catalog} showQuota={false} />
       {/* UI-4: the site layout already holds the page's one <main>. */}
       <div className="v4AskMain v4MapsMain">
