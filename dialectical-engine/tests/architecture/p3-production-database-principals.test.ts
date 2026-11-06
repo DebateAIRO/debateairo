@@ -1351,6 +1351,13 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 {
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0157_moderation_statements.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_moderation(uuid,uuid)"
+  ]
+},
+{
   "roleName": "debateai_runtime",
   "source": "migrations/0153_dig_tree_settled.sql",
   "grants": [

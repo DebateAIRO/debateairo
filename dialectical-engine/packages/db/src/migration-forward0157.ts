@@ -43,7 +43,8 @@ const FUNCTIONS: readonly string[] = [
   "identity.public_flag_close(uuid,text,uuid,uuid,text)",
   "identity.public_flag_queue_answered()",
   "staff.read_public_flag_queue_answered(jsonb,text)",
-  "staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)"
+  "staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)",
+  "identity.read_data_export_moderation(uuid,uuid)"
 ];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0157_${detail}`); };

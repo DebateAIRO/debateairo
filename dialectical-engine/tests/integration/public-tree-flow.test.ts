@@ -1311,6 +1311,16 @@ async function delegate(): Promise<Actor> {
     expect(xenas.find((one) => one.kind === "CONTRIBUTION_REMOVED")).toMatchObject({ piece_kind: "DIG", facts: ["It names a private person and where they live."], ground: { grounds: ["PERSONAL_DATA"] } });
     // An affected person is told their piece went with the review, not the facts about someone else's.
     expect(xenas.find((one) => one.kind === "CONTRIBUTION_AFFECTED")).toMatchObject({ facts: [], quote: null });
+    // 0157: the person's own export carries the same, through the worker's one reader under 0128's lease.
+    const exported = async (who: StoryEncryptedOwner) => {
+      const exportId = randomUUID(), workerId = randomUUID();
+      await q().query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until) VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, who.userId, randomUUID(), workerId]);
+      return (await q().query<{ value: { statements: Record<string, unknown>[]; earlier_notices: unknown[]; report_answers: Record<string, unknown>[] } }>("SELECT identity.read_data_export_moderation($1,$2) AS value", [exportId, workerId])).rows[0]!.value;
+    };
+    const xenaExport = await exported(xena);
+    expect(xenaExport.statements.map((one) => one.kind).sort()).toEqual(["CONTRIBUTION_AFFECTED", "CONTRIBUTION_REMOVED"]);
+    expect(xenaExport.statements.every((one) => one.emailed_at !== null)).toBe(true);
+    expect(JSON.stringify(xenaExport)).not.toContain("It names a private person");
     const wess = await read(wesIn);
     expect(wess.every((one) => one.public_ref === debate.ref)).toBe(true);
     expect(JSON.stringify(wess)).not.toContain(POINT_TEXT);
@@ -1592,6 +1602,17 @@ async function delegate(): Promise<Actor> {
     expect(english("PUBLIC_FLAG_ANSWER_NO_BREACH")).toContain("found no breach");
     expect(english("PUBLIC_FLAG_ANSWER_ACTED")).toContain("acted on it");
     expect(english("PUBLIC_FLAG_ANSWER_ACTED")).toContain("within six months");
+    // 0157: the person's own export carries the same, through the worker's one reader under 0128's lease.
+    const exported = async (who: StoryEncryptedOwner) => {
+      const exportId = randomUUID(), workerId = randomUUID();
+      await q().query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until) VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, who.userId, randomUUID(), workerId]);
+      return (await q().query<{ value: { statements: Record<string, unknown>[]; earlier_notices: unknown[]; report_answers: Record<string, unknown>[] } }>("SELECT identity.read_data_export_moderation($1,$2) AS value", [exportId, workerId])).rows[0]!.value;
+    };
+    const tomExport = await exported(tom);
+    expect(tomExport.report_answers).toHaveLength(1);
+    expect(tomExport.report_answers[0]).toMatchObject({ publication_ref: first.ref, closed_as: "NO_BREACH" });
+    expect((tomExport.report_answers[0]!.emails as { kind: string; emailed_at: string | null }[]).map((mail) => [mail.kind, mail.emailed_at !== null])).toEqual([["RECEIPT", true], ["NO_BREACH", true]]);
+    expect(JSON.stringify(tomExport)).not.toContain(owner.staffId);
     // Once: a later pass sends none again; the runtime reads none of these tables.
     const again = new MemoryTemplatedMailSender();
     await new PublicFlagAnswerReconciler(mailRepository, userDeks, again, "https://debate.example.test").reconcile(100);

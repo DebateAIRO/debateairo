@@ -163,7 +163,7 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
       `EXECUTE ON FUNCTION ${EXPORT_READER} TO ${WORKER}`
     ]);
     expect(read("packages/db/src/data-export.ts")).toContain(`"${EXPORT_READER}"`);
-    expect(read("packages/db/src/data-export.ts")).toContain("worker.worker_count !== 22");
+    expect(read("packages/db/src/data-export.ts")).toContain("worker.worker_count !== 23");
   });
 
   it("discloses its grants, lists its loader, and is documented truthfully as expand", () => {

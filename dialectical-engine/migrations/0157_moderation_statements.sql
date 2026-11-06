@@ -816,3 +816,37 @@ GRANT EXECUTE ON FUNCTION identity.claim_public_flag_mail(integer) TO debateai_r
 GRANT EXECUTE ON FUNCTION identity.read_public_flag_mail(uuid,uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.settle_stuck_public_flags() TO debateai_runtime;
+
+-- 8. The person's own data export (D1, D4) ------------------------------------------------------------------------------------------
+-- Everything this step keeps about the person, and 0156's notices: their statements of reasons in full (the facts and the quote stay sealed
+-- under each debate's key, for the worker to open), whether each was emailed, 0156's earlier notices, and for each report they made how it was
+-- closed and which mails went (matched to 0152's report rows by debate and time; 0152's reader is left as it is).
+CREATE OR REPLACE FUNCTION identity.read_data_export_moderation(p_export_id uuid, p_worker uuid) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_user uuid; v_owner_ref uuid;
+BEGIN
+  v_user := identity.data_export_lease_user(p_export_id, p_worker);
+  SELECT identity_user.owner_ref INTO v_owner_ref FROM identity."user" AS identity_user WHERE identity_user.user_id = v_user;
+  RETURN jsonb_build_object(
+    'statements', (SELECT COALESCE(jsonb_agg(own.value || jsonb_build_object('emailed_at', statement.delivered_at) ORDER BY own.at), '[]'::jsonb)
+      FROM jsonb_array_elements(identity.read_own_moderation_statements(v_owner_ref)) WITH ORDINALITY AS own(value, at)
+        JOIN identity.moderation_statement AS statement ON statement.statement_id = (own.value->>'statement_id')::uuid),
+    'earlier_notices', (SELECT COALESCE(jsonb_agg(jsonb_build_object('kind', notice.kind, 'publication_ref', event.publication_ref, 'happened_at', notice.happened_at,
+        'emailed_at', notice.delivered_at) ORDER BY notice.happened_at, notice.notice_id), '[]'::jsonb)
+      FROM identity.moderation_notice AS notice JOIN identity.public_review_event AS event ON event.event_id = notice.event_id WHERE notice.owner_ref = v_owner_ref),
+    'report_answers', (SELECT COALESCE(jsonb_agg(jsonb_build_object('publication_ref', flag.publication_ref, 'created_at', flag.created_at,
+        'closed_as', (SELECT answer.outcome FROM identity.public_flag_answer AS answer WHERE answer.flag_id = flag.flag_id),
+        'emails', (SELECT COALESCE(jsonb_agg(jsonb_build_object('kind', mail.kind, 'emailed_at', mail.delivered_at) ORDER BY mail.created_at, mail.mail_id), '[]'::jsonb)
+          FROM identity.public_flag_mail AS mail WHERE mail.flag_id = flag.flag_id)) ORDER BY flag.created_at, flag.flag_id), '[]'::jsonb)
+      FROM identity.public_flag AS flag WHERE flag.reporter_ref = v_owner_ref));
+END $$;
+-- n1: reviewed gives only the new tables and the new functions their owner (here, the export's one reader), the owner of 0150's identity functions; touches no earlier object
+DO $moderation_export_owner$
+DECLARE v_owner name;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  EXECUTE pg_catalog.format('ALTER FUNCTION identity.read_data_export_moderation(uuid,uuid) OWNER TO %I', v_owner);
+  EXECUTE 'REVOKE ALL ON FUNCTION identity.read_data_export_moderation(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker';
+END
+$moderation_export_owner$;
+GRANT EXECUTE ON FUNCTION identity.read_data_export_moderation(uuid,uuid) TO debateai_data_export_worker;

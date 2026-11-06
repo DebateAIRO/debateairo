@@ -70,12 +70,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.16 · EFFECTIVE 1 NOVEMBER 2026");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.17 · EFFECTIVE 1 NOVEMBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.16");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.17");
       expect(TERMS_OF_SERVICE.contact).toBe("support@dezbatere.ro");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -390,12 +390,14 @@ describe("legal documents — generated data", () => {
 
     // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen; R22 item 15
     // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen.
-    it("turns the collection table into fifteen rows joined with em dashes", () => {
+    it("turns the collection table into sixteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(15);
+      // 0157: the moderation notices row.
+      expect(table.items).toHaveLength(16);
+      expect(table.items.some((item) => item.startsWith("Moderation notices — "))).toBe(true);
       expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
       expect(table.items[8]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);

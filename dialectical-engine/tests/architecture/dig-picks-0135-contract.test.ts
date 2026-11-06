@@ -277,7 +277,7 @@ describe("0135: a dig's picks and its path rewrite's material", () => {
     const exporter = read("packages/db/src/data-export.ts");
     expect(exporter).toContain(`"${EXPORT_READER}",`);
     expect(exporter.indexOf(`"${EXPORT_READER}",`)).toBeGreaterThan(exporter.indexOf('"identity.read_data_export_dig_model(uuid,uuid)",'));
-    expect(exporter).toContain("worker.worker_count !== 22");
+    expect(exporter).toContain("worker.worker_count !== 23");
     expect(read("packages/db/src/dig-picks.ts")).toContain(`export const READ_DATA_EXPORT_DIG_PICKS = "${EXPORT_READER}" as const;`);
   });
 
