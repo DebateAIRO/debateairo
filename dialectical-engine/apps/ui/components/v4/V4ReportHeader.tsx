@@ -47,7 +47,7 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  // Opening puts focus on the chosen item (the level menu), else the first one.
+  // Opening puts focus on a pressed choice, else the first one (Share's choices are never pressed: its first).
   useEffect(() => {
     if (!open) return;
     const list = root.current?.querySelector<HTMLElement>(".v4RepMenuList");
@@ -63,7 +63,7 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
     event.preventDefault();
     close(true);
   }
-  // As V4Header's level menu (UI-11): focus moving outside closes it; a blur with no new target is left to the click handler.
+  // UI-11: focus moving outside closes it; a blur with no new target is left to the click handler.
   function onBlur(event: FocusEvent<HTMLDivElement>) {
     const next = event.relatedTarget;
     if (open && next instanceof Node && root.current !== null && !root.current.contains(next)) setOpen(false);

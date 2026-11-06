@@ -10,8 +10,9 @@ import { shortText } from "./V4MapTree";
 
 /*
  * Dig model revision W4-6 (draft 5.5, "Nesting"): on a dig's own map, where it sits: the main question, then each path
- * that was dug on the way down ("Main question › {path} › …"), and "Level {n} of 10". Each part opens that map at that
- * path. The dig level counts the digs above this debate (owner Q-D12), never how far one debate's argument tree grows.
+ * that was dug on the way down ("Your question › {path} › …", the record's name for the question's own place: map-d1,
+ * map-f7), and "Level {n} of 10". Each part opens that map at that path. The dig level counts the digs above this debate
+ * (owner Q-D12), never how far one debate's argument tree grows.
  * Until the debates above are read (or when one cannot be), the trail shows what it knows: the level, and "…" for the
  * part it could not read.
  */
