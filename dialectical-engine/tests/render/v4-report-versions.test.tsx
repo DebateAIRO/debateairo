@@ -891,6 +891,14 @@ describe("the first debate's answer on the report", () => {
     expect(node.textContent).not.toMatch(/points? here (?:was|were) not checked/u);
   });
 
+  it("a report opened with no level (none in the address, none in the account) reads as Plain words, the server's rule", async () => {
+    // The server reads a debate with no stored level as Plain words; the report's details follow that level until the run
+    // read names the debate's own one (the wiring list's item 19 b).
+    const { reportLevelOf } = await import("../../apps/ui/components/v4/V4ReportClient.js");
+    expect(reportLevelOf(null)).toBe("plain");
+    for (const level of ["plain", "background", "expert"] as const) expect(reportLevelOf(level), level).toBe(level);
+  });
+
   it("f19: 'How sure we are' shows at every reading level", async () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => noInvestigation(runId));

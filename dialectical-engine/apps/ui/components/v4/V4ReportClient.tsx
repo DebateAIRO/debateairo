@@ -111,8 +111,17 @@ const REPORT_SLOW_POLL_MS = 120_000;
 const PRESS_MATCH_MS = 5 * 60_000;
 /** A dig's path sits one step in per level, up to four steps (as in the PDF). */
 const PATH_LEVEL_STEPS = 4;
-/** Spec D5: the reading level defaults to "Some background" when none is chosen. */
-const DEFAULT_LEVEL: ReadingLevel = "background";
+/**
+ * A report opened with no level (none in the address, none in the account) reads as Plain words: the server's rule for a
+ * debate with no stored level (the owner's 5 Nov level ruling: the level is chosen when asking and starts on Plain words).
+ * Spec D5's "Some background" default is gone.
+ */
+const DEFAULT_LEVEL: ReadingLevel = "plain";
+
+/** The level the report's details are shown at: the one chosen (address or account), else Plain words. */
+export function reportLevelOf(chosen: ReadingLevel | null): ReadingLevel {
+  return chosen ?? DEFAULT_LEVEL;
+}
 
 /** report-f14: what marks AI text: the debate's language (when known) and its own writing direction. */
 type AiProps = Readonly<{ "data-ai-generated": "true"; dir: "auto"; lang?: string }>;
@@ -354,7 +363,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // carrying it (the map's links into this page carry it too), so the round trip never depends on the account's memory.
   // The change that reads reading_level drops ?level= from all of them at once.
   const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
-  const level: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
+  const level: ReadingLevel = reportLevelOf(chosenLevel);
 
   // report-f9: the debate this page reads. A dig's report address moves to the first question's (the investigation's root).
   const [target, setTarget] = useState(id);
