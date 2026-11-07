@@ -3404,6 +3404,13 @@
         "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
         "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0166_main_answer_times.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_main_answer_times(uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

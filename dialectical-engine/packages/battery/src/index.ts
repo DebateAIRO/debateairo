@@ -291,6 +291,8 @@ export const WORK_ITEM_RETRY = Object.freeze({ delaySeconds: 180 });
  * the debate reached (its own ceiling, a step's tries used up) and every spending wall (the person's quota, the site's day, the debate's money
  * ceiling, a team grant that is gone). The runner never gives one its automatic retry (apps/runner runFailureRetriesOnce), and Continue never
  * continues a debate that stopped on one (apps/api/src/run-continue.ts stopIsOurs): one list for both, so the two never disagree.
+ * Task 57h: the debate's own call budget used up (RUN_COST_ENVELOPE_EXHAUSTED, its attempt ceiling, beside its money ceiling) is a limit it
+ * reached too: a retry or a Continue would meet it again at its first new call.
  */
 export const RUN_STOPS_NOT_OURS: ReadonlySet<string> = new Set([
   "PRIVATE_CONTENT_ERASED",
@@ -299,7 +301,22 @@ export const RUN_STOPS_NOT_OURS: ReadonlySet<string> = new Set([
   "PERSON_ALLOWANCE_REACHED",
   "DAILY_COST_ENVELOPE_REACHED",
   "RUN_COST_ENVELOPE_MONEY_REACHED",
-  "INTERNAL_FUNDING_UNAVAILABLE"
+  "INTERNAL_FUNDING_UNAVAILABLE",
+  "RUN_COST_ENVELOPE_EXHAUSTED"
+]);
+
+/**
+ * V4 start step, Task 57h (the 57f/57g review; the owner's 7 Nov words "Only if we can't re-use, then we need to pay for this ourselves") —
+ * THE CLAIM-TIME REFUSALS A PATH DEBATE'S STORED SET MAKES FINAL: its set missing (PATHS_SET_MISSING), the menu it built refused by the
+ * contract (START_MENU_INVALID), more paths than its receipt priced (PATHS_OVER_RECEIPT). The runner records each, as it is, as the work
+ * item's terminal reason before any root (apps/runner paths-run.ts PATHS_RUN_CODES); every copy would meet the same. So Continue never
+ * offers such a debate (apps/api/src/run-continue.ts stopIsOurs), and 0165's core.run_pre_start_kept gives its path-list charge back and
+ * core.continue_failed_run refuses it, as for a debate never queued: the same codes there.
+ */
+export const RUN_PATH_SET_REFUSALS: ReadonlySet<string> = new Set([
+  "PATHS_SET_MISSING",
+  "START_MENU_INVALID",
+  "PATHS_OVER_RECEIPT"
 ]);
 
 /**

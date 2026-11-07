@@ -1,4 +1,4 @@
-import { RUN_STOPS_NOT_OURS } from "@debateai/battery";
+import { RUN_PATH_SET_REFUSALS, RUN_STOPS_NOT_OURS } from "@debateai/battery";
 import { costEnvelopeDay } from "@debateai/budget";
 import { exhaustive } from "@debateai/kernel";
 import type { ContinuedRunWake, RunHandoverPort } from "./month-pause.js";
@@ -19,8 +19,9 @@ import type { ContinuedRunWake, RunHandoverPort } from "./month-pause.js";
  * A debate is continuable (`failedRunContinuable`, which the FAILED read and the route share) when it is FAILED, its content is live, its stop
  * was ours (`stopIsOurs`: never the person's own act, a spending wall or a step's tries used up; a reason the runner recorded without a typed
  * code counts as ours), an upload did not set it aside (0123's waiver: it used none of the person's quota and its page says so), it was queued
- * as a debate (not a setup failure), never settled, not paused at the month wall, and not re-opened since it failed. A debate that failed before
- * Task 57e's automatic retry existed reads the same: nothing here asks for its retry row.
+ * as a debate (not a setup failure), its stored path set does not refuse it for good (Task 57h), never settled, not paused at the month wall,
+ * and not re-opened since it failed. A debate that failed before Task 57e's automatic retry existed reads the same: nothing here asks for its
+ * retry row.
  */
 
 /** What 0165's core.read_run_continue says of the person's debate (null: not theirs). Codes and flags only. */
@@ -47,12 +48,14 @@ const RUNNER_FAILURE_PREFIX = "RUNNER_EXECUTION_FAILED:";
  * (apps/runner runFailureRetriesOnce): every stop but the person's own act and the walls (RUN_STOPS_NOT_OURS). An upload's set-aside
  * (RUN_SET_ASIDE:…) and a debate never queued (RUN_SETUP_FAILED:…) are not continued; no reason, nothing to continue. A code outside the
  * runner's diagnostic alphabet is recorded as UNRECOGNIZED_DOMAIN_ERROR (INTERNAL_FUNDING_UNAVAILABLE among them) and reads as ours.
+ * Task 57h: nor is a path debate the runner refused at its claim because its stored set can never run (RUN_PATH_SET_REFUSALS, recorded as
+ * they are): ours, but every copy would meet it again, so it is not continued (and 0165 gives its path-list charge back).
  */
 export function stopIsOurs(terminalReason: string | null): boolean {
   if (terminalReason === null || terminalReason.trim() === "") return false;
   if (terminalReason.startsWith("RUN_SET_ASIDE:") || terminalReason.startsWith("RUN_SETUP_FAILED:")) return false;
   const code = terminalReason.startsWith(RUNNER_FAILURE_PREFIX) ? terminalReason.slice(RUNNER_FAILURE_PREFIX.length) : terminalReason;
-  return !RUN_STOPS_NOT_OURS.has(code);
+  return !RUN_STOPS_NOT_OURS.has(code) && !RUN_PATH_SET_REFUSALS.has(code);
 }
 
 /** THE ONE RULE: whether Continue would continue this failed debate (the read's `continuable`, the route's re-open). */

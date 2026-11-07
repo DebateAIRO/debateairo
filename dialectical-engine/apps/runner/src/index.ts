@@ -25,6 +25,7 @@ import {
   type StoredStartPathSet
 } from "@debateai/db";
 import {
+  RUN_PATH_SET_REFUSALS,
   RUN_STOPS_NOT_OURS,
   WorkItemRepository,
   assertClaimCoversCall,
@@ -14412,6 +14413,16 @@ export function runFailureRetriesOnce(error: unknown): boolean {
 }
 
 /**
+ * Review of Task 57h: a path debate's claim-time refusal that its stored set makes final (packages/battery RUN_PATH_SET_REFUSALS) is recorded
+ * FAILED by the run itself, with its plain code, before it throws (refusedForGood), and the task's catch below re-writes an already FAILED
+ * item's reason (WorkItemRepository.recordTerminalFailure, D2). So the catch writes that same code, one of the set's three literals, never the
+ * wrapped diagnostic: the codes are outside the alphabet (UNRECOGNIZED_DOMAIN_ERROR), and Continue and 0165 read the plain code. Null otherwise.
+ */
+function pathSetRefusalOf(error: unknown): string | null {
+  return error instanceof TypedDomainError && RUN_PATH_SET_REFUSALS.has(error.code) ? error.code : null;
+}
+
+/**
  * Task 57e: parks a debate that stopped on our side for its one retry; true when parked. A park that does not take (it had its retry, the
  * claim is not this copy's) or that fails leaves today's path: the caller records FAILED. Its line names ids and an outcome only.
  */
@@ -14550,7 +14561,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
             const recorded = await input.failures.recordTerminalFailure({
               runId: dispatch.runId,
               workItemId: dispatch.workItemId,
-              reason: runnerTerminalFailureReason(error)
+              reason: pathSetRefusalOf(error) ?? runnerTerminalFailureReason(error)
             });
             if (!recorded) {
               // OBS-R064: a handler that cannot record the failure must still

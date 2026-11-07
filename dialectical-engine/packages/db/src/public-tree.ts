@@ -61,6 +61,8 @@ export class PostgresPublicTreeRepository {
 
 export type PublicMaterialRead = Readonly<{ run_id: string; publication_ref: string; kind: "DIG" | "REPORT"; recorded_at: string; content: CryptoEnvelope }>;
 export type PublicDigUnsettled = Readonly<{ dig_run_id: string; finished: boolean }>;
+/** 0166: a finished main-answer version 0147 does not hold (0138's, or the page's copy of one an erasure took): ids and a time, never content. */
+export type MainAnswerTimeRead = Readonly<{ update_id: string; recorded_at: string; trigger_run_id: string }>;
 export type PublicReportUnwritten = Readonly<{
   report_id: string; publication_ref: string; report_version: number; carrier_run_id: string; writer_ref: string | null; free: boolean; requested_at: string;
 }>;
@@ -140,6 +142,14 @@ export class PostgresPublicTreeRunnerRepository {
   /** The main answer's versions once the root's key is gone, in 0138's shape; each opens under its own `trigger_run_id`. */
   async readGoneAnswers(rootRunId: string): Promise<readonly MainAnswerUpdateRead[]> {
     return (await this.pool.query<{ updates: MainAnswerUpdateRead[] }>("SELECT identity.read_public_answer_updates($1) AS updates", [rootRunId])).rows[0]!.updates;
+  }
+
+  /**
+   * V4 start step, Task 56g (0166): the root's finished main-answer versions 0147 does not hold, oldest first, whatever the root's state: 0138's,
+   * each at its own time, and the page's copies of those an erasure took, each at its copy's time (never earlier than the version's own).
+   */
+  async readMainAnswerTimes(rootRunId: string): Promise<readonly MainAnswerTimeRead[]> {
+    return (await this.pool.query<{ times: MainAnswerTimeRead[] }>("SELECT identity.read_main_answer_times($1) AS times", [rootRunId])).rows[0]!.times;
   }
 
   async recordGoneAnswer(record: MainAnswerUpdateRecord): Promise<Readonly<{ outcome: "RECORDED" | "ALREADY" | "NOT_PUBLIC" | "BASE_MOVED"; answerSeq: number | null }>> {

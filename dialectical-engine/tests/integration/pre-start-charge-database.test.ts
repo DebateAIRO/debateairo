@@ -4,7 +4,7 @@ import {
   PostgresModelSpendStore, linkPreStartTry, preStartChargeWriterPresent, preStartSpendRef, readRunQuotaUsed, recordAskClarifyCharge, recordPreStartCharge,
   type PreStartChargeKind
 } from "@debateai/budget";
-import { WORK_ITEM_RETRY, WorkItemRepository } from "@debateai/battery";
+import { RUN_PATH_SET_REFUSALS, WORK_ITEM_RETRY, WorkItemRepository } from "@debateai/battery";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { ASK_CLARIFY_SPEND_REF } from "../../apps/api/src/ask-clarify.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
@@ -210,14 +210,14 @@ describe("0165: a failed question gives back its charges before Start", () => {
   const tryRef = (): string => createHash("sha256").update(`try:${randomUUID()}`).digest("hex");
   /** The person's own debate, as the asks route starts one (its ownership event names them). */
   const ownRun = (): Promise<string> => createEncryptedStoryRun(database.pool, owner, "Should Harbour Town build a second ferry pier?");
-  /** A work item of the debate in `state`, written past every trigger as the database's own fixtures write one. */
-  async function workItem(runId: string, state: "READY" | "DONE" | "FAILED"): Promise<void> {
+  /** A work item of the debate in `state` (a FAILED one with `reason`), written past every trigger as the database's own fixtures write one. */
+  async function workItem(runId: string, state: "READY" | "DONE" | "FAILED", reason: string | null = state === "FAILED" ? "TEST_RUN_FAILED" : null): Promise<void> {
     const seed = await database.pool.connect();
     try {
       await seed.query("BEGIN");
       await seed.query("SET LOCAL session_replication_role = 'replica'");
       await seed.query(`INSERT INTO core.work_item (run_id,battery_row_id,node_set,command_key,state,terminal_reason,created_at_seq)
-        VALUES ($1,'Q1','[]'::jsonb,$2,$3,$4,ledger.allocate_sequence())`, [runId, `pre-start-try:${randomUUID()}`, state, state === "FAILED" ? "TEST_RUN_FAILED" : null]);
+        VALUES ($1,'Q1','[]'::jsonb,$2,$3,$4,ledger.allocate_sequence())`, [runId, `pre-start-try:${randomUUID()}`, state, reason]);
       await seed.query("COMMIT");
     } catch (error) { await seed.query("ROLLBACK"); throw error; } finally { seed.release(); }
   }
@@ -396,6 +396,39 @@ describe("0165: a failed question gives back its charges before Start", () => {
     await pathSet(run, "MENU");
     await workItem(run, "FAILED");
     expect([await grantSpent(), await teamSpent()]).toEqual([grantBefore + 4, teamBefore + 4]);
+  });
+
+  // Task 57h (the 57f/57g review; the owner's 7 Nov words "Only if we can't re-use, then we need to pay for this ourselves"): a path debate the
+  // runner refused at its claim because its stored set can never run (no set, a menu the contract refuses, more paths than its receipt priced)
+  // can never continue, so even the paths it kept from the list give their charge back, as a debate never queued does. A stop of ours keeps it.
+  it("Task 57h: a path set that can never run gives its list charge back, though its paths were kept from the list; a stop of ours keeps it", async () => {
+    const [from, to] = window();
+    const store = new PostgresModelSpendStore(runner);
+    const grantSpent = () => total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total",
+      [owner.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to]);
+    const teamSpent = () => total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const [before, grantBefore, teamBefore] = [await store.readOwnerSpentMicros(owner.ownerRef, from, to), await grantSpent(), await teamSpent()];
+    const refused: (readonly [string, string])[] = [];
+    for (const code of RUN_PATH_SET_REFUSALS) {
+      const [made, run] = [tryRef(), await ownRun()];
+      await charged(2, "LIST", made);
+      if (code === "PATHS_OVER_RECEIPT") await charged(5, "MERGE", made, GRANT);
+      expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBeGreaterThan(0);
+      await pathSet(run, "MENU");
+      refused.push([code, run]);
+    }
+    const [made, ours] = [tryRef(), await ownRun()];
+    await charged(3, "MERGE", made);
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: ours })).toBe(1);
+    await pathSet(ours, "MENU");
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 9);
+    expect([await grantSpent(), await teamSpent()]).toEqual([grantBefore + 5, teamBefore + 5]);
+    for (const [code, run] of refused) await workItem(run, "FAILED", code);
+    await workItem(ours, "FAILED", "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED");
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 3);
+    expect([await grantSpent(), await teamSpent()]).toEqual([grantBefore, teamBefore]);
+    for (const [code, run] of refused) expect(await quota(run), code).toBe("NONE");
+    expect(await quota(ours)).toBe("SOME");
   });
 
   // Task 57e: a debate that stops on our side is claimed again once, a few minutes later, and resumes from what it saved (0119): the copy

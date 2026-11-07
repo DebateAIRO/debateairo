@@ -20,14 +20,16 @@
 -- FAILED debate (the same work item, claimed again and resumed from what it saved), each re-open recorded. And a call an earlier copy of a
 -- debate paid for that a later copy must buy again (it never got an answer, or its answer no longer answers the request) is the site's: the
 -- person pays each call once, as an unbroken debate would.
+-- Task 57h (the 57f/57g review): a path debate the runner refused at its claim because its stored set can never run is never continued,
+-- so it keeps nothing its calls before Start bought, as a debate never queued: its path-list charge is given back.
 --
 --   §1 identity.pre_start_try: which try a charge was made for, and (from Start) the debate it was given to, at most once. Append-only but
 --      for that one link. An erased account takes its rows, as it takes the charges.
 --   §2 identity.record_pre_start_try_charge, 0158's writer and the try's row in one transaction, or neither.
 --   §3 identity.link_pre_start_try: at Start, the person's charges of that try not yet given to a debate, given to the person's new debate.
 --   §4 core.run_pre_start_kept (Task 57e): whether a debate keeps, for the person, the paths chosen from the list (0159's set, from the
---      menu; not on a debate an upload set aside, nor, Task 57f, one never queued as a debate), which the readers of §5 and §6 read: a failed
---      debate that keeps them keeps their charges.
+--      menu; not on a debate an upload set aside, nor, Task 57f, one never queued as a debate, nor, Task 57h, one its stored set refused for
+--      good), which the readers of §5 and §6 read: a failed debate that keeps them keeps their charges.
 --   §5 the readers: 0158's identity.read_pre_start_spent and its two funded readers leave out a charge whose debate failed and keeps
 --      nothing it bought.
 --   §6 identity.read_run_quota_used: whether a person's debate used any of their quota (its own counted spend, or a charge before Start
@@ -146,7 +148,9 @@ $$;
 -- charges (their act, not a failure of ours). 0159's table and 0123's waiver are read by their owner's definer, never granted to another role.
 -- Task 57f: the paths are re-used by continuing the same debate (§7a), so a debate that can never continue because it was never queued as a
 -- debate (a failure of ours at its setup, RUN_SETUP_FAILED) keeps nothing either: "Only if we can't re-use, then we need to pay for this
--- ourselves" (the owner, 7 Nov). Its charges are given back as before.
+-- ourselves" (the owner, 7 Nov). Its charges are given back as before. Task 57h: nor does a path debate the runner refused at its claim
+-- because its stored set can never run (its set missing, the menu it built refused by the contract, more paths than its receipt priced: the
+-- codes the runner records as they are, packages/battery RUN_PATH_SET_REFUSALS): every copy would meet the same, so it can never continue.
 CREATE OR REPLACE FUNCTION core.run_pre_start_kept(p_run_id uuid) RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -156,7 +160,8 @@ AS $$
   SELECT EXISTS (SELECT 1 FROM core.start_path_set AS path_set WHERE path_set.run_id = p_run_id AND path_set.source = 'MENU')
     AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = p_run_id)
     AND NOT EXISTS (SELECT 1 FROM core.work_item AS item WHERE item.run_id = p_run_id AND item.state = 'FAILED'
-      AND item.terminal_reason LIKE 'RUN_SETUP_FAILED:%')
+      AND (item.terminal_reason LIKE 'RUN_SETUP_FAILED:%'
+        OR item.terminal_reason IN ('PATHS_SET_MISSING', 'START_MENU_INVALID', 'PATHS_OVER_RECEIPT')))
 $$;
 
 -- 4a. A call bought again is the site's (Task 57f) ----------------------------------------------------------------------------------
@@ -341,9 +346,9 @@ $$;
 
 -- The person's Continue on their own FAILED debate. RECORDED: its newest work item is claimable again (a lapsed claim) and the re-open recorded. CONTINUING: it was
 -- re-opened already and is still open (a second press; nothing written). NOT_FAILED, NOT_OWNED, and NOT_CONTINUABLE: erased, set aside by an
--- upload (0123's waiver, or its RUN_SET_ASIDE reason), never queued as a debate (RUN_SETUP_FAILED), its tries used up (an attempt settled), or
--- paused at the month wall. A debate of an older release is moved to `p_to_release_key` in the same transaction, as 0143's hand-over does
--- (NOT_CURRENT while a switch is under way, VERSION_NOT_PASSED). Under 0134's lock, so two presses, and the month wall's Continue, take turns.
+-- upload (0123's waiver, or its RUN_SET_ASIDE reason), never queued as a debate (RUN_SETUP_FAILED), refused for good by its stored path set
+-- (Task 57h: §4's codes), its tries used up (an attempt settled), or paused at the month wall. A debate of an older release is moved to
+-- `p_to_release_key` in the same transaction, as 0143's hand-over does (NOT_CURRENT while a switch is under way, VERSION_NOT_PASSED). Under 0134's lock, so two presses, and the month wall's Continue, take turns.
 -- Refuses (22023) a missing value or a release key out of shape.
 CREATE OR REPLACE FUNCTION core.continue_failed_run(p_owner uuid, p_run_id uuid, p_to_release_key text, p_to_register_version bigint) RETURNS text
 LANGUAGE plpgsql
@@ -375,6 +380,7 @@ BEGIN
   END IF;
   IF v_item.state <> 'FAILED' THEN RETURN 'NOT_FAILED'; END IF;
   IF v_item.settled_attempt_id IS NOT NULL OR v_item.terminal_reason LIKE 'RUN_SET_ASIDE:%' OR v_item.terminal_reason LIKE 'RUN_SETUP_FAILED:%'
+    OR v_item.terminal_reason IN ('PATHS_SET_MISSING', 'START_MENU_INVALID', 'PATHS_OVER_RECEIPT')
     OR EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = p_run_id)
     OR (core.run_uses_content_encryption(p_run_id) AND NOT core.run_private_content_is_live(p_run_id))
     OR COALESCE((SELECT event.kind = 'PAUSED' FROM identity.run_pause_event AS event WHERE event.run_id = p_run_id

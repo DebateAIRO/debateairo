@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
-import { RUN_STOPS_NOT_OURS } from "@debateai/battery";
+import { RUN_PATH_SET_REFUSALS, RUN_STOPS_NOT_OURS } from "@debateai/battery";
 import {
   AskRequestSchema, RUN_CONTINUE_NO_ROOM, RUN_NOT_CONTINUABLE, RunNotContinuedSchema, RunProjectionSchema, createContractClient, type RunProjection
 } from "@debateai/contract";
@@ -22,6 +22,7 @@ import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
   continueFailedRun, continueRoomOf, failedRunContinuable, stopIsOurs, type FailedRunContinuePort, type RunContinueFacts, type RunReopenOutcome
 } from "../../apps/api/src/run-continue.js";
+import { PATHS_RUN_CODES } from "../../apps/runner/src/paths-run.js";
 import { callCreditsOf, createReplayBook, recordedCalls, replayingGateway, type RecordedAttempt } from "../../apps/runner/src/run-replay.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
@@ -87,6 +88,46 @@ describe("whether a failed debate is continuable (one pure rule the read and the
     expect(failedRunContinuable({ ...STOPPED, waived: true })).toBe(false);
     expect(failedRunContinuable({ ...STOPPED, paused: true })).toBe(false);
     for (const state of ["NONE", "OPEN", "DONE"] as const) expect(failedRunContinuable({ ...STOPPED, state, reopened: true })).toBe(false);
+  });
+});
+
+/**
+ * Task 57h (the 57f/57g review; the owner's 7 Nov words "Only if we can't re-use, then we need to pay for this ourselves") — TWO STOPS THAT
+ * CONTINUE CAN NEVER GET PAST. A debate's own call budget used up (RUN_COST_ENVELOPE_EXHAUSTED, its attempt ceiling, beside its money
+ * ceiling) is a limit the debate reached: never retried, never continued. A path debate's claim-time refusal that its stored set makes final
+ * (no set, a menu the contract refuses, more paths than its receipt priced) meets every copy again: never continued (0165 gives its list
+ * charge back, tests/integration/pre-start-charge-database.test.ts).
+ */
+describe("Task 57h: a debate's own call budget, and a path set that can never run, are never continued", () => {
+  const ENVELOPE = "RUN_COST_ENVELOPE_EXHAUSTED";
+
+  it("the attempt ceiling is a limit the debate reached: not ours, never retried, never continuable", () => {
+    expect(RUN_STOPS_NOT_OURS.has(ENVELOPE)).toBe(true);
+    const error = new TypedDomainError(ENVELOPE, ENVELOPE);
+    expect(runFailureRetriesOnce(error)).toBe(false);
+    expect(runnerTerminalFailureReason(error)).toBe(`RUNNER_EXECUTION_FAILED:${ENVELOPE}`);
+    expect(stopIsOurs(runnerTerminalFailureReason(error))).toBe(false);
+    expect(failedRunContinuable({ ...STOPPED, terminal_reason: runnerTerminalFailureReason(error) })).toBe(false);
+  });
+
+  it("the path-set refusals are the runner's terminal codes, recorded as they are; none is ever continuable", () => {
+    expect([...RUN_PATH_SET_REFUSALS].sort()).toEqual([PATHS_RUN_CODES.noSet, PATHS_RUN_CODES.menuInvalid, PATHS_RUN_CODES.overReceipt].sort());
+    for (const code of RUN_PATH_SET_REFUSALS) {
+      expect(stopIsOurs(code), code).toBe(false);
+      expect(failedRunContinuable({ ...STOPPED, terminal_reason: code }), code).toBe(false);
+    }
+  });
+
+  it("the press: NOT_CONTINUABLE for each, nothing re-opened or woken", async () => {
+    const input = { ownerRef: OWNER.authenticated.ownerRef, runId: RUN, now: new Date("2026-11-07T08:00:00.000Z") };
+    for (const reason of [`RUNNER_EXECUTION_FAILED:${ENVELOPE}`, ...RUN_PATH_SET_REFUSALS]) {
+      const { store } = storeOver({ ...STOPPED, terminal_reason: reason });
+      const wake = vi.fn(async () => undefined);
+      await expect(continueFailedRun(input, { store, room: { continueHasRoom: async () => true }, wake: { wake } }), reason)
+        .resolves.toEqual({ kind: "NOT_CONTINUABLE" });
+      expect(store.reopen, reason).not.toHaveBeenCalled();
+      expect(wake, reason).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -433,6 +474,14 @@ describe("GET /v1/runs/{id}: a failed debate says `continuable` exactly when the
     expect((await running.read()).json()).not.toHaveProperty("continuable");
     expect(running.asked).toEqual([]);
     await running.api.close();
+  });
+
+  it("Task 57h: absent for a debate's own call budget used up and for each path set that can never run", async () => {
+    for (const reason of ["RUNNER_EXECUTION_FAILED:RUN_COST_ENVELOPE_EXHAUSTED", ...RUN_PATH_SET_REFUSALS]) {
+      const h = readOver({ ...FAILED, terminal_reason: reason }, { ...STOPPED, terminal_reason: reason });
+      expect((await h.read()).json(), reason).toEqual({ ...FAILED, terminal_reason: reason, quota_used: "SOME" });
+      await h.api.close();
+    }
   });
 });
 

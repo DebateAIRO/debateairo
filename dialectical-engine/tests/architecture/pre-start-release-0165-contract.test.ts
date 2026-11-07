@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { RUN_PATH_SET_REFUSALS } from "@debateai/battery";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationReplaySafety, definedFunctionNames, definedRelationNames } from "../../tools/orphan-audit/src/index.js";
@@ -44,6 +45,14 @@ const RECORD_CALL_WAIVER = "ledger.record_call_waiver(uuid,uuid[])";
 const CALL_WAIVED = "ledger.call_waived_attempts(uuid)";
 /** What leaves a call the site paid for out of the person's spend, in every reader that counts it. */
 const NOT_CALL_WAIVED = "NOT EXISTS (SELECT 1 FROM ledger.model_spend_call_waiver cw WHERE cw.attempt_id = s.attempt_id)";
+/**
+ * Task 57h: the codes of a path debate's claim-time refusal that its stored set makes final, as a definer lists them after `column IN (`:
+ * the same set as the API's rule (packages/battery RUN_PATH_SET_REFUSALS), so the database and the read never disagree.
+ */
+const pathSetRefusalsIn = (body: string, column: string): readonly string[] | null => {
+  const listed = body.match(new RegExp(`${column.replace(/\./gu, "\\.")} IN \\(([^)]*)\\)`, "u"))?.[1];
+  return listed === undefined ? null : listed.split(",").map((value) => value.trim().replace(/^'|'$/gu, "")).sort();
+};
 const nameOf = (signature: string): string => signature.slice(0, signature.indexOf("(")).toLowerCase();
 const bodyOf = (sql: string, head: string): string => {
   const at = sql.indexOf(head);
@@ -55,7 +64,8 @@ describe("0165: a failed question gives back its path-list charge", () => {
   it("C-T is a step of the chain, after 0164, with its own loader and its amendments", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0165 } from './migration-forward0165.js';");
-    expect(chain).toContain("loadForward0164,loadForward0165]");
+    // Task 56g (0166): no longer the chain's head; found by its name below.
+    expect(chain).toContain("loadForward0164,loadForward0165,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
@@ -182,6 +192,8 @@ describe("0165: a failed question gives back its path-list charge", () => {
     // Task 57f: the paths are re-used by continuing the debate; one never queued as a debate (RUN_SETUP_FAILED) can never continue: given back.
     expect(kept).toContain("item.state = 'FAILED'");
     expect(kept).toContain("item.terminal_reason LIKE 'RUN_SETUP_FAILED:%'");
+    // Task 57h: nor can a path debate whose stored set makes its claim-time refusal final (every copy meets it again): given back too.
+    expect(pathSetRefusalsIn(kept, "item.terminal_reason")).toEqual([...RUN_PATH_SET_REFUSALS].sort());
     expect(sql).toContain(`REVOKE ALL ON FUNCTION ${KEPT} FROM PUBLIC,`);
     expect([...sql.matchAll(/^GRANT EXECUTE ON FUNCTION core\.run_pre_start_kept\(uuid\) TO ([a-z_]+);$/gmu)].map((match) => match[1]))
       .toEqual(["debateai_staff_security_owner"]);
@@ -238,6 +250,8 @@ describe("0165: a failed question gives back its path-list charge", () => {
     // Never a debate set aside by an upload (0123's waiver: it used none of the person's quota), one never queued, a settled one, an erased one.
     for (const needle of ["ledger.model_spend_waiver", "'RUN_SET_ASIDE:%'", "'RUN_SETUP_FAILED:%'", "settled_attempt_id IS NOT NULL",
       "core.run_private_content_is_live(p_run_id)", "identity.run_handover", "register.settings_version_passed"]) expect(reopen, needle).toContain(needle);
+    // Task 57h: nor a path debate whose stored set makes its claim-time refusal final, as the API's rule (its list charge was given back).
+    expect(pathSetRefusalsIn(reopen, "v_item.terminal_reason")).toEqual([...RUN_PATH_SET_REFUSALS].sort());
     const facts = bodyOf(sql, "CREATE OR REPLACE FUNCTION core.read_run_continue(");
     expect(facts).toContain("core.run_ownership_event");
     expect(facts).toContain(REOPEN_TABLE);

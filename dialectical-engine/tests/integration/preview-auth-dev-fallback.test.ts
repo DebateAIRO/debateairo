@@ -203,7 +203,7 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0149_public_report_team_month.sql',
     '0150_public_review.sql',
     '0151_public_flag.sql',
-    '0152_report_export_and_check_usage.sql', '0153_dig_tree_settled.sql', '0154_region_iceland_liechtenstein.sql', '0155_owner_answer_writes.sql', '0156_moderation_notice.sql', '0157_moderation_statements.sql', '0158_pre_start_charge.sql', '0159_start_paths.sql', '0160_path_results.sql', '0161_path_progress.sql', '0162_saved_questions.sql', '0163_carry_on_session_free_digs.sql', '0164_main_answer_path_added.sql', '0165_pre_start_release.sql'
+    '0152_report_export_and_check_usage.sql', '0153_dig_tree_settled.sql', '0154_region_iceland_liechtenstein.sql', '0155_owner_answer_writes.sql', '0156_moderation_notice.sql', '0157_moderation_statements.sql', '0158_pre_start_charge.sql', '0159_start_paths.sql', '0160_path_results.sql', '0161_path_progress.sql', '0162_saved_questions.sql', '0163_carry_on_session_free_digs.sql', '0164_main_answer_path_added.sql', '0165_pre_start_release.sql', '0166_main_answer_times.sql'
    ]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;

@@ -13,7 +13,7 @@
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every figure and question is made up.
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { WorkItemRepository } from "@debateai/battery";
+import { RUN_PATH_SET_REFUSALS, WorkItemRepository } from "@debateai/battery";
 import {
   CostEnvelopeGuard, PostgresModelSpendStore, linkPreStartTry, preStartSpendRef, readRunQuotaUsed, recordPreStartCharge, type PreStartChargeKind
 } from "@debateai/budget";
@@ -162,6 +162,8 @@ describe("0165 (Task 57f): Continue re-opens the person's own failed debate", ()
     await refused((_run, item) => database.pool.query("UPDATE core.work_item SET settled_attempt_id=gen_random_uuid(), settled_artifact_ref=gen_random_uuid() WHERE work_item_id=$1", [item]),
       "CALL_BUDGET_EXHAUSTED");
     await refused((run) => database.pool.query("SELECT identity.record_run_pause($1,'MONTH_WALL',clock_timestamp() + interval '1 hour',1,1,1)", [run]));
+    // Task 57h: a path debate the runner refused at its claim because its stored set can never run (every copy would meet it again).
+    for (const code of RUN_PATH_SET_REFUSALS) await refused(async () => undefined, code);
     // A stop the person caused, or a spending wall: the database re-opens what the API asks, so the API's rule refuses it first.
     const walled = await ownRun();
     await workItem(walled, "FAILED", "RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED");

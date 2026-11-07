@@ -1530,6 +1530,13 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
     "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
   ]
+},
+// V4 start step, Task 56g (0166): a public debate's finished main-answer versions 0147 does not hold, ids and times only, whatever the
+// debate's state, for the runner's climb (the shared runtime role).
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0166_main_answer_times.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_main_answer_times(uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

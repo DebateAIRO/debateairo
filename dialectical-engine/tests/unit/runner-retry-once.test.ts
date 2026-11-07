@@ -7,6 +7,7 @@
 // deleted while it ran), the month wall and a spending wall are never retried. Without the port (fixtures, an older wiring) today's
 // behaviour stands. Every id here is made up.
 import { describe, expect, it, vi } from "vitest";
+import { RUN_PATH_SET_REFUSALS } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import { ProviderCallFailedError } from "@debateai/providers";
 import { declareHatchetWalkingSkeletonTask, runFailureRetriesOnce, type RunnerExecutionResult } from "@debateai/runner";
@@ -73,8 +74,9 @@ describe("one automatic retry from where it stopped (Task 57e)", () => {
   });
 
   it("a refusal the person caused, the month wall and a spending wall are never retried", async () => {
+    // Task 57h: nor the debate's own call budget used up (RUN_COST_ENVELOPE_EXHAUSTED, its attempt ceiling): a retry would meet it again.
     for (const code of ["PRIVATE_CONTENT_ERASED", "RUN_CEILING_BELOW_FIRST_CALL", "PERSON_ALLOWANCE_REACHED", "DAILY_COST_ENVELOPE_REACHED",
-      "RUN_COST_ENVELOPE_MONEY_REACHED", "INTERNAL_FUNDING_UNAVAILABLE", "CALL_BUDGET_EXHAUSTED"]) {
+      "RUN_COST_ENVELOPE_MONEY_REACHED", "INTERNAL_FUNDING_UNAVAILABLE", "CALL_BUDGET_EXHAUSTED", "RUN_COST_ENVELOPE_EXHAUSTED"]) {
       const task = taskOver([{ throws: new TypedDomainError(code, code) }]);
       const outcome = await task.outcome();
       expect("error" in outcome && outcome.error.code, code).toBe(code);
@@ -89,6 +91,20 @@ describe("one automatic retry from where it stopped (Task 57e)", () => {
       expect(task.parkForRetry, code).not.toHaveBeenCalled();
       expect(task.recordTerminalFailure, code).not.toHaveBeenCalled();
       expect(runFailureRetriesOnce(new TypedDomainError(code, code)), code).toBe(false);
+    }
+  });
+
+  // Review of Task 57h: a path debate's claim-time refusal that its stored set makes final is recorded FAILED by the run itself, with its plain
+  // code, before it throws (refusedForGood). The park then finds the item FAILED (NOT_HELD), and the task's catch re-writes an already FAILED
+  // item's reason (WorkItemRepository.recordTerminalFailure, D2). It writes the same plain code, never the wrapped diagnostic (the three codes
+  // are outside the alphabet: UNRECOGNIZED_DOMAIN_ERROR), or Continue would offer the debate and 0165 would keep its path-list charge.
+  it("a path set refused for good keeps its plain code through the task's catch", async () => {
+    for (const code of RUN_PATH_SET_REFUSALS) {
+      const task = taskOver([{ throws: new TypedDomainError(code, code) }], { park: async () => "NOT_HELD" });
+      const outcome = await task.outcome();
+      expect("error" in outcome && outcome.error.code, code).toBe(code);
+      expect(task.recordTerminalFailure, code).toHaveBeenCalledTimes(1);
+      expect(task.recordTerminalFailure, code).toHaveBeenCalledWith({ ...DISPATCH, reason: code });
     }
   });
 

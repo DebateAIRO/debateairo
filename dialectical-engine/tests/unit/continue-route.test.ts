@@ -253,6 +253,20 @@ describe("POST /v1/runs/{id}/continue on a FAILED debate (Task 57f)", () => {
     }
   });
 
+  // Task 57h: a debate's own call budget used up (its attempt ceiling, a limit it reached), and a path debate's claim-time refusal that its
+  // stored set makes final (no set, a menu the contract refuses, more paths than its receipt priced): every copy would meet the same.
+  it("Task 57h: a debate's own call budget used up and each path set that can never run: 409 RUN_NOT_CONTINUABLE, nothing re-opened", async () => {
+    for (const reason of ["RUNNER_EXECUTION_FAILED:RUN_COST_ENVELOPE_EXHAUSTED", "PATHS_SET_MISSING", "START_MENU_INVALID", "PATHS_OVER_RECEIPT"]) {
+      const { api, reopen, wake } = failedApi({ ...STOPPED, terminal_reason: reason });
+      const response = await pressFailed(api, OWNER);
+      expect(response.statusCode, reason).toBe(409);
+      expect(response.json(), reason).toEqual({ error: "RUN_NOT_CONTINUABLE", message: "RUN_NOT_CONTINUABLE" });
+      expect(reopen, reason).not.toHaveBeenCalled();
+      expect(wake, reason).not.toHaveBeenCalled();
+      await api.close();
+    }
+  });
+
   it("no room left for the rest: 409 RUN_CONTINUE_NO_ROOM, nothing re-opened", async () => {
     const { api, reopen } = failedApi(STOPPED, { room: false });
     const response = await pressFailed(api, OWNER);

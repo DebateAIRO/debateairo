@@ -725,6 +725,85 @@ describe("a public debate whose owner leaves stays open to everyone's digs and r
     expect(revising).not.toContain(before);
     expect((await page(debate.ref)).main_answer_update!.segments[0]!.text).not.toBe(during);
   });
+
+  // Task 56g (the 56f review's mirror case): the owner suspended AGAIN after being back, or erased after a suspension. The climb writes 0147 again; its writer
+  // revises the version the page shows (written under the root's key while she was back), not 0147's newest, from her first suspension.
+  it("its owner suspended again: the next main-answer version builds on the one written while she was back, not on the one from her first suspension", async () => {
+    const [ana, dan, eve, fay] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const state = (to: "active" | "suspended") => seeded([[`UPDATE identity."user" SET state=$2 WHERE user_id=$1`, [ana.userId, to]]]);
+    const shown = async (): Promise<string> => (await page(debate.ref)).main_answer_update!.segments[0]!.text;
+    // First suspension: Dan's version, under his dig's key (0147).
+    await state("suspended");
+    const first = vendors();
+    await dig(dan, debate, first);
+    await settleAll(first);
+    const suspended = await shown();
+    // Back: Eve's version, under the root's key (0138).
+    await state("active");
+    const back = vendors();
+    const evesDig = await dig(eve, debate, back);
+    await settleAll(back);
+    const meanwhile = await shown();
+    expect(meanwhile).not.toBe(suspended);
+    // Suspended again: Fay's version is 0147's again; its writer revises the version the page shows (Eve's), not 0147's newest (Dan's).
+    await state("suspended");
+    // 0166's reader, whatever the root's state: 0138's one version (Eve's), ids and a time, no content. The runner's role reads it; the erasure,
+    // export and replay logins may not call it; its only grant is the runner's role (the API's roles hold it through debateai_runtime, 0093).
+    const times = await new PostgresPublicTreeRunnerRepository(runner).readMainAnswerTimes(debate.root);
+    expect(times.map((time) => Object.keys(time).sort())).toEqual([["recorded_at", "trigger_run_id", "update_id"]]);
+    expect(times.map((time) => time.trigger_run_id)).toEqual([evesDig]);
+    for (const key of ["ERASURE_DATABASE_URL", "DATA_EXPORT_DATABASE_URL", "REPLAY_SELF_TEST_DATABASE_URL"] as const) {
+      const other = createPool(logins!.url(key));
+      try {
+        await expect(new PostgresPublicTreeRunnerRepository(other).readMainAnswerTimes(debate.root), key).rejects.toMatchObject({ code: "42501" });
+      } finally {
+        await other.end();
+      }
+    }
+    expect((await database.pool.query<{ grantee: string }>(`SELECT CASE a.grantee WHEN 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee
+      FROM pg_proc AS p, aclexplode(p.proacl) AS a WHERE p.oid = 'identity.read_main_answer_times(uuid)'::regprocedure AND a.grantee <> p.proowner`)).rows)
+      .toEqual([{ grantee: "debateai_runtime" }]);
+    const again = vendors();
+    await dig(fay, debate, again);
+    await settleAll(again);
+    const revising = everyPromptText(again.sent.filter((packet) => contractOf(packet).startsWith("report.answer.later")));
+    expect(revising).toContain(meanwhile);
+    expect(revising).not.toContain(suspended);
+  });
+
+  it("its owner erased after a suspension: the next main-answer version builds on the one written while she was back, though her debate's own rows went with her", async () => {
+    const [ana, dan, eve, fay] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const state = (to: "active" | "suspended") => seeded([[`UPDATE identity."user" SET state=$2 WHERE user_id=$1`, [ana.userId, to]]]);
+    const shown = async (): Promise<string> => (await page(debate.ref)).main_answer_update!.segments[0]!.text;
+    await state("suspended");
+    const first = vendors();
+    await dig(dan, debate, first);
+    await settleAll(first);
+    const suspended = await shown();
+    await state("active");
+    const back = vendors();
+    const evesDig = await dig(eve, debate, back);
+    await settleAll(back);
+    const meanwhile = await shown();
+    expect(meanwhile).not.toBe(suspended);
+    // Erased: her key, her account and her debate's private rows go, 0138's versions among them; the page keeps its copy of Eve's version.
+    await authorLeaves(ana, debate.root);
+    expect(Number((await database.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM identity.main_answer_update WHERE run_id=$1", [debate.root])).rows[0]!.n)).toBe(0);
+    expect(await shown()).toBe(meanwhile);
+    // 0166's reader still knows of it: the page's copy of Eve's version, at the copy's time, after Dan's version (0147's, which it leaves out).
+    const [dans] = await new PostgresPublicTreeRunnerRepository(runner).readGoneAnswers(debate.root);
+    const times = await new PostgresPublicTreeRunnerRepository(runner).readMainAnswerTimes(debate.root);
+    expect(times.map((time) => time.trigger_run_id)).toEqual([evesDig]);
+    expect(Date.parse(times[0]!.recorded_at)).toBeGreaterThan(Date.parse(dans!.recorded_at));
+    const again = vendors();
+    await dig(fay, debate, again);
+    await settleAll(again);
+    const revising = everyPromptText(again.sent.filter((packet) => contractOf(packet).startsWith("report.answer.later")));
+    expect(revising).toContain(meanwhile);
+    expect(revising).not.toContain(suspended);
+  });
 });
 
 describe("a report on a public debate", () => {
