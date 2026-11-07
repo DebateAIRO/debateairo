@@ -21,11 +21,19 @@
  * Owner's screen review (3 Nov 2026, journey-d2): it reads the draft start time of a running question (`started_at`).
  * dig-d1 B and dig-f2: a running dig's draft progress read through the website's own reader (switch live=), and the played
  * climb of the seeded level-3 dig up to the first debate (switch climb=; it waits 31 s for it).
+ * V4 start step, Task 80b: the questions not started yet (saved-questions.ts) on the #pickup scene (switch saved=): the list,
+ * Pick up with no AI call, a first and a later save (and an old revision refused), and Delete. It leaves the scene seeded.
+ * V4 start step, Task 81 (branches.ts): a new question is a path debate. It sends three paths at Start (a menu the mock's own merge writes,
+ * in this process) and reads them filling in one by one, drawn by the website's own run map builder; asks with no paths and `#carryon`
+ * (the AIs choose for 8 s, the carry-on on its answer from the first read); and presses a report that waits for the reset (#reportwaits).
+ * It waits 30 s for them.
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { FAILED_DIGS } from "./failed-seed.js";
+import { MOCK_PICKUP_IDS } from "./saved-questions.js";
+import { mockStartListsScript, mockStartMenu } from "./start-step.js";
 
 const ROUTE = join("app", "api", "[...path]", "route.ts");
 function findUiDir(): string {
@@ -314,6 +322,107 @@ await step("dig links (0131)", async () => {
   return `${parent.children.length} dig(s) from the first debate`;
 }, (value: string) => value);
 
+// ---- V4 start step, Task 80b (saved-questions.ts): the questions not started yet, on the #pickup scene ----
+await mock("/__mock/set?saved=pickup");
+await step("saved questions: the list (saved=pickup)", async () => {
+  const list: Loose = await client.listSavedQuestions();
+  const ids = list.questions.map((one: Loose) => one.id);
+  must(ids[0] === MOCK_PICKUP_IDS.ready && ids.includes(MOCK_PICKUP_IDS.needsReading), "the two seeded questions, the newer first");
+  return list.questions.map((one: Loose) => `"${one.question}" (${String(one.saved_at).slice(0, 10)})`).join(", ");
+}, (value: string) => value);
+const pickedUp: Loose = await step("saved questions: Pick up asks no AI", async () => {
+  const before: Loose = (await mock("/__mock/state")).start_step;
+  const ready: Loose = await client.readSavedQuestion(MOCK_PICKUP_IDS.ready);
+  const other: Loose = await client.readSavedQuestion(MOCK_PICKUP_IDS.needsReading);
+  const after: Loose = (await mock("/__mock/state")).start_step;
+  must(ready.state === "READY" && ready.doc.page.plan.paths.length === 5, "the Plus one is READY with its five paths");
+  must(other.state === "NEEDS_READING", "the one read for Free must be read again on Plus");
+  must(JSON.stringify(after) === JSON.stringify(before), "no lists, merge, combine or fit was asked");
+  return ready;
+}, (ready: Loose) => `${ready.state}, ${ready.doc.page.plan.paths.map((path: Loose) => path.wording).join(" ")}`);
+if (pickedUp !== undefined) {
+  const written: Loose = await step("saved questions: a first save", () => client.createSavedQuestion(pickedUp.doc),
+    (value: Loose) => `${value.id} revision ${value.revision}`);
+  if (written !== undefined) {
+    await step("saved questions: a later save, and one over an old revision refused", async () => {
+      const later: Loose = await client.saveSavedQuestion(written.id, written.revision, pickedUp.doc);
+      let refused: Loose = null;
+      try {
+        await client.saveSavedQuestion(written.id, written.revision, pickedUp.doc);
+      } catch (failure) {
+        refused = failure;
+      }
+      must(later.revision === written.revision + 1, "the later save's revision");
+      must(refused?.status === 409 && refused?.serverCode === "SAVED_QUESTION_REVISION", "an old revision is refused 409");
+      return `revision ${later.revision}; the old one ${refused.serverCode}`;
+    }, (value: string) => value);
+    await step("saved questions: Delete", async () => {
+      await client.deleteSavedQuestion(written.id);
+      const list: Loose = await client.listSavedQuestions();
+      must(!list.questions.some((one: Loose) => one.id === written.id), "gone from the list");
+      return "gone from the list";
+    }, (value: string) => value);
+  }
+}
+
+// ---- V4 start step, Task 81 (branches.ts): a new question is a path debate; its paths fill in one by one ----
+const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
+await step("the AIs choose the paths, with the carry-on (#carryon)", async () => {
+  const sent: Loose = await client.submitAsk({ ...ask, question_line: "Should our town plant a tree on every street? #carryon" });
+  const choosing: Loose = await client.readRun(sent.run_ref);
+  must(choosing.branches === undefined && Array.isArray(choosing.path_progress) && choosing.path_progress.length === 0, "no paths while the AIs choose");
+  must(choosing.carry_on_part === "ANSWER", "the carry-on line is on its answer from the first read (Task 57b)");
+  await sleep(9_000);
+  const named: Loose = await client.readRun(sent.run_ref);
+  must(named.branches?.source === "RUN_BUILT" && named.branches.paths.length === 5 && named.path_progress.length === 5, "five paths named after 8 s");
+  must(named.branches.paths.every((path: Loose) => path.state === "LOOKING" && path.author === "AI_SUGGESTION"), "each the AIs', still looked into");
+  must(named.carry_on_part === "ANSWER" && named.branches.carry_on_to_report === true, "the carry-on still on its answer");
+  return named.branches.paths.map((path: Loose, at: number) => `${String(path.title)} ${String(named.path_progress[at].step)}`).join(", ");
+}, (value: string) => value);
+await step("one path per path sent at Start, filling in one by one", async () => {
+  // Sent as the page sends them after Start, from a menu the mock's own merge writes (start-step.ts, in this process: the mock's references
+  // are its own and not secret): a menu path as written, one viewpoint as written, the person's own words.
+  const question = "Should towns close their centres to cars at weekends?";
+  const script = mockStartListsScript(question, "PLUS");
+  const checkRef: string = (script.find((one) => one.event.event === "check")!.event as Loose).data.check_ref;
+  const menu = mockStartMenu(script.flatMap((one) => (one.event.event === "list" ? [one.event.data.list] : [])), null).menu;
+  const first = menu.menu.paths[0]!;
+  const single = menu.menu.viewpoints.find((one) => !first.viewpoint_ids.includes(one.viewpoint_id))!;
+  const own = "Shops on the square would lose their weekend customers.";
+  const startPaths = { source: "MENU", menu, width: 3, chosen_by: "PERSON", paths: [
+    { title: first.title, question: first.question, members: first.viewpoint_ids.map((id) => ({ viewpoint_id: id })) },
+    { title: single.title, question: single.question, members: [{ viewpoint_id: single.viewpoint_id }] },
+    { title: "Shops on the square", question: own, members: [{ own_text: own }] }
+  ] };
+  const sent: Loose = await client.submitAsk({ ...ask, question_line: question, start_check: { ref: checkRef }, start_paths: startPaths });
+  const atStart: Loose = await client.readRun(sent.run_ref);
+  must(atStart.branches.paths.map((path: Loose) => path.author).join() === "AI_SUGGESTION,AI_SUGGESTION,PERSON_OWN_VIEW", "each path with who wrote it");
+  must(atStart.branches.paths.every((path: Loose) => path.state === "LOOKING"), "all three looked into");
+  must(atStart.path_progress.every((entry: Loose) => entry.step === "FINDING_SOURCES"), "each finding sources");
+  await sleep(21_000);
+  const later: Loose = await client.readRun(sent.run_ref);
+  must(later.branches.paths.map((path: Loose) => path.state).join() === "ARGUED,LOOKING,LOOKING", "b1 argued, b2 and b3 still looked into");
+  must(later.path_progress[0].findings.length > 0 && later.path_progress.every((entry: Loose) => entry.points.length <= 6), "b1's findings; never more than 6 dots");
+  const map: Loose = mapModel.buildV4RunMap({ runId: sent.run_ref, run: later });
+  must(map !== null && map.paths.length === 3 && map.paths[0].points.length > 0, "the website's run map draws b1's findings");
+  return later.branches.paths.map((path: Loose, at: number) => `${String(path.path_id)} ${String(path.state)}${later.path_progress[at].step === null ? "" : ` ${String(later.path_progress[at].step)}`}`).join(", ");
+}, (value: string) => value);
+await step("a report that waits for the reset (#reportwaits)", async () => {
+  const sent: Loose = await client.submitAsk({ ...ask, question_line: "Should our library open on Sundays? #reportwaits" });
+  const read: Loose = await client.readInvestigation(sent.run_ref);
+  must(read.first_closing_left === false, "its next report is not its first");
+  let refused: Loose = null;
+  try {
+    await client.writeReport(sent.run_ref);
+  } catch (failure) {
+    refused = failure;
+  }
+  must(refused?.status === 409 && refused?.serverCode === "PUBLIC_DEBATE_WAITS_FOR_RESET", "the press waits for the reset; nothing starts");
+  must((await client.readInvestigation(RUNS.storyWriting)).first_closing_left === true, "no version yet elsewhere: the first report is left");
+  must((await client.readInvestigation(RUNS.settled)).first_closing_left === false, "a version stands on the first debate");
+  return `refused ${String(refused.serverCode)}`;
+}, (value: string) => value);
+
 await step("investigation of the first debate, reserve kept (draft)", async () => {
   const investigation: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.settled}/investigation`);
   const room: Loose = await mock("/__mock/draft/v1/asks/room?plan_tier=premium&composition_budget_tier=medium&depth=2&answer_length=standard");
@@ -505,7 +614,11 @@ await step("a failed dig per reason group, and a failed question that used some 
   must(new Set(links.children.map((link: Loose) => [...link.places].sort().join(" "))).size === links.children.length, "each failed dig digs its own place");
   const some: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failedSome}`);
   must(some.state === "FAILED" && some.quota_used === "SOME", "the second failed question's draft view says it used some");
-  return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}`;
+  // V4 start step, Task 57e: the contract's run read says it kept what ran for the next try; the first failed question kept nothing.
+  const someRead: Loose = await client.readRun(RUNS.failedSome);
+  must(someRead.reusable === true, "the second failed question's run read says what ran is kept for the next try");
+  must((await client.readRun(RUNS.failed) as Loose).reusable === undefined, "the first failed question kept nothing for the next try");
+  return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}, reusable ${String(someRead.reusable)}`;
 }, (value: string) => value);
 
 // Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any

@@ -1,5 +1,5 @@
 import { randomBytes as cryptoRandomBytes } from "node:crypto";
-import type { PathOutcome } from "@debateai/contract";
+import type { PathOutcome, PurposeLines } from "@debateai/contract";
 import { TypedDomainError, replyLanguageCheckFor, type PathId } from "@debateai/kernel";
 import type { ProviderGateway, TokenCounter } from "@debateai/providers";
 import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
@@ -37,6 +37,11 @@ import { fitDossierToTokenLine } from "./token-line.js";
  *
  * Never throws for a provider or a refused call (`writeOverallAnswer`'s rule); material that fits no ladder place ends FAILED with no
  * call. Logs codes, ids and counts only.
+ *
+ * Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"): when the person said what they care about (`goalStated`, read from the
+ * run's purpose lines by `pathsGoalStated`), the writer and the checker are the next versions, report.answer.v5 and
+ * report.answer-check.v4 (Task 50b's drafts, sealed only through Task 92): the same words with one sentence each, that the answer says
+ * how that goal fares across the paths. The material, the calls and the money are the same.
  */
 
 /** One path as the main answer reads it: its menu text, its root, its answer so far, the person's own words, its points and pages. */
@@ -63,6 +68,8 @@ export type PathsMainAnswerInput = Readonly<{
   question: PathRewriteQuestion;
   paths: readonly PathsDossierPath[];
   seats: PathOutcomesJob["seats"];
+  /** Task 50b: the person said what they care about (`pathsGoalStated` over the run's purpose lines); absent: no goal stated. */
+  goalStated?: boolean;
   gateway: ProviderGateway;
   tokenCount: TokenCounter | undefined;
   log: (event: string, detail: Record<string, unknown>) => void;
@@ -71,6 +78,14 @@ export type PathsMainAnswerInput = Readonly<{
 export const PATHS_MAIN_ANSWER_DOSSIER_TOO_LARGE = "PATHS_MAIN_ANSWER_DOSSIER_TOO_LARGE" as const;
 /** The subject every call of a path run's main answer names (its attempts' key, beside the run and the call site). */
 const PATHS_MAIN_ANSWER_SUBJECT = "paths-main-answer";
+
+/**
+ * Task 50b: whether the person said what they care about: an answer in the run's purpose lines that the page marked as the answer to
+ * "What do you care about most?" (`cares: true`, offered or typed). Never read from the words of the question, the answers or any line.
+ */
+export function pathsGoalStated(lines: PurposeLines | null): boolean {
+  return (lines?.answers ?? []).some((answer) => answer.cares === true);
+}
 
 /* ----------------------------------------------------------------- the material */
 
@@ -181,7 +196,7 @@ export async function runPathsMainAnswer(input: PathsMainAnswerInput): Promise<R
   const written = await writeOverallAnswer({
     runId: input.runId, subjectItemId: PATHS_MAIN_ANSWER_SUBJECT, contractHash: engineContractHash(), callSiteOf: pathsMainAnswerCallSiteOf,
     maxRounds: input.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
-    later: false, writer, checker, backupCandidates: [],
+    later: false, goalStated: input.goalStated === true, writer, checker, backupCandidates: [],
     material: built.material,
     // The first debate's answer calls are the writer and the checker on the served lane: the answer's own money, never walled.
     send: (maker, request) => maker.provider.call(Object.freeze({ ...request, lane: "served" as const })),

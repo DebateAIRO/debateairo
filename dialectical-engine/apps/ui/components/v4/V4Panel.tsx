@@ -10,7 +10,7 @@ import { digWords, type V4DigQuota } from "@/lib/v4/digQuota";
 import { placeOf } from "@/components/v4/mapDigHelpers";
 import type { MoneyLine } from "@/lib/v4/money";
 import { pauseOfDig } from "@/lib/v4/monthPause";
-import { draftTarget, mainQuestionTarget } from "@/lib/v4/suggestions";
+import { draftTarget, mainQuestionTarget, type PickRefusal } from "@/lib/v4/suggestions";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
 import {
@@ -21,6 +21,7 @@ import {
   type DigTarget,
   type DigView,
   type ReadingLevel,
+  type TrustBasis,
   type TrustCounts,
   type TrustWord,
   type V4Branch,
@@ -82,7 +83,7 @@ import { V4TrustBar } from "./V4TrustBar";
  * Continue once the server says its month has reset), and a dig that did not finish its reason and "Try this dig again".
  * Wave 2 (map-d4 A, map-f14, dig-f22): evidence first, each finding's sources folded into one line and "Other pages found"
  * folded; "Skip to the dig button" near the top; the dig block pinned to the panel's foot on a computer; one pick reads
- * "Dig into your pick", and "Your question" digs the picks it lists; a greyed pick box has its reason right above it.
+ * "Dig into this" (question 1 B), and "Your question" digs the picks it lists; a greyed pick box has its reason right above it.
  * Owner review 3 Nov (dig-d1 B, dig-f32): a dig at work shows its own running panel (V4DigRunning: the waiting card, the
  * steps and checked findings when the server reports them, the path's text now); a finished dig opens with the same result
  * box as the path it rewrote, its bar in words only, "Open this dig's map" below.
@@ -92,6 +93,10 @@ import { V4TrustBar } from "./V4TrustBar";
  * answer so far, its trust word, what changed, the point-of-view line and its findings. While the debate runs nothing digs.
  * "+ N more to explore" lists the menu paths left out, each one to dig into once the answer is ready; the question's panel
  * lists what the AIs also raised that no path took.
+ * V4 start step, Task 76k (the owner's answers of 5 Nov): "Your question" offers "Go to them · Clear them" beside its line
+ * when the picks wait on a path (question 26 A); at Plain words a point a second AI checked that has no sources gets the
+ * folded "From the AIs' own knowledge · checked by a second AI" line, which opens its check line (question 27 A); the
+ * dates under a point are long, with the year, day first in English (questions 4 A and 5 B).
  */
 
 type PanelProps = Readonly<{
@@ -193,14 +198,29 @@ function basisLine(point: V4Point, catalog: MessageCatalog, locale: string): str
   if (point.basis === "AGREED_BUT_DATED") {
     return point.asOf === null
       ? t(catalog, "v4.basis.AGREED_BUT_DATED.noDate")
-      : t(catalog, "v4.basis.AGREED_BUT_DATED", { date: formatDate(locale, point.asOf, { dateStyle: "medium" }) });
+      // Questions 4 A and 5 B (owner, 5 Nov): the long form with the year, day first in English ("28 October 2026").
+      : t(catalog, "v4.basis.AGREED_BUT_DATED", { date: formatDate(locale, point.asOf, { dateStyle: "long" }) });
   }
   return t(catalog, basisKey(point.basis));
 }
 
+/**
+ * Question 27 A (owner, 5 Nov): the bases a second AI's check gave the point (it agreed, agreed but the point may be dated,
+ * or disagreed). Not one it could not check, nor the debate's own word on a path that fell, nor a point resting on a page
+ * this debate looked up.
+ */
+const SECOND_AI_CHECKED: ReadonlySet<TrustBasis> = new Set<TrustBasis>([
+  "LOOKED_UP_AND_AGREED", "ARGUED_AND_AGREED", "AGREED_BUT_DATED", "DISPUTED"
+]);
+
 function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: ReadingLevel; catalog: MessageCatalog; locale: string }>) {
   const { point, word, level, catalog } = props;
   const basis = level === "plain" ? null : basisLine(point, catalog, props.locale);
+  // Question 27 A: at Plain words a point a second AI checked that has no sources gets one folded grey line, the twin of
+  // a sourced point's "From iea.org ▸"; opened, it shows the check line the other levels show.
+  const ownKnowledge = level === "plain" && (point.sources ?? []).length === 0 && point.basis !== null && SECOND_AI_CHECKED.has(point.basis)
+    ? basisLine(point, catalog, props.locale)
+    : null;
   const reasons = level === "expert" ? point.reasons.filter((reason) => reason.trim().length > 0) : [];
   return (
     <li className={`v4PanelPoint v4PanelPoint${word}`}>
@@ -220,6 +240,12 @@ function PointItem(props: Readonly<{ point: V4Point; word: TrustWord; level: Rea
           : null}
         {/* map-d4 A: the sources folded into one line under the point; open, each page in full. */}
         <V4SourcesFold sources={point.sources} catalog={catalog} locale={props.locale} />
+        {ownKnowledge === null ? null : (
+          <details className="v4SourcesFold v4OwnKnowledge">
+            <summary className="v4SourcesFoldLine">{t(catalog, "v4.web.ownKnowledge")}</summary>
+            <p className="v4PanelBasis">{ownKnowledge}</p>
+          </details>
+        )}
         {level === "expert" && word === "DIDNT_HOLD" && point.answeredBy !== null
           ? (
             <p className="v4PanelBasis">
@@ -360,35 +386,60 @@ function WhereToDig(props: Readonly<{
   panel: PanelProps;
   /** V4 start step, Task 62 (spec §2.5): the main question's "+ N more" picks, listed first; absent: none. */
   more?: readonly V4DigPick[];
+  /**
+   * Question 26 A (owner, 5 Nov): on "Your question", "Go to them · Clear them" right under the line that says the picks
+   * wait on a path, as every path offers them. Absent or false: the line alone (a path offers both in "Choose what to dig").
+   */
+  picksGo?: boolean;
 }>) {
   const { panel, emptyKey } = props;
   if (props.open.length === 0 && props.digs.length === 0 && emptyKey === null) return null;
+  const choice = panel.choice;
+  // Only picks waiting on a path: picks on "Your question" itself have nowhere else to go.
+  const place = props.picksGo === true && choice !== undefined && choice.draft.group !== null ? choice.picksPlace ?? null : null;
   const moreRows = panel.choice === undefined || props.more === undefined
     ? null
     : <V4MorePickRows picks={props.more} choice={panel.choice} catalog={panel.catalog} />;
   const hasMore = moreRows !== null && (props.more ?? []).some((pick) => pick.kind === "MORE") && panel.choice?.canDig === true
     && panel.choice.onToggleMainPick !== undefined;
   // dig-f22: the visible reason sits right above the first box greyed for it (each question is its own group here, since
-  // the main question's list can hold the starred question of a path beside its own).
-  const reasons = pickReasonPlaces(
+  // the main question's list can hold the starred question of a path beside its own). Independent review (Task 76k): on a
+  // path debate the "+ N more" rows come first, so when they are greyed the line (with question 26 A's buttons) sits above
+  // them, once, and not again above an open question greyed for the same reason.
+  const morePicked = new Set((choice?.draft.picks ?? []).map((pick) => pick.key));
+  const moreReason = hasMore && choice !== undefined && choice.draft.picks.length > 0
+    && (props.more ?? []).some((pick) => pick.kind === "MORE" && !morePicked.has(pick.key))
+    ? choice.refusalFor(null)
+    : null;
+  const reasons = new Map([...pickReasonPlaces(
     props.open.map((question) => ({ key: question.id, path: null, open: [question], suggestions: false })), panel.picked, panel.choice
-  );
+  )].filter(([, found]) => found.reason !== moreReason));
+  /** The reason line, and right under it question 26 A's two buttons when the picks wait on a path. */
+  const reasonRows = (reason: PickRefusal, key: string): ReactNode[] => (choice === undefined ? [] : [
+    <li key={`reason/${key}`} className="v4PanelReasonRow">
+      <V4PickReason reason={reason} choice={choice} paths={panel.map.paths} catalog={panel.catalog} />
+    </li>,
+    // Question 26 A: the path's own two buttons and words (V4DigCompose), on a row of their own under the line.
+    reason !== "OTHER_PATH" || place === null ? null : (
+      <li key={`picks/${key}`} className="v4PanelReasonRow v4SugElsewhereActions">
+        <button type="button" className="v4Btn" onClick={() => place.onGo()}>{t(panel.catalog, "v4.suggest.goToPicks")}</button>
+        <button type="button" className="v4Btn" onClick={() => choice.onClear()}>{t(panel.catalog, "v4.suggest.clearPicks")}</button>
+      </li>
+    )
+  ]);
   return (
     <Section title={t(panel.catalog, "v4.panel.whereToDig")}>
       {props.open.length === 0 && !hasMore
         ? (emptyKey === null ? null : <p className="v4Muted">{t(panel.catalog, emptyKey)}</p>)
         : (
           <ul className="v4PanelRows">
+            {hasMore && moreReason !== null ? reasonRows(moreReason, "+more") : null}
             {hasMore ? moreRows : null}
             {props.open.flatMap((question) => {
               const picked = panel.picked.has(question.id);
               const reason = reasons.get(question.id);
               return [
-                reason === undefined || panel.choice === undefined ? null : (
-                  <li key={`reason/${question.id}`} className="v4PanelReasonRow">
-                    <V4PickReason reason={reason.reason} choice={panel.choice} paths={panel.map.paths} catalog={panel.catalog} />
-                  </li>
-                ),
+                ...(reason === undefined ? [] : reasonRows(reason.reason, question.id)),
                 <li key={`${question.pathId ?? "root"}/${question.id}`} className={`v4PanelOpenRow ${groundClass("OPEN")}`}>
                   <PickBox
                     question={question}
@@ -625,7 +676,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   // Task 62 (spec §2.5): on a path debate the menu paths left out come first in its dig list.
   const more = panel.choice?.mainQuestionPicks ?? [];
   // map-f14 / dig-f4: the tray shows only from two picks, so a pick made here is dug by this panel's own pinned button
-  // ("Dig into your pick"), offered only when the panel lists every pick (Task 62: its "+ N more" picks too).
+  // ("Dig into this", question 1 B), offered only when the panel lists every pick (Task 62: its "+ N more" picks too).
   const picksTarget = panel.choice?.canDig === true ? mainQuestionTarget(open, more, panel.choice.draft, map.paths) : null;
   const digId = useId();
   // DATA-2: with no short answer yet, the whole composed answer is shown, so there is always an answer to read.
@@ -733,7 +784,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
         )
         : null}
       {raised}
-      <WhereToDig open={open} digs={digsUnder(map, panel.digs, null)} emptyKey="v4.panel.noOpenRoot" panel={panel} more={more} />
+      <WhereToDig open={open} digs={digsUnder(map, panel.digs, null)} emptyKey="v4.panel.noOpenRoot" panel={panel} more={more} picksGo />
       {picksTarget !== null ? <DigBlock target={picksTarget} panel={panel} id={digId} /> : null}
     </>
   );

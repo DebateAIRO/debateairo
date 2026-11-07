@@ -1470,8 +1470,16 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
     "EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid)",
-    "EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid)"
+    "EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid)",
+    // Task 57e: the one automatic retry's writer, for the runner (the shared runtime role).
+    "EXECUTE ON FUNCTION core.record_work_item_retry(uuid,uuid,timestamptz)"
   ]
+},
+// Task 57e: whether a failed debate keeps what its charges before Start bought, for the readers' owner (they call it as their definer).
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0164_pre_start_release.sql",
+  "grants": ["EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

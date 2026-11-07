@@ -6,8 +6,12 @@
 // report.answer-check.v3 byte for byte through `writeOverallAnswer`, at the first debate's own answer keys on the served lane, 2
 // rounds on a paid plan and 1 on Free, every round under one fence. The material stays under the 100K line (the byte ladder, then
 // the real count near the line). The answer's segments map back to the run's nodes. R22's dossier keeps its bytes. Data made up.
+// Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"): when the person said what they care about (the purpose lines' marked
+// answer), the writer and the checker are the next versions, drafts until Task 92 seals them; otherwise the sealed two, as before.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { PathOutcome } from "@debateai/contract";
+import { PurposeLinesSchema, type PathOutcome } from "@debateai/contract";
 import {
   TEXT_NOT_IN_QUESTION_LANGUAGE, questionLanguageField, questionLanguageFromRun, questionLanguageSentence, type PathId
 } from "@debateai/kernel";
@@ -16,15 +20,18 @@ import {
   type ProviderCallResult, type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
 import {
-  REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, REPORT_ANSWER_V4_PROMPT_CONTRACT, type ReportAnswerDraft
+  REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT, REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_V5_PROMPT_CONTRACT,
+  REPORT_GOAL_DRAFT_CONTRACTS, writeOverallAnswer, type ReportAnswerDraft
 } from "@debateai/story";
+import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
 import {
-  INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES, buildInvestigationDossier, digsInTreeOrder, dossierFieldsOf, dossierRefsOf, type Dossier,
-  type DossierInput
+  INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES, buildInvestigationDossier, digsInTreeOrder, dossierFieldsOf, dossierRefsOf, investigationReportGuard,
+  type Dossier, type DossierInput
 } from "../../apps/runner/src/investigation-dossier.js";
 import { PATH_REWRITE_BODY_MAX_BYTES, pathRewriteBodyBytes, type PathRewriteQuestion } from "../../apps/runner/src/path-rewrite-material.js";
 import {
-  pathsComposedSegments, pathsDossierInput, pathsMainAnswerCallSiteOf, runPathsMainAnswer, type PathsDossierPath, type PathsMainAnswerInput
+  pathsComposedSegments, pathsDossierInput, pathsGoalStated, pathsMainAnswerCallSiteOf, runPathsMainAnswer, type PathsDossierPath,
+  type PathsMainAnswerInput
 } from "../../apps/runner/src/paths-main-answer.js";
 import { fitDossierToTokenLine } from "../../apps/runner/src/token-line.js";
 import {
@@ -125,7 +132,7 @@ const callsOf = (requests: readonly ProviderCallRequest[]) =>
   requests.map((request) => [request.callSiteKey, request.providerRef, frameOf(request.packet).contractId]);
 function inputOf(over: Partial<PathsMainAnswerInput> & Pick<PathsMainAnswerInput, "gateway">): PathsMainAnswerInput {
   return Object.freeze({ runId: RUN, free: false, answerWords: 300, question: QUESTION, paths: PATHS, seats: { writer: HAIKU, checker: GLM },
-    tokenCount: undefined, log: () => undefined, ...over });
+    goalStated: false, tokenCount: undefined, log: () => undefined, ...over });
 }
 
 /* ----------------------------------------------------------------- the dossier */
@@ -323,6 +330,111 @@ describe("runPathsMainAnswer", () => {
   });
 });
 
+/* ----------------------------------------------------------------- Task 50b: the person's stated goal */
+
+// Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"; owner answer Q4): when the person said what they care about, the main
+// answer says, in one or two plain sentences, how that goal fares across the paths. The run knows it from the purpose lines' marked
+// answer (the page marks the answer to "What do you care about most?"), never from the words. The writer and the checker are then the
+// next versions, report.answer.v5 and report.answer-check.v4: drafts the owner reads word for word at Task 92 (sealed only there),
+// each the sealed version's words byte for byte with one drafted sentence at its end. Without a stated goal: the sealed two, as before.
+const GOAL_WRITER_SENTENCE = "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";
+const GOAL_CHECKER_SENTENCE = "If the question says what the person cares about, the answer must say how that goal fares across the paths.";
+const CARES = Object.freeze({ question: "What do you care about most?", answer: "Keeping bills low" });
+const instructionOf = (request: ProviderCallRequest): string => request.packet.messages[0]!.content;
+
+describe("Task 50b: the person's stated goal", () => {
+  it("the two drafts: v4's writer and v3's check byte for byte, each with its one drafted sentence last; the forms as they were; unsealed", () => {
+    expect(REPORT_GOAL_DRAFT_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v5", "report.answer-check.v4"]);
+    expect(REPORT_GOAL_DRAFT_CONTRACTS).toEqual([REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT]);
+    expect(Object.isFrozen(REPORT_GOAL_DRAFT_CONTRACTS)).toBe(true);
+    expect(REPORT_ANSWER_V5_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`);
+    expect(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction}\n\n${GOAL_CHECKER_SENTENCE}`);
+    expect(REPORT_ANSWER_V5_PROMPT_CONTRACT.answerForm).toBe(REPORT_ANSWER_V4_PROMPT_CONTRACT.answerForm);
+    expect(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.answerForm).toBe(REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.answerForm);
+    const sealed = engineSealedContracts().map((contract) => contract.contractId);
+    for (const contract of REPORT_GOAL_DRAFT_CONTRACTS) expect(sealed, contract.contractId).not.toContain(contract.contractId);
+    // Each drafted sentence is marked as the owner's to approve, and names no field, no snake_case word and no id a model could copy.
+    const source = readFileSync(join(process.cwd(), "packages/story/src/investigation-report.ts"), "utf8");
+    for (const name of ["REPORT_WRITER_GOAL_SENTENCE", "REPORT_CHECKER_GOAL_CRITERION"]) {
+      expect(source, name).toMatch(new RegExp(`// OWNER WORDING — approve before switch-on[^\\n]*\\nexport const ${name} =`, "u"));
+    }
+    for (const sentence of [GOAL_WRITER_SENTENCE, GOAL_CHECKER_SENTENCE]) {
+      expect(sentence).not.toMatch(/[A-Za-z]+_[A-Za-z]+/u);
+      expect(sentence).not.toMatch(/\b(A[1-9][0-9]*|P[1-9][0-9]*|W[1-9][0-9]*|b[1-8]|pt[1-9][1-6]|kp\d{2})\b/u);
+    }
+  });
+
+  it("a run whose person stated a goal: Haiku writes report.answer.v5 and GLM checks report.answer-check.v4, over the very same material", async () => {
+    const plain = team();
+    await runPathsMainAnswer(inputOf({ gateway: plain.gateway }));
+    const { gateway, requests } = team();
+    const { written, segments } = await runPathsMainAnswer(inputOf({ gateway, goalStated: true }));
+    expect(callsOf(requests)).toEqual([
+      ["COMPOSER:SYNTHESIZER:INITIAL:1", HAIKU.providerRef, "report.answer.v5"],
+      ["POST_COMPOSE_R9:EVALUATOR:1", GLM.providerRef, "report.answer-check.v4"]]);
+    expect(requests.map((request) => [request.role, request.lane])).toEqual([["SYNTHESIZER", "served"], ["EVALUATOR", "served"]]);
+    expect(instructionOf(requests[0]!).startsWith(REPORT_ANSWER_V5_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(requests[0]!)).toContain(GOAL_WRITER_SENTENCE);
+    expect(instructionOf(requests[1]!).startsWith(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(requests[1]!)).toContain(GOAL_CHECKER_SENTENCE);
+    expect(written.outcome).toMatchObject({ outcome: "READY", body: ANSWER });
+    expect(segments.map((segment) => segment.segmentId)).toEqual(["s1", "s2"]);
+    // Only the instruction changes: the writer and the checker read the same dossier, field for field.
+    const fieldsOf = (request: ProviderCallRequest) => frameOf(request.packet).fields.map((entry) => [entry.name, entry.content]);
+    expect(fieldsOf(requests[0]!)).toEqual(fieldsOf(plain.requests[0]!));
+    expect(fieldsOf(requests[1]!)).toEqual(fieldsOf(plain.requests[1]!));
+  });
+
+  it("a run without one asks the sealed report.answer.v4 and report.answer-check.v3, today's bytes, with no goal sentence", async () => {
+    const { gateway, requests } = team();
+    await runPathsMainAnswer(inputOf({ gateway, goalStated: false }));
+    expect(callsOf(requests).map(([, , contractId]) => contractId)).toEqual(["report.answer.v4", "report.answer-check.v3"]);
+    expect(instructionOf(requests[0]!).startsWith(REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(requests[1]!).startsWith(REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction)).toBe(true);
+    for (const request of requests) {
+      expect(instructionOf(request)).not.toContain(GOAL_WRITER_SENTENCE);
+      expect(instructionOf(request)).not.toContain(GOAL_CHECKER_SENTENCE);
+    }
+  });
+
+  it("the run knows a goal was stated from the purpose lines' mark alone, never from the words", () => {
+    expect(pathsGoalStated(null)).toBe(false);
+    expect(pathsGoalStated({ place: "Cluj, Romania" })).toBe(false);
+    expect(pathsGoalStated({ answers: [{ question: "Which region?", answer: "The north" }] })).toBe(false);
+    // The care question's own words, or a line that says what the person cares about, unmarked: code reads nothing into them.
+    expect(pathsGoalStated({ answers: [CARES], matters: "What I care about is: keeping bills low." })).toBe(false);
+    expect(pathsGoalStated({ answers: [{ question: "Which region?", answer: "The north" }, { ...CARES, cares: true }] })).toBe(true);
+    // An answer typed under "Other…" is a stated goal too, in any language.
+    expect(pathsGoalStated({ answers: [{ question: "Ce contează cel mai mult pentru tine?", answer: "Facturi mai mici", cares: true }] })).toBe(true);
+  });
+
+  it("the mark rides the purpose lines: `cares: true` on an answer, nothing else; today's lines parse as before", () => {
+    expect(PurposeLinesSchema.safeParse({ answers: [{ ...CARES, cares: true }] }).success).toBe(true);
+    for (const bad of [false, "yes", 1, null]) {
+      expect(PurposeLinesSchema.safeParse({ answers: [{ ...CARES, cares: bad }] }).success, String(bad)).toBe(false);
+    }
+    expect(PurposeLinesSchema.safeParse({ cares: true, answers: [CARES] }).success).toBe(false);
+    expect(PurposeLinesSchema.parse({ answers: [CARES] })).toEqual({ answers: [CARES] });
+  });
+
+  it("a later version has no goal draft: asking for both is refused before any call", async () => {
+    const { gateway, requests } = team();
+    const maker = (providerRef: string) => Object.freeze({ provider: gateway, providerRef });
+    await expect(writeOverallAnswer({ runId: RUN, subjectItemId: "s", contractHash: "h", maxRounds: 1, later: true, goalStated: true,
+      writer: maker(HAIKU.providerRef), checker: maker(GLM.providerRef), backupCandidates: [], material: dossierOf(pathsInput()).material,
+      send: (author, request) => author.provider.call(request), guard: investigationReportGuard, log: () => undefined }))
+      .rejects.toMatchObject({ code: "INVESTIGATION_REPORT_GOAL_LATER_INVALID" });
+    expect(requests).toEqual([]);
+  });
+
+  it("the runner tells the main answer whether the person stated a goal, from the run's own purpose lines", () => {
+    const runner = readFileSync(join(process.cwd(), "apps/runner/src/index.ts"), "utf8");
+    const at = runner.indexOf("main = await runPathsMainAnswer({");
+    expect(at).toBeGreaterThan(0);
+    expect(runner.slice(at, runner.indexOf("});", at))).toContain("goalStated: pathsGoalStated(pathsPurposeLines)");
+  });
+});
+
 /* ----------------------------------------------------------------- seven full paths, in a 3-byte script */
 
 const CJK = "中";
@@ -354,6 +466,19 @@ describe("seven full paths in \"中\"", () => {
     for (const one of sent) expect(pathRewriteBodyBytes(one.packet), one.key).toBeLessThanOrEqual(LINE);
     const first = JSON.parse(frameOf(requests[0]!.packet).fields.find((entry) => entry.name === "first_debate")!.content) as { paths: Array<{ ref: string; fate: string }> };
     expect(first.paths.map((path) => [path.ref, path.fate])).toEqual([1, 2, 3, 4, 5, 6, 7].map((no) => [`A${String(no)}`, "PARTLY_HELD"]));
+  });
+
+  // Review of Task 50b (plan Review Focus 5): the goal versions' longer instructions ride the same largest material, so their bodies,
+  // round 2's included, stay at or under the line too.
+  it("with a stated goal (report.answer.v5, report.answer-check.v4), every body sent, round 2's included, stays at or under 195,904 bytes", async () => {
+    let checked = 0;
+    const { gateway, requests, sent } = team(() => BIG_ANSWER, () => { checked += 1; return checked === 1 ? BIG_OBJECTION : SATISFIED; });
+    const { written } = await runPathsMainAnswer(inputOf({ gateway, question: CJK_QUESTION, paths: SEVEN, goalStated: true }));
+    expect(callsOf(requests).map(([, , contractId]) => contractId))
+      .toEqual(["report.answer.v5", "report.answer-check.v4", "report.answer.v5", "report.answer-check.v4"]);
+    expect(written.outcome.outcome).toBe("READY");
+    expect(sent.length).toBeGreaterThanOrEqual(4);
+    for (const one of sent) expect(pathRewriteBodyBytes(one.packet), one.key).toBeLessThanOrEqual(LINE);
   });
 
   it("a real count of 99,000 moves the dossier one ladder place down, logged with its place", async () => {

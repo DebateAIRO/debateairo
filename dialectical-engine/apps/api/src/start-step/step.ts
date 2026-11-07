@@ -20,7 +20,7 @@ import {
 import type { StartCharges } from "./charge.js";
 import { createStartBusyBook, startModelOfSeat, startSeatsFor, type StartBusyBook } from "./seats.js";
 import {
-  signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startDigTryRefOf, startMembersHash, startTryRefOf,
+  newStartTryRef, signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startDigTryRefOf, startMembersHash,
   startTryRefOfCheck, verifyStartCheck, verifyStartMergeRequest, type StartCombineContext, type StartStepKey
 } from "./signing.js";
 import type { StartCallEnd, StartTransport } from "./transport.js";
@@ -110,10 +110,12 @@ type Decided = Readonly<{ kind: "LOCK"; lock: QuestionLanguageLock }> | Readonly
   | Readonly<{ kind: "REFUSED" }>;
 /**
  * Step 4: started together at the first Next of these words; an offer and its re-post share one planner and the words' check. `checks`
- * holds each line's check once (the words', and an accepted rewrite's: wave-4 review); one that could not answer is forgotten.
+ * holds each line's check once (the words', and an accepted rewrite's: wave-4 review); one that could not answer is forgotten. Task 57d
+ * (owner, 6 Nov: "Random id"): `tryRef`, the reading's try, a random id minted with the planner; every reading that shares the planner
+ * shares it, and its check carries it (signing.ts).
  */
-type Prepared = { readonly at: number; readonly planned: Promise<StartPlanned>; readonly checks: Map<string, Promise<QuestionCheckOutcome | null>>;
-  decided: Promise<Decided> | null };
+type Prepared = { readonly at: number; readonly tryRef: string; readonly planned: Promise<StartPlanned>;
+  readonly checks: Map<string, Promise<QuestionCheckOutcome | null>>; decided: Promise<Decided> | null };
 /** Step 4b: one reading's events, in order, from its first to its end, and who is listening while it runs. */
 type Reading = { readonly key: string; readonly createdAt: number; firstAt: number | null; readonly events: StartListsEvent[]; bytes: number;
   answeredNone: boolean; ended: boolean; inBook: boolean; readonly listeners: Set<(event: StartListsEvent) => void> };
@@ -394,10 +396,13 @@ export function createStartStep(deps: Readonly<{
     }
   };
 
-  /** A new reading's run, from step 4 to its end. Anything unforeseen ends it `none TRANSPORT`, so it always ends once. */
-  const read = async (reading: Reading, run: Readonly<{ input: StartListsInput; seats: readonly MapSeat[]; planner: MapSeat; caller: MapCaller;
-    questionCheck: AskQuestionCheck; language: QuestionLanguagePort }>): Promise<void> => {
-    const { input, seats, planner, caller } = run;
+  /**
+   * A new reading's run, from step 4 to its end. Anything unforeseen ends it `none TRANSPORT`, so it always ends once. Task 57d: `callerFor`
+   * charges each call to a try; the planner's and every list's are the prepared words' try, which the check carries.
+   */
+  const read = async (reading: Reading, run: Readonly<{ input: StartListsInput; seats: readonly MapSeat[]; planner: MapSeat;
+    callerFor: (tryRef: string) => MapCaller; questionCheck: AskQuestionCheck; language: QuestionLanguagePort }>): Promise<void> => {
+    const { input, seats, planner } = run;
     const startedAt = now();
     timed("STARTED", startedAt);
     // Step 4: the person's words as they typed them (an accepted rewrite's original), so an offer and its re-post share one planner and
@@ -408,12 +413,14 @@ export function createStartStep(deps: Readonly<{
     let ready = prepared.get(preparedKey);
     if (ready === undefined || startedAt - ready.at >= timing.serverCacheTtlMs) {
       prepared.delete(preparedKey);
-      ready = { at: startedAt, planned: mapPlanStartAngles({ questionLine: words, planner, caller, ...withClock, signal: RUNS_ON }), checks: new Map(),
-        decided: null };
+      const tryRef = newStartTryRef();
+      ready = { at: startedAt, tryRef, planned: mapPlanStartAngles({ questionLine: words, planner, caller: run.callerFor(tryRef), ...withClock,
+        signal: RUNS_ON }), checks: new Map(), decided: null };
       prepared.set(preparedKey, ready);
       while (prepared.size > START_PREPARED.entries) prepared.delete(prepared.keys().next().value!);
     }
     const entry = ready;
+    const caller = run.callerFor(entry.tryRef);
     const checkedOnce = (line: string): Promise<QuestionCheckOutcome | null> => {
       const known = entry.checks.get(line);
       if (known !== undefined) return known;
@@ -463,11 +470,13 @@ export function createStartStep(deps: Readonly<{
         return;
       }
     }
-    // Step 7: the check the lists are written under, signed for this line, plan and version (the lock less its original, Task 26).
+    // Step 7: the check the lists are written under, signed for this line, plan and version (the lock less its original, Task 26), with
+    // the reading's try (Task 57d).
     const lock = decision.lock;
     const binding = Object.freeze({ ownerScope: input.ownerScope, questionLine: input.question_line, planKey: input.planKey,
       settingsVersion: input.settingsVersion });
-    publish(reading, { event: "check", data: { check_ref: signStartCheck(deps.key, { ...binding, lock, originalQuestionLine: lock.originalQuestionLine }),
+    publish(reading, { event: "check", data: { check_ref: signStartCheck(deps.key, { ...binding, lock, originalQuestionLine: lock.originalQuestionLine,
+      tryRef: entry.tryRef }),
       language: { code: lock.language.code, name: lock.language.name }, seats: seats.length } });
     timed("CHECKED", startedAt);
     // The decision record of 3 Nov and Calls item 8 (wave-4 review): when everyone has gone before the lists start (Back to new words,
@@ -530,15 +539,14 @@ export function createStartStep(deps: Readonly<{
         timed("REUSED", now());
         return listen(kept, emit, signal);
       }
-      // Task 57c: the person's words as typed (an accepted rewrite's original), which the planner reads and the check's try names.
-      const caller = callerOf(transport, config, input, startTryRefOf(deps.key, { ownerScope: input.ownerScope,
-        words: input.question_language_choice?.original_question_line ?? input.question_line }));
+      // Task 57c: every call of the reading is charged to its try. Task 57d: the try is the prepared words' random id (read picks it).
+      const callerFor = (tryRef: string): MapCaller => callerOf(transport, config, input, tryRef);
       const reading: Reading = { key, createdAt: at, firstAt: null, events: [], bytes: 0, answeredNone: false, ended: false, inBook: true,
         listeners: new Set() };
       book.set(key, reading);
       while (book.size > START_LISTS_REUSE.entries) oldestOut();
       const listening = listen(reading, emit, signal);
-      void read(reading, { input, seats, planner, caller, questionCheck, language }).catch(() => {
+      void read(reading, { input, seats, planner, callerFor, questionCheck, language }).catch(() => {
         for (const event of none("TRANSPORT")) publish(reading, event);
       });
       return listening;
@@ -592,7 +600,7 @@ export function createStartStep(deps: Readonly<{
       const kept = keptIn(combines, key);
       if (kept !== null) return kept;
       if (signal.aborted) return noneOf("NOT_ASKED");
-      // Task 57c: on the menu, the question's try; over a dig's picks, the dig's of its parent.
+      // Task 57c: on the menu, the reading's try (its check carries it, Task 57d); over a dig's picks, the dig's of its parent.
       const tryRef = asked.kind === "MENU" ? startTryRefOfCheck(deps.key, input.ownerScope, asked.check_ref)
         : startDigTryRefOf(deps.key, { ownerScope: input.ownerScope, parentRunId: asked.parent_run_id });
       return keep(combines, key, combineOnce(input, main, context, membersHash, callerOf(transport, ready.config, input, tryRef), haikuOf(transport))

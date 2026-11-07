@@ -25,8 +25,9 @@ import { previewModelRow, type ProviderCostEnvelopeSeam, type ProviderDiscoveryT
 export type StartCharges = Readonly<{
   recordDown(): boolean;
   /**
-   * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call is made for (signing.ts's
-   * startTryRefOf), rides the record, so Start can give the try's charges to its debate and 0164 gives them back if it fails.
+   * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call is made for (Task 57d: the
+   * reading's random id its check carries, signing.ts), rides the record, so Start can give the try's charges to its debate and 0164 gives
+   * them back if it fails.
    */
   seamFor(input: Readonly<{ ownerRef: string; funding: FundingBasis | null; kind: PreStartChargeKind; target: ProviderDiscoveryTarget;
     tryRef?: string }>): ProviderCostEnvelopeSeam;

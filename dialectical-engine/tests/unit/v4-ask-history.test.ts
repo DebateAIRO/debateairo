@@ -44,6 +44,16 @@ describe("the ask page's history entry (answer Q3)", () => {
     }
   });
 
+  it("Task 76f (owner answer S1 A): a read entry keeps a string savedId; a number or an object there is dropped, the step and the words kept", () => {
+    const saved = withAskHistory({ __NA: true, tree: [1] }, { step: "read", words: "Q", savedId: "4d7c1c4e-0000-4000-8000-000000000001" });
+    expect(saved).toEqual({ __NA: true, tree: [1], v4ask: { step: "read", words: "Q", savedId: "4d7c1c4e-0000-4000-8000-000000000001" } });
+    expect(askHistoryOf(saved)).toEqual({ step: "read", words: "Q", savedId: "4d7c1c4e-0000-4000-8000-000000000001" });
+    expect(askHistoryOf({ v4ask: { step: "read", words: "Q", savedId: 7 } })).toEqual({ step: "read", words: "Q" });
+    expect(askHistoryOf({ v4ask: { step: "read", words: "Q", savedId: { id: "x" } } })).toEqual({ step: "read", words: "Q" });
+    // Only step 2's entry names the saved question; step 1's never does.
+    expect(askHistoryOf({ v4ask: { step: "ask", words: "Q", savedId: "4d7c1c4e-0000-4000-8000-000000000001" } })).toEqual({ step: "ask", words: "Q" });
+  });
+
   it("the address says step 2 and keeps ?level=, never the words; step 1's address drops only the step", () => {
     expect(ASK_STEP_PARAM).toBe("step");
     expect(stepTwoAddress("")).toBe("?step=2");

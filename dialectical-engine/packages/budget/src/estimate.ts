@@ -78,9 +78,10 @@ export interface CostEstimator {
   digWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null;
   /**
    * V4 start step, Task 37: a path debate's web part at its most (every chosen path a pack of its own, at a debate's
-   * start), for the share shown before Start; absent or null: not known.
+   * start), for the share shown before Start; absent or null: not known. Task 79b: `origin` "DIG" prices a path debate's
+   * dig (its own results per search, as the ask's receipt counts it); absent: a debate's start, as before.
    */
-  pathsWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; paths: number }>): number | null;
+  pathsWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; paths: number; origin?: "START" | "DIG" }>): number | null;
   /** The owner's ruling (31 Oct): what follows a dig at this level, for the same share; absent or null: not known. */
   digUpdatesPartMicros?(dig: Readonly<{ level: number; free: boolean }>): number | null;
 }
@@ -287,11 +288,13 @@ export class RecentRunsCostEstimator implements CostEstimator {
   /**
    * V4 start step, Task 37: a path debate's web part at the most it can do (every chosen path its own planner, up to 4
    * searches on a Quick look, 8 on a Thorough one, its readers and its pick; every path's arguing reading every path's
-   * pack), for the share shown before Start. Null with no web prices. Like a dig's, only the share reads it.
+   * pack), for the share shown before Start. Null with no web prices. Like a dig's, only the share reads it. Task 79b: a
+   * path debate's dig asks it from a dig's origin (`origin` "DIG"), the share shown before the dig.
    */
-  pathsWebPartMicros(web: Readonly<{ depth: "QUICK" | "THOROUGH"; paths: number }>): number | null {
+  pathsWebPartMicros(web: Readonly<{ depth: "QUICK" | "THOROUGH"; paths: number; origin?: "START" | "DIG" }>): number | null {
     if (this.#webPrices === null) return null;
-    return estimateWebPartMicros(webSitesOf({ kind: "PATHS", depth: web.depth, paths: web.paths, origin: "START" }), this.#webPrices).totalMicros;
+    return estimateWebPartMicros(webSitesOf({ kind: "PATHS", depth: web.depth, paths: web.paths, origin: web.origin ?? "START" }),
+      this.#webPrices).totalMicros;
   }
 
   /** What follows a dig: its rewrite, the climb and the main answer's update. Null with no web prices. Like the web part, only the line reads it. */

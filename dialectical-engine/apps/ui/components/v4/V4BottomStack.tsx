@@ -11,7 +11,7 @@ import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 /*
  * V4 UX fixes (owner picks 3 Nov: journey-d3 A, dig-f16, dig-f17): the bottom of the map page is ONE stack that measures
  * itself, so nothing overlaps and the page's bottom room is the stack's real height (never a guessed 150 px).
- *  - Phone: one pinned bar whose job changes ("Dig into your pick · up to 3%"; dig-f31: with nothing picked, "Choose what
+ *  - Phone: one pinned bar whose job changes ("Dig into this · up to 3%"; dig-f31: with nothing picked, "Choose what
  *    to dig ›", which goes to the choices; or "Write my report" when that is the next step),
  *    with the Map button. Above it, inside the same surface: the slim "Good time to write your report" line when the rule
  *    fires (dig-f17, with a small × to close it), the Undo and ready notes for their few seconds (never floating over

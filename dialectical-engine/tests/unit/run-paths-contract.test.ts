@@ -98,8 +98,8 @@ describe("the run read's progress and paths", () => {
     expect(RunProjectionSchema.safeParse({ ...RUN, path_progress: nine }).success).toBe(false);
   });
 
-  it("comes last, after the paths (Task 57c's quota_used of a failed run after it)", () => {
-    expect(Object.keys(RunProjectionSchema.shape).slice(-4)).toEqual(["branches", "path_progress", "carry_on_part", "quota_used"]);
+  it("comes last, after the paths (Task 57c's quota_used of a failed run after it, then Task 57e's reusable)", () => {
+    expect(Object.keys(RunProjectionSchema.shape).slice(-5)).toEqual(["branches", "path_progress", "carry_on_part", "quota_used", "reusable"]);
   });
 });
 

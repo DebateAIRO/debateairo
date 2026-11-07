@@ -623,12 +623,21 @@ describe("report-d2: waiting for the report on the map", () => {
     const runId = crypto.randomUUID();
     // Every open question was dug (dig-f29's good time), so only the wait keeps the good-time note away.
     digEverythingOpen(runId);
+    // The owner's answer 23 A (5 Nov; Task 76j's wiring): the map has read its one dig, still running, so the line names it as
+    // the report page does.
+    const done = harness.digView!;
+    let named: string | null = null;
+    harness.digView = (link) => {
+      named = link.questions[0] ?? null;
+      return { ...done(link), state: "RUNNING" };
+    };
     reports.load = async () => investigation(runId, "CLOSED", [writing(1, "2026-11-04T10:00:00.000Z", 1)], 1);
     await mountMap(1600, runId);
     const card = waitCard()!;
     expect(card.dataset.reportWait).toBe("WAITING_DIGS");
     expect(flat(card.querySelector("[data-wait-word]"))).toBe(CATALOG["v4.state.WAITING.noTime"]);
-    expect(flat(card)).toContain(CATALOG["v4.investigation.waitingDigs.one"]);
+    expect(named).not.toBeNull();
+    expect(flat(card)).toContain(`Your report starts when your dig on “${named!}” finishes.`);
     expect(flat(card)).toContain(CATALOG["v4.reportWait.digsRest"]);
     expect(card.querySelector("[data-wait-started]")).toBeNull();
     // No "Good time to write your report" while it waits, and no mark on the button.
@@ -636,6 +645,18 @@ describe("report-d2: waiting for the report on the map", () => {
     expect(header().querySelector(".v4DebReportGood")).toBeNull();
     // The owner's answers of 5 Nov (question 2 A): while it waits for a dig, the header's link reads "See my report".
     expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
+  });
+
+  it("while it waits for a dig the map could not read (its stand-in), the line names no dig: the report page's plain line", async () => {
+    const runId = crypto.randomUUID();
+    digEverythingOpen(runId);
+    harness.digView = () => { throw new Error("made-up failed read"); };
+    reports.load = async () => investigation(runId, "CLOSED", [writing(1, "2026-11-04T10:00:00.000Z", 1)], 1);
+    await mountMap(1600, runId);
+    const card = waitCard()!;
+    expect(card.dataset.reportWait).toBe("WAITING_DIGS");
+    expect(flat(card)).toContain(CATALOG["v4.investigation.waitingDigs.one"]);
+    expect(card.querySelector(".v4DebReportWaitLine [data-ai-generated]")).toBeNull();
   });
 
   it("opened on a version already being written, with digs and no press here: no start time; 15 minutes on, the report page's line", async () => {

@@ -30,7 +30,8 @@ describe("the run read's quota_used (contract)", () => {
     expect(messagesOf(RunProjectionSchema, FAILED)).toEqual(["accepted"]);
     expect(messagesOf(RunProjectionSchema, { ...RUNNING, quota_used: "NONE" })).toEqual(["only a failed debate says whether any quota was used"]);
     expect(RunProjectionSchema.safeParse({ ...FAILED, quota_used: "ALL" }).success).toBe(false);
-    expect(Object.keys(RunProjectionSchema.shape).at(-1)).toBe("quota_used");
+    // Task 57e's `reusable` of a failed run comes after it.
+    expect(Object.keys(RunProjectionSchema.shape).slice(-2)).toEqual(["quota_used", "reusable"]);
   });
 });
 

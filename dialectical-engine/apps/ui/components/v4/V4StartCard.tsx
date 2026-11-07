@@ -322,6 +322,11 @@ export type V4StartCardProps = Readonly<{
   share: Readonly<{ wider: StartShare | null }>;
   /** read-d4 A: the person first acted on a path, once per card (the page folds the answered questions). */
   onPathsUsed?(): void;
+  /**
+   * Task 76e (owner, 4 Nov, card "Reload line": "Hide the old line"): true while the site-update banner shows, so only the banner
+   * speaks; Task 76f adds its own reason. Absent or false: the reload line shows as Task 73 says.
+   */
+  hideReloadLine?: boolean;
 }>;
 
 /** One notice above the list; `undoAt`: its own Undo shows while the plan's Undo stack is this deep (narrowing's). */
@@ -474,7 +479,7 @@ export function V4StartCard(props: V4StartCardProps) {
       {freePlan && !props.questionsShown
         ? <p className="v4StartCardLine">{tPlural(catalog, "v4.start.freeLine", PATH_PLAN_LIMITS.freePathsMax, locale)}</p>
         : null}
-      {start.menu !== null ? <p className="v4StartCardLine">{t(catalog, "v4.start.reloadLine")}</p> : null}
+      {start.menu !== null && props.hideReloadLine !== true ? <p className="v4StartCardLine">{t(catalog, "v4.start.reloadLine")}</p> : null}
       {waiting ? <V4StartBand start={start} freePlan={freePlan} narrow={narrow} catalog={catalog} /> : null}
       {missing === null ? null : <p className="v4StartMissing" role="status">{missing}</p>}
       {listShown && start.narrowedTo !== null
@@ -526,6 +531,8 @@ function missingLine(start: V4StartCardState, catalog: MessageCatalog, quotaLine
   if (start.phase === "REFUSED") return t(catalog, "v4.start.refused");
   if (start.phase === "STALE") return t(catalog, "v4.start.readAgainNeeded");
   if (start.phase !== "NONE" || start.noneLine === null) return null;
+  // Task 76f (saved-questions spec §3.5): a kept step 2 whose AIs had not finished when the person left (Pick up, a reload).
+  if (start.reading?.end === "LEFT_EARLY") return t(catalog, "v4.start.none.leftEarly");
   if (start.noneLine === "QUOTA" && quotaLine !== null) return t(catalog, quotaLine.key, quotaLine.values);
   return t(catalog, startNoneLineKey(start.noneLine));
 }

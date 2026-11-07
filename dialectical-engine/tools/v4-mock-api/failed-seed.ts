@@ -109,5 +109,8 @@ export const RUN_FAILED_SOME = Object.freeze({
   seq: 24,
   reason: "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED",
   quotaUsed: "SOME" as const,
-  question: "Should my city make its buses free for everyone, or only for people on low incomes?"
+  question: "Should my city make its buses free for everyone, or only for people on low incomes?",
+  // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): it kept its clarifying answers and the paths chosen
+  // from the list, so its read says `reusable` ("What already ran is kept for your next try, ..."). The first failed question kept nothing.
+  reusable: true as const
 });

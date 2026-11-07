@@ -48,9 +48,12 @@ export function V4SearchNote(props: Readonly<{ search: WebSearchStatus; catalog:
   return <p className={className}>{t(catalog, NOTE_KEYS[note])}</p>;
 }
 
-/** The page's date, as written on it (a calendar day: read in UTC so it never moves a day). */
+/**
+ * The page's date, as written on it (a calendar day: read in UTC so it never moves a day). Questions 4 A and 5 B (owner,
+ * 5 Nov; Task 76k): the long form with the year, day first in English ("12 June 2025").
+ */
 function pageDate(locale: string, day: string): string {
-  return formatDate(locale, `${day}T00:00:00Z`, { dateStyle: "medium", timeZone: "UTC" });
+  return formatDate(locale, `${day}T00:00:00Z`, { dateStyle: "long", timeZone: "UTC" });
 }
 
 type PageLike = Readonly<Pick<WebSource, "title" | "site" | "link" | "read_depth" | "explanation">>;

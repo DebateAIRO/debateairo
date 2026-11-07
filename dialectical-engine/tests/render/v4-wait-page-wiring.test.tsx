@@ -30,8 +30,9 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 
 /*
  * Owner's screen review, 3 Nov 2026, on today's debate page: the question's status is read through useWaitPolling
- * (wait-f19: rarely while the tab is hidden, at once when it is shown again or the connection returns), and while it
- * waits the header leaves "Open in the classic view" out, so the waiting card shows it once (wait-f23).
+ * (wait-f19: rarely while the tab is hidden, at once when it is shown again or the connection returns). "Open in the
+ * classic view" shows once (wait-f23): since the owner's answer 12 B (5 Nov; Task 76j's wiring) in the header's account menu
+ * only, on the waiting and failed screens too.
  */
 let visibility: DocumentVisibilityState = "visible";
 const running = (runId: string): RunProjection => ({
@@ -92,33 +93,21 @@ describe("the debate page's checks while the question runs (wait-f19)", () => {
 });
 
 describe("Open in the classic view while the question waits (wait-f23)", () => {
-  it("the header leaves it out on the waiting card, so it shows once; the map's header has it again", async () => {
+  // The owner's answers of 5 Nov, question 12 B (journey-f19): "Open in the classic view" in the account menu only. The page's
+  // own wiring (V4DebateClient, Task 76j) hands it to the header on every screen and to no body screen.
+  it("question 12 B: the header carries it on the waiting card, and the card does not; the map's header keeps it", async () => {
     const runId = crypto.randomUUID();
     harness.run = running(runId);
     await mountMap(1600, runId);
-    expect(seen.headerLinks.at(-1)).toBeNull();
-    expect(classicLinks()).toHaveLength(1);
+    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(classicLinks()).toEqual([]);
     harness.run = null;
     await advance(5_000);
     await settle();
     expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
   });
 
-  it("the failed page carries it once too: the header leaves it out (until the page's wiring for question 12 B lands)", async () => {
-    const runId = crypto.randomUUID();
-    harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
-    await mountMap(1600, runId);
-    expect(page().textContent).toContain(CATALOG["v4.debate.failedTitle"]);
-    expect(seen.headerLinks.at(-1)).toBeNull();
-    expect(classicLinks()).toHaveLength(1);
-    expect(page().querySelector(".v4DebFailed")!.contains(classicLinks()[0]!)).toBe(true);
-  });
-
-  // The owner's answers of 5 Nov, question 12 B (journey-f19): "Open in the classic view" in the account menu only. The
-  // screens draw it only when the page hands it to them; the page's own wiring (V4DebateClient, the start-step's file) still
-  // hands it to the screen and keeps it out of the header. This is the state once that wiring lands. It is marked as
-  // failing until then: when it starts to pass, turn it into a plain `it` and drop the test above.
-  it.fails("question 12 B, once the page's wiring lands: the failed screen's header carries it and the screen does not", async () => {
+  it("question 12 B: the failed screen's header carries it and the screen does not", async () => {
     const runId = crypto.randomUUID();
     harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
     await mountMap(1600, runId);

@@ -333,6 +333,11 @@ export type V4StartHandOver = Readonly<{
   startPaths?: StartPaths;
   carryOnToReport?: true;
   ownWords: readonly string[];
+  /**
+   * V4 start step, Task 76f (saved-questions spec §3.7): the question the account keeps for this step 2, which the server
+   * removes once it accepts the debate. Absent: none kept.
+   */
+  savedQuestionId?: string;
 }>;
 
 /**

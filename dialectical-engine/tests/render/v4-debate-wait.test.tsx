@@ -291,35 +291,33 @@ describe("the month pause on the map (wait-f5)", () => {
   });
 
   // Review of Tasks 60-62: the pause block stands in the waiting card's place, so what the waiting card carried at its foot stays
-  // with the block, as on the paused screen it replaced: the lost-touch line (wait-f19) and "Open in the classic view", once
-  // (wait-f23; the header leaves it out during the run).
+  // with the block, as on the paused screen it replaced: the lost-touch line (wait-f19). "Open in the classic view" is in the
+  // header's account menu only since the owner's answer 12 B (5 Nov; Task 76j), so the block draws none.
   const classicLinks = (): Element[] =>
     [...page().querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
   const PAUSE = { until: "2026-12-01T00:00:00.000Z", can_continue: false };
 
-  it("paused on the map, it still says it lost touch, and keeps \"Open in the classic view\" once", async () => {
+  it("paused on the map, it still says it lost touch, and draws no classic link (question 12 B)", async () => {
     const runId = crypto.randomUUID();
     harness.run = runRead(runId, [], { month_pause: PAUSE });
     await mountMap(1600, runId);
     const root = (): Element => page().querySelector("[data-run-root]")!;
-    expect(classicLinks()).toHaveLength(1);
-    expect(root().contains(classicLinks()[0]!)).toBe(true);
+    expect(classicLinks()).toEqual([]);
     expect(text()).not.toContain(CATALOG["v4.debate.reconnecting"]);
     harness.loadError = new Error("made-up network fault");
     await advance(5_000);
     await settle();
     expect(flat(root())).toContain(CATALOG["v4.debate.reconnecting"]);
-    expect(classicLinks()).toHaveLength(1);
+    expect(classicLinks()).toEqual([]);
   });
 
-  it("an R22 run paused at the month wall keeps them too, on its first card", async () => {
+  it("an R22 run paused at the month wall keeps the lost-touch line too, on its first card, and no classic link", async () => {
     const runId = crypto.randomUUID();
     harness.run = { run_ref: runId, question_line: Q, state: "RUNNING", terminal_reason: null, hold_until: null, month_pause: PAUSE } as RunProjection;
     await mountMap(1600, runId);
     const first = (): Element => page().querySelector(".v4DebFirstCard")!;
     expect(first().querySelector(".v4Pause")).not.toBeNull();
-    expect(classicLinks()).toHaveLength(1);
-    expect(first().contains(classicLinks()[0]!)).toBe(true);
+    expect(classicLinks()).toEqual([]);
     harness.loadError = new Error("made-up network fault");
     await advance(5_000);
     await settle();

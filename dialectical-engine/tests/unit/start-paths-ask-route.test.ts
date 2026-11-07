@@ -76,7 +76,9 @@ const MENU: StartMenu = StartMenuSchema.parse({
 type Signing = Readonly<{ questionLine?: string; planKey?: DebateShapePlanKey; settingsVersion?: number }>;
 const bound = (over: Signing = {}) => ({ ownerScope: SCOPE, questionLine: over.questionLine ?? Q, planKey: over.planKey ?? "premium" as DebateShapePlanKey,
   settingsVersion: over.settingsVersion ?? ACTIVE });
-const checkRef = (over: Signing = {}) => signStartCheck(KEY, { ...bound(over), lock: LOCK, originalQuestionLine: null });
+/** Task 57d: the reading's try, a random id its check carries (made up, fixed so every check of the reading names the same one). */
+const READING_TRY = "7a".repeat(32);
+const checkRef = (over: Signing = {}) => signStartCheck(KEY, { ...bound(over), lock: LOCK, originalQuestionLine: null, tryRef: READING_TRY });
 const signedMenu = (over: Signing = {}): SignedStartMenu => ({ menu: MENU, ref: signStartMenu(KEY, { ...bound(over), menu: MENU }) });
 const signedLate = (over: Signing = {}): SignedStartList => ({ list: LIST3, ref: signStartList(KEY, { ...bound(over), list: LIST3 }) });
 /** One character of the signature changed. */

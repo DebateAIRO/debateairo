@@ -4,6 +4,7 @@ import {
   PostgresModelSpendStore, linkPreStartTry, preStartChargeWriterPresent, preStartSpendRef, readRunQuotaUsed, recordAskClarifyCharge, recordPreStartCharge,
   type PreStartChargeKind
 } from "@debateai/budget";
+import { WORK_ITEM_RETRY, WorkItemRepository } from "@debateai/battery";
 import { createPool, migrate, type Pool } from "@debateai/db";
 import { ASK_CLARIFY_SPEND_REF } from "../../apps/api/src/ask-clarify.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
@@ -336,5 +337,140 @@ describe("0164: a failed question gives back its charges before Start", () => {
       expect(await denied(pool, "SELECT identity.record_pre_start_try_charge($1,$1,NULL,NULL,'LIST','pre-start:list:x:y',current_date,1,1,1,$2)",
         [randomUUID(), made])).toBe(true);
     }
+  });
+
+  // Task 57e (the owner's 6 Nov rule: "re-use what we already paid for ... only in case ... there's no way we can re-use those parts, then
+  // of course we will give the user back that credit"): a failed debate that keeps the paths chosen from the list keeps the charges that
+  // bought them, for "Ask this again" re-uses those paths at no new charge; one that keeps nothing they bought gives them back.
+  /** The debate's set as 0158 keeps it (codes only here: written past the content check, as the database's own fixtures write one). */
+  async function pathSet(runId: string, source: "MENU" | "RUN_BUILT" | "DIG_PICKS"): Promise<void> {
+    const seed = await database.pool.connect();
+    try {
+      await seed.query("BEGIN");
+      await seed.query("SET LOCAL session_replication_role = 'replica'");
+      await seed.query(`INSERT INTO core.start_path_set (run_id,source,width,path_count,chosen_by,carry_on_to_report,content_ciphertext,content_attestation)
+        VALUES ($1,$2,3,3,'PERSON',false,'{}'::jsonb,'\\x00'::bytea)`, [runId, source]);
+      await seed.query("COMMIT");
+    } catch (error) { await seed.query("ROLLBACK"); throw error; } finally { seed.release(); }
+  }
+
+  it("Task 57e: a failed debate that keeps the paths chosen from the list keeps their charges; one that kept nothing they bought gives them back", async () => {
+    const [kept, built, none, dig, setAside] = [tryRef(), tryRef(), tryRef(), tryRef(), tryRef()];
+    const [menuRun, builtRun, noSetRun, digRun, setAsideRun] = [await ownRun(), await ownRun(), await ownRun(), await ownRun(), await ownRun()];
+    const [from, to] = window();
+    const store = new PostgresModelSpendStore(runner);
+    const before = await store.readOwnerSpentMicros(owner.ownerRef, from, to);
+    await charged(3, "LIST", kept);
+    await charged(2, "MERGE", kept);
+    await charged(4, "LIST", built);
+    await charged(1, "ANGLES", none);
+    await charged(6, "COMBINE", dig);
+    await charged(7, "MERGE", setAside);
+    for (const [made, run] of [[kept, menuRun], [built, builtRun], [none, noSetRun], [dig, digRun], [setAside, setAsideRun]] as const) {
+      expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBeGreaterThan(0);
+    }
+    await pathSet(menuRun, "MENU");
+    await pathSet(builtRun, "RUN_BUILT");
+    await pathSet(digRun, "DIG_PICKS");
+    await pathSet(setAsideRun, "MENU");
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 23);
+    // An upload set one aside: its waiver says it used none of the person's quota, so its charges are given back though its paths stay.
+    await database.pool.query("INSERT INTO ledger.model_spend_waiver (run_id, reason) VALUES ($1, 'BACKSTOP')", [setAsideRun]);
+    for (const run of [menuRun, builtRun, noSetRun, digRun, setAsideRun]) await workItem(run, "FAILED");
+    // Only the charges of the paths kept from the list stay: Ask again re-uses them. The rest (nothing stored for the person) are given back.
+    expect(await store.readOwnerSpentMicros(owner.ownerRef, from, to)).toBe(before + 5);
+    expect(await quota(menuRun)).toBe("SOME");
+    expect([await quota(builtRun), await quota(noSetRun), await quota(digRun), await quota(setAsideRun)]).toEqual(["NONE", "NONE", "NONE", "NONE"]);
+  });
+
+  it("Task 57e: a team member's failed debate that keeps its paths keeps their charge in the grant's window and the team's limit", async () => {
+    const made = tryRef();
+    const run = await ownRun();
+    const [from, to] = window();
+    const grantSpent = () => total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total",
+      [owner.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to]);
+    const teamSpent = () => total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const [grantBefore, teamBefore] = [await grantSpent(), await teamSpent()];
+    await charged(4, "LIST", made, GRANT);
+    expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBe(1);
+    await pathSet(run, "MENU");
+    await workItem(run, "FAILED");
+    expect([await grantSpent(), await teamSpent()]).toEqual([grantBefore + 4, teamBefore + 4]);
+  });
+
+  // Task 57e: a debate that stops on our side is claimed again once, a few minutes later, and resumes from what it saved (0119): the copy
+  // that stopped keeps its claim until then (so nothing else takes it early, and the run still reads as running), and the work item's one
+  // retry is recorded. The lapsed re-send then lists it and the next copy claims it. A second stop is RETRIED: nothing parked again.
+  /** A READY work item of the debate, its id. */
+  async function readyItem(runId: string): Promise<string> {
+    return (await database.pool.query<{ work_item_id: string }>(`INSERT INTO core.work_item (run_id,battery_row_id,node_set,command_key,state,created_at_seq)
+      VALUES ($1,'Q1','[]'::jsonb,$2,'READY',ledger.allocate_sequence()) RETURNING work_item_id::text`, [runId, `retry:${randomUUID()}`])).rows[0]!.work_item_id;
+  }
+  const releaseOf = async (runId: string): Promise<string> =>
+    (await database.pool.query<{ key: string }>("SELECT identity.run_release_now($1) AS key", [runId])).rows[0]!.key;
+  const itemRow = async (workItemId: string) => (await database.pool.query<{ state: string; claimed_by: string | null; deadline: string | null;
+    held_seconds: number | null }>(`SELECT state, claimed_by, claim_deadline::text AS deadline,
+      round(extract(epoch FROM claim_deadline - clock_timestamp()))::int AS held_seconds FROM core.work_item WHERE work_item_id=$1`, [workItemId])).rows[0]!;
+  const retries = async (workItemId: string): Promise<number> =>
+    Number((await database.pool.query<{ n: string }>("SELECT count(*) AS n FROM core.work_item_retry WHERE work_item_id=$1", [workItemId])).rows[0]!.n);
+
+  it("Task 57e: a stopped debate is parked once: its claim kept until the delay, then lapsed for the re-send and claimed again; a second stop is RETRIED", async () => {
+    const run = await ownRun();
+    const workItemId = await readyItem(run);
+    const releaseKey = await releaseOf(run);
+    const first = new WorkItemRepository(system, { releaseKey, workerId: "runner-a" });
+    expect((await first.claimById({ workItemId, workerId: "runner-a", claimSeconds: 600 }))?.workItemId).toBe(workItemId);
+    // Another copy's park never touches this copy's claim.
+    expect(await new WorkItemRepository(system, { releaseKey, workerId: "runner-b" }).parkForRetry({ runId: run, workItemId, delaySeconds: 1 })).toBe("NOT_HELD");
+    expect(await retries(workItemId)).toBe(0);
+    expect(await first.parkForRetry({ runId: run, workItemId, delaySeconds: 1 })).toBe("PARKED");
+    expect(await itemRow(workItemId)).toMatchObject({ state: "CLAIMED", claimed_by: "runner-a" });
+    expect(await retries(workItemId)).toBe(1);
+    expect(await first.listLapsedClaimed(1_000)).not.toContainEqual({ runId: run, workItemId });
+    await new Promise((resolve) => { setTimeout(resolve, 1_200); });
+    // The delay passed: the lapsed re-send lists it, and the next copy claims it and resumes.
+    expect(await first.listLapsedClaimed(1_000)).toContainEqual({ runId: run, workItemId });
+    const second = new WorkItemRepository(system, { releaseKey, workerId: "runner-c" });
+    expect((await second.claimById({ workItemId, workerId: "runner-c", claimSeconds: 600 }))?.workItemId).toBe(workItemId);
+    const { held_seconds: _seconds, ...held } = await itemRow(workItemId);
+    void _seconds;
+    // It stops again: never parked twice. Its claim and deadline are left as they were, for the task to record FAILED as today.
+    expect(await second.parkForRetry({ runId: run, workItemId })).toBe("RETRIED");
+    expect(await itemRow(workItemId)).toMatchObject(held);
+    expect(await retries(workItemId)).toBe(1);
+    expect(await second.recordTerminalFailure({ runId: run, workItemId, reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED" })).toBe(true);
+    expect((await itemRow(workItemId)).state).toBe("FAILED");
+  });
+
+  it("Task 57e: the default delay is a few minutes; a FAILED or settled item is never parked; the retry's row is insert-only and no request role reads it", async () => {
+    const run = await ownRun();
+    const workItemId = await readyItem(run);
+    const releaseKey = await releaseOf(run);
+    const copy = new WorkItemRepository(system, { releaseKey, workerId: "runner-d" });
+    await copy.claimById({ workItemId, workerId: "runner-d", claimSeconds: 60 });
+    expect(await copy.parkForRetry({ runId: run, workItemId })).toBe("PARKED");
+    const held = (await itemRow(workItemId)).held_seconds!;
+    expect(held).toBeGreaterThanOrEqual(WORK_ITEM_RETRY.delaySeconds - 5);
+    expect(held).toBeLessThanOrEqual(WORK_ITEM_RETRY.delaySeconds);
+    expect(WORK_ITEM_RETRY.delaySeconds).toBeGreaterThanOrEqual(120);
+    expect(WORK_ITEM_RETRY.delaySeconds).toBeLessThanOrEqual(600);
+    const failedRun = await ownRun();
+    await workItem(failedRun, "FAILED");
+    const failedItem = (await database.pool.query<{ id: string }>("SELECT work_item_id::text AS id FROM core.work_item WHERE run_id=$1", [failedRun])).rows[0]!.id;
+    expect(await new WorkItemRepository(system, { releaseKey: await releaseOf(failedRun), workerId: "runner-d" })
+      .parkForRetry({ runId: failedRun, workItemId: failedItem })).toBe("NOT_HELD");
+    for (const sql of ["UPDATE core.work_item_retry SET retry_after = clock_timestamp() WHERE work_item_id=$1", "DELETE FROM core.work_item_retry WHERE work_item_id=$1"]) {
+      expect((await sqlError(() => database.pool.query(sql, [workItemId]))).code, sql).toBe("55000");
+    }
+    for (const pool of [runner, billing, erasure, worker, authorization, replay]) {
+      expect((await sqlError(() => pool.query("SELECT * FROM core.work_item_retry"))).code).toBe("42501");
+    }
+    const denied = async (pool: Pool) => (await sqlError(() => pool.query("SELECT core.record_work_item_retry($1,$1,clock_timestamp())", [randomUUID()]))).code === "42501";
+    for (const pool of [erasure, worker, replay]) expect(await denied(pool)).toBe(true);
+    for (const pool of [erasure, worker, replay, runner]) {
+      expect((await sqlError(() => pool.query("SELECT core.run_pre_start_kept($1)", [randomUUID()]))).code).toBe("42501");
+    }
+    // The runner's role may write it, for a CLAIMED item only.
+    expect((await sqlError(() => runner.query("SELECT core.record_work_item_retry($1,$1,clock_timestamp())", [randomUUID()]))).message).toContain("WORK_ITEM_RETRY_INVALID");
   });
 });

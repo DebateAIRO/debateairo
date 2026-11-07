@@ -71,7 +71,12 @@ const NOT_ANSWERED_BY_DEFAULT: Readonly<Record<string, string>> = Object.freeze(
   "support.chat-answer.v3": "the support chat is not part of a debate", "support.case-summary.v1": "the support chat is not part of a debate",
   "support.case-summary.v2": "the support chat is not part of a debate", "support.no-source-judgement.v1": "the support chat is not part of a debate",
   "evaluator.blind-judge-grade.v1": "the dormant evaluator lane's add-on", "evaluator.domain-tagger.v1": "the dormant evaluator lane's add-on",
-  "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on"
+  "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on",
+  // V4 start step (Task 50b): the main answer's goal versions, drafts until Task 92 seals them (and then maps them to REPORT_ANSWER and
+  // REPORT_ANSWER_CHECK in tests/support/gate-later-steps.ts). A path run asks them only when the person stated a goal, which only the
+  // clarifying call's version 2 (sealed by the same Task 92) offers, so nothing the practice runs sends them before then.
+  "report.answer.v5": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers",
+  "report.answer-check.v4": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers"
 });
 
 const chatOf = (contract: PromptContract, material: readonly FramedMaterialField[]): string =>

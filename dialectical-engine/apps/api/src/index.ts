@@ -371,6 +371,8 @@ import {
   freeNoticeMissing, startHandOverOf, startQuestionCheckText, startStepOnInView, startTextsOfBody, startWidthsOfView, type StartDig,
   type StartHandOverAtAsk
 } from "./start-paths-at-ask.js";
+// V4 start step, Task 57e: "Ask this again" re-uses what the failed question kept.
+import { askAgainHandOverOf, askAgainOf, readAskAgainSource, type AskAgain, type AskAgainSource } from "./ask-again.js";
 // V4 start step, Task 30: the step behind the four calls before Start, its key and its stream writer.
 import { START_STEP_TIMING, type StartStepTiming } from "@debateai/map";
 import { detectArgumentLanguage } from "@debateai/kernel";
@@ -1876,9 +1878,17 @@ export interface AskApplication {
   readRunQuotaUsed?(runId: string, ownership: RunOwnershipAccess): Promise<RunQuotaUsed | null>;
   /**
    * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): at Start, the person's charges before Start of one try
-   * (signing.ts's startTryRefOf) not yet given to a debate, given to their new debate (0164); how many. Absent: nothing is given.
+   * (Task 57d: the reading's random id its check carries, signing.ts's startTryRefOfCheck) not yet given to a debate, given to their new
+   * debate (0164); how many. Absent: nothing is given.
    */
   linkPreStartTry?(ownerRef: string, tryRef: string, runId: string): Promise<number>;
+  /**
+   * V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): what one of the person's FAILED first questions kept
+   * for "Ask this again" (./ask-again.ts AskAgainSource: its line with the clarifying answers, its purpose lines, depth and the paths chosen
+   * from the list), read only after that debate's owner-gated read said FAILED; null when it keeps nothing to re-use or cannot be read.
+   * Absent: Ask again is today's ask, and the FAILED read never says `reusable`.
+   */
+  readAskAgain?(ownerRef: string, runId: string): Promise<AskAgainSource | null>;
 }
 
 /** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
@@ -4459,15 +4469,33 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // V4 start step
     // Task 39e (saved questions spec 2026-11-04 §3.7): the question not started yet this ask starts from is read only by the removal
     // once the ask is accepted (below); it is never handed to `submit`, so never stored with the run, sealed, logged or passed to the runner.
-    const { saved_question_id: savedQuestionId, ...ask } = parseRequest(AskRequestSchema, request.body);
+    // Task 57e: the "Ask this again" link is read the same way: by the route alone, never handed to `submit` with the ask.
+    const { saved_question_id: savedQuestionId, again_of: againOf, ...ask } = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     // V4 start step, Task 56: everything after the body's checks is the person's own question and dig step (askAsOwner, below,
     // shared with the carry-on); the route sends what it answers.
-    const answered = await askAsOwner(asker, ask, savedQuestionId === undefined ? {} : { savedQuestionId });
+    const answered = await askAsOwner(asker, ask, { ...(savedQuestionId === undefined ? {} : { savedQuestionId }),
+      ...(againOf === undefined ? {} : { againOf }) });
     return reply.status(answered.status).send(answered.body);
   });
+  /**
+   * V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): what the person's own FAILED first question `runId`
+   * kept for "Ask this again" (its owner-gated read first, then the application's read), or null: not theirs, not FAILED, erased, nothing kept,
+   * or anything that cannot be read. Never throws: a link that cannot be honoured is today's ask.
+   */
+  const askAgainSourceOf = async (request: AskerOfRequest, runId: string): Promise<AskAgainSource | null> => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef === undefined || options.application.readAskAgain === undefined) return null;
+    try {
+      const run = await readOwnerRun(options, runId, request.session, ownershipFor(request));
+      if (run?.state !== "FAILED") return null;
+      return await options.application.readAskAgain(ownerRef, runId);
+    } catch {
+      return null;
+    }
+  };
   /**
    * V4 start step, Task 56: POST /v1/asks after the body's checks, as one step the route and the carry-on share: the Free notice
    * lock, Decision 13's public branch, the dig's admission, Task 36's hand-over, the question check, `submit`, the dig's join and
@@ -4475,7 +4503,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * `public_dig_not_joined` included) or REFUSED (the route's refusal; `body.error` is its code). `extras.principal` is set only by
    * the carry-on ports (a server principal's carry-on dig); `extras.savedQuestionId` only by the route.
    */
-  const askAsOwner = async (asker: AskAsker, ask: AskRequest, extras: Readonly<{ savedQuestionId?: string;
+  const askAsOwner = async (asker: AskAsker, ask: AskRequest, extras: Readonly<{ savedQuestionId?: string; againOf?: string;
     principal?: Pick<Extract<AskPrincipal, { kind: "server" }>, "carryOn"> }> = {}): Promise<AskAsOwnerOutcome> => {
     const owner = asker.owner;
     const request: AskerOfRequest = owner === null ? Object.freeze({ session: asker.session }) : Object.freeze({ session: asker.session, authenticatedSession: owner });
@@ -4553,7 +4581,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const digOfStart = digParent !== undefined ? { parentRunId: digParent.parent_run_id, picks: digParent.picks ?? [], own: true }
       : publicAdmission === null ? null : { parentRunId: publicAdmission.parentRunId, picks: publicAdmission.picks, own: false };
     let start: StartHandOverAtAsk | null = null;
-    if (owner !== null && (ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
+    // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): "Ask this again" on the person's own FAILED first
+    // question that kept the paths chosen from the list, with its line unchanged: the question starts again on what that debate stored (its
+    // clarifying answers, purpose lines, depth and paths), handed over as a Start's verified paths are, with no call before Start, no charge
+    // and no try linked. Anything else ignores the link (today's ask, `ask` as sent).
+    const again: AskAgain | null = extras.againOf === undefined || owner === null || !newQuestion ? null
+      : askAgainOf(ask, await askAgainSourceOf(request, extras.againOf));
+    if (owner !== null && (again !== null || ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
       const view = await viewOnce();
       // Where the switch is off nothing runs, so no plan is read for a binding (null: a menu is STALE, the rest is today's ask).
       const binding = !startStepOnInView(view) ? null
@@ -4563,7 +4597,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         pickAuthors: Object.freeze(await Promise.all(digOfStart.picks.map(async (pick) => digPickAuthorOf(pick,
           pick.suggestion_id === null || !digOfStart.own ? null : await digSuggestionText(owner.ownerRef, digOfStart.parentRunId, pick.suggestion_id))))) });
       try {
-        start = startHandOverOf({ key: options.startStepKey, ownerRef: owner.ownerRef, ask, binding, view, dig, now: new Date() });
+        if (again !== null) {
+          // Task 57e: the kept paths under the binding Next would derive now; where the step does not run any more, today's ask.
+          const reused = askAgainHandOverOf({ again, binding, view });
+          if (reused !== null) {
+            ask = again.ask;
+            start = Object.freeze({ ...reused, questionEdited: false });
+          }
+        } else {
+          start = startHandOverOf({ key: options.startStepKey, ownerRef: owner.ownerRef, ask, binding, view, dig, now: new Date() });
+        }
       } catch (error) {
         if (error instanceof TypedDomainError && START_PATHS_REFUSAL_STATUS.has(error.code)) {
           return refusedWith({ status: askRefusalStatus(error.code), body: { error: error.code, message: error.code } });
@@ -4593,9 +4636,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ...handOver
     ));
     // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): the
-    // debate takes the charges before Start of each try this Start names (the question's, from its check; a combine over a dig's picks,
-    // from its parent), once, so 0164 gives them back if it fails. A link that fails never changes the 202 (the charges stay counted), and
-    // its one line names the debate and no word.
+    // debate takes the charges before Start of each try this Start names (the reading's random id its check carries, Task 57d; a combine
+    // over a dig's picks, from its parent), once, so 0164 gives them back if it fails. A link that fails never changes the 202 (the
+    // charges stay counted), and its one line names the debate and no word.
     if (start !== null && owner !== null && options.startStepKey !== undefined && options.application.linkPreStartTry !== undefined) {
       const ownerScope = ownerScopeOf({ kind: "server", ownerRef: owner.ownerRef });
       const tries = [ask.start_check === undefined ? null : startTryRefOfCheck(options.startStepKey, ownerScope, ask.start_check.ref),
@@ -4949,21 +4992,37 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // room estimates the debate an ask without chosen paths would run (`startRunBuiltPaths`: the default width), and the
     // room is asked for the share of each path count up to the widest, with the web part the ask itself would price
     // (`webSitesForAsk`: a search gate on a paid plan, QUICK below depth 2). Null: today's read, byte for byte.
-    const startWidths = digParent !== undefined ? null : startStepWidthsFor({ policy: view.debateShapePolicy ?? null,
+    const stepWidths = startStepWidthsFor({ policy: view.debateShapePolicy ?? null,
       engineInForce: view.engineVersionPolicy !== undefined, scorecardInForce: view.modelScorecardInForce,
       serverPrincipal: access.ownerRef !== null }, roomPlanKey);
+    const startWidths = digParent !== undefined ? null : stepWidths;
+    const searchGate = view.previewProviderTestConfig !== undefined && previewGateSocket(view.previewProviderTestConfig, "perplexity") !== undefined;
     const startMember = ((): Pick<RoomQuestion, "start"> => {
       if (startWidths === null) return {};
       const maxPaths = Math.max(...startWidths.options);
-      const config = view.previewProviderTestConfig;
-      const web = webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape: null,
+      const web = webSitesForAsk({ searchGate, shape: null,
         shapeV2: { plan: roomPlanKey, paths: maxPaths }, engine: view.engineVersionPolicy ?? null, depth: query.data.depth, parent: undefined });
       return { start: Object.freeze({ maxPaths, web: web?.depth ?? null }) };
+    })();
+    // V4 start step, Task 79b (owner answer Q19 of 4 Nov, "a dig's share follows a combine"; spec 2026-11-03 §4.4): a dig's read where
+    // the start step runs for this person on the view's version (the same widths: such a dig is argued as paths, one per pick or as the
+    // page shaped them) asks the room for the dig's share for each path count up to the most it may send (`startPathsFit`: How wide's
+    // widest, Free 3), with the web part the dig itself would price (`webSitesForAsk` from a dig: a search gate on a paid plan, in the
+    // dig's own mode). The dig's own class is unchanged. Without widths: today's dig read, byte for byte.
+    const digQuestion = ((): Pick<RoomQuestion, "dig"> => {
+      const dig = "dig" in digMember ? digMember.dig : undefined;
+      if (dig === undefined) return {};
+      if (stepWidths === null) return { dig };
+      const widest = Math.max(...stepWidths.options);
+      const maxPaths = roomPlanKey === "free" ? Math.min(widest, START_STEP_LIMITS.freePathsMax) : widest;
+      const web = webSitesForAsk({ searchGate, shape: null, shapeV2: { plan: roomPlanKey, paths: maxPaths },
+        engine: view.engineVersionPolicy ?? null, depth: query.data.depth, parent: { mode: dig.mode } });
+      return { dig: Object.freeze({ ...dig, paths: Object.freeze({ maxPaths, web: web?.depth ?? null }) }) };
     })();
     const answer: AskRoomAnswer = options.askRoom === undefined || decided === null
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       // V4 start step, Task 56: the question built one way (roomQuestionOf) for this read and for a carry-on dig's look.
-      : await options.askRoom.readRoom(roomQuestionOf({ access, view, settings: decided.settings, roomPlanKey, ...digMember, ...startMember,
+      : await options.askRoom.readRoom(roomQuestionOf({ access, view, settings: decided.settings, roomPlanKey, ...digQuestion, ...startMember,
           paths: startWidths === null ? undefined : startRunBuiltPaths(startWidths, roomPlanKey) }));
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
@@ -5007,7 +5066,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         lists: options.startStep?.route === "PREVIEW" ? "ON" as const : "OFF" as const,
         widths: { options: [...startWidths.options], default: startWidths.default },
         ...(answer.startShareByPaths === undefined ? {} : { share_by_paths: [...answer.startShareByPaths] })
-      } })
+      } }),
+      // V4 start step, Task 79b (owner answer Q19): a path debate's dig's share for each number of paths, when the room gave it (a dig's
+      // read where the start step runs, under the money rule). Absent: today's body, byte for byte.
+      ...(answer.digShareByPaths === undefined ? {} : { dig_share_by_paths: [...answer.digShareByPaths] })
     }));
   });
 
@@ -5320,7 +5382,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): a failed debate says whether any of the person's quota was used (0164),
       // after its owner-gated read above; nothing is said where the server cannot say. A debate that did not fail reads as before.
       const quotaUsed = await options.application.readRunQuotaUsed?.(runId, ownershipFor(request)) ?? null;
-      const failed = quotaUsed === null ? run : RunProjectionSchema.parse({ ...run, quota_used: quotaUsed });
+      // Task 57e (the owner's 6 Nov rule: re-use what was already paid for): it says `reusable` when what already ran is kept for the
+      // person's next try ("Ask this again" would re-use its clarifying answers and paths); nothing when it keeps nothing or cannot be read.
+      const againOwner = request.authenticatedSession?.ownerRef;
+      const readAskAgain = options.application.readAskAgain?.bind(options.application);
+      const reusable = againOwner !== undefined && readAskAgain !== undefined
+        && await Promise.resolve().then(() => readAskAgain(againOwner, runId)).then((source) => source !== null, () => false);
+      const failed = quotaUsed === null && !reusable ? run
+        : RunProjectionSchema.parse({ ...run, ...(quotaUsed === null ? {} : { quota_used: quotaUsed }), ...(reusable ? { reusable: true } : {}) });
       // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
       if (failed.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
         const found = await options.application.readRunFound(runId);
@@ -6964,6 +7033,15 @@ export class PostgresAskApplication implements AskApplication {
   /** V4 start step, Task 56: the carry-on's read of a debate's stored ask (its own lease; null: no such run). */
   readStoredAsk(runId: string): Promise<StoredAsk | null> {
     return this.#runs.readStoredAsk(runId);
+  }
+
+  /**
+   * V4 start step, Task 57e: what a FAILED first question of the person kept for "Ask this again" (./ask-again.ts), read only after the
+   * route's owner-gated read: its kept paths (the start paths store, null once erased), its stored ask and its purpose lines. Never throws.
+   */
+  readAskAgain(ownerRef: string, runId: string): Promise<AskAgainSource | null> {
+    return readAskAgainSource({ pool: this.pool, ownerRef, runId, readStoredAsk: (id) => this.#runs.readStoredAsk(id),
+      startPaths: this.settings.startPaths });
   }
 
   async submit(

@@ -6,8 +6,12 @@
  * (`?step=2`, keeping `?level=`), never the words.
  */
 
-/** What the page keeps in an entry: the words of step 1 or step 2, or the debate a started question became. */
-export type AskHistoryState = Readonly<{ step: "ask" | "read"; words: string }> | Readonly<{ step: "started"; runId: string }>;
+/**
+ * What the page keeps in an entry: the words of step 1 or step 2, or the debate a started question became. Task 76f (owner answer
+ * S1 A): step 2's entry also names the question the account keeps (`savedId`), so a reload on step 2 reopens it from the account;
+ * step 1's entry never does.
+ */
+export type AskHistoryState = Readonly<{ step: "ask" | "read"; words: string; savedId?: string }> | Readonly<{ step: "started"; runId: string }>;
 
 /** The one key this page writes inside history.state, beside the router's own keys. */
 export const ASK_HISTORY_KEY = "v4ask";
@@ -28,7 +32,9 @@ export function askHistoryOf(state: unknown): AskHistoryState | null {
   if (held === null) return null;
   const { step } = held;
   if ((step === "ask" || step === "read") && typeof held.words === "string" && held.words.trim().length > 0) {
-    return Object.freeze({ step, words: held.words });
+    // Task 76f: a saved question's id only in step 2's entry, and only as a string (any other value is dropped).
+    const savedId = step === "read" && typeof held.savedId === "string" && held.savedId.length > 0 ? held.savedId : null;
+    return Object.freeze(savedId === null ? { step, words: held.words } : { step, words: held.words, savedId });
   }
   if (step === "started" && typeof held.runId === "string" && held.runId.length > 0) return Object.freeze({ step, runId: held.runId });
   return null;
@@ -36,7 +42,9 @@ export function askHistoryOf(state: unknown): AskHistoryState | null {
 
 /** `state` with the page's own part set: every key already there (the router's) is kept; the state handed in is not changed. */
 export function withAskHistory(state: unknown, ask: AskHistoryState): Record<string, unknown> {
-  const own = ask.step === "started" ? { step: ask.step, runId: ask.runId } : { step: ask.step, words: ask.words };
+  const own = ask.step === "started" ? { step: ask.step, runId: ask.runId }
+    : ask.step === "read" && ask.savedId !== undefined ? { step: ask.step, words: ask.words, savedId: ask.savedId }
+      : { step: ask.step, words: ask.words };
   return { ...(recordOf(state) ?? {}), [ASK_HISTORY_KEY]: own };
 }
 

@@ -705,7 +705,33 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // V4 start step, Task 76g (read-f1, the owner's words of record :303): a new reading's line for an answer it set aside, and
   // its button, shown at the click-test.
   "v4.read.setAside",
-  "v4.read.putBack"
+  "v4.read.putBack",
+  // V4 start step, Task 76e (owner answer Q8, the spec's draft words): the site-update banner and its Reload, shown at the
+  // click-test.
+  "v4.ask.siteUpdated",
+  "v4.ask.siteUpdatedReload",
+  // V4 start step, Task 76k (owner answer Q27 A of 5 Nov: the drawn words of map-d4, "new words"): at Plain words, the folded
+  // line under a point a second AI checked that has no sources, shown at the click-test.
+  "v4.web.ownKnowledge",
+  // V4 start step, Task 76f (saved-questions spec 2026-11-04 §3.4-§3.6; owner answers S2 A and S3 A): "Not started yet" with
+  // Pick up and Delete (the owner's words), and the draft lines of saved questions, shown at the click-test.
+  "v4.saved.title",
+  "v4.saved.pickUp",
+  "v4.saved.delete",
+  "v4.saved.showAll",
+  "v4.saved.full",
+  "v4.saved.deleted",
+  "v4.saved.elsewhere",
+  "v4.start.none.leftEarly",
+  "v4.ask.leaveUnsaved",
+  // The Delete note's own still line and spoken line (the shared note's are about starting), drafted by Task 76f.
+  "v4.saved.deleteStill",
+  "v4.saved.deleteAnnounce",
+  // V4 start step, Task 77 (choose-f6, the spec's draft words): what the drop spot says while a mouse drags a path or a chip,
+  // shown at the click-test.
+  "v4.start.drop.add",
+  "v4.start.drop.combine",
+  "v4.start.drop.ownPath"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

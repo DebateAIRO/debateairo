@@ -17,8 +17,9 @@ import type { QuestionLanguageLock } from "../question-language/decider.js";
  * The payload binds the person (a hash of the owner scope), the question line checked at Next (its hash, trimmed), the
  * plan and the settings version, and a hash of what it signs (`h`). It never carries words: the page reads it and holds
  * the words beside it. The check also carries the language lock, less its original line, and a hash of that original
- * (`r`, null when there was no rewrite). A combined question binds its context (the menu or the dig), its members' hash
- * and its own title and question, and no question, plan or version.
+ * (`r`, null when there was no rewrite), and (Task 57d) its reading's try (`y`, last; none in a check signed without one).
+ * A combined question binds its context (the menu or the dig), its members' hash and its own title and question, and no
+ * question, plan or version.
  *
  * Task 26b: no reference has a lifetime, and none carries an expiry (one Task 26 wrote is ignored). The owner's answer
  * Q8 of 4 Nov ("Your rule, no time limit"): suggestions never go out of date by time, and a site update keeps the paths,
@@ -46,7 +47,7 @@ export type StartCombineContext = Readonly<{ kind: "MENU"; menuId: string } | { 
 type Kind = "CHECK" | "LIST" | "MENU" | "COMBINE";
 type LockWithoutOriginal = Omit<QuestionLanguageLock, "originalQuestionLine">;
 type BoundPayload = Readonly<{ v: 1; t: "CHECK" | "LIST" | "MENU"; o: string; q: string; p: string; s: number; h: string }>;
-type CheckPayload = BoundPayload & Readonly<{ l: LockWithoutOriginal; r: string | null }>;
+type CheckPayload = BoundPayload & Readonly<{ l: LockWithoutOriginal; r: string | null; y?: string }>;
 type CombinePayload = Readonly<{ v: 1; t: "COMBINE"; o: string; c: string; m: string; h: string }>;
 type Payload = BoundPayload | CheckPayload | CombinePayload;
 
@@ -116,6 +117,8 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const isText = (value: unknown): value is string => typeof value === "string";
 const isWhole = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
+/** A try's shape: 64 lower-case hex characters (0164's). */
+const isTry = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
 /** The payload of a well-formed reference this key signed, of whatever kind, or null; never throws. */
 function payloadOf(key: StartStepKey, ref: unknown): Payload | null {
@@ -136,7 +139,7 @@ function payloadOf(key: StartStepKey, ref: unknown): Payload | null {
   if (value.t === "COMBINE") return isText(value.c) && isText(value.m) ? value as Payload : null;
   if (value.t !== "CHECK" && value.t !== "LIST" && value.t !== "MENU") return null;
   if (!isText(value.q) || !isText(value.p) || !isWhole(value.s)) return null;
-  if (value.t === "CHECK" && (!isRecord(value.l) || !(value.r === null || isText(value.r)))) return null;
+  if (value.t === "CHECK" && (!isRecord(value.l) || !(value.r === null || isText(value.r)) || !(value.y === undefined || isTry(value.y)))) return null;
   return value as Payload;
 }
 
@@ -157,14 +160,19 @@ function assertBound(payload: BoundPayload, h: string, c: StartRefCheck): void {
   if (c.settingsVersion !== null && payload.s !== c.settingsVersion) refuse(START_PATHS_STALE);
 }
 
-/** The check at Next: the language lock the lists were written under, bound to the line checked and (after a rewrite) its original. */
+/**
+ * The check at Next: the language lock the lists were written under, bound to the line checked and (after a rewrite) its original.
+ * Task 57d: `tryRef`, the reading's try (newStartTryRef), rides inside it as its last member, so every later call of the reading and its
+ * Start name the same try; one of any other shape is never signed (a TypeError, START_TRY_REF_INVALID).
+ */
 export function signStartCheck(key: StartStepKey, b: StartRefBinding & Readonly<{
-  lock: QuestionLanguageLock; originalQuestionLine: string | null;
+  lock: QuestionLanguageLock; originalQuestionLine: string | null; tryRef?: string;
 }>): string {
+  if (b.tryRef !== undefined && !isTry(b.tryRef)) throw new TypeError("START_TRY_REF_INVALID");
   const { originalQuestionLine: _original, ...lock } = b.lock;
   void _original;
   const payload: CheckPayload = { ...bound("CHECK", b, contentHash(lock)), l: lock,
-    r: b.originalQuestionLine === null ? null : questionOf(b.originalQuestionLine) };
+    r: b.originalQuestionLine === null ? null : questionOf(b.originalQuestionLine), ...(b.tryRef === undefined ? {} : { y: b.tryRef }) };
   return seal(key, payload);
 }
 
@@ -227,25 +235,26 @@ export function startRefVersionOf(key: StartStepKey, ref: string): number | null
 
 /*
  * V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): THE TRY a
- * call before Start is charged to. One person's one question as they typed it at Next (an accepted rewrite's original, which the planner
- * reads first): an HMAC under this key of the owner hash and the words' hash, so it never reads back as words, is the same for every call
- * of that question (the planner, the lists, the merges, a combine on its menu, a fit) and for its Start, and differs for other words or
- * another person. A combine over a dig's picks is charged to the dig's parent instead. 64 lower-case hex characters (0164's shape).
+ * call before Start is charged to, so Start can give the try's charges to its debate and 0164 gives them back if it fails. Task 57d (the
+ * owner's 6 Nov answer, card "Privacy": "Random id"): one reading's try is a random id, minted once when the reading's planner starts (the
+ * same words from the same person within the ten minutes share that planner, so they are the same reading and share its try), carried
+ * inside the signed check, and read back from it by the merge, a combine on its menu, the fit and Start. Nothing made from the question's
+ * words is ever a try, so 0164 stores no fingerprint of a question. A combine over a dig's picks is charged to the dig's parent instead.
+ * 64 lower-case hex characters (0164's shape).
  */
 const tryOf = (key: StartStepKey, part: string): string =>
   createHmac("sha256", key.bytes).update(`debateai:start-step-try:v1\0${part}`, "utf8").digest("hex");
 
-/** The try of a person's words at Next. */
-export function startTryRefOf(key: StartStepKey, input: Readonly<{ ownerScope: string; words: string }>): string {
-  return tryOf(key, `${ownerOf(input.ownerScope)}\0${questionOf(input.words)}`);
+/** A new reading's try: 32 random bytes, never made from anything the person wrote. */
+export function newStartTryRef(): string {
+  return randomBytes(32).toString("hex");
 }
 
-/** The try a check this key signed for this person belongs to (its original's hash after a rewrite, else its line's); null otherwise. */
+/** The try a check this key signed for this person carries; null for a check that names none, another person's, or any other string. */
 export function startTryRefOfCheck(key: StartStepKey, ownerScope: string, ref: string): string | null {
   const payload = payloadOf(key, ref);
   if (payload === null || payload.t !== "CHECK" || payload.o !== ownerOf(ownerScope)) return null;
-  const check = payload as CheckPayload;
-  return tryOf(key, `${check.o}\0${check.r ?? check.q}`);
+  return (payload as CheckPayload).y ?? null;
 }
 
 /** The try a combine over a dig's picks is charged to: the person's dig of that parent debate. */

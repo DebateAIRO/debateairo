@@ -758,8 +758,13 @@ export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
 
 const PurposeLineSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
 
-/** Decision 29: one clarifying question the person answered, as asked and as answered. */
-export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema }).strict();
+/**
+ * Decision 29: one clarifying question the person answered, as asked and as answered.
+ * V4 start step, Task 50b (owner answer Q4; "Goal in answer": "Always say it"): `cares`, on the answer to "What do you care about most?"
+ * (the clarifying call's `cares` question, an offered or a typed answer), set by the page at Start; the run reads a stated goal from it,
+ * never from the words. Absent on every other answer, and on every line stored before (a widening only).
+ */
+export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema, cares: z.literal(true).optional() }).strict();
 export type PurposeAnswer = z.infer<typeof PurposeAnswerSchema>;
 
 /**

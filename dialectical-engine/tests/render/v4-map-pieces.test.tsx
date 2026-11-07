@@ -319,7 +319,10 @@ describe("V4 panel", () => {
     expect(expert.textContent).toContain("Answer to n4");
     expect(expert.textContent).toContain("First reason");
     const plain = panel(buildMap(), "root", "plain");
-    expect(plain.querySelectorAll(".v4PanelBasis")).toHaveLength(0);
+    // Question 27 A (5 Nov; Task 76k): at Plain words a checked point with no sources keeps its check line inside the closed
+    // "From the AIs' own knowledge" fold; none shows unfolded.
+    expect([...plain.querySelectorAll(".v4PanelBasis")].filter((line) => line.closest("details.v4SourcesFold") === null)).toHaveLength(0);
+    for (const fold of plain.querySelectorAll("details.v4SourcesFold")) expect(fold.hasAttribute("open")).toBe(false);
     expect(plain.textContent).toContain("Claim n1");
   });
 

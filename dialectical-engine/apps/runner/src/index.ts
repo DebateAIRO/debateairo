@@ -220,7 +220,7 @@ import {
   PATH_OUTCOME_FAILED, pathCopyStops, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathRunInvestigationsOf, pathsFinalSeatsOf,
   runPathChains, runPathOutcomeFor, type PathOutcomesJob, type PathOutcomesPath, type PathOutcomesSeat
 } from "./path-outcomes.js";
-import { runPathsMainAnswer, type PathsDossierPath } from "./paths-main-answer.js";
+import { pathsGoalStated, runPathsMainAnswer, type PathsDossierPath } from "./paths-main-answer.js";
 import { fitStoryPathsToTokenLine } from "./token-line.js";
 import { closingRandomBytes } from "./investigation-close.js";
 // (Named for the paths here: the debate's own body never names the dig's rewrite, tests/unit/dig-no-story.test.ts.)
@@ -12105,7 +12105,9 @@ export class WalkingSkeletonRunner {
             main = await runPathsMainAnswer({ runId: run.runId, free: pathsFree,
               answerWords: lengthGuidance?.steps.answer_writer ?? pathsShape!.answerWords,
               // Task 50's note: the main answer reads the language lock and the reading level from its question.
-              question: pathsQuestion, paths, seats: pathsFinalSeats, gateway: pathsGateway, tokenCount: pathsTokenCount, log: pathsLog });
+              question: pathsQuestion, paths, seats: pathsFinalSeats, gateway: pathsGateway, tokenCount: pathsTokenCount, log: pathsLog,
+              // Task 50b: the person said what they care about (the purpose lines' marked answer): the answer says how that goal fares.
+              goalStated: pathsGoalStated(pathsPurposeLines) });
             // Review of Task 54: its loop ends FAILED on a stop that ends this copy too; that stop ends the copy (no fallback served).
             pathsStops.throwIfStopped();
           } catch (error) {
@@ -13241,6 +13243,12 @@ export interface RunnerFailureRecorder {
     readonly workItemId: string;
     readonly reason: string;
   }): Promise<boolean>;
+  /**
+   * V4 start step, Task 57e: the one automatic retry (packages/battery WorkItemRepository.parkForRetry, main.ts's recorder): this copy's
+   * claim kept until a few minutes from now and the work item's one retry recorded (PARKED), or nothing written (RETRIED: it had its retry;
+   * NOT_HELD: not this copy's claim). Absent (fixtures, an older wiring): no retry, today's FAILED at once.
+   */
+  parkForRetry?(input: Readonly<{ runId: string; workItemId: string }>): Promise<"PARKED" | "RETRIED" | "NOT_HELD">;
 }
 
 // ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET ─────────────────────────────────────
@@ -14375,6 +14383,54 @@ const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
   "SETTINGS_VERSION_UNSUPPORTED"
 ]);
 
+/**
+ * V4 start step, Task 57e (the owner's 6 Nov rule: "either we fix the code that produced the error, we should re-use what we already paid
+ * for"; confirmed plan: one automatic retry after a few minutes, from the last saved step) — THE STOPS THAT ARE NOT OURS, never retried: the
+ * person's own act (a debate or account they erased while it ran: PRIVATE_CONTENT_ERASED), a limit the debate reached (its own ceiling, a
+ * step's tries used up), and every spending wall (the person's quota, the site's day, the debate's money ceiling, a team grant that is gone).
+ * A crisis stop and a refused question never reach a runner (the asks route answers them before any debate exists); the month wall's planned
+ * stop and the other stops that leave the work item alone are never recorded at all (LEAVES_WORK_ITEM_ALONE).
+ */
+const NEVER_RETRIED: ReadonlySet<string> = new Set([
+  "PRIVATE_CONTENT_ERASED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
+  "CALL_BUDGET_EXHAUSTED",
+  "PERSON_ALLOWANCE_REACHED",
+  "DAILY_COST_ENVELOPE_REACHED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "INTERNAL_FUNDING_UNAVAILABLE"
+]);
+
+/**
+ * V4 start step, Task 57e: whether a debate's stop is ours and earns its one automatic retry: a provider out (PROVIDER_CALL_FAILED), an AI's
+ * reply that could not be read, a time limit (RUNNER_TIME_LIMIT_REACHED), any fault of our code or database (an untyped throw, or a typed
+ * one). Never a stop the person caused or a wall (NEVER_RETRIED), nor one that leaves the work item alone. The retry resumes from what the
+ * debate saved (0119's true resume replays every call already answered, so nothing is bought twice) and seats the debate as any copy does:
+ * a member that sits out hands its seat to the debate's backup where one exists (run resilience). Claim-time refusals that record their own
+ * FAILED before they throw (a pinned role or model gone) stay terminal: the park finds the item no longer CLAIMED.
+ */
+export function runFailureRetriesOnce(error: unknown): boolean {
+  if (!(error instanceof TypedDomainError)) return true;
+  return !LEAVES_WORK_ITEM_ALONE.has(error.code) && !NEVER_RETRIED.has(error.code);
+}
+
+/**
+ * Task 57e: parks a debate that stopped on our side for its one retry; true when parked. A park that does not take (it had its retry, the
+ * claim is not this copy's) or that fails leaves today's path: the caller records FAILED. Its line names ids and an outcome only.
+ */
+async function parkedForRetry(failures: RunnerFailureRecorder, dispatch: Readonly<{ runId: string; workItemId: string }>,
+  error: unknown): Promise<boolean> {
+  if (failures.parkForRetry === undefined || !runFailureRetriesOnce(error)) return false;
+  let parked: "PARKED" | "RETRIED" | "NOT_HELD" | "FAILED";
+  try {
+    parked = await failures.parkForRetry({ runId: dispatch.runId, workItemId: dispatch.workItemId });
+  } catch {
+    parked = "FAILED";
+  }
+  console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_RETRY", event: parked, runId: dispatch.runId, workItemId: dispatch.workItemId }));
+  return parked === "PARKED";
+}
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -14490,6 +14546,10 @@ export function declareHatchetWalkingSkeletonTask(input: {
             if (error instanceof TypedDomainError && LEAVES_WORK_ITEM_ALONE.has(error.code)) {
               throw scrubbedTaskFailure(error);
             }
+            // V4 start step, Task 57e: a stop on our side is not FAILED the first time. The copy keeps its claim a few minutes and the
+            // retry is recorded; the lapsed re-send then hands the debate to a runner again, which resumes it from what it saved. The task
+            // ends without a failure (no Hatchet retry: an early one would find the claim still held). A second stop is FAILED as today.
+            if (await parkedForRetry(input.failures, dispatch, error)) return { kind: "RETRY_PARKED" };
             const recorded = await input.failures.recordTerminalFailure({
               runId: dispatch.runId,
               workItemId: dispatch.workItemId,

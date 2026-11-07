@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { CarryOnPart, RunProjection } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pauseOfRun } from "@/lib/v4/monthPause";
@@ -17,7 +16,8 @@ import { V4WaitCard } from "./V4WaitCard";
  *   - while the AIs are still choosing what to look into ("Just answer it"), "The AIs are choosing what to look into";
  *   - the other session's waiting card (V4WaitCard) with its one state line, the start time when the page knows it, the
  *     lost-touch line and no choices of its own (the paths are right beside it). Paused at the month wall, the one pause block
- *     (V4MonthPause) stands in its place: the waiting card always draws its state line, so the pause is said once (wait-f5);
+ *     (V4MonthPause) stands in its place: the waiting card always draws its state line, so the pause is said once (wait-f5).
+ *     Neither draws "Open in the classic view": the header's account menu holds it (the owner's answer 12 B, Task 76j);
  *   - the carry-on line, when the box was ticked and the behaviour is built (under the "choosing" line while there is one);
  *   - on a phone, "Your paths": one compact row per path (the same V4PathCard), each opening that path's screen.
  * Once the answer is served only the carry-on line stays. Nothing here reads, keeps or sends anything.
@@ -46,8 +46,6 @@ export function V4RunRoot(props: Readonly<{
   onSelect(selection: V4Selection, viaKeyboard: boolean): void;
   catalog: MessageCatalog;
   locale: string;
-  /** wait-f23: "Open in the classic view", once, at the bottom of the waiting card; absent: none. */
-  classicHref?: string | null;
   /** W2L-4: where focus goes when the pause block goes with Continue held (the first card's question); absent: nowhere. */
   pauseFocusAfter?: () => HTMLElement | null;
 }>) {
@@ -72,11 +70,9 @@ export function V4RunRoot(props: Readonly<{
             {...(props.pauseFocusAfter === undefined ? {} : { focusAfter: props.pauseFocusAfter })}
           />
           {/* Review of Tasks 60-62: what the waiting card carries at its foot stays with the block that stands in its place, as on
-              the paused screen it replaced: the lost-touch line (wait-f19) and "Open in the classic view", once (wait-f23). */}
+              the paused screen it replaced: the lost-touch line (wait-f19). Task 76j (the owner's answer 12 B, 5 Nov): "Open in
+              the classic view" is in the header's account menu only, so neither this block nor the waiting card draws it. */}
           {props.reconnecting ? <p className="v4WaitReconnect v4Muted" data-wait-reconnecting="">{t(catalog, "v4.debate.reconnecting")}</p> : null}
-          {props.classicHref === null || props.classicHref === undefined ? null : (
-            <p className="v4WaitClassic"><Link className="v4Link" href={props.classicHref}>{t(catalog, "v4.common.classicView")}</Link></p>
-          )}
         </>
       ) : (
         <V4WaitCard
@@ -84,7 +80,6 @@ export function V4RunRoot(props: Readonly<{
           variant="inline"
           startedAt={props.startedAt}
           reconnecting={props.reconnecting}
-          classicHref={props.classicHref ?? null}
           catalog={catalog}
           locale={locale}
         />

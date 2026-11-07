@@ -2,6 +2,7 @@ import {
   AskParentSchema,
   AskRequestSchema,
   PublicDigParentSchema,
+  SavedQuestionIdSchema,
   StartCheckSchema,
   StartPathsSchema,
   ContractHttpError,
@@ -517,7 +518,7 @@ export async function createDebate(
    * each only when present (none: today's ask, byte for byte). Each is parsed by its contract schema first, so a lane that
    * does not parse is refused before anything is sent.
    */
-  startLane?: Readonly<{ startCheck?: StartCheck; startPaths?: StartPaths; carryOnToReport?: true }>
+  startLane?: Readonly<{ startCheck?: StartCheck; startPaths?: StartPaths; carryOnToReport?: true; savedQuestionId?: string }>
 ): Promise<{ id: string; public_dig_not_joined?: boolean }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -563,7 +564,9 @@ export async function createDebate(
     ...(publicLane?.freePublicNotice === true ? { free_public_notice: true as const } : {}),
     ...(startLane?.startCheck === undefined ? {} : { start_check: StartCheckSchema.parse(startLane.startCheck) }),
     ...(startLane?.startPaths === undefined ? {} : { start_paths: StartPathsSchema.parse(startLane.startPaths) }),
-    ...(startLane?.carryOnToReport === undefined ? {} : { carry_on_to_report: AskRequestSchema.shape.carry_on_to_report.parse(startLane.carryOnToReport) })
+    ...(startLane?.carryOnToReport === undefined ? {} : { carry_on_to_report: AskRequestSchema.shape.carry_on_to_report.parse(startLane.carryOnToReport) }),
+    // V4 start step, Task 76f (saved-questions spec §3.7): the question not started yet this ask starts from, last (absent: today's bytes).
+    ...(startLane?.savedQuestionId === undefined ? {} : { saved_question_id: SavedQuestionIdSchema.parse(startLane.savedQuestionId) })
   };
   requireToken(token);
   if (language === undefined) {                                   // today's call, unchanged

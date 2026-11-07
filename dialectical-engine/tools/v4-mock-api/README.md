@@ -16,6 +16,8 @@ On 1 Nov 2026 (R22, for the owner's click-test) it gained the final report as th
 
 On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer, rewritten after its digs: version 1 while a change is still being written into it (45 seconds after the mock starts, `MOCK_MAIN_ANSWER_SECONDS`), then version 2.
 
+On 6 Nov 2026 (V4 start step, Task 80) it gained the step before Start: the AIs' lists as they come, the merge into the paths list, late ideas, combine and fit, a room read that says How wide and each path count's share, the Free notice lock and the paths read back at Start, usage that moves before Start, and the clarifying questions' new members. See "The step before Start" below.
+
 ## Files
 
 | File | What it is |
@@ -30,9 +32,12 @@ On 4 Nov 2026 (V4 screen review, dig-f1) the first debate gained its main answer
 | `failed-seed.ts` | The owner's answers of 5 Nov (questions 3 A and 20 A): a debate with one failed dig per reason group, and a failed question whose draft view says it used some of the quota. |
 | `plan-windows.ts` | Which quota windows the usage read names for each plan: Free the month alone, a paid plan its day, week and month (as the real API reads the register). |
 | `quaderno-tax.ts` | Prices `GET /v1/billing/plans` through Quaderno itself when `MOCK_QUADERNO_API_KEY_PATH` is set: the API's own tax reader (`DisplayedTaxReader`) over the production Quaderno client. See "Tax from Quaderno" below. |
+| `start-step.ts` | V4 start step (Task 80): the step before Start (the lists stream, the merge, combine and fit), the clarifying questions, the room's start step and room scenes, what `POST /v1/asks` refuses for the step, and the counters. See "The step before Start" below. |
+| `saved-questions.ts` | V4 start step (Task 80b): the questions not started yet (the five saved-question routes), the `#pickup` scene, the removal at Start, and the counters. See "Questions not started yet" below. |
+| `branches.ts` | V4 start step (Task 81): a new question as a path debate (one path per path sent at Start, or the AIs' own), its paths filling in one by one, the carry-on line, the scenes `#slowfill`, `#pathfailed`, `#carryon` and `#reportwaits`. See "One path per path sent at Start" below. |
 | `check.ts` | Self-check. It reads every endpoint through the website's own code: the `/api` proxy, the typed client, and the V4 map builder. |
 
-The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything. `tests/unit/v4-mock-quaderno.test.ts` checks the Quaderno pricing against the acceptance fake of Quaderno.
+The unit test `tests/unit/v4-mock-api.test.ts` checks the seed and the draft shapes without starting anything. `tests/unit/v4-mock-quaderno.test.ts` checks the Quaderno pricing against the acceptance fake of Quaderno. `tests/unit/v4-mock-start-step.test.ts` checks the step before Start, its routes run on a stand-in request. `tests/unit/v4-mock-saved-questions.test.ts` checks the questions not started yet the same way, and through the website's contract client.
 
 ## 1. Start the mock
 
@@ -156,6 +161,7 @@ The shapes are the contract's (`packages/contract/src/web.ts`, merged in W2-7), 
 | `GET /v1/billing/usage` | `borrowed` | with `usage=BORROWED`: the day reads 104% and running work used 4% of tomorrow's allowance |
 | `GET /v1/runs/:id` | `month_pause` | on run `e100…`: `until` (the next month) and `can_continue` |
 | `GET /v1/runs/:id` | `quota_used` (owner review 3 Nov; in the contract since Task 57c, 5 Nov) | on a failed run: `NONE` (nothing was taken from the person's quota: the failed question's path-list charge is given back) or `SOME`. The normal view sends it as the API does; a run that did not fail never carries it. A failed question says "Nothing was taken for the failed try." (NONE) or "The part that ran used some of your quota." (SOME), and a failed dig says "Nothing was taken from your quota for this." (NONE only). Seeded: 4444 `NONE`, 4500…45 `SOME`, and the seven failed digs of f000 |
+| `GET /v1/runs/:id` | `reusable` (V4 start step, Task 57e, 6 Nov; in the contract) | on a failed question only: `true` when what already ran is kept for the person's next try (its clarifying answers and the paths chosen from the list), so "Ask this again" re-uses them at no new charge (the API's ask takes `again_of`; the stand-in's ask ignores it). Absent otherwise. The page's line for it ("What already ran is kept for your next try, so asking again will not charge it twice.", draft) is the review session's. Seeded: 4500…45 `true`; 4444 none |
 | `POST /v1/runs/:id/continue` | (draft route) | 409 `RUN_PAUSED_UNTIL_RESET` before the month reset, 200 `{"state":"CONTINUING"}` after it (switch `pause=CAN_CONTINUE`); setting `pause=` again pauses the run again |
 
 **The quota's windows (owner's screen review, 3 Nov 2026: read-f19, public-f14, map-f33, map-f9):** two more fields that are NOT in the contract yet, so, like `started_at`, they are sent on the draft view (`/__mock/draft/v1/…`) and on the normal view only once the contract's own (strict) schema accepts them (they never make a read fall back and lose its shares or its month pause):
@@ -177,9 +183,10 @@ Since task W4-6 the first debate's map shows all four rewrite states: n-mix and 
 
 - Each ask the page sends is printed on the mock's standard output as one JSON line, `{"mock":"ask", "valid":…, "outcome":…, "run_ref":…, "body":{…}}`, so you can check exactly what was sent. To see only those lines, start the mock with `| grep '"mock":"ask"'` at the end of the command. The per-request lines go to the error output, so they are not caught by that filter.
 - An ask that breaks the contract's ask rules (or whose draft `parent` breaks the draft rules) gets a 400 reply, and its line says `"valid":false` with the reasons. A `parent` naming an unknown run gets 404.
-- A valid ask gets a new run id. The run reads "running" for 25 seconds, then "finished". Its answer is the nuclear debate with your question line. Its story says "still writing" for 10 more seconds, then ready.
+- A valid ask gets a new run id. The run reads "running" for 25 seconds, then "finished". Its answer is the nuclear debate with your question line. Its story says "still writing" for 10 more seconds, then ready. **Since V4 start step Task 81** that is a dig's run; a new question is a path debate, which runs until 6 seconds after its last path is argued (see "One path per path sent at Start").
 - A new question opens its own investigation. A dig, whether it names its `parent` in the ask (the draft way) or the page records the link after start (`POST /v1/runs/<parent>/dig-links`, today's way), joins its parent's investigation and reopens it if it was closed.
 - Put `#mix` anywhere in the question to get the "your question mixes languages" offer (409 QUESTION_LANGUAGE_CHOICE_NEEDED). Answering the offer goes through.
+- **Since V4 start step Task 80**, before anything starts: on `plan=FREE`, a new question without `free_public_notice` gets **403 `FREE_PUBLIC_NOTICE_REQUIRED`** (the mock's start step is on, so the Free notice lock is too; digs are never held). An ask with paths chosen before Start (`start_check`, `start_paths`) is read back from its references: a question line edited on step 2 goes through (the line is never compared); references from the other plan get **409 `START_PATHS_STALE`**; references from before a site update go through, unless they hold more paths than the room's widest now: **409 `START_PATHS_NARROWED`** (see "The step before Start").
 
 ## Switches
 
@@ -199,11 +206,13 @@ Set these when starting the mock, or change them live by opening `http://127.0.0
 | `MOCK_PUBLIC` / `public=` | `OPEN` (default), `ONGOING`, `REPORT_WRITING`, `TOO_DEEP`, `REPORT_STUCK` | What a public debate's presses get: see "Public debates" (Refusals, and "A report that never arrives"). |
 | `MOCK_PUBLIC_STATE` / `publicstate=` | `PRIVATE` (default), `WILL_BE_PUBLIC`, `BEING_CHECKED`, `PUBLISHED`, `KEPT_PRIVATE` | Every question's public state (its visibility read): see "Public debates" ("The globe line on your own map"). |
 | `MOCK_PUBLIC_DIG_SHARE` / `publicdigshare=` | `OFF` (default), `ON` | Draft (public-d3 A, public-f11): `ON` makes a room read with no dig parent carry a quick dig's share (`dig_share_percent`, 20%) instead of a new question's, so a public page's dig box shows "Dig here · up to 20%" and its period line ("of today · you can still finish your report"). The real API cannot say a dig's share on someone else's public debate yet (server need). While it is `ON`, the ask page shows no share of its own (one estimate per read). |
+| `MOCK_ROOM_SCENE` / `roomscene=` | `NONE` (default), `SITEUPDATED`, `PLANFAILS`, `PLANFAILSALL` | V4 start step (Task 80): the room reads' scene, see "The step before Start". `SITEUPDATED` (`#siteupdated`, owner answer Q8): 30 s after the first room read, the room names settings version 21, whose paid How wide is 3 or 5. `PLANFAILS` (`#planfails`, read-f3): the first two room reads fail (503) and later ones answer. `PLANFAILSALL` (`#planfailsall`): every room read fails. Setting it again starts it afresh. |
+| `MOCK_SAVED` / `saved=` | `NONE` (default), `PICKUP` | V4 start step (Task 80b): the questions not started yet, see "Questions not started yet". `PICKUP` (`#pickup`) seeds the scene's two made-up questions (again, as they were, beside any others); `NONE` keeps none (every kept question goes). |
 | `session=` | `IN` (default), `OUT` | A stranger (`OUT`): see "Public debates" ("A stranger", and "A sign-in that ended during a wait"). |
 | `subscription=RESET` | | Puts the Plus subscription back inside its 14 days after a withdrawal, so the withdrawal can be clicked again. |
 | `MOCK_REPORT_SECONDS` | default `8` | How long "Write my report" reads as being written. |
 | `MOCK_PORT` | default `4011` | Port (always on 127.0.0.1). |
-| `MOCK_RUN_SECONDS` | default `25` | How long a new debate "runs". |
+| `MOCK_RUN_SECONDS` | default `25` | How long a new dig "runs". A new question is a path debate, timed by its paths (see "One path per path sent at Start"). |
 | `MOCK_STORY_WRITING_SECONDS` | default `40` | How long run 5555's story says "still writing". |
 | `MOCK_POSTED_STORY_SECONDS` | default `10` | How long a new debate's story says "still writing" after it finishes. |
 | `MOCK_MAIN_ANSWER_SECONDS` | default `45` | How long run 1111's main answer says a change is still being written into it, before version 2 shows. |
@@ -245,9 +254,12 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 | `GET`/`POST /v1/account/sensitive-data-consent` | `given` (no consent pop-up). |
 | `GET /v1/account/legal-status`, `POST /v1/account/legal-accept` | Nothing to accept / 204. |
 | `GET`/`POST /v1/account/reading-level` | The reading level (0131), null until saved. |
-| `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20, answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. Draft: `reserve`, `dig_share_percent`. |
+| `GET`/`POST /v1/account/saved-questions`, `PUT`/`GET`/`DELETE /v1/account/saved-questions/:id` | The questions not started yet; see "Questions not started yet" (401 with `session=OUT`). |
+| `GET /v1/asks/room?…` | The plan (`PLUS` or `FREE`), settings version 20 (21 once `roomscene=SITEUPDATED` has moved it), answer length offered, word targets 300/700/1500. The debate-shape switch is left out (the contract allows only "on" or absent). The query is checked like the real API checks it. A new question's read carries the step before Start, `start_step` (see "The step before Start"); a dig's read does not. Draft: `reserve`, `dig_share_percent`. With `roomscene=PLANFAILS` or `PLANFAILSALL` it fails (503). |
 | `POST /v1/asks` | See above. |
-| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. |
+| `POST /v1/asks/clarify` | The clarifying questions, with version 2's members; see "The step before Start". |
+| `POST /v1/asks/paths/lists`, `/merge`, `/combine`, `/fit` | The step before Start; see "The step before Start". |
+| `GET /v1/billing/usage` | Day 14%, week 31%, month 9%; with `usage=BORROWED`, day 104% with a borrow notice. Each window also moves up with the calls made before Start (see "The step before Start"), at most to 110%. |
 | `GET /v1/billing/plans` | The register's default plans (Free, Plus $20, Pro $50, Max $200). With no `?country=` there is no place yet, so the paid cards show the price before tax and ask for the country. With `?country=` the plans come in that country's currency (lei in Romania, euro in the euro countries, dollars elsewhere, as the register says) and each total includes its tax: each EU country's standard VAT (21% in Romania, 19% in Germany, 21% in the Czech Republic, 25% in Croatia, and so on), none added outside the EU (with `MOCK_QUADERNO_API_KEY_PATH`, whatever Quaderno answers instead). The US and Canada also need `?postal_code=` (a Texas ZIP such as 75201 adds 6.25%); a missing one, or one that does not fit the country's format (the kernel's own check), is asked for again. |
 | `GET /v1/billing/subscription`, `GET /v1/billing/invoices` | Plus in euro, subscribed four days ago, inside its 14-day withdrawal window (none on `plan=FREE`); no invoices. After a withdrawal it reads WITHDRAWN. |
 | `POST /v1/billing/subscription/withdraw` | The signed-in session withdraws with an empty body, no step-up (OUG 34/2014 art. 11^1, owner ruling 2026-11-04): a €18.00 refund, once; again, 409 `NOT_SUBSCRIBED`. A body with anything in it gets 400 `MALFORMED_REQUEST`. |
@@ -260,10 +272,10 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 | `GET /v1/runs/:id`, `/answer`, `/visibility` | The run. Its answer appears once it is finished (404 before). It is private, except a finished Free question (6666, and new asks with `plan_tier: "free"`), which is public (`PUBLISHED`, as a Free debate is once its check passed), so the report's "This question is public, so your report will be public too." can be seen (report-f15); `#private` in a Free question plays one its check kept private. `/__mock/set?publicstate=…` (see "Public debates") sets every question's public state for the click-test and wins while it is not `PRIVATE`. |
 | `GET`/`POST /v1/runs/:id/last-visit` | The last visit (0131): both null before a first visit. |
 | `GET`/`POST /v1/runs/:id/dig-links` | The dig links (0131): the parent this debate was dug from, and the digs made from it. A child already dug from another debate gets 409 `DIG_LINK_CONFLICT`. |
-| `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". |
+| `GET /v1/runs/:id/investigation`, `POST …/investigation/close` | Draft routes, see "Draft fields". The website's read also says `first_closing_left` (Task 56b): true until the debate has a report version, false under `#reportwaits` (see "One path per path sent at Start"). |
 | `POST /v1/runs/:id/continue` | Draft route (W2-7): Continue on the month-paused debate. |
 | `GET /v1/runs/:id/progress` | Draft route (owner review 3 Nov, dig-d1 B): a dig's steps and the findings that passed their checks, `{run_ref, steps, now, findings: [{finding_id, text, trust, passed_at}]}`. Only with `live=ON`, only for a dig, never for one that failed; otherwise 404, as today's API (which has no such route). With a web search: Finding sources, Reading, Checking, Writing what changed; on Free or after a failed search: Arguing for and against, Checking, Writing what changed (and never "Sure" on Free). |
-| `GET /v1/runs/:id/events` | A live event stream. For a finished or failed run it replays three events and closes. For an open run it stays open with a keep-alive every 15 s, and a new debate's stream sends "finished" after 25 s. |
+| `GET /v1/runs/:id/events` | A live event stream. For a finished or failed run it replays three events and closes. For an open run it stays open with a keep-alive every 15 s, and a new debate's stream sends "finished" when it settles (a dig after 25 s, a new question 6 s after its last path). |
 | `GET /v1/geo/availability`, `/v1/public/ai-providers`, `/v1/public/debates`, `/v1/deployment` | Simple valid replies. |
 | `POST /v1/auth/logout` | 204. The mock still says "signed in" afterwards. |
 | `GET /readyz` | Ready (for the website's own `/readyz` check). |
@@ -271,6 +283,79 @@ Quaderno adds a country's tax only where the account has a tax registration ther
 An unknown run id gets 404 on every run route, as the real API answers a debate that is not yours.
 
 Anything else gets a 404 `NOT_MOCKED` reply. The mock also prints a line like `[mock] POST /v1/billing/checkout 404 <- NOT MOCKED`, so you can see at once what the website asked for that is missing.
+
+## The step before Start (V4 start step, Task 80)
+
+All of it lives in `start-step.ts`. Every body is the contract's and is checked at the mock's start and again before it is sent. All words, times and shares are made up.
+
+**The room read.** A new question's read carries `start_step`: the lists run before Start (`lists: "ON"`), How wide (Plus: 3, 5 or 7 paths, 5 to start with; Free: 3) and each path count's share of the day (Plus at depth 1: 6, 9, 12, 15, 18, 21, 24%; Plus deeper: 11 to 41%; Free, of the month: 8, 12, 16%). The step is on for every plan, so on `plan=FREE` a new question needs the Free notice (403 `FREE_PUBLIC_NOTICE_REQUIRED` without it).
+
+**The lists** (`POST /v1/asks/paths/lists`, an event stream). The check comes first (0.6 s), then each AI's progress and its list, the cut, any late lists, and one end. Plus has 4 AIs, Free 2. The words in the question pick the scene:
+
+| In the question | What happens |
+|---|---|
+| (nothing) | Lists at 2, 4 and 6 s, the cut at 6 s, a fourth list late at 12 s (Plus; Free's two lists are both in by 4 s). |
+| `#slowpaths` | Lists at 20, 40, 70 and 95 s, the cut at 30 s: only the first list is in by the cut, the rest come late. |
+| `#failpaths` | No list: "none" (`NO_LISTS`) at 3 s. The page starts without a list. |
+| `#fewpaths` | One AI only: one list, still merged by the AI (with cards and suggestions). |
+| `#siteupdated` | The room scene `SITEUPDATED` starts at this Next (see below). |
+| `#mix` | The language offer comes first; choosing reads the lists. |
+
+The same words from the same person (same plan, settings version, reading level and language choice) are read once for the mock's life: Back, then Next again, or a reload, replays the same lists and counts nothing (ask-f9).
+
+**The merge** (`…/merge`, an event stream: the menu after 1.5 s, a late merge after 1 s, then the end). Repeats of a viewpoint are folded into it, two pairs are put together in the merge's own words, and the menu has three "Another way to see it" cards and two suggestions (Combine, and fits inside). A late merge keeps every earlier path, card and suggestion exactly as it was and adds the late list's new paths at the end, marked new. **Combine** (`…/combine`, 1 s) writes one question for the points; with `#failcombine` in the question it answers NONE. **Fit** (`…/fit`, 0.8 s) names the first path that shares a word of four letters or more with the person's own view, else none.
+
+**The references** the mock writes are its own (`<base64url JSON>.mock`: the kind, the read line's hash, the plan, the settings version). Nothing in them is secret and no signature is checked. `POST /v1/asks` reads the plan and the version back: a question line edited on step 2 goes through (choose-d2); the other plan's references get 409 `START_PATHS_STALE`; references from before a site update go through unless they hold more paths than the room's widest now (409 `START_PATHS_NARROWED`).
+
+**Usage that moves before Start.** The calls before Start count in the quota even when Start is never pressed: each new reading of lists adds 2% to every window of the usage read, each merge, combine or fit 1% (a replayed reading adds nothing). `/__mock/state` shows `start_step`: the counters (`lists`, `merges`, `combines`, `fits`), `used_percent`, the room scene and the settings version the room names now.
+
+**The room scenes** (`roomscene=`; a room read comes before any question is typed, so these are a switch):
+
+- **`SITEUPDATED`** (owner answer Q8): 30 s after the first room read since the switch was set, the room names settings version 21, whose paid How wide is 3 or 5. Set it before opening `/v4`, choose 7 paths, and after 30 s come back to the tab (the page reads the room on focus): the update banner shows, and Start with 7 paths gets 409 `START_PATHS_NARROWED`, so the page asks to combine or remove down to 5. Typed as `#siteupdated` in the question, the 30 s start at Next.
+- **`PLANFAILS`** (read-f3): set it, then open `/v4`: the page's room read and its retry both fail, so the plan is unknown; at Start, "Checking your plan…", then the third read answers (with the mock's plan, Plus by default).
+- **`PLANFAILSALL`**: every room read fails, so Start shows "We couldn't check your plan. Try again."
+
+**The clarifying questions** (`POST /v1/asks/clarify`) carry version 2's members: each answer's own sentence ("I mean the next 25 years."), the place question marked (`about_place`), and "What do you care about most?" (`cares`, its sentences "What I care about is: …"). The end of the question picks the scene: `#none` (no questions), `#fail` (the call fails, 503), `#slow` (no answer until 5 s past the page's own wait, so the page gives up first), `#late` (the answer at 9 s: the held rows and "Still analyzing. Your words are still here." show first; ask-d3), `#purposeonly` (only the question about what the answer is for), `#nopurpose` (without it). **A second reading** (read-f1): once a reading had questions, a different question line gets the same questions with "Over what time?" reworded as "By when?", keeping its answers but the last ("To 2035"), so the page shows the kept answers and, if "To 2035" was picked, the set-aside one.
+
+## Questions not started yet (V4 start step, Task 80b)
+
+All of it lives in `saved-questions.ts`. After Next, the page keeps the question and all of step 2 in the account; the mock keeps them in memory, for its one person, with the API's five routes:
+
+| Route | What the mock does |
+|---|---|
+| `GET /v1/account/saved-questions` | The list ("Not started yet"), newest first: each question's first line and the day it was last saved. |
+| `POST /v1/account/saved-questions` | A first save: 201 with its id and revision 1. At most 20 are kept: a 21st gets 409 `SAVED_QUESTIONS_FULL`. |
+| `PUT /v1/account/saved-questions/:id` | A later save over the revision the page last had; another revision gets 409 `SAVED_QUESTION_REVISION` (with the current one), a question no longer kept 404 `SAVED_QUESTION_GONE`. |
+| `GET /v1/account/saved-questions/:id` | Pick up: the document exactly as the page sent it, and whether it is `READY` or `NEEDS_READING`. |
+| `DELETE /v1/account/saved-questions/:id` | 204; the question is gone (an id that is not kept gets 204 too). |
+
+As in the API: an id that is not a lowercase uuid gets 400 `MALFORMED_REQUEST`, a question box over 8,192 bytes (or a document over its limits) 400 `SAVED_QUESTION_TOO_LARGE`, and crisis words in what the person wrote 422 `CRISIS_SUPPORT_OFFERED`, and nothing is kept. Every answer says `cache-control: no-store`. The mock keeps no keys and checks no signature: Pick up says `NEEDS_READING` when a reference in the reading is not the mock's, or the mock wrote it for the other plan, and `READY` otherwise. Start (`POST /v1/asks` with `saved_question_id`) takes the question out of the list once the ask is accepted; a refused ask keeps it.
+
+**The `#pickup` scene** (`saved=PICKUP`; the list is read on step 1, before any question is typed, so this is a switch): two made-up questions. "Should Romania build new nuclear plants?", saved two days ago and read for Plus: its two answers in the question box, five paths (one combined in the mock's words, one of the person's own, three of the AIs'), Thorough. "Should my town close its centre to cars at weekends?", saved two weeks ago and read for Free, so on Plus Pick up says it must be read again (with `plan=FREE` the two swap). Pick up asks no AI: `/__mock/state`'s `start_step` counters stay as they were. Setting `saved=PICKUP` again puts both back as they were (revision 1), beside any other kept question; `saved=NONE` keeps none.
+
+`/__mock/state` shows `savedQuestions`: the calls so far (`creates`, `saves`, `reads` for Pick ups, `deletes`), how many are `kept`, and the `scene`.
+
+## One path per path sent at Start (V4 start step, Task 81)
+
+All of it lives in `branches.ts`. Every body is the contract's and is checked at the mock's start and again before it is sent. All words and times are made up.
+
+**A new question is a path debate**, as on the API with the start step on (a dig keeps its 25 seconds and today's answer; a question that waits to start keeps today's run read). Its run read (`GET /v1/runs/:id`) carries the paths (`branches`), each path's step line, dots or findings (`path_progress`), and the carry-on part (`carry_on_part`) when the box is ticked. It carries no purpose lines: the answers are sentences in the question line (owner answer Q17).
+
+- **Paths sent at Start** (`start_paths`): one path per path sent, in the person's order, each with who wrote it (Task 33's rule, with the mock's references read but not verified): the person's own words alone are their own view; a path combined by the mock's combine, or the menu's viewpoints under the page's joined words, is combined; a menu path, one viewpoint or one card under its own words is the AIs'; anything else is the person's edit. "+ N more" lists the menu's paths none of whose viewpoints was sent.
+- **No paths sent** ("Just answer it" on step 1, or no list): for 8 seconds the AIs are still choosing (`path_progress: []`, no paths), then they name five paths (Free three), "Path 1" to "Path 5", each theirs.
+
+**Each path fills in on its own clock** (from the ask; when no paths were sent, from the moment they are named): finding sources until 6 s (never on Free, which argues from the start), then arguing, one more point every 2 s up to 6 dots, then checking from 14 s, each dot "being checked", then "checked", one by one. Path n is argued at 20 + 6 × (n − 1) s: its step line and dots give way to its findings (three made-up points, each with its trust word; never "Sure" on Free) and its answer so far, while the other paths still work. The answer comes 6 s after the last path (three paths: 38 s; five chosen by the AIs: 58 s). In the answer, path n stands on the seeded position in its place (b1 on `n-mix`, … b4 on `n-smr`; none further), and its web part is named by its path id (the path id is the position everywhere).
+
+**The scenes** (words anywhere in the question; they combine):
+
+| In the question | What happens |
+|---|---|
+| `#slowfill` | b2 fills in 60 s after its time, after every other path (three paths: the answer at 92 s). |
+| `#pathfailed` | b3 ends failed (no answer so far, no findings); the others are argued. |
+| `#carryon` | The carry-on box, ticked: the carry-on line says the answer while the debate runs (from the first read, also while the AIs still choose its paths), then the digs for 20 s after the answer, then the report for 10 s, then nothing. The box ticked at Start plays the same line. The mock starts no digs and writes no report for it. |
+| `#reportwaits` | The debate's next report is not its first (public-f25): its investigation read says `first_closing_left: false`, and "Write my report" gets 409 `PUBLIC_DEBATE_WAITS_FOR_RESET` (nothing closes or starts). Pair it with `publicstate=PUBLISHED` and `room=FULL` for the button's wait line. Without it the read says `first_closing_left: true` until the debate has a report version. |
+
+These differ from the step before Start's `#slowpaths`, `#failpaths` and `#fewpaths` on purpose (those are the lists before Start).
 
 ## Public debates (decisions 13, 16 and 22)
 
@@ -307,7 +392,7 @@ Made-up debates from `public-seed.ts`, read at `GET /v1/public/debates/:id`. The
 
 ## Self-check
 
-With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts six asks (so six extra debates appear in the mock), two of them digs on a public debate and one with the Free notice, presses one report and one dig past the deepest level (refused, so nothing appears), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, switches the plan, the room and the usage and back, and continues the paused debate (then pauses it again). Since W2-7 it also reads the rewritten paths, the verdict and the dig trail.
+With the mock running, this reads every endpoint through the website's own proxy code and typed client, draws the seeded debates with the V4 map builder, and reads the draft fields. It does not start the website. It posts six asks (so six extra debates appear in the mock), two of them digs on a public debate and one with the Free notice, presses one report and one dig past the deepest level (refused, so nothing appears), saves the reading level, records a last visit and a dig link, closes run 7777's investigation, switches the plan, the room and the usage and back, and continues the paused debate (then pauses it again). Since W2-7 it also reads the rewritten paths, the verdict and the dig trail. Since Task 80b it seeds the `#pickup` scene (`saved=PICKUP`, left seeded), picks both questions up with no AI call, saves a copy twice (and one over an old revision, refused), and deletes it. Since Task 81 it posts three more new questions: one with no paths and `#carryon` (read while the AIs choose and 9 s later), one with three paths sent at Start (read at once and 21 s later, drawn with the website's run map builder), and one with `#reportwaits`, whose report press is refused; it waits 30 s for them.
 
 ```sh
 cd dialectical-engine/apps/ui && ../../node_modules/.bin/tsx ../../tools/v4-mock-api/check.ts

@@ -136,9 +136,10 @@ describe("the care question (Q4)", () => {
     const call = submitted.calls.at(-1)!;
     expect(call[0]).toBe(boxText(page));
     const lines = call[4] as { answers: readonly unknown[] };
-    expect(lines.answers.at(-1)).toEqual({ question: "What do you care about most?", answer: "Keeping bills low" });
+    // Task 50b: the care question's answer goes marked, so the run knows a goal was stated without reading the words.
+    expect(lines.answers.at(-1)).toEqual({ question: "What do you care about most?", answer: "Keeping bills low", cares: true });
     expect(lines).toEqual({ answers: [{ question: "What do you want it for?", answer: "To teach" },
-      { question: "What do you care about most?", answer: "Keeping bills low" }] });
+      { question: "What do you care about most?", answer: "Keeping bills low", cares: true }] });
     await press("Keeping bills low");
     expect(boxLines(page)).toEqual(["I want it to teach."]);
     expect(boxText(page)).not.toContain("What I care about is");
@@ -157,6 +158,10 @@ describe("the care question (Q4)", () => {
       typed.dispatchEvent(new Event("input", { bubbles: true }));
     });
     expect(boxLines(page)).toEqual(["What do you care about most? Lower bills."]);
+    // Task 50b: a typed goal is a stated goal too: Start sends it marked.
+    await pressStart();
+    expect((submitted.calls.at(-1)![4] as { answers: readonly unknown[] }).answers)
+      .toEqual([{ question: "What do you care about most?", answer: "Lower bills", cares: true }]);
   });
 
   it("on Free it is one of the 3 choices: with three answers given elsewhere its answers are muted, reachable, and a press changes nothing", async () => {
@@ -214,5 +219,8 @@ describe("each answer's own sentence (Q5) and the site's country first (r2-5)", 
     expect(chipsOf(page, "Which region?")).toEqual(["The north", "The south", "Other…"]);
     await press("The north");
     expect(boxLines(page)).toEqual(["Which region? The north."]);
+    // Task 50b: no care question, no mark.
+    await pressStart();
+    expect((submitted.calls.at(-1)![4] as { answers: readonly unknown[] }).answers).toEqual([{ question: "Which region?", answer: "The north" }]);
   });
 });

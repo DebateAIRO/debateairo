@@ -75,10 +75,14 @@ export function goalWithinPlan(goal: V4Goal, planTier: "free" | "premium"): V4Go
   return Object.freeze({ answers: Object.freeze(answers), matters: keepsMatters ? goal.matters : "" });
 }
 
-/** The answers as sent: one line each; a pressed "Other" with nothing typed says nothing. */
-function sentAnswers(goal: V4Goal): readonly PurposeAnswer[] {
+/**
+ * The answers as sent: one line each; a pressed "Other" with nothing typed says nothing. Task 50b: an answer to one of `cares` (the
+ * words of each "What do you care about most?" the page was given) goes marked `cares: true`, offered or typed.
+ */
+function sentAnswers(goal: V4Goal, cares: readonly string[] = []): readonly PurposeAnswer[] {
   const line = (text: string): string => oneLine(text).slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
-  return goal.answers.flatMap((given) => (oneLine(given.answer).length === 0 ? [] : [{ question: line(given.question), answer: line(given.answer) }]));
+  return goal.answers.flatMap((given) => (oneLine(given.answer).length === 0 ? [] : [{ question: line(given.question), answer: line(given.answer),
+    ...(cares.includes(given.question) ? { cares: true as const } : {}) }]));
 }
 
 /**
@@ -95,9 +99,11 @@ function goalSentences(goal: V4Goal, catalog: MessageCatalog): readonly string[]
 /**
  * Decisions 5 and 29: a goal as the ask's structured `purpose_lines`, whatever the page's language: the debate stores them encrypted and every
  * rewrite, answer update and report reads them. Undefined when none is set. Decision 2: a new ask never sends `angles`; an old debate's stay readable.
+ * V4 start step, Task 50b: `cares`, the words of each care question the page was given; an answer to one goes marked (Start's lines
+ * only; without it, today's lines byte for byte).
  */
-export function purposeLinesOfGoal(goal: V4Goal): PurposeLines | undefined {
-  const answers = sentAnswers(goal);
+export function purposeLinesOfGoal(goal: V4Goal, cares?: readonly string[]): PurposeLines | undefined {
+  const answers = sentAnswers(goal, cares);
   const matters = oneLine(goal.matters).slice(0, WEB_CONTRACT_LIMITS.purposeLineMaxChars);
   if (answers.length === 0 && matters.length === 0) return undefined;
   return { ...(answers.length === 0 ? {} : { answers: [...answers] }), ...(matters.length === 0 ? {} : { matters }) };

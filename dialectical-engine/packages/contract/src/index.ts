@@ -323,7 +323,12 @@ export const AskRequestSchema = z.object({
   carry_on_to_report: z.literal(true).optional(),
   // V4 start step, Task 39c (saved questions spec 2026-11-04 §3.7), last: the question not started yet this ask starts from,
   // removed once the debate is accepted. Read only by that removal: never stored with the run, sealed, logged or passed to the runner.
-  saved_question_id: SavedQuestionIdSchema.optional()
+  saved_question_id: SavedQuestionIdSchema.optional(),
+  // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for), last: "Ask this again" on one of the person's own
+  // FAILED first questions whose read says `reusable`. With the same line, the question starts again on what that debate stored (its
+  // clarifying answers and its paths chosen from the list) with no call before Start; otherwise the link is ignored (today's ask). Read only
+  // by the asks route: never stored with the run, sealed, logged or passed to the runner.
+  again_of: z.uuid().optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -511,7 +516,8 @@ function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null
  * question's estimate or a dig's, never both.
  */
 function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; new_starts?: string | undefined;
-  start_share_percent?: number | undefined; dig_share_percent?: number | undefined; start_step?: unknown }>, context: z.RefinementCtx): void {
+  start_share_percent?: number | undefined; dig_share_percent?: number | undefined; start_step?: unknown;
+  dig_share_by_paths?: readonly number[] | undefined }>, context: z.RefinementCtx): void {
   if (answer.new_starts !== undefined && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
   }
@@ -522,7 +528,19 @@ function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; 
   if (answer.start_step !== undefined && answer.dig_share_percent !== undefined) {
     context.addIssue({ code: "custom", message: "the start step comes with a new question's read, not a dig's" });
   }
+  // V4 start step, Task 79b: a path debate's dig's share per path count comes only beside the dig's own share (so never on a new
+  // question's read, its share or its start step).
+  if (answer.dig_share_by_paths !== undefined && answer.dig_share_percent === undefined) {
+    context.addIssue({ code: "custom", message: "the share per path count comes with a dig's read and its share" });
+  }
 }
+
+/**
+ * V4 start step, Task 79b (owner answer Q19 of 4 Nov: "a dig's share follows a combine"): on a dig's read where the start step runs,
+ * the dig's share of today (Free: of its month) for each number of paths it may look into, entry i - 1 for i paths (1 to 7), each a
+ * whole percent (Task 38's rule), so a combine that takes one path away always shows.
+ */
+const DigShareByPathsSchema = z.array(z.number().int().min(0).max(100)).min(1).max(7);
 
 /**
  * V4 start step, Task 14 (spec 2026-11-03 §2.6): How wide's choices (1 to 3 path counts, whole numbers 1 to 7, rising)
@@ -585,7 +603,9 @@ const CustomerAskRoomResponseSchema = z.object({
   // W2-7 (money rule): new questions and digs wait for `resets_at` (RoomNewStartsSchema, ./web.ts); running work goes on.
   new_starts: RoomNewStartsSchema.optional(),
   // V4 start step, Task 14: the step before Start, present only when its switch is on for the read's plan.
-  start_step: StartStepRoomSchema.optional()
+  start_step: StartStepRoomSchema.optional(),
+  // V4 start step, Task 79b: a path debate's dig's share for each number of paths (DigShareByPathsSchema), beside its own share.
+  dig_share_by_paths: DigShareByPathsSchema.optional()
 }).strict().superRefine((answer, context) => {
   roomReserveIssues(answer, context);
   roomMoneyIssues(answer, context);
@@ -619,7 +639,9 @@ const InternalAskRoomResponseSchema = z.object({
   start_share_percent:DigSharePercentSchema.optional(),
   new_starts:RoomNewStartsSchema.optional(),
   // V4 start step, Task 14: as the customer answer's `start_step`.
-  start_step:StartStepRoomSchema.optional()
+  start_step:StartStepRoomSchema.optional(),
+  // V4 start step, Task 79b: as the customer answer's `dig_share_by_paths`.
+  dig_share_by_paths:DigShareByPathsSchema.optional()
 }).strict().superRefine((answer,context)=>{
   roomReserveIssues(answer,context);
   roomMoneyIssues(answer,context);
@@ -1027,13 +1049,20 @@ export const RunProjectionSchema = z.object({
   // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up), last: whether a FAILED debate used any of the person's
   // quota. NONE: nothing was taken (its path-list charge was given back, 0164, and nothing else ran); SOME: some was. Absent on every
   // other run, and where the server cannot say, so an older reader still parses.
-  quota_used: z.enum(["NONE", "SOME"]).optional()
+  quota_used: z.enum(["NONE", "SOME"]).optional(),
+  // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for), last: true when what already ran is kept for the
+  // person's next try: this FAILED first question is theirs, not erased, and keeps the paths chosen from the list, so "Ask this again"
+  // (`again_of`) starts it again on its clarifying answers and those paths at no new charge. Absent otherwise.
+  reusable: z.literal(true).optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
   }
   if (run.quota_used !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", path: ["quota_used"], message: "only a failed debate says whether any quota was used" });
+  }
+  if (run.reusable !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["reusable"], message: "only a failed debate keeps what ran for the next try" });
   }
   if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
     context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });

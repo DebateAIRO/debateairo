@@ -19,6 +19,7 @@ apps/api/src/active-settings-version.ts
 apps/api/src/admission-alarm.ts
 apps/api/src/admission-settings.ts
 apps/api/src/admission.ts
+apps/api/src/ask-again.ts
 apps/api/src/ask-billing.ts
 apps/api/src/ask-clarify.ts
 apps/api/src/ask-model-picker.ts
@@ -738,10 +739,12 @@ apps/ui/components/v4/V4MapSeed.tsx
 apps/ui/components/v4/V4MapShelf.tsx
 apps/ui/components/v4/V4MapTree.tsx
 apps/ui/components/v4/V4MonthPause.tsx
+apps/ui/components/v4/V4NotStarted.tsx
 apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
 apps/ui/components/v4/V4PathRewrite.tsx
 apps/ui/components/v4/V4PausedScreen.tsx
+apps/ui/components/v4/V4PendingMap.tsx
 apps/ui/components/v4/V4PicksClearedNote.tsx
 apps/ui/components/v4/V4PublicDig.tsx
 apps/ui/components/v4/V4PublicFlag.tsx
@@ -1033,6 +1036,10 @@ apps/ui/lib/v4/questionBox.ts
 apps/ui/lib/v4/quotaPulse.ts
 apps/ui/lib/v4/readyMoment.ts
 apps/ui/lib/v4/reportWriting.ts
+apps/ui/lib/v4/savedQuestion.ts
+apps/ui/lib/v4/siteVersion.ts
+apps/ui/lib/v4/startHandOff.ts
+apps/ui/lib/v4/startKept.ts
 apps/ui/lib/v4/startUndo.ts
 apps/ui/lib/v4/stateWords.ts
 apps/ui/lib/v4/storage.ts
@@ -1054,6 +1061,7 @@ apps/ui/lib/v4/useLeaveGuard.ts
 apps/ui/lib/v4/useLevelSettled.ts
 apps/ui/lib/v4/useMapKeys.ts
 apps/ui/lib/v4/useOpenSide.ts
+apps/ui/lib/v4/useParentDigRetry.ts
 apps/ui/lib/v4/usePausedBarJob.ts
 apps/ui/lib/v4/usePicksUndo.ts
 apps/ui/lib/v4/useQuestionAddress.ts
@@ -1061,6 +1069,7 @@ apps/ui/lib/v4/useQuotaMoments.ts
 apps/ui/lib/v4/useReadingLevel.ts
 apps/ui/lib/v4/useReportVersions.ts
 apps/ui/lib/v4/useReveal.ts
+apps/ui/lib/v4/useSavedQuestion.ts
 apps/ui/lib/v4/useSentDigs.ts
 apps/ui/lib/v4/useSheetFocusReturn.ts
 apps/ui/lib/v4/useStartPaths.ts

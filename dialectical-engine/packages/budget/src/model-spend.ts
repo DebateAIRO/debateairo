@@ -202,8 +202,9 @@ export type PreStartChargeKind = typeof PRE_START_CHARGE_KINDS[number];
 export const PRE_START_CHARGE_WRITER = "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)" as const;
 
 /**
- * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call was made for (the API's keyed
- * hash of one person's one question, 64 lower-case hex characters), when it has one: written with the charge by 0164's writer.
+ * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call was made for (Task 57d: a random
+ * id the API mints once per reading, never made from the question's words; 64 lower-case hex characters), when it has one: written with the
+ * charge by 0164's writer.
  */
 export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind; tryRef?: string }>;
 

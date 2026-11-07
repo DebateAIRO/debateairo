@@ -515,4 +515,17 @@ describe("decisions 5 and 29: the goal goes as its own field too", () => {
     expect(long.answers![0]!.answer).toHaveLength(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
     expect(PurposeLinesSchema.safeParse(long).success).toBe(true);
   });
+  // V4 start step, Task 50b (owner answer Q4; "Goal in answer": "Always say it"): the answer to "What do you care about most?",
+  // offered or typed, goes marked, so the run knows the person stated a goal without reading the words.
+  it("an answer to a care question the page was given goes marked `cares: true`; every other answer, and a goal sent without the list, as before", () => {
+    const CARES = "What do you care about most?";
+    const goal = { answers: [WHERE, { question: CARES, answer: "Keeping bills low", other: false }], matters: "" };
+    const marked = purposeLinesOfGoal(goal, [CARES])!;
+    expect(marked).toEqual({ answers: [{ question: "Where?", answer: "Bucharest" }, { question: CARES, answer: "Keeping bills low", cares: true }] });
+    expect(PurposeLinesSchema.safeParse(marked).success).toBe(true);
+    expect(purposeLinesOfGoal({ ...goal, answers: [{ question: CARES, answer: " Lower \n bills ", other: true }] }, [CARES]))
+      .toEqual({ answers: [{ question: CARES, answer: "Lower bills", cares: true }] });
+    expect(purposeLinesOfGoal(goal)).toEqual({ answers: [{ question: "Where?", answer: "Bucharest" }, { question: CARES, answer: "Keeping bills low" }] });
+    expect(purposeLinesOfGoal(goal, [])).toEqual(purposeLinesOfGoal(goal));
+  });
 });

@@ -6,15 +6,17 @@ import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from 
 /**
  * 0164, a failed question gives back its path-list charge (V4 start step; plan 2026-11-03 Task 57c; the owner's 5 Nov answer Q20 A and its
  * second-round follow-up; drained): each charge before Start names its try, Start gives the try's charges to the debate once, the person's
- * readers leave out a charge whose debate failed, and a reader says whether a debate used any quota. It pins the objects it creates and the
- * three readers it redefines; it keeps 0130's verifier.
+ * readers leave out a charge whose debate failed, and a reader says whether a debate used any quota. Task 57e (edited in place, never pushed or
+ * applied): a failed debate that keeps the paths chosen from the list keeps their charges (core.run_pre_start_kept), and a work item's one
+ * automatic retry is recorded once (core.work_item_retry, core.record_work_item_retry). It pins the objects it creates and the three readers it
+ * redefines; it keeps 0130's verifier.
  */
 const NAME = "0164_pre_start_release.sql";
 const VERSION = "pre-start-release-forward0164-v1";
 const MANIFEST_PATH = "lineage/pre-start-release-forward0164.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0163_main_answer_path_added.sql";
-const TABLES = ["identity.pre_start_try"] as const;
+const TABLES = ["core.work_item_retry", "identity.pre_start_try"] as const;
 const SPENT = "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)";
 /** 0140's, 0144's and 0157's digests pin the two funded readers; 0157's pins the person's. The manifest carries the same list. */
 const READERS = Object.freeze(["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"]);
@@ -24,7 +26,10 @@ const FUNCTIONS = [
   "identity.link_pre_start_try(uuid,text,uuid)",
   "identity.read_run_quota_used(uuid,uuid)",
   SPENT,
-  ...READERS
+  ...READERS,
+  // Task 57e.
+  "core.run_pre_start_kept(uuid)",
+  "core.record_work_item_retry(uuid,uuid,timestamptz)"
 ] as const;
 const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
   ...["0140_internal_spend_kinds.sql", "0144_ask_clarify_charge.sql"].map((step) => Object.freeze({ step, functions: READERS, field: "function_definition" as const })),
@@ -37,7 +42,7 @@ const exactKeys = (value: unknown, keys: readonly string[]): value is Record<str
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
-/** The 1 table (owner, ACL, columns, constraints, indexes, triggers) and the 7 functions (owner, definer, body, ACL), as 0157's. */
+/** The 2 tables (owner, ACL, columns, constraints, indexes, triggers) and the 9 functions (owner, definer, body, ACL), as 0157's. */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
   const tables = (await client.query(`
     SELECT relation,pg_get_userbyid(c.relowner) owner,c.relkind,c.relpersistence,c.relrowsecurity rls,c.relforcerowsecurity force_rls,

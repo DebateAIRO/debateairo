@@ -11,14 +11,15 @@
  * One merge request is one reading, under one version.
  */
 import { createHash, createHmac, hkdfSync } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StartListSchema, StartMenuSchema, type StartList, type StartMenu, type StartMergeRequest } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
 import type { QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { questionLanguageReferenceKeyFrom } from "../../apps/api/src/question-language/reference.js";
 import {
-  newStartStepKey, signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startDigTryRefOf, startMembersHash,
-  startRefQuestionOf, startRefVersionOf, startStepKeyFrom, startTryRefOf, startTryRefOfCheck, verifyStartCheck, verifyStartCombine, verifyStartList,
+  newStartStepKey, newStartTryRef, signStartCheck, signStartCombine, signStartList, signStartMenu, startCanonicalJson, startDigTryRefOf,
+  startMembersHash, startRefQuestionOf, startRefVersionOf, startStepKeyFrom, startTryRefOfCheck, verifyStartCheck, verifyStartCombine, verifyStartList,
   verifyStartMenu, verifyStartMergeRequest
 } from "../../apps/api/src/start-step/signing.js";
 
@@ -369,36 +370,54 @@ describe("the start step's signed references (spec 2026-11-03 §4.1)", () => {
 });
 
 /*
- * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): THE TRY a call before Start
- * is charged to. One person's one question, as they typed it at Next (an accepted rewrite's original): the same for every call of that
- * question and for its Start, never the same for another person or other words, and it never reads back as words. A dig's combine is
- * charged to its parent's try.
+ * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge) and Task 57d (the owner's
+ * 6 Nov answer, card "Privacy": "Random id"): THE TRY a call before Start is charged to. A random id minted once per reading, carried
+ * inside the signed check, so the merge, a combine on its menu, the fit and Start read it back from the check; nothing made from the
+ * question's words is ever a try (0164 stores it). A dig's combine is charged to its parent's try.
  */
-describe("the try a call before Start is charged to (Task 57c)", () => {
-  it("is the person's words under the step's key: the same for the check's reading, another for other words, another person or another key", () => {
-    const made = startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: QUESTION });
+describe("the try a call before Start is charged to (Tasks 57c, 57d)", () => {
+  it("a new try is random: 64 lower-case hex characters, never the same twice", () => {
+    const made = newStartTryRef();
     expect(made).toMatch(/^[0-9a-f]{64}$/u);
-    expect(made).not.toContain(sha(QUESTION));
-    expect(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: `  ${QUESTION} ` })).toBe(made);
-    expect(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: OTHER_QUESTION })).not.toBe(made);
-    expect(startTryRefOf(key, { ownerScope: "owner:5555", words: QUESTION })).not.toBe(made);
-    expect(startTryRefOf(newStartStepKey(), { ownerScope: BINDING.ownerScope, words: QUESTION })).not.toBe(made);
-    const check = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null });
-    expect(startTryRefOfCheck(key, BINDING.ownerScope, check)).toBe(made);
+    expect(new Set(Array.from({ length: 64 }, () => newStartTryRef())).size).toBe(64);
   });
 
-  it("after an accepted rewrite the check's try is the person's own words (the planner read them first)", () => {
-    const check = signStartCheck(key, { ...BINDING, questionLine: REWRITE, lock: LOCK, originalQuestionLine: ORIGINAL });
-    expect(startTryRefOfCheck(key, BINDING.ownerScope, check)).toBe(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: ORIGINAL }));
-    expect(startTryRefOfCheck(key, BINDING.ownerScope, check)).not.toBe(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: REWRITE }));
+  it("the check carries its reading's try: the same words, person, plan and version read twice give two checks with two tries", () => {
+    const [first, second] = [newStartTryRef(), newStartTryRef()];
+    const one = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null, tryRef: first });
+    const two = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null, tryRef: second });
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, one)).toBe(first);
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, two)).toBe(second);
+    expect(second).not.toBe(first);
+    // The member is the payload's last, and the check verifies as before.
+    expect(Object.keys(payloadOf(one)).at(-1)).toBe("y");
+    expect(verifyStartCheck(key, { ...BINDING, ref: one, originalQuestionLine: null })).toEqual(PLAIN_LOCK);
+    // After an accepted rewrite: the reading's try, whichever line was read first.
+    const rewritten = signStartCheck(key, { ...BINDING, questionLine: REWRITE, lock: LOCK, originalQuestionLine: ORIGINAL, tryRef: first });
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, rewritten)).toBe(first);
   });
 
-  it("is none for another person's check, another kind of reference, a forged one or another key's", () => {
-    const check = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null });
+  it("a try changed on the page breaks the check's signature: no try, and the check is INVALID", () => {
+    const check = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null, tryRef: newStartTryRef() });
+    const payload = { ...payloadOf(check), y: newStartTryRef() };
+    const forged = `${Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")}.${check.split(".")[1]!}`;
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, forged)).toBeNull();
+    expect(codeOf(() => verifyStartCheck(key, { ...BINDING, ref: forged, originalQuestionLine: null }))).toBe("START_PATHS_INVALID");
+  });
+
+  it("is none for a check that names no try, another person's check, another kind of reference, a forged one or another key's", () => {
+    expect(startTryRefOfCheck(key, BINDING.ownerScope, signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null }))).toBeNull();
+    const check = signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null, tryRef: newStartTryRef() });
     expect(startTryRefOfCheck(key, "owner:5555", check)).toBeNull();
     expect(startTryRefOfCheck(key, BINDING.ownerScope, signStartList(key, { ...BINDING, list: LIST1 }))).toBeNull();
     expect(startTryRefOfCheck(key, BINDING.ownerScope, `${check.split(".")[0]!}.AAAA`)).toBeNull();
     expect(startTryRefOfCheck(newStartStepKey(), BINDING.ownerScope, check)).toBeNull();
+  });
+
+  it("a try of any other shape is never signed", () => {
+    for (const tryRef of ["", "ab", "A".repeat(64), `${"a".repeat(63)}g`, "a".repeat(65)]) {
+      expect(() => signStartCheck(key, { ...BINDING, lock: PLAIN_LOCK, originalQuestionLine: null, tryRef }), tryRef).toThrow("START_TRY_REF_INVALID");
+    }
   });
 
   it("a dig's combine is charged to its parent's try: one per person and parent, never a question's", () => {
@@ -408,6 +427,31 @@ describe("the try a call before Start is charged to (Task 57c)", () => {
     expect(startDigTryRefOf(key, { ownerScope: BINDING.ownerScope, parentRunId: parent })).toBe(made);
     expect(startDigTryRefOf(key, { ownerScope: "owner:5555", parentRunId: parent })).not.toBe(made);
     expect(startDigTryRefOf(key, { ownerScope: BINDING.ownerScope, parentRunId: "6f0c2a8e-1b3d-4c6e-9a7b-2d4f6e8a0c1b" })).not.toBe(made);
-    expect(startTryRefOf(key, { ownerScope: BINDING.ownerScope, words: parent })).not.toBe(made);
+  });
+
+  // Task 57d: the source scan. Nothing makes a try from the words: no export does it, the try label keys the dig's parent only, and the
+  // reader of a check's try hashes nothing.
+  it("no try is made from the question's words anywhere (a source scan)", async () => {
+    const signing = await import("../../apps/api/src/start-step/signing.js");
+    expect(Object.keys(signing)).not.toContain("startTryRefOf");
+    expect(Object.keys(signing)).toContain("newStartTryRef");
+    const root = new URL("../../", import.meta.url);
+    const sources = ["apps/api/src/", "packages/budget/src/", "packages/serve/src/"].flatMap((folder) =>
+      (readdirSync(new URL(folder, root), { recursive: true }) as string[]).filter((name) => /\.tsx?$/u.test(name))
+        .map((name) => [`${folder}${name}`, readFileSync(new URL(`${folder}${name}`, root), "utf8")] as const));
+    expect(sources.length).toBeGreaterThan(20);
+    for (const [name, text] of sources) {
+      expect(text, name).not.toMatch(/\bstartTryRefOf\b(?!Check)/u);
+      if (!name.endsWith("start-step/signing.ts")) expect(text, name).not.toContain("start-step-try");
+    }
+    const text = readFileSync(new URL("apps/api/src/start-step/signing.ts", root), "utf8");
+    // The one keyed try: the dig's, of the person and the parent debate's id.
+    expect([...text.matchAll(/\btryOf\(key, ([^\n;]+)\);/gu)].map((match) => match[1]!))
+      .toEqual(["`${ownerOf(input.ownerScope)}\\0dig:${input.parentRunId}`"]);
+    expect([...text.matchAll(/\btryOf\(/gu)]).toHaveLength(1);
+    const at = text.indexOf("export function startTryRefOfCheck(");
+    const reader = text.slice(at, text.indexOf("\n}\n", at));
+    expect(reader).toContain("payload.o !== ownerOf(ownerScope)");
+    expect(reader).not.toMatch(/tryOf|createHmac|questionOf|sha\(|\.q\b|\.r\b/u);
   });
 });

@@ -358,6 +358,31 @@ export const REPORT_WRITER_V4_SEALED_CONTRACTS: readonly PromptContract[] = Obje
   REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT
 ]);
 
+/**
+ * V4 start step, Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"; owner answer Q4): when the person said what they care about
+ * (the purpose lines' marked answer to "What do you care about most?"), a path debate's main answer says, in one or two plain sentences,
+ * how that goal fares across the paths. The next versions of the writer and the check: v4's writer and v3's check byte for byte, each
+ * with one drafted sentence at its end; the forms as they were. DRAFTS: the owner reads both sentences word for word at Task 92, which
+ * seals them (appended to REPORT_WRITER_V4_SEALED_CONTRACTS); until then they are in no seal. A run without a stated goal asks
+ * report.answer.v4 and report.answer-check.v3, as before.
+ */
+// OWNER WORDING — approve before switch-on (Task 50b's draft of the owner's own sentence, plan 2026-11-03 Task 50b).
+export const REPORT_WRITER_GOAL_SENTENCE =
+  "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";
+// OWNER WORDING — approve before switch-on (Task 50b's draft: the check's one more criterion, that a stated goal is answered).
+export const REPORT_CHECKER_GOAL_CRITERION =
+  "If the question says what the person cares about, the answer must say how that goal fares across the paths.";
+export const REPORT_ANSWER_V5_CONTRACT_ID = "report.answer.v5" as const;
+export const REPORT_ANSWER_CHECK_V4_CONTRACT_ID = "report.answer-check.v4" as const;
+export const REPORT_ANSWER_V5_PROMPT_CONTRACT = contract(REPORT_ANSWER_V5_CONTRACT_ID,
+  [REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+export const REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT = contract(REPORT_ANSWER_CHECK_V4_CONTRACT_ID,
+  [REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction, REPORT_CHECKER_GOAL_CRITERION].join("\n\n"), REPORT_ANSWER_CHECK_FORM);
+/** Task 50b's two drafts, the writer then the check; Task 92 seals them. */
+export const REPORT_GOAL_DRAFT_CONTRACTS: readonly PromptContract[] = Object.freeze([
+  REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT
+]);
+
 /* ----------------------------------------------------------------- the call sites */
 
 export type ReportSite = "ANSWER" | "ANSWER_ASKED" | "ANSWER_CHECK" | "STORY" | "STORY_CHECK";
@@ -799,22 +824,30 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
   return Object.freeze({ outcome: second, rounds: Object.freeze([...first.rounds, ...second.rounds]), backup });
 }
 
-/** What the overall answer needs: a report call without the story's parts. */
-export type OverallAnswerCall = Omit<ReportRunCall, "free" | "storyLanguageCheck">;
+/**
+ * What the overall answer needs: a report call without the story's parts. V4 start step, Task 50b: `goalStated`, the person said what
+ * they care about (a path debate's main answer only): the writer and the check are Task 50b's drafts; absent or false, as before. A later
+ * version has no goal draft, so `later` with `goalStated` is refused before any call.
+ */
+export type OverallAnswerCall = Omit<ReportRunCall, "free" | "storyLanguageCheck"> & Readonly<{ goalStated?: boolean }>;
 
 /**
  * THE OVERALL ANSWER, the one checked step the final report and every automatic main-answer update share (decisions 3, 4 and 26):
  * the writer and the checker in their approved v3 wording, the later-version writer when `later`. The caller brings the
  * material (`buildInvestigationDossier`), the money (`send`), and, when it is not a report, its own `callSiteOf`.
+ * V4 start step, Task 50b: with `goalStated` (a path debate's main answer whose person said what they care about), the writer and
+ * the check are the next versions, Task 50b's drafts (report.answer.v5, report.answer-check.v4); the material is the same.
  * Never throws for a provider or a refused call: it keeps its last checked draft or ends FAILED, as the story loop does.
  */
 export async function writeOverallAnswer(call: OverallAnswerCall): Promise<OverallAnswerWritten> {
+  const goal = call.goalStated === true;
+  if (goal && call.later) throw new TypedDomainError("INVESTIGATION_REPORT_GOAL_LATER_INVALID", "A later version has no goal draft");
   let material = call.material;
   let askArtifactRef: string | null = null;
   const written = await writeStep<ReportAnswerDraft>(call, {
     writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
-    writerContract: call.later ? REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
-    checkerContract: REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, rules: ANSWER_RULES,
+    writerContract: call.later ? REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT : goal ? REPORT_ANSWER_V5_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
+    checkerContract: goal ? REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT : REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, rules: ANSWER_RULES,
     writerMaterial: () => material.answerWriter, checkerMaterialOf: (candidate) => material.answerCheckerOf(candidate), index: () => material.index,
     asking: {
       askable: () => material.deeper?.names ?? null,

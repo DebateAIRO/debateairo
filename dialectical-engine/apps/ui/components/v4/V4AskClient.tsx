@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import {
-  askQuestionMaxBytes, detectCrisis, purposeAnswerSentence, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse,
-  type ClarifyQuestion, type PurposeLines, type QuestionLanguageOffer
+  askQuestionMaxBytes, ContractHttpError, detectCrisis, purposeAnswerSentence, SavedQuestionDocSchema, savedQuestionOwnWords, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse, type ClarifyQuestion, type PurposeLines,
+  type QuestionLanguageOffer, type SavedQuestionDoc, type SavedQuestionRead, type SavedQuestionSummary
 } from "@debateai/contract";
 import { alreadyWaitingShown, RoomNotice } from "@/components/billing/RoomNotice";
 import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
@@ -14,7 +14,7 @@ import { V4AskGate, type V4Session } from "@/components/v4/V4AskGate";
 import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4LeaveQuestion } from "@/components/v4/V4LeaveQuestion";
-import { V4MapTree } from "@/components/v4/V4MapTree";
+import { V4PendingMap } from "@/components/v4/V4PendingMap";
 import { V4StartBar, type StartBarState } from "@/components/v4/V4StartBar";
 import { V4AskQuestions, type SetAsideAnswer } from "@/components/v4/V4AskQuestions";
 import { startWiderWidth, V4StartCard } from "@/components/v4/V4StartCard";
@@ -23,6 +23,8 @@ import { V4Steps } from "@/components/v4/V4Steps";
 import { V4UndoNote } from "@/components/v4/V4UndoNote";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
+import { V4NotStarted } from "@/components/v4/V4NotStarted";
+import { contractClient } from "@/lib/api";
 import type { AskRoom } from "@/lib/billing/room";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -34,22 +36,25 @@ import {
 } from "@/lib/v4/askText";
 import { CARRY_ON_BUILT } from "@/lib/v4/carryOn";
 import { siteCountryOf, withSiteCountryFirst } from "@/lib/v4/clarifyPlace";
-import { DIG_CANCELLED_SHOWN_MS } from "@/lib/v4/digUndo";
+import { DIG_CANCELLED_SHOWN_MS, DIG_UNDO_MS } from "@/lib/v4/digUndo";
 import { foldTransform, type FoldRect } from "@/lib/v4/foldMove";
 import { buildV4PendingMap } from "@/lib/v4/mapModel";
 import {
   limitLine, startPathsShare, startPathsShareLine, startShareChange, startShareLine, startsWaitLine, usedUpLine, type MoneyLine
 } from "@/lib/v4/money";
-import { PATH_PLAN_LIMITS, pathPlanFromMenu, pathPlanOwnWords, type PathPlan } from "@/lib/v4/pathPlan";
+import { PATH_PLAN_LIMITS, pathPlanFromMenu, pathPlanFromPicks, pathPlanOwnWords, type PathPlan } from "@/lib/v4/pathPlan";
 import {
   boxChanged, boxDropped, boxLine, boxOf, boxOwnWords, boxPlace, boxRekey, boxRemove, boxTyped, type QuestionBox
 } from "@/lib/v4/questionBox";
+import { keptOfSaved, savedDocOf } from "@/lib/v4/savedQuestion";
+import { reloadPage, useSiteVersion } from "@/lib/v4/siteVersion";
+import { handOffStart } from "@/lib/v4/startHandOff";
+import { keptLineOf, startKeptOf, type V4StartKept, type V4StartReading } from "@/lib/v4/startKept";
 import { pendingPathsOf, START_UNDO_MS, type PendingStart } from "@/lib/v4/startUndo";
 import {
   EMPTY_GOAL,
   READING_LEVELS,
   type DigMode,
-  type DigView,
   type ReadingLevel,
   type V4Goal,
   type V4GoalAnswer,
@@ -58,6 +63,7 @@ import {
 import { useAskAgain } from "@/lib/v4/useAskAgain";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
+import { useSavedQuestion } from "@/lib/v4/useSavedQuestion";
 import { useStartPaths } from "@/lib/v4/useStartPaths";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
@@ -94,6 +100,16 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
  * questions and answers. When it lands, an answer it offers again sits under its new question with its sentence untouched, a
  * typed answer keeps its own question's words, and one it no longer offers is set aside where its question was, until "Put it
  * back"; a reading that brings nothing back keeps the earlier questions and answers exactly as they were.
+ * V4 start step, Task 76e (owner answer Q8; amended 4 Nov night by owner answer S1 A, read-f3, read-f23): when the site is
+ * updated while the page is open, one banner says so at the top, on step 1 and step 2, with Reload, and the card's quiet reload
+ * line goes meanwhile; step 1 sends nothing until Next. Step 2 is never written into the tab's history: the account keeps it
+ * (Task 76f), and the page's restore (restoreStepTwo) opens it exactly as kept, with no clarifying call, no lists and no merge,
+ * its questions drawn at once, and the room read fresh (fewer paths allowed now: combine or remove first).
+ * V4 start step, Task 76f (owner cards "When saved", "How long", "Where shown"; answers Q1, Q2, Q3, Q8, S1 A, S2 A, S3 A; saved-
+ * questions spec 2026-11-04): once the check passes after Next, the account keeps step 2 by itself (useSavedQuestion; its id in
+ * step 2's history entry, never in the address); Start names it and removes it; "Not started yet" on step 1 lists the newest 5
+ * with Pick up and Delete (the shared 10-second Undo); Pick up and a reload on step 2 reopen it through the restore with no AI
+ * call; the page asks before leaving only while the latest change is not saved, and the card's reload line goes meanwhile.
  */
 
 /** The API's own floor for a question is a few words; Start waits for it (spec: "under 7 characters"). */
@@ -155,9 +171,6 @@ const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const BOX_HIGHLIGHT_MS = 1_000;
 /** The fly-in's own token (v4-base.css `--v4-move-fly`), read from the page; this when the page names none. */
 const FLY_IN_FALLBACK_MS = 250;
-/** Task 76b: the map during Start's 10 seconds has no digs, nothing new and nothing picked. */
-const NO_DIGS: readonly DigView[] = Object.freeze([]);
-const NOTHING: ReadonlySet<string> = new Set();
 
 /**
  * Task 76 (read-d3): one answer as the sentence the box holds and the AIs read (today's pair, "Which region? The north."); null for
@@ -191,6 +204,33 @@ function sentenceIn(given: V4GoalAnswer, questions: readonly ClarifyQuestion[], 
   if (kept !== undefined && kept.answer === given.answer && kept.other === given.other) return kept.text;
   return answerSentence(given, questions);
 }
+
+/**
+ * Task 76e: a kept step 2's sentences as its box holds them, held for their answers, so the box comes back exactly as kept
+ * (never rewritten from the questions it is shown with).
+ */
+function heldOfKept(box: QuestionBox, goal: V4Goal): ReadonlyMap<string, HeldSentence> {
+  const held = new Map<string, HeldSentence>();
+  for (const given of goal.answers) {
+    const placed = box.placed.find((sentence) => sentence.key === given.question);
+    if (placed !== undefined) held.set(given.question, { answer: given.answer, other: given.other, text: placed.text });
+  }
+  return held;
+}
+
+/** Task 76e: a kept step 2 whose questions had not come yet opens with none, and asks for none. */
+const NO_CLARIFY: AskClarifyResponse = Object.freeze({ source: "NONE" });
+
+/** Task 76f (saved-questions spec §3.3): a reading that was never checked (not offered, switched off, quota used up) is never saved. */
+const UNCHECKED_REASONS: ReadonlySet<string> = new Set(["NOT_ASKED", "OFF", "POOL_EMPTY"]);
+
+/** Task 76f: a saved question the account no longer holds (deleted, started, or its key gone) answers 404. */
+function savedQuestionGone(error: unknown): boolean {
+  return error instanceof ContractHttpError && error.status === 404;
+}
+
+/** Task 76f: a delete waiting out its 10 seconds in the shared Undo note (spec §3.6), then (`sent`) its answer. */
+type WaitingDelete = Readonly<{ item: SavedQuestionSummary; sendsAt: number; sent: boolean }>;
 
 /**
  * Task 76g (read-f1): step 2's questions as shown, kept apart from the clarifying hook's reply so a new reading can keep them.
@@ -355,7 +395,8 @@ export function V4AskClient({
   locale,
   crisisCountryHint,
   initialQuestion,
-  againRunId = null
+  againRunId = null,
+  kept = null
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -371,6 +412,11 @@ export function V4AskClient({
   initialLevel?: ReadingLevel | null;
   /** Owner review 3 Nov (wait-f11): "Ask this again" names the debate (`?again=`) whose question fills the box; null: none. */
   againRunId?: string | null;
+  /**
+   * V4 start step, Task 76e: step 2 as kept, opened at once by the page's restore (the same restore Task 76f calls with the
+   * account's copy on Pick up and on a reload); one the page cannot read is ignored. Absent or null: the page opens as Task 76c says.
+   */
+  kept?: V4StartKept | null;
 }>) {
   // ask-d1 D / ask-f16: the real page from the first frame, signed in or not; the session is learnt beside it (V4AskGate).
   // The accept screen reads newDebate.* keys, as on /new.
@@ -386,6 +432,7 @@ export function V4AskClient({
         initialQuestion={initialQuestion}
         session={session}
         againRunId={againRunId}
+        kept={kept}
       />
     )}</V4AskGate>
   );
@@ -400,7 +447,8 @@ function V4AskForm({
   crisisCountryHint,
   initialQuestion,
   session,
-  againRunId
+  againRunId,
+  kept: keptAtOpen
 }: Readonly<{
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -413,6 +461,8 @@ function V4AskForm({
   session: V4Session;
   /** Owner review 3 Nov (wait-f11): the debate whose question fills the box (`?again=`); null: none. */
   againRunId: string | null;
+  /** Task 76e: step 2 as kept, restored when the page opens; null: none. */
+  kept: V4StartKept | null;
 }>) {
   const router = useRouter();
   // V4 start step, Task 75d (owner, 5 Nov, second round): the level belongs to this question. Its choice always starts on Plain
@@ -466,7 +516,7 @@ function V4AskForm({
   const questionField = useRef<HTMLTextAreaElement>(null);
   const shownStep = useRef<Step>(step);
   const ids = useId();
-  // ask-d5 B: "Your maps", read once the person is known to be signed in.
+  // ask-d5 B: "My questions" (the owner's third round, 5 Nov), read once the person is known to be signed in.
   const shelf = useMapShelf({ enabled: session === "IN", want: SHELF_MAX, catalog });
   // Owner review 3 Nov (wait-f11): "Ask this again" fills the box with the earlier question, read back from the server, as
   // long as the person has not started typing; nothing starts by itself. Read once the person is known to be signed in.
@@ -499,6 +549,34 @@ function V4AskForm({
     // V4 start step, Task 70b (ask-f8): a declined consent's line sits right under Next, never at the page's bottom.
     showDeclinedLine: false
   });
+  // Task 76e (owner answer Q8): the site updated while the page is open (the room read again every 5 minutes, on focus and on
+  // becoming visible, Task 70b's refreshRoom); its latest room is the start step's, so the new widths reach the card.
+  const site = useSiteVersion({ room: ask.room, refresh: ask.refreshRoom });
+  // Task 76e (owner answer S1 A): the kept step 2 this page restored (its clarifying questions come back without a call while
+  // its line is read); null once another line is read.
+  const [restored, setRestored] = useState<V4StartKept | null>(null);
+  // Task 76f (owner answers S1 A, S3 A): the question the account keeps for the step 2 this page holds (its first save's answer,
+  // or the one picked up or reopened), as a ref too for the send; the revision it was read at; the check event's language and
+  // seats a saved reading carried (a restored reading has neither of its own); a reload on step 2 still reopening from the
+  // account; "Not started yet" as last read (null: not read) and its reads; the deletes waiting out their 10 seconds.
+  const [savedId, setSavedIdState] = useState<string | null>(null);
+  const savedIdRef = useRef<string | null>(null);
+  const [savedRevision, setSavedRevision] = useState<number | null>(null);
+  const [savedExtras, setSavedExtras] = useState<Readonly<{ ref: string; language: V4StartReading["language"]; seats: number | null }> | null>(null);
+  const [reopening, setReopening] = useState<Readonly<{ id: string; words: string }> | null>(null);
+  const [savedList, setSavedList] = useState<readonly SavedQuestionSummary[] | null>(null);
+  const [savedListReads, setSavedListReads] = useState(0);
+  const [waitingDeletes, setWaitingDeletes] = useState<readonly WaitingDelete[]>([]);
+  const deleteTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => () => {
+    for (const timer of deleteTimers.current.values()) clearTimeout(timer);
+    deleteTimers.current.clear();
+  }, []);
+  const setSavedId = useCallback((id: string | null, revision: number | null = null) => {
+    savedIdRef.current = id;
+    setSavedIdState(id);
+    setSavedRevision(revision);
+  }, []);
   // Task 70b (read-d2, read-f14): the question is read once, at Next. `readLine` is the line read then (the step-1 words, tidied
   // as R22 sends them); step 2's box starts as it (Task 70c), and nothing typed there is read again. Back keeps both.
   const [readLine, setReadLine] = useState<string | null>(null);
@@ -546,6 +624,8 @@ function V4AskForm({
   // whether the page is still here (a send that ends after the person left touches no other page's entry).
   const [startedRun, setStartedRun] = useState<string | null>(null);
   const [leaveAsking, setLeaveAsking] = useState(false);
+  // Task 76f: the logo's question as asked (Task 76c's, or the change not saved yet while the account keeps the question).
+  const leaveKey = useRef("v4.ask.leavePaths");
   const brandLink = useRef<HTMLAnchorElement | null>(null);
   const leaving = useRef(false);
   const alive = useRef(true);
@@ -555,7 +635,8 @@ function V4AskForm({
   }, []);
   // Task 76c (answer Q3): the page opens on its history entry as it was left. A reload (or a way back) to step 1 or step 2
   // shows step 1 with the entry's words and calls no AI; step 2's entry becomes step 1's, so the address says step 1 again.
-  // A started question's entry shows one line with its map, the box empty, and no step 2.
+  // A started question's entry shows one line with its map, the box empty, and no step 2. Task 76f (owner answer S1 A): step
+  // 2's entry naming the question the account keeps reopens step 2 from the account (below), with no AI call.
   useBrowserLayoutEffect(() => {
     const held = askHistoryOf(window.history.state);
     if (held === null) return;
@@ -565,6 +646,10 @@ function V4AskForm({
       return;
     }
     setQuestion(held.words);
+    if (held.step === "read" && held.savedId !== undefined) {
+      setReopening({ id: held.savedId, words: held.words });
+      return;
+    }
     if (held.step === "read") {
       window.history.replaceState(withAskHistory(window.history.state, { step: "ask", words: held.words }), "",
         stepOneAddress(window.location.pathname, window.location.search));
@@ -590,6 +675,9 @@ function V4AskForm({
   // Task 76g (read-f1): the questions on screen, and the sentences kept answers hold as they were.
   const [shown, setShown] = useState<ShownQuestions>(NOTHING_SHOWN);
   const [held, setHeld] = useState<ReadonlyMap<string, HeldSentence>>(NO_HELD);
+  // Task 50b (owner answer Q4, "Goal in answer"): the words of each "What do you care about most?" a reading brought, so Start marks
+  // its answer in the purpose lines (`cares: true`) and the run knows the person stated a goal without reading the words.
+  const [caresAsked, setCaresAsked] = useState<readonly string[]>([]);
   // Task 76g: a new line's call is told the earlier wording's questions (the reply's own: the site's country is the page's) and
   // the answers given, within the request's bounds.
   const earlier = useMemo((): AskClarifyEarlier | null => {
@@ -598,7 +686,10 @@ function V4AskForm({
     const answers = purposeLinesOfGoal({ answers: sentGoal.answers, matters: "" })?.answers ?? [];
     return { questions: shown.earlier.slice(0, most), answers: answers.slice(0, most) };
   }, [shown, clarifyLine, sentGoal]);
-  const clarify = useAskClarify({ active: step === "read" && clarifyLine !== null, question: clarifyLine ?? "", mayCall: consented, earlier });
+  // Task 76e (read-f23): a restored step 2's questions as shown come back without a call while its line is the one read.
+  const clarifySeed = restored !== null && clarifyLine === restored.readLine ? restored.clarify ?? NO_CLARIFY : undefined;
+  const clarify = useAskClarify({ active: step === "read" && clarifyLine !== null, question: clarifyLine ?? "", mayCall: consented, earlier,
+    ...(clarifySeed === undefined ? {} : { seed: clarifySeed }) });
   // Task 76d (r2-5): the site's country, first among the answers of the question that asks where, never ticked. It is named in the
   // site's language (the page knows no other for the question before its paths come).
   const questionLanguage = catalogLocale(isLocale(locale) ? locale : "en");
@@ -613,6 +704,8 @@ function V4AskForm({
   if (landed !== null) {
     // Task 76d (answer Q4): version 2's "What do you care about most?" comes last (clarifyingQuestions), answered like any other.
     const fresh = clarifyingQuestions(landed.reply);
+    const caresText = landed.reply.source === "AI" ? landed.reply.cares?.text : undefined;
+    if (caresText !== undefined && !caresAsked.includes(caresText)) setCaresAsked([...caresAsked, caresText]);
     const after = fresh.map((one) => withSiteCountryFirst(one, siteCountry));
     const onScreen = [...shown.questions, ...shown.kept];
     if (onScreen.length === 0) {
@@ -667,7 +760,8 @@ function V4AskForm({
   // for a new one). Task 76: what they hold shows on step 2's card. `active` stays tied to the step (Task 71's note: a later
   // flip of the crisis patterns or of the length must never start read-f1's re-read of a stale card without Back and Next;
   // step 2 opens only for words that passed both).
-  const startRoom = ask.room?.start_step ?? null;
+  // Task 76e: the start step of the latest room read (a failed read of the update check keeps the one before; useSiteVersion).
+  const startRoom = site.latestRoom?.start_step ?? null;
   const start = useStartPaths({
     active: step === "read" && readLine !== null && consented,
     questionLine: readLine ?? "",
@@ -675,9 +769,91 @@ function V4AskForm({
     readingLevel: level,
     clarify: purposeLinesOfGoal(sentGoal) ?? null,
     room: startRoom,
-    freePlan
+    freePlan,
+    // Task 76e: a restored step 2 opens as kept, and nothing is posted for it.
+    ...(restored === null ? {} : { kept: restored })
   });
   const plan = start.plan;
+
+  // Task 76f (saved-questions spec §3.3; owner card "When saved"): the account keeps step 2 once its check passed: signed in, the
+  // start step on the site, the consent given, step 2 shown (not during Start's 10 seconds, nor after its send), no language offer
+  // waiting, no refusal, and a reading that was checked. So nothing is saved before Next, after a declined consent or crisis help.
+  const reading = start.reading;
+  const savingOn = session === "IN" && startRoom !== null && consented && step === "read" && pending === null && reading !== null
+    && start.languageOffer === null && start.phase !== "REFUSED" && !(reading.end === "NONE" && UNCHECKED_REASONS.has(reading.noneReason ?? ""));
+  // The document: the reading the server signed (with the language and seats a saved reading carried, which a restored one has
+  // not), and the page's own state: the box, the answers, the clarifying questions as shown, the plan, How wide, the mode and
+  // the carry-on tick. A reading with no list keeps an empty plan.
+  const clarifyReplyShown = clarify.line !== null && clarify.line === clarifyLine && !clarify.waiting ? clarify.reply : null;
+  const savedDoc = useMemo(() => {
+    if (reading === null) return null;
+    const extras = savedExtras !== null && savedExtras.ref === reading.check.ref ? savedExtras : null;
+    const signed: V4StartReading = { ...reading, language: reading.language ?? extras?.language ?? null, seats: reading.seats ?? extras?.seats ?? null };
+    const kept: V4StartKept = {
+      v: 1, readLine: reading.checkedLine, box, sentGoal, clarify: clarifyReplyShown, check: reading.check, menu: reading.menu, lists: [],
+      lateLists: reading.lateLists, end: reading.end, ...(reading.noneReason === undefined ? {} : { noneReason: reading.noneReason }),
+      plan: plan ?? { ...pathPlanFromPicks([], freePlan), width: start.width }, width: start.width, mode, carryOn
+    };
+    return savedDocOf({ kept, reading: signed });
+  }, [reading, savedExtras, box, sentGoal, clarifyReplyShown, plan, freePlan, start.width, mode, carryOn]);
+  // What goes at once (spec §3.3): the reading's end (the list landing) and a late merge (a new menu), and a path's AI words
+  // written or given up (COMBINE_WRITTEN, COMBINE_FAILED). Every other change waits SAVE_PAUSE_MS.
+  const savedMoment = `${reading?.end ?? ""} ${reading?.menu?.ref ?? ""}`;
+  const writingKeys = useMemo(() => plan === null ? [] : [...plan.paths, ...plan.more].filter((path) => path.wording === "WRITING").map((path) => path.key),
+    [plan]);
+  const [saveAtOnce, setSaveAtOnce] = useState(0);
+  const lastSavedMoment = useRef<Readonly<{ moment: string; writing: readonly string[] }>>({ moment: savedMoment, writing: writingKeys });
+  useEffect(() => {
+    const before = lastSavedMoment.current;
+    lastSavedMoment.current = { moment: savedMoment, writing: writingKeys };
+    const settled = before.writing.some((key) => !writingKeys.includes(key) && [...(plan?.paths ?? []), ...(plan?.more ?? [])]
+      .some((path) => path.key === key && (path.wording === "COMBINED" || path.wording === "FALLBACK")));
+    if (before.moment !== savedMoment || settled) setSaveAtOnce((count) => count + 1);
+  }, [savedMoment, writingKeys, plan]);
+  /** Task 76f: the first save's id, in memory and in step 2's history entry beside the words (never in the address). */
+  const keepSavedId = useCallback((id: string): void => {
+    setSavedId(id);
+    if (!alive.current) return;
+    const entry = askHistoryOf(window.history.state);
+    if (entry?.step === "read") window.history.replaceState(withAskHistory(window.history.state, { step: "read", words: entry.words, savedId: id }), "");
+  }, [setSavedId]);
+  const save = useSavedQuestion({ enabled: savingOn, savedId, revision: savedRevision, doc: savedDoc, immediate: saveAtOnce, client: contractClient,
+    onSavedId: keepSavedId });
+  // Owner answers S1 A and S2 A: the account keeps this question (its first save landed and saving has not stopped); then only a
+  // change not saved yet is at risk when leaving, and the card's reload line goes (a reload reopens step 2 from the account).
+  const accountKeeps = savedId !== null && save.state !== "OFF" && save.state !== "STOPPED";
+  const changeUnsaved = accountKeeps && (save.state === "PENDING" || save.state === "SAVING" || save.state === "FAILED");
+  // Spec §3.10: a picked-up reading that no longer verifies (a plan change, a new signing key) opens as left, to be read again.
+  const staleOnOpen = useRef<string | null>(null);
+  const markStale = start.markStale;
+  useEffect(() => {
+    const ref = staleOnOpen.current;
+    if (ref === null || reading?.check.ref !== ref) return;
+    staleOnOpen.current = null;
+    markStale();
+  }, [reading, markStale]);
+
+  // Task 76f (spec §3.4; owner card "Where shown"): "Not started yet" is read on step 1 when signed in on a site with the start
+  // step: as the page opens, after each Back to step 1, and after a Pick up found its question gone. The question whose step 2
+  // this page holds is not listed, nor one waiting out its Delete.
+  const listOffered = session === "IN" && startRoom !== null && reopening === null;
+  const onStepOne = step === "ask";
+  useEffect(() => {
+    if (!onStepOne || !listOffered) return undefined;
+    let live = true;
+    void (async () => {
+      try {
+        const read = await contractClient.listSavedQuestions();
+        if (live) setSavedList(read.questions);
+      } catch {
+        // Nothing to show: the list stays as it was.
+      }
+    })();
+    return () => { live = false; };
+  }, [onStepOne, listOffered, savedListReads]);
+  const heldSavedId = readLine === null ? null : savedId;
+  const notStartedItems = useMemo(() => (savedList ?? [])
+    .filter((one) => one.id !== heldSavedId && !waitingDeletes.some((waiting) => waiting.item.id === one.id)), [savedList, heldSavedId, waitingDeletes]);
   // "Just answer it" sends the question alone, tidied the same way (so its title is the person's whole words); Next reads this line.
   const plain = useMemo(() => composeQuestion(trimmed, EMPTY_GOAL, newDebateCatalog), [trimmed, newDebateCatalog]);
   const boxLongEnough = boxWords.length >= QUESTION_MIN;
@@ -871,17 +1047,37 @@ function V4AskForm({
     try {
       let handOver: V4StartHandOver | undefined;
       if (sending.handsOver) {
+        // Task 76f (saved-questions spec §3.7): the latest change goes to the account first (whatever it answers), then the ask
+        // names the question the account keeps, which the server removes once it accepts the debate.
+        await save.flush();
         if (sending.chosenBy === "PERSON" && start.plan?.paths.some((path) => path.wording === "WRITING") === true) setPendingPhase("WRITING");
         const handed = await start.handOver({ chosenBy: sending.chosenBy, questionLine: sending.line });
         setPendingPhase("SENDING");
         handOver = sending.carryOn ? { ...handed, carryOnToReport: true as const } : handed;
+        const kept = savedIdRef.current;
+        if (kept !== null) handOver = { ...handOver, savedQuestionId: kept };
       } else if (sending.press !== "quick") {
         // Step 2 with no start step: the line alone, as the card's hook hands it over then.
         handOver = { questionLine: sending.line, ownWords: [] };
       }
       const outcome = await ask.submit(handOver?.questionLine ?? sending.line, sending.mode, "ask", null, sending.purposeLines, undefined, handOver);
       switch (outcome.kind) {
-        case "STARTED":
+        case "STARTED": {
+          // Task 76f (spec §3.7): the page removes the saved copy too, in case the server's removal failed; it never holds the
+          // debate up, and a refused or stopped Start deletes nothing.
+          const startedFrom = handOver?.savedQuestionId;
+          if (startedFrom !== undefined) {
+            void (async () => {
+              try {
+                await contractClient.deleteSavedQuestion(startedFrom);
+              } catch {
+                // The server's own removal at Start stands; a copy left behind shows in the list and can be deleted there.
+              }
+            })();
+          }
+          // Task 76i (wait-f14): the question and the paths the map shows now go to the map page in this tab's memory only, so
+          // they stay on screen while it checks the session and reads the debate for the first time.
+          handOffStart({ runId: outcome.runId, questionLine: sending.line, paths: shownPendingPaths.current ?? [], level, at: Date.now() });
           // Task 76c (answer Q3): this entry is the started question's from now on (step 2's, or step 1's for its "Just
           // answer it"), so Back from the map never comes to a half-started ask. Not once the person has left the page.
           if (alive.current) {
@@ -890,6 +1086,7 @@ function V4AskForm({
           // Task 75d: no level in the map's address; the map shows the debate at the level it was asked at (its run read).
           router.push(`/v4/debate/${encodeURIComponent(outcome.runId)}`);
           return; // the map stays until the map page takes over
+        }
         case "REFUSED": {
           if (outcome.startPathsStale === true) {
             start.markStale();
@@ -1031,10 +1228,11 @@ function V4AskForm({
     if (line !== null && line !== readLine) {
       setReadLine(line);
       setBox(boxOf(line));
-      // Task 76: a new reading has no rewrite in force, no card swap to undo and no folded answers.
+      // Task 76: a new reading has no rewrite in force, no card swap to undo and no folded answers. Task 76e: nor a kept step 2.
       setRewriteLine(null);
       swapWords.current = null;
       setAnswersFolded(false);
+      setRestored(null);
     }
     setStep("read");
     setNextPress("IDLE");
@@ -1143,7 +1341,7 @@ function V4AskForm({
       const menu = start.menu;
       beginPending({
         press, chosenBy, mode, carryOn: carryOnOffered && carryOn, line, basis: boxWords,
-        purposeLines: purposeLinesOfGoal(goalWithinPlan(goal, free ? "free" : "premium")),
+        purposeLines: purposeLinesOfGoal(goalWithinPlan(goal, free ? "free" : "premium"), caresAsked),
         handsOver: startRoom !== null,
         topPaths: chosenBy === "AIS" && start.phase === "READY" && menu !== null ? pathPlanFromMenu(menu.menu, start.width, free) : null,
         share: startPathsShareLine(start.sharePercent, free)
@@ -1226,6 +1424,8 @@ function V4AskForm({
     if (words === null) return;
     swapWords.current = null;
     setRewriteLine(null);
+    // Task 76e: a fresh reading, so a restored step 2's questions are not seeded any more.
+    setRestored(null);
     setAccepted(null);
     setAnswersFolded(false);
     setGoal((current) => ({ ...current, answers: [] }));
@@ -1234,6 +1434,174 @@ function V4AskForm({
     setReadLine(words);
     setBox((current) => boxOwnWords(current.placed.reduce((emptied, placed) => boxRemove(emptied, placed.key), current), words));
   }
+
+  /**
+   * Task 76e (owner answers Q8 and S1 A; saved-questions spec §3.5; read-f3, read-f23): the restore, which Task 76f calls with the
+   * account's copy (Pick up, and a reload on step 2). Step 2 opens exactly as kept: the box, the answers, the clarifying questions
+   * as shown (no clarifying call; drawn at once), the reading with its menu, lists and plan (no lists post, no merge; a path still
+   * being written takes its joined words), How wide, Quick look or Thorough and the carry-on tick. Step 1 holds the person's words,
+   * so Back finds them and "Your paths are kept". The room is read fresh, so a site that now allows fewer paths shows the narrowed
+   * line and Start waits until the person combines or removes down to it. Nothing is written to the tab's history here (Task 76f
+   * writes its entry). False, and nothing changes, for a kept step 2 the page cannot read (the page then follows Task 76c's rule).
+   */
+  function restoreStepTwo(given: unknown): boolean {
+    const kept = startKeptOf(given);
+    if (kept === null) return false;
+    const words = keptLineOf(kept);
+    const rewrite = kept.check.original_question_line === undefined ? null : kept.readLine;
+    setRestored(kept);
+    setQuestion(words);
+    setReadLine(words);
+    setRewriteLine(rewrite);
+    setAccepted(null);
+    swapWords.current = kept.plan.questionSwap?.original ?? null;
+    setAnswersFolded(false);
+    setBox(kept.box);
+    setGoal(kept.sentGoal);
+    setHeld(heldOfKept(kept.box, kept.sentGoal));
+    setShown(NOTHING_SHOWN);
+    setMode(kept.mode);
+    setCarryOn(kept.carryOn);
+    setConsented(true);
+    clearPressLines();
+    setRefusalStart(null);
+    setDeclinedAtNext(false);
+    setStartedRun(null);
+    setStep("read");
+    void ask.refreshRoom().catch(() => null);
+    return true;
+  }
+  // Task 76e: a kept step 2 handed to the page opens at once, before the browser paints.
+  useBrowserLayoutEffect(() => {
+    if (keptAtOpen !== null) restoreStepTwo(keptAtOpen);
+  }, []);
+
+  /**
+   * Task 76f (saved-questions spec §3.5, §3.10): a saved question as Pick up and a reload get it. Its document is checked
+   * (SavedQuestionDocSchema) and read into a kept step 2 (another version, or one the page cannot read: UNREADABLE); crisis words
+   * in the person's own words open the help screen instead (HELP); else step 2 opens through the restore above, with the level it
+   * was read at, the check's language and seats, the id and revision the account answered, and, when the reading no longer
+   * verifies (NEEDS_READING), marked to be read again (Back, then Next). Pick up puts step 1's entry behind step 2's (`push`);
+   * a reload is already on step 2's entry.
+   */
+  function openSaved(read: SavedQuestionRead, push: boolean): "OPENED" | "UNREADABLE" | "HELP" {
+    const checked = SavedQuestionDocSchema.safeParse(read.doc);
+    const kept = checked.success ? keptOfSaved(read.doc as SavedQuestionDoc) : null;
+    if (!checked.success || kept === null) return "UNREADABLE";
+    const own = savedQuestionOwnWords(read.doc as SavedQuestionDoc);
+    if (own.some((words) => detectCrisis(words).crisis) && ask.offerCrisisHelp([...own])) return "HELP";
+    const words = keptLineOf(kept);
+    if (push) {
+      window.history.replaceState(withAskHistory(window.history.state, { step: "ask", words }), "");
+      window.history.pushState(withAskHistory(window.history.state, { step: "read", words, savedId: read.id }), "",
+        stepTwoAddress(window.location.search));
+    } else {
+      window.history.replaceState(withAskHistory(window.history.state, { step: "read", words, savedId: read.id }), "");
+    }
+    const signed = checked.data.reading;
+    const level = READING_LEVELS.find((one) => one === signed.reading_level);
+    if (level !== undefined) setLevel(level);
+    setSavedExtras({ ref: signed.check.ref, language: signed.language ?? null, seats: signed.seats ?? null });
+    setSavedId(read.id, read.revision);
+    staleOnOpen.current = read.state === "NEEDS_READING" ? kept.check.ref : null;
+    return restoreStepTwo(kept) ? "OPENED" : "UNREADABLE";
+  }
+
+  /**
+   * Task 76f (owner card "Where shown"; spec §3.5): Pick up. The step 2 this page holds goes to the account first; then one read of
+   * the saved question, and step 2 opens as it was left, with no AI call (the room is read fresh). Gone: the list is read again.
+   * Unreadable: step 1 with its title in the box.
+   */
+  const pickingUp = useRef(false);
+  async function pickUp(id: string): Promise<void> {
+    if (pickingUp.current || pendingRef.current !== null) return;
+    pickingUp.current = true;
+    try {
+      await save.flush();
+      let read: SavedQuestionRead;
+      try {
+        read = await contractClient.readSavedQuestion(id);
+      } catch (error) {
+        if (savedQuestionGone(error)) setSavedListReads((count) => count + 1);
+        return;
+      }
+      if (!alive.current) return;
+      if (openSaved(read, true) === "UNREADABLE") {
+        const title = savedList?.find((one) => one.id === id)?.question;
+        if (title !== undefined) setQuestion(title);
+      }
+    } finally {
+      pickingUp.current = false;
+    }
+  }
+
+  // Task 76f (owner answer S1 A): a reload on step 2 whose entry names a saved question reopens it from the account, as Pick up
+  // does, with no AI call; gone or unreadable (or crisis words), step 1 shows the entry's words and the entry is step 1's again
+  // (Task 76c's rule).
+  const openSavedNow = useRef(openSaved);
+  openSavedNow.current = openSaved;
+  useEffect(() => {
+    if (reopening === null) return undefined;
+    const { id, words } = reopening;
+    let live = true;
+    void (async () => {
+      let read: SavedQuestionRead | null = null;
+      try {
+        read = await contractClient.readSavedQuestion(id);
+      } catch {
+        read = null;
+      }
+      if (!live) return;
+      setReopening(null);
+      if (read !== null && openSavedNow.current(read, false) === "OPENED") return;
+      setQuestion(words);
+      window.history.replaceState(withAskHistory(window.history.state, { step: "ask", words }), "",
+        stepOneAddress(window.location.pathname, window.location.search));
+    })();
+    return () => { live = false; };
+  }, [reopening]);
+
+  /**
+   * Task 76f (spec §3.6): Delete. The line leaves the list at once and the shared Undo note shows for DIG_UNDO_MS; then one DELETE.
+   * Undo before it brings the line back and sends nothing; leaving the page meanwhile sends nothing. A DELETE that fails brings
+   * the line back (nothing is tried again by itself); one that answers gone takes it out of the list.
+   */
+  const focusAfterUndo = useRef<string | null>(null);
+  function deleteSaved(item: SavedQuestionSummary): void {
+    if (waitingDeletes.some((one) => one.item.id === item.id)) return;
+    setWaitingDeletes((now) => [...now, { item, sendsAt: Date.now() + DIG_UNDO_MS, sent: false }]);
+    deleteTimers.current.set(item.id, setTimeout(() => {
+      deleteTimers.current.delete(item.id);
+      setWaitingDeletes((now) => now.map((one) => one.item.id === item.id ? { ...one, sent: true } : one));
+      void (async () => {
+        let gone = true;
+        try {
+          await contractClient.deleteSavedQuestion(item.id);
+        } catch (error) {
+          gone = savedQuestionGone(error);
+        }
+        if (!alive.current) return;
+        if (gone) setSavedList((now) => now === null ? now : now.filter((one) => one.id !== item.id));
+        setWaitingDeletes((now) => now.filter((one) => one.item.id !== item.id));
+      })();
+    }, DIG_UNDO_MS));
+  }
+  function undoDelete(id: string): void {
+    const timer = deleteTimers.current.get(id);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    deleteTimers.current.delete(id);
+    focusAfterUndo.current = id;
+    setWaitingDeletes((now) => now.filter((one) => one.item.id !== id));
+  }
+  // After Undo the line is back; focus goes to its Delete, where it was before the note took it.
+  useEffect(() => {
+    const id = focusAfterUndo.current;
+    if (id === null) return;
+    focusAfterUndo.current = null;
+    const line = [...(stepOne.current?.querySelectorAll<HTMLElement>(".v4NotStartedItem") ?? [])].find((one) => one.dataset.savedId === id);
+    line?.querySelector<HTMLElement>(".v4NotStartedDelete")?.focus();
+  }, [waitingDeletes]);
 
   /**
    * Task 76g (read-f1): "Put it back". The answer comes back under its own question's words, as a block of its own after the new
@@ -1321,11 +1689,23 @@ function V4AskForm({
     const kept = held === null || held.step === "started" ? null : held.words;
     return trimmed !== filledByItself.trim() && trimmed !== initialQuestion.trim() && kept?.trim() !== trimmed && kept !== plain;
   }
-  useLeaveSiteGuard(() => stepOneAtRisk() || stepTwoAtRisk(), leaving);
+  /**
+   * Task 76f (owner answer S2 A): while the account keeps the question, step 2 risks only a change not saved yet (on its way, or
+   * not landed); while saving is off or stopped (20 kept included), Task 76c's rule.
+   */
+  function stepTwoLeaveRisk(): boolean {
+    return accountKeeps ? changeUnsaved : stepTwoAtRisk();
+  }
+  useLeaveSiteGuard(() => stepOneAtRisk() || stepTwoLeaveRisk(), leaving);
 
-  /** Task 76c: puts step 2's entry (back) on top of this tab's history; the address says only that it is step 2. */
+  /**
+   * Task 76c: puts step 2's entry (back) on top of this tab's history; the address says only that it is step 2. Task 76f: with the
+   * question the account keeps (a reload then reopens it from the account).
+   */
   function pushStepTwo(words: string): void {
-    window.history.pushState(withAskHistory(window.history.state, { step: "read", words }), "", stepTwoAddress(window.location.search));
+    const kept = savedIdRef.current;
+    window.history.pushState(withAskHistory(window.history.state, kept === null ? { step: "read", words } : { step: "read", words, savedId: kept }), "",
+      stepTwoAddress(window.location.search));
   }
 
   /** Task 76c: the ⋯ menu, Options sheet or More drawer open on step 2 (the innermost, when one is inside another); null: none. */
@@ -1392,9 +1772,11 @@ function V4AskForm({
    */
   function onBrandClick(event: MouseEvent<HTMLAnchorElement>): void {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (!stepTwoAtRisk()) return;
+    if (!stepTwoLeaveRisk()) return;
     event.preventDefault();
     brandLink.current = event.currentTarget;
+    // Task 76f (owner answer S2 A): while the account keeps the question, the question names the change not saved yet.
+    leaveKey.current = accountKeeps ? "v4.ask.leaveUnsaved" : "v4.ask.leavePaths";
     setLeaveAsking(true);
   }
   function stayHere(): void {
@@ -1416,11 +1798,27 @@ function V4AskForm({
   // ask-d1 / ask-d6 A: the header knows the session from this page, so a signed-out visitor reads "Sign in" at its end (the
   // way back is this page) and a signed-in person the round account button. ask-f6 / journey-f19: no classic link here.
   // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level is chosen only here, for this question (the step-1 level block);
-  // the header offers no level change. Task 75d: and shows no level (no menu or label in any header, the owner's 5 Nov answers).
-  // Task 76c: the logo asks first while something would be lost.
-  const header = <V4Header catalog={catalog} readingLevel={null} session={session} onBrandClick={onBrandClick} />;
+  // the header offers no level change. Task 75d: and shows no level (no menu or label in any header, the owner's 5 Nov answers);
+  // Task 76j: so no level is handed to it at all. Task 76c: the logo asks first while something would be lost.
+  const header = <V4Header catalog={catalog} session={session} onBrandClick={onBrandClick} />;
   // read-f17: one line, never both: while the room notice says one question already waits, its refusal adds nothing.
   const refusalAlert = refusal === null || (refusalWaits && waitingShown) ? null : <p className="v4AskRefusal" role="alert">{refusal}</p>;
+  /**
+   * Task 76e: the banner's Reload. Nothing else is sent from the banner. Task 76f (spec §6, risk 12): the latest change goes to the
+   * account first, then the page reloads whatever it answered (the reload reopens the last copy that landed, or, with none kept
+   * yet, Task 76c's rule).
+   */
+  async function reloadForUpdate(): Promise<void> {
+    await save.flush();
+    reloadPage();
+  }
+  // Task 76e (owner answer Q8): while the site is updated, one line at the top of the page, on step 1 and step 2 (draft wording).
+  const updateBanner = site.updated ? (
+    <p className="v4AskHint v4AskSiteUpdated" role="status">
+      {t(catalog, "v4.ask.siteUpdated")}{" "}
+      <button type="button" className="v4Link" onClick={() => void reloadForUpdate()}>{t(catalog, "v4.ask.siteUpdatedReload")}</button>
+    </p>
+  ) : null;
 
   // Task 76, step 2's lines. Above the bar (read-f9): the reset line (unless the card already says it) or the room notice, and
   // a refusal at Start, one line each: not while sentence D says it (read-f17), not while the card says a stale reading or the
@@ -1455,6 +1853,28 @@ function V4AskForm({
       takeFocus={false}
     />
   ) : null;
+  // Task 76f (spec §3.6): each Delete waiting out its 10 seconds, in the shared Undo note ("Deleted “…”", Undo, the shrinking
+  // line); it goes once the DELETE is sent.
+  const deleteNotes = waitingDeletes.filter((one) => !one.sent).map((one) => (
+    <V4UndoNote
+      key={one.item.id}
+      state="counting"
+      label={t(catalog, "v4.saved.deleted", { question: one.item.question })}
+      sendsAt={one.sendsAt}
+      durationMs={DIG_UNDO_MS}
+      onUndo={() => undoDelete(one.item.id)}
+      undoLabel={t(catalog, "v4.start.undo")}
+      stillLine={t(catalog, "v4.saved.deleteStill")}
+      announce={t(catalog, "v4.saved.deleteAnnounce")}
+      sendingLine={t(catalog, "v4.saved.deleteStill")}
+      confirmedLine={t(catalog, "v4.saved.deleteStill")}
+    />
+  ));
+  // Task 76f (spec §3.3, §3.4): why the account stopped keeping this question, above the bar: changed in another window, 20 already
+  // kept, or signed out (the existing line, unless the card already says it); any other refusal stops saving quietly.
+  const savedStopKey = save.stopped === "ELSEWHERE" ? "v4.saved.elsewhere" : save.stopped === "FULL" ? "v4.saved.full"
+    : save.stopped === "SIGNED_OUT" && start.noneLine !== "SIGNED_OUT" ? "v4.start.none.SIGNED_OUT" : null;
+  const savedStopLine = savedStopKey === null ? null : <p className="v4AskHint v4AskSavedStopped" role="status">{t(catalog, savedStopKey)}</p>;
   const stepTwoAbove = (
     <>
       {stepTwoWait === null ? (
@@ -1465,6 +1885,7 @@ function V4AskForm({
       {declinedAtStartLine}
       {planUnknownLine}
       {stepTwoRefusal}
+      {savedStopLine}
       {undoneNote}
     </>
   );
@@ -1472,27 +1893,23 @@ function V4AskForm({
   // Task 76b, rule 3 (answers Q11, Q12; Task 60): the map during the 10 seconds, before any run exists: the question as it is
   // sent and the paths being sent, each being looked into (Start: the plan as it stands, so a combine written meanwhile shows;
   // "Just answer it" at READY: the menu's top paths; otherwise none, and the AIs are choosing). Task 61's tree, read-only (no
-  // pick boxes), the question's card selected, no panel and nothing pulsing; the shared note under the question.
-  const pendingMap = useMemo(() => pending === null ? null : buildV4PendingMap({
-    questionLine: pending.line,
-    paths: pendingPathsOf(pending.press === "start" && pending.handsOver ? plan : pending.topPaths)
-  }), [pending, plan]);
+  // pick boxes), the question's card selected, no panel and nothing pulsing; the shared note under the question. Task 76i: the
+  // drawing is V4PendingMap, which the map page also draws until its first run read (the hand-off below).
+  const pendingPaths = useMemo(() => pending === null ? null
+    : pendingPathsOf(pending.press === "start" && pending.handsOver ? plan : pending.topPaths), [pending, plan]);
+  const pendingMap = useMemo(() => pending === null || pendingPaths === null ? null
+    : buildV4PendingMap({ questionLine: pending.line, paths: pendingPaths }), [pending, pendingPaths]);
+  /** Task 76i (wait-f14): the paths the map shows now (a combine written during the send included), for the hand-off at STARTED. */
+  const shownPendingPaths = useRef(pendingPaths);
+  shownPendingPaths.current = pendingPaths;
   const pendingWords = pending === null ? "" : pending.share === null ? t(catalog, "v4.start.undo.noteNoShare")
     : t(catalog, "v4.start.undo.note", { share: t(catalog, pending.share.key, pending.share.values) });
   const pendingView = pending === null || pendingMap === null ? null : (
     <div ref={pendingBox} className="v4AskMain v4AskPendingMap">
-      <V4MapTree
+      <V4PendingMap
         map={pendingMap}
-        digs={NO_DIGS}
-        selected="root"
-        changed={NOTHING}
-        picked={NOTHING}
-        onSelect={() => undefined}
-        onTogglePick={() => undefined}
         catalog={catalog}
         locale={locale}
-        readOnly
-        running={false}
         rootExtra={(
           <>
             {pendingMap.pending ? <p className="v4RunChoosing" role="status">{t(catalog, "v4.paths.choosing")}</p> : null}
@@ -1525,6 +1942,7 @@ function V4AskForm({
   return (
     <>
       {header}
+      {updateBanner}
       {pendingView !== null ? pendingView : step === "ask" ? (
         <div ref={stepOne} className="v4AskMain">
           {/* Task 76c (choose-f21, answer Q3): the page opened on a started question's entry: one line at the top, with its map. */}
@@ -1663,9 +2081,15 @@ function V4AskForm({
             above={<>{stepOneRoomLines}{refusalAlert}{undoneNote}</>}
           />
 
+          {/* Task 76f (owner card "Where shown"; answer S3 A): the questions the account keeps, under the question box and its
+              lines and above "Your maps", newest first, with Pick up and Delete; then any Delete's shared Undo note. */}
+          {listOffered ? (
+            <V4NotStarted items={notStartedItems} locale={locale} catalog={catalog} onPickUp={(id) => void pickUp(id)} onDelete={deleteSaved} />
+          ) : null}
+          {deleteNotes}
           {firstVisit ? <V4MapSeed question={question} catalog={catalog} /> : null}
-          {/* Task 75d: no level rides the shelf's links; each map shows its debate at its own level. */}
-          <V4MapShelf load={shelf.load} catalog={catalog} locale={locale} level={null} />
+          {/* Task 75d: no level rides the shelf's links; each map shows its debate at its own level (Task 76j: none is handed). */}
+          <V4MapShelf load={shelf.load} catalog={catalog} locale={locale} />
         </div>
       ) : (
         <div
@@ -1725,8 +2149,9 @@ function V4AskForm({
             </div>
 
             {/* Task 76h (read-f5, read-f8, read-f15, read-f23, ask-d3): the questions' one status line, the wait and its held rows,
-                the questions (the answered ones fold once a path is used, read-d4 A) and Free's joined line. Until Task 76e's seed,
-                a reply this page already holds draws at once by itself (the block never waited for it). Task 76g (read-f1): the
+                the questions (the answered ones fold once a path is used, read-d4 A) and Free's joined line. Task 76e: a restored
+                step 2's seed is drawn as seeded; any other reply this page already holds draws at once by itself (the block never
+                waited for it). Task 76g (read-f1): the
                 answers a new reading kept under their own question's words are blocks after its questions, the ones it set aside
                 are lines where their question was, and a reading that brought nothing back leaves the earlier questions as they were. */}
             <V4AskQuestions
@@ -1734,7 +2159,7 @@ function V4AskForm({
               questions={questions}
               goal={goal}
               planIsFree={freePlan}
-              seeded={false}
+              seeded={clarifySeed !== undefined}
               onAnswer={answerQuestion}
               fold={{ folded: answersFolded, onShow: () => setAnswersFolded(false) }}
               setAside={shown.setAside}
@@ -1761,6 +2186,9 @@ function V4AskForm({
               narrow={narrow}
               share={{ wider: widerShare }}
               onPathsUsed={() => setAnswersFolded(true)}
+              // Task 76e (owner, 4 Nov, "Hide the old line"): while the update banner shows, only the banner speaks. Task 76f (owner
+              // answer S1 A): nor while the account keeps the question, since a reload then reopens step 2 from the account.
+              hideReloadLine={site.updated || accountKeeps}
             />
           )}
 
@@ -1798,7 +2226,7 @@ function V4AskForm({
       {languageAtNext.dialog}
       {refusalAtNext.dialog}
       {leaveAsking ? (
-        <V4LeaveQuestion question={t(catalog, "v4.ask.leavePaths")} onStay={stayHere} onLeave={leaveHere} catalog={catalog} />
+        <V4LeaveQuestion question={t(catalog, leaveKey.current)} onStay={stayHere} onLeave={leaveHere} catalog={catalog} />
       ) : null}
     </>
   );

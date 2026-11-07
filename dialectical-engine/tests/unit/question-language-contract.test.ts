@@ -43,7 +43,9 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
       "start_paths",
       "carry_on_to_report",
       // V4 start step, Task 39c: the question not started yet this ask starts from, a later optional key.
-      "saved_question_id"
+      "saved_question_id",
+      // V4 start step, Task 57e: "Ask this again" on a failed question that kept what ran, a later optional key.
+      "again_of"
     ]);
     expect(AskRequestSchema.shape.site_language.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.question_language_choice.safeParse(undefined).success).toBe(true);

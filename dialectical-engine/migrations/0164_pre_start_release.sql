@@ -1,20 +1,31 @@
 -- 0164 · A failed question gives back its path-list charge (V4 start step; plan docs/superpowers/plans/2026-11-03-v4-start-step.md Task 57c;
--- the owner's 5 Nov answer Q20 A and its second-round follow-up).
+-- the owner's 5 Nov answer Q20 A and its second-round follow-up; Task 57d, the owner's 6 Nov answer "Random id"; Task 57e, the owner's 6 Nov
+-- rule for a failed question: re-use what was already paid for, give back only what cannot be re-used, one automatic retry).
 --
 -- Plain words. Before Start, small AIs plan the angles, write the lists, merge them, combine two paths and check that a path fits; each call
 -- is charged to the person (0157). When the debate they were for fails, that charge is given back: the person's day, week and month no
 -- longer count it, so a question that failed before any round ran took nothing. The site's day still counts it (the money was spent), as a
--- debate set aside by an update keeps its spend in the site's day (0123's waiver). Each call names the try it was made for: one person's one
--- question, as a keyed hash the API derives (it never reads back as words). At Start the API gives the try's charges to the new debate, once.
+-- debate set aside by an update keeps its spend in the site's day (0123's waiver). Each call names the try it was made for: a random id the
+-- API mints once per reading before Start, carried inside the signed check the page sends back (a combine over a dig's picks is charged to
+-- that dig's try instead). Nothing made from the question's words is stored. At Start the API gives the try's charges to the new debate, once.
 -- A charge is given back while its debate is FAILED; nothing is written when it fails, so a charge is given back once and never twice.
+-- Task 57e: what the calls bought is given back only when it cannot be re-used. A failed debate that keeps the paths the person chose from
+-- the list keeps their charges: "Ask this again" starts the question again on those paths, with its clarifying answers, and calls nothing
+-- before Start. A debate that built its own paths, a dig, or one that kept no paths gives them back, as before. A debate that stops on our
+-- side (a provider out, a time limit, a fault of ours) is claimed again once, a few minutes later, and resumes from what it saved (0119's
+-- true resume: nothing already answered is bought again); the runner records that one retry per work item here.
 --
 --   §1 identity.pre_start_try: which try a charge was made for, and (from Start) the debate it was given to, at most once. Append-only but
 --      for that one link. An erased account takes its rows, as it takes the charges.
 --   §2 identity.record_pre_start_try_charge, 0157's writer and the try's row in one transaction, or neither.
 --   §3 identity.link_pre_start_try: at Start, the person's charges of that try not yet given to a debate, given to the person's new debate.
---   §4 the readers: 0157's identity.read_pre_start_spent and its two funded readers leave out a charge whose debate failed.
---   §5 identity.read_run_quota_used: whether a person's debate used any of their quota (its own counted spend, or a charge before Start
+--   §4 core.run_pre_start_kept (Task 57e): whether a debate keeps, for the person, the paths chosen from the list (0158's set, from the
+--      menu; not on a debate an upload set aside), which the readers of §5 and §6 read: a failed debate that keeps them keeps their charges.
+--   §5 the readers: 0157's identity.read_pre_start_spent and its two funded readers leave out a charge whose debate failed and keeps
+--      nothing it bought.
+--   §6 identity.read_run_quota_used: whether a person's debate used any of their quota (its own counted spend, or a charge before Start
 --      not given back), for the failed debate's read.
+--   §7 core.work_item_retry and core.record_work_item_retry (Task 57e): the one automatic retry of a work item, written once.
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: drained
@@ -22,9 +33,9 @@
 --   drained         it redefines 0157's three readers in place (declared as amendments of the postconditions of 0140, 0144 and 0157), so it
 --                   is uploaded drained, as 0157 was: no debate waits or runs while it applies. No expand step could say this. The V4
 --                   start step's release is drained already (0157).
---   keeps-verifier  no new billing relation or billing function (the same name and signature; the table and the new functions are the
---                   identity schema's), so lineage/verify-effective-capabilities-130.sql stays in force.
---   row security    outside 0130's scope rule, as 0131 to 0163: no request role can SELECT this table.
+--   keeps-verifier  no new billing relation or billing function (the same name and signature; the tables and the new functions are the
+--                   identity and core schemas'), so lineage/verify-effective-capabilities-130.sql stays in force.
+--   row security    outside 0130's scope rule, as 0131 to 0163: no request role can SELECT these tables.
 --
 -- Replay-safe in the repository's form, as 0157.
 
@@ -115,8 +126,26 @@ BEGIN
 END;
 $$;
 
--- 4. The readers --------------------------------------------------------------------------------------------------------------
--- 0157's, less a charge given to a debate that failed (a FAILED work item: a debate's failure is final).
+-- 4. What a failed question keeps (Task 57e) ----------------------------------------------------------------------------------
+-- Whether a debate keeps, for the person, what its calls before Start bought: the paths the person chose from the list (0158's set, source
+-- MENU), which "Ask this again" starts the debate again on without a new call, so the readers below do not give their charges back when it
+-- fails. A debate that built its own paths (RUN_BUILT), a dig's picks (DIG_PICKS) or no set keeps nothing they bought; and a debate an upload
+-- set aside (0123's waiver: it used none of the person's quota, as its own sentence says) keeps nothing for the person either, so its charges
+-- are given back as before (its paths are still there for Ask again). Codes only, no liveness check: a debate the person deleted keeps its
+-- charges (their act, not a failure of ours). 0158's table and 0123's waiver are read by their owner's definer, never granted to another role.
+CREATE OR REPLACE FUNCTION core.run_pre_start_kept(p_run_id uuid) RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+  SELECT EXISTS (SELECT 1 FROM core.start_path_set AS path_set WHERE path_set.run_id = p_run_id AND path_set.source = 'MENU')
+    AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = p_run_id)
+$$;
+
+-- 5. The readers --------------------------------------------------------------------------------------------------------------
+-- 0157's, less a charge given to a debate that failed (a FAILED work item: a debate's failure is final) and keeps nothing it bought (Task 57e:
+-- no paths chosen from the list, or set aside by an upload: §4).
 CREATE OR REPLACE FUNCTION identity.read_pre_start_spent(p_owner uuid, p_from timestamptz, p_to timestamptz) RETURNS numeric
 LANGUAGE sql
 STABLE
@@ -125,7 +154,7 @@ SET search_path=pg_catalog
 AS $$
  SELECT coalesce(sum(c.charge_micros),0) FROM identity.pre_start_charge c
  WHERE c.owner_ref=p_owner AND c.funding_kind='SUBSCRIPTION' AND c.recorded_at>=p_from AND c.recorded_at<p_to
- AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=c.charge_id AND w.state='FAILED')
+ AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=c.charge_id AND w.state='FAILED' AND NOT core.run_pre_start_kept(t.run_id))
 $$;
 
 -- 0157's, likewise. Same signature, language, owner, definer, path and grants.
@@ -142,7 +171,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  + (SELECT coalesce(sum(b.charge_micros),0) FROM identity.pre_start_charge b
  WHERE b.owner_ref=p_owner AND b.funding_kind='INTERNAL' AND b.internal_grant_id=p_grant AND b.internal_grant_event_id=p_event
  AND (p_total OR (b.recorded_at>=p_from AND b.recorded_at<p_to))
- AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=b.charge_id AND w.state='FAILED'))
+ AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=b.charge_id AND w.state='FAILED' AND NOT core.run_pre_start_kept(t.run_id)))
 $$;
 
 -- 0157's, likewise.
@@ -158,12 +187,13 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  WHERE k.funding_kind='INTERNAL' AND k.recorded_at>=p_from AND k.recorded_at<p_to)
  + (SELECT coalesce(sum(b.charge_micros),0) FROM identity.pre_start_charge b
  WHERE b.funding_kind='INTERNAL' AND b.recorded_at>=p_from AND b.recorded_at<p_to
- AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=b.charge_id AND w.state='FAILED'))
+ AND NOT EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN core.work_item w ON w.run_id=t.run_id WHERE t.charge_id=b.charge_id AND w.state='FAILED' AND NOT core.run_pre_start_kept(t.run_id)))
 $$;
 
--- 5. Whether a debate used any quota ------------------------------------------------------------------------------------------
+-- 6. Whether a debate used any quota ------------------------------------------------------------------------------------------
 -- SOME: its own spend the person's windows count (the kinds and the waiver of the readers above) is more than nothing, or a charge before
--- Start given to it is not given back; NONE otherwise; NULL when the debate is not the person's (its latest owner). Codes only.
+-- Start given to it is not given back (it has not failed, or it keeps the paths that charge bought: Task 57e); NONE otherwise; NULL when the
+-- debate is not the person's (its latest owner). Codes only.
 CREATE OR REPLACE FUNCTION identity.read_run_quota_used(p_owner uuid, p_run_id uuid) RETURNS text
 LANGUAGE sql
 STABLE
@@ -179,12 +209,48 @@ AS $$
        AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver w WHERE w.run_id = s.run_id))
      OR EXISTS (SELECT 1 FROM identity.pre_start_try t JOIN identity.pre_start_charge c ON c.charge_id=t.charge_id
        WHERE t.run_id=p_run_id AND c.charge_micros>0
-       AND NOT EXISTS (SELECT 1 FROM core.work_item w WHERE w.run_id=t.run_id AND w.state='FAILED')) THEN 'SOME'
+       AND NOT EXISTS (SELECT 1 FROM core.work_item w WHERE w.run_id=t.run_id AND w.state='FAILED' AND NOT core.run_pre_start_kept(t.run_id))) THEN 'SOME'
    ELSE 'NONE'
  END
 $$;
 
--- 6. Owners, then the grants --------------------------------------------------------------------------------------------------
+-- 7. The one automatic retry (Task 57e) ----------------------------------------------------------------------------------------
+-- A debate that stopped on our side keeps its claim until `retry_after`, then the runner's lapsed re-send hands it to a runner again, which
+-- resumes it (0119). One row per work item, written once: the runner retries a work item that has a row never again. Ids and times only.
+-- No foreign key to core.work_item, as 0132 to 0147: the writer checks the item.
+CREATE TABLE IF NOT EXISTS core.work_item_retry (
+  work_item_id uuid PRIMARY KEY,
+  run_id uuid NOT NULL,
+  retry_after timestamptz NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+SELECT core.install_truncate_guard('core.work_item_retry');
+-- Insert-only: nothing updates or deletes a row.
+DROP TRIGGER IF EXISTS reject_mutation ON core.work_item_retry;
+CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON core.work_item_retry
+FOR EACH STATEMENT EXECUTE FUNCTION core.reject_mutation();
+
+-- RECORDED: this CLAIMED work item of this run has had its one retry recorded now; ALREADY: it had it before (nothing written). Refuses
+-- (22023) a missing value, an unknown item, an item of another run, or one not CLAIMED.
+CREATE OR REPLACE FUNCTION core.record_work_item_retry(p_work_item_id uuid, p_run_id uuid, p_retry_after timestamptz) RETURNS text
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+BEGIN
+  IF p_work_item_id IS NULL OR p_run_id IS NULL OR p_retry_after IS NULL
+    OR NOT EXISTS (SELECT 1 FROM core.work_item AS item WHERE item.work_item_id = p_work_item_id AND item.run_id = p_run_id
+      AND item.state = 'CLAIMED') THEN
+    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='WORK_ITEM_RETRY_INVALID';
+  END IF;
+  INSERT INTO core.work_item_retry (work_item_id, run_id, retry_after) VALUES (p_work_item_id, p_run_id, p_retry_after) ON CONFLICT DO NOTHING;
+  IF FOUND THEN RETURN 'RECORDED'; END IF;
+  RETURN 'ALREADY';
+END;
+$$;
+
+-- 8. Owners, then the grants --------------------------------------------------------------------------------------------------
 -- The table and its guard are 0115's export owner's, as 0157's charge table. The writer, the link and the quota reader are
 -- debateai_staff_security_owner's, as 0157's writer: it owns 0157's writer and the readers, and reads core.run_ownership_event,
 -- core.work_item and ledger.model_spend (0093) and the waiver (0123) already.
@@ -212,8 +278,16 @@ GRANT SELECT, INSERT, UPDATE (run_id, linked_at) ON identity.pre_start_try TO de
 GRANT EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid) TO debateai_runtime;
+-- Task 57e: §4 and §7 keep the migrator, as 0158's core definers and tables (it owns core.start_path_set and core.work_item). Every definer leaves
+-- PUBLIC first: a new core function PUBLIC could run would change the content-provision login's core function count, which the API checks at boot.
+-- §4 for the readers' owner alone (the readers above call it as their definer); §7's writer for the runner's role alone; no role reads the table.
+REVOKE ALL ON core.work_item_retry FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION core.run_pre_start_kept(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION core.record_work_item_retry(uuid,uuid,timestamptz) FROM PUBLIC,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+GRANT EXECUTE ON FUNCTION core.run_pre_start_kept(uuid) TO debateai_staff_security_owner;
+GRANT EXECUTE ON FUNCTION core.record_work_item_retry(uuid,uuid,timestamptz) TO debateai_runtime;
 
--- 7. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed -----------------------------------------------------------------
+-- 9. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed -----------------------------------------------------------------
 DO $pre_start_try_contract$
 DECLARE
   v_role text;
@@ -243,5 +317,36 @@ BEGIN
       RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT %', v_name;
     END IF;
   END LOOP;
+  -- Task 57e.
+  IF pg_catalog.to_regclass('core.work_item_retry') IS NULL
+    OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass('core.work_item_retry')
+      AND t.tgname = 'reject_truncate' AND NOT t.tgisinternal)
+    OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = pg_catalog.to_regclass('core.work_item_retry')
+      AND t.tgname = 'reject_mutation' AND NOT t.tgisinternal AND t.tgenabled = 'O') THEN
+    RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT retry table';
+  END IF;
+  FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
+    'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker', 'debateai_content_provision'] LOOP
+    IF pg_catalog.has_table_privilege(v_role, 'core.work_item_retry', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
+      RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT retry table privilege %', v_role;
+    END IF;
+  END LOOP;
+  -- As 0158's definers: the API's billing and authorization roles may hold the runtime role, so the roles that must never run them are named.
+  FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_erasure_runtime', 'debateai_data_export_worker', 'debateai_content_provision'] LOOP
+    IF pg_catalog.has_function_privilege(v_role, 'core.run_pre_start_kept(uuid)', 'EXECUTE')
+      OR (v_role <> 'debateai_runtime' AND pg_catalog.has_function_privilege(v_role, 'core.record_work_item_retry(uuid,uuid,timestamptz)', 'EXECUTE')) THEN
+      RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT retry privilege %', v_role;
+    END IF;
+  END LOOP;
+  FOREACH v_name IN ARRAY ARRAY['core.run_pre_start_kept(uuid)', 'core.record_work_item_retry(uuid,uuid,timestamptz)'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p WHERE p.oid = pg_catalog.to_regprocedure(v_name)
+        AND p.prosecdef AND p.proconfig = '{search_path=pg_catalog}'::text[]) THEN
+      RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT %', v_name;
+    END IF;
+  END LOOP;
+  IF NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'core.run_pre_start_kept(uuid)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'core.record_work_item_retry(uuid,uuid,timestamptz)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'PRE_START_TRY_0164_CONTRACT retry grants';
+  END IF;
 END
 $pre_start_try_contract$;

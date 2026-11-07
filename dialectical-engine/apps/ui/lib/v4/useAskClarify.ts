@@ -73,15 +73,19 @@ function clarifyCall(question: string, earlier: AskClarifyEarlier | null, starte
  * Task 76g (read-f1): `earlier`, the earlier wording's questions and answers, goes with a call for a new line (read when the call
  * starts; "Try again" sends it again); it never changes which reply is reused. `line` is the line `reply` answers, so the page
  * knows when the reading of a new line has landed (null: no reply yet).
+ * Task 76e (owner answer S1 A; read-f23): `seed`, a reply the page already holds for `question` (a kept step 2's questions as
+ * shown), is that line's reply at once: no call, never waiting. An AI seed is then known for the line, as an answer would be.
  */
-export function useAskClarify(input: Readonly<{ active: boolean; question: string; mayCall: boolean; earlier?: AskClarifyEarlier | null }>): Readonly<{
+export function useAskClarify(input: Readonly<{
+  active: boolean; question: string; mayCall: boolean; earlier?: AskClarifyEarlier | null; seed?: AskClarifyResponse
+}>): Readonly<{
   reply: AskClarifyResponse | null;
   line: string | null;
   waiting: boolean;
   startedAt: number | null;
   retry(): void;
 }> {
-  const { active, question, mayCall } = input;
+  const { active, question, mayCall, seed } = input;
   // Task 76g: the earlier wording's questions and answers as the page has them now; a call takes them when it starts.
   const earlier = useRef<AskClarifyEarlier | null>(null);
   earlier.current = input.earlier ?? null;
@@ -107,12 +111,17 @@ export function useAskClarify(input: Readonly<{ active: boolean; question: strin
 
   // Task 76h (read-f23): what this hook is asked for is known while the page draws, so its first frame for a new line already
   // waits (and a reply it already holds shows at once), before the effect below asks.
-  const asking = active ? `${mayCall ? "ASK" : "NO"}\n${question}` : null;
+  // Task 76e: a seed's first frame already shows it.
+  const asking = active ? `${seed !== undefined ? "SEED" : mayCall ? "ASK" : "NO"}\n${question}` : null;
   const [drawnFor, setDrawnFor] = useState<string | null>(null);
   if (asking !== drawnFor) {
     setDrawnFor(asking);
     const seen = known.current.get(question);
     if (asking === null) {
+      setWaiting(false);
+      setStartedAt(null);
+    } else if (seed !== undefined) {
+      setReply(seed, question);
       setWaiting(false);
       setStartedAt(null);
     } else if (seen !== undefined || !mayCall) {
@@ -132,6 +141,18 @@ export function useAskClarify(input: Readonly<{ active: boolean; question: strin
 
   useEffect(() => {
     if (!active) {
+      setWaiting(false);
+      setStartedAt(null);
+      return;
+    }
+    // Task 76e: a seed is the line's reply, with no call; a call still running for another line stops, as for a new line.
+    if (seed !== undefined) {
+      if (seed.source === "AI") known.current.set(question, seed);
+      if (running.current !== null && running.current.question !== question) {
+        running.current.stop();
+        running.current = null;
+      }
+      setReply(seed, question);
       setWaiting(false);
       setStartedAt(null);
       return;
@@ -159,7 +180,7 @@ export function useAskClarify(input: Readonly<{ active: boolean; question: strin
       setStartedAt(null);
     });
     return () => { shown = false; };
-  }, [active, question, mayCall, asks, settled, setReply]);
+  }, [active, question, mayCall, asks, settled, setReply, seed]);
 
   /**
    * Task 76h (ask-d3): "Try again". The wait keeps its start (its words stay as they are); only the page's own wait starts again.

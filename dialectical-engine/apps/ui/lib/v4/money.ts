@@ -74,9 +74,18 @@ export function sharePeriodOf(room: AskRoom | null): SharePeriod {
   return room?.plan_id === "FREE" ? "PERSON_MONTH" : "PERSON_DAY";
 }
 
-/** Before a dig: "This dig uses about {percent}% of today. …" (approved), when the room read for the dig says a share. */
-export function digShareLine(room: AskRoom | null): MoneyLine | null {
-  const percent = room?.dig_share_percent;
+/**
+ * Before a dig: "This dig uses about {percent}% of today. …" (approved), when the room read for the dig says a share.
+ * V4 start step, Task 79b (owner answer Q19 of 4 Nov: "a dig's share follows a combine"): with `paths`, the number of paths a path
+ * debate's dig will look into, and the read's share for each path count (`dig_share_by_paths`, entry i - 1 for i paths, the
+ * server's own figures), that count's share (a count outside them reads the nearest entry, as `startPathsShare` does); otherwise, an
+ * R22 dig's read included, today's single `dig_share_percent`, as before.
+ */
+export function digShareLine(room: AskRoom | null, paths?: number): MoneyLine | null {
+  const byPaths = room?.dig_share_by_paths;
+  const percent = paths === undefined || byPaths === undefined || byPaths.length === 0 || !Number.isFinite(paths)
+    ? room?.dig_share_percent
+    : byPaths[Math.min(byPaths.length, Math.max(1, Math.trunc(paths))) - 1];
   return percent === undefined || percent <= 0 ? null : Object.freeze({ key: "v4.dig.quotaShare", values: { percent } });
 }
 

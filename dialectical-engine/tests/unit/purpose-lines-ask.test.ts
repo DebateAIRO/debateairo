@@ -68,6 +68,33 @@ describe("the ask stores the lines", () => {
     expect(stored).toEqual([[expect.any(String), RUN_ID, answered]]);
     await api.close();
   });
+  // Review of V4 start step Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"): the page marks the answer to "What do you care
+  // about most?" (`cares: true`); the run reads a stated goal from that mark alone, so the ask keeps it as sent. The check reads the
+  // same text as for an unmarked answer: the mark is never words.
+  it("Task 50b: the care answer's mark is stored as sent, and the check reads the same text as without it", async () => {
+    const marked: PurposeLines = { answers: [{ question: "Which town?", answer: "Harbour Town" },
+      { question: "What do you care about most?", answer: "Keeping bills low", cares: true }] };
+    const unmarked: PurposeLines = { answers: marked.answers!.map(({ question, answer }) => ({ question, answer })) };
+    const line = `${ask.question_line}\n\nWhich town? Harbour Town.\nWhat I care about is: keeping bills low.`;
+    const withMark = apiOver(async () => "RECORDED");
+    expect((await withMark.api.inject({ method: "POST", url: "/v1/asks", headers, payload: { ...ask, question_line: line, purpose_lines: marked } }))
+      .statusCode).toBe(202);
+    expect(withMark.stored).toEqual([[expect.any(String), RUN_ID, marked]]);
+    expect(withMark.submitted[0]!.purpose_lines).toEqual(marked);
+    await withMark.api.close();
+    const without = apiOver(async () => "RECORDED");
+    expect((await without.api.inject({ method: "POST", url: "/v1/asks", headers, payload: { ...ask, question_line: line, purpose_lines: unmarked } }))
+      .statusCode).toBe(202);
+    expect(without.stored).toEqual([[expect.any(String), RUN_ID, unmarked]]);
+    expect(withMark.checked).toEqual(without.checked);
+    await without.api.close();
+    // Only `true` marks an answer; anything else is refused at the door, as any malformed line is.
+    const refused = apiOver(async () => "RECORDED");
+    const bad = { answers: [{ question: "What do you care about most?", answer: "Keeping bills low", cares: "yes" }] };
+    expect((await refused.api.inject({ method: "POST", url: "/v1/asks", headers, payload: { ...ask, purpose_lines: bad } })).statusCode).toBe(400);
+    expect(refused.stored).toEqual([]);
+    await refused.api.close();
+  });
   it("decision 29: a line sent beside the question and not in it is still judged by the check", async () => {
     const { api, checked } = apiOver(async () => "RECORDED");
     await api.inject({ method: "POST", url: "/v1/asks", headers, payload: { ...ask, purpose_lines: { angles: ["a line the question does not say"] } } });

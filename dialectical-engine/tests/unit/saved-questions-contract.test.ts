@@ -357,7 +357,8 @@ describe("the ask's saved_question_id", () => {
   it("is an optional lowercase uuid, the ask's last key", () => {
     expect(AskRequestSchema.parse({ ...ASK, saved_question_id: ID }).saved_question_id).toBe(ID);
     for (const id of ["abc", "", ID.toUpperCase(), 7]) expect(AskRequestSchema.safeParse({ ...ASK, saved_question_id: id }).success).toBe(false);
-    expect(Object.keys(AskRequestSchema.shape).at(-1)).toBe("saved_question_id");
+    // Task 57e's "Ask this again" link (`again_of`) comes after it.
+    expect(Object.keys(AskRequestSchema.shape).slice(-2)).toEqual(["saved_question_id", "again_of"]);
     // The 39d review: PostgreSQL finds an id in capitals, the question-key store (which compares ids as written) does not.
     expect(SavedQuestionSummarySchema.safeParse({ id: ID.toUpperCase(), question: "q", saved_at: SAVED_AT }).success).toBe(false);
     expect(SavedQuestionWrittenSchema.safeParse({ id: ID.toUpperCase(), revision: 1 }).success).toBe(false);

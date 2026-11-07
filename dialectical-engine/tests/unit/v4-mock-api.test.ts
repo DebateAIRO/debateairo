@@ -763,3 +763,350 @@ describe("V4 mock API: every switch is named where people look for it (the wave-
     expect(known).toContain("subscription=RESET");
   });
 });
+
+/*
+ * V4 start step, Task 81 (items wait-d1, map-d2, journey-f1, wait-f16, public-f25; owner card "Carry-on", "Show it from the start" (Task
+ * 57b); owner answer Q17): on the mock a new question is a path debate. One path per path sent at Start, in order, with who wrote it, or,
+ * with none sent, the AIs choose for 8 s and then name five (Free three). Each path fills in on its own made-up clock, and the answer comes
+ * 6 s after the last. The scenes `#slowfill`, `#pathfailed` and `#carryon` are words in the question; `#reportwaits` makes the debate's
+ * report wait for the reset. branches.ts holds the pure parts; server.ts listens when it is imported, so its wiring is read as source, as
+ * the cases above do, and the run read is built here exactly as its runProjection builds it.
+ */
+describe("V4 mock API: one path per path sent at Start, filling in one by one (Task 81)", () => {
+  const branches = () => import("../../tools/v4-mock-api/branches.js");
+  const startStep = () => import("../../tools/v4-mock-api/start-step.js");
+  const contract = () => import("../../packages/contract/src/index.js");
+  /** The seeded answer's four positions, the roots of b1..b4 (server.ts POSITION_NODE_IDS). */
+  const ROOTS = ["n-mix", "n-renew", "n-nuclear", "n-smr"] as const;
+  const QUESTION = "Should towns close their centres to cars at weekends?";
+  const OWN = "Shops on the square would lose their weekend customers.";
+
+  /** A menu as the mock's merge writes it, and three paths sent from it: a menu path as written, one viewpoint as written, own words. */
+  async function sentFromMenu(free = false): Promise<Loose> {
+    const S = await startStep();
+    const C = await contract();
+    const script = S.mockStartListsScript(QUESTION, free ? "FREE" : "PLUS");
+    const lists = script.flatMap((one) => (one.event.event === "list" ? [one.event.data.list] : []));
+    const menu = S.mockStartMenu(lists, null).menu;
+    const first = menu.menu.paths[0]!;
+    const single = menu.menu.viewpoints.find((one) => !first.viewpoint_ids.includes(one.viewpoint_id))!;
+    const startPaths = C.StartPathsSchema.parse({
+      source: "MENU", menu, width: 3, chosen_by: "PERSON",
+      paths: [
+        { title: first.title, question: first.question, members: first.viewpoint_ids.map((id) => ({ viewpoint_id: id })) },
+        { title: single.title, question: single.question, members: [{ viewpoint_id: single.viewpoint_id }] },
+        { title: "Shops on the square", question: OWN, members: [{ own_text: OWN }] }
+      ]
+    });
+    return { menu, first, single, startPaths };
+  }
+  const askOf = (startPaths: Loose, extra: Loose = {}): Loose =>
+    ({ question_line: QUESTION, plan_tier: "premium", ...(startPaths === undefined ? {} : { start_paths: startPaths }), ...extra });
+  /** The run read at `elapsedMs` after the ask, as server.ts's runProjection builds it (RUNNING until the answer, then SETTLED). */
+  async function readAt(run: Loose, elapsedMs: number): Promise<Loose> {
+    const B = await branches();
+    const answerAt = B.mockPathRunMs(run);
+    const state = elapsedMs >= answerAt ? "SETTLED" : "RUNNING";
+    return {
+      run_ref: "81818181-8181-4181-8181-818181818181", question_line: QUESTION, state, terminal_reason: null, hold_until: null,
+      ...B.mockRunPathsPart({ run, positionNodeIds: ROOTS, state, elapsedMs, sinceAnswerMs: elapsedMs - answerAt })
+    };
+  }
+  const states = (read: Loose): string[] => read.branches.paths.map((path: Loose) => path.state);
+  const steps = (read: Loose): (string | null)[] => read.path_progress.map((entry: Loose) => entry.step);
+
+  it("three sent paths read back LOOKING in order at 0 s, finding sources on a paid plan and arguing on Free, each with who wrote it", async () => {
+    const B = await branches();
+    for (const free of [false, true]) {
+      const { menu, first, single, startPaths } = await sentFromMenu(free);
+      const run = B.mockPathRunOf(askOf(startPaths, { plan_tier: free ? "free" : "premium" }));
+      const read = RunProjectionSchema.parse(await readAt(run, 0));
+      expect(read.branches!.source).toBe("MENU");
+      expect(read.branches!.paths.map((path) => path.path_id)).toEqual(["b1", "b2", "b3"]);
+      expect(states(read)).toEqual(["LOOKING", "LOOKING", "LOOKING"]);
+      expect(read.branches!.paths.map((path) => path.author)).toEqual(["AI_SUGGESTION", "AI_SUGGESTION", "PERSON_OWN_VIEW"]);
+      expect(read.branches!.paths.map((path) => path.outcome)).toEqual([null, null, null]);
+      expect(steps(read)).toEqual(free ? ["ARGUING", "ARGUING", "ARGUING"] : ["FINDING_SOURCES", "FINDING_SOURCES", "FINDING_SOURCES"]);
+      expect(read.path_progress!.every((entry) => entry.findings.length === 0)).toBe(true);
+      // Each path's viewpoints: the menu path's, the one viewpoint's, the person's own words (no title).
+      expect(read.branches!.paths[0]!.viewpoints.map((viewpoint) => viewpoint.question))
+        .toEqual(first.viewpoint_ids.map((id: string) => menu.menu.viewpoints.find((one: Loose) => one.viewpoint_id === id)!.question));
+      expect(read.branches!.paths[1]!.viewpoints).toEqual([{ title: single.title, question: single.question, own: false }]);
+      expect(read.branches!.paths[2]!.viewpoints).toEqual([{ title: null, question: OWN, own: true }]);
+      // "+ N more" is the menu's paths none of whose viewpoints was sent, in menu order.
+      const chosen = new Set([...first.viewpoint_ids, single.viewpoint_id]);
+      expect(read.branches!.more.map((item) => item.more_id))
+        .toEqual(menu.menu.paths.filter((path: Loose) => !path.viewpoint_ids.some((id: string) => chosen.has(id))).map((path: Loose) => `more-${String(path.path_ref)}`));
+      expect(read.branches!.more.length).toBeGreaterThan(0);
+      expect(read.branches!.carry_on_to_report).toBe(false);
+      expect(read).not.toHaveProperty("carry_on_part");
+      // Answer Q17: the answers are sentences in the question line; the run read carries no purpose lines.
+      expect(read).not.toHaveProperty("purpose_lines");
+      // The pure parts say the same.
+      expect(B.mockBranchesOf({ startPaths, free, positionNodeIds: ROOTS, phase: "RUN", elapsedMs: 0, scene: null })).toEqual(read.branches);
+      expect(B.mockPathProgress({ pathId: "b1", pathNo: 1, free, elapsedMs: 0, scene: null }).step).toBe(free ? "ARGUING" : "FINDING_SOURCES");
+    }
+  });
+
+  it("at 21 s b1 is argued with its findings and its answer so far, while b2 and b3 are still looked into", async () => {
+    const B = await branches();
+    const C = await contract();
+    const { startPaths } = await sentFromMenu();
+    const run = B.mockPathRunOf(askOf(startPaths));
+    const read = RunProjectionSchema.parse(await readAt(run, 21_000));
+    expect(states(read)).toEqual(["ARGUED", "LOOKING", "LOOKING"]);
+    const [b1, b2, b3] = read.path_progress!;
+    expect(b1).toMatchObject({ path_id: "b1", step: null, points: [] });
+    expect(b1!.findings.length).toBeGreaterThan(0);
+    const argued = read.branches!.paths[0]!;
+    expect(argued.root_node_id).toBe("n-mix");
+    expect(argued.outcome!.state).toBe("READY");
+    expect(argued.outcome!.trust).toBe(C.pathTrustWordOf(b1!.findings.map((finding) => finding.trust)));
+    expect(argued.outcome!.rests_on).toEqual(b1!.findings.map((finding) => finding.node_ref));
+    expect(read.branches!.main_trust).toBe(argued.outcome!.trust);
+    // b2 (fills at 26 s, checked every 2 s) and b3 (32 s, every 3 s) are checking their points one by one.
+    expect(b2).toMatchObject({ step: "CHECKING", points: ["CHECKED", "CHECKED", "CHECKED", "BEING_CHECKED", "PUT_FORWARD", "PUT_FORWARD"], findings: [] });
+    expect(b3).toMatchObject({ step: "CHECKING", points: ["CHECKED", "CHECKED", "BEING_CHECKED", "PUT_FORWARD", "PUT_FORWARD", "PUT_FORWARD"], findings: [] });
+    expect(states(await readAt(run, 26_000))).toEqual(["ARGUED", "ARGUED", "LOOKING"]);
+    expect(states(await readAt(run, 32_000))).toEqual(["ARGUED", "ARGUED", "ARGUED"]);
+    expect((await readAt(run, 37_999)).state).toBe("RUNNING");
+    expect((await readAt(run, 38_000)).state).toBe("SETTLED");
+  });
+
+  it("the made-up clock: finding sources to 6 s, one more point every 2 s up to 6, checking from 14 s, each point checked one by one", async () => {
+    const B = await branches();
+    const at = (elapsedMs: number, free = false) => B.mockPathProgress({ pathId: "b1", pathNo: 1, free, elapsedMs, scene: null });
+    expect(at(5_999)).toEqual({ path_id: "b1", step: "FINDING_SOURCES", points: [], findings: [] });
+    expect(at(6_000)).toMatchObject({ step: "ARGUING", points: ["PUT_FORWARD"] });
+    expect(at(13_999)).toMatchObject({ step: "ARGUING", points: ["PUT_FORWARD", "PUT_FORWARD", "PUT_FORWARD", "PUT_FORWARD"] });
+    expect(at(14_000)).toMatchObject({ step: "CHECKING", points: ["BEING_CHECKED", "PUT_FORWARD", "PUT_FORWARD", "PUT_FORWARD", "PUT_FORWARD"] });
+    expect(at(16_000)).toMatchObject({ step: "CHECKING", points: ["CHECKED", "CHECKED", "BEING_CHECKED", "PUT_FORWARD", "PUT_FORWARD", "PUT_FORWARD"] });
+    expect(at(19_999).points).toEqual(["CHECKED", "CHECKED", "CHECKED", "CHECKED", "CHECKED", "BEING_CHECKED"]);
+    expect(at(20_000)).toMatchObject({ step: null, points: [] });
+    // Free never searches: it argues from the start, its points come from 0 s.
+    expect(at(0, true)).toMatchObject({ step: "ARGUING", points: ["PUT_FORWARD"] });
+    expect(at(10_000, true).points).toHaveLength(6);
+    // The answer comes 6 s after the last path: 20 + 6 × (n − 1) + 6; with no paths sent, after the AIs' 8 s.
+    const { startPaths } = await sentFromMenu();
+    expect(B.mockPathRunMs(B.mockPathRunOf(askOf(startPaths)))).toBe(38_000);
+    expect(B.mockPathRunMs(B.mockPathRunOf(askOf(undefined)))).toBe(58_000);
+    expect(B.mockPathRunMs(B.mockPathRunOf(askOf(undefined, { plan_tier: "free" })))).toBe(46_000);
+    expect(B.mockPathRunMs(B.mockPathRunOf(askOf(startPaths, { question_line: `${QUESTION} #slowfill` })))).toBe(92_000);
+  });
+
+  it("no read ever has more than 6 points, each point is checked one by one, and every read parses with RunProjectionSchema", async () => {
+    const B = await branches();
+    const samples = B.mockPathRunSamples();
+    expect(samples.some((run) => run.startPaths === undefined) && samples.some((run) => (run.startPaths?.paths.length ?? 0) === 7)).toBe(true);
+    for (const run of samples) {
+      const label = `${run.startPaths?.source ?? "RUN_BUILT"} ${String(run.startPaths?.paths.length ?? "")} free=${String(run.free)} box=${String(run.carryOnToReport)} ${String(run.scene)}`;
+      const checked = new Map<string, number>();
+      for (let elapsedMs = 0; elapsedMs <= B.mockPathRunMs(run) + 40_000; elapsedMs += 500) {
+        const read = await readAt(run, elapsedMs);
+        const parsed = RunProjectionSchema.safeParse(read);
+        expect(parsed.success, `${label} at ${String(elapsedMs)}: ${JSON.stringify(parsed.error?.issues)}`).toBe(true);
+        for (const entry of read.path_progress as Loose[]) {
+          expect(entry.points.length, label).toBeLessThanOrEqual(6);
+          expect(entry.points.filter((point: string) => point === "BEING_CHECKED").length, label).toBeLessThanOrEqual(1);
+          const now = entry.points.filter((point: string) => point === "CHECKED").length + (entry.step === null ? 6 : 0);
+          expect(now, `${label} ${String(entry.path_id)} at ${String(elapsedMs)}`).toBeGreaterThanOrEqual(checked.get(entry.path_id) ?? 0);
+          checked.set(entry.path_id, now);
+        }
+      }
+    }
+    expect(B.mockPathRunSelfCheck()).toBeGreaterThan(1_000);
+  });
+
+  it("with no paths sent the AIs choose for 8 s (path_progress []), then name five (Free three) paths of their own", async () => {
+    const B = await branches();
+    for (const free of [false, true]) {
+      const run = B.mockPathRunOf(askOf(undefined, { plan_tier: free ? "free" : "premium" }));
+      const choosing = RunProjectionSchema.parse(await readAt(run, 5_000));
+      expect(choosing.path_progress).toEqual([]);
+      expect(choosing).not.toHaveProperty("branches");
+      expect(choosing).not.toHaveProperty("carry_on_part");
+      expect(B.mockBranchesOf({ startPaths: undefined, free, positionNodeIds: ROOTS, phase: "RUN", elapsedMs: 7_999, scene: null })).toBeNull();
+      const named = RunProjectionSchema.parse(await readAt(run, 9_000));
+      const count = free ? 3 : 5;
+      expect(named.branches!.source).toBe("RUN_BUILT");
+      expect(named.branches!.width).toBe(count);
+      expect(named.branches!.paths.map((path) => path.title)).toEqual(Array.from({ length: count }, (_, at) => `Path ${String(at + 1)}`));
+      expect(new Set(named.branches!.paths.map((path) => path.author))).toEqual(new Set(["AI_SUGGESTION"]));
+      expect(named.branches!.more).toEqual([]);
+      expect(steps(named)).toEqual(Array.from({ length: count }, () => (free ? "ARGUING" : "FINDING_SOURCES")));
+    }
+  });
+
+  it("#pathfailed: b3 ends FAILED with a FAILED outcome, the others are argued; #slowfill: b2 fills 60 s after its time, after every other path", async () => {
+    const B = await branches();
+    const { startPaths } = await sentFromMenu();
+    const failing = B.mockPathRunOf(askOf(startPaths, { question_line: `${QUESTION} #pathfailed` }));
+    expect(failing.scene).toBe("#pathfailed");
+    const failed = RunProjectionSchema.parse(await readAt(failing, 32_000));
+    expect(states(failed)).toEqual(["ARGUED", "ARGUED", "FAILED"]);
+    expect(failed.branches!.paths[2]).toMatchObject({ root_node_id: null,
+      outcome: { state: "FAILED", text: null, what_changed: [], view: null, trust: null, rests_on: [] } });
+    expect(failed.path_progress![2]).toEqual({ path_id: "b3", step: null, points: [], findings: [] });
+    expect(states(RunProjectionSchema.parse(await readAt(failing, 38_000)))).toEqual(["ARGUED", "ARGUED", "FAILED"]);
+    const slow = B.mockPathRunOf(askOf(startPaths, { question_line: `${QUESTION} #slowfill` }));
+    expect(states(await readAt(slow, 40_000))).toEqual(["ARGUED", "LOOKING", "ARGUED"]);
+    expect(steps(await readAt(slow, 40_000))[1]).toBe("CHECKING");
+    expect(states(await readAt(slow, 85_999))).toEqual(["ARGUED", "LOOKING", "ARGUED"]);
+    expect(states(await readAt(slow, 86_000))).toEqual(["ARGUED", "ARGUED", "ARGUED"]);
+    // Scenes combine, each named anywhere in the line.
+    expect(B.mockFillScenesOf(`#carryon ${QUESTION} #slowfill #PathFailed`)).toBe("#slowfill #pathfailed #carryon");
+    expect(B.mockFillScenesOf(QUESTION)).toBeNull();
+    expect(B.MOCK_FILL_SCENES).toEqual(["#slowfill", "#pathfailed", "#carryon"]);
+  });
+
+  it("#carryon: ANSWER while the debate runs, DIGS 10 s after the answer, REPORT at 25 s and none at 35 s; the answer says the same", async () => {
+    const B = await branches();
+    expect(B.mockCarryOnPart({ carryOnToReport: false, settled: false, sinceAnswerMs: -5_000, scene: "#carryon" })).toBe("ANSWER");
+    expect(B.mockCarryOnPart({ carryOnToReport: false, settled: true, sinceAnswerMs: 10_000, scene: "#carryon" })).toBe("DIGS");
+    expect(B.mockCarryOnPart({ carryOnToReport: false, settled: true, sinceAnswerMs: 25_000, scene: "#carryon" })).toBe("REPORT");
+    expect(B.mockCarryOnPart({ carryOnToReport: false, settled: true, sinceAnswerMs: 35_000, scene: "#carryon" })).toBeNull();
+    expect(B.mockCarryOnPart({ carryOnToReport: false, settled: false, sinceAnswerMs: -5_000, scene: null })).toBeNull();
+    // The box ticked at Start plays the same line.
+    expect(B.mockCarryOnPart({ carryOnToReport: true, settled: true, sinceAnswerMs: 10_000, scene: null })).toBe("DIGS");
+    const { startPaths } = await sentFromMenu();
+    const run = B.mockPathRunOf(askOf(startPaths, { question_line: `${QUESTION} #carryon` }));
+    const running = RunProjectionSchema.parse(await readAt(run, 10_000));
+    expect(running.carry_on_part).toBe("ANSWER");
+    expect(running.branches!.carry_on_to_report).toBe(true);
+    expect(RunProjectionSchema.parse(await readAt(run, 38_000 + 10_000)).carry_on_part).toBe("DIGS");
+    expect(RunProjectionSchema.parse(await readAt(run, 38_000 + 25_000)).carry_on_part).toBe("REPORT");
+    expect(RunProjectionSchema.parse(await readAt(run, 38_000 + 35_000))).not.toHaveProperty("carry_on_part");
+    expect(B.mockAnswerCarryOn({ run, sinceAnswerMs: 10_000 })).toEqual({ carry_on_part: "DIGS" });
+    expect(B.mockAnswerCarryOn({ run, sinceAnswerMs: 35_000 })).toEqual({});
+    const ticked = B.mockPathRunOf(askOf(startPaths, { carry_on_to_report: true }));
+    expect(RunProjectionSchema.parse(await readAt(ticked, 10_000)).carry_on_part).toBe("ANSWER");
+  });
+
+  it("#carryon on an ask with no paths sent: at 5 s path_progress [], no branches, carry_on_part ANSWER, and the read parses (Task 57b)", async () => {
+    const B = await branches();
+    for (const run of [B.mockPathRunOf(askOf(undefined, { question_line: `${QUESTION} #carryon` })), B.mockPathRunOf(askOf(undefined, { carry_on_to_report: true }))]) {
+      const read = await readAt(run, 5_000);
+      expect(RunProjectionSchema.safeParse(read).success).toBe(true);
+      expect(read).toEqual(expect.objectContaining({ path_progress: [], carry_on_part: "ANSWER" }));
+      expect(read).not.toHaveProperty("branches");
+      expect(RunProjectionSchema.parse(await readAt(run, 9_000))).toMatchObject({ carry_on_part: "ANSWER", branches: { carry_on_to_report: true } });
+    }
+  });
+
+  it("the answer: every path argued (b3 failed under #pathfailed), its web part named by path id, and it parses with AnswerSchema", async () => {
+    const B = await branches();
+    const { startPaths } = await sentFromMenu();
+    for (const [question, web] of [[QUESTION, "PAID"], [`${QUESTION} #pathfailed #carryon`, "PAID"], [QUESTION, "FREE"]] as const) {
+      const run = B.mockPathRunOf(askOf(startPaths, { question_line: question, plan_tier: web === "FREE" ? "free" : "premium" }));
+      const base: Loose = seed.answer({ answerId: "aaaa8181-8181-4181-8181-818181818181", runRef: "81818181-8181-4181-8181-818181818181", question,
+        askedAt: "2026-11-06T10:00:00.000Z", servedAt: "2026-11-06T10:00:38.000Z", web });
+      const answer = { ...base, ...B.mockAnswerPathsPart({ run, positionNodeIds: ROOTS, web: base.web }), ...B.mockAnswerCarryOn({ run, sinceAnswerMs: 10_000 }) };
+      const parsed = AnswerSchema.safeParse(answer);
+      expect(parsed.success, `${question}: ${JSON.stringify(parsed.error?.issues)}`).toBe(true);
+      expect(answerDraftProblems(answer), question).toEqual([]);
+      const failing = question.includes("#pathfailed");
+      expect(answer.branches.paths.map((path: Loose) => path.state)).toEqual(failing ? ["ARGUED", "ARGUED", "FAILED"] : ["ARGUED", "ARGUED", "ARGUED"]);
+      expect(answer.branches.paths.map((path: Loose) => path.root_node_id)).toEqual(failing ? ["n-mix", "n-renew", null] : ["n-mix", "n-renew", "n-nuclear"]);
+      // The path id is the position everywhere (spec §4.3): each argued path's web part is named by it, its suggestions' path places too.
+      expect(answer.web.paths.map((path: Loose) => path.position_ref)).toEqual(failing ? ["b1", "b2"] : ["b1", "b2", "b3"]);
+      const places = answer.web.paths.flatMap((path: Loose) => path.suggestions.flatMap((suggestion: Loose) => suggestion.places));
+      expect(places.filter((place: string) => place.startsWith("path:")).every((place: string) => /^path:b[1-3]$/u.test(place)), question).toBe(true);
+      expect(answer.carry_on_part, question).toBe(question.includes("#carryon") ? "DIGS" : undefined);
+    }
+    // With no paths sent, the answer names the AIs' five paths; b5 has no seeded position to stand on.
+    const built = B.mockAnswerPathsPart({ run: B.mockPathRunOf(askOf(undefined)), positionNodeIds: ROOTS });
+    expect(built.branches.paths.map((path) => path.root_node_id)).toEqual(["n-mix", "n-renew", "n-nuclear", "n-smr", null]);
+    expect(built).not.toHaveProperty("web");
+    // Every sample's answer, as the mock's startup check reads them (server.ts startupCheck), during the carry-on and after it.
+    for (const sample of B.mockPathRunSamples()) {
+      const base: Loose = seed.answer({ answerId: "aaaa8181-8181-4181-8181-818181818181", runRef: "81818181-8181-4181-8181-818181818181",
+        question: QUESTION, askedAt: "2026-11-06T10:00:00.000Z", servedAt: "2026-11-06T10:01:00.000Z", web: sample.free ? "FREE" : "PAID" });
+      const answer = { ...base, ...B.mockAnswerPathsPart({ run: sample, positionNodeIds: ROOTS, web: base.web }) };
+      const label = `${sample.startPaths?.source ?? "RUN_BUILT"} ${String(sample.startPaths?.paths.length ?? "")} free=${String(sample.free)} ${String(sample.scene)}`;
+      expect(answerDraftProblems(answer), label).toEqual([]);
+      for (const since of [0, 25_000, 35_000]) {
+        const parsed = AnswerSchema.safeParse({ ...answer, ...B.mockAnswerCarryOn({ run: sample, sinceAnswerMs: since }) });
+        expect(parsed.success, `${label} ${String(since)}: ${JSON.stringify(parsed.error?.issues)}`).toBe(true);
+      }
+    }
+  });
+
+  it("Task 33's author rule, read without signatures: the mock's combine, code-joined words, a card, and the person's edit", async () => {
+    const B = await branches();
+    const S = await startStep();
+    const { menu, first, single } = await sentFromMenu();
+    const second = menu.menu.viewpoints.find((one: Loose) => one.viewpoint_id !== single.viewpoint_id && !first.viewpoint_ids.includes(one.viewpoint_id))!;
+    const members = [{ viewpoint_id: single.viewpoint_id }, { viewpoint_id: second.viewpoint_id }];
+    const combined = S.mockStartCombine({ context: { kind: "MENU", menu_id: menu.menu.menu_id, question_line: QUESTION, check_ref: menu.ref },
+      reading_level: "plain", members: [single, second].map((one: Loose) => ({ viewpoint_id: one.viewpoint_id, pick_no: null, title: one.title, question: one.question })) } as Loose);
+    expect(combined.source).toBe("AI");
+    const { joinedPathWords } = await import("../../packages/kernel/src/path-join.js");
+    const joined = joinedPathWords([single, second]);
+    const card = menu.menu.cards[0]!;
+    const startPaths: Loose = { source: "MENU", menu, width: 5, chosen_by: "PERSON", paths: [
+      { title: (combined as Loose).title, question: (combined as Loose).question, members, combine_ref: (combined as Loose).combine_ref },
+      { ...joined, members },
+      { title: card.new_path.title, question: card.new_path.question, members: [{ viewpoint_id: card.card_id }] },
+      { title: "My own wording", question: String(single.question), members: [{ viewpoint_id: single.viewpoint_id }] }
+    ] };
+    const read = B.mockBranchesOf({ startPaths, free: false, positionNodeIds: ROOTS, phase: "RUN", elapsedMs: 0, scene: null })!;
+    expect(read.paths.map((path) => path.author)).toEqual(["AI_COMBINED", "AI_COMBINED", "AI_SUGGESTION", "PERSON_EDITED"]);
+    expect(read.paths[2]!.viewpoints).toEqual([{ title: card.new_path.title, question: card.new_path.question, own: false }]);
+    expect(read.width).toBe(5);
+  });
+
+  it("#reportwaits (public-f25): the investigation read says the next report is not the first, and a press waits for the reset", async () => {
+    const B = await branches();
+    const C = await contract();
+    expect(B.mockFirstClosingLeft({ question: `${QUESTION} #reportwaits`, versions: 0 })).toBe(false);
+    expect(B.mockFirstClosingLeft({ question: QUESTION, versions: 0 })).toBe(true);
+    expect(B.mockFirstClosingLeft({ question: QUESTION, versions: 1 })).toBe(false);
+    const refused = B.mockReportRefusal(`${QUESTION} #REPORTWAITS`);
+    expect(refused).toEqual({ status: 409, body: { error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" } });
+    expect(C.PublicDebateRefusedSchema.safeParse(refused!.body).success).toBe(true);
+    expect(B.mockReportRefusal(QUESTION)).toBeNull();
+    expect(B.MOCK_REPORT_WAITS_SCENE).toBe("#reportwaits");
+    expect(InvestigationReportsSchema.safeParse({ investigation_id: "1a1a1a1a-8181-4181-8181-818181818181", root_run_id: "81818181-8181-4181-8181-818181818181",
+      state: "OPEN", digs: 0, versions: [], current: null, first_closing_left: false }).success).toBe(true);
+  });
+
+  it("server.ts argues every new question that runs as a path debate, serves its paths, the carry-on part and the report's wait", () => {
+    const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
+    const between = (from: string, to: string): string => server.slice(server.indexOf(from), server.indexOf(to, server.indexOf(from)));
+    expect(server).toContain('from "./branches.js";');
+    expect(server).toContain('const POSITION_NODE_IDS = Object.freeze(["n-mix", "n-renew", "n-nuclear", "n-smr"]);');
+    // POST /v1/asks: a new question (no parent, not a public page's dig) that runs is a path debate, timed by its paths.
+    const ask = between("async function postAsk(", "function sendProgress(");
+    expect(ask).toContain("const pathRun = parent === null && publicParent === undefined ? mockPathRunOf(ask) : undefined;");
+    expect(ask).toContain("const settleAt = now + (pathRun === undefined ? RUN_SECONDS * 1000 : mockPathRunMs(pathRun));");
+    expect(ask).toContain("...(pathRun === undefined ? {} : { paths: pathRun })");
+    expect(ask.indexOf("const pathRun =")).toBeLessThan(ask.indexOf("const settleAt ="));
+    // The answer, the run read and the answer read.
+    expect(between("function settledRun(", "settledRun({")).toContain("mockAnswerPathsPart({ run: input.paths, positionNodeIds: POSITION_NODE_IDS, web: base.web })");
+    expect(between("function runProjection(", "function withQuestionShare(")).toContain("mockRunPathsPart({ run: run.paths, positionNodeIds: POSITION_NODE_IDS, state,");
+    expect(between("function answerNow(", "function withClimb(")).toContain("mockAnswerCarryOn({ run: run.paths, sinceAnswerMs: now - (run.settleAt ?? now) })");
+    // #reportwaits: the investigation read's flag, and the press refused before anything closes.
+    expect(between("function investigationReports(", "function startupCheck(")).toContain("first_closing_left: mockFirstClosingLeft({ question: root?.question ?? \"\", versions: versions.length })");
+    const report = between('if (parts[1] === "runs" && parts.length === 4 && parts[3] === "report" && method === "POST") {', "// R22 W5-1: \"Keep digging\".");
+    expect(report).toContain("const waits = mockReportRefusal(runs.get(investigation.root_run_id)?.question ?? \"\");");
+    expect(report).toContain("if (waits !== null) return sendJson(req, res, waits.status, waits.body, C.PublicDebateRefusedSchema);");
+    expect(report.indexOf("mockReportRefusal(")).toBeLessThan(report.indexOf('investigation.state = "CLOSED";'));
+    // The startup check reads every sample's run reads and answers.
+    const startup = between("function startupCheck(", "const CHECKED = startupCheck();");
+    expect(startup).toContain("count += mockPathRunSelfCheck();");
+    expect(startup).toContain("for (const sample of mockPathRunSamples())");
+  });
+
+  it("check.ts plays them through the website's own client and map builder, and the README names the scenes", () => {
+    const check = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/check.ts"), "utf8");
+    const readme = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/README.md"), "utf8");
+    expect(check).toContain('from "./start-step.js";');
+    for (const label of ["one path per path sent at Start, filling in one by one", "the AIs choose the paths, with the carry-on (#carryon)",
+      "a report that waits for the reset (#reportwaits)"]) expect(check).toContain(`await step("${label}"`);
+    for (const used of ["mapModel.buildV4RunMap(", "start_paths: startPaths", "client.writeReport(", 'serverCode === "PUBLIC_DEBATE_WAITS_FOR_RESET"',
+      "first_closing_left === true", "first_closing_left === false"]) expect(check).toContain(used);
+    expect(readme).toContain("`branches.ts`");
+    for (const scene of ["#slowfill", "#pathfailed", "#carryon", "#reportwaits"]) expect(readme, scene).toContain(`\`${scene}\``);
+    expect(readme).toContain("## One path per path sent at Start (V4 start step, Task 81)");
+  });
+});

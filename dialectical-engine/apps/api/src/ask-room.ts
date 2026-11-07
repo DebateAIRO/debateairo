@@ -76,8 +76,12 @@ export type RoomQuestion = Readonly<{
    * Plan 2026-10-30 W3-2 (the money rule): a room read asked for a dig (its parent already checked as the person's and
    * below the deepest level, apps/api/src/dig-admission.ts). Its answer then carries the dig's share of today instead
    * of a new question's.
+   * V4 start step, Task 79b (owner answer Q19 of 4 Nov; spec 2026-11-03 §4.4): `paths`, on a dig's read where the start step runs
+   * (the dig is argued as paths): the most paths it may look into (How wide's widest, Free 3) and the web depth each would search
+   * at (null: no web part, as on Free or with no search gate). The answer then also carries the dig's share for each path count.
    */
-  dig?: Readonly<{ parentRunId: string; mode: DigLinkMode; picks: number | null; level?: number }>;
+  dig?: Readonly<{ parentRunId: string; mode: DigLinkMode; picks: number | null; level?: number;
+    paths?: Readonly<{ maxPaths: number; web: "QUICK" | "THOROUGH" | null }> }>;
   /**
    * V4 start step, Task 38 (spec 2026-11-03 §2.6): a room read for a new question whose start step runs (GET /v1/asks/room,
    * `startStepWidthsFor`): How wide's widest choice, and the web depth each chosen path would search at (null: no web
@@ -294,6 +298,12 @@ export type AskRoomAnswer = Readonly<{
    * its web part) as a whole share of today (`wholeSharePercent`), for i from 1 to the widest choice.
    */
   startShareByPaths?: readonly number[];
+  /**
+   * V4 start step, Task 79b (owner answer Q19: "a dig's share follows a combine"): on a dig's read with `dig.paths`, under the money
+   * rule and not on an internal grant: entry i - 1 is the dig of i paths (its arguing, its web part from a dig, and what follows a
+   * dig) as a whole share of today (`wholeSharePercent`), for i from 1 to `dig.paths.maxPaths`. Beside `digSharePercent`, which stays.
+   */
+  digShareByPaths?: readonly number[];
 }>;
 
 export interface AskRoomReader {
@@ -818,7 +828,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const funding = grant === null ? {} : {funding: Object.freeze({kind:"INTERNAL" as const, expiresAt:grant.expiresAt})};
     const money = grant === null ? {
       ...moneyRuleMembers(question, evaluation, await this.#digWebPartMicros(question) + await this.#digUpdatesPartMicros(question)),
-      ...await this.#startShareByPaths(question, evaluation)
+      ...await this.#startShareByPaths(question, evaluation),
+      ...await this.#digShareByPaths(question, evaluation)
     } : {};
     const admission = evaluation.admission;
     switch (admission.kind) {
@@ -1160,6 +1171,32 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       shares.push(wholeSharePercent(arguing + web, today.limitMicros));
     }
     return { startShareByPaths: Object.freeze(shares) };
+  }
+
+  /**
+   * V4 start step, Task 79b (owner answer Q19 of 4 Nov: "a dig's share follows a combine"; spec 2026-11-03 §4.4): a path debate's dig's
+   * share of today for each path count, 1 to `dig.paths.maxPaths`, under the money rule, for a shaped class: each count's estimate
+   * (the dig's class with that many paths, at its own version), plus, with a web depth, its web part from a dig's origin
+   * (`pathsWebPartMicros` with origin DIG, as the dig's receipt counts it; 0 when the estimator cannot say), plus what follows a dig
+   * (the owner's ruling of 31 Oct, the same part today's `digSharePercent` counts), as a whole share (`wholeSharePercent`, Task 38's
+   * rule, so one path less always shows). One estimate per count, in turn. Only the line reads it: the room is measured, held and
+   * walled by the dig's own class alone. Nothing otherwise (an R22 dig, a new question).
+   */
+  async #digShareByPaths(question: RoomQuestion, evaluation: RoomEvaluation): Promise<Pick<AskRoomAnswer, "digShareByPaths">> {
+    const paths = question.dig?.paths;
+    const shape = question.settingsClass.shape;
+    if (paths === undefined || !evaluation.moneyRule || shape === undefined) return {};
+    const today = todayOf(evaluation);
+    if (today === undefined) return {};
+    const estimator = await this.#estimatorFor(question.registerVersion);
+    const updates = await this.#digUpdatesPartMicros(question);
+    const shares: number[] = [];
+    for (let count = 1; count <= paths.maxPaths; count += 1) {
+      const arguing = await estimator.estimateMicros(Object.freeze({ ...question.settingsClass, shape: Object.freeze({ ...shape, paths: count }) }));
+      const web = paths.web === null ? 0 : estimator.pathsWebPartMicros?.({ depth: paths.web, paths: count, origin: "DIG" }) ?? 0;
+      shares.push(wholeSharePercent(arguing + web + updates, today.limitMicros));
+    }
+    return { digShareByPaths: Object.freeze(shares) };
   }
 
   /** The site's live debates at its cap, counted under `SITE_CONCURRENT_DEBATES_LOCK` on the decision's own transaction. */

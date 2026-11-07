@@ -103,3 +103,16 @@ export function askAgainQuestion(run: Pick<RunProjection, "question_line">, cata
   const words = ownWords(run.question_line);
   return words.length > 0 ? words : null;
 }
+
+/**
+ * V4 start step, Task 57e (the owner's 6 Nov rule: "re-use what we already paid for"): what "Ask this again" re-uses. When the FAILED run
+ * read says `reusable` (the person's own failed question kept its clarifying answers and the paths chosen from the list), the link the ask
+ * sends as `again_of`: the failed debate's id and its whole line as the server sent it (the clarifying answers in it), which the ask must
+ * send unchanged for the server to start it again on what it kept, at no new charge. Null otherwise (nothing kept, not FAILED, a dig).
+ */
+export type AskAgainReuse = Readonly<{ runId: string; questionLine: string }>;
+
+export function askAgainReuseOf(run: Pick<RunProjection, "run_ref" | "question_line" | "state" | "reusable">, catalog: MessageCatalog): AskAgainReuse | null {
+  if (run.state !== "FAILED" || run.reusable !== true || parseDigQuestion(run.question_line, catalog) !== null) return null;
+  return Object.freeze({ runId: run.run_ref, questionLine: run.question_line });
+}

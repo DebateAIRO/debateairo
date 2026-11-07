@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode
+} from "react";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import {
-  cutText, PATH_PLAN_LIMITS, type PathPlan, type PathPlanAction, type PathPlanRefusal, type PlanPath, type PlanViewpoint
+  cutText, PATH_PLAN_LIMITS, pathPlanReduce, type PathPlan, type PathPlanAction, type PathPlanRefusal, type PlanPath, type PlanViewpoint
 } from "@/lib/v4/pathPlan";
 
 /*
@@ -26,7 +28,15 @@ import {
  *  - The snap (one of the six moves): paths joining when their combined question is written, and parting on Split apart,
  *    under 0.5 s on its token; with reduced motion at once, with the 1-second highlight.
  *  - Phone (`narrow`, choose-f6): the title takes the whole row, the controls sit on a line under it, and Rewrite lives
- *    only in ⋯. No drag grip anywhere here (Task 77 adds the mouse's drag).
+ *    only in ⋯. No drag grip on a phone: Move up and Move down are in ⋯.
+ * Task 77 (choose-d3, choose-f6; spec §2 item 5 "Drag"): drag is a mouse shortcut beside the menus. Only a mouse drags (never
+ * touch, never a pen), a path from its row's grip (⋮⋮, on a computer only; hidden from screen readers and no tab stop, since
+ * ⋯ does the same by keyboard) and a chip from itself, once the pointer has moved a few pixels (a press alone is still a
+ * press). While dragging, a gap shows before each row and after the last, and the drop spot says what will happen:
+ * a chip onto another path, "Drop to add · no extra path" (MOVE_CHIP); a chip onto a gap, "Drop to make its own path"
+ * (MOVE_CHIP to NEW, then MOVE to that place); a path onto another path, "Drop to combine · frees 1 path" (SELECT both, then
+ * COMBINE_SELECTED); a path onto a gap, the gap's line only (MOVE). A drop that would change nothing shows nothing. Escape,
+ * or the browser taking the pointer back, ends a drag with nothing sent.
  * Every change goes through `dispatch` (the path plan model, through useStartPaths); a refusal goes to `onRefusal`, whose
  * words the card says (Task 73). Nothing here fetches, stores or keeps anything in the browser.
  */
@@ -85,6 +95,73 @@ export function pickedTitle(plan: PathPlan, key: string): Readonly<{ text: strin
     if (chip !== undefined) return { text: chipText(chip), ai: chip.source.kind !== "OWN" };
   }
   return null;
+}
+
+/** Task 77: where a drag would land: a path's row, a chip (in its path), or the gap before row `index` (the list's length: after the last). */
+export type StartDropTarget =
+  | Readonly<{ kind: "PATH"; key: string }>
+  | Readonly<{ kind: "CHIP"; key: string; pathKey: string }>
+  | Readonly<{ kind: "GAP"; index: number }>;
+
+/** Task 77: the drop target an element under the pointer is part of: a gap, a chip, or anywhere else on a path's row; else null. */
+export function dropTargetOf(element: Element | null): StartDropTarget | null {
+  if (element === null) return null;
+  const gap = element.closest<HTMLElement>("[data-drop-gap]");
+  if (gap !== null) {
+    const index = Number(gap.dataset.dropGap);
+    return Number.isSafeInteger(index) && index >= 0 ? { kind: "GAP", index } : null;
+  }
+  const row = element.closest<HTMLElement>(".v4StartRow[data-path-key]");
+  const pathKey = row?.dataset.pathKey;
+  if (row === null || pathKey === undefined) return null;
+  const chipKey = element.closest<HTMLElement>("[data-chip-key]")?.dataset.chipKey;
+  return chipKey === undefined ? { kind: "PATH", key: pathKey } : { kind: "CHIP", key: chipKey, pathKey };
+}
+
+/**
+ * Task 77 (choose-f6): the catalogue key of what a drop there says, by what is dragged: a chip onto a path (or one of its
+ * chips) adds it, with no extra path; a chip onto a gap makes it its own path; a path onto another path combines them; a path
+ * onto a gap says nothing (the gap's line shows where it goes). Null with no target.
+ */
+export function dropLabelOf(dragged: "PATH" | "CHIP", target: StartDropTarget | null): string | null {
+  if (target === null) return null;
+  if (target.kind === "GAP") return dragged === "CHIP" ? "v4.start.drop.ownPath" : null;
+  return dragged === "CHIP" ? "v4.start.drop.add" : "v4.start.drop.combine";
+}
+
+/** Task 77: what a drag holds: a path (`key` its own, `pathKey` the same), or a chip (`key` the viewpoint's) of the path `pathKey`. */
+type Dragged = Readonly<{ kind: "PATH" | "CHIP"; key: string; pathKey: string }>;
+/** A drag under way: what is dragged and where a drop would land now (null: a drop there changes nothing). */
+type DragView = Readonly<{ dragged: Dragged; aim: StartDropTarget | null }>;
+/** How far a mouse moves, pressed, before it drags: a press that stays put is still a press (a chip's ⋯). */
+const DRAG_START_PX = 4;
+
+/** The drop target `target` when a drop there would change the plan; null when it would not (its own path, its own place). */
+function aimOf(dragged: Dragged, target: StartDropTarget | null, plan: PathPlan): StartDropTarget | null {
+  if (target === null) return null;
+  if (target.kind === "GAP") {
+    if (dragged.kind === "CHIP") return target;
+    const from = plan.paths.findIndex((path) => path.key === dragged.key);
+    return from < 0 || target.index === from || target.index === from + 1 ? null : target;
+  }
+  const pathKey = target.kind === "PATH" ? target.key : target.pathKey;
+  return pathKey === dragged.pathKey || !plan.paths.some((path) => path.key === pathKey) ? null : target;
+}
+
+/** The element under the pointer: the browser's own answer where it has one, else the event's target (a page without layout). */
+function elementUnder(event: PointerEvent): Element | null {
+  const under = typeof document.elementFromPoint === "function" ? document.elementFromPoint(event.clientX, event.clientY) : null;
+  return under ?? (event.target instanceof Element ? event.target : null);
+}
+
+/** After a drag, the click its release makes (on what the pointer went down and up over) presses nothing. */
+function swallowNextClick(): void {
+  const swallow = (event: Event): void => {
+    event.stopPropagation();
+    event.preventDefault();
+  };
+  window.addEventListener("click", swallow, { capture: true, once: true });
+  setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
 }
 
 /** One item of a ⋯ menu. */
@@ -148,7 +225,7 @@ export function V4StartMenu({ label, items, onClose, opener }: Readonly<{
 }
 
 /** A viewpoint chip: its words (the AIs' marked), its place said to a screen reader, and its ⋯ on a press or Enter. */
-export function V4StartChip({ viewpoint, n, count, path, picked, catalog, open, onOpen, onKeyDown, buttonRef }: Readonly<{
+export function V4StartChip({ viewpoint, n, count, path, picked, catalog, open, onOpen, onKeyDown, buttonRef, onPointerDown, dragged = false }: Readonly<{
   viewpoint: PlanViewpoint;
   /** Its place in the path, from 1. */
   n: number;
@@ -161,6 +238,10 @@ export function V4StartChip({ viewpoint, n, count, path, picked, catalog, open, 
   onOpen(): void;
   onKeyDown(event: KeyboardEvent<HTMLButtonElement>): void;
   buttonRef(element: HTMLButtonElement | null): void;
+  /** Task 77: a press that may become a mouse's drag (absent on a phone). */
+  onPointerDown?: ((event: ReactPointerEvent<HTMLButtonElement>) => void) | undefined;
+  /** Task 77: this chip is being dragged. */
+  dragged?: boolean;
 }>) {
   const words = chipText(viewpoint);
   return (
@@ -169,7 +250,8 @@ export function V4StartChip({ viewpoint, n, count, path, picked, catalog, open, 
         ref={buttonRef}
         type="button"
         tabIndex={-1}
-        className="v4Chip v4StartChip"
+        className={dragged ? "v4Chip v4StartChip v4StartChip--dragged" : "v4Chip v4StartChip"}
+        onPointerDown={onPointerDown}
         dir="auto"
         data-chip-key={viewpoint.key}
         data-ai-generated={aiMark(viewpoint.source.kind !== "OWN")}
@@ -262,7 +344,37 @@ type RowProps = Readonly<{
   onChipKey(event: KeyboardEvent<HTMLButtonElement>, chip: number): void;
   rowRef(element: HTMLButtonElement | null): void;
   chipRef(chipKey: string, element: HTMLButtonElement | null): void;
+  /** Task 77: the grip's press, which may become a mouse's drag of this path; absent: no grip (a phone). */
+  onGripDown?: ((event: ReactPointerEvent<HTMLElement>) => void) | undefined;
+  /** Task 77: a chip's press, which may become a mouse's drag of that chip; absent on a phone. */
+  onChipDown?: ((event: ReactPointerEvent<HTMLButtonElement>, chipKey: string) => void) | undefined;
+  /** Task 77: while something is dragged, what this row shows of it; null or absent: nothing is dragged. */
+  drag?: RowDrag | null;
 }>;
+
+/** Task 77: one row's part of a drag under way. */
+type RowDrag = Readonly<{
+  /** This path is what is dragged. */
+  dragged: boolean;
+  /** The chip of this path being dragged, if one is. */
+  chipKey: string | null;
+  /** A drop on this path would land here: the words it says, or "" for none. Null: it would not land here. */
+  over: string | null;
+  /** The gap before this row, and (on the last row) the gap after it: its place, and its words when a drop would land there ("" for none). */
+  gaps: readonly Readonly<{ index: number; over: string | null }>[];
+}>;
+
+/** Task 77: the gap before a row (or after the last): where a drag lands between paths. Never read out: drag is a mouse's. */
+function DropGap({ index, over, after }: Readonly<{ index: number; over: string | null; after: boolean }>) {
+  const classes = ["v4StartGap"];
+  if (after) classes.push("v4StartGap--after");
+  if (over !== null) classes.push("v4StartGap--over");
+  return (
+    <div className={classes.join(" ")} data-drop-gap={index} aria-hidden="true">
+      {over === null || over === "" ? null : <span className="v4StartDropLabel">{over}</span>}
+    </div>
+  );
+}
 
 /** The tag line: the tag's words, "· Split" on a path put together, and "new" on a late idea; null when none of them. */
 function tagLine(path: PlanPath, catalog: MessageCatalog, onSplit: () => void): ReactNode {
@@ -294,14 +406,24 @@ export function V4StartRow(props: RowProps) {
       props.onPress();
     }
     : undefined;
+  const drag = props.drag ?? null;
   const classes = ["v4StartRow"];
   if (narrow) classes.push("v4StartRow--narrow");
   if (picked) classes.push("v4StartRow--picked");
   else if (combining) classes.push("v4StartRow--pickable");
   if (props.snapClass !== null) classes.push(props.snapClass);
+  if (drag?.dragged === true) classes.push("v4StartRow--dragged");
+  if (drag !== null && drag.over !== null) classes.push("v4StartRow--drop");
+  const gapBefore = drag?.gaps.find((gap) => gap.index === at);
+  const gapAfter = drag?.gaps.find((gap) => gap.index === at + 1);
   return (
     <li className={classes.join(" ")} data-path-key={path.key} onClick={onRowClick}>
+      {gapBefore === undefined ? null : <DropGap index={gapBefore.index} over={gapBefore.over} after={false} />}
+      {drag === null || drag.over === null || drag.over === "" ? null : <span className="v4StartDropLabel" aria-hidden="true">{drag.over}</span>}
       <div className="v4StartRowHead">
+        {narrow || props.onGripDown === undefined ? null : (
+          <span className="v4StartRowGrip" aria-hidden="true" onPointerDown={props.onGripDown}>⋮⋮</span>
+        )}
         <button
           ref={props.rowRef}
           type="button"
@@ -367,6 +489,8 @@ export function V4StartRow(props: RowProps) {
                 onOpen={() => props.onChip(viewpoint.key)}
                 onKeyDown={(event) => props.onChipKey(event, chip)}
                 buttonRef={(element) => props.chipRef(viewpoint.key, element)}
+                onPointerDown={narrow || props.onChipDown === undefined ? undefined : (event) => props.onChipDown?.(event, viewpoint.key)}
+                dragged={drag?.chipKey === viewpoint.key}
               />
             ))}
           </ul>
@@ -374,6 +498,7 @@ export function V4StartRow(props: RowProps) {
         </div>
       ) : null}
       {tagLine(path, catalog, props.onSplit)}
+      {gapAfter === undefined || at + 1 !== count ? null : <DropGap index={gapAfter.index} over={gapAfter.over} after />}
     </li>
   );
 }
@@ -396,6 +521,12 @@ export function V4StartList(props: StartPlanProps) {
   const pathsBefore = useRef(plan.paths);
   const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const combining = plan.selected.length > 0;
+  // Task 77: the drag under way (drawn), how to end the one listening (null: none), and what it reads when it lands.
+  const [drag, setDrag] = useState<DragView | null>(null);
+  const dragEnd = useRef<((draw: boolean) => void) | null>(null);
+  const current = useRef({ plan, dispatch, onRefusal });
+  current.current = { plan, dispatch, onRefusal };
+  useEffect(() => () => dragEnd.current?.(false), []);
 
   const send = (action: PathPlanAction): PathPlanRefusal | null => {
     const refusal = dispatch(action);
@@ -549,6 +680,126 @@ export function V4StartList(props: StartPlanProps) {
     }
   };
 
+  /** Task 77: a drag lands, on the plan as it is now (each change through the model; a refusal is reported as for the menus). */
+  const land = (dragged: Dragged, target: StartDropTarget): void => {
+    const now = current.current;
+    const sent = (action: PathPlanAction): PathPlanRefusal | null => {
+      const refusal = now.dispatch(action);
+      if (refusal !== null) now.onRefusal(refusal, action);
+      return refusal;
+    };
+    if (target.kind !== "GAP") {
+      const into = target.kind === "PATH" ? target.key : target.pathKey;
+      if (dragged.kind === "CHIP") {
+        sent({ type: "MOVE_CHIP", chipKey: dragged.key, toPathKey: into });
+        return;
+      }
+      // A path onto another: both picked, then combined, as "Combine with…" does; a refused combine leaves nothing picked.
+      if (now.plan.selected.length > 0) now.dispatch({ type: "CLEAR_SELECTION" });
+      now.dispatch({ type: "SELECT", key: dragged.key });
+      now.dispatch({ type: "SELECT", key: into });
+      if (sent({ type: "COMBINE_SELECTED" }) !== null) now.dispatch({ type: "CLEAR_SELECTION" });
+      return;
+    }
+    if (dragged.kind === "PATH") {
+      const from = now.plan.paths.findIndex((path) => path.key === dragged.key);
+      sent({ type: "MOVE", key: dragged.key, to: target.index > from ? target.index - 1 : target.index });
+      return;
+    }
+    // A chip onto a gap: its own path (made right under its path, Task 65), then moved to the gap's place: right above the
+    // path that was below the gap (the chip's own path when the gap is just above it), or last.
+    const own: PathPlanAction = { type: "MOVE_CHIP", chipKey: dragged.key, toPathKey: "NEW" };
+    const after = pathPlanReduce(now.plan, own).plan;
+    if (sent(own) !== null || after === now.plan) return;
+    const madeAt = after.paths.findIndex((path) => path.viewpoints.length === 1 && path.viewpoints[0]!.key === dragged.key);
+    if (madeAt < 0) return;
+    const below = now.plan.paths[target.index];
+    const belowAt = below === undefined ? -1 : below.key === dragged.pathKey ? madeAt - 1 : after.paths.findIndex((path) => path.key === below.key);
+    const to = belowAt < 0 ? after.paths.length - 1 : belowAt > madeAt ? belowAt - 1 : belowAt;
+    if (to !== madeAt) sent({ type: "MOVE", key: after.paths[madeAt]!.key, to });
+  };
+
+  /**
+   * Task 77: a press that may become a drag. Only a mouse's main button, never on a phone; touch and pen press as before. The
+   * drag starts once the pointer has moved DRAG_START_PX; from then on the page follows the pointer until it is let go
+   * (landing), Escape, or the browser taking the pointer back (a cancel). The release's click then presses nothing.
+   */
+  const pressToDrag = (event: ReactPointerEvent<HTMLElement>, dragged: Dragged): void => {
+    if (event.pointerType !== "mouse" || event.button !== 0 || narrow) return;
+    dragEnd.current?.(true);
+    const { pointerId, clientX: x, clientY: y } = event;
+    let started = false;
+    /** The aim last drawn, as text (null: none yet): the list is drawn again only when it changes, not on every move of the mouse. */
+    let drawn: string | null = null;
+    const aimAt = (moved: PointerEvent): StartDropTarget | null => aimOf(dragged, dropTargetOf(elementUnder(moved)), current.current.plan);
+    const onMove = (moved: PointerEvent): void => {
+      if (moved.pointerId !== pointerId) return;
+      if (!started) {
+        if (Math.hypot(moved.clientX - x, moved.clientY - y) < DRAG_START_PX) return;
+        started = true;
+        setMenu(null);
+      }
+      moved.preventDefault();
+      const aim = aimAt(moved);
+      const seen = JSON.stringify(aim);
+      if (seen === drawn) return;
+      drawn = seen;
+      setDrag({ dragged, aim });
+    };
+    const onUp = (released: PointerEvent): void => {
+      if (released.pointerId !== pointerId) return;
+      const was = started;
+      end(true);
+      if (!was) return;
+      swallowNextClick();
+      const aim = aimAt(released);
+      if (aim !== null) land(dragged, aim);
+    };
+    const onCancel = (cancelled: PointerEvent): void => {
+      if (cancelled.pointerId === pointerId) end(true);
+    };
+    const onKey = (pressed: globalThis.KeyboardEvent): void => {
+      if (pressed.key !== "Escape" || !started) return;
+      pressed.preventDefault();
+      end(true);
+    };
+    const onBlur = (): void => end(true);
+    const end = (draw: boolean): void => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onCancel);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("blur", onBlur);
+      if (dragEnd.current === end) dragEnd.current = null;
+      if (draw && started) setDrag(null);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("blur", onBlur);
+    dragEnd.current = end;
+  };
+
+  /** Task 77: what one row shows of the drag under way. */
+  const rowDrag = (path: PlanPath, at: number): RowDrag | null => {
+    if (drag === null) return null;
+    const { dragged, aim } = drag;
+    const words = (): string => {
+      const key = dropLabelOf(dragged.kind, aim);
+      return key === null ? "" : t(catalog, key);
+    };
+    const overPath = aim === null || aim.kind === "GAP" ? null : aim.kind === "PATH" ? aim.key : aim.pathKey;
+    const gapAt = (index: number): Readonly<{ index: number; over: string | null }> =>
+      ({ index, over: aim?.kind === "GAP" && aim.index === index ? words() : null });
+    return {
+      dragged: dragged.kind === "PATH" && dragged.key === path.key,
+      chipKey: dragged.kind === "CHIP" && dragged.pathKey === path.key ? dragged.key : null,
+      over: overPath === path.key ? words() : null,
+      gaps: at + 1 === plan.paths.length ? [gapAt(at), gapAt(at + 1)] : [gapAt(at)]
+    };
+  };
+
   const pathMenu = (path: PlanPath, at: number): ReactNode => {
     if (menu?.kind !== "PATH" || menu.key !== path.key) return null;
     const n = at + 1;
@@ -620,7 +871,7 @@ export function V4StartList(props: StartPlanProps) {
 
   const snapClass = reduced ? "v4Highlight" : "v4StartRow--snap";
   return (
-    <ol className="v4StartList">
+    <ol className={drag === null ? "v4StartList" : "v4StartList v4StartList--dragging"}>
       {plan.paths.map((path, at) => (
         <V4StartRow
           key={path.key}
@@ -654,6 +905,9 @@ export function V4StartList(props: StartPlanProps) {
           onChipKey={(event, chip) => onChipKey(event, path, at, chip)}
           rowRef={(element) => { if (element === null) rowButtons.current.delete(path.key); else rowButtons.current.set(path.key, element); }}
           chipRef={(chipKey, element) => { if (element === null) chipButtons.current.delete(chipKey); else chipButtons.current.set(chipKey, element); }}
+          onGripDown={narrow ? undefined : (event) => pressToDrag(event, { kind: "PATH", key: path.key, pathKey: path.key })}
+          onChipDown={narrow ? undefined : (event, chipKey) => pressToDrag(event, { kind: "CHIP", key: chipKey, pathKey: path.key })}
+          drag={rowDrag(path, at)}
         />
       ))}
     </ol>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ContractHttpError,
   QuestionNotStartedSchema,
@@ -41,7 +41,9 @@ import {
   type PathPlanAction,
   type PathPlanRefusal
 } from "./pathPlan.js";
+import { keptLineOf, type V4StartEnd, type V4StartKept, type V4StartLanguage, type V4StartReading } from "./startKept.js";
 import type { ReadingLevel, V4StartHandOver } from "./types.js";
+import { useBrowserLayoutEffect } from "./useBrowserLayoutEffect.js";
 
 /*
  * V4 start step, Task 70 (spec 2026-11-03 §2 items 1-3 and "When the list is missing"; chat-start-waits-for-paths, read-d6,
@@ -71,6 +73,11 @@ import type { ReadingLevel, V4StartHandOver } from "./types.js";
  *    the joined words stay (FALLBACK), and the next time asks again.
  *  - A stale reading starts no new call (the calls already asked finish), and is read again on Back, then Next (read-f1).
  *  - "Use my words instead" (ask-f13): after an accepted rewrite, the person's own words are read fresh with KEEP_MINE.
+ * Task 76e (owner answers Q8 and S1 A; saved-questions spec §3.5): a kept step 2 (`kept`, from the account through the page's
+ * restore) opens as it was, READY with its menu, lists and plan, or NONE (also when the person had left before the list),
+ * and posts nothing: no lists, no merge, no combine. A path still being written shows its joined words (no call; combining
+ * again is the person's choice) and nothing is left picked. `reading` is what the server signed for this reading, which
+ * Task 76f saves.
  * Every call is the contract client's; nothing is kept in the browser.
  */
 
@@ -126,9 +133,15 @@ export type V4StartCardState = Readonly<{
   keepMyWords(): string | null;
   /** The person shaped the list (a change on the Undo stack, or a path of their own): the page's leave rule (Task 76c). */
   shaped: boolean;
+  /** Task 76e: what the server signed for this reading once the check passed (Task 76f saves it); null before the check. */
+  reading: V4StartReading | null;
 }>;
 
-/** `questionLine` is the line posted at Next; the page never passes the step-2 box here (Task 76). */
+/**
+ * `questionLine` is the line posted at Next; the page never passes the step-2 box here (Task 76). Task 76e: `kept`, step 2 as
+ * kept, opens a reading of its own for its line (the person's words: `check.original_question_line`, else `readLine`) when the
+ * page reads that line, and posts nothing; a new kept step 2 (another object) opens again.
+ */
 export type V4StartPathsInput = Readonly<{
   active: boolean;
   questionLine: string;
@@ -137,6 +150,7 @@ export type V4StartPathsInput = Readonly<{
   clarify: PurposeLines | null;
   room: StartStepRoom | null;
   freePlan: boolean;
+  kept?: V4StartKept;
 }>;
 
 type ReadingPhase = Exclude<StartCardPhase, "OFF" | "IDLE">;
@@ -149,8 +163,11 @@ type Reading = Readonly<{
   checkedLine: string | null;
   /** After USE_REWRITE: the person's own words, sent back as the check's original_question_line. */
   originalLine: string | null;
-  /** After USE_REWRITE: the offer's check and the person's own words, for "Use my words instead" (ask-f13). */
-  rewrite: Readonly<{ checkRef: string; original: string }> | null;
+  /**
+   * After USE_REWRITE: the offer's check and the person's own words, for "Use my words instead" (ask-f13). Task 76e: a kept
+   * step 2 keeps no offer, so its check is null there and the person's words are read fresh with no choice.
+   */
+  rewrite: Readonly<{ checkRef: string | null; original: string }> | null;
   /** The language choice is made for this reading: an offer is not shown again. */
   choiceMade: boolean;
   languageOffer: QuestionLanguageOffer | null;
@@ -165,6 +182,12 @@ type Reading = Readonly<{
   noneReason: StartStepNoneReason | null;
   noneLine: StartNoneLine | null;
   justLanded: boolean;
+  /** Task 76e: the level the lists were read at, and the check event's language and seats (null for a kept step 2). */
+  level: ReadingLevel;
+  language: V4StartLanguage | null;
+  seats: number | null;
+  /** Task 76e: a kept step 2 whose AIs had not finished when the person left (NONE on the card, LEFT_EARLY when saved). */
+  leftEarly: boolean;
 }>;
 type Timer = ReturnType<typeof setTimeout>;
 /** The AI's words for a set of viewpoints put together, with its combine reference (Task 71). */
@@ -190,12 +213,52 @@ type Run = {
 
 const WAITING: ReadonlySet<ReadingPhase> = new Set(["CHECKING", "READING", "MERGING"]);
 
-function freshReading(line: string, choiceMade: boolean): Reading {
+function freshReading(line: string, choiceMade: boolean, level: ReadingLevel): Reading {
   return {
     line, phase: "CHECKING", progress: null, checkRef: null, checkedLine: null, originalLine: null, rewrite: null, choiceMade,
     languageOffer: null, refusal: null, lists: [], late: [], merging: false, menu: null, plan: null, landedKeys: [], noneReason: null,
-    noneLine: null, justLanded: false
+    noneLine: null, justLanded: false, level, language: null, seats: null, leftEarly: false
   };
+}
+
+/**
+ * Task 76e (saved-questions spec §3.5): the kept plan as it opens. A path still being written takes its joined words (FALLBACK:
+ * no call; combining again is the person's choice and is counted), and nothing stays picked. Neither is an Undo step.
+ */
+function settledPlan(plan: PathPlan): PathPlan {
+  const writing = [...plan.paths, ...plan.more].filter((path) => path.wording === "WRITING").map((path) => path.key);
+  const answered = writing.reduce((held, key) => pathPlanReduce(held, { type: "COMBINE_FAILED", key }).plan, plan);
+  return pathPlanReduce(answered, { type: "CLEAR_SELECTION" }).plan;
+}
+
+/**
+ * Task 76e: a kept step 2 as this hook's reading of `line`. READY with its menu, lists and plan (every path counted as landed, so
+ * no late ideas are announced and no ready note shows); NONE with its reason's line; LEFT_EARLY as NONE on the card (Start works,
+ * and the debate chooses its own paths), still LEFT_EARLY in `reading`. Nothing is asked from here.
+ */
+function keptReading(kept: V4StartKept, line: string, level: ReadingLevel): Reading {
+  const original = kept.check.original_question_line ?? null;
+  const ready = kept.end === "READY" && kept.menu !== null;
+  const plan = ready ? settledPlan(kept.plan) : null;
+  const reason = kept.noneReason ?? null;
+  return {
+    line, phase: ready ? "READY" : "NONE", progress: null, checkRef: kept.check.ref, checkedLine: kept.readLine, originalLine: original,
+    rewrite: original === null ? null : { checkRef: null, original }, choiceMade: true, languageOffer: null, refusal: null,
+    lists: [...kept.lists], late: [...kept.lateLists], merging: false, menu: ready ? kept.menu : null, plan,
+    landedKeys: plan === null ? [] : [...plan.paths, ...plan.more].map((path) => path.key),
+    noneReason: ready || kept.end === "LEFT_EARLY" ? null : reason,
+    noneLine: ready ? null : kept.end === "LEFT_EARLY" || reason === null ? "PASSING" : noneLineOf(reason),
+    justLanded: false, level, language: null, seats: null, leftEarly: !ready && kept.end === "LEFT_EARLY"
+  };
+}
+
+/**
+ * Task 76e: how a reading ended, as saved: READY with a list (a stale reading keeps its paths, so it counts as READY when it
+ * holds a menu); NONE with no list; LEFT_EARLY while the AIs were still reading, or a kept step 2 left before its list.
+ */
+function endOf(reading: Reading): V4StartEnd {
+  if (reading.phase === "READY" || (reading.phase === "STALE" && reading.menu !== null)) return "READY";
+  return reading.phase === "NONE" && !reading.leftEarly ? "NONE" : "LEFT_EARLY";
 }
 
 function freshRun(): Run {
@@ -509,7 +572,8 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     if (run.controller.signal.aborted || runRef.current !== run || run.posts !== postNo) return;
     if (event.event === "check") {
       commit(run, (current) => ({ ...current, phase: current.phase === "CHECKING" ? "READING" : current.phase, checkRef: event.data.check_ref,
-        checkedLine: posted, originalLine: original, progress: { answered: 0, of: event.data.seats } }));
+        checkedLine: posted, originalLine: original, progress: { answered: 0, of: event.data.seats }, language: event.data.language,
+        seats: event.data.seats }));
     } else if (event.event === "language_offer") {
       // The choice is made (chooseLanguage, or "Use my words instead"): the offer does not come back.
       if (readingRef.current?.choiceMade === true) return;
@@ -570,7 +634,7 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
   const begin = useCallback((line: string, choice?: QuestionLanguageChoice): void => {
     const run = freshRun();
     runRef.current = run;
-    const fresh = freshReading(line, choice !== undefined);
+    const fresh = freshReading(line, choice !== undefined, latest.current.readingLevel);
     readingRef.current = fresh;
     setReading(fresh);
     if (browserOffline()) {
@@ -592,6 +656,21 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
 
   // Leaving the page stops the reading (the calls already asked run on and count, Calls item 8).
   useEffect(() => stop, [stop]);
+
+  // Task 76e (answers Q8 and S1 A): a kept step 2 opens as its own reading once the page reads its line, before the browser
+  // paints and before the reading below could post; nothing is asked. The same kept object opens once.
+  const { kept } = input;
+  const opened = useRef<V4StartKept | null>(null);
+  useBrowserLayoutEffect(() => {
+    if (kept === undefined || kept === opened.current || keptLineOf(kept) !== questionLine) return;
+    opened.current = kept;
+    stop();
+    const run = freshRun();
+    runRef.current = run;
+    const restored = keptReading(kept, questionLine, latest.current.readingLevel);
+    readingRef.current = restored;
+    setReading(restored);
+  }, [kept, questionLine, stop]);
 
   // Effects read primitives only. A new read line stops the old reading; the line is read once, when active with the step on.
   // read-f1: a stale reading is read again when the page makes the hook inactive and then active with the same line (Back,
@@ -769,7 +848,8 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     if (current === null || current.rewrite === null || current.line !== latest.current.questionLine) return null;
     const { checkRef, original } = current.rewrite;
     stop();
-    begin(original, { check_ref: checkRef, choice: "KEEP_MINE" });
+    // Task 76e: a kept step 2 kept no offer; its person's words are read fresh with no choice (an offer may come again).
+    begin(original, checkRef === null ? undefined : { check_ref: checkRef, choice: "KEEP_MINE" });
     return original;
   }, [begin, stop]);
 
@@ -882,6 +962,18 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
   const lateIdeas = plan === null || landedKeys === undefined ? 0
     : plan.more.filter((path) => path.isNew && !landedKeys.includes(path.key)).length;
 
+  // Task 76e: what the server signed for this reading, once the check passed (one object per reading state, for Task 76f's saves).
+  const signed = useMemo((): V4StartReading | null => {
+    if (own === null || own.checkRef === null || own.checkedLine === null) return null;
+    const end = endOf(own);
+    return {
+      check: { ref: own.checkRef, ...(own.originalLine === null ? {} : { original_question_line: own.originalLine }) },
+      menu: own.menu, lateLists: lateListsOf(own), end,
+      ...(end === "NONE" && own.noneReason !== null ? { noneReason: own.noneReason } : {}),
+      checkedLine: own.checkedLine, readingLevel: own.level, language: own.language, seats: own.seats
+    };
+  }, [own]);
+
   return {
     phase,
     progress: own?.progress ?? null,
@@ -908,6 +1000,7 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     justLanded: own?.justLanded ?? false,
     keepMyWords,
     // Task 71: what the page's leave rule reads (Task 76c); the hook itself adds no beforeunload listener.
-    shaped: plan !== null && (pathPlanChanged(plan) || plan.paths.some(isPersonPath))
+    shaped: plan !== null && (pathPlanChanged(plan) || plan.paths.some(isPersonPath)),
+    reading: signed
   };
 }

@@ -10,7 +10,9 @@ import { harness, mountMap, page, resetHarness, seededAnswer, settle, unmountMap
  * changed"): the map page shows a debate at the level it was asked at, as its run read says, whatever the address's `?level=`
  * or the account's saved level say; it offers no level change; a dig from it is asked at that level. A debate asked without
  * one reads as the default level, as today. The page's reads are the harness's; the header and the ask hook are stood in here
- * so the test sees what the page hands them.
+ * so the test sees what the page hands them. Task 76j (the review session's wiring list, item 4): the header is handed no level
+ * at all (it shows none and its links carry none), so the map's level is seen where the page uses it: the level its digs are
+ * asked at.
  */
 const seen = vi.hoisted(() => ({
   header: [] as Array<Readonly<Record<string, unknown>>>,
@@ -62,7 +64,8 @@ describe("the map page shows the debate at its own level", () => {
     await mountMap(1600, crypto.randomUUID(), null, "plain");
     await settle();
     expect(page().querySelector(".v4MapBranch")).not.toBeNull();
-    expect(lastHeader().readingLevel).toBe("expert");
+    expect(seen.askLevels.at(-1)).toBe("expert");
+    expect(seen.header.every((props) => !("readingLevel" in props))).toBe(true);
   });
 
   it("its header leads to the next question with no level: step 1 offers the account's level, never this debate's", async () => {
@@ -73,9 +76,9 @@ describe("the map page shows the debate at its own level", () => {
     await mountMap(1600, crypto.randomUUID(), null, "plain");
     await settle();
     expect(page().querySelector(".v4MapBranch")).not.toBeNull();
-    expect(lastHeader().readingLevel).toBe("expert");
+    expect(seen.askLevels.at(-1)).toBe("expert");
     expect(seen.header.map((props) => props.linkLevel ?? null)).not.toContain("expert");
-    expect(lastHeader().linkLevel).toBeNull();
+    expect(seen.header.every((props) => !("linkLevel" in props))).toBe(true);
   });
 
   it("offers no level change", async () => {
@@ -100,9 +103,9 @@ describe("the map page shows the debate at its own level", () => {
     harness.accountLevel = Promise.resolve("expert");
     await mountMap(1600, crypto.randomUUID(), null, "expert");
     await settle();
-    expect(lastHeader().readingLevel).toBe("plain");
     expect(seen.askLevels.at(-1)).toBe("plain");
-    expect(lastHeader().linkLevel).toBeNull();
+    expect(lastHeader().readingLevel).toBeUndefined();
+    expect(lastHeader().linkLevel).toBeUndefined();
   });
 });
 

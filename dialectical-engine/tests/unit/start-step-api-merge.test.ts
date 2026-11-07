@@ -171,8 +171,9 @@ function harness(options: Readonly<{
     report: (line) => { reports.push(line); }, ...(options.newMenuId === undefined ? {} : { newMenuId: options.newMenuId }) });
   const binding = (over: Readonly<{ planKey?: "plus" | "premium"; settingsVersion?: number }> = {}) =>
     ({ ownerScope: SCOPE, questionLine: Q, planKey: over.planKey ?? "plus", settingsVersion: over.settingsVersion ?? 30 });
+  // Task 57d: the reading's try, a random id its check carries (made up, fixed so every check of the reading names the same one).
   const checkRef = (over: Parameters<typeof binding>[0] = {}): string =>
-    signStartCheck(key, { ...binding(over), lock: lockOf(), originalQuestionLine: null });
+    signStartCheck(key, { ...binding(over), lock: lockOf(), originalQuestionLine: null, tryRef: "7a".repeat(32) });
   const list = (one: StartList, over: Parameters<typeof binding>[0] = {}): SignedStartList => ({ list: one, ref: signStartList(key, { ...binding(over), list: one }) });
   const mergeInput = (over: Partial<StartMergeInput> = {}): StartMergeInput => ({ question_line: Q, check_ref: checkRef(), reading_level: "plain",
     lists: [list(LIST_1)], ownerRef: OWNER, ownerScope: SCOPE, funding: GRANT, planKey: "plus", settingsVersion: 30, ...over });

@@ -20,7 +20,7 @@ import type { QuestionCheckOutcome } from "../../apps/api/src/question-check/con
 import { QuestionLanguageChoiceNeeded, type QuestionLanguageLock, type QuestionLanguagePort } from "../../apps/api/src/question-language/decider.js";
 import { createStartCharges } from "../../apps/api/src/start-step/charge.js";
 import { startModelOfSeat } from "../../apps/api/src/start-step/seats.js";
-import { newStartStepKey, startTryRefOf, startTryRefOfCheck, verifyStartCheck, verifyStartList } from "../../apps/api/src/start-step/signing.js";
+import { newStartStepKey, startTryRefOfCheck, verifyStartCheck, verifyStartList } from "../../apps/api/src/start-step/signing.js";
 import {
   START_LISTS_REUSE, createStartStep, startStepRouteOf, type StartListsInput, type StartStepSettings
 } from "../../apps/api/src/start-step/step.js";
@@ -261,8 +261,9 @@ describe("the step port at Next: the lists stream", () => {
       originalQuestionLine: MIXED })).toThrow("START_PATHS_STALE");
   });
 
-  // Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): every call of a question is charged to its try, the person's
-  // words at Next, which the check carries, so Start can give the try's charges to the debate (0164).
+  // Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): every call of a question is charged to its try, which the
+  // check carries, so Start can give the try's charges to the debate (0164). Task 57d (owner, 6 Nov: "Random id"): the try is a random id
+  // minted once per reading; the offer and its re-post share the planner, so they share the reading and its try.
   it("every charge of a reading names the check's try: the planner and each list, after an offer and its re-post too", async () => {
     const plain = harness({ times: ORDER_TIMES });
     const read = await readToEnd(plain, INPUT);
@@ -275,9 +276,32 @@ describe("the step port at Next: the lists stream", () => {
     const chosen = await readToEnd(h, inputOf({ question_line: REWRITE,
       question_language_choice: { check_ref: OFFER_REF, choice: "USE_REWRITE", original_question_line: MIXED } }));
     const rewritten = startTryRefOfCheck(h.key, INPUT.ownerScope, checkOf(chosen).check_ref);
-    expect(rewritten).toBe(startTryRefOf(h.key, { ownerScope: INPUT.ownerScope, words: MIXED }));
+    expect(rewritten).toMatch(/^[0-9a-f]{64}$/u);
     expect(h.entries.map((entry) => [entry.kind, entry.tryRef])).toEqual(h.entries.map((entry) => [entry.kind, rewritten]));
     expect(h.entries.map((entry) => entry.kind)).toContain("ANGLES");
+  });
+
+  // Task 57d (the owner's 6 Nov answer, card "Privacy": "Random id"): nothing made from the question's words is a try. Within the ten
+  // minutes the same words share the planner, so a reading at another level is the same reading and keeps its try; past them the same
+  // words from the same person, under the same key, are a new reading with a new random try, and each charge names its own reading's.
+  it("two readings of the same words by the same person get two random tries; a reading kept for the ten minutes keeps its try", async () => {
+    const h = harness();
+    const first = await readToEnd(h, INPUT, 2_000);
+    const one = startTryRefOfCheck(h.key, INPUT.ownerScope, checkOf(first).check_ref);
+    expect(one).toMatch(/^[0-9a-f]{64}$/u);
+    const level = await readToEnd(h, inputOf({ reading_level: "expert" }), 2_000);
+    expect(h.count(START_CALL_SITES.angles)).toBe(1);
+    expect(startTryRefOfCheck(h.key, INPUT.ownerScope, checkOf(level).check_ref)).toBe(one);
+    const charged = h.entries.length;
+    expect(h.entries.map((entry) => entry.tryRef)).toEqual(h.entries.map(() => one));
+    await vi.advanceTimersByTimeAsync(START_STEP_TIMING.serverCacheTtlMs);
+    const second = await readToEnd(h, INPUT, 2_000);
+    expect(h.count(START_CALL_SITES.angles)).toBe(2);
+    const two = startTryRefOfCheck(h.key, INPUT.ownerScope, checkOf(second).check_ref);
+    expect(two).toMatch(/^[0-9a-f]{64}$/u);
+    expect(two).not.toBe(one);
+    expect(h.entries.length).toBeGreaterThan(charged);
+    expect(h.entries.slice(charged).map((entry) => entry.tryRef)).toEqual(h.entries.slice(charged).map(() => two));
   });
 
   it("a choice the language step refuses is none NOT_ASKED, and no list is asked", async () => {

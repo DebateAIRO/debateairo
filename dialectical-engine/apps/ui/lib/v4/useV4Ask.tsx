@@ -116,7 +116,9 @@ function startLaneOf(handOver: V4StartHandOver | undefined): Parameters<typeof c
   const lane = {
     ...(handOver.startCheck === undefined ? {} : { startCheck: handOver.startCheck }),
     ...(handOver.startPaths === undefined ? {} : { startPaths: handOver.startPaths }),
-    ...(handOver.carryOnToReport === true ? { carryOnToReport: true as const } : {})
+    ...(handOver.carryOnToReport === true ? { carryOnToReport: true as const } : {}),
+    // V4 start step, Task 76f (saved-questions spec §3.7): the question the account keeps, removed once the debate is accepted.
+    ...(handOver.savedQuestionId === undefined ? {} : { savedQuestionId: handOver.savedQuestionId })
   };
   return Object.keys(lane).length === 0 ? undefined : lane;
 }
