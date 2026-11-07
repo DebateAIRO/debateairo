@@ -367,7 +367,8 @@ describe("the panel (V4Panel) with a web part", () => {
 
 describe("the report (V4ReportClient) shows the same", () => {
   const report = async (answer: Answer, level: ReadingLevel) => {
-    mocks.load = { kind: "SERVED", runId: "run-1", answer, story: storyFixture("READY") };
+    // The report shows the level its debate's run read names (the map's loader hands it on as `level`), never the address's.
+    mocks.load = { kind: "SERVED", runId: "run-1", answer, story: storyFixture("READY"), level };
     return mount(<V4ReportClient id="run-1" locale="en" initialLevel={level} catalog={catalog} newDebateCatalog={{}} />);
   };
 

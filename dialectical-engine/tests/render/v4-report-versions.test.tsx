@@ -19,6 +19,8 @@ const reports = vi.hoisted(() => ({
   reopen: (async () => ({ kind: "FAILED" })) as (runId: string) => Promise<unknown>,
   /** report-f14: the question's language the page's read carries (undefined: none). */
   language: undefined as string | undefined,
+  // The level the debate's run read names (the map's loader hands it on as `level`); the report never takes the address's.
+  servedLevel: undefined as "plain" | "background" | "expert" | undefined,
   /** report-f10: a read of the debate that fails, in place of the harness's. */
   fail: null as Error | null,
   /** Review F5: debates whose own answer is not served yet (still running, or failed), whatever the harness serves. */
@@ -51,7 +53,9 @@ vi.mock("@/lib/v4/load", async (original) => {
           terminal_reason: notServed === "FAILED" ? "RUNNER_FAILED" : null, hold_until: null } as RunProjection };
       }
       const served = await base.loadV4(id);
-      return reports.language === undefined || served.kind !== "SERVED" ? served : { ...served, language: reports.language };
+      if (served.kind !== "SERVED") return served;
+      return { ...served, ...(reports.language === undefined ? {} : { language: reports.language }),
+        ...(reports.servedLevel === undefined ? {} : { level: reports.servedLevel }) };
     },
     loadInvestigation: (runId: string) => reports.load(runId),
     loadDigView: (link: DigLink) => reports.digView === null ? base.loadDigView(link) : reports.digView(link),
@@ -153,6 +157,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   resetHarness();
   reports.language = undefined;
+  reports.servedLevel = undefined;
   reports.fail = null;
   reports.reads = [];
   reports.notServed = new Map();
@@ -884,6 +889,7 @@ describe("the first debate's answer on the report", () => {
   it("f18: at the expert level every point is listed, an unchecked one in grey, and nothing is counted", async () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => noInvestigation(runId));
+    reports.servedLevel = "expert";
     const node = await mountReport(runId, "expert");
     const unchecked = [...node.querySelectorAll<HTMLElement>(".v4RepPoint[data-trust=\"UNCHECKED\"]")];
     expect(unchecked.length).toBeGreaterThan(0);
@@ -891,10 +897,10 @@ describe("the first debate's answer on the report", () => {
     expect(node.textContent).not.toMatch(/points? here (?:was|were) not checked/u);
   });
 
-  it("with no level in the address or the account, the report's level is Plain words, where the first screen's choice starts", async () => {
+  it("with no level from the run read, the report's level is Plain words, where the first screen's choice starts", async () => {
     // The owner's 5 Nov ruling: the level choice on the first screen always starts on Plain words. This is the page's own
-    // default, not a server rule (the server gives a debate with no level no reader sentence). It holds until the run read
-    // names the debate's own level (the wiring list's item 19 b); the map page's default moves with it (item 20).
+    // default, not a server rule (the server gives a debate with no level no reader sentence). The run read's own level wins
+    // whenever it names one (the wiring list's item 19 b); no level is taken from the address (7 Nov).
     const { reportLevelOf } = await import("../../apps/ui/components/v4/V4ReportClient.js");
     expect(reportLevelOf(null)).toBe("plain");
     for (const level of ["plain", "background", "expert"] as const) expect(reportLevelOf(level), level).toBe(level);
