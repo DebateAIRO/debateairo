@@ -1,7 +1,7 @@
 // tests/unit/serve-dig-suggestions-paths.test.ts
 // V4 start step, Task 55b (owner F14: Free keeps the suggestions code finds). On a path debate the web part's paths are named by
 // their path ids (b<n>), so the points code reads are those under each path's ROOT: the served answer hands the map from path id to
-// root node (0159's roots in force), and each suggestion still hangs under its path ("path:b<n>"). An R22 answer hands none and
+// root node (0160's roots in force), and each suggestion still hangs under its path ("path:b<n>"). An R22 answer hands none and
 // keeps its bytes. Made-up points.
 import { describe, expect, it } from "vitest";
 import { AnswerWebSchema, type AnswerWeb, type Node } from "@debateai/contract";

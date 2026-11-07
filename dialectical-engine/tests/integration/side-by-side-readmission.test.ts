@@ -695,7 +695,7 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
 
 /**
  * V4 start step, Task 39 (spec 2026-11-03 §4.2) — A WAITING PATH DEBATE IS RE-ADMITTED WITH ITS PATHS AND LINES. An owner's
- * debate r16 placed in line with two chosen paths (sealed under its key, migration 0158) and its purpose lines (0138) is
+ * debate r16 placed in line with two chosen paths (sealed under its key, migration 0159) and its purpose lines (0138) is
  * started by r17's waker, whose version runs the start step, as a NEW run admitted with shape receipt v2 for those two
  * paths: the set sealed again under the new run's own key, the same lines recorded for it, the carry-on box kept. r17 is
  * current (above); the activation case below comes after this one. Made-up question, paths and lines.

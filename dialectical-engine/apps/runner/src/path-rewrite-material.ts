@@ -301,7 +301,7 @@ export function pathRewriteDigPathsOfDig(
 }
 
 /**
- * V4 start step, Task 49: the same walk from the roots given, in their order (a path run's roots, from 0159's `readPathRoots`), each
+ * V4 start step, Task 49: the same walk from the roots given, in their order (a path run's roots, from 0160's `readPathRoots`), each
  * path named by its own ref (`b<n>`) instead of its root's node id. Each point is still given once across the paths. A root the
  * snapshot does not hold, or one set aside, is left out. Given the judges' order and each root's own id, it is
  * `pathRewriteDigPathsOf` exactly.

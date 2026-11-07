@@ -8,18 +8,18 @@ import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/dis
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
 
 /**
- * 0162 (V4 start step, plan 2026-11-03 Task 56a; decision record answer 11, owner ruling 3 Nov night): the carry-on's digs run even when
+ * 0163 (V4 start step, plan 2026-11-03 Task 56a; decision record answer 11, owner ruling 3 Nov night): the carry-on's digs run even when
  * the person has signed out or their session has lapsed. A dig of the carry-on is a NEW encrypted run whose key is provisioned from the
  * debate's own binding (the same user and identity session, signed out or not), once per chosen path and never again, Free once in all,
  * while the carry-on is BEGUN and not DONE and the account is active and still the debate's owner. The ordinary provision (0040) still
- * needs a live session, and 0123's re-admission still commits. Over embedded Postgres and the forward chain to 0162, with the content
+ * needs a live session, and 0123's re-admission still commits. Over embedded Postgres and the forward chain to 0163, with the content
  * cipher configured (tests/support/contentRunFixture.ts). Made-up questions and paths. CI skips this directory; run it alone.
  */
 let fixture: ContentRunFixture;
 let store: PostgresStartPathsStore;
 
 beforeAll(async () => {
-  fixture = await startContentRunFixture("carry-on-0162");
+  fixture = await startContentRunFixture("carry-on-0163");
   store = new PostgresStartPathsStore(fixture.database.pool);
 }, 600_000);
 afterAll(async () => { await fixture?.stop(); });
@@ -27,7 +27,7 @@ afterAll(async () => { await fixture?.stop(); });
 const runInput = (questionLine: string, principal: StartRunInput["principal"], planTier: "free" | "premium",
   sessionId: string = fixture.authSessionId): StartRunInput => ({
   questionLine,
-  askContract: { audience: "carry-on-0162" },
+  askContract: { audience: "carry-on-0163" },
   principal,
   sessionId,
   callerScope: "ASKER",
@@ -35,7 +35,7 @@ const runInput = (questionLine: string, principal: StartRunInput["principal"], p
   askerRiskTier: "casual",
   effectiveRiskTier: "casual",
   tierSource: "ASKER",
-  tierProvenanceRef: "carry-on-0162:integration",
+  tierProvenanceRef: "carry-on-0163:integration",
   compositionBudgetTier: "low",
   planTier,
   depthParams: { depth: 1 },
@@ -43,7 +43,7 @@ const runInput = (questionLine: string, principal: StartRunInput["principal"], p
   strangerSampleRate: 1,
   envelopeBasis: fixtureStructuralCeiling(4),
   registerVersion: 1,
-  batteryVersion: "carry-on-0162:integration",
+  batteryVersion: "carry-on-0163:integration",
   batteryRows: []
 });
 const owner = (): StartRunInput["principal"] => ({ kind: "server", userId: fixture.userId, ownerRef: fixture.ownerRef });
@@ -105,7 +105,7 @@ const leftBy = async (parentRunId: string): Promise<Readonly<{ bindings: number;
   return { bindings: bindings.rows[0]!.n, intents: intents.rows[0]!.n, runs: written.rows[0]!.n };
 };
 
-describe("0162: a carry-on dig's key provision, without a live sign-in", () => {
+describe("0163: a carry-on dig's key provision, without a live sign-in", () => {
   it("a Plus debate's dig of b1 is written with its Start session revoked; a second dig of b1 is TAKEN and writes nothing; b2 is its own", async () => {
     const pool = fixture.database.pool;
     const debate = await parent("premium");
@@ -233,7 +233,7 @@ describe("0162: a carry-on dig's key provision, without a live sign-in", () => {
   });
 });
 
-describe("0162 leaves 0040's provision and 0123's re-admission as they were", () => {
+describe("0163 leaves 0040's provision and 0123's re-admission as they were", () => {
   it("an ordinary startRun (no carryOn) on the revoked session is still refused RUN_OWNER_INVALID", async () => {
     const refused = await refusal(signedOut(() => runs().startRun(runInput("Should the ferry run at night?", owner(), "premium"))));
     expect(codeOf(refused)).toBe("RUN_OWNER_INVALID");

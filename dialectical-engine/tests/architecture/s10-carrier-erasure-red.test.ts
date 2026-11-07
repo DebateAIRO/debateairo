@@ -241,10 +241,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // withRunContentLease and opened through prepareLeasedContentEncryptionForRun, both under the dig's own run key.
       "packages/db/src/dig-picks.ts",
       "packages/db/src/index.ts",
-      // V4 start step (0159, Task 21): each path's answer so far and the gap round are sealed inside withRunContentLease and opened through
+      // V4 start step (0160, Task 21): each path's answer so far and the gap round are sealed inside withRunContentLease and opened through
       // prepareLeasedContentEncryptionForRun, both under the debate's own run key.
       "packages/db/src/path-results.ts",
-      // V4 start step (0158, Task 20): the chosen paths and their menu are sealed inside withRunContentLease and opened through
+      // V4 start step (0159, Task 20): the chosen paths and their menu are sealed inside withRunContentLease and opened through
       // prepareLeasedContentEncryptionForRun, both under the debate's own run key.
       "packages/db/src/start-paths.ts",
       "packages/evaluator/src/index.ts",
@@ -314,7 +314,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "apps/runner/src/path-climb.ts",
       // V4 start step, Task 49: each path's answer so far sends its writer and checker calls through the gateway its job
       // hands it (Task 54: the run's lane-wrapped, leased gateway), naming the run. It opens no lease and reads no content
-      // of its own; the outcome is stored through the path results store (0159).
+      // of its own; the outcome is stored through the path results store (0160).
       "apps/runner/src/path-outcomes.ts",
       "apps/runner/src/path-rewrite.ts",
       // V4 start step, Task 50: the main answer of a path run sends its writer and checker calls through the gateway its

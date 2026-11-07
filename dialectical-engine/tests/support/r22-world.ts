@@ -320,7 +320,7 @@ export async function startR22World(options: R22WorldOptions = {}) {
       hosted: () => { throw new TypeError("R22_QUESTION_LANGUAGE_HOSTED_ROUTE"); } }), referenceKey: newQuestionLanguageReferenceKey() }),
     previewRemaining: remaining, log });
   const siteAdmission = await loadAdmissionSettings(apiPool, nextVersion, admissionSite);
-  // V4 start step, Task 86, as main.ts (Task 31): the calls before Start go out where a preview gate AND 0157's writer answer for
+  // V4 start step, Task 86, as main.ts (Task 31): the calls before Start go out where a preview gate AND 0158's writer answer for
   // the API's own login; the references are signed with a key from a throwaway root (main.ts derives it from the blind-index key).
   const preStartWriter = await preStartChargeWriterPresent(apiPool);
   const startStepKey = startStepKeyFrom(randomBytes(32));
@@ -375,7 +375,7 @@ export async function startR22World(options: R22WorldOptions = {}) {
   const investigations = new PostgresInvestigationRepository(apiPool);
   const accountMemory = accountMemoryStoreFrom((text, values) => apiPool.query(text, values));
   // V4 start step, Task 39e, as main.ts (tests/architecture/saved-question-keys-wiring.test.ts): the questions not started yet through
-  // 0161's store on the API's pool, each under its own key in a question-key store over the world's user-key store, kept only for a
+  // 0162's store on the API's pool, each under its own key in a question-key store over the world's user-key store, kept only for a
   // reading the step's key signed.
   const savedQuestionKeys = new MemorySavedQuestionKeyStore(userDeks);
   const savedQuestions = createSavedQuestionService({ store: savedQuestionStoreFrom((text, values) => apiPool.query(text, values)),
@@ -401,7 +401,7 @@ export async function startR22World(options: R22WorldOptions = {}) {
   if (questionCheckOff.length > 0) throw new Error("R22_WORLD_QUESTION_CHECK_OFF");
   // V4 start step, Task 86: THE STEP BEFORE START, as main.ts composes it (tests/unit/r22-world-api-drift.test.ts keeps the two
   // equal): each call on its version's settings from the one admission cache, Start's own question check, the gate's guarded fetch
-  // on the preview route, and each call charged to the person through 0157's writer at the price the runner charges the same target.
+  // on the preview route, and each call charged to the person through 0158's writer at the price the runner charges the same target.
   // The register's switch decides the rest: with the step "OFF" (no `startStep` member) the four calls answer none OFF.
   const startStep = createStartStep({
     route: startStepRoute,

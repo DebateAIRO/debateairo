@@ -83,7 +83,7 @@ const START_PREPARED = Object.freeze({ entries: 2_000 });
 
 /**
  * The calls before Start go out only on the preview (spec §3 non-goals), and only where every call can be charged: a preview gate
- * AND the 0157 pre-Start charge writer. Never keyed on the deployment mode: the test site runs in hosted mode.
+ * AND the 0158 pre-Start charge writer. Never keyed on the deployment mode: the test site runs in hosted mode.
  */
 export function startStepRouteOf(input: Readonly<{ previewGate: unknown; writerPresent: boolean }>): "PREVIEW" | "NONE" {
   return input.previewGate !== undefined && input.writerPresent ? "PREVIEW" : "NONE";
@@ -196,7 +196,7 @@ export function createStartStep(deps: Readonly<{
   };
   /**
    * Each call charged to this person (the first asker of a kept answer), through its kind's seam; a call's end is one code line. Task 57c:
-   * each charge names the try it was made for (signing.ts), so Start gives it to its debate and a failed debate gives it back (0164).
+   * each charge names the try it was made for (signing.ts), so Start gives it to its debate and a failed debate gives it back (0165).
    */
   const callerOf = (transport: StartTransport, config: PreviewProviderTestConfig, who: StartStepContext, tryRef: string | null): MapCaller =>
     transport.callerFor({ config, busy, onCallEnd: callEnded,

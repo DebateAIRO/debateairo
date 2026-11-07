@@ -1,14 +1,14 @@
 {
-  "version": "pre-start-release-forward0164-v1",
+  "version": "pre-start-charge-forward0158-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0163_main_answer_path_added.sql",
-    "manifestSha256": "4b972e70cf663de2e860b97f4a7568684e1fbb8802b5cf188f5fe5e3fa13f93b",
+    "name": "0156_moderation_notice.sql",
+    "manifestSha256": "345d425ea5e3bbe23dfc061c5825d397be7df27efa91ef2a0ae2e061a6b11fbd",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
-    "name": "0164_pre_start_release.sql",
-    "sha256": "dd604ae61ec1584473421ed9506636f2f5c8d37c4d16bb8a38e25e5e08faefd2"
+    "name": "0158_pre_start_charge.sql",
+    "sha256": "175a1fc56dc6ea16cc8deaedcb28d8e614111d1c969c266875e3bc70ae68bd14"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
@@ -26,15 +26,6 @@
     {
       "step": "0144_ask_clarify_charge.sql",
       "functions": [
-        "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
-        "staff.read_team_internal_spent(timestamptz,timestamptz)"
-      ],
-      "field": "function_definition"
-    },
-    {
-      "step": "0157_pre_start_charge.sql",
-      "functions": [
-        "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)",
         "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
         "staff.read_team_internal_spent(timestamptz,timestamptz)"
       ],

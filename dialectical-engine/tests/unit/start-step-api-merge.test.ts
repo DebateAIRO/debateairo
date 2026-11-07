@@ -592,7 +592,7 @@ describe("the fit: where the person's own view fits", () => {
 
 /*
  * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): every call on step 2 is
- * charged to the question's try, which its check carries; a combine over a dig's picks to its parent's try (0164 gives them back when the
+ * charged to the question's try, which its check carries; a combine over a dig's picks to its parent's try (0165 gives them back when the
  * debate they were for fails).
  */
 describe("step 2's charges name the try they were for (Task 57c)", () => {

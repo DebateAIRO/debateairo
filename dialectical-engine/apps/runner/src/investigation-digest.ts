@@ -29,7 +29,7 @@ import { addedPagesOf } from "./web-researched-read.js";
  *   Each other debate is read under a short lease of its own, outside the dig's (`withOwnRunContentLease`); one whose lease cannot
  *   be had in time (an erasure holds it) is left out like an erased one.
  * - A path debate's story names a path by its id b<n> (Task 55d, as Task 55's parentPathOf): the point left out of that path's
- *   points is its root in force (0159), its own answer (`storyPathPointIds`).
+ *   points is its root in force (0160), its own answer (`storyPathPointIds`).
  * - The size: at most DIG_INVESTIGATED_MAX_BYTES, cut by code. Every line first (the dig's own line of parents, nearest first,
  *   then the others in the order they joined), then what the digs changed, then the points, then the notes and searches,
  *   each kept while the whole still fits (`investigatedText`).
@@ -104,7 +104,7 @@ const asPoint = (point: Readonly<{ text: string; side: "for" | "against" | null;
 /**
  * The ids of a story path's points: the nodes it names, without the path's own answer. On R22 that answer is the story path's
  * position (its `position_ref`). On a path debate (V4 start step, Task 55d; Task 55's rule in parentPathOf) the path is named by its
- * id b<n>, and its answer is that path's root in force (0159), which `roots` names; with none read, only the id is left out. Pure.
+ * id b<n>, and its answer is that path's root in force (0160), which `roots` names; with none read, only the id is left out. Pure.
  */
 export function storyPathPointIds(path: Readonly<{ position_ref: string; node_refs: readonly string[] }>,
   roots: readonly Readonly<{ ref: string; rootNodeId: string }>[]): readonly string[] {

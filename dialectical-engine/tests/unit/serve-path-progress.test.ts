@@ -1,6 +1,6 @@
 /**
  * V4 start step, Task 57 (spec 2026-11-03 §2 item 7; items wait-d1, journey-f1, wait-f16): each path's progress as the run read serves
- * it, built by one pure function from what the runner wrote down (0160's steps and marks) and the paths' outcomes (0159). A path still at
+ * it, built by one pure function from what the runner wrote down (0161's steps and marks) and the paths' outcomes (0160). A path still at
  * work shows its newest step and at most 6 quiet dots, one per point put forward, each being checked or checked; nothing unchecked is
  * ever readable. Once its outcome is stored it shows its findings instead: the points found, each in its own words and with its trust
  * word. Only those points' words are opened. An R22 debate has no progress at all; a path debate whose AIs are still choosing its paths
@@ -55,7 +55,7 @@ describe("a path still at work", () => {
   it("shows its newest step, and none before it has one", async () => {
     const progress = progressOf({ read: readOf([["b1", "ARGUING"]], []) });
     expect(progress.map((entry) => entry.step)).toEqual(["ARGUING", null, null]);
-    // On Postgres the store keeps the newest of the steps 0160 lists oldest first.
+    // On Postgres the store keeps the newest of the steps 0161 lists oldest first.
     const { pool } = poolOf({ steps: [{ path_id: "b1", step: "FINDING_SOURCES", recorded_at: "2026-11-04T12:00:00Z" },
       { path_id: "b1", step: "ARGUING", recorded_at: "2026-11-04T12:00:05Z" }] });
     const served = await readRunPathProgress(postgresPathProgressReadPorts(pool), RUN_ID);

@@ -145,7 +145,7 @@ describe("V4 account memory in the data export", () => {
 
   // Ten with 0131; twelve since the Perplexity plan's 0132 and 0133 added their two readers; thirteen with 0134's;
   // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's; twenty-two with 0152's;
-  // twenty-three with 0157's; twenty-four with 0161's (Task 39e).
+  // twenty-three with 0158's; twenty-four with 0162's (Task 39e).
   it("requires the page memory reader in the worker role witness (twenty-two functions)", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({

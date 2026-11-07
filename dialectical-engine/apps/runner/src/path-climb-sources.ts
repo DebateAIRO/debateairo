@@ -43,8 +43,8 @@ const seal = (pool: Pool, runId: string, carrier: typeof PATH_UPDATE_CARRIER | t
 /**
  * Each dig whose rewrite or climb called an AI between the two times (the sweep's list). V4 start step, Task 55e: and each path debate dug
  * under the main question of a path debate whose paths' answers so far (PATH_OUTCOME calls) stood still in that window and whose first
- * debate has no main-answer version triggered by it yet (0163's PATH_ADDED): an update a runner left undone before its first call. Read
- * through the runtime's own definers (0138's climb and versions, 0158's path ids), so a first debate, a dig under a path and an R22 dig
+ * debate has no main-answer version triggered by it yet (0164's PATH_ADDED): an update a runner left undone before its first call. Read
+ * through the runtime's own definers (0138's climb and versions, 0159's path ids), so a first debate, a dig under a path and an R22 dig
  * are never listed by it.
  */
 export async function readRecentTreeDigs(pool: Pool, since: Date, before: Date, limit: number): Promise<readonly string[]> {
@@ -87,8 +87,8 @@ export function postgresTreeUpdatePorts(pool: Pool): TreeUpdatePorts {
   const closing = postgresInvestigationCloseSources(pool);
   /**
    * V4 start step, Task 55e: the run as a first-level path of its first debate, by the investigation's own rule (investigation-close-sources):
-   * a private dig whose picks hang under the main question of the first debate (0135's set, 0138's climb), both path debates (0158), each
-   * of the dig's paths with its answer so far (0159). Its name is the item its path's pick named ("more-<id>"), else `<b n>@<dig run>`; a
+   * a private dig whose picks hang under the main question of the first debate (0135's set, 0138's climb), both path debates (0159), each
+   * of the dig's paths with its answer so far (0160). Its name is the item its path's pick named ("more-<id>"), else `<b n>@<dig run>`; a
    * second dig of the same item is "#2" there, and keeps the item's name here. Ids first, then the dig's sealed set and outcomes, each
    * under the dig's own short lease (never inside another run's).
    */

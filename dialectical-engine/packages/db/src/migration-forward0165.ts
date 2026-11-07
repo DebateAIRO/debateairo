@@ -4,41 +4,52 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from "./migration-forward-chain.js";
 
 /**
- * 0157, the small AIs before Start count in the person's quota (V4 start step; plan 2026-11-03 Task 18; drained): one row per call naming the
- * person, the kind, the cost and the time, its writer and readers, and 0144's two readers taught to count it. It pins the objects it creates and
- * the two it redefines; it keeps 0130's verifier.
+ * 0165, a failed question gives back its path-list charge (V4 start step; plan 2026-11-03 Task 57c; the owner's 5 Nov answer Q20 A and its
+ * second-round follow-up; drained): each charge before Start names its try, Start gives the try's charges to the debate once, the person's
+ * readers leave out a charge whose debate failed, and a reader says whether a debate used any quota. Task 57e (edited in place, never pushed or
+ * applied): a failed debate that keeps the paths chosen from the list keeps their charges (core.run_pre_start_kept), and a work item's one
+ * automatic retry is recorded once (core.work_item_retry, core.record_work_item_retry). Task 57f (edited in place, never pushed or applied): the
+ * person's Continue re-opens their own failed debate (core.work_item_reopen, core.read_run_continue, core.continue_failed_run), and a call bought
+ * again is the site's (ledger.model_spend_call_waiver, ledger.record_call_waiver, ledger.call_waived_attempts). It pins the objects it creates
+ * and the three readers it redefines; it keeps 0130's verifier.
  */
-const NAME = "0157_pre_start_charge.sql";
-const VERSION = "pre-start-charge-forward0157-v1";
-const MANIFEST_PATH = "lineage/pre-start-charge-forward0157.json";
+const NAME = "0165_pre_start_release.sql";
+const VERSION = "pre-start-release-forward0165-v1";
+const MANIFEST_PATH = "lineage/pre-start-release-forward0165.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0156_moderation_notice.sql";
-const TABLES = ["identity.pre_start_charge"] as const;
-const FUNCTIONS = [
-  "identity.guard_pre_start_charge()",
-  "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
-  "ledger.refuse_pre_start_spend_outside_writer()",
-  "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)",
-  "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
-  "staff.read_team_internal_spent(timestamptz,timestamptz)",
-  "identity.read_data_export_pre_start(uuid,uuid)"
-] as const;
-/** 0140's and 0144's digests both pin the two readers this step teaches the new kind, so it declares both (0130's route). The manifest carries the same list. */
+const PREVIOUS = "0164_main_answer_path_added.sql";
+const TABLES = ["core.work_item_retry", "identity.pre_start_try", "core.work_item_reopen", "ledger.model_spend_call_waiver"] as const;
+const SPENT = "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)";
+/** 0140's, 0144's and 0158's digests pin the two funded readers; 0158's pins the person's. The manifest carries the same list. */
 const READERS = Object.freeze(["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"]);
-const AMENDS: readonly PostconditionAmendment[] = Object.freeze(["0140_internal_spend_kinds.sql", "0144_ask_clarify_charge.sql"].map((step) =>
-  Object.freeze({ step, functions: READERS, field: "function_definition" as const })));
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0157_${detail}`); };
+const FUNCTIONS = [
+  "identity.guard_pre_start_try()",
+  "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
+  "identity.link_pre_start_try(uuid,text,uuid)",
+  "identity.read_run_quota_used(uuid,uuid)",
+  SPENT,
+  ...READERS,
+  // Task 57e.
+  "core.run_pre_start_kept(uuid)",
+  "core.record_work_item_retry(uuid,uuid,timestamptz)",
+  // Task 57f.
+  "core.read_run_continue(uuid,uuid)",
+  "core.continue_failed_run(uuid,uuid,text,bigint)",
+  "ledger.record_call_waiver(uuid,uuid[])",
+  "ledger.call_waived_attempts(uuid)"
+] as const;
+const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
+  ...["0140_internal_spend_kinds.sql", "0144_ask_clarify_charge.sql"].map((step) => Object.freeze({ step, functions: READERS, field: "function_definition" as const })),
+  Object.freeze({ step: "0158_pre_start_charge.sql", functions: Object.freeze([SPENT, ...READERS]), field: "function_definition" as const })
+]);
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0165_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
-/**
- * The 1 table (owner, ACL, columns, constraints, indexes, triggers), the 7 functions (owner, definer, body, ACL), and what it adds to
- * ledger.model_spend, as 0128's: the writer-only trigger (the only barrier for a login whose row security admits a run-less row) and the
- * run-less CHECK. Not the shared source CHECK, which later steps widen.
- */
+/** The 4 tables (owner, ACL, columns, constraints, indexes, triggers) and the 13 functions (owner, definer, body, ACL), as 0158's. */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
   const tables = (await client.query(`
     SELECT relation,pg_get_userbyid(c.relowner) owner,c.relkind,c.relpersistence,c.relrowsecurity rls,c.relforcerowsecurity force_rls,
@@ -55,19 +66,10 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
       (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
     FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
   if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  const trigger = (await client.query(`
-    SELECT t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
-    FROM pg_trigger t WHERE t.tgrelid='ledger.model_spend'::regclass
-      AND t.tgname='pre_start_spend_writer_only'`)).rows;
-  const check = (await client.query(`
-    SELECT k.conname,pg_get_constraintdef(k.oid) definition
-    FROM pg_constraint k WHERE k.conrelid='ledger.model_spend'::regclass
-      AND k.conname='model_spend_pre_start_is_runless'`)).rows;
-  if (trigger.length !== 1 || check.length !== 1) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions, trigger, check }));
+  return sha(JSON.stringify({ tables, functions }));
 }
 
-export async function loadForward0157(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
+export async function loadForward0165(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
   const directory = new URL("../../../migrations/", import.meta.url);
   const bytes = await readFile(new URL(MANIFEST_PATH, directory));
   const raw: unknown = JSON.parse(bytes.toString("utf8"));

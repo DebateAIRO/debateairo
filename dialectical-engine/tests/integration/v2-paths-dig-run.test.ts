@@ -182,7 +182,7 @@ describe("a dig of a path debate argues its picks as paths (Task 55)", () => {
     expect(known?.alreadyInvestigated).not.toBe("[]");
     expect(known?.alreadyInvestigated).toContain(STORY_PATH_LINE);
     // Review of Task 55d (the b<n> rule, as read): each of the parent's paths b<n> brings the points its story names under it, without
-    // that path's own root (its answer, 0159's root in force), though the story names it there too.
+    // that path's own root (its answer, 0160's root in force), though the story names it there too.
     const parentRoots = (await new PostgresPathResultsRepository(database.pool).readPathRoots(parentId)).filter((root) => !root.stale);
     const pointsWithoutOwnRoot: string[] = [];
     for (const [pathId, refs] of await storyPathRefs(parentId)) {

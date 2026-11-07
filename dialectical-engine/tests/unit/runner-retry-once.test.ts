@@ -1,7 +1,7 @@
 // V4 start step, Task 57e (the owner's 6 Nov rule: "re-use what we already paid for"; confirmed plan, card "Build this (Recommended)"):
 // A QUESTION THAT FAILS ON OUR SIDE IS RETRIED ONCE BY THE SERVER, A FEW MINUTES LATER, FROM WHERE IT STOPPED. The Hatchet task's catch
 // parks a debate that stopped on our side (a provider out, a time limit, a fault of ours) instead of failing it: its claim is kept until
-// the delay passes and the work item's one retry is recorded (0164's core.work_item_retry, through the work repository's parkForRetry).
+// the delay passes and the work item's one retry is recorded (0165's core.work_item_retry, through the work repository's parkForRetry).
 // The lapsed re-send then hands it to a runner again, which resumes it from what it saved (0119's true resume: every answered call is
 // replayed, never bought again). A second stop is not retried: the debate is FAILED as today. A stop the person caused (a debate they
 // deleted while it ran), the month wall and a spending wall are never retried. Without the port (fixtures, an older wiring) today's

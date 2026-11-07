@@ -1,8 +1,8 @@
 /**
  * V4 start step, Task 59 (spec 2026-11-03 §4.5 "The classic view"): a debate with chosen paths (a v2 run, its paths
- * sealed by 0158's `core.start_path_set`) has no classic map view. Its page reads the paths from `Answer.branches`
+ * sealed by 0159's `core.start_path_set`) has no classic map view. Its page reads the paths from `Answer.branches`
  * (Tasks 57, 58 and 60), so GET /v1/answers/{id}/map finds no map for it and a publication copies none, and the map
- * choice is never read for it. The owner check asks `core.read_start_path_ids` (0158: the run's path ids, NULL without
+ * choice is never read for it. The owner check asks `core.read_start_path_ids` (0159: the run's path ids, NULL without
  * a set) only for the caller's own run, after the owner query. An R22 run reads exactly as before.
  */
 import { describe, expect, it } from "vitest";

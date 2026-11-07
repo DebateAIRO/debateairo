@@ -9,12 +9,12 @@ import type { ContinuedRunWake, RunHandoverPort } from "./month-pause.js";
  * to pay for this ourselves"; cards "Only what never ran" and "Button on the stopped page", both Recommended) — CONTINUE WHERE IT STOPPED.
  *
  * POST /v1/runs/{id}/continue, today's Continue of a debate paused at the month wall (./month-pause.ts), also continues the person's own
- * FAILED debate, a first question or a dig alike: the SAME work item goes back to be claimed (0164's core.continue_failed_run, one owner-checked
+ * FAILED debate, a first question or a dig alike: the SAME work item goes back to be claimed (0165's core.continue_failed_run, one owner-checked
  * step that records each re-open, ids and times only) and its runner is woken; that copy resumes the debate from what it saved (0119's true
  * resume: every call already answered is replayed from the debate's own record, never bought again; a seat that sits out hands over to its
  * backup as on any copy). The person pays only for what never ran: the calls the copy really buys now are charged as on any run (their quota,
  * the site's day and the debate's ceiling apply), and a call an earlier copy paid for whose answer cannot be handed back is the site's once it
- * is bought again (0164's call waiver, written by the runner's replaying gateway).
+ * is bought again (0165's call waiver, written by the runner's replaying gateway).
  *
  * A debate is continuable (`failedRunContinuable`, which the FAILED read and the route share) when it is FAILED, its content is live, its stop
  * was ours (`stopIsOurs`: never the person's own act, a spending wall or a step's tries used up; a reason the runner recorded without a typed
@@ -23,7 +23,7 @@ import type { ContinuedRunWake, RunHandoverPort } from "./month-pause.js";
  * Task 57e's automatic retry existed reads the same: nothing here asks for its retry row.
  */
 
-/** What 0164's core.read_run_continue says of the person's debate (null: not theirs). Codes and flags only. */
+/** What 0165's core.read_run_continue says of the person's debate (null: not theirs). Codes and flags only. */
 export type RunContinueFacts = Readonly<{
   /** Its newest work item: NONE (no job yet: waiting or queued), OPEN (READY or CLAIMED), DONE or FAILED. */
   state: "NONE" | "OPEN" | "DONE" | "FAILED";
@@ -61,7 +61,7 @@ export function failedRunContinuable(facts: RunContinueFacts | null): boolean {
     && stopIsOurs(facts.terminal_reason);
 }
 
-/** 0164's core.continue_failed_run: RECORDED (re-opened now), CONTINUING (re-opened already and still running), or why not. */
+/** 0165's core.continue_failed_run: RECORDED (re-opened now), CONTINUING (re-opened already and still running), or why not. */
 export type RunReopenOutcome = "RECORDED" | "CONTINUING" | "NOT_FAILED" | "NOT_CONTINUABLE" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED";
 
 /** The database's half, on the API's own pool (packages/db PostgresDigModelRepository). */

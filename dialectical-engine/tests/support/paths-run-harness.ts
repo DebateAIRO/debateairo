@@ -2,7 +2,7 @@
 // V4 start step, Task 53 (spec 2026-11-03 §4.2-§4.3): ONE PATH DEBATE, END TO END, over the preview harness
 // (tests/support/preview-debate-harness.ts): a run admitted with shape receipt v2 (the sizes the admission would freeze at
 // the start values, `resolveDebateShapeV2`), engine 2 and the length row, for one encrypted owner; the paths it was sealed
-// with at Start written as Start writes them (0158, `PostgresStartPathsStore`), or none (a run that builds its own list);
+// with at Start written as Start writes them (0159, `PostgresStartPathsStore`), or none (a run that builds its own list);
 // the run's own step-2 lines when given (0144's purpose lines, the API's port); the gates scripted by what was asked
 // (`scriptedShapeAnswers`, the later steps' defaults), each path's web planner planning a search on Plus when asked; and the
 // runner composed as main.ts composes it, to a completed answer. Every name, question and page is made up.
@@ -123,7 +123,7 @@ export type PathsDebateOptions = Readonly<{
   web?: Readonly<{ webPlan: "PLUS" | "FREE"; planSearch?: boolean }>;
   /** Asked before the script for every gate request; null lets the script answer. */
   before?: (request: GateRequest, chat: string) => GateOverride | null;
-  /** The runner's progress store (default 0160's on the runner's pool). */
+  /** The runner's progress store (default 0161's on the runner's pool). */
   pathProgress?: PathProgressStore;
   /** The admitted run, given; absent, a new one. */
   debate?: AdmittedRun;

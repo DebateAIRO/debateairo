@@ -203,7 +203,7 @@ import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
 import { accountMemoryStoreFrom } from "./account-memory.js";
-// V4 start step, Task 39e: the questions not started yet, 0161's store of rows and the service over it and the question keys.
+// V4 start step, Task 39e: the questions not started yet, 0162's store of rows and the service over it and the question keys.
 import { savedQuestionStoreFrom } from "./saved-questions/store.js";
 import { createSavedQuestionService, savedQuestionOpener } from "./saved-questions/service.js";
 import { StoryRepository } from "@debateai/story";
@@ -734,7 +734,7 @@ const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
 }));
 /**
  * V4 start step, Task 31 (spec 2026-11-03 §3 and §4.1): the calls before Start go out only on the preview, and only where every
- * one of them can be charged to the person: a preview gate AND 0157's writer, asked of this login as step 2's writer is above
+ * one of them can be charged to the person: a preview gate AND 0158's writer, asked of this login as step 2's writer is above
  * (never keyed on the deployment mode: the test site runs in hosted mode). The references are signed with a key derived from
  * the blind-index key, as the question-language key is, so every API process of this deployment verifies the others'.
  */
@@ -1145,7 +1145,7 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
 );
 /**
  * V4 start step, Task 36: THE ONE chosen paths store, on the runtime pool (its login holds debateai_runtime, the only role granted
- * core.record_start_paths and core.read_start_paths, 0158): the AskApplication seals a run's chosen paths through it (the START_PATHS
+ * core.record_start_paths and core.read_start_paths, 0159): the AskApplication seals a run's chosen paths through it (the START_PATHS
  * setup step) and reads them when a waiting debate is let in again; buildApi gets the same object.
  */
 const startPaths = new PostgresStartPathsStore(pool);
@@ -1827,7 +1827,7 @@ const admission = new AdmissionLimiter(admissionPolicy);
 // V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
 // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
 const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
-// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answers S3 A, S4 A): the questions not started yet, through 0161's
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answers S3 A, S4 A): the questions not started yet, through 0162's
 // five functions on the same runtime pool (EXECUTE for debateai_billing_runtime only), each sealed and opened with its own key from the
 // one question-key store, and kept only for a reading the start step's key signed (Task 31's, the same the step signs with).
 const savedQuestionStore = savedQuestionStoreFrom((text, values) => pool.query(text, values));
@@ -1842,7 +1842,7 @@ const investigations = new PostgresInvestigationRepository(pool);
  * V4 start step, Task 31 (spec 2026-11-03 §4.1; owner answers Q2 and Q8 of 4 Nov): THE STEP BEFORE START, behind POST
  * /v1/asks/paths/lists, …/merge, …/combine and …/fit. Each call runs on the settings of the version it is asked under, from the
  * one admission cache (the switch, the line-up, the language port); the question check is Start's own. On the preview route it
- * sends through the gate's guarded fetch, which settles the money there, and each call is the person's charge through 0157's
+ * sends through the gate's guarded fetch, which settles the money there, and each call is the person's charge through 0158's
  * writer, at the price the runner charges the same target at (F4). Off the preview route there is no transport, and every
  * call answers none OFF. Nothing it logs carries the question, a list or a person.
  */
@@ -1920,7 +1920,7 @@ const api = buildApi({
   startStepKey,
   // V4 start step, Task 36: the same chosen paths store the AskApplication holds.
   startPaths,
-  // V4 start step, Task 56b (owner answer Q20 B): a public debate's report counts, on this pool (0160 grants them to its billing role),
+  // V4 start step, Task 56b (owner answer Q20 B): a public debate's report counts, on this pool (0161 grants them to its billing role),
   // so the owner's first report of their own public debate uses the kept reserve and a further one waits for the reset.
   ownClosings: new PostgresOwnClosingsReader(pool),
   // V4 start step, Task 39e: the questions not started yet, their five routes and the removal at Start.
@@ -1945,7 +1945,7 @@ const api = buildApi({
     resumeInRelease: (ownerRef, runId, releaseKey, registerVersion) =>
       new PostgresDigModelRepository(pool).resumeInRelease(ownerRef, runId, releaseKey, registerVersion)
   }),
-  // V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate, through 0164's read and re-open on
+  // V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate, through 0165's read and re-open on
   // this pool (the API's role); hosted, only while the person's pool (the ask room's) and the site's day have room for the rest. The wake and the
   // hand-over are the two above.
   failedRunContinue: {

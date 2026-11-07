@@ -147,11 +147,11 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_path_suggestions(uuid,uuid)",
   // When step 2's small AI read the person's question (0144): wired, into account.json.
   "identity.read_data_export_ask_clarify(uuid,uuid)",
-  // When the small AIs before Start ran for the person (0157): wired, into account.json, the time and the kind only.
+  // When the small AIs before Start ran for the person (0158): wired, into account.json, the time and the kind only.
   "identity.read_data_export_pre_start(uuid,uuid)",
   // The reports the person made with the Report button (0152): wired, into account.json. The words stay under the debate's publication key.
   "identity.read_data_export_public_flags(uuid,uuid)",
-  // V4 start step, Task 39e: the questions not started yet (0161), each part under its question's own key: wired, into account.json.
+  // V4 start step, Task 39e: the questions not started yet (0162), each part under its question's own key: wired, into account.json.
   "identity.read_data_export_saved_questions(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",

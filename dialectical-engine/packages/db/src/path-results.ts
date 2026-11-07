@@ -5,11 +5,11 @@ import { TypedDomainError } from "@debateai/kernel";
 import { decryptLeasedContentForRun, encryptAttestedContentForRun, prepareLeasedContentEncryptionForRun, withRunContentLease } from "./index.js";
 
 /**
- * A path debate's results per path (migration 0159; V4 start step, spec 2026-11-03 §2.7, §4.3), through 0159's six definers only, on the
+ * A path debate's results per path (migration 0160; V4 start step, spec 2026-11-03 §2.7, §4.3), through 0160's six definers only, on the
  * runner's pool (debateai_runtime): which root argued each chosen path (ids and codes only), each path's answer so far and the debate's gap
  * round, the last two sealed under the debate's own run key inside withRunContentLease and opened through prepareLeasedContentEncryptionForRun.
  *
- * Carriers (packages/crypto CONTENT_CARRIERS), each checked by 0159's attestation guard: `core.path_outcome` bound to the path id ("b1", …),
+ * Carriers (packages/crypto CONTENT_CARRIERS), each checked by 0160's attestation guard: `core.path_outcome` bound to the path id ("b1", …),
  * `core.path_gap_round` bound to the run id. A run without content encryption keeps no sealed row: the writers refuse with
  * PATH_RESULTS_NOT_SEALED and call nothing. An erased debate answers RUN_ERASED to every write and reads as nothing. What it reads is not
  * parsed here: callers parse it against the contract.
@@ -94,7 +94,7 @@ export class PostgresPathResultsRepository implements PathResultsStore {
   }
 
   async recordPathGapRound(input: Readonly<{ runId: string; roundCount: number; round: PathGapRound }>): Promise<"RECORDED" | "ALREADY" | "RUN_ERASED"> {
-    // 0159's guard binds the envelope to run_id::text, which Postgres renders lower-case.
+    // 0160's guard binds the envelope to run_id::text, which Postgres renders lower-case.
     return this.#sealed(input.runId, PATH_RESULT_CARRIERS.gapRound, input.runId.toLowerCase(), input.round, (content, attestation) =>
       this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "RUN_ERASED" }>("SELECT core.record_path_gap_round($1,$2,$3::jsonb,$4) AS outcome",
         [input.runId, input.roundCount, JSON.stringify(content), attestation]));

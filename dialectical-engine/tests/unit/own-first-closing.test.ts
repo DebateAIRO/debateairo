@@ -86,7 +86,7 @@ function reportPorts(world: World): InvestigationReportPorts {
   };
 }
 
-/** Task 53a's counts as 0160 counts them: the versions that did not fail, this writer's and every writer's. */
+/** Task 53a's counts as 0161 counts them: the versions that did not fail, this writer's and every writer's. */
 function closingsStore(world: World, asked: string[]): OwnClosingsStore {
   return {
     countPublicReports: async (ownerRef, publicationRef) => {

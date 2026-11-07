@@ -82,7 +82,7 @@ export type ModelSpendSource =
   /** step 2's small AI before a debate: run-less, in the site's day and in the person's windows through its own row (0144), written only by identity.record_ask_clarify_charge */
   | "ASK_CLARIFY"
   /**
-   * V4 start step (0157; spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the merges,
+   * V4 start step (0158; spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the merges,
    * the combine and the fit check). Run-less like ASK_CLARIFY, in the site's day and in the person's windows through its own
    * row, written only by identity.record_pre_start_charge.
    */
@@ -194,7 +194,7 @@ export async function recordAskClarifyCharge(pool: Pick<Pool, "query">, entry: A
       entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
 }
 
-/** V4 start step (0157): which small AI before Start a charge paid for. */
+/** V4 start step (0158): which small AI before Start a charge paid for. */
 export const PRE_START_CHARGE_KINDS = Object.freeze(["ANGLES", "LIST", "MERGE", "MERGE_LATE", "COMBINE", "FIT"] as const);
 export type PreStartChargeKind = typeof PRE_START_CHARGE_KINDS[number];
 
@@ -204,14 +204,14 @@ export const PRE_START_CHARGE_WRITER = "identity.record_pre_start_charge(uuid,uu
 /**
  * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call was made for (Task 57d: a random
  * id the API mints once per reading, never made from the question's words; 64 lower-case hex characters), when it has one: written with the
- * charge by 0164's writer.
+ * charge by 0165's writer.
  */
 export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind; tryRef?: string }>;
 
-/** 0164's writer: 0157's, and the call's try in the same transaction. */
+/** 0165's writer: 0158's, and the call's try in the same transaction. */
 export const PRE_START_TRY_CHARGE_WRITER = "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)" as const;
 
-/** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0157's writer checks the kind matches. */
+/** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0158's writer checks the kind matches. */
 export function preStartSpendRef(kind: PreStartChargeKind, provider: string, model: string): string {
   return `pre-start:${kind.toLowerCase().replaceAll("_", "-")}:${provider}:${model}`;
 }
@@ -237,7 +237,7 @@ export async function recordPreStartCharge(pool: Pick<Pool, "query">, entry: Pre
 }
 
 /**
- * Task 57c (0164): at Start, the person's charges of that try not yet given to a debate are given to their new debate, once; how many.
+ * Task 57c (0165): at Start, the person's charges of that try not yet given to a debate are given to their new debate, once; how many.
  * Another person's debate, or none, takes nothing (0).
  */
 export async function linkPreStartTry(pool: Pick<Pool, "query">, input: Readonly<{ ownerRef: string; tryRef: string; runId: string }>): Promise<number> {
@@ -246,10 +246,10 @@ export async function linkPreStartTry(pool: Pick<Pool, "query">, input: Readonly
   return Number(result.rows[0]?.given ?? 0);
 }
 
-/** Task 57c (0164): whether a person's debate used any of their quota (its own counted spend, or a charge before Start not given back). */
+/** Task 57c (0165): whether a person's debate used any of their quota (its own counted spend, or a charge before Start not given back). */
 export type RunQuotaUsed = "NONE" | "SOME";
 
-/** Task 57c (0164): the answer for the person's own debate; null for another's, or for any answer that is not one of the two. */
+/** Task 57c (0165): the answer for the person's own debate; null for another's, or for any answer that is not one of the two. */
 export async function readRunQuotaUsed(pool: Pick<Pool, "query">, input: Readonly<{ ownerRef: string; runId: string }>): Promise<RunQuotaUsed | null> {
   const result = await pool.query<{ used: unknown }>("SELECT identity.read_run_quota_used($1::uuid,$2::uuid) AS used", [input.ownerRef, input.runId]);
   const used = result.rows[0]?.used;
@@ -1637,7 +1637,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       return this.#total(result.rows[0]?.total);
     }
     // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
-    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144); the V4 start step: plus the small AIs before Start (0157).
+    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144); the V4 start step: plus the small AIs before Start (0158).
     const result = await this.pool.query<{ total: string }>(
       `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
          + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz)
@@ -1653,7 +1653,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * subscription spend in [$2, $3): the RUN, STORY and PATH_REWRITE charges of the runs `billing.run_charge_scope` pins to
    * owner $1 on a subscription, admitted before $3, a premium run removed by its synthesis check excepted, no waiver
    * (side-by-side C10), nor a call the site took over (V4 start step, Task 57f: an earlier copy's charge for a call a continued debate had to
-   * buy again, 0164's call waiver, read through its one definer). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
+   * buy again, 0165's call waiver, read through its one definer). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
    * `billing.read_internal_grant_spent` (the internal branch) counts the same kinds since the drained step 0140.
    */
   static readonly #ownerSpendFrom = `FROM billing.run_charge_scope AS scope

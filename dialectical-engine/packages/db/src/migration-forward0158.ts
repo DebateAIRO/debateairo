@@ -1,23 +1,32 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
-import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
+import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from "./migration-forward-chain.js";
 
 /**
- * 0158, the paths a person chose at Start, sealed under the debate's own key (V4 start step; plan 2026-11-03 Task 19; expand): the set, its
- * paths and the carry-on marks, and the seven definers the runtime calls. It keeps 0130's verifier and amends no earlier step.
+ * 0158, the small AIs before Start count in the person's quota (V4 start step; plan 2026-11-03 Task 18; drained): one row per call naming the
+ * person, the kind, the cost and the time, its writer and readers, and 0144's two readers taught to count it. It pins the objects it creates and
+ * the two it redefines; it keeps 0130's verifier.
  */
-const NAME = "0158_start_paths.sql";
-const VERSION = "start-paths-forward0158-v1";
-const MANIFEST_PATH = "lineage/start-paths-forward0158.json";
+const NAME = "0158_pre_start_charge.sql";
+const VERSION = "pre-start-charge-forward0158-v1";
+const MANIFEST_PATH = "lineage/pre-start-charge-forward0158.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0157_pre_start_charge.sql";
-const TABLES: readonly string[] = ["core.start_path_set", "core.start_path", "core.carry_on_mark"];
-const FUNCTIONS: readonly string[] = [
-  "core.record_start_paths(uuid,jsonb,jsonb)", "core.read_start_paths(uuid)", "core.read_start_path_ids(uuid)",
-  "core.record_carry_on_due(uuid)", "core.claim_carry_on_due(integer)", "core.read_carry_on_begun(integer)", "core.record_carry_on_done(uuid)"
-];
-const AMENDS: readonly never[] = [];
+const PREVIOUS = "0156_moderation_notice.sql";
+const TABLES = ["identity.pre_start_charge"] as const;
+const FUNCTIONS = [
+  "identity.guard_pre_start_charge()",
+  "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
+  "ledger.refuse_pre_start_spend_outside_writer()",
+  "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)",
+  "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
+  "staff.read_team_internal_spent(timestamptz,timestamptz)",
+  "identity.read_data_export_pre_start(uuid,uuid)"
+] as const;
+/** 0140's and 0144's digests both pin the two readers this step teaches the new kind, so it declares both (0130's route). The manifest carries the same list. */
+const READERS = Object.freeze(["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "staff.read_team_internal_spent(timestamptz,timestamptz)"]);
+const AMENDS: readonly PostconditionAmendment[] = Object.freeze(["0140_internal_spend_kinds.sql", "0144_ask_clarify_charge.sql"].map((step) =>
+  Object.freeze({ step, functions: READERS, field: "function_definition" as const })));
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0158_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
@@ -25,7 +34,11 @@ const exactKeys = (value: unknown, keys: readonly string[]): value is Record<str
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
-/** The tables (owner, ACL, columns, constraints, indexes, triggers) and the functions (owner, definer, body, ACL). */
+/**
+ * The 1 table (owner, ACL, columns, constraints, indexes, triggers), the 7 functions (owner, definer, body, ACL), and what it adds to
+ * ledger.model_spend, as 0128's: the writer-only trigger (the only barrier for a login whose row security admits a run-less row) and the
+ * run-less CHECK. Not the shared source CHECK, which later steps widen.
+ */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
   const tables = (await client.query(`
     SELECT relation,pg_get_userbyid(c.relowner) owner,c.relkind,c.relpersistence,c.relrowsecurity rls,c.relforcerowsecurity force_rls,
@@ -42,7 +55,16 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
       (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
     FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
   if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions }));
+  const trigger = (await client.query(`
+    SELECT t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
+    FROM pg_trigger t WHERE t.tgrelid='ledger.model_spend'::regclass
+      AND t.tgname='pre_start_spend_writer_only'`)).rows;
+  const check = (await client.query(`
+    SELECT k.conname,pg_get_constraintdef(k.oid) definition
+    FROM pg_constraint k WHERE k.conrelid='ledger.model_spend'::regclass
+      AND k.conname='model_spend_pre_start_is_runless'`)).rows;
+  if (trigger.length !== 1 || check.length !== 1) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify({ tables, functions, trigger, check }));
 }
 
 export async function loadForward0158(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {

@@ -818,7 +818,7 @@ export class WorkItemRepository {
 
   /**
    * V4 start step, Task 57e — THE ONE AUTOMATIC RETRY. A copy whose debate stopped on our side keeps its own claim of this release's open
-   * item until `delaySeconds` from now (WORK_ITEM_RETRY's few minutes by default), and records the item's one retry (0164's
+   * item until `delaySeconds` from now (WORK_ITEM_RETRY's few minutes by default), and records the item's one retry (0165's
    * core.record_work_item_retry), on one transaction: PARKED. The item stays CLAIMED, never FAILED, so the run reads as running and nothing
    * is given back; once the claim lapses the lapsed re-send hands it to a runner again, which resumes it (0119). An item that had its retry
    * already is left exactly as it was (RETRIED: the caller records FAILED as today), and so is one this copy does not hold (NOT_HELD: another

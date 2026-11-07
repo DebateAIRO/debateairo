@@ -2,9 +2,9 @@ import type { CryptoEnvelope } from "@debateai/crypto";
 import type { AccountMemoryQuery } from "../account-memory.js";
 
 /**
- * Saved questions (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.14; migration 0161): the questions a
+ * Saved questions (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.14; migration 0162): the questions a
  * person has not started yet, kept in their account, at most 20 (owner answer S3 A). This module is the port the API's service uses and
- * its one PostgreSQL adapter, over 0161's five functions on the API's runtime pool (EXECUTE for debateai_billing_runtime only), beside
+ * its one PostgreSQL adapter, over 0162's five functions on the API's runtime pool (EXECUTE for debateai_billing_runtime only), beside
  * 0131's page settings. It deals in envelopes only: each part is sealed under the question's own key (owner answer S4 A) before it gets
  * here, and opened after it leaves; the account always comes from the sign-in. No words, no key and no key file pass through it.
  */
@@ -26,7 +26,7 @@ export type SavedQuestionWrite =
   | Readonly<{ outcome: "GONE" }>
   | Readonly<{ outcome: "REVISION"; revision: number }>;
 
-/** 0161 refused the account (22023 SAVED_QUESTION_ACCOUNT_INVALID): no active account with that owner_ref, a closing's included. */
+/** 0162 refused the account (22023 SAVED_QUESTION_ACCOUNT_INVALID): no active account with that owner_ref, a closing's included. */
 export class SavedQuestionAccountInvalidError extends Error {
   constructor() {
     super("SAVED_QUESTION_ACCOUNT_INVALID");
@@ -57,7 +57,7 @@ const invalid = (): never => { throw new TypeError("SAVED_QUESTION_ROW_INVALID")
 type Raw = Readonly<Record<string, unknown>>;
 const isObject = (value: unknown): value is Raw => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The stored envelope, exactly its five members (0161's CHECKs hold the same shape). */
+/** The stored envelope, exactly its five members (0162's CHECKs hold the same shape). */
 function envelopeOf(value: unknown): CryptoEnvelope {
   if (!isObject(value) || Object.keys(value).length !== 5 || value.v !== 1 || typeof value.keyId !== "string"
     || typeof value.nonce !== "string" || typeof value.ct !== "string" || typeof value.tag !== "string") return invalid();
@@ -107,7 +107,7 @@ async function accountChecked<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-/** The adapter over 0161's five API functions; it calls nothing else of the database. */
+/** The adapter over 0162's five API functions; it calls nothing else of the database. */
 export function savedQuestionStoreFrom(query: AccountMemoryQuery): SavedQuestionStore {
   const answer = async (text: string, values: unknown[]): Promise<unknown> => (await query(text, values)).rows[0]?.answer;
   return Object.freeze({

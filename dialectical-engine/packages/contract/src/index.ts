@@ -1044,7 +1044,7 @@ export const RunProjectionSchema = z.object({
   path_progress: z.array(RunPathProgressSchema).max(ANSWER_BRANCH_LIMITS.pathsMax).optional(),
   carry_on_part: z.enum(CARRY_ON_PARTS).optional(),
   // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up), last: whether a FAILED debate used any of the person's
-  // quota. NONE: nothing was taken (its path-list charge was given back, 0164, and nothing else ran); SOME: some was. Absent on every
+  // quota. NONE: nothing was taken (its path-list charge was given back, 0165, and nothing else ran); SOME: some was. Absent on every
   // other run, and where the server cannot say, so an older reader still parses.
   quota_used: z.enum(["NONE", "SOME"]).optional(),
   // V4 start step, Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again"; Task 57e's

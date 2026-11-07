@@ -37,7 +37,7 @@ import { replayingGateway, type ReplayBook } from "./run-replay.js";
  *     answer; one version per trigger, sealed under the ROOT's key (0138's `record_main_answer_update`). A FAILED version changes nothing.
  *  4. V4 start step, Task 55e (spec §4.4): a dig under the main question of a path debate (a path left out before Start, "+ N more") is
  *     a new first-level path once each of its paths has its answer so far (`addedPathOf`). It writes no rewrite, so it updates the main
- *     answer itself, its trigger the dig (0163's PATH_ADDED), once its story is written (`advanceTree` with no rewrite of its own); and a
+ *     answer itself, its trigger the dig (0164's PATH_ADDED), once its story is written (`advanceTree` with no rewrite of its own); and a
  *     change of one of its paths is a first-level change: a climb that reaches it updates the main answer instead of stopping there.
  *     A first debate, an R22 dig under the question and a runner without the read do as before.
  *

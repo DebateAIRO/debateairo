@@ -1,5 +1,5 @@
 // tests/integration/path-results-repository.test.ts
-// V4 start step, Task 21 (spec 2026-11-03 §2.7, §4.3): a path debate's results per path on real PostgreSQL through 0159's six definers, on the
+// V4 start step, Task 21 (spec 2026-11-03 §2.7, §4.3): a path debate's results per path on real PostgreSQL through 0160's six definers, on the
 // runner's login: which root argued each path (and where it moved after a reclaim), each path's answer so far and the gap round, the last two
 // sealed under the debate's own key; erasure; the definers' refusals; and no role reading a table. Data is made up.
 import { randomUUID } from "node:crypto";

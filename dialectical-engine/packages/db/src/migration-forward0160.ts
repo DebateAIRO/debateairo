@@ -4,19 +4,22 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0160, each path's step and points, the carry-on mark and a public debate's report counts (V4 start step; plan 2026-11-03 Task 53a;
- * expand): the two tables the runner writes as a path's work moves on (ids and codes only), the four definers the runtime calls and the
- * report counts the API's billing role reads. It keeps 0130's verifier and amends no earlier step.
+ * 0160, a path debate's results per path (V4 start step; plan 2026-11-03 Task 21; expand): each chosen path's root and its moves after a
+ * reclaim, each path's answer so far and the gap round (the last two sealed under the debate's own key), the four content guards and the six
+ * definers the runtime calls. It keeps 0130's verifier and amends no earlier step.
  */
-const NAME = "0160_path_progress.sql";
-const VERSION = "path-progress-forward0160-v1";
-const MANIFEST_PATH = "lineage/path-progress-forward0160.json";
+const NAME = "0160_path_results.sql";
+const VERSION = "path-results-forward0160-v1";
+const MANIFEST_PATH = "lineage/path-results-forward0160.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0159_path_results.sql";
-const TABLES: readonly string[] = ["core.path_step", "core.path_point_mark"];
+const PREVIOUS = "0159_start_paths.sql";
+const TABLES: readonly string[] = ["core.path_root", "core.path_root_repoint", "core.path_outcome", "core.path_gap_round"];
 const FUNCTIONS: readonly string[] = [
-  "core.record_path_step(uuid,text,text)", "core.record_path_point_mark(uuid,text,uuid,text,text)", "core.read_path_progress(uuid)",
-  "core.read_carry_on_mark(uuid)", "identity.count_public_reports(uuid,uuid)"
+  "core.enforce_content_ciphertext_path_outcome()", "core.enforce_content_attestation_v2_path_outcome()",
+  "core.enforce_content_ciphertext_path_gap_round()", "core.enforce_content_attestation_v2_path_gap_round()",
+  "core.write_path_root(uuid,text,integer,uuid,text)", "core.record_path_outcome(uuid,text,text,jsonb,bytea)",
+  "core.record_path_gap_round(uuid,integer,jsonb,bytea)", "core.read_path_roots(uuid)", "core.read_path_outcomes(uuid)",
+  "core.read_path_gap_round(uuid)"
 ];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0160_${detail}`); };

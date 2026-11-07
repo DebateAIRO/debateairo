@@ -1874,14 +1874,14 @@ export interface AskApplication {
    */
   readStoredAsk?(runId: string): Promise<StoredAsk | null>;
   /**
-   * V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): whether a FAILED debate used any of the person's quota (0164), read only
+   * V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): whether a FAILED debate used any of the person's quota (0165), read only
    * after that debate's owner-gated read; null when it cannot be said (a legacy asker's debate). Absent: the run read says nothing of it.
    */
   readRunQuotaUsed?(runId: string, ownership: RunOwnershipAccess): Promise<RunQuotaUsed | null>;
   /**
    * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): at Start, the person's charges before Start of one try
    * (Task 57d: the reading's random id its check carries, signing.ts's startTryRefOfCheck) not yet given to a debate, given to their new
-   * debate (0164); how many. Absent: nothing is given.
+   * debate (0165); how many. Absent: nothing is given.
    */
   linkPreStartTry?(ownerRef: string, tryRef: string, runId: string): Promise<number>;
 }
@@ -1894,7 +1894,7 @@ async function resolvedRunId(options: Pick<ApiOptions, "application">, id: strin
 
 /**
  * Who a new run is for. V4 start step, Task 56: a server principal's `carryOn` makes the run a carry-on dig of that debate's path,
- * passed unchanged to both `startRun` call sites (0162 provisions its key from the debate's own binding, no live session needed);
+ * passed unchanged to both `startRun` call sites (0163 provisions its key from the debate's own binding, no live session needed);
  * only the carry-on ports built in buildApi set it, never a route.
  */
 export type AskPrincipal =
@@ -2084,7 +2084,7 @@ export interface ApiOptions {
   /** Decision 12 (./month-pause.ts): where Continue hands a debate of another release; absent: Continue resumes it where it is. */
   readonly runHandover?: RunHandoverPort;
   /**
-   * V4 start step, Task 57f (./run-continue.ts): Continue on the person's own FAILED debate (0164's read and re-open, and the room for the
+   * V4 start step, Task 57f (./run-continue.ts): Continue on the person's own FAILED debate (0165's read and re-open, and the room for the
    * rest), and the FAILED read's `continuable`. Absent: Continue is the month wall's alone, and no read says `continuable`.
    */
   readonly failedRunContinue?: FailedRunContinueOptions;
@@ -2219,7 +2219,7 @@ export interface ApiOptions {
   readonly startPaths?: StartPathsStore;
   /**
    * V4 start step, Task 56b (item public-f25; owner answer Q20 B): Task 53a's counts of a public debate's report versions
-   * (`PostgresOwnClosingsReader`, on the API's own pool: 0160 grants identity.count_public_reports to its billing role only). With it,
+   * (`PostgresOwnClosingsReader`, on the API's own pool: 0161 grants identity.count_public_reports to its billing role only). With it,
    * the owner's "Write my report" on their own public debate, and their press on its public page, go ahead while new starts wait for
    * the reset when the press is the debate's first report (the kept reserve), and the owner's investigation read says so
    * (`first_closing_left`). Absent: both presses and the read answer as before.
@@ -2228,14 +2228,14 @@ export interface ApiOptions {
   // V4 start step
   /**
    * V4 start step, Task 39e (saved questions spec 2026-11-04 §3.14; owner answers S3 A, S4 A): the questions not started yet, each under
-   * a key of its own (./saved-questions/service.ts; main.ts composes it over 0161's store, the question-key store and the start step's
+   * a key of its own (./saved-questions/service.ts; main.ts composes it over 0162's store, the question-key store and the start step's
    * key), behind GET and POST /v1/account/saved-questions and PUT, GET and DELETE …/{id}, and removed after a 202 of POST /v1/asks that
    * names one. Absent: the five routes are mounted all the same and answer 503 SAVED_QUESTIONS_UNAVAILABLE; Start removes nothing.
    */
   readonly savedQuestions?: SavedQuestionService;
   // V4 start step
   /**
-   * V4 start step, Task 56 ("Let the AIs carry on to the report"; owner ruling 3 Nov, evening): the carry-on marks (0158's DUE →
+   * V4 start step, Task 56 ("Let the AIs carry on to the report"; owner ruling 3 Nov, evening): the carry-on marks (0159's DUE →
    * BEGUN → DONE, `PostgresStartPathsStore`; main.ts passes Task 36's one store, `startPaths` above). With it, `api.carryOnTick()`
    * digs once into each path's top suggestion of a ticked first debate, through POST /v1/asks's own steps, then presses "Write my
    * report" through POST /v1/runs/{id}/report's. Absent: the tick answers zeros.
@@ -4604,7 +4604,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ));
     // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): the
     // debate takes the charges before Start of each try this Start names (the reading's random id its check carries, Task 57d; a combine
-    // over a dig's picks, from its parent), once, so 0164 gives them back if it fails. A link that fails never changes the 202 (the
+    // over a dig's picks, from its parent), once, so 0165 gives them back if it fails. A link that fails never changes the 202 (the
     // charges stay counted), and its one line names the debate and no word.
     if (start !== null && owner !== null && options.startStepKey !== undefined && options.application.linkPreStartTry !== undefined) {
       const ownerScope = ownerScopeOf({ kind: "server", ownerRef: owner.ownerRef });
@@ -5346,7 +5346,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     );
     if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     if (run.state === "FAILED") {
-      // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): a failed debate says whether any of the person's quota was used (0164),
+      // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): a failed debate says whether any of the person's quota was used (0165),
       // after its owner-gated read above; nothing is said where the server cannot say. A debate that did not fail reads as before.
       const quotaUsed = await options.application.readRunQuotaUsed?.(runId, ownershipFor(request)) ?? null;
       // Task 57f (the owner's 7 Nov answers: continue where it stopped; 57e's `reusable`, renamed): it says `continuable` exactly when Continue
@@ -5810,7 +5810,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // V4 start step, Task 56 ("Let the AIs carry on to the report"; owner ruling 3 Nov, evening): the carry-on's ports, over the two
   // routes' own steps (askPreflight, askAsOwner, writeReportAsOwner) and the room's look; ./carry-on.ts drives them. The person acts
   // with no live sign-in: the first debate's session, and each dig's server principal carries its carry-on dig (the one place a
-  // principal gets one), so 0162 provisions its key from that debate's binding. Without the marks the tick answers zeros.
+  // principal gets one), so 0163 provisions its key from that debate's binding. Without the marks the tick answers zeros.
   const carryOnMarks = options.carryOn;
   if (carryOnMarks === undefined) {
     api.decorate("carryOnTick", async (): Promise<CarryOnTick> => Object.freeze({ begun: 0, digs: 0, pressed: 0, waiting: 0 }));
@@ -6183,7 +6183,7 @@ export interface RunCreationSettings {
    */
   readonly activeVersionAlarm?: ActiveVersionAlarm;
   /**
-   * V4 start step, Task 35 (spec 2026-11-03 §4.2): the chosen paths' store (0158), where a debate admitted with shape
+   * V4 start step, Task 35 (spec 2026-11-03 §4.2): the chosen paths' store (0159), where a debate admitted with shape
    * receipt v2 seals the paths the person chose before its first job (RUN_SETUP_FAILED:START_PATHS). Absent: such a debate
    * is refused at that step (START_PATHS_STORE_UNAVAILABLE). A process member, never a version's.
    */
@@ -8118,12 +8118,12 @@ export class PostgresAskApplication implements AskApplication {
     return this.#serve.readRunFound(runId);
   }
 
-  /** V4 start step, Task 57c (0164): the person's own debate only (its latest owner); a legacy asker's: none. */
+  /** V4 start step, Task 57c (0165): the person's own debate only (its latest owner); a legacy asker's: none. */
   async readRunQuotaUsed(runId: string, ownership: RunOwnershipAccess): Promise<RunQuotaUsed | null> {
     return ownership.ownerRef === null ? null : readRunQuotaUsed(this.pool, { ownerRef: ownership.ownerRef, runId });
   }
 
-  /** V4 start step, Task 57c (0164): the try's charges before Start given to the person's new debate, once. */
+  /** V4 start step, Task 57c (0165): the try's charges before Start given to the person's new debate, once. */
   linkPreStartTry(ownerRef: string, tryRef: string, runId: string): Promise<number> {
     return linkPreStartTry(this.pool, { ownerRef, tryRef, runId });
   }

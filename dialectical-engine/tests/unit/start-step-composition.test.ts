@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * V4 start step, Task 31 (spec 2026-11-03 §3 and §4.1; the plan's Global Constraints): THE COMPOSITION in apps/api/src/main.ts.
- * The calls before Start go out only where a preview gate is configured AND 0157's pre-Start charge writer answers for the
+ * The calls before Start go out only where a preview gate is configured AND 0158's pre-Start charge writer answers for the
  * API's own login, never keyed on the deployment mode (the test site runs in hosted mode). The step signs its references
  * with a key derived from the blind-index key, and buildApi gets the step and that same key together: without the key the
  * four routes answer none OFF (Task 30). A source pin: main.ts boots only against a real database and gate.
@@ -31,7 +31,7 @@ const KEY = "const startStepKey = startStepKeyFrom(blindIndexKey);";
 const ROUTE = "const startStepRoute = startStepRouteOf({ previewGate, writerPresent: preStartWriter });";
 
 describe("V4 start step: main.ts composes the step on the preview route", () => {
-  it("probes 0157's writer under the boot ledger for the login's own connections, and keys the route on the gate and the writer", () => {
+  it("probes 0158's writer under the boot ledger for the login's own connections, and keys the route on the gate and the writer", () => {
     const writer = onlyAt(WRITER);
     // One probe, never a second spelling elsewhere (the import is the only other mention).
     expect(MAIN.split("preStartChargeWriterPresent(").length - 1).toBe(1);
@@ -56,7 +56,7 @@ describe("V4 start step: main.ts composes the step on the preview route", () => 
     // A transport only on the preview route, through the gate's guarded fetch, over the declared targets.
     expect(step).toContain("  transport: startStepRoute === \"PREVIEW\" && previewFetch !== undefined\n"
       + "    ? createStartTransport({ fetch: previewFetch, targets: declaredProviderTargets }) : null,\n");
-    // Each call charged to the person through 0157's writer, at the price the runner charges the same target at.
+    // Each call charged to the person through 0158's writer, at the price the runner charges the same target at.
     expect(step).toContain("    record: (entry) => recordPreStartCharge(pool, entry),\n");
     expect(step).toContain("previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target))");
     expect(step).toContain("declaredProviderTargets.find((declared) => declared.providerRef === providerRef)");

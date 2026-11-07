@@ -11,7 +11,7 @@ import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncr
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * 0157 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's day, week and month,
+ * 0158 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's day, week and month,
  * in a team member's grant and in the team's one limit, and in the site's day; the row holds the person, the kind, the cost and the time; an erased
  * account takes its rows; the export gets the times and the kinds only; no request role reads the table. Data is made up.
  */
@@ -73,7 +73,7 @@ afterAll(async () => {
   await database?.stop();
 });
 
-describe("0157: the charge reaches every reader", () => {
+describe("0158: the charge reaches every reader", () => {
   it("the API's login finds the writer; another role does not", async () => {
     expect(await preStartChargeWriterPresent(runner)).toBe(true);
     expect(await preStartChargeWriterPresent(erasure)).toBe(false);
@@ -123,7 +123,7 @@ describe("0157: the charge reaches every reader", () => {
   });
 });
 
-describe("0157: the writer's refusals", () => {
+describe("0158: the writer's refusals", () => {
   it("a kind its reference does not name, free text, a far day: refused, nothing written", async () => {
     const ana = await account();
     expect((await sqlError(() => recordPreStartCharge(runner, { ...entry(ana.ownerRef, 1, "LIST"), kind: "FIT" }))).code).toBe("23514");
@@ -160,7 +160,7 @@ describe("0157: the writer's refusals", () => {
   });
 });
 
-describe("0157: erasure, export and the roles", () => {
+describe("0158: erasure, export and the roles", () => {
   it("an erased account takes its rows; the ledger's row, naming nobody, stays in the site's day", async () => {
     const ana = await account();
     const made = entry(ana.ownerRef, 5);
@@ -198,11 +198,11 @@ describe("0157: erasure, export and the roles", () => {
 });
 
 /*
- * 0164 (V4 start step, plan 2026-11-03 Task 57c; the owner's 5 Nov answer Q20 A and its second-round follow-up): a failed question gives back
+ * 0165 (V4 start step, plan 2026-11-03 Task 57c; the owner's 5 Nov answer Q20 A and its second-round follow-up): a failed question gives back
  * its path-list charge. Each charge names its try; Start gives the try's charges to the debate once; while that debate is FAILED the person's
  * windows, a team member's grant and the team's limit leave them out, and the site's day keeps them. Data is made up.
  */
-describe("0164: a failed question gives back its charges before Start", () => {
+describe("0165: a failed question gives back its charges before Start", () => {
   let owner: StoryEncryptedOwner;
   beforeAll(async () => { owner = await provisionStoryEncryptedOwner(database.pool); });
   afterAll(async () => { if (owner !== undefined) await releaseStoryEncryptedOwner(owner); });
@@ -330,7 +330,7 @@ describe("0164: a failed question gives back its charges before Start", () => {
       expect((await sqlError(() => pool.query("SELECT * FROM identity.pre_start_try"))).code).toBe("42501");
     }
     const denied = async (pool: Pool, sql: string, values: readonly unknown[]) => (await sqlError(() => pool.query(sql, [...values]))).code === "42501";
-    // As 0157's own: the API's billing and authorization logins hold the runtime role, so only the other roles are refused.
+    // As 0158's own: the API's billing and authorization logins hold the runtime role, so only the other roles are refused.
     for (const pool of [erasure, worker, replay]) {
       expect(await denied(pool, "SELECT identity.link_pre_start_try($1,$2,$1)", [randomUUID(), made])).toBe(true);
       expect(await denied(pool, "SELECT identity.read_run_quota_used($1,$1)", [randomUUID()])).toBe(true);
@@ -342,7 +342,7 @@ describe("0164: a failed question gives back its charges before Start", () => {
   // Task 57e (the owner's 6 Nov rule: "re-use what we already paid for ... only in case ... there's no way we can re-use those parts, then
   // of course we will give the user back that credit"): a failed debate that keeps the paths chosen from the list keeps the charges that
   // bought them, for "Ask this again" re-uses those paths at no new charge; one that keeps nothing they bought gives them back.
-  /** The debate's set as 0158 keeps it (codes only here: written past the content check, as the database's own fixtures write one). */
+  /** The debate's set as 0159 keeps it (codes only here: written past the content check, as the database's own fixtures write one). */
   async function pathSet(runId: string, source: "MENU" | "RUN_BUILT" | "DIG_PICKS"): Promise<void> {
     const seed = await database.pool.connect();
     try {

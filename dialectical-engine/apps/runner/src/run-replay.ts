@@ -99,7 +99,7 @@ export function recordedCalls(attempts: readonly RecordedAttempt[]): readonly Re
  * ran") — WHAT AN EARLIER COPY PAID FOR, CALL BY CALL. Each call at a site and member (as `recordedCalls` groups them, plus the attempts after the
  * site's last answer, which never got one) with at least one charged attempt. When this copy buys a call at that site again because the
  * earlier one cannot be handed back (it never got an answer, or its answer no longer answers this request), the earlier call's charged attempts
- * are the site's (0164's call waiver), so the person pays each call once, as an unbroken debate would. A call this copy replays is the
+ * are the site's (0165's call waiver), so the person pays each call once, as an unbroken debate would. A call this copy replays is the
  * person's one purchase and stays theirs.
  */
 export type CallCredit = Readonly<{
@@ -400,7 +400,7 @@ export function replayingGateway(
   /** The run's structure-repair route is wired: replay A1-rescued and B-answered calls too. */
   structureReplay = false,
   /**
-   * V4 start step, Task 57f: hands an earlier copy's charged attempts to the site (0164's call waiver), when this copy buys a call again that
+   * V4 start step, Task 57f: hands an earlier copy's charged attempts to the site (0165's call waiver), when this copy buys a call again that
    * an earlier copy paid for and cannot hand back. Absent (and with nothing paid for earlier), the gateway is today's.
    */
   waiveCalls?: (runId: string, attemptIds: readonly string[]) => Promise<void>
@@ -462,7 +462,7 @@ export function replayingGateway(
 }
 
 /**
- * V4 start step, Task 57f: the site takes over an earlier copy's charged attempts (0164's ledger.record_call_waiver, for the runner's role): the
+ * V4 start step, Task 57f: the site takes over an earlier copy's charged attempts (0165's ledger.record_call_waiver, for the runner's role): the
  * person's windows, a funded grant's and the team's no longer count them; the site's day and the debate's own ceiling still do (the money was
  * spent). Only attempts charged on this debate are taken, each once.
  */

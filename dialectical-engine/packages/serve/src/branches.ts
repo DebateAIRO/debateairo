@@ -14,8 +14,8 @@ import { isShapeReceiptV2 } from "@debateai/register";
 /**
  * V4 start step, Task 57 (spec 2026-11-03 §2 items 7 and 8, §4.3; items journey-f1, wait-d1, wait-f16): the paths of a path debate as
  * the answer and the run read serve them (`Answer.branches`, Task 16), and each path's progress while it runs (`path_progress`, Task 57a).
- * Both are built by pure functions from what the debate stored: the chosen paths (0158), each path's root, answer so far and the gap round
- * (0159), and each path's step and point marks (0160). Only the run read's phase tells them apart: while the debate runs a path without an
+ * Both are built by pure functions from what the debate stored: the chosen paths (0159), each path's root, answer so far and the gap round
+ * (0160), and each path's step and point marks (0161). Only the run read's phase tells them apart: while the debate runs a path without an
  * answer so far is still being looked into, so each path fills in the moment its own outcome is stored, while the others keep working.
  * On a path debate the path id is the position everywhere, so its web paths are named by path id.
  */
@@ -91,7 +91,7 @@ export function webPathRootsOfBranches(pathIds: readonly string[]): ReadonlyMap<
   return new Map(pathIds.map((pathId) => [pathId, pathId] as const));
 }
 
-/** The branch reads on the runtime's pool: 0158's and 0159's stores. */
+/** The branch reads on the runtime's pool: 0159's and 0160's stores. */
 export function postgresBranchReadPorts(pool: Pool): BranchReadPorts {
   const paths = new PostgresStartPathsStore(pool);
   const results = new PostgresPathResultsRepository(pool);
@@ -166,7 +166,7 @@ export async function readRunPathProgress(ports: PathProgressReadPorts, runId: s
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * The progress reads on the runtime's pool: 0158's ids, 0159's outcomes and 0160's marks. A path debate is one whose receipt is shape v2.
+ * The progress reads on the runtime's pool: 0159's ids, 0160's outcomes and 0161's marks. A path debate is one whose receipt is shape v2.
  * The points' words are opened in the run's content lease under its key, as the served answer opens its nodes; a node a reclaim set
  * aside is not the answer's and is not opened, and a debate erased meanwhile opens nothing.
  */

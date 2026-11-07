@@ -4,22 +4,18 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0159, a path debate's results per path (V4 start step; plan 2026-11-03 Task 21; expand): each chosen path's root and its moves after a
- * reclaim, each path's answer so far and the gap round (the last two sealed under the debate's own key), the four content guards and the six
- * definers the runtime calls. It keeps 0130's verifier and amends no earlier step.
+ * 0159, the paths a person chose at Start, sealed under the debate's own key (V4 start step; plan 2026-11-03 Task 19; expand): the set, its
+ * paths and the carry-on marks, and the seven definers the runtime calls. It keeps 0130's verifier and amends no earlier step.
  */
-const NAME = "0159_path_results.sql";
-const VERSION = "path-results-forward0159-v1";
-const MANIFEST_PATH = "lineage/path-results-forward0159.json";
+const NAME = "0159_start_paths.sql";
+const VERSION = "start-paths-forward0159-v1";
+const MANIFEST_PATH = "lineage/start-paths-forward0159.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0158_start_paths.sql";
-const TABLES: readonly string[] = ["core.path_root", "core.path_root_repoint", "core.path_outcome", "core.path_gap_round"];
+const PREVIOUS = "0158_pre_start_charge.sql";
+const TABLES: readonly string[] = ["core.start_path_set", "core.start_path", "core.carry_on_mark"];
 const FUNCTIONS: readonly string[] = [
-  "core.enforce_content_ciphertext_path_outcome()", "core.enforce_content_attestation_v2_path_outcome()",
-  "core.enforce_content_ciphertext_path_gap_round()", "core.enforce_content_attestation_v2_path_gap_round()",
-  "core.write_path_root(uuid,text,integer,uuid,text)", "core.record_path_outcome(uuid,text,text,jsonb,bytea)",
-  "core.record_path_gap_round(uuid,integer,jsonb,bytea)", "core.read_path_roots(uuid)", "core.read_path_outcomes(uuid)",
-  "core.read_path_gap_round(uuid)"
+  "core.record_start_paths(uuid,jsonb,jsonb)", "core.read_start_paths(uuid)", "core.read_start_path_ids(uuid)",
+  "core.record_carry_on_due(uuid)", "core.claim_carry_on_due(integer)", "core.read_carry_on_begun(integer)", "core.record_carry_on_done(uuid)"
 ];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0159_${detail}`); };

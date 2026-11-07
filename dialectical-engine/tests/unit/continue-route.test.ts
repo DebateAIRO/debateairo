@@ -159,7 +159,7 @@ describe("the typed client's continueRun", () => {
 
 /**
  * V4 start step, Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again") — THE SAME ROUTE
- * CONTINUES A FAILED DEBATE. The person's own continuable FAILED debate is re-opened once (0164's core.continue_failed_run: the same work
+ * CONTINUES A FAILED DEBATE. The person's own continuable FAILED debate is re-opened once (0165's core.continue_failed_run: the same work
  * item goes back to be claimed and the runner resumes it from what it saved) and its runner is woken: CONTINUING. A second press while it
  * runs is CONTINUING again with nothing re-opened twice. A failed debate that cannot continue (erased, a stop the person caused, a spending
  * wall, set aside) is 409 RUN_NOT_CONTINUABLE; no room for the rest is 409 RUN_CONTINUE_NO_ROOM; another account's debate is the closed

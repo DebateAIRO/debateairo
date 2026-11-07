@@ -451,8 +451,8 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   runSettingsVersions,
   // V4 start step, Task 53: the run → final-writer terms map the call policy reads, set at each claim.
   runFinalWriterTerms,
-  // V4 start step, Task 53: a path debate's stores on the runner's pool: the paths sealed at Start (0158), each path's root and the gap
-  // round (0159), each path's step and points (0160).
+  // V4 start step, Task 53: a path debate's stores on the runner's pool: the paths sealed at Start (0159), each path's root and the gap
+  // round (0160), each path's step and points (0161).
   startPaths,
   pathResults: new PostgresPathResultsRepository(pool),
   pathProgress: new PostgresPathProgressRepository(pool),

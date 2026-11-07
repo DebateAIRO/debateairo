@@ -262,7 +262,7 @@ describe("the step port at Next: the lists stream", () => {
   });
 
   // Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): every call of a question is charged to its try, which the
-  // check carries, so Start can give the try's charges to the debate (0164). Task 57d (owner, 6 Nov: "Random id"): the try is a random id
+  // check carries, so Start can give the try's charges to the debate (0165). Task 57d (owner, 6 Nov: "Random id"): the try is a random id
   // minted once per reading; the offer and its re-post share the planner, so they share the reading and its try.
   it("every charge of a reading names the check's try: the planner and each list, after an offer and its re-post too", async () => {
     const plain = harness({ times: ORDER_TIMES });

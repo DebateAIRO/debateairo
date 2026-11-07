@@ -373,7 +373,7 @@ describe("the start step's signed references (spec 2026-11-03 §4.1)", () => {
  * Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge) and Task 57d (the owner's
  * 6 Nov answer, card "Privacy": "Random id"): THE TRY a call before Start is charged to. A random id minted once per reading, carried
  * inside the signed check, so the merge, a combine on its menu, the fit and Start read it back from the check; nothing made from the
- * question's words is ever a try (0164 stores it). A dig's combine is charged to its parent's try.
+ * question's words is ever a try (0165 stores it). A dig's combine is charged to its parent's try.
  */
 describe("the try a call before Start is charged to (Tasks 57c, 57d)", () => {
   it("a new try is random: 64 lower-case hex characters, never the same twice", () => {

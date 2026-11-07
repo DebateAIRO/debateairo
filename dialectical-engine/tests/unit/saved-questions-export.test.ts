@@ -4,7 +4,7 @@
  * as it reads, the line the AIs read, the answers, the paths and the other suggestions, How wide, Quick look or Thorough, the carry-on
  * tick, and when it was first and last saved, each opened under the question's own key. No signed reference, hash, key name or envelope
  * goes out. A question whose key is gone is deleted in effect and left out; a key that is there but does not open fails the export.
- * The worker reaches 0161's reader: its function count is one more. Every question here is made up.
+ * The worker reaches 0162's reader: its function count is one more. Every question here is made up.
  */
 import { describe, expect, it } from "vitest";
 import { KEEP_COLUMNS, RAW_SECTIONS, collectSnapshot, type ExportDecryptors } from "../../apps/api/src/data-export/snapshot.js";
@@ -151,7 +151,7 @@ describe("the questions not started yet in account.json", () => {
   });
 });
 
-describe("the worker reads 0161's reader", () => {
+describe("the worker reads 0162's reader", () => {
   it("as one more function in its role witness (twenty-four), and beside the snapshot in readRaw", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({ principal: name, authorization_member: name === "request",

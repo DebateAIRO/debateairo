@@ -1,8 +1,8 @@
 // tests/integration/run-path-progress-database.test.ts
 // V4 start step, Task 58 (spec 2026-11-03 §2 items 7 and 8; items wait-d1, journey-f1, wait-f16, r2-8; owner card "Carry-on", "Show it
 // from the start"): the owner's run read of a path debate, on real PostgreSQL, through the API's own application on the API's login. No
-// runner runs: the stores are written directly, as the runner's login writes them (0158's paths and carry-on marks, 0159's roots and
-// answers so far, 0160's steps and point marks), the points through the graph store. Pinned: the run read's `path_progress` equals what the
+// runner runs: the stores are written directly, as the runner's login writes them (0159's paths and carry-on marks, 0160's roots and
+// answers so far, 0161's steps and point marks), the points through the graph store. Pinned: the run read's `path_progress` equals what the
 // stores hold; a path fills in on its own (ARGUED with its findings) while another is still arguing and the debate runs; a debate whose
 // paths are not named yet has none, and a ticked carry-on debate is on its answer from the first read; the carry-on part follows the debate
 // to the digs, the report and the end, on the run read and on the answer alike; an R22 debate's read and a stranger's have none of it, and
@@ -113,7 +113,7 @@ function pathDebate(carryOn = false): Promise<string> {
   });
 }
 
-/** The runner names the debate's three paths (0158, the runner's login). */
+/** The runner names the debate's three paths (0159, the runner's login). */
 async function recordPaths(runId: string, carryOn = false): Promise<void> {
   expect(await new PostgresStartPathsStore(runner).recordStartPaths({ runId, source: "RUN_BUILT", width: 3, chosenBy: "AIS",
     carryOnToReport: carryOn, paths: PATHS, menu: null })).toBe("RECORDED");
@@ -326,7 +326,7 @@ describe("Task 58: the owner's run read of a path debate serves each path's prog
     const answer = (await application().readRunAnswer(runId, SESSION, OWNER()))!;
     AnswerSchema.parse(answer);
     expect(answer.carry_on_part).toBe("DIGS");
-    // The carry-on is due and begun (0158's marks, the runner's login): still the digs.
+    // The carry-on is due and begun (0159's marks, the runner's login): still the digs.
     const marks = new PostgresStartPathsStore(runner);
     expect(await marks.recordCarryOnDue(runId)).toBe("RECORDED");
     expect((await marks.claimCarryOnDue(10)).map((due) => due.runId)).toContain(runId);

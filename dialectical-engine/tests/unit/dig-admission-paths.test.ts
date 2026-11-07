@@ -70,7 +70,7 @@ describe("the places of a path debate's map anchor on its paths", () => {
 });
 
 describe("a dig that is a path debate rewrites its parent's path with its own paths b<n>", () => {
-  // The dig's roots in force (0159), by root index: b1 argued from the runner-up (Yes), b2 from the winner (No).
+  // The dig's roots in force (0160), by root index: b1 argued from the runner-up (Yes), b2 from the winner (No).
   const ROOTS = Object.freeze([Object.freeze({ ref: "b1", rootNodeId: DIG_NODES.yes }), Object.freeze({ ref: "b2", rootNodeId: DIG_NODES.no })]);
 
   async function rewriteWith(roots: readonly Readonly<{ ref: string; rootNodeId: string }>[] | null) {

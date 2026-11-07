@@ -1377,14 +1377,14 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0157_pre_start_charge.sql",
+  "source": "migrations/0158_pre_start_charge.sql",
   "grants": [
     "SELECT, INSERT ON identity.pre_start_charge"
   ]
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0157_pre_start_charge.sql",
+  "source": "migrations/0158_pre_start_charge.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
     "EXECUTE ON FUNCTION identity.read_pre_start_spent(uuid,timestamptz,timestamptz)"
@@ -1392,14 +1392,14 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_data_export_worker",
-  "source": "migrations/0157_pre_start_charge.sql",
+  "source": "migrations/0158_pre_start_charge.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.read_data_export_pre_start(uuid,uuid)"
   ]
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0158_start_paths.sql",
+  "source": "migrations/0159_start_paths.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.record_start_paths(uuid,jsonb,jsonb)",
     "EXECUTE ON FUNCTION core.read_start_paths(uuid)",
@@ -1412,7 +1412,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0159_path_results.sql",
+  "source": "migrations/0160_path_results.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.write_path_root(uuid,text,integer,uuid,text)",
     "EXECUTE ON FUNCTION core.record_path_outcome(uuid,text,text,jsonb,bytea)",
@@ -1424,7 +1424,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0160_path_progress.sql",
+  "source": "migrations/0161_path_progress.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.record_path_step(uuid,text,text)",
     "EXECUTE ON FUNCTION core.record_path_point_mark(uuid,text,uuid,text,text)",
@@ -1434,16 +1434,16 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_billing_runtime",
-  "source": "migrations/0160_path_progress.sql",
+  "source": "migrations/0161_path_progress.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.count_public_reports(uuid,uuid)"
   ]
 },
-// The V4 start step's saved questions (0161, plan 2026-11-03 Task 39d): the five functions for the API's own role (never the shared
+// The V4 start step's saved questions (0162, plan 2026-11-03 Task 39d): the five functions for the API's own role (never the shared
 // runtime role), the export reader for the export worker alone, as 0131. No table grant.
 {
   "roleName": "debateai_billing_runtime",
-  "source": "migrations/0161_saved_questions.sql",
+  "source": "migrations/0162_saved_questions.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.create_saved_question(uuid,uuid,jsonb,jsonb)",
     "EXECUTE ON FUNCTION identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
@@ -1454,19 +1454,19 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_data_export_worker",
-  "source": "migrations/0161_saved_questions.sql",
+  "source": "migrations/0162_saved_questions.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"]
 },
-// V4 start step, Task 57c (0164): a failed question gives back its path-list charge. The try's table for the writer's owner (as 0157's
-// charge table), the writer with the try, the link at Start and the failed debate's quota read for the shared runtime role, as 0157's.
+// V4 start step, Task 57c (0165): a failed question gives back its path-list charge. The try's table for the writer's owner (as 0158's
+// charge table), the writer with the try, the link at Start and the failed debate's quota read for the shared runtime role, as 0158's.
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0164_pre_start_release.sql",
+  "source": "migrations/0165_pre_start_release.sql",
   "grants": ["SELECT, INSERT, UPDATE (run_id, linked_at) ON identity.pre_start_try"]
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0164_pre_start_release.sql",
+  "source": "migrations/0165_pre_start_release.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
     "EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid)",
@@ -1478,19 +1478,19 @@ describe("P3-01 production database-principal manifest", () => {
 // Task 57e: whether a failed debate keeps what its charges before Start bought, for the readers' owner (they call it as their definer).
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0164_pre_start_release.sql",
+  "source": "migrations/0165_pre_start_release.sql",
   "grants": ["EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"]
 },
 // Task 57f: a failed debate continues where it stopped. The waiver, call by call, for the readers' owner (its readers read it); the facts and
 // the re-open for the API's role alone; the waiver's writer (the runner) and its reader (the subscription reader) for the shared runtime role.
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0164_pre_start_release.sql",
+  "source": "migrations/0165_pre_start_release.sql",
   "grants": ["SELECT ON ledger.model_spend_call_waiver"]
 },
 {
   "roleName": "debateai_billing_runtime",
-  "source": "migrations/0164_pre_start_release.sql",
+  "source": "migrations/0165_pre_start_release.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.read_run_continue(uuid,uuid)",
     "EXECUTE ON FUNCTION core.continue_failed_run(uuid,uuid,text,bigint)"
@@ -1498,7 +1498,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0164_pre_start_release.sql",
+  "source": "migrations/0165_pre_start_release.sql",
   "grants": [
     "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
     "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"

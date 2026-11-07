@@ -87,12 +87,12 @@ export type RunPauseRead = Readonly<{
   planned_calls: number | null; planned_searches: number | null; planned_micros: number | null; paused_at: string | null;
 }>;
 export type DigLevelRead = Readonly<{ run_id: string; parent_run_id: string | null; dig_level: number }>;
-/** V4 start step, Task 57f (0164): a debate as Continue sees it (core.read_run_continue). */
+/** V4 start step, Task 57f (0165): a debate as Continue sees it (core.read_run_continue). */
 export type RunContinueRead = Readonly<{
   state: "NONE" | "OPEN" | "DONE" | "FAILED"; terminal_reason: string | null; content_live: boolean; waived: boolean; settled: boolean;
   paused: boolean; reopened: boolean;
 }>;
-/** Task 57f (0164): what core.continue_failed_run did. */
+/** Task 57f (0165): what core.continue_failed_run did. */
 export type RunReopenRead = "RECORDED" | "CONTINUING" | "NOT_FAILED" | "NOT_CONTINUABLE" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED";
 
 export class PostgresDigModelRepository {
@@ -133,7 +133,7 @@ export class PostgresDigModelRepository {
   }
 
   /**
-   * V4 start step, Task 57f (0164's core.read_run_continue): the person's own debate as Continue and its FAILED read see it, codes and flags
+   * V4 start step, Task 57f (0165's core.read_run_continue): the person's own debate as Continue and its FAILED read see it, codes and flags
    * only (its newest work item's state and terminal reason, live, set aside, settled, paused, re-opened); null when it is not this account's.
    */
   async readRunContinue(ownerRef: string, runId: string): Promise<RunContinueRead | null> {
@@ -142,7 +142,7 @@ export class PostgresDigModelRepository {
   }
 
   /**
-   * Task 57f (0164's core.continue_failed_run): the person's Continue on their own FAILED debate: its work item goes back to be claimed and
+   * Task 57f (0165's core.continue_failed_run): the person's Continue on their own FAILED debate: its work item goes back to be claimed and
    * the re-open is recorded; a debate of an older release moves to `toReleaseKey` (a version this release has passed) in the same transaction.
    * Whether its stop was ours is the API's rule, asked before this. The room code has already found room.
    */

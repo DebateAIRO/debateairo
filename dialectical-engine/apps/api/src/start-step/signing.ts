@@ -117,7 +117,7 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const isText = (value: unknown): value is string => typeof value === "string";
 const isWhole = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
-/** A try's shape: 64 lower-case hex characters (0164's). */
+/** A try's shape: 64 lower-case hex characters (0165's). */
 const isTry = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
 /** The payload of a well-formed reference this key signed, of whatever kind, or null; never throws. */
@@ -235,12 +235,12 @@ export function startRefVersionOf(key: StartStepKey, ref: string): number | null
 
 /*
  * V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up: a failed question gives back its path-list charge): THE TRY a
- * call before Start is charged to, so Start can give the try's charges to its debate and 0164 gives them back if it fails. Task 57d (the
+ * call before Start is charged to, so Start can give the try's charges to its debate and 0165 gives them back if it fails. Task 57d (the
  * owner's 6 Nov answer, card "Privacy": "Random id"): one reading's try is a random id, minted once when the reading's planner starts (the
  * same words from the same person within the ten minutes share that planner, so they are the same reading and share its try), carried
  * inside the signed check, and read back from it by the merge, a combine on its menu, the fit and Start. Nothing made from the question's
- * words is ever a try, so 0164 stores no fingerprint of a question. A combine over a dig's picks is charged to the dig's parent instead.
- * 64 lower-case hex characters (0164's shape).
+ * words is ever a try, so 0165 stores no fingerprint of a question. A combine over a dig's picks is charged to the dig's parent instead.
+ * 64 lower-case hex characters (0165's shape).
  */
 const tryOf = (key: StartStepKey, part: string): string =>
   createHmac("sha256", key.bytes).update(`debateai:start-step-try:v1\0${part}`, "utf8").digest("hex");

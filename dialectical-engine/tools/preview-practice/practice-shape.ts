@@ -120,7 +120,7 @@ export function isPracticePathShapeSizes(sizes: PracticeShapeSizes | PracticePat
 }
 
 /**
- * V4 start step, Task 91e: a path debate's stored set (0158's clear columns, codes only): where its paths came from and each path's
+ * V4 start step, Task 91e: a path debate's stored set (0159's clear columns, codes only): where its paths came from and each path's
  * author, in path order.
  */
 export type PracticePathSet = Readonly<{ source: string; authors: readonly string[] }>;
@@ -314,7 +314,7 @@ function pathSizesOf(shape: DebateShapeV2Input): PracticePathShapeSizes {
 }
 
 /**
- * V4 start step, Task 91e: a path debate's stored set, its clear codes only (0158: the set's source, each path's author in path order;
+ * V4 start step, Task 91e: a path debate's stored set, its clear codes only (0159: the set's source, each path's author in path order;
  * a set always holds at least one path). Null: the run stored none.
  */
 async function readPracticePathSet(pool: Pick<Pool, "query">, runId: string): Promise<PracticePathSet | null> {

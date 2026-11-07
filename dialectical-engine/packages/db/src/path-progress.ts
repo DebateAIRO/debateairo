@@ -2,12 +2,12 @@ import type { Pool } from "pg";
 import type { PathId, TrustWord } from "@debateai/contract";
 
 /**
- * Each path's step and each point's marks while a path debate runs (migration 0160; V4 start step, spec 2026-11-03 §2 item 7; items
- * wait-d1, chat-first-round, journey-f1), through 0160's definers only, on the runner's pool (debateai_runtime). Only the runner knows when
+ * Each path's step and each point's marks while a path debate runs (migration 0161; V4 start step, spec 2026-11-03 §2 item 7; items
+ * wait-d1, chat-first-round, journey-f1), through 0161's definers only, on the runner's pool (debateai_runtime). Only the runner knows when
  * a path's work moves on, so it writes each step a path reaches and each mark a point gets, once each; the run read shows them. Ids and
  * codes only: nothing is sealed, so no lease. An erased debate answers RUN_ERASED to every write and reads as nothing.
  *
- * Two small reads go with it: how far a debate's carry-on has gone (0158's marks; item wait-f16), and, on the API's billing pool
+ * Two small reads go with it: how far a debate's carry-on has gone (0159's marks; item wait-f16), and, on the API's billing pool
  * (debateai_billing_runtime), how many reports of a public debate did not fail, the owner's own and everyone's (0147's reports; item
  * public-f25, owner answer Q20: B, only a debate's very first report uses the kept reserve).
  */
@@ -101,7 +101,7 @@ export class PostgresPathProgressRepository implements PathProgressStore {
   }
 }
 
-/** On the API's billing pool (debateai_billing_runtime), the one role 0160 grants identity.count_public_reports. */
+/** On the API's billing pool (debateai_billing_runtime), the one role 0161 grants identity.count_public_reports. */
 export class PostgresOwnClosingsReader implements OwnClosingsStore {
   constructor(private readonly pool: Pool) {}
 

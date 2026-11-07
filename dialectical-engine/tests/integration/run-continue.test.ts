@@ -1,7 +1,7 @@
 // V4 start step, Task 57f (the owner's 7 Nov answers, his words: "we need to have a way to continue where it 'broke', and not charge the
 // customer again ... Only if we can't re-use, then we need to pay for this ourselves"; cards "Only what never ran" and "Button on the stopped
 // page") — A FAILED DEBATE CONTINUES WHERE IT STOPPED, AND THE PERSON PAYS ONLY FOR WHAT NEVER RAN. On real PostgreSQL:
-//  1. 0164's re-open: the person's own FAILED debate's work item goes back to be claimed, once per failure (a second press while it runs writes
+//  1. 0165's re-open: the person's own FAILED debate's work item goes back to be claimed, once per failure (a second press while it runs writes
 //     nothing), recorded insert-only; another account's debate is not theirs; what is not continuable is refused; only the API's role may.
 //  2. The pre-Start readers keep their meaning while the debate runs again and after it ends.
 //  3. The waiver, call by call: the runner's writer takes over only charges recorded on that debate, once; the person's windows, a funded
@@ -87,7 +87,7 @@ const itemRow = async (workItemId: string) => (await database.pool.query<{ state
   "SELECT state, terminal_reason, claimed_by FROM core.work_item WHERE work_item_id=$1", [workItemId])).rows[0]!;
 const reopens = async (workItemId: string) => (await database.pool.query<{ reopen_no: number; run_id: string }>(
   "SELECT reopen_no, run_id::text AS run_id FROM core.work_item_reopen WHERE work_item_id=$1 ORDER BY reopen_no", [workItemId])).rows;
-/** The API's port over 0164's read and re-open, on the API's own role's login. */
+/** The API's port over 0165's read and re-open, on the API's own role's login. */
 const storeOn = (pool: Pool): FailedRunContinuePort => {
   const repository = new PostgresDigModelRepository(pool);
   return {
@@ -102,7 +102,7 @@ function wakeLog() {
   return { dispatched, wake };
 }
 
-describe("0164 (Task 57f): Continue re-opens the person's own failed debate", () => {
+describe("0165 (Task 57f): Continue re-opens the person's own failed debate", () => {
   it("once per failure: CONTINUING, its work item back to be claimed and the re-open recorded; a second press writes nothing; the API's role only", async () => {
     const run = await ownRun();
     const item = await workItem(run, "FAILED");
@@ -177,7 +177,7 @@ describe("0164 (Task 57f): Continue re-opens the person's own failed debate", ()
   });
 });
 
-describe("0164 (Task 57f): the pre-Start readers keep their meaning while a continued debate runs and after it ends", () => {
+describe("0165 (Task 57f): the pre-Start readers keep their meaning while a continued debate runs and after it ends", () => {
   const entry = (ownerRef: string, chargeMicros: number, kind: PreStartChargeKind) => ({
     spendId: randomUUID(), ownerRef, grant: null, kind, providerRef: preStartSpendRef(kind, "deepinfra", "zai-org/GLM-5.3-Flash"),
     chargedOn: new Date().toISOString().slice(0, 10), chargeMicros, inputTokens: 700, outputTokens: 90 });
@@ -195,7 +195,7 @@ describe("0164 (Task 57f): the pre-Start readers keep their meaning while a cont
     expect(await quota()).toBe("SOME");
   });
 
-  /** The debate's set as 0158 keeps it (codes only here: written past the content check, as the database's own fixtures write one). */
+  /** The debate's set as 0159 keeps it (codes only here: written past the content check, as the database's own fixtures write one). */
   async function menuSet(runId: string): Promise<void> {
     const seed = await database.pool.connect();
     try {
@@ -222,7 +222,7 @@ describe("0164 (Task 57f): the pre-Start readers keep their meaning while a cont
   });
 });
 
-describe("0164 (Task 57f): the waiver, call by call", () => {
+describe("0165 (Task 57f): the waiver, call by call", () => {
   const spend = async (runId: string, micros: number, attemptId: string | null = randomUUID()) => {
     await database.pool.query(`INSERT INTO ledger.model_spend (spend_id,spend_source,spend_phase,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,attempt_id)
       VALUES (gen_random_uuid(),'RUN','BODY',$1,'fake-provider',(clock_timestamp() AT TIME ZONE 'UTC')::date,$2,1,1,$3)`, [runId, micros, attemptId]);

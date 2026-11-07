@@ -13,23 +13,23 @@ import {
 } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0161 (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.8, §3.14; owner answers S3 A, S4 A and S5 A of
+ * 0162 (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.8, §3.14; owner answers S3 A, S4 A and S5 A of
  * 4 Nov): the questions a person has not started yet. One identity table keyed by the account (ON DELETE CASCADE, so the account's closing
  * removes the rows), whose two parts are envelopes naming the row's own key (`saved-question:<id>:v1`), never a key, a text or a fingerprint;
  * five API functions for the API's own role and one export reader for the export worker; 0115's export owner owns all of it, as 0131 §6. The
  * question keys live outside the database (packages/crypto FileSavedQuestionKeyStore), and the account's closing destroys them in its own key
  * step (packages/db/src/account-erasure.ts). No database here: the behaviour is tests/integration/saved-questions-database.test.ts.
  */
-const NAME = "0161_saved_questions.sql";
+const NAME = "0162_saved_questions.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/saved-questions-forward0161.json";
-const PREVIOUS = "0160_path_progress.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/path-progress-forward0160.json";
+const MANIFEST_PATH = "migrations/lineage/saved-questions-forward0162.json";
+const PREVIOUS = "0161_path_progress.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/path-progress-forward0161.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
-/** The SQL without its `--` comments (no literal or body of 0161 contains `--`). */
+/** The SQL without its `--` comments (no literal or body of 0162 contains `--`). */
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const TABLE = "identity.saved_question";
 const API_FUNCTIONS = [
@@ -67,31 +67,31 @@ const constraintOf = (body: string, name: string): string => {
   return "";
 };
 
-describe("0161: the questions not started yet, each under its own key", () => {
-  it("C-T is the step right after 0160, found by name, with its own loader and no amendment", async () => {
+describe("0162: the questions not started yet, each under its own key", () => {
+  it("C-T is the step right after 0161, found by name, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0161 } from './migration-forward0161.js';");
-    expect(chain).toContain("loadForward0160,loadForward0161");
+    expect(chain).toContain("import { loadForward0162 } from './migration-forward0162.js';");
+    expect(chain).toContain("loadForward0161,loadForward0162");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
-    // Found by name, never as the chain's last step: the steps after it (0162, Task 56a) need no edit here.
+    // Found by name, never as the chain's last step: the steps after it (0163, Task 56a) need no edit here.
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
     expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([]);
-    const loader = read("packages/db/src/migration-forward0161.ts");
+    const loader = read("packages/db/src/migration-forward0162.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
-    expect(loader).toContain('const VERSION = "saved-questions-forward0161-v1";');
-    expect(loader).toContain('const PREVIOUS = "0160_path_progress.sql";');
+    expect(loader).toContain('const VERSION = "saved-questions-forward0162-v1";');
+    expect(loader).toContain('const PREVIOUS = "0161_path_progress.sql";');
     expect(loader).toContain('const TABLES: readonly string[] = ["identity.saved_question"];');
     for (const signature of FUNCTIONS) expect(loader, signature).toContain(`"${signature}"`);
-    expect(loader).toContain("MIGRATION_FORWARD0161_");
+    expect(loader).toContain("MIGRATION_FORWARD0162_");
   });
 
-  it("C-M is bound to 0160's manifest and to the verifier in force (0130's, which 0160 keeps)", () => {
+  it("C-M is bound to 0161's manifest and to the verifier in force (0130's, which 0161 keeps)", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string; verifier: { sha256: string } };
     expect(Object.keys(manifest)).toEqual(["version", "baseRecipeSha256", "previous", "migration", "verifier", "amendsPostconditionsOf"]);
     expect(manifest).toEqual({
-      version: "saved-questions-forward0161-v1",
+      version: "saved-questions-forward0162-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -216,7 +216,7 @@ describe("0161: the questions not started yet, each under its own key", () => {
     expect(sql.split("\n")[sql.split("\n").findIndex((line) => line.startsWith("DO $saved_questions_owner$")) - 1]).toMatch(/^-- n1: reviewed \S/u);
     // The closing block checks the contract instead of assuming it.
     const contract = sql.slice(sql.indexOf("DO $saved_questions_contract$"), sql.indexOf("$saved_questions_contract$;"));
-    expect(contract).toContain("SAVED_QUESTIONS_0161_CONTRACT");
+    expect(contract).toContain("SAVED_QUESTIONS_0162_CONTRACT");
     for (const signature of FUNCTIONS) expect(contract, signature).toContain(`'${signature}'`);
     expect(sql.lastIndexOf("DO $saved_questions_contract$")).toBeGreaterThan(sql.lastIndexOf("GRANT "));
   });
@@ -298,12 +298,12 @@ describe("0161: the questions not started yet, each under its own key", () => {
 
   it("C-R is documented, listed and lives in the API, not in the database package's index", () => {
     const corpus = read("tests/support/shipped-corpus.manifest.txt").split("\n");
-    for (const path of ["packages/db/src/migration-forward0161.ts", "apps/api/src/saved-questions/store.ts"]) expect(corpus, path).toContain(path);
+    for (const path of ["packages/db/src/migration-forward0162.ts", "apps/api/src/saved-questions/store.ts"]) expect(corpus, path).toContain(path);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0161, below) the fifty-first", "## The saved questions (0161)", "`loadForward0161`", "MIGRATION_FORWARD0161_"]) {
+    for (const needle of ["(0162, below) the fifty-first", "## The saved questions (0162)", "`loadForward0162`", "MIGRATION_FORWARD0162_"]) {
       expect(readme, needle).toContain(needle);
     }
-    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0161_saved_questions.sql` (after `0160_path_progress.sql`, `n1: expand`)");
+    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0162_saved_questions.sql` (after `0161_path_progress.sql`, `n1: expand`)");
     expect(read("packages/db/src/index.ts")).not.toContain("saved-question");
     const store = read("apps/api/src/saved-questions/store.ts");
     expect(store).toContain('import type { CryptoEnvelope } from "@debateai/crypto";');
@@ -311,7 +311,7 @@ describe("0161: the questions not started yet, each under its own key", () => {
     // The store calls the five API functions, and nothing else of the database.
     expect([...store.matchAll(/identity\.([a-z_]+)\(/gu)].map((match) => match[1]).sort())
       .toEqual(["create_saved_question", "delete_saved_question", "read_saved_question", "read_saved_questions", "save_saved_question"]);
-    expect(read("tests/integration/identity-database.test.ts")).toMatch(/\/\/ 0161[^\n]*\n\s*"saved_question",/u);
+    expect(read("tests/integration/identity-database.test.ts")).toMatch(/\/\/ 0162[^\n]*\n\s*"saved_question",/u);
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/saved-questions-database.test.ts");
   });
 });

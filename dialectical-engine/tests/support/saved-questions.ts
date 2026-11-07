@@ -1,6 +1,6 @@
 /**
  * V4 start step, Task 39e (saved questions spec 2026-11-04; owner answers S3 A, S4 A): what the saved-question service, route and export
- * tests share. A made-up user key store, a store that keeps 0161's rows in memory (one account keeps at most 20, the revision moves by
+ * tests share. A made-up user key store, a store that keeps 0162's rows in memory (one account keeps at most 20, the revision moves by
  * one at every save, the newest first), and a saved step 2 whose reading is signed for real with the start step's own functions
  * (signStartCheck, signStartMenu, signStartList): the shared fixture's refs ("menu1.sig", "list3.sig") are made up and never verify.
  * Every question, path and answer here is made up.
@@ -48,7 +48,7 @@ export class MemoryUserDekStore implements ReadableUserDekStore {
 
 type KeptRow = { ownerRef: string; id: string; revision: number; title: CryptoEnvelope; content: CryptoEnvelope; createdAt: Date; updatedAt: Date };
 
-/** 0161's five functions over memory: the store port the service uses (apps/api/src/saved-questions/store.ts). */
+/** 0162's five functions over memory: the store port the service uses (apps/api/src/saved-questions/store.ts). */
 export class FakeSavedQuestionStore implements SavedQuestionStore {
   readonly rows = new Map<string, KeptRow>();
   /** Every call, in order, by name (`create`, `save`, `list`, `read`, `remove`). */
@@ -111,7 +111,7 @@ export class FakeSavedQuestionStore implements SavedQuestionStore {
     return [...this.rows.values()].filter((row) => row.ownerRef === ownerRef);
   }
 
-  /** The rows as 0161's export reader answers them (identity.read_data_export_saved_questions), oldest first. */
+  /** The rows as 0162's export reader answers them (identity.read_data_export_saved_questions), oldest first. */
   exportRows(ownerRef: string): Record<string, unknown>[] {
     return this.ownedBy(ownerRef).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((row) => ({
       saved_question_id: row.id, revision: row.revision, title_ciphertext: row.title, content_ciphertext: row.content,

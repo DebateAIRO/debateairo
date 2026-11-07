@@ -1640,7 +1640,7 @@ describe("engine 2's story (R1d)", () => {
  * spends real money. Step 4's first command (`--register-next --shape-policy <its file> --question ro --start-step free:3 --digs 1`),
  * with the engine and length rows this test's export lacks (the release's export carries both): the step before Start through the
  * step the ask composition built over the real gate ports (the lists, the merge, one combine, each charged to the practice person as
- * 0157 records it), Start with the menu's top 3 paths and the hand-over on the throwaway database, a v2 run on the real runner (its
+ * 0158 records it), Start with the menu's top 3 paths and the hand-over on the throwaway database, a v2 run on the real runner (its
  * paths stored and served with their answers so far), then one dig admitted with its DIG_PICKS hand-over, joined to the
  * investigation, its picks kept, settled, and the month's lines in --out. Every call is a stand-in's: nothing is paid.
  */
@@ -1696,7 +1696,7 @@ describe("preview practice: debate mode, the start step on the stand-ins (V4 Tas
       .exec(logged.find((line) => line.startsWith("start step: ")) ?? "")?.[1]);
     expect(listsByCut).toBeGreaterThanOrEqual(2);
     expect(logged).toContain("start: 3 path(s) of the menu's top 3, chosen by the AIs");
-    // What the stand-ins answered before Start: Next's language decision (no 0157 charge), then the step's own calls: the planner, the
+    // What the stand-ins answered before Start: Next's language decision (no 0158 charge), then the step's own calls: the planner, the
     // lists, the merge and the combine.
     const preStart = stubs.requests.slice(0, at.preStart).filter((request) => request.kind !== "PROBE");
     expect({ language: countOf(preStart, "QUESTION_LANGUAGE"), planner: countOf(preStart, "MAP"), lists: countOf(preStart, "START_LIST"),
@@ -1751,7 +1751,7 @@ describe("preview practice: debate mode, the start step on the stand-ins (V4 Tas
     expect(month[0]).toEqual({ kind: "START_MONTH_RUN", plan: "free", paths: 3, digs: 1, questionId: "ro" });
     expect(month.slice(1).map((line) => [line.kind, line.phase, line.runId])).toEqual([["START_MONTH", "PRE_START", null],
       ["START_MONTH", "DEBATE", report.run.runId], ["START_MONTH", "END_OF_DEBATE", report.run.runId], ["START_MONTH", "DIG", digRunId]]);
-    // The PRE_START line: the step's own calls, one 0157 row each (the planner, the lists, the merge and the combine), at a cost.
+    // The PRE_START line: the step's own calls, one 0158 row each (the planner, the lists, the merge and the combine), at a cost.
     expect(month[1]!.calls).toBe(listsByCut + 3);
     expect(BigInt(month[1]!.costNanoUsd!)).toBeGreaterThan(0n);
     for (const line of month.slice(2)) expect(line.calls).toBeGreaterThan(0);

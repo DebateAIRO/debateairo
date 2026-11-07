@@ -11,17 +11,17 @@ import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationReplaySafety, definedRelationNames } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0160 (V4 start step, plan 2026-11-03 Task 53a; spec §2 item 7, §4.6; items wait-d1, chat-first-round, journey-f1, wait-f16, public-f25):
+ * 0161 (V4 start step, plan 2026-11-03 Task 53a; spec §2 item 7, §4.6; items wait-d1, chat-first-round, journey-f1, wait-f16, public-f25):
  * each path's step and each point's marks, written by the runner as the work moves on, ids and codes only (nothing sealed, no carrier), and
- * two small reads: how far a debate's carry-on has gone (0158's marks) and how many reports a public debate has that did not fail, the
- * owner's own and everyone's (0147's reports; owner answer Q20: B). Tables and guards on 0117's model, access on 0159's: definers only, no
+ * two small reads: how far a debate's carry-on has gone (0159's marks) and how many reports a public debate has that did not fail, the
+ * owner's own and everyone's (0147's reports; owner answer Q20: B). Tables and guards on 0117's model, access on 0160's: definers only, no
  * role reads a table. Expand: new objects only.
  */
-const NAME = "0160_path_progress.sql";
+const NAME = "0161_path_progress.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/path-progress-forward0160.json";
-const PREVIOUS = "0159_path_results.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/path-results-forward0159.json";
+const MANIFEST_PATH = "migrations/lineage/path-progress-forward0161.json";
+const PREVIOUS = "0160_path_results.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/path-results-forward0160.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
@@ -50,27 +50,27 @@ const listIn = (body: string, column: string): readonly string[] => {
 const definedFunctions = (sql: string): readonly string[] =>
   [...code(sql).matchAll(/^CREATE OR REPLACE FUNCTION ([a-z_0-9.]+)\(/gmu)].map((match) => match[1]!);
 
-describe("0160: each path's step and points, the carry-on mark and the public report counts", () => {
-  it("C-T is a step of the chain, after 0159, with its own loader and no amendment", async () => {
+describe("0161: each path's step and points, the carry-on mark and the public report counts", () => {
+  it("C-T is a step of the chain, after 0160, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0160 } from './migration-forward0160.js';");
-    expect(chain).toContain("loadForward0159,loadForward0160,");
+    expect(chain).toContain("import { loadForward0161 } from './migration-forward0161.js';");
+    expect(chain).toContain("loadForward0160,loadForward0161,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);
     expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual([]);
-    const loader = read("packages/db/src/migration-forward0160.ts");
+    const loader = read("packages/db/src/migration-forward0161.ts");
     for (const name of [...TABLES, ...DEFINERS]) expect(loader, name).toContain(`"${name}"`);
-    expect(loader).toContain('const VERSION = "path-progress-forward0160-v1";');
-    expect(loader).toContain('const PREVIOUS = "0159_path_results.sql";');
-    expect(loader).toContain("MIGRATION_FORWARD0160_");
+    expect(loader).toContain('const VERSION = "path-progress-forward0161-v1";');
+    expect(loader).toContain('const PREVIOUS = "0160_path_results.sql";');
+    expect(loader).toContain("MIGRATION_FORWARD0161_");
   });
 
-  it("C-M is bound to 0159's manifest and to the verifier in force", () => {
+  it("C-M is bound to 0160's manifest and to the verifier in force", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string };
     expect(manifest).toEqual({
-      version: "path-progress-forward0160-v1",
+      version: "path-progress-forward0161-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -79,14 +79,14 @@ describe("0160: each path's step and points, the carry-on mark and the public re
     });
   });
 
-  it("C-H says truthfully that it is expand and keeps the verifier: it creates exactly its five definers and redefines nothing of 0147 or 0158", () => {
+  it("C-H says truthfully that it is expand and keeps the verifier: it creates exactly its five definers and redefines nothing of 0147 or 0159", () => {
     const sql = read(SQL_PATH);
     expect(parseN1Header(NAME, sql)).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
     expect(sql).toMatch(/^-- n1: expand$/mu);
     expect(sql).toMatch(/^-- n1: keeps-verifier$/mu);
     // No guard function of its own: nothing here is sealed, so the truncate guard, 0000's reject_mutation and 0040's erasure barrier are called.
     expect(definedFunctions(sql)).toEqual(DEFINERS.map(nameOf));
-    for (const earlier of ["0147_public_tree.sql", "0158_start_paths.sql"]) {
+    for (const earlier of ["0147_public_tree.sql", "0159_start_paths.sql"]) {
       const theirs = definedFunctions(read(`migrations/${earlier}`));
       expect(theirs.length, earlier).toBeGreaterThan(0);
       for (const name of definedFunctions(sql)) expect(theirs, `${earlier} ${name}`).not.toContain(name);
@@ -208,12 +208,12 @@ describe("0160: each path's step and points, the carry-on mark and the public re
 
   it("C-R is documented and listed", () => {
     const corpus = read("tests/support/shipped-corpus.manifest.txt").split("\n");
-    for (const path of ["packages/db/src/migration-forward0160.ts", "packages/db/src/path-progress.ts"]) expect(corpus, path).toContain(path);
+    for (const path of ["packages/db/src/migration-forward0161.ts", "packages/db/src/path-progress.ts"]) expect(corpus, path).toContain(path);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0160, below) the fiftieth", "## The path progress per run (0160)", "`loadForward0160`", "MIGRATION_FORWARD0160_"]) {
+    for (const needle of ["(0161, below) the fiftieth", "## The path progress per run (0161)", "`loadForward0161`", "MIGRATION_FORWARD0161_"]) {
       expect(readme, needle).toContain(needle);
     }
-    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0160_path_progress.sql` (after `0159_path_results.sql`, `n1: expand`)");
+    expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0161_path_progress.sql` (after `0160_path_results.sql`, `n1: expand`)");
     // The repository reads the contract's types only.
     const repository = read("packages/db/src/path-progress.ts");
     expect(repository).toMatch(/^import type \{[^}]+\} from "@debateai\/contract";$/mu);

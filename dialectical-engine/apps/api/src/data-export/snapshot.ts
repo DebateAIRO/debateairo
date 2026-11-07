@@ -22,11 +22,11 @@ export const RAW_SECTIONS = [
   "web_evidence", "investigations", "reserve_events",
   // When step 2's small AI read the person's question (0144, identity.read_data_export_ask_clarify): the time only (README C5).
   "ask_clarify_calls",
-  // When the small AIs before Start ran for the person (0157, identity.read_data_export_pre_start): the time and the kind only.
+  // When the small AIs before Start ran for the person (0158, identity.read_data_export_pre_start): the time and the kind only.
   "pre_start_calls",
   // The reports the person made with the Report button (0152, identity.read_data_export_public_flags). Not what the AI answered.
   "public_flags",
-  // V4 start step, Task 39e: the questions not started yet (0161, identity.read_data_export_saved_questions), each opened with its own key.
+  // V4 start step, Task 39e: the questions not started yet (0162, identity.read_data_export_saved_questions), each opened with its own key.
   "saved_questions",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
@@ -152,7 +152,7 @@ export const KEEP_COLUMNS = {
     closings: ["report_version", "closed_at", "reopened_at", "report_ref", "report_written_at"],
   },
   reserve_events: ["event_no", "kind", "amount_micros", "investigation_id", "report_version", "blocked_window", "blocked_until", "recorded_at"],
-  // V4 start step, Task 39e: 0161's reader, per question. Its title and revision are not exported; the content is opened, then read.
+  // V4 start step, Task 39e: 0162's reader, per question. Its title and revision are not exported; the content is opened, then read.
   saved_questions: ["saved_question_id", "content_ciphertext", "created_at", "updated_at"],
 } as const;
 

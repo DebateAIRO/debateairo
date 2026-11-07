@@ -8,7 +8,7 @@ import { previewModelRow, type ProviderCostEnvelopeSeam, type ProviderDiscoveryT
 
 /**
  * V4 start step, Task 27 (spec 2026-11-03 §4.1 "Allowance"): THE PER-PERSON CHARGE of every call before Start. No run
- * exists yet, so each call has its own record (0157): one row naming the person, the kind of call, the cost and the
+ * exists yet, so each call has its own record (0158): one row naming the person, the kind of call, the cost and the
  * time, beside a run-less ledger row that keeps it in the site's day; the windows, a team member's grant and the team's
  * one limit read it, as they read step 2's clarifying call (ask-clarify.ts, 0144), whose rules this follows.
  *
@@ -26,7 +26,7 @@ export type StartCharges = Readonly<{
   recordDown(): boolean;
   /**
    * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call is made for (Task 57d: the
-   * reading's random id its check carries, signing.ts), rides the record, so Start can give the try's charges to its debate and 0164 gives
+   * reading's random id its check carries, signing.ts), rides the record, so Start can give the try's charges to its debate and 0165 gives
    * them back if it fails.
    */
   seamFor(input: Readonly<{ ownerRef: string; funding: FundingBasis | null; kind: PreStartChargeKind; target: ProviderDiscoveryTarget;
@@ -45,7 +45,7 @@ function realUsage(usage: unknown, projection: Readonly<{ requestBytes: number; 
 }
 
 export function createStartCharges(deps: Readonly<{
-  /** The one writer (0157): identity.record_pre_start_charge. */
+  /** The one writer (0158): identity.record_pre_start_charge. */
   record(entry: PreStartChargeEntry): Promise<void>;
   /** The target's price (main: previewTargetChargePrice over providerTargetPrice), or null: none. */
   priceOf(providerRef: string): ProviderTargetPrice | null;

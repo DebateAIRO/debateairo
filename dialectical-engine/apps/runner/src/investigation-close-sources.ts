@@ -44,8 +44,8 @@ import { addedPagesOf } from "./web-researched-read.js";
  *  - the debate's place, time and purpose lines (0138, decision 5; an old debate has none);
  *  - the earlier report's answer (0136, opened under the root's key), from version 2 on (F8 A).
  *
- * V4 start step, Task 55b: on a path debate (its chosen paths stored, 0158) the first debate's paths are the paths the person chose,
- * each by its path id, read from 0159 (`v2FirstPathsOf`): its points under its root in force, its text its answer so far unless a later
+ * V4 start step, Task 55b: on a path debate (its chosen paths stored, 0159) the first debate's paths are the paths the person chose,
+ * each by its path id, read from 0160 (`v2FirstPathsOf`): its points under its root in force, its text its answer so far unless a later
  * climb or rewrite wrote a newer one, a FAILED path named as not finished, the person's own words beside the verdict on them, and what
  * each version keeps (path id, trust word, own words). A path debate's path b<n> was first written as its answer so far, so that is the
  * text a dig's rewrite of it was written on. A path left out before Start and dug under the main question ("+ N more", spec §4.4) is a
@@ -164,7 +164,7 @@ export async function trustWordsOf(pool: Pool, runId: string, free: boolean, poi
 /**
  * W4-4: the investigation's added pages (the first debate's named by their path; a dig's by none), debate by debate, each opened under its own key.
  * V4 start step, Task 55b: a path debate's pages are kept by path id, which is its path's name in the dossier too: labelled through its roots
- * in force (0159), so a path whose root dropped names none.
+ * in force (0160), so a path whose root dropped names none.
  */
 async function addedPagesOfInvestigation(pool: Pool, root: string, digs: readonly string[], pathDebate: boolean): Promise<readonly DossierAddedPage[]> {
   const pages: DossierAddedPage[] = [];
@@ -257,7 +257,7 @@ async function pointsUnderRoot(pool: Pool, runId: string, rootNodeId: string): P
 
 /**
  * V4 start step, Task 55b (Task 50's dossier path rule): a path debate's first-level paths, the paths the person chose in their order,
- * each by its path id. Its points are those under its root in force (0159; none when its root dropped). Its text is the newest climb's or
+ * each by its path id. Its points are those under its root in force (0160; none when its root dropped). Its text is the newest climb's or
  * rewrite's when one came (`newest`), else its answer so far (the outcome's line, summary and fate); a FAILED path, or one with no answer
  * so far, is named as not finished: its question, SET_ASIDE. The person's own words go to `views` beside the outcome's verdict on them,
  * and what each version keeps (`stored`) is beside them, never read by the material. Sources are left to the caller (none here).

@@ -21,7 +21,7 @@ import { mapAnswersArgued, mapMergeAlsoRaised, mapNamesInternalWord } from "@deb
  * read or content lease when there is no map.
  *
  * V4 start step, Task 59 (spec 2026-11-03 §4.5 "The classic view"): a debate with chosen
- * paths (0158's `core.start_path_set`) has no classic map view; its page reads the paths from
+ * paths (0159's `core.start_path_set`) has no classic map view; its page reads the paths from
  * `Answer.branches`. After the owner query, and only for the caller's own run, one code-only
  * question (`core.read_start_path_ids`, no lease, no decryption) says whether the run has paths;
  * if it has, the map choice is never read.
@@ -65,7 +65,7 @@ export type RunOwnerQuery = (
 
 const RUN_OWNED_SQL = "SELECT core.run_is_owned_by($1,$2,$3) AS owned";
 /**
- * V4 start step, Task 59: `core.read_start_path_ids(uuid)` (migration 0158, EXECUTE granted to debateai_runtime) names a
+ * V4 start step, Task 59: `core.read_start_path_ids(uuid)` (migration 0159, EXECUTE granted to debateai_runtime) names a
  * run's path ids, or NULL when the run has no set; it checks codes only, so an erased path run is still a path run.
  */
 const PATH_RUN_SQL = "SELECT core.read_start_path_ids($1) IS NOT NULL AS path_run";

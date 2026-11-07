@@ -39,7 +39,7 @@ const seen = vi.hoisted(() => ({
   receipt: null as unknown,
   /** The asks handed to the stand-in application, with their hand-overs (the fourth argument). */
   submits: [] as { request: Record<string, unknown>; handOver: unknown }[],
-  /** Made-up charges of the calls before Start (micro-dollars), one per call, as 0157's writer records them. */
+  /** Made-up charges of the calls before Start (micro-dollars), one per call, as 0158's writer records them. */
   preStart: [] as string[],
   /** Made-up ledger rows of every run (the stand-in runner writes them when it runs a work item). */
   ledger: [] as LedgerRow[],
@@ -193,7 +193,7 @@ const usage = (input: number, output: number) => ({ usage: { prompt_tokens: inpu
 
 /**
  * The step before Start on fake gates: every reference signed with the composition's key as the real step signs it, the
- * menu the shared fixture's, and each call charged to the person (a made-up 0157 row) as it ends.
+ * menu the shared fixture's, and each call charged to the person (a made-up 0158 row) as it ends.
  */
 function fakeStep(key: ReturnType<typeof newStartStepKey>, menu: StartMenu): StartStepPort {
   const charge = (micros: number) => { seen.preStart.push(String(micros)); };
@@ -447,7 +447,7 @@ describe("Task 91b: a dry run on fake gates (Free, 3 paths, 1 dig)", () => {
     expect(seen.digJoins).toHaveLength(1);
     expect(seen.digPicks).toHaveLength(1);
 
-    // The month: the lines in --out add up to the ledger rows (the 0157 rows before Start, each run's model calls).
+    // The month: the lines in --out add up to the ledger rows (the 0158 rows before Start, each run's model calls).
     const fileLines = readFileSync(join(out, PRACTICE_START_MONTH_FILE), "utf8").trim().split("\n").map((line) => JSON.parse(line) as Record<string, unknown>);
     expect(fileLines[0]).toEqual({ kind: "START_MONTH_RUN", plan: "free", paths: 3, digs: 1, questionId: "en" });
     const lines = fileLines.slice(1) as unknown as PracticeStartMonthLine[];

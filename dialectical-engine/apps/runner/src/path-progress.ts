@@ -4,7 +4,7 @@ import { TypedDomainError } from "@debateai/kernel";
 
 /**
  * V4 start step, Task 53 (spec 2026-11-03 §2 item 7; items wait-d1, chat-first-round, journey-f1) — A PATH DEBATE'S PROGRESS MARKS, as
- * the runner writes them (migration 0160's store, Task 53a): each step a path reaches (FINDING_SOURCES, ARGUING, CHECKING) and each
+ * the runner writes them (migration 0161's store, Task 53a): each step a path reaches (FINDING_SOURCES, ARGUING, CHECKING) and each
  * mark a point gets under its path's root (PUT_FORWARD, CHECKING, CHECKED, then FOUND with its trust word, Task 54). Only the runner
  * knows when a path's work moves on; the run read shows what was written.
  *

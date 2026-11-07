@@ -1,6 +1,6 @@
 /**
  * V4 start step, Task 57 (spec 2026-11-03 §2 items 7 and 8, §4.3; items journey-f1, wait-d1, wait-f16): the paths of a path debate as the
- * answer and the run read serve them, read by one pure function from the stored paths (0158), their roots, outcomes and gap round (0159).
+ * answer and the run read serve them, read by one pure function from the stored paths (0159), their roots, outcomes and gap round (0160).
  * A path with an outcome is argued (or failed, with a FAILED outcome); while the debate runs a path without one is still being looked
  * into, so a path fills in the moment its own outcome is stored. "+ N more" is the menu's paths none of whose viewpoints was chosen; "also
  * raised" is the gap round's points no path took; the main trust word comes from the paths' words. A debate without chosen paths has no
@@ -154,7 +154,7 @@ describe("reading a debate's paths", () => {
     expect((await readAnswerBranches(ports, RUN_ID, "RUN"))?.paths[0]).toMatchObject({ path_id: "b1", state: "ARGUED", root_node_id: null });
   });
 
-  it("on Postgres, asks 0158's id reader first and opens nothing when the debate keeps no paths", async () => {
+  it("on Postgres, asks 0159's id reader first and opens nothing when the debate keeps no paths", async () => {
     const sql: string[] = [];
     const pool = { query: async (text: string) => { sql.push(text); return { rows: [{ ids: null }] }; } } as unknown as Pool;
     expect(await readAnswerBranches(postgresBranchReadPorts(pool), RUN_ID, "ANSWER")).toBeNull();

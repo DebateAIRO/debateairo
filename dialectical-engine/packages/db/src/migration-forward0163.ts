@@ -4,23 +4,42 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from "./migration-forward-chain.js";
 
 /**
- * 0163, a dig under the main question of a path debate updates the main answer (V4 start step; plan 2026-11-03 Task 55e; spec 2026-11-03
- * §4.4; drained): 0138's CHECK on identity.main_answer_update.trigger_kind widened by PATH_ADDED. No table, function or grant is added.
- * 0138's postcondition digests the CHECK, so the step declares that amendment, and keeps 0130's verifier.
+ * 0163, carry-on digs without a live sign-in (V4 start step; plan 2026-11-03 Task 56a; decision record answer 11, owner ruling 3 Nov night;
+ * drained): the carry-on markers on the key provision intent and the run binding (one binding per debate and path), the carry-on dig's key
+ * provision and its commit lock, and 0123's core.create_encrypted_run redefined with one more branch. It pins the columns, CHECKs and index
+ * it adds and the three functions it creates or redefines, declares the redefinition as an amendment of 0123's postcondition, and keeps
+ * 0130's verifier.
  */
-const NAME = "0163_main_answer_path_added.sql";
-const VERSION = "main-answer-path-added-forward0163-v1";
-const MANIFEST_PATH = "lineage/main-answer-path-added-forward0163.json";
+const NAME = "0163_carry_on_session_free_digs.sql";
+const VERSION = "carry-on-forward0163-v1";
+const MANIFEST_PATH = "lineage/carry-on-forward0163.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0162_carry_on_session_free_digs.sql";
-const TABLE = "identity.main_answer_update";
-const CONSTRAINT = "main_answer_update_trigger_check";
-/** 0138's digest pins the CHECK this step widens, so it declares that (as 0162 declares its own). The manifest carries the same list. */
+const PREVIOUS = "0162_saved_questions.sql";
+/** The columns 0163 adds, as table.column. */
+const COLUMNS = [
+  "core.run_key_provision_intent.carry_on_parent_run_id",
+  "identity.run_execution_binding.carry_on_parent_run_id",
+  "identity.run_execution_binding.carry_on_path_id"
+] as const;
+/** The CHECKs 0163 adds, as table.constraint. */
+const CONSTRAINTS = [
+  "core.run_key_provision_intent.run_key_provision_intent_one_marker",
+  "identity.run_execution_binding.run_execution_binding_carry_on_pair",
+  "identity.run_execution_binding.run_execution_binding_one_marker"
+] as const;
+/** The UNIQUE index 0163 adds: one carry-on dig per debate and path. */
+const INDEXES = ["identity.run_execution_binding_one_carry_on_dig_idx"] as const;
+/** The prepare and the commit lock it adds, and 0123's create_encrypted_run it redefines (whole: owner, definer, path, volatility, body, ACL). */
+const FUNCTIONS = [
+  "core.prepare_carry_on_run_key_provision(uuid,uuid,text)",
+  "core.lock_carry_on_run_key_provision_for_commit(uuid,uuid,uuid,uuid)",
+  "core.create_encrypted_run(jsonb,uuid,uuid,jsonb)"
+] as const;
+/** 0123's digest pins the function this step redefines, so it declares that (0144's route). The manifest carries the same list. */
 const AMENDS: readonly PostconditionAmendment[] = Object.freeze([Object.freeze({
-  step: "0138_tree_updates.sql",
-  relations: Object.freeze([TABLE]),
-  constraints: Object.freeze([CONSTRAINT]),
-  field: "constraint_definition" as const
+  step: "0123_side_by_side_releases.sql",
+  functions: Object.freeze(["core.create_encrypted_run(jsonb,uuid,uuid,jsonb)"]),
+  field: "function_definition" as const
 })]);
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0163_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
@@ -28,18 +47,40 @@ const exactKeys = (value: unknown, keys: readonly string[]): value is Record<str
   typeof value === "object" && value !== null && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+/** 'schema.table.name' → ['schema.table', 'name']. */
+const split = (qualified: string): readonly [string, string] =>
+  [qualified.slice(0, qualified.lastIndexOf(".")), qualified.slice(qualified.lastIndexOf(".") + 1)];
 
 /**
- * The CHECK's name, table, kind and whether it is validated. Its kinds are pinned by tests (main-answer-path-added-0163-contract and the
- * v2 report suite), not digested, as 0154 leaves its own list, so a later step may widen it again without a postcondition drift on 0163
- * (it still declares the amendment of 0138's, whose digest holds the definition).
+ * The 3 columns (type, NOT NULL, default), the 3 CHECKs (validated, definition), the index (definition, unique, valid) and the 3 functions
+ * (owner, definer, path, volatility, definition digest, ACL). Only what 0163 adds or redefines: the two tables' other columns, constraints
+ * and indexes belong to 0040 and 0123.
  */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
-  const rows = (await client.query(`
-    SELECT k.conname,k.contype,k.convalidated validated,c.oid::regclass::text relation FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid
-    WHERE k.conrelid=to_regclass($1) AND k.conname=$2`, [TABLE, CONSTRAINT])).rows;
-  if (rows.length !== 1) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify(rows));
+  const columns = (await client.query(`
+    SELECT qualified,format_type(a.atttypid,a.atttypmod) type,a.attnotnull not_null,pg_get_expr(d.adbin,d.adrelid) default_value
+    FROM unnest($1::text[],$2::text[],$3::text[]) AS wanted(qualified,relation,name)
+    JOIN pg_attribute a ON a.attrelid=to_regclass(wanted.relation) AND a.attname=wanted.name AND a.attnum>0 AND NOT a.attisdropped
+    LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum ORDER BY qualified`,
+  [COLUMNS, COLUMNS.map((name) => split(name)[0]), COLUMNS.map((name) => split(name)[1])])).rows;
+  if (columns.length !== COLUMNS.length) return fail("POSTCONDITION_OBJECTS");
+  const constraints = (await client.query(`
+    SELECT qualified,k.convalidated validated,pg_get_constraintdef(k.oid) definition
+    FROM unnest($1::text[],$2::text[],$3::text[]) AS wanted(qualified,relation,name)
+    JOIN pg_constraint k ON k.conrelid=to_regclass(wanted.relation) AND k.conname=wanted.name ORDER BY qualified`,
+  [CONSTRAINTS, CONSTRAINTS.map((name) => split(name)[0]), CONSTRAINTS.map((name) => split(name)[1])])).rows;
+  if (constraints.length !== CONSTRAINTS.length) return fail("POSTCONDITION_OBJECTS");
+  const indexes = (await client.query(`
+    SELECT relation,pg_get_indexdef(i.indexrelid) definition,i.indisunique is_unique,i.indisvalid valid
+    FROM unnest($1::text[]) relation JOIN pg_index i ON i.indexrelid=to_regclass(relation) ORDER BY relation`, [INDEXES])).rows;
+  if (indexes.length !== INDEXES.length) return fail("POSTCONDITION_OBJECTS");
+  const functions = (await client.query(`
+    SELECT signature,pg_get_userbyid(p.proowner) owner,p.prosecdef definer,p.proconfig config,p.provolatile volatility,
+      encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') definition,
+      (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
+    FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
+  if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify({ columns, constraints, indexes, functions }));
 }
 
 export async function loadForward0163(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
