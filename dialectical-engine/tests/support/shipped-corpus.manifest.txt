@@ -1041,6 +1041,7 @@ apps/ui/lib/v4/questionAddress.ts
 apps/ui/lib/v4/questionBox.ts
 apps/ui/lib/v4/quotaPulse.ts
 apps/ui/lib/v4/readyMoment.ts
+apps/ui/lib/v4/reportPaths.ts
 apps/ui/lib/v4/reportWriting.ts
 apps/ui/lib/v4/savedQuestion.ts
 apps/ui/lib/v4/siteVersion.ts

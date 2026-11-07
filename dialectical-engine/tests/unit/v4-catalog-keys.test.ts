@@ -744,7 +744,16 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // stopped", its line when some quota was used, and "Ask this again" as "Change the question" (draft wording), shown at the click-test.
   "v4.failed.continue",
   "v4.failed.continueLine",
-  "v4.failed.changeQuestion"
+  "v4.failed.changeQuestion",
+  // V4 start step, Task 55c (report-f4, the owner's words, record OWNER-PICKS-2026-11-03.md:954): the report page's fold of the paths
+  // dug later under their first-level path, shown at the click-test.
+  "v4.investigation.updatedByDig",
+  // V4 start step, Task 56c (public-f25, owner answer Q20 B): a further report's button says when it can start, and the month line
+  // without "You can still write your report." while this debate's report waits (draft wording), shown at the click-test.
+  "v4.report.waits.PERSON_DAY",
+  "v4.report.waits.PERSON_WEEK",
+  "v4.report.waits.PERSON_MONTH",
+  "v4.money.startsWait.PERSON_MONTH_NO_REPORT"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -1305,5 +1314,58 @@ describe("V4 start step, Task 61: the map's paths", () => {
     // "Your paths" heading over the rows is spec §2 item 7's words, not a mark on a card, so only "Your path" alone is refused.)
     expect(words.filter((line) => /allowance|usually|minute|\bleft\b(?! out)|You picked|Your path(?!s)/iu.test(line))).toEqual([]);
     expect(words.filter((line) => /\d/u.test(line.replace("+ 1 more", "")))).toEqual([]);
+  });
+});
+
+/**
+ * V4 start step, Task 82 (items chat-quota-word-on-choosing-card, r2-2, chat-start-waits-for-paths, wait-d1 and dig-f35; 4 Nov night:
+ * the saved questions and the 21 review items; Task 92c's answer A): the choosing card's drafts use plain words. The full path's two
+ * refusals and "Paths coming…" are their drafted words exactly, and no line of the start step's families says "allowance", what is
+ * "left after", "let the AIs choose", "starting as soon as" or "usually". The families are the brief's, then each one a later task of
+ * the start step drafted: a dig's paths, the stopped page's Continue and "Change the question", the report's fold and its waits, the
+ * month line while the report waits (waves 15-17), and the lines of a path a dig added, the short answer, a person's own path and the
+ * AIs' own knowledge.
+ */
+const START_STEP_EXACT_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.start.refusal.VIEWPOINTS_FULL": "This path is full. Start a new path, or move one out.",
+  "v4.start.refusal.OWN_WORDS_FULL": "A path holds up to four of your own points. Start a new path for this one.",
+  "v4.start.pathsComing": "Paths coming…"
+});
+const START_STEP_FAMILIES: readonly string[] = [
+  "v4.start.", "v4.ask.", "v4.paths.", "v4.saved.", "v4.read.", "v4.report.", "v4.investigation.updatedByDig",
+  "v4.digPaths.", "v4.failed.continue", "v4.failed.changeQuestion", "v4.money.startsWait.PERSON_MONTH_NO_REPORT",
+  "v4.answerCard.updated.PATH_ADDED", "v4.mainAnswer.trigger.PATH_ADDED", "v4.ready.shortAnswer", "v4.public.pathOwnWords",
+  "v4.web.ownKnowledge"
+];
+const START_STEP_ENGINE_WORDS = /\b(?:score|strength|threshold|Haiku|GLM|DeepSeek|checker|raised by|votes?)\b/iu;
+const START_STEP_NOT_PLAIN = /allowance|left after|let the ais choose|starting as soon as|usually/iu;
+
+describe("V4 start step, Task 82: the choosing card's drafts use plain words", () => {
+  const startDrafts = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.start."));
+  const covered = Object.keys(catalog).filter((key) => START_STEP_FAMILIES.some((family) => key.startsWith(family)));
+
+  it("more than 60 v4.start.* lines are drafts, and none names a score, a model, a checker or a vote", () => {
+    expect(startDrafts.length).toBeGreaterThan(60);
+    expect(startDrafts.filter((key) => START_STEP_ENGINE_WORDS.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
+  });
+
+  it("the full path's two refusals and 'Paths coming…' are their drafted words exactly, drafts until the click-test", () => {
+    expect(Object.fromEntries(Object.keys(START_STEP_EXACT_LINES).map((key) => [key, catalog[key]]))).toEqual(START_STEP_EXACT_LINES);
+    expect(Object.keys(START_STEP_EXACT_LINES).filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+  });
+
+  it("no line of the start step's families says allowance, what is left after, 'let the AIs choose', 'starting as soon as' or 'usually'", () => {
+    // Every family has lines, so the check reads real words.
+    expect(START_STEP_FAMILIES.filter((family) => !covered.some((key) => key.startsWith(family)))).toEqual([]);
+    expect(covered.filter((key) => START_STEP_NOT_PLAIN.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
+  });
+
+  it("the drafts of the later families (waves 15-17 among them) name no score, model, checker or vote either", () => {
+    const later = DRAFTED_UNTIL_CLICK_TEST.filter((key) => !key.startsWith("v4.start.") && covered.includes(key));
+    expect(later).toEqual(expect.arrayContaining([
+      "v4.digPaths.overlap", "v4.failed.continue", "v4.investigation.updatedByDig", "v4.report.waits.PERSON_MONTH",
+      "v4.money.startsWait.PERSON_MONTH_NO_REPORT"
+    ]));
+    expect(later.filter((key) => START_STEP_ENGINE_WORDS.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
   });
 });

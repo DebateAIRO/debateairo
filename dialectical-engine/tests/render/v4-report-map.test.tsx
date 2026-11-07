@@ -260,7 +260,8 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(flat(railStep())).toBe(`${CATALOG["v4.state.BEING_WRITTEN"]} · ${word("v4.wait.started", { time: clock(Date.parse(closedAt)) })}`);
     expect(railStep()!.querySelector(".v4WaitDot-PULSE")).not.toBeNull();
     expect(topButton()).toBeNull();
-    expect(header().querySelector("a.v4DebReportLink")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    // Task 76l (owner, 5 Nov: no level from the address on V4 pages): the report page reads the debate's level itself.
+    expect(header().querySelector("a.v4DebReportLink")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
     // The owner's answers of 5 Nov (question 2 A): once asked for, the link reads "See my report".
     expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
     // Dig buttons rest, with the reason under them. journey-f14 (the wave-2 review): one pattern with the quota wait, so the
@@ -729,7 +730,7 @@ describe("the owner's answers of 5 Nov 2026, question 2 A: \"See my report\" unt
     expect(hold()).toBeNull();
     const link = header().querySelector<HTMLAnchorElement>("a.v4DebReportLink")!;
     expect(flat(link)).toBe(CATALOG["v4.rail.writeReport"]);
-    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
   });
 
   it("a dig that reopens the investigation turns it back into \"Write my report\", which asks again", async () => {

@@ -79,7 +79,7 @@ import {
 import { researchedWaiting } from "@/lib/v4/web";
 import { buildV4Map, buildV4PendingMap, buildV4RunMap, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import { clearHandOff, handOffFor, type StartHandOff } from "@/lib/v4/startHandOff";
-import { borrowLines, digShareLine, limitLine, type MoneyLine } from "@/lib/v4/money";
+import { borrowLines, digShareLine, limitLine, limitLineWhileReportWaits, type MoneyLine } from "@/lib/v4/money";
 import { digButtonLabel, type V4DigQuota } from "@/lib/v4/digQuota";
 import { useBorrowed } from "@/lib/v4/useBorrowed";
 import { useDigQuota } from "@/lib/v4/useDigQuota";
@@ -387,8 +387,9 @@ function V4Debate({
   const [loadAttempt, setLoadAttempt] = useState(0);
   // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level belongs to the question. The page shows the debate at the level it
   // was asked at, as its run read says (lib/v4/load.ts); the address's `?level=` and the account's saved level no longer change it,
-  // and nothing on this page changes it. A debate asked without one reads as the default level (Task 75d: Plain words). Links carry
-  // its own level.
+  // and nothing on this page changes it. A debate asked without one reads as the default level (Task 75d: Plain words). Links from
+  // here carry no `?level=`: into its report (Task 76l: the report page reads the level itself) or to its other maps (Task 76n:
+  // each map reads its own debate's level, so the address never names one).
   const debateLevel: ReadingLevel | null = load === null ? null : load.kind === "RUN" ? load.run.reading_level ?? null : load.level ?? null;
   const readingLevel: ReadingLevel = debateLevel ?? DEFAULT_LEVEL;
   /** The level is known once the debate was read (map-f6: no level shows before). */
@@ -1123,11 +1124,29 @@ function V4Debate({
   const [bottomShowsReport, setBottomShowsReport] = useState(false);
   const waitingDigQuestion = isDig ? null
     : waitingDigQuestionOf(links.map((link) => ({ link, view: statuses.get(link.childRunId)?.view })));
+  // Task 76l (the review session's wiring list, item 21): a report version this visit saw being written is done, so the answer
+  // is read again once and the map's count of changes names that version. A rewrite that finished after the version began but
+  // before it was written then brings "Your report is older than the map" back (the owner's fourth round, 6 Nov).
+  const readAnswerAfterReport = (): void => {
+    if (servedRunId === null) return;
+    void loadAnswer(servedRunId).then((next) => {
+      if (next !== null) setFreshAnswer(next);
+    });
+  };
   const report = useMapReport({
     runId, servedRunId, isDig, answer: served?.answer,
     free: map?.webNote === "FREE" || planTier === "free", sharesShown: planTier !== "free",
-    digsKey: linkKey, level: debateLevel, onReady: () => reportReady.current(), barJobRef, catalog, locale,
-    waitingDigQuestion, waitingDigLanguage: served?.language ?? served?.story?.language ?? null, bottomShowsReport
+    // Task 76l (owner, 5 Nov: no level is ever taken from the address on V4 pages): the links into the report carry none; the
+    // report page reads the debate's own level from its loader.
+    digsKey: linkKey, level: null, barJobRef, catalog, locale,
+    onReady: () => {
+      reportReady.current();
+      readAnswerAfterReport();
+    },
+    waitingDigQuestion, waitingDigLanguage: served?.language ?? served?.story?.language ?? null, bottomShowsReport,
+    // V4 start step, Task 56c (public-f25, owner answer Q20 B): a further report on a public debate waits for the reset, and its
+    // buttons say when (the dig buttons' room read, read again after each quota moment).
+    room: digQuota.room, isPublic: publicStage?.kind === "PUBLIC"
   });
   const reportAnswer = report.answer;
 
@@ -1405,6 +1424,9 @@ function V4Debate({
     map,
     // wait-f5 / journey-f22: a debate paused at the month wall is "Paused", never "Looking into it".
     waiting: map === null && load?.kind === "RUN" && load.run.state !== "FAILED" && pauseOfRun(load.run) === null,
+    // Task 76l (the owner's fourth and fifth rounds, 6-7 Nov): the tab says the page's own state word for the unfinished
+    // question ("Waiting" for a free spot, a short break, the other question, the month's pause), from its run read.
+    waitState: runRead === null ? null : waitStateOfRun(runRead),
     isDigPage: isDigPage || recordParent !== null,
     news,
     hiddenNews,
@@ -1561,7 +1583,7 @@ function V4Debate({
               askAgainHref={askAgainHref(runId)}
               askHref={askHref}
               dig={isDigPage || recordParent !== null
-                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, debateLevel) }
+                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, null) }
                 : null}
               {...(parentRetry === undefined ? {} : { digRetry: parentRetry })}
               // Task 57g: "Continue where it stopped" only when the read says `continuable` ("Ask this again" then says "Change the question").
@@ -1617,7 +1639,13 @@ function V4Debate({
   // public-f24: the one V4 line whichever server switch is in force. dig-f5 / public-d3 A: a dig's share is on its own
   // button (digQuota), in no other line.
   const startsWait = limitLine(room, locale);
-  const money: readonly MoneyLine[] = startsWait === null ? [] : [startsWait];
+  // Task 56c: while this debate's report waits for the reset, the month line goes without "You can still write your report.".
+  const money: readonly MoneyLine[] = startsWait === null ? [] : [limitLineWhileReportWaits(startsWait, report.waitLine !== null)];
+  // Task 56c: beside a dig button the month's wait line is that same line (lib/v4/digQuota.ts digWaitLine), so it goes without it too.
+  const startsWaitText = startsWait === null ? null : t(catalog, startsWait.key, startsWait.values);
+  const shownQuota: V4DigQuota = money[0] !== undefined && money[0] !== startsWait && digQuota.quota.waitLine === startsWaitText
+    ? Object.freeze({ ...digQuota.quota, waitLine: t(catalog, money[0].key, money[0].values) })
+    : digQuota.quota;
   const roomNotice = startsWait === null && room !== null
     && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
@@ -1635,7 +1663,7 @@ function V4Debate({
   // job says the report's state in the bar. A paused dig open in the panel gives the bar its Continue.
   const digRest = report.digsRest ? report.restReason : null;
   const phoneDig: V4BarJob | null = phoneTarget !== null && waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
-    ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
+    ? phoneBarJob(phoneTarget, shownQuota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
     : null;
   // Task 62 (wait-d1 A, answer Q15): during the wait the bar holds "Map" and one quiet line for the whole question: the waiting
   // card's state word while any path works, then "Writing your answer" once every path is filled and the run still runs. Each
@@ -1656,17 +1684,21 @@ function V4Debate({
         ? pausedBar
         : phoneTarget !== null
           ? phoneDig ?? { kind: "none" }
-          : goodTime ? { kind: "report", href: reportHref } : { kind: "none" };
+          // Task 56c: a report that waits for the reset keeps its place in the bar, greyed, with the line that says when.
+          : goodTime ? { kind: "report", href: reportHref, ...(report.waitLine === null ? {} : { waiting: true, reason: report.waitLine }) }
+            : { kind: "none" };
 
   const rail = (variant: "column" | "strip" | "marks" | "notes" | "steps") => (
     <V4Rail
       runId={runId}
-      level={debateLevel}
+      // Task 76l: no level rides a link into the report (the rail's own link is the page's `reportHref`, which carries none).
+      level={null}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
       usageNotes={borrowLines(borrowed)}
-      moment={moment}
+      // Review of Task 56c: no "Good time to write your report" while the report waits for the reset (its step says when instead).
+      moment={moment === "GOOD" && report.waitLine !== null ? null : moment}
       reportReady={ready.reportDot}
       {...(report.rail === undefined ? {} : { report: report.rail })}
       reportHref={reportHref}
@@ -1744,7 +1776,7 @@ function V4Debate({
       planTier={planTier}
       mode={sentDigMode}
       money={money}
-      quota={digQuota.quota}
+      quota={shownQuota}
       rest={report.digsRest ? report.restReason : null}
       publicNote={publicNotes.tray}
       // Task 62: the main question's own button also digs its "+ N more" picks when it lists every pick.
@@ -1857,7 +1889,7 @@ function V4Debate({
         ) : null}
         <div className="v4DebMain">
           {parent !== null ? (
-            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, debateLevel)}>
+            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, null)}>
               <span aria-hidden="true">‹</span>{" "}
               {parent.question.length > 0 ? (
                 <>
@@ -1869,7 +1901,7 @@ function V4Debate({
           ) : null}
           {/* W4-6: a dig's map says where it sits; the top of every map, how many paths changed since the answer. */}
           {view.dig !== null && view.dig !== undefined ? (
-            <V4LevelTrail level={view.dig.level} trail={trail} linkLevel={debateLevel} catalog={catalog} />
+            <V4LevelTrail level={view.dig.level} trail={trail} linkLevel={null} catalog={catalog} />
           ) : null}
           <V4PublicMark stage={publicStage} catalog={catalog} />
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
@@ -1890,6 +1922,8 @@ function V4Debate({
               changedSince={map.changedSince}
               changedPaths={pathsChangedSinceReport(map, reportAnswer?.writtenAt ?? null)}
               digRunning={dugCounts.running > 0}
+              // Task 76l (the owner's fourth round, 6 Nov): hidden while a new report version waits or is written.
+              reportStage={report.stage}
               reportHref={reportHref}
               catalog={catalog}
               locale={locale}
@@ -1956,7 +1990,7 @@ function V4Debate({
                 digs={digs}
                 selected={shownSelection}
                 readingLevel={readingLevel}
-                linkLevel={debateLevel}
+                linkLevel={null}
                 picked={picked}
                 onTogglePick={togglePick}
                 onSelect={select}
@@ -1977,7 +2011,7 @@ function V4Debate({
                 researchedPresses={researchedPresses}
                 roomNotice={roomNotice}
                 money={money}
-                digQuota={digQuota.quota}
+                digQuota={shownQuota}
                 digPathLine={trail?.steps.at(-1)?.line ?? null}
                 reportAnswer={reportAnswer}
                 answerOnTop
@@ -2023,7 +2057,9 @@ function V4Debate({
           jobRef={barJobRef}
           onMap={sheetFocus.openFromMap}
           job={phoneJob}
-          goodTime={goodTime}
+          // Task 56c: no slim "Good time to write your report" line while the report waits for the reset (the top bar's button
+          // says when, greyed).
+          goodTime={goodTime && report.waitLine === null}
           reportHref={reportHref}
           {...(layout === "phone" && !rootShown && questionShare !== null
             ? { status: <V4QuestionShareLine share={questionShare} catalog={catalog} /> } : {})}

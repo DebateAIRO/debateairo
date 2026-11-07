@@ -186,6 +186,30 @@ export function limitLine(room: AskRoom | null, locale: string): MoneyLine | nul
 }
 
 /**
+ * V4 start step, Task 56c (item public-f25; owner answer Q20 B: only a debate's very first report uses the kept reserve): a further
+ * report on a public debate (after a visitor's report, or a second one) uses the quota and waits for the reset like digs, "and their
+ * button says when they can run": "This report can start after 08:00." (a day's or a week's reset), "… on 1 December." (a month's).
+ * Only when the page is sure: the debate is public (`isPublic`), the server said this press would not be its first report
+ * (`firstReportLeft` false, the owner's investigation read, Task 56b; true or not said: the first report goes ahead), and a person
+ * window holds new starts. The words say when, never what is left and never a price. Null otherwise.
+ */
+export function reportWaitLine(input: Readonly<{ room: AskRoom | null; isPublic: boolean; firstReportLeft: boolean | null; locale: string }>): MoneyLine | null {
+  if (!input.isPublic || input.firstReportLeft !== false) return null;
+  const held = limitWindowOf(input.room);
+  return held === null ? null : Object.freeze({ key: `v4.report.waits.${held.scope}`, values: resetValues(held.at, held.scope, input.locale) });
+}
+
+/**
+ * Task 56c: while this debate's report waits for the reset, the month line's last sentence ("You can still write your report.") is
+ * untrue here, so the month line goes without it, with the same date; a day's and a week's line say nothing of the report.
+ */
+export function limitLineWhileReportWaits(line: MoneyLine, reportWaits: boolean): MoneyLine {
+  return reportWaits && line.key === "v4.money.startsWait.PERSON_MONTH"
+    ? Object.freeze({ key: "v4.money.startsWait.PERSON_MONTH_NO_REPORT", values: line.values })
+    : line;
+}
+
+/**
  * dig-f5: a dig's own share, from its own check with the server (the room read for that dig). The page's main read is for
  * the dig it would send now; this reads another kind (a whole path or one open question while picks wait). Null when it
  * cannot be read or names no share. It costs no AI call and no quota.

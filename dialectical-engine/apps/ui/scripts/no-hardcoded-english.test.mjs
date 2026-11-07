@@ -98,6 +98,40 @@ test("the V4 map's dig choice, money lines (W3-4) and rewrites (W4-6) are scanne
   }
 });
 
+// V4 start step, Task 82 (amended 4 Nov and 4 Nov night): every shipped file the start step added to the V4 pages is scanned and never
+// allowlisted, the choosing card's and the saved questions' among them. tests/unit/v4-storage.test.ts names the same files.
+const startStepFiles = [
+  // Tasks 72-75: the choosing card's seven V4Start* pieces.
+  "components/v4/V4StartBar.tsx", "components/v4/V4StartCard.tsx", "components/v4/V4StartCombineBar.tsx", "components/v4/V4StartMore.tsx",
+  "components/v4/V4StartRow.tsx", "components/v4/V4StartSuggest.tsx", "components/v4/V4StartWays.tsx",
+  // Task 62: the paths under the map's first card. Task 79: a dig's paths and their plan.
+  "components/v4/V4RunPaths.tsx", "components/v4/V4DigPaths.tsx", "lib/v4/digPathPlan.ts",
+  // Tasks 64, 70, 76g, 76c and 76b, and Task 76e's update banner (owner answer Q8).
+  "lib/v4/pathPlan.ts", "lib/v4/useStartPaths.ts", "lib/v4/questionBox.ts", "lib/v4/askHistory.ts", "lib/v4/startUndo.ts",
+  "lib/v4/siteVersion.ts",
+  // 4 Nov night: the saved questions and the kept step 2 (Tasks 76f and 76e), the clarifying questions (Task 76h), the map before the
+  // first read and the hand-over (Tasks 76b and 76i), the fold (Task 76b) and the report's paths (Task 55c).
+  "lib/v4/savedQuestion.ts", "lib/v4/useSavedQuestion.ts", "lib/v4/startKept.ts", "components/v4/V4NotStarted.tsx",
+  "components/v4/V4AskQuestions.tsx", "lib/v4/clarifyWait.ts", "components/v4/V4PendingMap.tsx", "lib/v4/startHandOff.ts",
+  "lib/v4/foldMove.ts", "lib/v4/reportPaths.ts",
+  // Found by Task 82 among the files this branch added: the carry-on switch (Task 56), the site's country first (Task 76d), a dig's
+  // failed page reading its map (Task 76j) and the stopped page's "Continue where it stopped" (Task 57g).
+  "lib/v4/carryOn.ts", "lib/v4/clarifyPlace.ts", "lib/v4/useParentDigRetry.ts", "components/v4/useStoppedContinue.tsx"
+];
+
+test("the V4 start step's files (Task 82) are scanned, never allowlisted, and carry no hard-coded English", () => {
+  // Every V4Start* piece on disk is on the list, so a new piece joins it.
+  const startPieces = readdirSync(resolve(root, "components/v4")).filter((name) => /^V4Start.*\.tsx$/u.test(name))
+    .map((name) => `components/v4/${name}`);
+  assert.ok(startPieces.length > 0);
+  assert.deepEqual(startPieces.filter((path) => !startStepFiles.includes(path)), []);
+  assert.deepEqual(startStepFiles.filter(allowed), []);
+  // Every file's English at once, so one failure names every file that has some.
+  const failures = startStepFiles.flatMap((path) =>
+    visibleEnglishFromSource(path, readFileSync(resolve(root, path), "utf8")).map((text) => `${path}: ${text}`));
+  assert.deepEqual(failures, []);
+});
+
 test("migrated JSX contains no hard-coded user-visible English", () => {
   const failures = [];
   const visit = (directory) => {

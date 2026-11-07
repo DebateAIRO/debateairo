@@ -90,7 +90,8 @@ describe("after a report", () => {
     expect(strip()!.textContent).not.toMatch(/\b2\b/u);
     const report = strip()!.querySelector<HTMLAnchorElement>("a")!;
     expect(report.textContent).toBe(CATALOG["v4.rewrite.updateReport"]);
-    expect(report.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    // Task 76l (owner, 5 Nov: no level from the address on V4 pages): the report page reads the debate's level itself.
+    expect(report.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
     // map-f15: the one "Write my report" button is in the top bar; this line carries a plain link.
     expect(report.className).not.toContain("v4Btn");
     expect(strip()!.textContent).not.toContain(CATALOG["v4.rewrite.waitsForDig"]);

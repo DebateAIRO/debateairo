@@ -281,7 +281,15 @@ export type WriteReportResult =
   | Readonly<{ kind: "WRITING"; reportVersion: number; waitingForDigs: number }>
   /** A finished version stands: the page offers "Keep digging", which reopens the investigation. */
   | Readonly<{ kind: "CLOSED" }>
+  /**
+   * V4 start step, Task 56c (item public-f25; owner answer Q20 B): a further report on a public debate waits for the reset (409
+   * PUBLIC_DEBATE_WAITS_FOR_RESET): nothing started, and the page says when it can start, never that it could not confirm.
+   */
+  | Readonly<{ kind: "WAITS_FOR_RESET" }>
   | Readonly<{ kind: "FAILED" }>;
+
+/** Task 56c: the report route's refusal of a further public report while new starts wait (apps/api, Task 56b). */
+const REPORT_WAITS_FOR_RESET = "PUBLIC_DEBATE_WAITS_FOR_RESET";
 
 /** "Write my report": closes the investigation and numbers the version being written (a second press: the same one). */
 export async function writeReport(runId: string, client: Pick<ContractClient, "writeReport"> = contractClient): Promise<WriteReportResult> {
@@ -289,7 +297,8 @@ export async function writeReport(runId: string, client: Pick<ContractClient, "w
     const answer = await Promise.resolve().then(() => client.writeReport(runId));
     if ("state" in answer) return { kind: "WRITING", reportVersion: answer.report_version, waitingForDigs: answer.waiting_for_digs };
     return { kind: "CLOSED" };
-  } catch {
+  } catch (failure) {
+    if (failure instanceof ContractHttpError && failure.status === 409 && failure.serverCode === REPORT_WAITS_FOR_RESET) return { kind: "WAITS_FOR_RESET" };
     return { kind: "FAILED" };
   }
 }

@@ -95,7 +95,7 @@ export const harness = {
   accountLevel: null as Promise<ReadingLevel | null> | null,
   /**
    * V4 start step, Task 75c (owner answer Q15, 5 Nov): the level the debate was asked at, as its run read says (null: asked
-   * without one). The map page shows it and its links carry it; "background", as the address's level was before.
+   * without one). The map page shows it; its links carry none (Tasks 76l, 76n); "background", as the address's level was before.
    */
   level: "background" as ReadingLevel | null,
   /**
