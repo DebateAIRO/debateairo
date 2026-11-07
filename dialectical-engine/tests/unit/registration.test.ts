@@ -1794,7 +1794,7 @@ function rework7Harness(options: {
   readonly deferHash?: boolean;
   readonly legalAcceptance?: boolean;
   readonly mailDomainCheck?: MailDomainCheck;
-  readonly outboundMail?: Readonly<{ hasStandardRoom(): Promise<boolean> }>;
+  readonly outboundMail?: Readonly<{ hasStandardRoom(): Promise<boolean>; balanceWithoutSend?(): Promise<void> }>;
 } = {}): Rework7Harness {
   const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const policy = Object.freeze({
@@ -3069,6 +3069,31 @@ describe("the daily outbound mail limit at sign-up and resend (owner's rulings o
       await harness.resend(1);
       await harness.service.drainMailDispatches();
     } finally { harness.restore(); }
+  });
+
+  it("a sign-up that sends nothing (the address has an account) asks the gate's database questions anyway; a new account's send asks them itself", async () => {
+    let balanced = 0;
+    const counting = { hasStandardRoom: async () => true, balanceWithoutSend: async () => { balanced += 1; } };
+    const known = rework7Harness({ outboundMail: counting, duplicate: true });
+    try {
+      await known.service.register(input, source("limit-balance-known"));
+      await known.service.drainMailDispatches();
+      expect(balanced).toBe(1);
+    } finally { known.restore(); }
+    balanced = 0;
+    const fresh = rework7Harness({ outboundMail: counting });
+    try {
+      await fresh.service.register(input, source("limit-balance-new"));
+      await fresh.service.drainMailDispatches();
+      expect(fresh.createdInputs).toHaveLength(1);
+      expect(balanced).toBe(0);
+    } finally { fresh.restore(); }
+    // Control: a balance that fails never fails the sign-up's postwork.
+    const failing = rework7Harness({ outboundMail: { hasStandardRoom: async () => true, balanceWithoutSend: async () => { throw new Error("DOWN"); } }, duplicate: true });
+    try {
+      await failing.service.register(input, source("limit-balance-down"));
+      await failing.service.drainMailDispatches();
+    } finally { failing.restore(); }
   });
 
   it("a count that cannot be read answers the retryable refusal, before any account is made", async () => {

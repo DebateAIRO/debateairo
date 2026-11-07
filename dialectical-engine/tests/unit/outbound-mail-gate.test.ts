@@ -60,6 +60,20 @@ describe("the outbound mail gate", () => {
     expect(() => mailPurposeClass("staff-alert" as MailPurpose)).toThrow("MAIL_PURPOSE_UNKNOWN");
   });
 
+  it("balances a sign-up that sends nothing: one suppression lookup and one read of the count, nothing counted, nothing reported", async () => {
+    const asked: string[] = [];
+    const store = new MemoryOutboundMailStore();
+    const ledger: OutboundMailLedger = { reserve: async (r) => { asked.push("reserve"); return store.reserve(r); }, today: async () => { asked.push("today"); return store.today(); }, claimAlert: async (k, d) => { asked.push("alert"); return store.claimAlert(k, d); } };
+    const suppression: MailSuppressionList = { isSuppressed: async (digest) => { asked.push(`suppressed:${digest.length}`); return store.isSuppressed(digest); } };
+    const h = harness({ ledger, suppression });
+    await h.gate.balanceWithoutSend();
+    expect(asked).toEqual(["suppressed:32", "today"]);
+    expect(await store.today()).toMatchObject({ total: 0 });
+    expect(h.events).toEqual([]);
+    const broken = harness({ ledger: { ...ledger, today: async () => { throw new Error("DOWN"); } } });
+    await expect(broken.gate.balanceWithoutSend()).resolves.toBeUndefined();
+  });
+
   it("asks the address rule first: a malformed address is refused and counts nothing", async () => {
     const h = harness();
     for (const recipient of ["person@localhost", "a@example.com,b@example.com", "pérson@example.com", "a@example.com\r\nBcc: x@example.org"]) {

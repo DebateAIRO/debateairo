@@ -839,7 +839,11 @@ export class RegistrationService implements RegistrationApplication {
      * MAIL_DAILY_LIMIT. It depends on the day's count alone, never on whether an account exists. The send itself is
      * still gated in the sender. Absent, nothing is asked.
      */
-    readonly outboundMail?: Readonly<{ hasStandardRoom(): Promise<boolean> }>;
+    readonly outboundMail?: Readonly<{
+      hasStandardRoom(): Promise<boolean>;
+      /** The gate's database work without a send, run by a sign-up that sends nothing so both paths load it alike. */
+      balanceWithoutSend?(): Promise<void>;
+    }>;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -1439,7 +1443,9 @@ export class RegistrationService implements RegistrationApplication {
           ? this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs)
           : Promise.resolve();
         if (duplicate !== undefined) {
-          await equalWork;
+          // The new account's send asks the outbound mail gate (a suppression lookup and the day's count) inside the
+          // same window; the duplicate asks the same questions without a send, so the database sees one load either way.
+          await Promise.all([equalWork, this.dependencies.outboundMail?.balanceWithoutSend?.().catch(() => undefined)]);
           await releaseReservation();
           await this.dependencies.repository.recordDuplicateRegistrationPostwork({
             userId: duplicate.userId,

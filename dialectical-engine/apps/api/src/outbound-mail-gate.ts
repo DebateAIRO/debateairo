@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createEmailBlindIndex } from "@debateai/crypto";
 import { isMailAddress } from "@debateai/kernel";
 import type { OutboundMailPolicy } from "@debateai/register";
@@ -187,6 +188,20 @@ export class OutboundMailGate implements OutboundMailAuthorizer {
     // At the limit sign-up and resend stop HERE, before any send reaches `authorize`: the owner's alert must too.
     await this.alert(day, "STANDARD_LIMIT", total);
     return false;
+  }
+
+  /**
+   * Equal work for a sign-up that sends nothing (an address that already has an account): the same database questions a
+   * verification mail's `authorize` asks (the keyed digest and its suppression lookup, then one read of the day's count),
+   * so the two sign-up paths put the same load on the database after the answer. It counts nothing, alerts nothing,
+   * reports nothing and never rejects. The digest is of a random address, so no real address is looked up.
+   */
+  async balanceWithoutSend(): Promise<void> {
+    try {
+      const digest = createEmailBlindIndex(this.dependencies.blindIndexKey, `${randomBytes(12).toString("hex")}@balance.invalid`);
+      await this.dependencies.suppression.isSuppressed(digest);
+      await this.dependencies.ledger.today();
+    } catch { /* Balancing work never decides anything. */ }
   }
 
   async authorize(request: Readonly<{ recipient: string; purpose: MailPurpose }>): Promise<boolean> {
