@@ -243,7 +243,7 @@ describe("0163: carry-on digs provision their key without a live sign-in", () =>
   it("C-R is documented and listed", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain(LOADER_PATH);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0163, below) the fifty-second", "## The carry-on digs without a live sign-in (0163)", "`loadForward0163`",
+    for (const needle of ["(0163, below) the fifty-third", "## The carry-on digs without a live sign-in (0163)", "`loadForward0163`",
       "MIGRATION_FORWARD0163_", "`-- n1: drained`"]) expect(readme, needle).toContain(needle);
     expect(read("deploy/preview-auth-dev/v1/README.md"))
       .toContain("`migrations/0163_carry_on_session_free_digs.sql` (after `0162_saved_questions.sql`, `n1: drained`)");

@@ -20,6 +20,8 @@ import { usePublicSignedIn } from "@/components/v4/V4PublicSession";
  * ACCESS-12 (the wave-2 checks, 4 Nov): the form is a real dialog, through the site's one dialog helper (components/dialogSurface.ts: the shared modal
  * semantics): named "Report a problem", focus goes into it and Tab and Shift+Tab stay inside it, the page behind is hidden from screen readers and covered,
  * so a tap or click beside it closes it (on a phone the sheet's page cannot be reached), and Escape, Cancel or that tap give focus back to the link.
+ * THE DSA NOTICES (6 Nov, D5): a report is a notice (Art 16), so the form asks for the reporter's good-faith statement (Art 16(2)(d)) as a required box,
+ * and the line a refusal ends on is true whatever stopped it: no person has read it, and here are the routes. The server says which of three it was, never why.
  */
 
 /**
@@ -51,7 +53,7 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
   where?: string;
   /** "top": in the page's top bar; "foot": at the foot of a question. */
   placement?: "top" | "foot";
-  send?: (publicRef: string, body: Readonly<{ where: string; claim: string }>) => Promise<PublicFlagAnswer>;
+  send?: (publicRef: string, body: Readonly<{ where: string; claim: string; good_faith: true }>) => Promise<PublicFlagAnswer>;
   readSession?: () => Promise<unknown>;
 }>) {
   const ids = useId();
@@ -59,18 +61,20 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
   const [open, setOpen] = useState(false);
   const [where, setWhere] = useState(() => (whereShown ?? "").slice(0, 300));
   const [claim, setClaim] = useState("");
-  const [tooShort, setTooShort] = useState<Readonly<{ where: boolean; claim: boolean }>>({ where: false, claim: false });
+  const [goodFaith, setGoodFaith] = useState(false);
+  const [tooShort, setTooShort] = useState<Readonly<{ where: boolean; claim: boolean; goodFaith: boolean }>>({ where: false, claim: false, goodFaith: false });
   const [sending, setSending] = useState(false);
   const [line, setLine] = useState<string | null>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const whereField = useRef<HTMLInputElement>(null);
   const claimField = useRef<HTMLTextAreaElement>(null);
+  const goodFaithField = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (open && signedIn === true) whereField.current?.focus();
   }, [open, signedIn]);
   function close() {
     setOpen(false);
-    setTooShort({ where: false, claim: false });
+    setTooShort({ where: false, claim: false, goodFaith: false });
     toggle.current?.focus();
   }
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -81,15 +85,16 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending) return;
-    const body = PublicFlagRequestSchema.safeParse({ where, claim });
+    const body = PublicFlagRequestSchema.safeParse({ where, claim, good_faith: goodFaith });
     if (!body.success) {
-      // Spaces only, or too little to act on: a short line under that box, and focus on it. Nothing is sent.
+      // Spaces only, too little to act on, or the box not ticked: a short line under that field, and focus on the first. Nothing is sent.
       const short = {
         where: !PublicFlagRequestSchema.shape.where.safeParse(where).success,
-        claim: !PublicFlagRequestSchema.shape.claim.safeParse(claim).success
+        claim: !PublicFlagRequestSchema.shape.claim.safeParse(claim).success,
+        goodFaith: !goodFaith
       };
       setTooShort(short);
-      (short.where ? whereField.current : claimField.current)?.focus();
+      (short.where ? whereField.current : short.claim ? claimField.current : goodFaithField.current)?.focus();
       return;
     }
     setLine(t(catalog, "v4.public.flag.thanks"));
@@ -100,6 +105,7 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
       setLine(t(catalog, `v4.public.flag.${answer.state}`));
       setWhere((whereShown ?? "").slice(0, 300));
       setClaim("");
+      setGoodFaith(false);
     } catch {
       // The words stay in the form, so trying again needs no retyping.
       setLine(t(catalog, "v4.public.flag.failed"));
@@ -110,6 +116,7 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
   const signIn = `/login?next=${encodeURIComponent(`/public/debate/${encodeURIComponent(publicRef)}`)}`;
   const whereHint = `${ids}-where-more`;
   const claimHint = `${ids}-claim-more`;
+  const goodFaithHint = `${ids}-good-faith-more`;
   return (
     <div className={`v4PubFlag v4PubFlag-${placement}`} data-public-flag data-placement={placement} onKeyDown={onKeyDown}>
       <button ref={toggle} className="v4Link v4PubFlagToggle" type="button" data-public-report aria-expanded={open} aria-controls={`${ids}-panel`}
@@ -141,6 +148,16 @@ export function V4PublicFlag({ publicRef, catalog, where: whereShown, placement 
                 onChange={(event) => setClaim(event.target.value)}
               />
               {tooShort.claim ? <p id={claimHint} className="v4PubFlagMore" data-public-flag-more>{t(catalog, "v4.public.flag.claimMore")}</p> : null}
+              <p className="v4PubFlagGoodFaith">
+                <input
+                  ref={goodFaithField} id={`${ids}-good-faith`} type="checkbox" name="goodFaith" required checked={goodFaith}
+                  aria-invalid={tooShort.goodFaith || undefined} aria-describedby={tooShort.goodFaith ? goodFaithHint : undefined}
+                  onChange={(event) => setGoodFaith(event.target.checked)}
+                />
+                {" "}
+                <label htmlFor={`${ids}-good-faith`}>{t(catalog, "v4.public.flag.goodFaith")}</label>
+              </p>
+              {tooShort.goodFaith ? <p id={goodFaithHint} className="v4PubFlagMore" data-public-flag-more>{t(catalog, "v4.public.flag.goodFaithMore")}</p> : null}
               <div className="v4PubDigActions">
                 <button className="v4Btn v4BtnPrimary" type="submit" disabled={sending}>{t(catalog, "v4.public.flag.send")}</button>
                 <button className="v4Link" type="button" onClick={close}>{t(catalog, "v4.public.flag.cancel")}</button>

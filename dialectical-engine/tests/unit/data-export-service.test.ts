@@ -27,7 +27,7 @@ function snapshotA(claim: ExportClaim, now: Date): ExportSnapshot {
   return {
     exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
     requestedAt: claim.requestedAt, generatedAt: now, recipient: "recipient@example.test",
-    account: { account: { pseudonym: "snapshot-a", email: "recipient@example.test", created_at: START.toISOString() }, channels: [], registration_region: null, age_checks: [], erasure_requests: [], kept_questions: [], reading_level: null, debate_visits: [], dig_links: [], investigations: [], reserve_events: [], question_readings: [], before_start_readings: [], reports_you_made: [],
+    account: { account: { pseudonym: "snapshot-a", email: "recipient@example.test", created_at: START.toISOString() }, channels: [], registration_region: null, age_checks: [], erasure_requests: [], kept_questions: [], reading_level: null, debate_visits: [], dig_links: [], investigations: [], reserve_events: [], question_readings: [], before_start_readings: [], reports_you_made: [], moderation_notices: [], earlier_moderation_notices: [],
       // V4 start step, Task 39e: the questions not started yet.
       questions_not_started: [] },
     security: { mfa_factors: [], passkeys: [], recovery_codes: null, sessions: [], social_identities: [], email_changes: [], recovery_email_changes: [], recovery_requests: [] },

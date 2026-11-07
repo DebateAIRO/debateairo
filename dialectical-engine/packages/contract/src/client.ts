@@ -2,7 +2,7 @@ import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal 
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
 // V4 start step, Task 57f: Continue on a failed debate: its two refusals, answered as data.
 import { RunNotContinuedSchema, type RunNotContinued } from "./web.js";
-import { InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
+import { ModerationStatementsSchema, type ModerationStatements, InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
@@ -622,6 +622,8 @@ export interface ContractClient {
   /** Decision 13: "Write a report" on a public page. A 409 comes back as data (nothing started); a 404 and the rest throw. */
   writePublicReport(publicationRef: string): Promise<PublicReportAccepted | PublicDebateRefused>;
   flagPublicDebate(publicationRef: string, body: PublicFlagRequest): Promise<PublicFlagAnswer>;
+  /** 0157 (D1): the signed-in person's own statements of reasons, newest first. */
+  readModerationStatements(): Promise<ModerationStatements>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -1169,6 +1171,7 @@ export function createContractClient(
       root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/flag`, PublicFlagAnswerSchema,
       { method: "POST", body: JSON.stringify(PublicFlagRequestSchema.parse(body)) }, auth
     ),
+    readModerationStatements: () => request("/v1/account/moderation-statements", ModerationStatementsSchema),
     writePublicReport: (publicationRef: string) => requestJson<PublicReportAccepted | PublicDebateRefused>(
       root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/report`, PublicReportAcceptedSchema,
       { method: "POST", body: JSON.stringify(PublicReportRequestSchema.parse({})) }, auth, 202,

@@ -186,6 +186,11 @@ export function contributionOf(positionRef: string, onRef: string | null, update
   };
 }
 
+/** Decision 35's pretend check: "hide" in the claim hides, "#person" goes to a person, anything else is the one refusal every refusal shares (the DSA notices, D5). */
+export function mockFlagStateOf(claim: string): "WITH_A_PERSON" | "HIDDEN" | "NOT_FOUND" {
+  return claim.includes("#person") ? "WITH_A_PERSON" : claim.includes("hide") ? "HIDDEN" : "NOT_FOUND";
+}
+
 /**
  * V4 start step, Task 79c (owner answer Q33 A, 5 Nov): what a row of GET /v1/answers says of a dig made on someone else's public page, for
  * its own card on "Your maps" ("Dig: {its pick}"): `dug_on_public`, and its first pick's words (`dig_pick`) when it had a pick. Every other

@@ -1,7 +1,7 @@
 // tests/architecture/moderation-notice-0156-contract.test.ts
 // 0156: the person whose content a review took off the public page is told by email (owner request of 5 November 2026).
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MAIL_TEMPLATES } from "@debateai/mail-templates";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
@@ -22,7 +22,7 @@ describe("0156: the moderation notice", () => {
   // A step of the chain, found by name: the V4 start step's steps (0158 to 0165) come after it.
   it("follows 0155 in the chain, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0155,loadForward0156,loadForward0158,");
+    expect(chain).toContain("loadForward0155,loadForward0156,loadForward0157,");
     expect(chain).toContain("import { loadForward0156 } from './migration-forward0156.js';");
     const loader = read("packages/db/src/migration-forward0156.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -71,13 +71,17 @@ describe("0156: the moderation notice", () => {
     expect(table).not.toMatch(/ciphertext|content|text_sha256|actor_staff_id/u);
   });
 
-  it("the API sends the three templates, each with only the date and the Terms link", () => {
-    const sender = read("apps/api/src/moderation-notices.ts");
+  // 0157 (D1; changed on purpose): the API no longer sends 0156's no-reason notice. Its statement of reasons replaces it, so a person gets one mail, not
+  // both. 0156's queue, its three definers and its three templates stay, unchanged, for the release before.
+  it("this release sends the statement of reasons instead; 0156's three templates stay as they were for the release before", () => {
     for (const id of ["MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED"] as const) {
-      expect(sender).toContain(`"${id}"`);
       expect(MAIL_TEMPLATES[id].catalogue).toBe("mail");
       expect(MAIL_TEMPLATES[id].params).toEqual({ happened: "date", termsUrl: "url" });
     }
-    expect(read("apps/api/src/main.ts")).toContain("new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(pool), dekStore,");
+    expect(existsSync(new URL("apps/api/src/moderation-notices.ts", ROOT))).toBe(false);
+    const main = read("apps/api/src/main.ts");
+    expect(main).not.toContain("ModerationNoticeReconciler");
+    expect(main).not.toContain("PostgresModerationNoticeRepository");
+    expect(main).toContain("new ModerationStatementReconciler(moderationStatementRepository, dekStore,");
   });
 });

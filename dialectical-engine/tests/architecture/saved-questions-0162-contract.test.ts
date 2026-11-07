@@ -300,7 +300,7 @@ describe("0162: the questions not started yet, each under its own key", () => {
     const corpus = read("tests/support/shipped-corpus.manifest.txt").split("\n");
     for (const path of ["packages/db/src/migration-forward0162.ts", "apps/api/src/saved-questions/store.ts"]) expect(corpus, path).toContain(path);
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
-    for (const needle of ["(0162, below) the fifty-first", "## The saved questions (0162)", "`loadForward0162`", "MIGRATION_FORWARD0162_"]) {
+    for (const needle of ["(0162, below) the fifty-second", "## The saved questions (0162)", "`loadForward0162`", "MIGRATION_FORWARD0162_"]) {
       expect(readme, needle).toContain(needle);
     }
     expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0162_saved_questions.sql` (after `0161_path_progress.sql`, `n1: expand`)");

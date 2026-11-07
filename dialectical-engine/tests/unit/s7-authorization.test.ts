@@ -93,6 +93,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "read-saved-question" },
   { route: "DELETE /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "delete-saved-question" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "GET /v1/account/moderation-statements", auth: "user", resource: "identity", action: "read-moderation-statements" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "GET /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
@@ -395,7 +396,8 @@ describe("S7 deny-by-default authorization", () => {
     // V4 start step, Task 30 adds the four calls before Start (POST /v1/asks/paths/lists, …/merge, …/combine and …/fit): 205.
     // V4 start step, Task 39e adds the five of the questions not started yet (GET and POST /v1/account/saved-questions, PUT, GET and
     // DELETE …/{id}): 210.
-    expect(contractInventory.routes).toHaveLength(210);
+    // 0157 adds the statements of reasons (GET /v1/account/moderation-statements): 211 with the union.
+    expect(contractInventory.routes).toHaveLength(211);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

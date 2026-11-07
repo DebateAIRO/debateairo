@@ -23,8 +23,8 @@ import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
 import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
-import { PostgresModerationNoticeRepository } from "@debateai/db";
-import { ModerationNoticeReconciler } from "./moderation-notices.js";
+import { PostgresModerationStatementRepository, PostgresPublicFlagMailRepository } from "@debateai/db";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "./moderation-statements.js";
 import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
@@ -1324,14 +1324,27 @@ const publicFlagNoticesTimer = startTeamLimitNotices({
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
-// 0156: the person whose debate, contribution or report a review took off the public page hears it, content-free.
-const moderationNotices = new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(pool), dekStore, new TemplatedMailSender({
+// 0157: every person a review step affects gets a statement of reasons (DSA Art 17). It replaces 0156's content-free notice: this release no longer
+// claims 0156's queue, so nobody gets both from it; twelve months on, the typed facts and the quote go.
+const moderationStatementRepository = new PostgresModerationStatementRepository(pool);
+const moderationStatements = new ModerationStatementReconciler(moderationStatementRepository, dekStore, new TemplatedMailSender({
   executable: environment.MAIL_SENDMAIL_PATH,
   from: environment.MAIL_FROM,
   timeoutMs: authPolicy.channel.transportTimeoutMs
 }), environment.PUBLIC_APP_URL);
-const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(() => moderationNotices.reconcile(100),
-  () => console.error("[MODERATION_NOTICE_PENDING]")), 30_000);
+// 0157 (D4): the answers to people who report, and the sweep of a report left CHECKING (it goes to a person after five minutes).
+const publicFlagMailRepository = new PostgresPublicFlagMailRepository(pool);
+const publicFlagAnswers = new PublicFlagAnswerReconciler(publicFlagMailRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs
+}), environment.PUBLIC_APP_URL);
+const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(async () => {
+  await moderationStatements.reconcile(100);
+  await publicFlagAnswers.reconcile(100);
+  await publicFlagMailRepository.settleStuck();
+  await moderationStatementRepository.deleteWordsDue();
+}, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
@@ -1909,6 +1922,9 @@ const api = buildApi({
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
     log: (event: string, detail: Record<string, unknown>) => { console.error(JSON.stringify({ event, ...detail })); }
   } }),
+  // 0157 (D1): the person's own statements of reasons, their facts opened under the debate's key as the two accounts' review opens them.
+  ...(publications === undefined ? {} : { moderationStatements: { repository: moderationStatementRepository,
+    withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)

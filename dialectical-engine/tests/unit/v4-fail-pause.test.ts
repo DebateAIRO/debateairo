@@ -291,6 +291,10 @@ describe("the owner's words (OWNER-PICKS-2026-11-03.md), word for word", () => {
       || ["v4.money.paused", "v4.money.pausedReady", "v4.debate.askAgain", "v4.debate.askAgainNote", "v4.debate.askAgainNoteQuestion",
         "v4.debate.failedNothingTaken", "v4.debate.digFailedBackNote", "v4.report.backToQuestion"].includes(key));
     expect(keys.length).toBeGreaterThan(10);
-    for (const key of keys) expect(CATALOG[key], key).not.toMatch(/allowance|limit/iu);
+    // The owner's fourth round (6 Nov) gave a dig that reached the site's own limit its words, "This dig reached its limit
+    // before it could produce an answer." (question 6 A keeps "limit" for the site's own limit, never the person's quota).
+    const SITE_LIMIT = "v4.digFailed.reason.RUN_LIMIT_REACHED";
+    expect(CATALOG[SITE_LIMIT]).toBe("This dig reached its limit before it could produce an answer.");
+    for (const key of keys) expect(CATALOG[key], key).not.toMatch(key === SITE_LIMIT ? /allowance|quota/iu : /allowance|limit/iu);
   });
 });

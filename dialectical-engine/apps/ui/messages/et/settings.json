@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Mine seadetesse",
   "settings.account.title": "Konto",
   "settings.security.title": "Turvalisus",
+  "settings.notices.title": "Modereerimisteated",
   "settings.phone.reveal": "Näita telefoninumbrit",
   "settings.phone.change": "Muuda telefoninumbrit",
   "settings.phone.purpose": "Edaspidi võime saata teile SMS-iga koodi, mis aitab teil oma kontole tagasi pääseda, ja kui palute meilt abi, saame teile helistada või SMS-i saata. Salvestatakse krüpteeritult; seda ei jagata kunagi ega kasutata turunduseks.",

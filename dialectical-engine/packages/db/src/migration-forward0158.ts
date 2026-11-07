@@ -12,7 +12,7 @@ const NAME = "0158_pre_start_charge.sql";
 const VERSION = "pre-start-charge-forward0158-v1";
 const MANIFEST_PATH = "lineage/pre-start-charge-forward0158.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0156_moderation_notice.sql";
+const PREVIOUS = "0157_moderation_statements.sql";
 const TABLES = ["identity.pre_start_charge"] as const;
 const FUNCTIONS = [
   "identity.guard_pre_start_charge()",

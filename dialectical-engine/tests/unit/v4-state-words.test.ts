@@ -9,6 +9,7 @@ import {
   keepsGoing,
   stateWordOf,
   stateWordText,
+  tabStateWordOf,
   WAIT_STATE_KINDS,
   waitDotOf,
   waitStateOfDig,
@@ -156,6 +157,33 @@ describe("the shared state words (journey-f22)", () => {
     // "You can leave this page. It keeps going." only while it goes on or starts by itself; never while it is paused.
     expect(ALL.filter(keepsGoing).map((state) => state.kind))
       .toEqual(["LOOKING", "WAITING", "WAITING", "WAITING_OWN", "SHORT_BREAK", "SHORT_BREAK", "BEING_WRITTEN"]);
+  });
+});
+
+describe("the browser tab's state word (the owner's fourth round, 6 Nov)", () => {
+  const tab = (state: WaitState): string | null => {
+    const word = tabStateWordOf(state, "en");
+    return word === null ? null : stateWordTextOf(word);
+  };
+  const stateWordTextOf = (word: Readonly<{ key: string; values: Readonly<Record<string, string>> }>): string =>
+    Object.entries(word.values).reduce((line, [name, value]) => line.replace(`{${name}}`, value), CATALOG[word.key]!);
+
+  it("follows the page's state word without its time: \"Waiting\" for a free spot, a short break, the month's pause", () => {
+    expect(tab({ kind: "WAITING", startsAfter: "2026-11-06T00:40:00.000Z" })).toBe("Waiting");
+    expect(tab({ kind: "WAITING", startsAfter: null })).toBe("Waiting");
+    expect(tab({ kind: "SHORT_BREAK", continuesAbout: "2026-11-04T10:35:00.000Z" })).toBe(CATALOG["v4.state.SHORT_BREAK.noTime"]);
+    expect(tab({ kind: "SHORT_BREAK", continuesAbout: null })).toBe(CATALOG["v4.state.SHORT_BREAK.noTime"]);
+    expect(tab({ kind: "WAITING_OWN" })).toBe(CATALOG["v4.state.WAITING_OWN"]);
+    // The month's pause says its day, as the page does ("Paused until 1 December"), then "Ready to continue".
+    expect(tab({ kind: "PAUSED", until: "2026-12-01T00:00:00.000Z", canContinue: false }))
+      .toBe(stateWordText({ kind: "PAUSED", until: "2026-12-01T00:00:00.000Z", canContinue: false }, CATALOG, "en", NOW));
+    expect(tab({ kind: "PAUSED", until: "2026-12-01T00:00:00.000Z", canContinue: true })).toBe(CATALOG["v4.state.PAUSED.canContinue"]);
+    // No tab word carries a clock time.
+    for (const state of ALL) expect(tab(state) ?? "", state.kind).not.toMatch(/\d{1,2}:\d{2}/u);
+  });
+
+  it("has no word of its own while the AIs work or once it is over: the tab keeps \"Looking into it\" and the rest", () => {
+    for (const kind of ["LOOKING", "READY", "DIDNT_FINISH", "BEING_WRITTEN"] as const) expect(tabStateWordOf({ kind }, "en"), kind).toBeNull();
   });
 });
 

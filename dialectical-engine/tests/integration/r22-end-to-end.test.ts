@@ -22,7 +22,7 @@ import { stubJudgement, type GateRequest } from "../support/preview-gate-stubs.j
 import { driveStartStep, topPathsChoice, type StartStepDrive } from "../support/start-step-cases.js";
 import { publicDigAsk, publicPathViews } from "../../apps/ui/lib/v4/publicPage.js";
 import { composeQuestion, purposeLinesOfGoal } from "../../apps/ui/lib/v4/askText.js";
-import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
+import { canonicalPublicReviewBinding, groundFieldsOf } from "../../apps/api/src/staff/public-review.js";
 import { PostgresPublicReviewRepository } from "@debateai/db";
 import { TEAM_FEATURE_PLAN_ID, readAbuseLimits } from "@debateai/register";
 import { readWebRunPlan } from "../../apps/runner/src/run-settings.js";
@@ -484,16 +484,22 @@ describe("R22 on the real API", () => {
     const revision = (await q.query<{ n: number }>("SELECT coalesce(max(revision),0)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [debate.ref])).rows[0]!.n;
     const operationId = randomUUID();
     const textSha = piece.text === undefined ? null : createHash("sha256").update(piece.text).digest("hex");
-    const intent = step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: debate.ref, expected_revision: revision, operation_id: operationId }
-      : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: debate.ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null, text_sha256: textSha, expected_revision: revision, operation_id: operationId };
+    // 0157: a correction states its ground; a hide and a re-publish carry none.
+    const facts = step === "CORRECT" ? "It names a private person." : null;
+    const factsSha = facts === null ? null : createHash("sha256").update(facts).digest("hex");
+    const ground = step === "CORRECT" ? { grounds: ["PERSONAL_DATA" as const], source: "OWN_INITIATIVE" as const, flag_id: null } : { grounds: [], source: null, flag_id: null };
+    const intent = step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: debate.ref, expected_revision: revision, operation_id: operationId, ...ground }
+      : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: debate.ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null, text_sha256: textSha, expected_revision: revision, operation_id: operationId,
+        ...ground, facts_sha256: factsSha };
     const binding = canonicalPublicReviewBinding(intent as never, { expectedRevision: revision, hidden: false }) as unknown as Record<string, unknown>;
     const proofId = randomUUID(), c = actor.context as { securityEpoch: number; grantRevision: number; accountSecurityEpoch: number };
     await q.query(`INSERT INTO staff.action_proof(proof_id,staff_id,user_id,ordinary_session_id,privilege_session_id,security_epoch,account_security_epoch,grant_revision,binding,credential_id,verified_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'fixture-key',now(),now()+interval '5 minutes')`, [proofId, actor.staffId, actor.userId, actor.sessionId, actor.privilegeId, c.securityEpoch, c.accountSecurityEpoch, c.grantRevision, binding]);
     await authorizeStaffAlertFixture(q, operationId);
     const alert = { schema: "staff-alert-v1", event: "PUBLIC_REVIEW_CHANGED", operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } };
     const content = piece.text === undefined ? null : await world.withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ text: piece.text }));
+    const sealedFacts = facts === null ? null : await world.withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ facts }));
     return new PostgresPublicReviewRepository(world.fixtureSuperuserPool).act({ actor: actor.context as never, proof: { proofId, binding } as never, step, publicationRef: debate.ref, pieceKind: piece.kind ?? null, pieceId: piece.id ?? null,
-      pointer: piece.pointer ?? null, textSha256: textSha, content, expectedRevision: revision, operationId, alertIntent: alert as never });
+      pointer: piece.pointer ?? null, textSha256: textSha, content, ground: groundFieldsOf(intent as never), facts: sealedFacts, expectedRevision: revision, operationId, alertIntent: alert as never });
   }
   async function freePublic(who: R22Account, question: string): Promise<Readonly<{ ref: string; root: string }>> {
     const started = await ask(who, question, { settings: FREE, publicLane: { freePublicNotice: true } });
@@ -527,27 +533,27 @@ describe("R22 on the real API", () => {
     const debate = await freePublic(bea, "Should Harbour Town move the fish market?");
     const words = (await world.stranger.readPublicDebate(debate.ref)).question;
     world.flag.reply = () => JSON.stringify({ verdict: "AGREE", reason: "PERSONAL", quote: words });
-    expect(await pressing.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It names a private person in its words." })).toEqual({ state: "HIDDEN" });
+    expect(await pressing.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It names a private person in its words.", good_faith: true })).toEqual({ state: "HIDDEN" });
     expect(await isGone(debate.ref)).toBe(true);
     expect(await flagsOf(debate.ref)).toEqual([{ state: "HIDDEN", verdict: "AGREE" }]);
     // Re-published: reports only go to a person, whatever the AI would say.
     await act(owner, debate, "REPUBLISH");
-    expect(await second.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It still names a private person." })).toEqual({ state: "WITH_A_PERSON" });
+    expect(await second.client.flagPublicDebate(debate.ref, { where: "The question", claim: "It still names a private person.", good_faith: true })).toEqual({ state: "WITH_A_PERSON" });
     expect(await isGone(debate.ref)).toBe(false);
     // The AI does not agree: the plain sentence; a second report with details goes to the queue and hides nothing.
     const other = await freePublic(bea, "Should Harbour Town rebuild the sea wall?");
     world.flag.reply = () => JSON.stringify({ verdict: "NOT_FOUND", reason: null, quote: null });
-    const notFound = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "It breaks the rules somewhere here." });
+    const notFound = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "It breaks the rules somewhere here.", good_faith: true });
     expect(notFound).toEqual({ state: "NOT_FOUND" });
-    expect(v4Catalog[`v4.public.flag.${notFound.state}`]).toContain("An automatic check didn't find this.");
-    const again = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "With more details: the second sentence breaks the rules." });
+    expect(v4Catalog[`v4.public.flag.${notFound.state}`]).toContain("We have not acted on this report: it was stopped automatically, and no person has read it.");
+    const again = await second.client.flagPublicDebate(other.ref, { where: "The question", claim: "With more details: the second sentence breaks the rules.", good_faith: true });
     expect(again).toEqual({ state: "WITH_A_PERSON" });
     expect(await isGone(other.ref)).toBe(false);
     // The rate limit: this person's reports an hour; past it, the one answer every refusal shares. No row is added.
     const limit = await new PostgresFlagLimit().personHour();
     const stranger3 = await world.account("gus");
     const answers: string[] = [];
-    for (let press = 0; press <= limit; press += 1) answers.push((await stranger3.client.flagPublicDebate(other.ref, { where: "Here", claim: `A claim number ${String(press)} about this page.` })).state);
+    for (let press = 0; press <= limit; press += 1) answers.push((await stranger3.client.flagPublicDebate(other.ref, { where: "Here", claim: `A claim number ${String(press)} about this page.`, good_faith: true })).state);
     expect(answers.at(-1)).toBe("NOT_FOUND");
     saw("11", `AGREE: HIDDEN, 410, row HIDDEN/AGREE; after re-publish WITH_A_PERSON, still public; NOT_FOUND answer: "${v4Catalog[`v4.public.flag.${notFound.state}`]!}"; second report WITH_A_PERSON, nothing hidden; ${String(limit)} an hour, then NOT_FOUND. The judge's reply is scripted; the mail is not sent here`);
   }, 300_000);

@@ -81,7 +81,7 @@ describe("V4 account memory in the data export", () => {
       const text = await accountOf(raw, open);
       expect(open.mock.calls).toEqual([[PUBLICATION, RUN_BEHIND_IT, SEALED]]);
       expect(JSON.parse(text).reports_you_made).toEqual([{ debate_reference: PUBLICATION, made_at: "2026-10-29T08:30:00.000Z", outcome: "QUEUED",
-        closed_at: "2026-10-30T08:00:00.000Z", where: "The second paragraph.", what_you_wrote: "This line gives a home address." }]);
+        closed_at: "2026-10-30T08:00:00.000Z", where: "The second paragraph.", what_you_wrote: "This line gives a home address.", closed_as: null, emails: [] }]);
       for (const absent of ["run_id", RUN_BEHIND_IT, "SEALED-WORDS", "SEALED-KEY", "ciphertext", "SECRET-REASON", "AGREE"]) expect(text, absent).not.toContain(absent);
     });
 
@@ -99,7 +99,34 @@ describe("V4 account memory in the data export", () => {
       const snapshot = await collect(raw, open);
       expect(open).not.toHaveBeenCalled();
       expect(snapshot.account.reports_you_made).toEqual([{ debate_reference: PUBLICATION, made_at: "2026-10-29T08:30:00.000Z", outcome: "QUEUED",
-        closed_at: "2026-10-30T08:00:00.000Z", where: null, what_you_wrote: null }]);
+        closed_at: "2026-10-30T08:00:00.000Z", where: null, what_you_wrote: null, closed_as: null, emails: [] }]);
+    });
+
+    it("0157 (D4): a report shows how a person closed it and which emails told you, matched by debate and time; nothing of the person who closed it", async () => {
+      const raw = rawRows();
+      raw.public_flags = [report()];
+      raw.moderation = { statements: [], earlier_notices: [], report_answers: [{ publication_ref: PUBLICATION, created_at: "2026-10-29T08:30:00+00:00", closed_as: "NO_BREACH",
+        emails: [{ kind: "RECEIPT", emailed_at: "2026-10-29T08:31:00+00:00" }, { kind: "NO_BREACH", emailed_at: null }], actor_staff_id: "SECRET-STAFF" }] };
+      const text = await accountOf(raw, async () => ({ where: "w", claim: "c" }));
+      expect(JSON.parse(text).reports_you_made[0]).toMatchObject({ closed_as: "NO_BREACH", emails: [{ kind: "RECEIPT", emailed_at: "2026-10-29T08:31:00.000Z" }, { kind: "NO_BREACH", emailed_at: null }] });
+      expect(text).not.toContain("SECRET-STAFF");
+    });
+
+    it("0157 (D1): each statement of reasons in full, its facts and quote opened under the debate's key; 0156's earlier notices; no run id, no ciphertext", async () => {
+      const raw = rawRows();
+      const FACTS = { ciphertext: "SEALED-FACTS" }, QUOTE = { ciphertext: "SEALED-QUOTE" };
+      raw.moderation = { report_answers: [], earlier_notices: [{ kind: "DEBATE_HIDDEN", publication_ref: PUBLICATION, happened_at: "2026-11-02T08:00:00+00:00", emailed_at: "2026-11-02T08:01:00+00:00" }],
+        statements: [{ statement_id: "s-1", kind: "CONTRIBUTION_REMOVED", publication_ref: PUBLICATION, run_id: RUN_BEHIND_IT, happened_at: "2026-11-05T08:00:00+00:00", piece_kind: "DIG",
+          places: [], ground: { recorded: true, interim: false, grounds: ["PERSONAL_DATA"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false },
+          hidden_now: false, facts: [FACTS], facts_deleted: false, quote: QUOTE, emailed_at: "2026-11-05T08:01:00+00:00" }] };
+      const open = vi.fn(async (_ref: string, _run: string, envelope: unknown) => envelope === FACTS ? { facts: "It names a home address." } : { quote: "the words found" });
+      const account = JSON.parse(await accountOf(raw, open));
+      expect(open.mock.calls.map(([ref, run]) => [ref, run])).toEqual([[PUBLICATION, RUN_BEHIND_IT], [PUBLICATION, RUN_BEHIND_IT]]);
+      expect(account.moderation_notices).toEqual([{ kind: "CONTRIBUTION_REMOVED", debate_reference: PUBLICATION, happened_at: "2026-11-05T08:00:00.000Z", piece_kind: "DIG",
+        ground: { recorded: true, interim: false, grounds: ["PERSONAL_DATA"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false },
+        places: [], facts: ["It names a home address."], facts_deleted: false, quote: "the words found", emailed_at: "2026-11-05T08:01:00.000Z" }]);
+      expect(account.earlier_moderation_notices).toEqual([{ kind: "DEBATE_HIDDEN", debate_reference: PUBLICATION, happened_at: "2026-11-02T08:00:00.000Z", emailed_at: "2026-11-02T08:01:00.000Z" }]);
+      for (const absent of [RUN_BEHIND_IT, "SEALED-FACTS", "SEALED-QUOTE", "ciphertext", "s-1"]) expect(JSON.stringify(account), absent).not.toContain(absent);
     });
 
     it("words that cannot be opened fail the export rather than leave the report out", async () => {
@@ -144,24 +171,24 @@ describe("V4 account memory in the data export", () => {
   });
 
   // Ten with 0131; twelve since the Perplexity plan's 0132 and 0133 added their two readers; thirteen with 0134's;
-  // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's; twenty-two with 0152's;
-  // twenty-three with 0158's; twenty-four with 0162's (Task 39e).
-  it("requires the page memory reader in the worker role witness (twenty-two functions)", async () => {
+  // fourteen with 0135's; fifteen with 0136's; eighteen with 0137 to 0139's (three readers); nineteen with 0141's; twenty-one with 0144's and 0147's; twenty-two with 0152's; twenty-three with 0157's;
+  // twenty-four with 0158's; twenty-five with 0162's (Task 39e).
+  it("requires the page memory reader in the worker role witness (twenty-five functions)", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({
       principal: name, authorization_member: name === "request", worker_member: name === "worker",
       request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 25) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_page_memory(uuid,uuid)");
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 23) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   });
 
   it("names the new account records in the README", () => {
     expect(renderReadme()).toContain(
       // 0132/0133 (the Perplexity plan) append the investigations and the reserve events to the same line.
       "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits, dig links, "
-        + "investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, and the reports you made with the Report button.");
+        + "investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, the reports you made with the Report button with how each was closed and which emails we sent you about it, and your moderation notices: each statement of reasons in full, and the earlier notices we emailed.");
   });
 });

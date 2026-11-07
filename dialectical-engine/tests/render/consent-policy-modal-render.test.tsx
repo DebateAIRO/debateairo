@@ -183,7 +183,8 @@ describe("privacy policy modal — rendered", () => {
     expect(expectedParagraphs).toBe(59);
     // R22 item 15: section 2's and section 7's "Page settings and visits" rows add two. R22 decisions 35 and 36: the report's rows and the sealed original's row add three.
     // Privacy 3.12 (plan Task 83c): section 2's and section 7's "Questions not started yet" rows add two.
-    expect(expectedBullets).toBe(88);
+    // 0157 (Privacy 3.11, amended in place): three table rows more.
+    expect(expectedBullets).toBe(91);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 

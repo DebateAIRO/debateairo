@@ -141,7 +141,7 @@ apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/map-views.ts
 apps/api/src/mfa.ts
-apps/api/src/moderation-notices.ts
+apps/api/src/moderation-statements.ts
 apps/api/src/month-pause.ts
 apps/api/src/onboarding-evidence.ts
 apps/api/src/owner-read.ts
@@ -538,6 +538,7 @@ apps/ui/app/recover/layout.tsx
 apps/ui/app/recover/page.tsx
 apps/ui/app/reset-password/page.tsx
 apps/ui/app/settings/card/page.tsx
+apps/ui/app/settings/notices/page.tsx
 apps/ui/app/settings/page.tsx
 apps/ui/app/settings/security/page.tsx
 apps/ui/app/sign-up/page.tsx
@@ -597,6 +598,7 @@ apps/ui/components/MfaRecoveryCatalog.tsx
 apps/ui/components/MfaRecoveryFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
+apps/ui/components/ModerationNotices.tsx
 apps/ui/components/NewVersionNote.tsx
 apps/ui/components/NodeDetailDrawer.tsx
 apps/ui/components/OwnerPossessionPanel.tsx
@@ -1010,6 +1012,7 @@ apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/clarifyPlace.ts
 apps/ui/lib/v4/clarifyWait.ts
 apps/ui/lib/v4/clock.ts
+apps/ui/lib/v4/debateLevel.ts
 apps/ui/lib/v4/digDock.ts
 apps/ui/lib/v4/digIndex.ts
 apps/ui/lib/v4/digPathPlan.ts
@@ -1274,6 +1277,7 @@ packages/db/src/migration-forward0153.ts
 packages/db/src/migration-forward0154.ts
 packages/db/src/migration-forward0155.ts
 packages/db/src/migration-forward0156.ts
+packages/db/src/migration-forward0157.ts
 packages/db/src/migration-forward0158.ts
 packages/db/src/migration-forward0159.ts
 packages/db/src/migration-forward0160.ts
@@ -1290,6 +1294,7 @@ packages/db/src/migration-lineage.ts
 packages/db/src/migration-n1.ts
 packages/db/src/migration-transaction.ts
 packages/db/src/moderation-notice.ts
+packages/db/src/moderation-statement.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
 packages/db/src/owner-recovery.ts

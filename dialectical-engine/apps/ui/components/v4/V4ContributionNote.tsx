@@ -5,8 +5,11 @@ import type { AnswerContribution } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /*
- * Decision 13: a dig made on a public debate says what became of it, to the digger only (the API serves `contribution` to no one else). No reason is shown.
+ * Decision 13: a dig made on a public debate says what became of it, to the digger only (the API serves `contribution` to no one else). No reason is shown
+ * here; 0157 (D1): after a review step, it links to the person's statement of reasons, which gives the ground and the routes.
  */
+const REVIEWED: ReadonlySet<AnswerContribution["state"]> = new Set(["REMOVED_AFTER_REVIEW", "KEPT_PRIVATE_BY_REVIEW", "OFF_THE_PAGE_FOR_REVIEW"]);
+
 export function V4ContributionNote({ contribution, catalog }: Readonly<{ contribution: AnswerContribution | undefined; catalog: MessageCatalog }>) {
   if (contribution === undefined) return null;
   const rewrite = contribution.rewrite ?? null;
@@ -18,6 +21,11 @@ export function V4ContributionNote({ contribution, catalog }: Readonly<{ contrib
           <>
             {" "}
             <Link className="v4Link" href={`/public/debate/${encodeURIComponent(contribution.public_ref)}`}>{t(catalog, "v4.contribution.seePage")}</Link>
+          </>
+        ) : REVIEWED.has(contribution.state) ? (
+          <>
+            {" "}
+            <Link className="v4Link" href="/settings/notices">{t(catalog, "v4.contribution.statement")}</Link>
           </>
         ) : null}
       </p>

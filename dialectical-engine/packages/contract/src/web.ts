@@ -952,10 +952,12 @@ export type PublicDigParent = z.infer<typeof PublicDigParentSchema>;
 /**
  * `Answer.contribution`, on a dig made on a public debate, for the digger: CHECKING (the AI check on it is running), ON_THE_PAGE (it changed
  * the public page) or KEPT_PRIVATE (the check refused it or could not run: the dig stays theirs, and the page is unchanged). REMOVED_AFTER_REVIEW: it was on the page and was taken off after a review (decision 33); no reason and no staff name.
+ * 0157 (gap 5): KEPT_PRIVATE_BY_REVIEW, it was still running when its debate was hidden, so the review kept it private, not its check; OFF_THE_PAGE_FOR_REVIEW, it
+ * passed the check but is off the page while a review runs (its debate is hidden, or an earlier dig was taken out), and was not found to break any rule.
  */
 export const AnswerContributionSchema = z.object({
   public_ref: z.uuid(),
-  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE", "REMOVED_AFTER_REVIEW"]),
+  state: z.enum(["CHECKING", "ON_THE_PAGE", "KEPT_PRIVATE", "REMOVED_AFTER_REVIEW", "KEPT_PRIVATE_BY_REVIEW", "OFF_THE_PAGE_FOR_REVIEW"]),
   /** The digger's own rewrite of the path, for the digger only. Null: not written (yet), or closed by a review. Never a run id, and nothing of the debate above it. */
   rewrite: z.object({ line: z.string(), summary: z.string(), fate: StoryFateSchema, what_changed: z.array(z.string()) }).strict().nullable().optional()
 }).strict();
@@ -1061,9 +1063,37 @@ export type PublicMaterialPath = z.infer<typeof PublicMaterialPathSchema>;
 export type PublicMaterialDig = z.infer<typeof PublicMaterialDigSchema>;
 export type PublicMaterialPoint = z.infer<typeof PublicMaterialPointSchema>;
 
+/**
+ * GET /v1/account/moderation-statements (migration 0157; DSA Art 17; the owner's D1 of 6 November 2026): the signed-in person's own statements of reasons,
+ * newest first. Each says what was done to which item (its debate's public reference, and the kind of piece), when, where the facts came from, how automated
+ * means were used and the ground (fixed codes; `recorded` false for a step from before grounds were kept), and, here only, the facts a person typed, the
+ * automatic hide's quote (to the debate's owner) and the places a correction changed. Never a staff id or the reporter's identity.
+ */
+export const ModerationStatementGroundCodeSchema = z.enum(["REVIEW_HOLD", "UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]);
+export const ModerationStatementSchema = z.object({
+  statement_id: z.uuid(),
+  kind: z.enum(["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED"]),
+  public_ref: z.uuid(),
+  happened_at: z.iso.datetime({ offset: true }),
+  piece_kind: z.enum(["DIG", "REPORT"]).nullable(),
+  hidden_now: z.boolean(),
+  ground: z.object({
+    recorded: z.boolean(), interim: z.boolean(), grounds: z.array(ModerationStatementGroundCodeSchema).max(8), suspected: z.array(ModerationStatementGroundCodeSchema).max(8),
+    sources: z.array(z.enum(["REPORT_BUTTON", "EMAIL_NOTICE", "OWN_INITIATIVE", "AUTHORITY_ORDER"])).max(4), automated_detection: z.boolean(), automated_decision: z.boolean()
+  }).strict(),
+  facts: z.array(z.string().max(4000)).max(50),
+  facts_deleted: z.boolean(),
+  quote: z.string().max(4000).nullable(),
+  places: z.array(z.object({ piece_kind: z.enum(["SNAPSHOT", "UPDATE", "REPORT"]), pointer: z.string().regex(/^(\/[A-Za-z0-9_]{1,64}){1,12}$/u) }).strict()).max(200)
+}).strict();
+export type ModerationStatement = z.infer<typeof ModerationStatementSchema>;
+export const ModerationStatementsSchema = z.object({ statements: z.array(ModerationStatementSchema).max(500) }).strict();
+export type ModerationStatements = z.infer<typeof ModerationStatementsSchema>;
+
 /** POST /v1/public/debates/{id}/report (decision 13): nothing but the press; the writer is the session's. */
-/** Decision 35: "Report" on a public debate: what is wrong, and where. Bound in length: it goes to an AI the site pays for, and is kept. */
-export const PublicFlagRequestSchema = z.object({ where: z.string().trim().min(1).max(300), claim: z.string().trim().min(10).max(2000) }).strict();
+/** Decision 35: "Report" on a public debate: what is wrong, and where. Bound in length: it goes to an AI the site pays for, and is kept. `good_faith`: the reporter's
+ * statement that the report is accurate and complete (DSA Art 16(2)(d); Terms §10), which a notice must carry; a press without it is not a notice. */
+export const PublicFlagRequestSchema = z.object({ where: z.string().trim().min(1).max(300), claim: z.string().trim().min(10).max(2000), good_faith: z.literal(true) }).strict();
 export type PublicFlagRequest = z.infer<typeof PublicFlagRequestSchema>;
 /** NOT_FOUND is every refusal alike. No more than these three leave the server. */
 export const PublicFlagAnswerSchema = z.object({ state: z.enum(["NOT_FOUND", "HIDDEN", "WITH_A_PERSON"]) }).strict();

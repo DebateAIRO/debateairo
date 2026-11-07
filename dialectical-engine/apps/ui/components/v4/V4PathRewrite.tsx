@@ -6,6 +6,7 @@ import type { PathRewrite, PathsChangedSince, PointOfViewVerdict } from "@debate
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { cardLabel, digOutcome, pathHolds, pathOutcome, type DigOutcome } from "@/lib/v4/mapLooks";
 import { isFinishedRewrite, rewriteStateOf } from "@/lib/v4/mapModel";
+import type { ReportStage } from "@/lib/v4/reportWriting";
 import { servedRewriteWords } from "@/lib/v4/trust";
 import { levelHref } from "@/lib/v4/storage";
 import type { DigView, ReadingLevel, RewriteState, TrustWord, V4Map, V4Path, V4Point } from "@/lib/v4/types";
@@ -333,7 +334,10 @@ export function V4PathRewrite(props: Readonly<{
  * screen review (owner picks 3 Nov 2026), dig-f19 / map-f17: since the 31 Oct ruling the main answer updates itself after
  * each change, so a line shows only once a report exists and the map has moved on since it: "Your report is older than
  * the map." with [Update my report], the changed paths named under it (never a count), and while a dig runs "It will
- * wait for your running dig." (ruling F7). Hidden before any report, and when nothing changed since it.
+ * wait for your dig in progress." (ruling F7; the owner's words in the fourth round, 6 Nov). Hidden before any report, and
+ * when nothing changed since it. The fourth round also hides it whole while a new report version waits for digs or is
+ * being written (that version takes these changes in), and brings it back only when the map changes after that version
+ * (`reportStage`; reportCoversChanges below).
  */
 export function V4ChangedSince(props: Readonly<{
   changedSince: PathsChangedSince | null | undefined;
@@ -344,12 +348,18 @@ export function V4ChangedSince(props: Readonly<{
   changedPaths?: readonly V4Path[];
   /** A dig is still running: the report it writes will wait for it. */
   digRunning?: boolean;
+  /**
+   * The owner's fourth round (6 Nov 2026): the map's report stage (useMapReport's `stage`). While a new version waits for
+   * digs or is written, the box is hidden; it comes back when the map changes after that version. Absent: as before.
+   */
+  reportStage?: ReportStage;
 }>) {
   const { changedSince, catalog } = props;
   const titleId = useId();
   if (changedSince === null || changedSince === undefined || changedSince.since_report_version === null || changedSince.count === 0) {
     return null;
   }
+  if (props.reportStage !== undefined && reportCoversChanges(props.reportStage, changedSince.since_report_version)) return null;
   const named = props.changedPaths ?? [];
   return (
     <section className="v4ChangedSince" aria-labelledby={titleId}>
@@ -368,6 +378,32 @@ export function V4ChangedSince(props: Readonly<{
       {props.digRunning === true ? <p className="v4ChangedSinceWait v4Muted">{t(catalog, "v4.rewrite.waitsForDig")}</p> : null}
     </section>
   );
+}
+
+/**
+ * The owner's fourth round (6 Nov 2026): whether a report version newer than the one the map's count is against
+ * (`sinceVersion`, the server's newest written report) takes the changes in. A version that waits for digs or is being
+ * written does (it reads every finished rewrite when it starts); so does one written since, when the map was read before
+ * it was (the count then still names the older version). A version that did not finish takes nothing in, and an
+ * investigation reopened by a dig (or not read) says nothing about versions: the count speaks for itself, as before.
+ *
+ * The DONE case is a stand-in for the map's next read of the answer, and it has one known gap. A rewrite that finishes
+ * after the new version began but before it was written is in that old count, yet the version does not have it. Until the
+ * answer is read again, the box stays hidden for it. The page closes that gap by reading the answer again as soon as a
+ * version is written (wiring list item 21, with the `reportStage` prop): the fresh count then names the new version, and
+ * this case only keeps the box from flashing between the version's end and that read.
+ */
+function reportCoversChanges(stage: ReportStage, sinceVersion: number): boolean {
+  switch (stage.kind) {
+    case "WAITING_DIGS":
+    case "WRITING":
+    case "DONE":
+      return stage.version > sinceVersion;
+    case "FAILED":
+    case "NONE":
+    case "UNKNOWN":
+      return false;
+  }
 }
 
 const DIG_PAGE_STATE_KEYS: Readonly<Record<RewriteState, string>> = Object.freeze({

@@ -26,6 +26,8 @@ export const RAW_SECTIONS = [
   "pre_start_calls",
   // The reports the person made with the Report button (0152, identity.read_data_export_public_flags). Not what the AI answered.
   "public_flags",
+  // 0157 (D1, D4): the person's statements of reasons, 0156's earlier notices and the answers to their reports (identity.read_data_export_moderation).
+  "moderation",
   // V4 start step, Task 39e: the questions not started yet (0162, identity.read_data_export_saved_questions), each opened with its own key.
   "saved_questions",
 ] as const;
@@ -557,13 +559,33 @@ export async function collectSnapshot(input: {
     const legalAcceptances: Row[] = [];
     for (const source of rows(raw.legal_acceptances)) legalAcceptances.push(plain(project(source, KEEP_COLUMNS.legal_acceptances), "evidence_ciphertext", "evidence",
       openedRecord(decrypt, source, "evidence_ciphertext", { table: "legal.acceptance", column: "evidence_ciphertext", rowId: string(source.acceptance_id) })));
+    // 0157: one object from identity.read_data_export_moderation (an empty list in a fixture that predates it).
+    const moderation: RawRow = Array.isArray(raw.moderation) && raw.moderation.length === 0 ? {} : row(raw.moderation);
+    const listOf = (value: unknown): RawRow[] => value === undefined ? [] : rows(value);
+    const answers = listOf(moderation.report_answers);
     const reportsYouMade: Row[] = [];
     for (const source of rows(raw.public_flags)) {
       // Null once the six months are over: only the record of the report stays.
       const words = source.content == null ? null : await decrypt.openPublicFlag(string(source.publication_ref), string(source.run_id), source.content) as Readonly<{ where?: unknown; claim?: unknown }>;
-      reportsYouMade.push({ debate_reference: string(source.publication_ref), made_at: source.created_at, outcome: source.state, closed_at: source.dismissed_at ?? null, where: words?.where ?? null, what_you_wrote: words?.claim ?? null });
+      // 0157 (D4): how a person closed it, and which mails told you; matched to the report by debate and time.
+      const answer = answers.find((candidate) => candidate.publication_ref === source.publication_ref && new Date(string(candidate.created_at)).getTime() === new Date(string(source.created_at)).getTime());
+      reportsYouMade.push({ debate_reference: string(source.publication_ref), made_at: source.created_at, outcome: source.state, closed_at: source.dismissed_at ?? null, where: words?.where ?? null, what_you_wrote: words?.claim ?? null,
+        closed_as: answer?.closed_as ?? null, emails: listOf(answer?.emails).map(({ kind, emailed_at }) => ({ kind, emailed_at: emailed_at ?? null })) });
     }
-    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations" | "public_flags" | "saved_questions">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
+    // 0157 (D1): each statement of reasons in full; the facts a person wrote and the automatic hide's quote opened under the debate's key.
+    const moderationNotices: Row[] = [];
+    for (const source of listOf(moderation.statements)) {
+      const runId = source.run_id == null ? null : string(source.run_id);
+      const opened = async (envelope: unknown, field: "facts" | "quote"): Promise<unknown> => envelope == null || runId === null ? null
+        : ((await decrypt.openPublicFlag(string(source.publication_ref), runId, envelope)) as Record<string, unknown> | null)?.[field] ?? null;
+      const facts: unknown[] = [];
+      for (const envelope of Array.isArray(source.facts) ? source.facts : []) { const text = await opened(envelope, "facts"); if (text !== null) facts.push(text); }
+      moderationNotices.push({ kind: source.kind, debate_reference: string(source.publication_ref), happened_at: source.happened_at, piece_kind: source.piece_kind ?? null,
+        ground: source.ground ?? null, places: listOf(source.places).map(({ piece_kind, pointer }) => ({ piece_kind, pointer })), facts, facts_deleted: source.facts_deleted === true,
+        quote: await opened(source.quote, "quote"), emailed_at: source.emailed_at ?? null });
+    }
+    const earlierNotices: Row[] = listOf(moderation.earlier_notices).map(({ kind, publication_ref, happened_at, emailed_at }) => ({ kind, debate_reference: string(publication_ref), happened_at, emailed_at: emailed_at ?? null }));
+    const simple = <K extends Exclude<RawSection, "billing" | "web_evidence" | "investigations" | "public_flags" | "moderation" | "saved_questions">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
     return utcTimestampStrings({
       exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
       requestedAt: claim.requestedAt, generatedAt: input.now(), recipient: email ?? "",
@@ -586,6 +608,8 @@ export async function collectSnapshot(input: {
         question_readings: simple("ask_clarify_calls"),
         before_start_readings: simple("pre_start_calls"),
         reports_you_made: reportsYouMade,
+        moderation_notices: moderationNotices,
+        earlier_moderation_notices: earlierNotices,
         // V4 start step, Task 39e: the questions not started yet (never `kept_questions`, which the threat reports use).
         questions_not_started: await collectQuestionsNotStarted(raw, claim, decrypt),
       },

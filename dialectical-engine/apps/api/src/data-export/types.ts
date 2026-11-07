@@ -93,6 +93,8 @@ export type ExportSnapshot = Readonly<{
   generatedAt: Date;
   account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[]; kept_questions: Row[];
     reading_level: Row | null; debate_visits: Row[]; dig_links: Row[]; investigations: Row[]; reserve_events: Row[]; question_readings: Row[]; before_start_readings: Row[]; reports_you_made: Row[];
+    /** 0157: the statements of reasons, and 0156's earlier notices. */
+    moderation_notices: Row[]; earlier_moderation_notices: Row[];
     /** V4 start step, Task 39e: the questions not started yet, each opened with its own key (saved questions spec 2026-11-04 §3.9). */
     questions_not_started: Row[] }>;
   security: Readonly<{ mfa_factors: Row[]; passkeys: Row[]; recovery_codes: Row | null; sessions: Row[]; social_identities: Row[]; email_changes: Row[]; recovery_email_changes: Row[]; recovery_requests: Row[] }>;

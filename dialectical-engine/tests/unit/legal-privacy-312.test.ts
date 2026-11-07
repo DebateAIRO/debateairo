@@ -93,9 +93,10 @@ const SWAPS: Readonly<Record<string, readonly (readonly [string, string])[]>> = 
     ["Your email address, your debates and your authentication secrets", "Your email address, your debates, the questions you have not started yet and your authentication secrets"],
     ["nobody else at our company can read your private debates.", "nobody else at our company can read your private debates or the questions you have not started yet."]
   ],
+  // 0157 (V4, Privacy 3.11 amended in place): the 3.11 row now ends with the moderation notices and the answers to reports.
   access: [[
-    "answers or check results. |",
-    "answers or check results. It also holds each question you have not started yet, with your answers and paths. |"
+    "which emails we sent you about it. |",
+    "which emails we sent you about it. It also holds each question you have not started yet, with your answers and paths. |"
   ]],
   erasure: [[
     "Delete a private debate at any time from the debate page.",
@@ -198,43 +199,43 @@ const LABELS = {
   clarifyQuestions: "Before a debate starts: suggesting clarifying questions"
 } as const;
 
-/** The last 3.11 text of each locale (d3bf346e5), by the sha256 the archive names it with. */
+/** The last 3.11 text of each locale (V4's 25b81f5db: 3.11 amended in place for the moderation notices, 0157), by the sha256 the archive names it with. */
 const PRIOR: Readonly<Record<string, string>> = {
-  ar: "55e255f34ef47ed4df60f7a697780bdd8244b2cbd53ca28fc511ce36741b1726",
-  bg: "049ef7254a789601d3f6c232c7723886d20f7ac6cf68cfcaa6a064b02d078883",
-  cs: "a423b633c08e342c0661611ee3a48e6ea21532d6673d66bbda67361acaf71bf6",
-  da: "a2696348b253292309891f4763201f54561470357a0145ab8e103741ca52c723",
-  de: "147c3ab0b9fa5ab7af64e7951e7125c9436b880f386fc028694e37c592583ddd",
-  el: "df69b511b781b9b0b850b2832312f374731cb568e7e863ef556ceab01344ac2a",
-  en: "7252fafd0b72f3a23a822668170bc76b93297e067dd5f12324a900dd43167a53",
-  es: "e2af98103eede479613bc92943a3166e0980dbc7e496243742ddf5e6b03e166b",
-  et: "808986df541038f9751485cbb0787fffd9a2281d358ee945e19c778483a9bb2c",
-  fi: "8d123be9cbed68e93341e52050ade21b63725394b18069ed46ffe47b603c35bf",
-  fr: "cd19a3a39f727e49b53a436fb4792e822f4b6016bf4cc9c929bc56eced0bd7a3",
-  ga: "f748cbc8525f8da09eea4c271cb7aea339af9533c46a4e5a0389fc81a77e649f",
-  he: "866c7322c7ed68ef74f2d9f1712ac9ec672e8717074610f44c489e2a56de512b",
-  hi: "87b4a05ab7c17cb13e72e23ae79ee8a876ab215b596ed7cf4bb0ef7fb503aed9",
-  hr: "5f9be5a72049a4f3b268483cd1014bec9525521addbbf94399aaa2817819f2f4",
-  hu: "5e07c727acc4cd6dc312f9bc8b01d1710d2dd2c67213d83b8369248cbf72995e",
-  id: "2c43c29d715154df598a25e41eefe56bec4f8bc81a6394631efdda5157ae9d24",
-  it: "5163148781cbb2a1898ee955a53b53232c376671faae663d09b4b41f602b29f2",
-  ja: "d4270d811eff235939ebe281f5582d6a144c65eb7f1536a11ffe4420b08a53d2",
-  ko: "77b4b99213b9d2d97fd8c5682caaa51591b6aa803326a94f6a4b26fb24daa799",
-  lt: "dd31acce76be672dd590297f673ba66151143c99c3e0b96bc7948953a4016420",
-  lv: "527ece34a3c8700840fde85e051c24613322b44e286f4b6579955d6d174e7b6f",
-  mt: "8ce4002927548f43e523be4f193b5c06556f63c21c08245f1f1061cecda11be0",
-  nl: "c3d6d45fdc0d1e9796b6f3eef35bf2eef3b3fcfc362a8913b7aa40588db44862",
-  pl: "7c04e12e57acc8d5f247dc746cf38a8a1a6ae5a2e4e8bb4b7df68f98048d336c",
-  pt: "c481f355704c67d82a811fb650bd211248d35d4796e9927b6be15f488e1ab4dc",
-  ro: "fc400136334354f3658928d2ea9d0f23b693a883a63c13e3919134a34ed5423c",
-  ru: "746d01e372296d5a1305f35c6856bffe0f5ac28fc6695e9e5e22acaf1cb6842a",
-  sk: "fc02b3072c1c6d8d037e2363398841e4caa15b6fbf9726fcbc9f28d575dad035",
-  sl: "6d1931f30ddcce72b357ab255bedd53b92626b146d6219e3a2f20bb799db3cec",
-  sv: "266aa35ec19e21290c28619ed57d9db54c01057ee565b7d93176319e186ffa82",
-  tr: "5685b3cac61196cb9bb6cc77be42af8e9eb1409e82daea686152848b8a9a2716",
-  uk: "85b307bb12e3501c6fb099baab43f0550dc3bb85bd0f6dac61b5624f3473b466",
-  vi: "8762fb92aacea0f4e0847c1a8b2d729ed89fa1d8c383578ddc3b53557d00e8d0",
-  zh: "b130c700a5821fc7ccead39f8a5a5bd32249c5964382cfd50599f2cb75b46210"
+  ar: "7d51051633092751f21eb44a4b291a38609a91936341e486da0b6c39a1bf20c0",
+  bg: "6ef675d738a08e7fc085329ae35b82695a11e6ca393737b12c3e99e7d3f72439",
+  cs: "da8b248ef6b246536e288a7e443a181d2e3c264ef5d03b635ec085a13b0ea11c",
+  da: "eeb3003652228fead29cbd5c567d9fe31b6058660b70a26aa56098c587967bea",
+  de: "b680d35df360542c3046337bd7c77f535ecbdbe47469e3f247e408797e0350fc",
+  el: "920173e697906adb736dd33a4081d7af7d555f11d02a60b096bd757712d0a8e2",
+  en: "f5ebf00a24546ead412bdf85abfda57cf8d90cc1101ab49351e1f6992a12c87f",
+  es: "ff878cdcc3774d47bc111fb9527512b83c36b99d25c2d7ad6abd42dcff5169d0",
+  et: "1f08b4a7fcf27ae38a08360fb5e352fc73cb3af749d6fae6d67eff93fa0779f3",
+  fi: "2a0b213b64ce23a6759aa4982a7b3fc8f93f30f9474a0884afa89eab27c36bf3",
+  fr: "2c17f46b1e00097ed5d0711a52800538950b98f521e43556558c47f1870d687c",
+  ga: "10cb0b9fcbc7636c329449c094b3e89b14eb8ecfaeef78a3380cc0bb41cda4df",
+  he: "e75989447b9013538c674dd22ee4a0de95b0c97268331ea955ab4e5321bc7323",
+  hi: "9eacbb3cf4d5deb0a3710e2ade9bb7a87bde3076401de4572604aab2d4c88fc1",
+  hr: "f9f42cba7b2f76f8b3e95fad9c8f5d613b59f7b40d8b6458fe25605bd91bfe73",
+  hu: "8f7fd08d50394865bb9fc0d22f0e934703354d135b0875f1e05cc54f3e58496c",
+  id: "4e5bd17e10d33914c4e8ccc2036a1115b374a4debedbef6269d28a1981d51a47",
+  it: "b36c73c67a3554733ed333d9dd20aa73770799baa30e2ac802508d3169fe317e",
+  ja: "055d3ad203a854e4b0c2cc8608f4a3a32384c8e34471ddc650043ab4db9b56b1",
+  ko: "9bbf097b8d032c56ec94d2ae02e341914f451d6ef2c8f77df240321bcf91efbd",
+  lt: "9e778e9f516107377bd66afdc76d60c35eb3ad354a06df219e758d0e6a8e612f",
+  lv: "9cd58a00f53860b45c296e766460d18ede48d76eafae5f0916f25de397c389f3",
+  mt: "124665a70d53bf87d0516776533dd54d57fedbd12acde0ba384e86b6e0c7c44e",
+  nl: "ca4034cbaebc307c3e377aa6c9f1353c35fb92474cc0b8607828af39a7a89fa1",
+  pl: "98584c9144df40980f618dba1fee436664aa57323cd21d5fcdd4791bc6774a57",
+  pt: "341cf17e9484e012d1b8c5176e1d07a81cb75b7bc971a7edbc1cc3e4adbbdb41",
+  ro: "2a0407cd74fa0e1d16547efd8ac58eb45d0b8b6ab0ef37be2b2056f01854ecb5",
+  ru: "2f7ea770823f80e6f082927a44c34ea60d06326f3548c2ea8d6b94fd06516581",
+  sk: "d9409cd0ec59ff1141e68ab50f1a35b60e352b16d529144c74f97bb6f39ef131",
+  sl: "3ed32aed78f4da219959d1daf796248d2f8f5402f63bde7e40e47caffb394b67",
+  sv: "0b20dd64670e8ce340f273fbddccf1cc8f4e734e9eb64af339fe20019fc7bd3d",
+  tr: "6e658426606f7ccd17e4c49daec8b299024230d748de9baacd239d8c1a0b19fe",
+  uk: "3fae107cc31eeb59989243977081e256cbabf6bf48619fd1d3a1e9ad8e470364",
+  vi: "f6efa5825bab5b5b8032058ccb09574284a09e2a6bc9f88736e41ba7dae91c96",
+  zh: "e12836cb1ce0b2e55ea5c1473e380b5f547922111a9a35b6f7f3e1b933d93e02"
 };
 
 /**
@@ -283,23 +284,25 @@ const DATES: Readonly<Record<string, Readonly<{ eyebrow: string; line: string; u
  * 0-based line indexes of the 3.12 draft: the eyebrow, the end marker, the version line, section 2's new row and Next
  * paragraph, section 3's "About you", section 4's contract, sensitive-information and question-check rows, section 6's
  * Free paragraph, section 7's new row, section 9, section 10's Access, Erasure and Withdraw consent rows, section 14's log.
+ * V4's 0157 (3.11 amended in place) adds section 2's moderation notices row and section 7's two rows, so the lines from
+ * the Next paragraph on moved by one, and those from section 9 on by three.
  */
 const EYEBROW = 4;
 const END_MARKER = 7;
 const VERSION_LINE = 21;
 const SAVED_ROW_AT = 44;
-const NEXT_LINE = 54;
-const SENSITIVE_INFORMATION = 62;
-const CONTRACT = 74;
-const SENSITIVE_CONSENT = 83;
-const QUESTION_CHECK = 87;
-const FREE = 124;
-const SAVED_RETENTION_AT = 153;
-const SECURITY = 183;
-const ACCESS = 193;
-const ERASURE = 195;
-const WITHDRAW = 199;
-const CHANGE_LOG = 257;
+const NEXT_LINE = 55;
+const SENSITIVE_INFORMATION = 63;
+const CONTRACT = 75;
+const SENSITIVE_CONSENT = 84;
+const QUESTION_CHECK = 88;
+const FREE = 125;
+const SAVED_RETENTION_AT = 154;
+const SECURITY = 186;
+const ACCESS = 196;
+const ERASURE = 198;
+const WITHDRAW = 202;
+const CHANGE_LOG = 260;
 /** The two new rows, each right after its table's "Page settings and visits" row. */
 const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
 const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];

@@ -24,6 +24,7 @@ import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { waitForDigs } from "@/lib/v4/digUndo";
 import { whenText } from "@/lib/v4/stateWords";
+import { loadedLevelOf } from "@/lib/v4/debateLevel";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
@@ -66,9 +67,10 @@ import {
  *  - 35 A: "Link copied." stays until the next Share choice, as the "Public" line's does (the copy-failed line already
  *    did). Each choice first clears the line, so a second "Link copied." is read out again.
  *  - The level ruling: a debate keeps the level it was asked at, and the line above the title says "Report" with no level.
- *    Until the server's run read names that level (reading_level), the links to this debate's map and its digs' maps, and
- *    the address moves, still carry ?level=, so the map and its report keep one level both ways; they drop it in the same
- *    change that reads reading_level. "Ask a new question" carries none: a new question picks its own level.
+ *    The details are shown at the level the run read names (reading_level), and at Plain words when it names none; never
+ *    at a level from the address (7 Nov). The links to this debate's map and its digs' maps, and the address moves, still
+ *    carry the address's ?level= until they drop it together with the map's own links into this page. "Ask a new
+ *    question" carries none: a new question picks its own level.
  *  - 4 A: the version list in the long form with the year, clocks in 24 hours. The third round (5 Nov afternoon): the start
  *    of writing on another day in the long form too ("Started 4 November 2026, 14:02"), through the same helper as the
  *    map's report line, the waiting card and the list of your questions (lib/v4/stateWords.ts whenText).
@@ -89,7 +91,11 @@ type ReportLoad =
   | Readonly<{ kind: "NOT_FOUND" }>
   | Readonly<{ kind: "NOT_READY"; failed: boolean }>
   /** readFailures: failed story reads in a row (V3's rule: the fourth one is accepted as the story's state). */
-  | Readonly<{ kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null; readFailures: number; language: string | null }>;
+  /** level: the level the debate was asked at, as its run read names it (null: the read names none). */
+  | Readonly<{
+    kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null; readFailures: number; language: string | null;
+    level: ReadingLevel | null;
+  }>;
 
 /** A dig as the report lists it; `view` is undefined while it loads and null when it could not be read just now. */
 type ReportDig = Readonly<{ link: DigLink; view: DigView | null | undefined }>;
@@ -111,8 +117,22 @@ const REPORT_SLOW_POLL_MS = 120_000;
 const PRESS_MATCH_MS = 5 * 60_000;
 /** A dig's path sits one step in per level, up to four steps (as in the PDF). */
 const PATH_LEVEL_STEPS = 4;
-/** Spec D5: the reading level defaults to "Some background" when none is chosen. */
-const DEFAULT_LEVEL: ReadingLevel = "background";
+/**
+ * A report whose run read names no level shows its details at Plain words, because the owner ruled on 5 Nov that the level
+ * choice on the first screen always starts on Plain words (second round of follow-ups), and a public page reads such a
+ * debate the same way. No level is taken from the address or the account (7 Nov, as the start-step session's map does).
+ * This is the page's own default, not a server rule: the server gives a debate asked without a level no reader sentence at
+ * all (packages/kernel/src/reading-level.ts). Spec D5's "Some background" default is gone here. The map page's default
+ * (V4DebateClient's DEFAULT_LEVEL, still "Some background") moves to Plain words in the start-step session's first-screen
+ * change (wiring list item 20), so a debate's map and report agree. Until then the two differ only on the map: this page
+ * draws Plain words and Some background alike (only Expert adds to it).
+ */
+const DEFAULT_LEVEL: ReadingLevel = "plain";
+
+/** The level the report's details are shown at: the debate's own, as its run read names it, else Plain words. */
+export function reportLevelOf(debateLevel: ReadingLevel | null): ReadingLevel {
+  return debateLevel ?? DEFAULT_LEVEL;
+}
 
 /** report-f14: what marks AI text: the debate's language (when known) and its own writing direction. */
 type AiProps = Readonly<{ "data-ai-generated": "true"; dir: "auto"; lang?: string }>;
@@ -347,14 +367,12 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   initialLevel: ReadingLevel | null;
   catalog: MessageCatalog;
 }>) {
-  // Decision A: the level lives in the address; choosing one rewrites `?level=` (useReadingLevel does that).
-  // Owner's level ruling (5 Nov): the report shows its details at the level its debate was asked at. Until the server's run
-  // read names that level (reading_level, coming on the other session's branch), the details keep today's level (the
-  // address, else the account), and the links back to this debate's map and its digs, and the address moves below, keep
-  // carrying it (the map's links into this page carry it too), so the round trip never depends on the account's memory.
-  // The change that reads reading_level drops ?level= from all of them at once.
+  // Owner's level ruling (5 Nov): the report shows its details at the level its debate was asked at, as the run read names
+  // it (`reading_level`, which the map's loader hands on as `level`: the start-step session's Task 75c), and Plain words
+  // when it names none (`level` below); never a level from the address or the account (7 Nov). The address's `?level=` is
+  // still read only for the links back to this debate's map and its digs, and the address moves below, which keep carrying
+  // it until they drop it with the map's own links into this page (the map no longer reads it on the start-step branch).
   const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
-  const level: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
 
   // report-f9: the debate this page reads. A dig's report address moves to the first question's (the investigation's root).
   const [target, setTarget] = useState(id);
@@ -364,6 +382,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const [attempt, setAttempt] = useState(0);
   // B1's rule: a story still being written reads as such until the page stops waiting for it.
   const [storyGaveUp, setStoryGaveUp] = useState(false);
+  // The level the details are shown at: the debate's own when its run read names it, else Plain words (reportLevelOf).
+  const level: ReadingLevel = reportLevelOf(load.kind === "SERVED" ? load.level : null);
 
   useEffect(() => {
     let active = true;
@@ -379,7 +399,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
             answer: result.answer,
             story: result.story,
             readFailures: storyReadFailed(result.story) ? 1 : 0,
-            language: usableTag(result.language) ?? usableTag(result.story?.language)
+            language: usableTag(result.language) ?? usableTag(result.story?.language),
+            level: loadedLevelOf(result)
           });
         } else {
           setLoad({ kind: "NOT_READY", failed: result.run.state === "FAILED" });

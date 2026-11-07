@@ -20,8 +20,8 @@ describe("0146 the Owner's allowances for team members", () => {
     expect(manifest.verifier.path).toBe("lineage/verify-effective-capabilities-130.sql");
     expect(createHash("sha256").update(readFileSync(resolve(root, manifest.migration.name))).digest("hex")).toBe(manifest.migration.sha256);
     const chain = (await loadMigrationPlan()).forwardChain;
-    expect(chain.at(-19)!.name).toBe("0146_team_allowances.sql");
-    expect(chain.at(-19)!.previousName).toBe("0145_web_researched_unsettled.sql");
+    expect(chain.at(-20)!.name).toBe("0146_team_allowances.sql");
+    expect(chain.at(-20)!.previousName).toBe("0145_web_researched_unsettled.sql");
   });
   it("adds no billing relation, and gives the runtime role exactly the seven functions", () => {
     expect(sql).not.toMatch(/CREATE TABLE[^\n]*billing\./u);

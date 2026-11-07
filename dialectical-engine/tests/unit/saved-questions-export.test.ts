@@ -146,22 +146,22 @@ describe("the questions not started yet in account.json", () => {
   });
 
   it("the README names them on account.json's line", () => {
-    expect(renderReadme()).toContain("the reports you made with the Report button. It also holds the questions you have not started yet, "
+    expect(renderReadme()).toContain("each statement of reasons in full, and the earlier notices we emailed. It also holds the questions you have not started yet, "
       + "with your answers and paths.");
   });
 });
 
 describe("the worker reads 0162's reader", () => {
-  it("as one more function in its role witness (twenty-four), and beside the snapshot in readRaw", async () => {
+  it("as one more function in its role witness (twenty-five, after 0157's moderation reader), and beside the snapshot in readRaw", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({ principal: name, authorization_member: name === "request",
       worker_member: name === "worker", request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 25) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_saved_questions(uuid,uuid)");
-    expect((seen[1]?.[1] as string[]).length).toBe(24);
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 23) as never))
+    expect((seen[1]?.[1] as string[]).length).toBe(25);
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never))
       .rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
 
     const sql: string[] = [];

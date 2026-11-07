@@ -639,7 +639,10 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Renumber before merging origin V4 957e3d9d7 (2026-11-07): V4 took 0157 (the moderation statements), so the start step's eight
 // migrations moved up one again (0157-0164 → 0158-0165) and the module's comments, like the Task 20, 21, 53a and 56a lines above,
 // now name 0159, 0160, 0161 and 0163. Comments only; migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
-const NATIVE_MIGRATE_MODULE_SHA256 = "edf47a337d54a86e6bd47a51eecb99af06eda7218420d4099969b767724cb01b";
+// Moderation statements (2026-11-06): one export line for the statements of reasons repository (0157); migrate() is byte-identical.
+// Merge of origin V4 957e3d9d7 (2026-11-07): the module carries V4's moderation-statements export line (0157) and the start
+// step's comments above. migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+const NATIVE_MIGRATE_MODULE_SHA256 = "1a1abf9bbbbf3ad0d231cc4a905b1de5e6fd0dd683c17d00db4d478edbc6bb6c";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

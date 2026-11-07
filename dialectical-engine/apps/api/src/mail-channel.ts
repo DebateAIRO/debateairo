@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import { MailTemplateError, MAIL_TEMPLATES, copyOf, mailAttachmentFactsOf, mailLocaleOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
 import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 import { isMailAddress } from "@debateai/kernel";
+import { SELLER_COMPANY } from "@debateai/billing-core";
 
 // With `sendmail -t` the MTA reads every recipient out of the header block on
 // stdin, so no address reaches argv, which any local user can read with `ps`
@@ -362,9 +363,12 @@ function composeTemplatedMessage(from: string, mail: TemplatedMail, boundary: st
   }
   try {
     // R-31: a user mail names its language in the header block. An owner template's text is English (V-4), so it says en.
-    const contentLanguage = MAIL_TEMPLATES[mail.templateId].catalogue === "owner" ? "en" : mailLocaleOf(mail.locale);
+    const template = MAIL_TEMPLATES[mail.templateId];
+    const contentLanguage = template.catalogue === "owner" ? "en" : mailLocaleOf(mail.locale);
+    // 0157 (D6): a moderation mail is answered by the complaints route the Terms name, office@; From stays noreply@.
+    const replyTo = template.replyTo === "authorities" ? SELLER_COMPANY.emails.authorities : undefined;
     return buildTemplatedMessage({
-      from, to: mail.to, messageId: mail.messageId ?? null, ...rendered, attachments, boundary, contentLanguage
+      from, to: mail.to, messageId: mail.messageId ?? null, ...rendered, attachments, boundary, contentLanguage, ...(replyTo === undefined ? {} : { replyTo })
     });
   } catch {
     throw new MailDeliveryError("MAIL_INPUT_INVALID");

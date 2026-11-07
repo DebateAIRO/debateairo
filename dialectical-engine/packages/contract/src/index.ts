@@ -2083,6 +2083,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/saved-questions/{id}",
     "DELETE /v1/account/saved-questions/{id}",
     "GET /v1/account/legal-status",
+    // 0157 (DSA Art 17; D1): the person's own statements of reasons.
+    "GET /v1/account/moderation-statements",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
     "GET /v1/account/profile",

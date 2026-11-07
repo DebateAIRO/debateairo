@@ -44,7 +44,9 @@ const sourcePaths = [
   // knowing") from the question's `public` catalogue, and a publication review's "Details" and "Read" from the interface's; the review panel names its
   // own panels with the same two words.
   "components/v4/V4PublicPage.tsx",
-  "components/PublicationReviewsPanel.tsx"
+  "components/PublicationReviewsPanel.tsx",
+  // 0157 (D1): the statements of reasons page.
+  "components/ModerationNotices.tsx"
 ];
 const sources = new Map(sourcePaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
 const catalogPath = join(root, "messages/en/public.json");
@@ -155,6 +157,15 @@ test("the public namespace exists and covers every public translation call", () 
   for (const match of sources.get("lib/report/investigationReportModel.ts").matchAll(/\bpublic\.report\.(?:trust|investigation)\.[A-Za-z0-9_]+/g)) {
     usedKeys.add(match[0]);
   }
+  // 0157: the statements page picks each line by the statement's kind, ground code, source and place.
+  for (const kind of ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED"]) {
+    usedKeys.add(`public.moderation.kind.${kind}`);
+    usedKeys.add(`public.moderation.what.${kind}`);
+  }
+  for (const code of ["REVIEW_HOLD", "UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]) usedKeys.add(`public.moderation.ground.${code}`);
+  for (const source of ["REPORT_BUTTON", "EMAIL_NOTICE", "AUTHORITY_ORDER", "OWN_INITIATIVE"]) usedKeys.add(`public.moderation.source.${source}`);
+  for (const place of ["SNAPSHOT", "UPDATE", "REPORT"]) usedKeys.add(`public.moderation.place.${place}`);
+  for (const match of sources.get("components/ModerationNotices.tsx").matchAll(/"(public\.moderation\.[A-Za-z]+)"/g)) usedKeys.add(match[1]);
   assert.ok(usedKeys.size > 0, "S2-public sources must use public namespace keys");
   for (const key of usedKeys) assert.ok(Object.hasOwn(catalog, key), `missing ${key}`);
   assert.deepEqual([...usedKeys].sort(), Object.keys(catalog).sort(), "public catalog has no unused keys");

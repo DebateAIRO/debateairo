@@ -73,17 +73,14 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // The owner's answers of 5 Nov: question 3 A's seven lines saying why a dig did not finish, said about the dig (the
   // answer's own example is the "stopped partway" line; all are new words, approved at the click-test), and question 20
   // A's line when the part of a failed question that ran used some of the quota (section 2c: approved at the click-test).
-  // Two of the seven differ from the question's own reason, to be shown so at the click-test: RUN_LIMIT_REACHED says "a
-  // problem on our side" (the question says it "reached its limit"; new text never says "limit", and the run's own ceiling
-  // is the site's), and PLAN_ENDED says "put on hold" (the question says "paused", which on the V4 map is a dig's own state
-  // word at the month wall). The failed-question line cannot be seen in place until the contract's run read carries
+  // The owner's fourth round (6 Nov) gave two of the seven word for word, so they wait on no list (FOURTH_ROUND_ANSWER_LINES
+  // below): RUN_LIMIT_REACHED "This dig reached its limit before it could produce an answer." and PLAN_ENDED, which keeps
+  // "put on hold". The failed-question line cannot be seen in place until the contract's run read carries
   // `quota_used` (today's strict contract refuses a run read that has it; the stand-in sends it on its draft view only).
   // The dig's own failed page names the dig, not a question (the wave-4 browser check, 5 Nov): its heading is drafted.
   "v4.debate.digFailedTitle",
   "v4.digFailed.reason.NOT_STARTED",
-  "v4.digFailed.reason.PLAN_ENDED",
   "v4.digFailed.reason.MODELS_UNAVAILABLE",
-  "v4.digFailed.reason.RUN_LIMIT_REACHED",
   "v4.digFailed.reason.SET_ASIDE",
   "v4.digFailed.reason.STOPPED",
   "v4.digFailed.reason.CHOICE_GONE",
@@ -141,7 +138,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // Dig model revision W4-6 (31 Oct): the labels the map needed beyond 5.5's, drafted for the click-test (owner C2b): a dig
   // card once done (no path rewritten, rewriting, the rewrite failed), a dig paused at the month wall, a failed rewrite's
   // short line on a path's card, hiding the dig's points again, where the dig's points are when this page has not read
-  // them, and the name of a dig's trail.
+  // them, and the name of a dig's trail. The trail's first step is the record's "Your question" (YOUR_QUESTION_RECORD_LINES
+  // below), so it waits on no list.
   "v4.rewrite.digCard.DONE",
   "v4.rewrite.digCard.REWRITING",
   "v4.rewrite.digCard.REWRITE_FAILED",
@@ -150,7 +148,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.rewrite.hideDigPoints",
   "v4.rewrite.digPointsElsewhere",
   "v4.nest.trailLabel",
-  "v4.nest.trailRoot",
   "v4.nest.level",
   "v4.nest.deepest",
   "v4.nest.tooDeep",
@@ -358,17 +355,21 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // record gives no words for these places, so they are drafts, held here until the owner approves them at the click-test.
   "v4.report.backToQuestion",
   "v4.ask.usedUp.PERSON_WEEK",
+  // The owner's third round renamed the page "My questions"; its empty and failed lines now speak of questions, in drafted
+  // words.
   "v4.maps.empty",
   "v4.maps.ask",
   "v4.maps.failed",
   "v4.maps.more",
   // The owner's third round (5 Nov afternoon): the sentences that name the page behind "My questions" follow its new name
   // (MY_QUESTIONS_ANSWER_LINES below); the changed sentence is a draft. v4.public.dig.unconfirmed, the other one, is on
-  // this list already.
+  // this list already. Since the fourth round its second sentence is the owner's (FOURTH_ROUND_ANSWER_ENDINGS below), so
+  // only its first sentence is still a draft.
   "v4.debate.usually",
   "v4.debate.askAgainNoteQuestion",
   "v4.debate.digFailedBackNote",
-  "v4.state.WAITING.noTime",
+  // "Waiting" alone (v4.state.WAITING.noTime) is the owner's word since the fourth round (the tab's "Waiting · …"):
+  // FOURTH_ROUND_ANSWER_LINES below.
   "v4.state.SHORT_BREAK.noTime",
   "v4.state.PAUSED.canContinue",
   "v4.wait.choices",
@@ -1020,6 +1021,100 @@ const PAUSE_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.pause.continuesOn": "Continue on {date}"
 });
 
+/**
+ * The owner's fourth round of follow-ups (chat, 6 Nov 2026, after PR #245; OPEN-OWNER-QUESTIONS-2026-11-04.md, "Fourth
+ * round"), word for word: the browser tab follows the page's state word, "Waiting · …" while a question waits for a free
+ * spot and "Looking into it · …" while it runs (the tab's word is the state word without its time); the "older than the
+ * map" box says "It will wait for your dig in progress."; a dig that reached the site's limit says "This dig reached its
+ * limit before it could produce an answer."; and a dig whose paid plan ended keeps its line with "put on hold".
+ */
+const FOURTH_ROUND_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.ready.tab.waiting": "Looking into it",
+  "v4.state.WAITING.noTime": "Waiting",
+  "v4.rewrite.waitsForDig": "It will wait for your dig in progress.",
+  "v4.digFailed.reason.RUN_LIMIT_REACHED": "This dig reached its limit before it could produce an answer.",
+  "v4.digFailed.reason.PLAN_ENDED": "Your paid plan ended or was put on hold while this dig waited, so it didn't start."
+});
+
+/**
+ * The fourth round also says the public dig box keeps "“My questions” will show it if it did.", which is the second
+ * sentence of v4.public.dig.unconfirmed. That sentence is the owner's and is pinned here as the line's ending. The
+ * first sentence ("We couldn't confirm that this dig started.") is still a draft, so the key stays on
+ * DRAFTED_UNTIL_CLICK_TEST.
+ */
+const FOURTH_ROUND_ANSWER_ENDINGS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.public.dig.unconfirmed": " “My questions” will show it if it did."
+});
+
+/**
+ * The place the owner's record calls "Your question" (OWNER-PICKS-2026-11-03.md: map-d1 A, "whenever you are on “Your
+ * question”"; map-f7, the where-you-are line "Your question › Whole-system costs"; journey-f18, the rail "Your question ·
+ * What we'll look into · The map · Your report"), word for word: the first step of a dig's trail and the place named in
+ * "Your picks are waiting on “…”." when the picks are the question's own (OPEN-OWNER-QUESTIONS-2026-11-04.md, section 3,
+ * "Decided by your record").
+ */
+const YOUR_QUESTION_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.nest.trailRoot": "Your question"
+});
+
+/**
+ * The owner's answer to question 33 (5 Nov 2026, A) and the fifth round (7 Nov), word for word: a dig made on someone else's
+ * public page shows on "My questions" as a card of its own, "Dig: {its pick}" (dig-f30's words, which question 33 quotes),
+ * and one that dug a whole path, with no pick, as "Dig: a closer look at a path".
+ */
+const PUBLIC_DIG_CARD_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.dig": "Dig: {pick}",
+  "v4.maps.digWholePath": "Dig: a closer look at a path"
+});
+
+describe("the owner's answer to question 33 and the fifth round (7 Nov): the public dig's card on \"My questions\"", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(PUBLIC_DIG_CARD_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PUBLIC_DIG_CARD_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in PUBLIC_DIG_CARD_ANSWER_LINES)).toEqual([]);
+    // It echoes the map's own button for a whole path.
+    expect(catalog["v4.map.digWholePath"]).toBe("A closer look at this path");
+  });
+});
+
+describe("the owner's fourth round (6 Nov): the tab, the 'older than the map' box and two failed-dig lines", () => {
+  it("are the owner's words, pinned here, and wait on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(FOURTH_ROUND_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(FOURTH_ROUND_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in FOURTH_ROUND_ANSWER_LINES)).toEqual([]);
+    // The tab's working word is the shared state word itself.
+    expect(catalog["v4.ready.tab.waiting"]).toBe(catalog["v4.state.LOOKING"]);
+    // The waiting state's word is the tab's word followed by its time.
+    expect(catalog["v4.state.WAITING"]).toBe(`${catalog["v4.state.WAITING.noTime"]} · starts after {time}`);
+    expect(Object.values(catalog).filter((value) => /running dig/u.test(value))).toEqual([]);
+  });
+
+  it("the public dig box's line ends with the owner's sentence; its first sentence is still a draft", () => {
+    for (const [key, ending] of Object.entries(FOURTH_ROUND_ANSWER_ENDINGS)) {
+      expect(catalog[key], key).toBeDefined();
+      expect(catalog[key]!.endsWith(ending), `${key}: ${catalog[key]}`).toBe(true);
+      expect(catalog[key]!.slice(0, -ending.length).trim().length, key).toBeGreaterThan(0);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+  });
+});
+
+describe("the owner's record: the question's own place is \"Your question\"", () => {
+  it("the trail's first step is the record's words, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(YOUR_QUESTION_RECORD_LINES).map((key) => [key, catalog[key]]))).toEqual(YOUR_QUESTION_RECORD_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in YOUR_QUESTION_RECORD_LINES)).toEqual([]);
+    expect(Object.values(catalog).filter((value) => /Main question/u.test(value))).toEqual([]);
+  });
+});
+
+describe("the page \"My questions\": its empty and failed lines", () => {
+  it("speak of questions, not maps, and are drafts until the click-test", () => {
+    for (const key of ["v4.maps.empty", "v4.maps.failed"]) {
+      expect(catalog[key], key).toMatch(/\bquestions?\b/u);
+      expect(catalog[key], key).not.toMatch(/\bmaps?\b/iu);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+  });
+});
+
 describe("the owner's third round (5 Nov afternoon): the greyed 'Continue on 1 December'", () => {
   it("is the owner's words, pinned here, and waits on no drafted list", () => {
     expect(Object.fromEntries(Object.keys(PAUSE_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PAUSE_ANSWER_LINES);
@@ -1035,7 +1130,8 @@ describe("the owner's third round (5 Nov afternoon): the page is called 'My ques
     expect(catalog["v4.maps.menu"]).toBe(catalog["v4.maps.title"]);
     // The page's old names ("Your maps", "All my maps"); "your maps" for the maps themselves is not the page's name.
     expect(Object.entries(catalog).filter(([, value]) => /\b(?:Your|All my) maps\b/u.test(value))).toEqual([]);
-    // The sentences that name the page name it by its new name, and wait on the drafted list.
+    // The sentences that name the page name it by its new name, and wait on the drafted list (v4.public.dig.unconfirmed only
+    // for its first sentence: FOURTH_ROUND_ANSWER_ENDINGS).
     for (const key of ["v4.debate.usually", "v4.public.dig.unconfirmed"]) {
       expect(catalog[key], key).toContain(`“${catalog["v4.maps.title"]}”`);
       expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
@@ -1071,15 +1167,21 @@ describe("the owner's 5 Nov answers: the header", () => {
 });
 
 describe("the owner's 5 Nov answers: failed digs and questions, one pick, the public period", () => {
-  it("question 3 A: a dig that did not finish has its own line for every reason group, said about the dig, all drafts", () => {
+  it("question 3 A: a dig that did not finish has its own line for every reason group, said about the dig, drafts but the owner's", () => {
     const keys = RUN_FAILURE_KINDS.map((kind) => `v4.digFailed.reason.${kind}`);
     expect(keys.filter((key) => !(key in catalog))).toEqual([]);
-    expect(keys.filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+    // The fourth round (6 Nov) gave two of them word for word (FOURTH_ROUND_ANSWER_LINES); the others wait on the list.
+    expect(keys.filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key) && !(key in FOURTH_ROUND_ANSWER_LINES)))
+      .toEqual([]);
+    expect(keys.filter((key) => key in FOURTH_ROUND_ANSWER_LINES).sort())
+      .toEqual(["v4.digFailed.reason.PLAN_ENDED", "v4.digFailed.reason.RUN_LIMIT_REACHED"]);
     // The answer's own example; every line names the dig, never the question, and asks for nothing to be asked again.
     expect(catalog["v4.digFailed.reason.STOPPED"]).toBe("This dig stopped partway because of a problem on our side.");
     for (const key of keys) {
       expect(catalog[key], key).toMatch(/\bdig\b/u);
-      expect(catalog[key], key).not.toMatch(/question|debate|ask|allowance|limit|paused/iu);
+      // "limit" only where the owner gave it (the fourth round: the dig "reached its limit").
+      expect(catalog[key], key).not.toMatch(key === "v4.digFailed.reason.RUN_LIMIT_REACHED"
+        ? /question|debate|ask|allowance|paused/iu : /question|debate|ask|allowance|limit|paused/iu);
       // Plain words (the wave-4 checks, 5 Nov): no line names an internal reserve "set aside" for the dig, which beside
       // "Nothing was taken from your quota for this." could read as the person's quota set aside.
       expect(catalog[key], key).not.toMatch(/set aside/iu);

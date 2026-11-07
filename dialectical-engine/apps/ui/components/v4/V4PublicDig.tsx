@@ -207,6 +207,10 @@ export function PublicDigCard({ dig, openHref, catalog, locale }: Readonly<{
     <p className="v4PubHint">{t(catalog, "v4.public.digCard.keptPrivate")}</p>
   ) : progress.kind === "REMOVED" ? (
     <p className="v4PubHint">{t(catalog, "v4.public.digCard.removed")}</p>
+  ) : progress.kind === "KEPT_BY_REVIEW" ? (
+    <p className="v4PubHint">{t(catalog, "v4.public.digCard.keptByReview")}</p>
+  ) : progress.kind === "OFF_FOR_REVIEW" ? (
+    <p className="v4PubHint">{t(catalog, "v4.public.digCard.offForReview")}</p>
   ) : (
     <p className="v4PubHint">{t(catalog, "v4.state.DIDNT_FINISH")}</p>
   );

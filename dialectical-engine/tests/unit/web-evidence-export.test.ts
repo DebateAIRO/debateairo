@@ -233,7 +233,7 @@ describe("web sources, investigations and the reserve in the data export", () =>
   it("names the new records and the page-text choice in the README", () => {
     const readme = renderReadme();
     expect(readme).toContain("account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, "
-      + "debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, and the reports you made with the Report button.");
+      + "debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, the reports you made with the Report button with how each was closed and which emails we sent you about it, and your moderation notices: each statement of reasons in full, and the earlier notices we emailed.");
     expect(readme).toContain("debates.json — owned debates, their content status, answer versions, each debate's model rotation record "
       + "and its web sources: searches, pages found, readers' lines, short quotes and pages added to researched.");
     expect(README_EXCLUSION_LINES.filter(line => /^W\d:/.test(line))).toEqual([

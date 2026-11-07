@@ -345,7 +345,8 @@ describe("W1-6 inventory and the no-grade rule over every new shape", () => {
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report). Decision 33: the four staff routes of a public debate under review. Decision 35: the Report button's three.
     // V4 start step, Task 30: the four calls before Start (POST /v1/asks/paths/{lists,merge,combine,fit}).
     // V4 start step, Task 39e: the five saved-question routes (GET/POST /v1/account/saved-questions, GET/PUT/DELETE …/{id}).
-    expect(contractInventory.routes).toHaveLength(210);
+    // 0157: the statements of reasons (GET /v1/account/moderation-statements).
+    expect(contractInventory.routes).toHaveLength(211);
   });
 });
 

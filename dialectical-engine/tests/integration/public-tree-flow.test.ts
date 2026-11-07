@@ -8,22 +8,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
-import { PublicDebateSchema, StoryBodySchema, type Answer, type PathId, type PublicDebate } from "@debateai/contract";
+import { ModerationStatementsSchema, PublicDebateSchema, StoryBodySchema, type Answer, type ModerationGround, type ModerationSource, type PathId, type PublicDebate } from "@debateai/contract";
 import {
   ContentCipher, encrypt, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, generateVerificationToken, hashToken, loadKek, type RunContentKeyStore
 } from "../../packages/crypto/src/index.js";
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, RUN_PURPOSE_LINES_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
   PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
-  decryptContentForRun, migrate, PostgresModerationNoticeRepository, withRunContentLease, type Pool, type PublicFlagLimits
+  decryptContentForRun, migrate, PostgresModerationStatementRepository, PostgresPublicFlagMailRepository, withRunContentLease, type Pool, type PublicFlagLimits
 } from "@debateai/db";
 import { renderMail } from "@debateai/mail-templates";
 import { MemoryTemplatedMailSender } from "../../apps/api/src/mail-channel.js";
-import { ModerationNoticeReconciler } from "../../apps/api/src/moderation-notices.js";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "../../apps/api/src/moderation-statements.js";
 import { createPostgresProviderGateway } from "@debateai/runner";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
 import { StoryRepository, type StoryWriteInput } from "@debateai/story";
-import { buildApi, type ApiOptions } from "../../apps/api/src/index.js";
+import { buildApi, contributionStateOf, type ApiOptions } from "../../apps/api/src/index.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
@@ -37,7 +37,7 @@ import { DIG_NODES, SATISFIED, digSnapshot, fieldsOf, fittingRewrite, isChecker 
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { canonicalPublicFlagBinding, pressPublicFlag, sweepPublicReviewPurge } from "../../apps/api/src/public-flag.js";
-import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
+import { canonicalPublicReviewBinding, groundFieldsOf } from "../../apps/api/src/staff/public-review.js";
 import { drainTeamLimitNotices } from "../../apps/api/src/staff/team-limit.js";
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { persistTerminalRun } from "../support/settledRun.js";
@@ -1213,12 +1213,19 @@ async function delegate(): Promise<Actor> {
 }
 
   const reviewRevision = async (ref: string) => (await q().query<{ n: number }>("SELECT coalesce(max(revision),0)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
-  type Step = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT";
-  type Piece = Readonly<{ kind?: "SNAPSHOT" | "UPDATE" | "REPORT" | "DIG"; id?: string; pointer?: string; text?: string }>;
+  type Step = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT" | "DECIDE";
+  /** 0157's ground: a removal, a hidden report, a correction and DECIDE get a whole one unless the case names its own; null sends none. */
+  type Ground = Readonly<{ grounds: readonly ModerationGround[]; source: ModerationSource | null; flagId: string | null; facts: string | null }>;
+  type Piece = Readonly<{ kind?: "SNAPSHOT" | "UPDATE" | "REPORT" | "DIG"; id?: string; pointer?: string; text?: string; ground?: Ground | null }>;
+  const STANDARD_GROUND: Ground = { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flagId: null, facts: "It names a private person and where they live." };
+  const groundOf = (step: Step, piece: Piece): Ground => piece.ground ?? (piece.ground === undefined && ["REMOVE_DIG", "HIDE_REPORT", "CORRECT", "DECIDE"].includes(step) ? STANDARD_GROUND : { grounds: [], source: null, flagId: null, facts: null });
+  const digestOf = (text: string | null) => text === null ? null : createHash("sha256").update(text).digest("hex");
   function intentOf(ref: string, step: Step, piece: Piece, revision: number, operationId: string) {
-    return step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: ref, expected_revision: revision, operation_id: operationId }
+    const ground = groundOf(step, piece);
+    const fields = { grounds: [...ground.grounds], source: ground.source, flag_id: ground.flagId };
+    return step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: ref, expected_revision: revision, operation_id: operationId, ...fields }
       : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null,
-        text_sha256: piece.text === undefined ? null : createHash("sha256").update(piece.text).digest("hex"), expected_revision: revision, operation_id: operationId };
+        text_sha256: digestOf(piece.text ?? null), expected_revision: revision, operation_id: operationId, ...fields, facts_sha256: digestOf(ground.facts) };
   }
   async function act(actor: Actor, debate: Readonly<{ ref: string; root: string }>, step: Step, piece: Piece = {}, change: Readonly<{ noAlert?: boolean; revision?: number; proofFor?: Parameters<typeof intentOf>; replay?: Readonly<{ proofId: string; binding: Record<string, unknown>; alert: Record<string, unknown>; operationId: string }> }> = {}) {
     const revision = change.revision ?? await reviewRevision(debate.ref);
@@ -1227,8 +1234,10 @@ async function delegate(): Promise<Actor> {
     const binding = change.replay?.binding ?? canonicalPublicReviewBinding(change.proofFor === undefined ? intent : intentOf(...change.proofFor), { expectedRevision: change.proofFor?.[3] ?? revision, hidden: false }) as unknown as Record<string, unknown>;
     const proof = change.replay ?? await storedProof(actor, binding, "PUBLIC_REVIEW_CHANGED");
     const content = piece.text === undefined ? null : await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ text: piece.text }));
+    const ground = groundOf(step, piece);
+    const facts = ground.facts === null || step === "HIDE" ? null : await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.encrypt({ facts: ground.facts }));
     const receipt = await new PostgresPublicReviewRepository(runtime()).act({ actor: actor.context as never, proof: { proofId: proof.proofId, binding } as never, step, publicationRef: debate.ref, pieceKind: piece.kind ?? null, pieceId: piece.id ?? null,
-      pointer: piece.pointer ?? null, textSha256: piece.text === undefined ? null : createHash("sha256").update(piece.text).digest("hex"), content, expectedRevision: revision, operationId, alertIntent: change.noAlert === true ? null : proof.alert as never });
+      pointer: piece.pointer ?? null, textSha256: digestOf(piece.text ?? null), content, ground: groundFieldsOf(intent), facts, expectedRevision: revision, operationId, alertIntent: change.noAlert === true ? null : proof.alert as never });
     return { receipt, proofId: proof.proofId, binding, alert: proof.alert, operationId };
   }
   const updatesOf = async (ref: string) => (await q().query<{ update_id: string; dig_run_id: string; kind: string; update_seq: number }>("SELECT update_id,dig_run_id,kind,update_seq FROM identity.public_debate_update WHERE publication_ref=$1 ORDER BY update_seq", [ref])).rows;
@@ -1393,8 +1402,10 @@ async function delegate(): Promise<Actor> {
     expect(JSON.stringify(final)).not.toContain(REMOVED);
   }, 240_000);
 
-  it("0156: the author of what a review took off the page is told once, in the language of their last Terms, with no words of the debate; the other steps tell no one", async () => {
-    const [ana, xena, wes, una] = [await account(), await account(), await account(), await account()];
+  // 0157 (changed on purpose from 0156's case): this release sends no 0156 notice. Every person a review step affects gets a statement of reasons
+  // (DSA Art 17; D1, D3, D7, D8), through the API's sender, into the memory channel, rendered in two languages, and read in full on the signed-in page.
+  it("0157: every step tells each affected person why, with the source, the automated means, the ground and the routes; the mail carries no words, no staff and no reporter; the page carries the facts", async () => {
+    const [ana, xena, wes, una, eva, ivy, rea, fay] = [await account(), await account(), await account(), await account(), await account(), await account(), await account(), await account()];
     const debate = await publishedDebate(ana);
     const world = vendors({ writeWith: "TO-BE-REMOVED" });
     const xRun = await dig(xena, debate, world);
@@ -1410,61 +1421,152 @@ async function delegate(): Promise<Actor> {
     await terms(ana, "ro", "2 days");
     await terms(ana, "de", "1 day");
     await terms(xena, "xx", "1 day");
-    // The sender queues from 0150's log when it claims; here the queue step runs alone, as the database's owner, to read what it wrote.
-    const queued = async (ref = debate.ref) => {
-      await q().query("SELECT identity.queue_moderation_notices()");
-      return (await q().query<{ owner_ref: string | null; kind: string; mail_locale: string }>(`SELECT notice.owner_ref,notice.kind,notice.mail_locale FROM identity.moderation_notice AS notice
-        JOIN identity.public_review_event AS event USING (event_id) WHERE event.publication_ref=$1 ORDER BY event.revision`, [ref])).rows;
-    };
-    await act(owner, debate, "HIDE");
+    // fay's dig is still running when the debate is hidden.
+    const running = await createEncryptedStoryRun(database.pool, fay, "Still running?");
+    expect((await tree.join({ ownerRef: fay.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: running, positionRef: debate.position })).outcome).toBe("JOINED");
+    // Gap 5, the digger's own line, as the answer route reads it.
+    const lineOf = async (who: StoryEncryptedOwner, run: string) => contributionStateOf((await new PostgresPublicDebateRepository(api).readOwn(who.ownerRef, run)).find((row) => row.dig_run_id === run)!);
+    expect(await lineOf(xena, xRun)).toBe("ON_THE_PAGE");
+    // The staff steps: a hide with no ground and no alert (team tools locked), a correction, a removal, a hidden report, the re-publish.
+    await act(owner, debate, "HIDE", { ground: null }, { noAlert: true });
+    expect(await application().readPublicDebate(debate.ref)).toBeNull();
+    // Off the page for the review, not refused by its check; and the running dig was kept private by the review.
+    expect(await lineOf(xena, xRun)).toBe("OFF_THE_PAGE_FOR_REVIEW");
+    expect(await lineOf(fay, running)).toBe("KEPT_PRIVATE_BY_REVIEW");
     const material = (await new PostgresPublicReviewRepository(api).read(owner.context as never, hash(owner.sessionId), debate.ref))!;
     expect(material.reports).toHaveLength(1);
     await act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/story_short/paths/0/line", text: "Yes: CORRECTED-LINE." });
     await act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun });
+    expect(await lineOf(xena, xRun)).toBe("REMOVED_AFTER_REVIEW");
     await act(owner, debate, "HIDE_REPORT", { kind: "REPORT", id: material.reports[0]!.report_id });
     await act(owner, debate, "REPUBLISH");
-    expect(await queued()).toEqual([
-      { owner_ref: ana.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "de" },
-      { owner_ref: xena.ownerRef, kind: "CONTRIBUTION_REMOVED", mail_locale: "en" },
-      { owner_ref: wes.ownerRef, kind: "REPORT_REMOVED", mail_locale: "en" }
-    ]);
-    // An account that is no longer active hears nothing.
-    const quiet = await publishedDebate(una);
+    // The automatic hide on a press the check agreed with, then a person's final decision on it.
+    const auto = await publishedDebate(ana);
+    const CLAIM = "This path names a private person's home address.";
+    expect(await press(rea, auto.ref, CLAIM, agree().port)).toBe("HIDDEN");
+    const [flag] = await flagsOf(auto.ref);
+    const DECIDED = "Kept hidden: the path gives a private person's address.";
+    await act(owner, auto, "DECIDE", { ground: { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: flag!.flag_id as string, facts: DECIDED } });
+    // D8: an account in its closure grace is told; one already erased is not, and one erased after its statement was queued is dropped, with no error.
+    const [quiet, gone, late] = [await publishedDebate(una), await publishedDebate(eva), await publishedDebate(ivy)];
     await q().query(`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [una.userId]);
-    await act(owner, quiet, "HIDE");
-    expect(await queued(quiet.ref)).toEqual([{ owner_ref: null, kind: "DEBATE_HIDDEN", mail_locale: "en" }]);
-    expect((await q().query("SELECT count(*)::int AS n FROM identity.moderation_notice AS notice JOIN identity.public_review_event AS event USING (event_id) WHERE event.publication_ref=$1 AND notice.failed_at IS NOT NULL", [quiet.ref])).rows[0].n).toBe(1);
-    expect(await queued()).toHaveLength(3);
-    // No runtime login reads the queue itself; it claims, reads and settles through 0156's three definers only.
-    await expect(api.query("SELECT * FROM identity.moderation_notice")).rejects.toMatchObject({ code: "42501" });
+    await q().query(`UPDATE identity."user" SET state='deleted' WHERE user_id=$1`, [eva.userId]);
+    for (const hidden of [quiet, gone, late]) await act(owner, hidden, "HIDE", { ground: null }, { noAlert: true });
+    await q().query("SELECT identity.queue_moderation_statements()");
+    await q().query(`UPDATE identity."user" SET state='deleted' WHERE user_id=$1`, [ivy.userId]);
+    const queued = async (ref: string) => (await q().query<{ owner_ref: string; kind: string; mail_locale: string }>(`SELECT s.owner_ref,s.kind,s.mail_locale FROM identity.moderation_statement AS s
+      WHERE s.publication_ref=$1 ORDER BY s.happened_at,s.kind,s.owner_ref`, [ref])).rows;
+    const atOnce = (rows: readonly Readonly<{ owner_ref: string; kind: string; mail_locale: string }>[]) => [...rows].sort((x, y) => `${x.kind}${x.owner_ref}`.localeCompare(`${y.kind}${y.owner_ref}`));
+    // Who is told of what (D3, D7): the author of the hide and of the corrections, at the re-publish; the digger and the report's writer of their own
+    // piece's removal, and of their piece leaving with the debate; the report's writer again when the removed dig took it off with it.
+    const main = await queued(debate.ref);
+    expect(atOnce(main.slice(0, 4))).toEqual(atOnce([
+      { owner_ref: xena.ownerRef, kind: "CONTRIBUTION_AFFECTED", mail_locale: "en" },
+      { owner_ref: fay.ownerRef, kind: "CONTRIBUTION_AFFECTED", mail_locale: "en" },
+      { owner_ref: ana.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "de" },
+      { owner_ref: wes.ownerRef, kind: "REPORT_AFFECTED", mail_locale: "en" }]));
+    expect(main.slice(4)).toEqual([
+      { owner_ref: xena.ownerRef, kind: "CONTRIBUTION_REMOVED", mail_locale: "en" },
+      { owner_ref: wes.ownerRef, kind: "REPORT_AFFECTED", mail_locale: "en" },
+      { owner_ref: wes.ownerRef, kind: "REPORT_REMOVED", mail_locale: "en" },
+      { owner_ref: ana.ownerRef, kind: "CORRECTED", mail_locale: "de" }
+    ]);
+    expect(await queued(auto.ref)).toEqual([{ owner_ref: ana.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "de" }, { owner_ref: ana.ownerRef, kind: "DEBATE_DECIDED", mail_locale: "de" }]);
+    expect(await queued(quiet.ref)).toEqual([{ owner_ref: una.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "en" }]);
+    expect(await queued(gone.ref)).toEqual([]);
+    expect(await queued(late.ref)).toEqual([{ owner_ref: ivy.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "en" }]);
+    // No runtime login reads the statements; it claims, reads and settles through 0157's definers only.
+    await expect(api.query("SELECT * FROM identity.moderation_statement")).rejects.toMatchObject({ code: "42501" });
     // Each address sealed under its own account's key, as sign-up seals it, and read at sending time.
-    for (const who of [ana, xena, wes]) {
+    const people = [ana, xena, wes, una, ivy, rea, fay];
+    for (const who of people) {
       const envelope = encrypt(await userDeks.load(who.userId), Buffer.from(`${pseudonymOf(who)}@example.test`, "utf8"), ["identity", "user.email_ciphertext", who.userId, "run:none", who.userId, `user-dek:${who.userId}`, "1"]);
       await q().query(`UPDATE identity."user" SET email_ciphertext=$2 WHERE user_id=$1`, [who.userId, JSON.stringify(envelope)]);
     }
     const memory = new MemoryTemplatedMailSender();
-    const sender = new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(api), userDeks, memory, "https://debate.example.test");
-    await sender.reconcile(100);
-    const mine = new Map([ana, xena, wes].map((who) => [`${pseudonymOf(who)}@example.test`, who]));
+    const statements = new PostgresModerationStatementRepository(api);
+    for (let pass = 0; pass < 3; pass += 1) await new ModerationStatementReconciler(statements, userDeks, memory, "https://debate.example.test").reconcile(100);
+    const mine = new Map(people.map((who) => [`${pseudonymOf(who)}@example.test`, who]));
     const sent = memory.messages.filter(({ mail }) => mine.has(mail.to));
-    expect(sent.map(({ mail }) => [mail.to, mail.templateId, mail.locale])).toEqual([
-      [`${pseudonymOf(ana)}@example.test`, "MODERATION_DEBATE_HIDDEN", "de"],
-      [`${pseudonymOf(xena)}@example.test`, "MODERATION_CONTRIBUTION_REMOVED", "en"],
-      [`${pseudonymOf(wes)}@example.test`, "MODERATION_REPORT_REMOVED", "en"]
-    ]);
-    for (const { mail } of sent) {
-      const rendered = renderMail(mail.templateId, mail.locale, mail.params);
-      expect(`${rendered.subject} ${rendered.text}`).not.toContain(QUESTION);
-      expect(rendered.text).not.toContain("TO-BE-REMOVED");
-      expect(rendered.text).not.toContain(owner.staffId);
+    const to = (who: StoryEncryptedOwner) => sent.filter(({ mail }) => mail.to === `${pseudonymOf(who)}@example.test`).map(({ mail }) => mail.templateId).sort();
+    expect(to(ana)).toEqual(["MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_HIDDEN"]);
+    expect(to(xena)).toEqual(["MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED"]);
+    expect(to(wes)).toEqual(["MODERATION_STATEMENT_REPORT_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED", "MODERATION_STATEMENT_REPORT_REMOVED"]);
+    expect(to(una)).toEqual(["MODERATION_STATEMENT_DEBATE_HIDDEN"]);
+    expect(to(fay)).toEqual(["MODERATION_STATEMENT_CONTRIBUTION_AFFECTED"]);
+    expect(to(ivy)).toEqual([]);
+    expect(to(rea)).toEqual([]);
+    expect((await q().query("SELECT failed_at IS NOT NULL AS dropped, delivered_at IS NULL AS unsent FROM identity.moderation_statement WHERE publication_ref=$1", [late.ref])).rows).toEqual([{ dropped: true, unsent: true }]);
+    // Each statement, in its own language and in English and Romanian: what was done, the source, the automated means, the ground, office@ and the
+    // three routes, and the two links. No words of the debate, no fact staff typed, no staff id, no reporter.
+    const SOURCES = ["sourceReport", "sourceEmail", "sourceAuthority", "sourceOwn"], AUTOMATION = ["automatedDecision", "automatedDetection", "noAutomation"];
+    const GROUND = ["groundHold", "groundUnlawful", "groundHate", "groundWeapons", "groundSuicide", "groundReligious", "groundPersonal", "groundIllegal", "groundNone"];
+    for (const { mail, raw } of sent) {
+      expect(raw).toMatch(/^Reply-To: office@dezbatere\.ro\r?$/mu);
+      expect(SOURCES.filter((name) => mail.params[name] === "true").length, mail.templateId).toBeGreaterThan(0);
+      expect(GROUND.filter((name) => mail.params[name] === "true").length, mail.templateId).toBeGreaterThan(0);
+      for (const locale of new Set([mail.locale, "en", "ro"])) {
+        const { subject, text } = renderMail(mail.templateId, locale, mail.params);
+        const all = `${subject}\n${text}`;
+        expect(text).toContain("office@dezbatere.ro");
+        expect(text).toContain(mail.params.itemUrl!);
+        expect(text).toContain(mail.params.statementUrl!);
+        for (const words of [QUESTION, "TO-BE-REMOVED", "CORRECTED-LINE", POINT_TEXT, CLAIM, DECIDED, "It names a private person", owner.staffId, owner.userId, rea.ownerRef, pseudonymOf(rea)]) expect(all, `${mail.templateId} ${locale}`).not.toContain(words);
+      }
+      const english = renderMail(mail.templateId, "en", mail.params).text;
+      expect(english).toContain("within six months");
+      expect(english).toContain("certified out-of-court dispute settlement body, or to court");
+      expect(AUTOMATION.some((name) => english.includes(({ automatedDecision: "with no person involved yet", automatedDetection: "An AI read the report first", noAutomation: "without automated means" } as Record<string, string>)[name]!))).toBe(true);
     }
-    expect(renderMail(sent[0]!.mail.templateId, "de", sent[0]!.mail.params).subject).toBe("Ihre Debatte wurde von der öffentlichen Seite genommen");
-    expect((await q().query("SELECT count(*)::int AS n FROM identity.moderation_notice WHERE owner_ref = ANY($1::uuid[]) AND delivered_at IS NOT NULL", [[ana.ownerRef, xena.ownerRef, wes.ownerRef]])).rows[0].n).toBe(3);
+    const automatic = sent.find(({ mail }) => mail.templateId === "MODERATION_STATEMENT_DEBATE_HIDDEN" && mail.params.automatedDecision === "true")!;
+    expect(automatic.mail.params).toMatchObject({ sourceReport: "true", groundHold: "true", groundPersonal: "true", automatedDetection: "true" });
+    expect(renderMail(automatic.mail.templateId, "de", automatic.mail.params).text).toContain("office@dezbatere.ro");
+    const staffHide = sent.find(({ mail }) => mail.templateId === "MODERATION_STATEMENT_DEBATE_HIDDEN" && mail.params.automatedDecision === "false" && mail.to === `${pseudonymOf(ana)}@example.test`)!;
+    expect(staffHide.mail.params).toMatchObject({ sourceOwn: "true", groundHold: "true", automatedDecision: "false", automatedDetection: "false", groundPersonal: "false" });
     // Once: a later pass sends none of them again.
     const again = new MemoryTemplatedMailSender();
-    await new ModerationNoticeReconciler(new PostgresModerationNoticeRepository(api), userDeks, again, "https://debate.example.test").reconcile(100);
+    await new ModerationStatementReconciler(statements, userDeks, again, "https://debate.example.test").reconcile(100);
     expect(again.messages.filter(({ mail }) => mine.has(mail.to))).toEqual([]);
-  }, 240_000);
+    // D1: the signed-in page, through its route, gives each person their own statements in full: the facts, the quote and the places; nobody else's.
+    const signedIn = (who: StoryEncryptedOwner) => { const base = testHttpIdentity(randomUUID());
+      return { ...base, authenticated: { ...base.authenticated, userId: who.userId, ownerRef: who.ownerRef, session: { ...base.authenticated.session, session_id: who.sessionId, asker_id: `owner:${who.ownerRef}` } } }; };
+    const [anaIn, xenaIn, wesIn] = [signedIn(ana), signedIn(xena), signedIn(wes)];
+    const http = buildApi({ application: { withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"], sessions: testSessionApplication([anaIn, xenaIn, wesIn]),
+      allowedOrigin: TEST_APP_ORIGIN, publications: application() as never,
+      moderationStatements: { repository: statements, withKey: (ref, run, use) => application().withReviewKey(ref, run, use) } });
+    const read = async (identity: typeof anaIn) => {
+      const response = await http.inject({ method: "GET", url: "/v1/account/moderation-statements", headers: testSessionHeaders(identity, false) });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      return ModerationStatementsSchema.parse(response.json()).statements;
+    };
+    expect((await http.inject({ method: "GET", url: "/v1/account/moderation-statements", headers: { origin: TEST_APP_ORIGIN } })).statusCode).toBe(401);
+    const anas = await read(anaIn);
+    expect(anas.map((one) => one.kind).sort()).toEqual(["CORRECTED", "DEBATE_DECIDED", "DEBATE_HIDDEN", "DEBATE_HIDDEN"]);
+    expect(anas.find((one) => one.kind === "DEBATE_HIDDEN" && one.public_ref === auto.ref)).toMatchObject({ quote: POINT_TEXT, hidden_now: true,
+      ground: { automated_decision: true, automated_detection: true, grounds: ["REVIEW_HOLD"], suspected: ["PERSONAL_DATA"], sources: ["REPORT_BUTTON"] } });
+    expect(anas.find((one) => one.kind === "DEBATE_DECIDED")).toMatchObject({ facts: [DECIDED], ground: { grounds: ["PERSONAL_DATA"], sources: ["REPORT_BUTTON"], automated_decision: false } });
+    expect(anas.find((one) => one.kind === "CORRECTED")).toMatchObject({ hidden_now: false, places: [{ piece_kind: "SNAPSHOT", pointer: "/story_short/paths/0/line" }] });
+    expect(anas.find((one) => one.kind === "DEBATE_HIDDEN" && one.public_ref === debate.ref)).toMatchObject({ quote: null, facts: [], ground: { grounds: ["REVIEW_HOLD"], sources: ["OWN_INITIATIVE"], interim: true } });
+    const xenas = await read(xenaIn);
+    expect(xenas.find((one) => one.kind === "CONTRIBUTION_REMOVED")).toMatchObject({ piece_kind: "DIG", facts: ["It names a private person and where they live."], ground: { grounds: ["PERSONAL_DATA"] } });
+    // An affected person is told their piece went with the review, not the facts about someone else's.
+    expect(xenas.find((one) => one.kind === "CONTRIBUTION_AFFECTED")).toMatchObject({ facts: [], quote: null });
+    // 0157: the person's own export carries the same, through the worker's one reader under 0128's lease.
+    const exported = async (who: StoryEncryptedOwner) => {
+      const exportId = randomUUID(), workerId = randomUUID();
+      await q().query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until) VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, who.userId, randomUUID(), workerId]);
+      return (await q().query<{ value: { statements: Record<string, unknown>[]; earlier_notices: unknown[]; report_answers: Record<string, unknown>[] } }>("SELECT identity.read_data_export_moderation($1,$2) AS value", [exportId, workerId])).rows[0]!.value;
+    };
+    const xenaExport = await exported(xena);
+    expect(xenaExport.statements.map((one) => one.kind).sort()).toEqual(["CONTRIBUTION_AFFECTED", "CONTRIBUTION_REMOVED"]);
+    expect(xenaExport.statements.every((one) => one.emailed_at !== null)).toBe(true);
+    expect(JSON.stringify(xenaExport)).not.toContain("It names a private person");
+    const wess = await read(wesIn);
+    expect(wess.every((one) => one.public_ref === debate.ref)).toBe(true);
+    expect(JSON.stringify(wess)).not.toContain(POINT_TEXT);
+    await http.close();
+  }, 300_000);
 
   it("a correction: the first snapshot, a dig's text and a report read corrected everywhere; a later climb rewrites from corrected text; the originals stay sealed, only for the two", async () => {
     const [ana, dan, eve] = [await account(), await account(), await account()];
@@ -1542,7 +1644,8 @@ async function delegate(): Promise<Actor> {
     const replay = await act(owner, debate, "HIDE", {}, { revision: 0, replay: { proofId: first.proofId, binding: first.binding, alert: first.alert, operationId: first.operationId } });
     expect(replay.receipt.operationId).toBe(first.operationId);
     expect(await reviewRevision(debate.ref)).toBe(1);
-    await expect(new PostgresPublicReviewRepository(api).act({ actor: owner.context as never, proof: { proofId: first.proofId, binding: first.binding } as never, step: "REPUBLISH", publicationRef: debate.ref, pieceKind: null, pieceId: null, pointer: null, textSha256: null, content: null, expectedRevision: 1, operationId: randomUUID(), alertIntent: first.alert as never })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+    await expect(new PostgresPublicReviewRepository(api).act({ actor: owner.context as never, proof: { proofId: first.proofId, binding: first.binding } as never, step: "REPUBLISH", publicationRef: debate.ref, pieceKind: null, pieceId: null, pointer: null, textSha256: null, content: null,
+      ground: { grounds: "", source: "", flag_id: "", facts_sha256: "" }, facts: null, expectedRevision: 1, operationId: randomUUID(), alertIntent: first.alert as never })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
     // Bound to the piece and to the text's digest: a proof for one piece opens no other.
     const pieceA = randomUUID();
     await expect(act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/question", text: "Other words." }, { proofFor: [debate.ref, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/question", text: "Words." }, 1, pieceA] })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
@@ -1626,6 +1729,138 @@ async function delegate(): Promise<Actor> {
     expect(sent.every((mail) => Object.keys(mail.params as object).length === 0)).toBe(true);
     expect(JSON.stringify(sent)).not.toContain(pseudonymOf(rea));
   }, 120_000);
+
+  it("0157, gap 1 (DSA Art 17(3)): each step keeps its ground beside the log; a hide with no ground and team tools locked still hides, on Terms §9's hold; DECIDE keeps the final ground; the automatic hide keeps its quote, sealed", async () => {
+    const [ana, xena, rea] = [await account(), await account(), await account()];
+    const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+    // The automatic hide: the quote the check copied, sealed under the debate's key; its ground is read from 0151's own row.
+    const auto = await publishedDebate(ana);
+    expect(await press(rea, auto.ref, undefined, agree().port)).toBe("HIDDEN");
+    const [flag] = await flagsOf(auto.ref);
+    const quote = (await q().query("SELECT quote_ciphertext FROM identity.public_flag_quote WHERE flag_id=$1", [flag!.flag_id])).rows[0]!.quote_ciphertext;
+    expect(await application().withReviewKey(auto.ref, auto.root, (cipher) => cipher.decrypt(quote))).toEqual({ quote: POINT_TEXT });
+    // A staff hide while team tools are locked, carrying a ground that does not hold (a report that does not exist): it hides, on the hold, at once.
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    const xRun = await dig(xena, debate, world);
+    await settleAll(world);
+    await act(owner, debate, "HIDE", { ground: { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: randomUUID(), facts: null } }, { noAlert: true });
+    expect(await application().readPublicDebate(debate.ref)).toBeNull();
+    const facts = "A notice by email said the path names a private person.";
+    await act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun, ground: { grounds: ["UNLAWFUL", "HATE_SPEECH"], source: "EMAIL_NOTICE", flagId: null, facts } });
+    // The database checks the ground itself: the Report button's source names a report of another debate, and nothing is spent or written.
+    const before = await reviewRevision(debate.ref);
+    await expect(act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/story_short/paths/0/line", text: "Yes: CORRECTED.",
+      ground: { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: flag!.flag_id as string, facts } })).rejects.toMatchObject({ message: "PUBLIC_REVIEW_GROUND_INVALID" });
+    expect(await reviewRevision(debate.ref)).toBe(before);
+    await act(owner, debate, "DECIDE", { ground: { grounds: ["UNLAWFUL"], source: "EMAIL_NOTICE", flagId: null, facts: "Kept hidden: the whole question is unlawful." } });
+    expect(await reviewRevision(debate.ref)).toBe(before);
+    expect(await application().readPublicDebate(debate.ref)).toBeNull();
+    const grounds = (await q().query(`SELECT event.action,ground.grounds,ground.suspected,ground.source,ground.flag_id,ground.interim,ground.facts_sha256,ground.facts_ciphertext IS NOT NULL AS sealed
+      FROM identity.moderation_ground AS ground JOIN identity.public_review_event AS event USING (event_id) WHERE ground.publication_ref=$1 ORDER BY event.revision`, [debate.ref])).rows;
+    expect(grounds).toEqual([
+      { action: "HIDE", grounds: ["REVIEW_HOLD"], suspected: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flag_id: null, interim: true, facts_sha256: null, sealed: false },
+      { action: "REMOVE_DIG", grounds: ["HATE_SPEECH", "UNLAWFUL"], suspected: [], source: "EMAIL_NOTICE", flag_id: null, interim: false, facts_sha256: sha(facts), sealed: true }
+    ]);
+    const sealed = (await q().query("SELECT ground.facts_ciphertext FROM identity.moderation_ground AS ground JOIN identity.public_review_event AS event USING (event_id) WHERE event.publication_ref=$1 AND event.action='REMOVE_DIG'", [debate.ref])).rows[0]!.facts_ciphertext;
+    expect(await application().withReviewKey(debate.ref, debate.root, (cipher) => cipher.decrypt(sealed))).toEqual({ facts });
+    expect((await q().query("SELECT grounds,source,revision FROM identity.moderation_decision WHERE publication_ref=$1", [debate.ref])).rows).toEqual([{ grounds: ["UNLAWFUL"], source: "EMAIL_NOTICE", revision: before }]);
+    // A hide with nothing at all: the hold and our own initiative.
+    const quiet = await publishedDebate(ana);
+    await act(owner, quiet, "HIDE", {}, { noAlert: true });
+    expect((await q().query("SELECT grounds,source,interim FROM identity.moderation_ground WHERE publication_ref=$1", [quiet.ref])).rows).toEqual([{ grounds: ["REVIEW_HOLD"], source: "OWN_INITIATIVE", interim: true }]);
+    // No runtime login reads these records; they cannot be edited.
+    for (const table of ["identity.moderation_ground", "identity.moderation_decision", "identity.public_flag_quote"]) await expect(api.query(`SELECT * FROM ${table}`)).rejects.toMatchObject({ code: "42501" });
+    await expect(q().query("UPDATE identity.moderation_ground SET source='OWN_INITIATIVE' WHERE publication_ref=$1", [debate.ref])).rejects.toMatchObject({ message: "MODERATION_RECORD_APPEND_ONLY" });
+  }, 240_000);
+
+  it("0157, D4 (DSA Art 16(4)-(6)): the reporter hears each answer once: a receipt, the automatic hide and not-found, a person's close and a step naming the report; a stuck check goes to a person; an erased reporter hears nothing", async () => {
+    const [ana, rea, sam, tom, uma, vic] = [await account(), await account(), await account(), await account(), await account(), await account()];
+    const [first, second] = [await publishedDebate(ana), await publishedDebate(ana)];
+    const CLAIM = "This path names a private person's home address.";
+    // The automatic check hides; another finds nothing; a report of a debate already hidden goes to a person.
+    expect(await press(rea, first.ref, CLAIM, agree().port)).toBe("HIDDEN");
+    expect(await press(sam, second.ref, CLAIM, notFound().port)).toBe("NOT_FOUND");
+    expect(await press(tom, first.ref, CLAIM, agree().port)).toBe("WITH_A_PERSON");
+    expect(await press(vic, second.ref, "Another claim about this second debate.", notFound().port)).toBe("NOT_FOUND");
+    const flagOf = async (who: StoryEncryptedOwner) => (await q().query<{ flag_id: string }>("SELECT flag_id FROM identity.public_flag WHERE reporter_ref=$1", [who.ownerRef])).rows[0]!.flag_id;
+    const [reaFlag, tomFlag, vicFlag] = [await flagOf(rea), await flagOf(tom), await flagOf(vic)];
+    // A check the API never answered: left CHECKING six minutes ago (as if the API died between the press and the answer).
+    const stuck = randomUUID();
+    await q().query(`INSERT INTO identity.public_flag(flag_id,publication_ref,reporter_ref,state,content_ciphertext,created_at)
+      SELECT $1,publication_ref,$2,'CHECKING',content_ciphertext,clock_timestamp()-interval '6 minutes' FROM identity.public_flag WHERE flag_id=$3`, [stuck, uma.ownerRef, tomFlag]);
+    const fresh = randomUUID();
+    await q().query(`INSERT INTO identity.public_flag(flag_id,publication_ref,reporter_ref,state,content_ciphertext)
+      SELECT $1,publication_ref,$2,'CHECKING',content_ciphertext FROM identity.public_flag WHERE flag_id=$3`, [fresh, uma.ownerRef, tomFlag]);
+    const mailRepository = new PostgresPublicFlagMailRepository(api);
+    expect(await mailRepository.settleStuck()).toBe(1);
+    expect((await q().query("SELECT flag_id,state,verdict,judge_model_id FROM identity.public_flag WHERE flag_id=ANY($1::uuid[]) ORDER BY created_at", [[stuck, fresh]])).rows).toEqual([
+      { flag_id: stuck, state: "QUEUED", verdict: "UNAVAILABLE", judge_model_id: null }, { flag_id: fresh, state: "CHECKING", verdict: null, judge_model_id: null }]);
+    expect((await q().query("SELECT count(*)::int AS n FROM staff.public_flag_notice WHERE operation_id=$1 AND kind='PUBLIC_FLAG_WAITING'", [stuck])).rows[0].n).toBeGreaterThan(0);
+    expect(await mailRepository.settleStuck()).toBe(0);
+    // A person's decisions: the final decision on the first debate names rea's report; tom's report is closed, no breach found.
+    await act(owner, first, "DECIDE", { ground: { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: reaFlag, facts: "Kept hidden: a private address." } });
+    const flags = new PostgresPublicFlagRepository(api);
+    const operationId = randomUUID();
+    const binding = canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: tomFlag, outcome: "NO_BREACH", operation_id: operationId }) as unknown as Record<string, unknown>;
+    const proof = await storedProof(owner, binding, "PUBLIC_REVIEW_CHANGED");
+    expect((await flags.close({ actor: owner.context as never, proof: { proofId: proof.proofId, binding } as never, flagId: tomFlag, outcome: "NO_BREACH", operationId, alertIntent: proof.alert as never })).outcome).toBe("COMPLETED");
+    // vic's account is erased: 0151 takes the link, and nothing is mailed to anyone in its place.
+    await q().query("UPDATE identity.public_flag SET reporter_ref=NULL WHERE flag_id=$1", [vicFlag]);
+    await q().query(`UPDATE identity."user" SET state='deleted' WHERE user_id=$1`, [vic.userId]);
+    const people = [rea, sam, tom, uma, vic];
+    for (const who of people) {
+      const envelope = encrypt(await userDeks.load(who.userId), Buffer.from(`${pseudonymOf(who)}@example.test`, "utf8"), ["identity", "user.email_ciphertext", who.userId, "run:none", who.userId, `user-dek:${who.userId}`, "1"]);
+      await q().query(`UPDATE identity."user" SET email_ciphertext=$2 WHERE user_id=$1`, [who.userId, JSON.stringify(envelope)]);
+    }
+    await q().query(`INSERT INTO legal.acceptance(acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id)
+      VALUES($1,$2,'TERMS','1.0',$3,'ro','SIGN_UP',now(),$4,'0123456789abcdef')`, [randomUUID(), sam.ownerRef, createHash("sha256").update("ro").digest("hex"), randomBytes(40)]);
+    const memory = new MemoryTemplatedMailSender();
+    for (let pass = 0; pass < 3; pass += 1) await new PublicFlagAnswerReconciler(mailRepository, userDeks, memory, "https://debate.example.test").reconcile(100);
+    const mine = new Map(people.map((who) => [`${pseudonymOf(who)}@example.test`, who]));
+    const sent = memory.messages.filter(({ mail }) => mine.has(mail.to));
+    const to = (who: StoryEncryptedOwner) => sent.filter(({ mail }) => mail.to === `${pseudonymOf(who)}@example.test`).map(({ mail }) => mail.templateId).sort();
+    expect(to(rea)).toEqual(["PUBLIC_FLAG_ANSWER_ACTED", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN"]);
+    expect(to(sam)).toEqual(["PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND"]);
+    expect(to(tom)).toEqual(["PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_RECEIPT"]);
+    expect(to(uma)).toEqual(["PUBLIC_FLAG_ANSWER_RECEIPT"]);
+    expect(to(vic)).toEqual([]);
+    expect(sent.find(({ mail }) => mail.to === `${pseudonymOf(sam)}@example.test`)!.mail.locale).toBe("ro");
+    for (const { mail, raw } of sent) {
+      expect(mail.params.itemUrl).toMatch(/^https:\/\/debate\.example\.test\/public\/debate\/[0-9a-f-]{36}$/u);
+      if (mail.templateId === "PUBLIC_FLAG_ANSWER_RECEIPT") expect(raw).not.toMatch(/^Reply-To:/mu);
+      else expect(raw).toMatch(/^Reply-To: office@dezbatere\.ro\r?$/mu);
+      for (const locale of new Set([mail.locale, "en", "ro"])) {
+        const { subject, text } = renderMail(mail.templateId, locale, mail.params);
+        expect(text).toContain(mail.params.itemUrl!);
+        if (mail.templateId !== "PUBLIC_FLAG_ANSWER_RECEIPT") expect(text).toContain("office@dezbatere.ro");
+        for (const words of [CLAIM, "The first path", QUESTION, POINT_TEXT, "Kept hidden", owner.staffId, owner.userId, pseudonymOf(ana)]) expect(`${subject}\n${text}`, `${mail.templateId} ${locale}`).not.toContain(words);
+      }
+    }
+    const english = (id: string) => renderMail(id as never, "en", sent.find(({ mail }) => mail.templateId === id)!.mail.params).text;
+    expect(english("PUBLIC_FLAG_ANSWER_AUTO_HIDDEN")).toContain("with no person involved");
+    expect(english("PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND")).toContain("No person has read your report");
+    expect(english("PUBLIC_FLAG_ANSWER_NO_BREACH")).toContain("found no breach");
+    expect(english("PUBLIC_FLAG_ANSWER_ACTED")).toContain("acted on it");
+    expect(english("PUBLIC_FLAG_ANSWER_ACTED")).toContain("within six months");
+    // 0157: the person's own export carries the same, through the worker's one reader under 0128's lease.
+    const exported = async (who: StoryEncryptedOwner) => {
+      const exportId = randomUUID(), workerId = randomUUID();
+      await q().query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until) VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, who.userId, randomUUID(), workerId]);
+      return (await q().query<{ value: { statements: Record<string, unknown>[]; earlier_notices: unknown[]; report_answers: Record<string, unknown>[] } }>("SELECT identity.read_data_export_moderation($1,$2) AS value", [exportId, workerId])).rows[0]!.value;
+    };
+    const tomExport = await exported(tom);
+    expect(tomExport.report_answers).toHaveLength(1);
+    expect(tomExport.report_answers[0]).toMatchObject({ publication_ref: first.ref, closed_as: "NO_BREACH" });
+    expect((tomExport.report_answers[0]!.emails as { kind: string; emailed_at: string | null }[]).map((mail) => [mail.kind, mail.emailed_at !== null])).toEqual([["RECEIPT", true], ["NO_BREACH", true]]);
+    expect(JSON.stringify(tomExport)).not.toContain(owner.staffId);
+    // Once: a later pass sends none again; the runtime reads none of these tables.
+    const again = new MemoryTemplatedMailSender();
+    await new PublicFlagAnswerReconciler(mailRepository, userDeks, again, "https://debate.example.test").reconcile(100);
+    expect(again.messages.filter(({ mail }) => mine.has(mail.to))).toEqual([]);
+    for (const table of ["identity.public_flag_answer", "identity.public_flag_mail", "identity.public_flag_mail_since"]) await expect(api.query(`SELECT * FROM ${table}`), table).rejects.toMatchObject({ code: "42501" });
+    await expect(q().query("UPDATE identity.public_flag_answer SET outcome='ACTED'")).rejects.toBeDefined();
+  }, 300_000);
 
   it("a claim that gives orders is only data: the same frame, and a judge that obeyed it hides nothing because its words are not on the page", async () => {
     const [ana, rea, sam] = [await account(), await account(), await account()];
@@ -1725,17 +1960,22 @@ async function delegate(): Promise<Actor> {
     await expect(q().query("DELETE FROM identity.public_flag")).rejects.toMatchObject({ message: "PUBLIC_FLAG_APPEND_ONLY" });
     await expect(q().query("UPDATE identity.public_flag SET publication_ref=publication_ref, created_at=now()")).rejects.toMatchObject({ message: "PUBLIC_FLAG_APPEND_ONLY" });
     await expect(q().query("DELETE FROM identity.public_flag_event")).rejects.toBeDefined();
-    // Dismissing: a delegate no; a proof for another report no; used once.
-    const dismiss = async (actor: Actor, flag: string, proofFlag = flag) => {
+    // Closing (0157, D4: 0151's Dismiss with what the person found): a delegate no; a proof for another report, or for the other outcome, no; used once.
+    const dismiss = async (actor: Actor, flag: string, proofFlag = flag, outcome: "NO_BREACH" | "ACTED" = "NO_BREACH", proofOutcome = outcome) => {
       const operationId = randomUUID();
-      const binding = canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: proofFlag, operation_id: operationId }) as unknown as Record<string, unknown>;
+      const binding = canonicalPublicFlagBinding({ action: "PUBLIC_REPORT_DISMISS", flag_id: proofFlag, outcome: proofOutcome, operation_id: operationId }) as unknown as Record<string, unknown>;
       const proof = await storedProof(actor, binding, "PUBLIC_REVIEW_CHANGED");
-      return repository.dismiss({ actor: actor.context as never, proof: { proofId: proof.proofId, binding } as never, flagId: flag, operationId, alertIntent: proof.alert as never });
+      return repository.close({ actor: actor.context as never, proof: { proofId: proof.proofId, binding } as never, flagId: flag, outcome, operationId, alertIntent: proof.alert as never });
     };
     await expect(dismiss(person, row.flag_id)).rejects.toMatchObject({ message: "STAFF_AUTHORITY_INVALID" });
     await expect(dismiss(owner, row.flag_id, randomUUID())).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+    await expect(dismiss(owner, row.flag_id, row.flag_id, "ACTED", "NO_BREACH")).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
     expect((await dismiss(owner, row.flag_id)).outcome).toBe("COMPLETED");
     await expect(dismiss(owner, row.flag_id)).rejects.toMatchObject({ message: "PUBLIC_FLAG_ALREADY_DISMISSED" });
+    // The close is 0151's dismissal too (the words' six months start), with its outcome beside it.
+    const closed = (await repository.readQueue(owner.context as never, hash(owner.sessionId))).find((entry) => entry.flag_id === row.flag_id)!;
+    expect(closed).toMatchObject({ outcome: "NO_BREACH" });
+    expect(closed.dismissed_at).not.toBeNull();
     // Erasure: the database takes the name and keeps the words (0151's foreign key), and a row can change that way only.
     expect((await q().query("SELECT confdeltype FROM pg_constraint WHERE conrelid='identity.public_flag'::regclass AND contype='f' AND confrelid='identity.\"user\"'::regclass")).rows[0].confdeltype).toBe("n");
     await q().query("UPDATE identity.public_flag SET reporter_ref=NULL WHERE flag_id=$1", [row.flag_id]);
@@ -1825,7 +2065,8 @@ async function delegate(): Promise<Actor> {
     const identity = { ...base, authenticated: { ...base.authenticated, userId: reporter.userId, ownerRef: reporter.ownerRef, session: { ...base.authenticated.session, session_id: reporter.sessionId, asker_id: `owner:${reporter.ownerRef}` } } };
     const judge = agree();
     const http = buildApi({ application: { withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"], sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never, publicFlags: flagPorts(judge.port) as never });
-    const body = { where: "The first path", claim: "It names a private person's home." };
+    // D5: a press carries the good-faith statement; one without it is not a notice.
+    const body = { where: "The first path", claim: "It names a private person's home.", good_faith: true };
     const out = await http.inject({ method: "POST", url: `/v1/public/debates/${debate.ref}/flag`, headers: { origin: TEST_APP_ORIGIN }, payload: body });
     expect([401, 403]).toContain(out.statusCode);
     expect(judge.sent).toHaveLength(0);
@@ -1834,6 +2075,9 @@ async function delegate(): Promise<Actor> {
     const post = (url: string, payload: unknown) => http.inject({ method: "POST", url, headers: testSessionHeaders(identity, true), payload: payload as never });
     expect((await post(`/v1/public/debates/${debate.ref}/flag`, { where: "x", claim: "short" })).statusCode).toBe(400);
     expect((await post(`/v1/public/debates/${debate.ref}/flag`, { where: "x", claim: "y".repeat(2001) })).statusCode).toBe(400);
+    expect((await post(`/v1/public/debates/${debate.ref}/flag`, { where: body.where, claim: body.claim })).statusCode).toBe(400);
+    expect((await post(`/v1/public/debates/${debate.ref}/flag`, { ...body, good_faith: false })).statusCode).toBe(400);
+    expect(judge.sent).toHaveLength(0);
     const guessed = await post(`/v1/public/debates/${randomUUID()}/flag`, body);
     const notAnId = await post("/v1/public/debates/not-an-id/flag", body);
     expect(guessed.statusCode).toBe(200);

@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { shelfStateText } from "../../apps/ui/components/v4/V4MapShelf.js";
+import { MapList, shelfStateText } from "../../apps/ui/components/v4/V4MapShelf.js";
+import type { ShelfMap } from "../../apps/ui/lib/v4/mapShelf.js";
 import { stateWordText } from "../../apps/ui/lib/v4/stateWords.js";
 
 /*
@@ -47,5 +49,21 @@ describe("the shelf's state words are the waiting card's (WHOLE-12)", () => {
   it("ready and didn't finish: the shared words", () => {
     expect(shelfStateText("READY", null, CATALOG, "en")).toBe(stateWordText({ kind: "READY" }, CATALOG, "en"));
     expect(shelfStateText("FAILED", null, CATALOG, "en")).toBe(stateWordText({ kind: "DIDNT_FINISH" }, CATALOG, "en"));
+  });
+});
+
+describe("question 33 A: a dig made on someone else's public page is a card of its own", () => {
+  it("draws its 'Dig: …' words as the card's own line, opening the dig's own map, beside the questions", () => {
+    const card = (runId: string, kind: ShelfMap["kind"], question: string): ShelfMap => ({
+      runId, kind, question, state: "READY", pause: null, startedAt: null, bar: null, changed: false, digs: []
+    });
+    const html = renderToStaticMarkup(
+      <MapList maps={[card("run-dig", "PUBLIC_DIG", "Dig: Cars pollute city air"), card("run-q", "QUESTION", "Should my town close the centre to cars?")]}
+        catalog={CATALOG} locale="en" digsMax={2} />
+    );
+    const cards = [...html.matchAll(/<a class="v4ShelfCard"[^>]*href="([^"]+)"[^>]*>.*?<span class="v4ShelfQuestion"[^>]*>([^<]+)<\/span>/gu)]
+      .map((match) => [match[1], match[2]]);
+    expect(cards).toEqual([["/v4/debate/run-dig", "Dig: Cars pollute city air"], ["/v4/debate/run-q", "Should my town close the centre to cars?"]]);
+    expect(html.match(/data-shelf-public-dig/gu)).toHaveLength(1);
   });
 });
