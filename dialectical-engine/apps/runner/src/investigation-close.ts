@@ -63,6 +63,11 @@ export type InvestigationCloseInput = Readonly<{
   free: boolean;
   /** The question's line and locked language, for the replies' language check. */
   questionLine: string;
+  /**
+   * V4 start step, Task 50c: the ROOT question's purpose lines carry the person's marked care answer (`pathsGoalStated`), so the report's
+   * answer and every main-answer update say how that goal fares (the goal drafts). Absent: no goal stated, every byte as before.
+   */
+  goalStated?: boolean;
 }>;
 
 export type InvestigationCloseSources = Readonly<{
@@ -347,6 +352,8 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
     runId: root, subjectItemId: subject, contractHash: settings.contractHash ?? engineContractHash(),
     maxRounds: payer.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
     free: payer.free, later: read.input.earlier !== null,
+    // V4 start step, Task 50c: the root's stated goal; the answer's writer and check are the goal drafts, the story as before.
+    goalStated: read.goalStated === true,
     writer, checker, backupCandidates: settings.roles.backupCandidates ?? [], backupMakers: settings.roles.backupMakers,
     material: dossier.material, send, guard: investigationReportGuard, randomBytes: closingRandomBytes(seed),
     answerLanguageCheck: replyLanguageCheckFor(read.questionLine, language, REPORT_ANSWER_PROSE),

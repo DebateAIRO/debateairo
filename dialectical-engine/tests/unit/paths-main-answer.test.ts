@@ -8,6 +8,8 @@
 // the real count near the line). The answer's segments map back to the run's nodes. R22's dossier keeps its bytes. Data made up.
 // Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"): when the person said what they care about (the purpose lines' marked
 // answer), the writer and the checker are the next versions, drafts until Task 92 seals them; otherwise the sealed two, as before.
+// Task 50c (the same answer, "Always say it"): the main answer's later versions (the update after a dig) and the person's report say it
+// too: report.answer.later.v5 (a draft) for a later version, checked by report.answer-check.v4; the seven-path byte line holds for both.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -19,11 +21,15 @@ import {
   ANTHROPIC_TOKEN_COUNT, PREVIEW_V2_FINAL_SEATS, ProviderContentUnacceptedError, readPromptFrame, type PromptPacket, type ProviderCallRequest,
   type ProviderCallResult, type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
+import type { MainAnswerUpdateRead, MainAnswerUpdateRecord } from "@debateai/db";
 import {
-  REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT, REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_V5_PROMPT_CONTRACT,
-  REPORT_GOAL_DRAFT_CONTRACTS, writeOverallAnswer, type ReportAnswerDraft
+  REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT,
+  REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_GOAL_DRAFT_CONTRACTS,
+  writeOverallAnswer, type ReportAnswerDraft
 } from "@debateai/story";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
+import { closeInvestigation, type InvestigationCloseSettings } from "../../apps/runner/src/investigation-close.js";
+import { advanceTree, type TreeUpdatePorts, type TreeUpdateSettings } from "../../apps/runner/src/path-climb.js";
 import {
   INVESTIGATION_REPORT_ROUND_TWO_ROOM_BYTES, buildInvestigationDossier, digsInTreeOrder, dossierFieldsOf, dossierRefsOf, investigationReportGuard,
   type Dossier, type DossierInput
@@ -35,7 +41,7 @@ import {
 } from "../../apps/runner/src/paths-main-answer.js";
 import { fitDossierToTokenLine } from "../../apps/runner/src/token-line.js";
 import {
-  DIG_FAILED, DIG_NESTED, DIG_READY, PATH_NO, PATH_YES, investigationInput
+  DIG_FAILED, DIG_NESTED, DIG_READY, PATH_NO, PATH_YES, closingOf, investigationInput, memoryReports, settingsOver, team as closingTeam
 } from "../support/investigation-close-world.js";
 
 /* ----------------------------------------------------------------- the world */
@@ -344,8 +350,9 @@ const instructionOf = (request: ProviderCallRequest): string => request.packet.m
 
 describe("Task 50b: the person's stated goal", () => {
   it("the two drafts: v4's writer and v3's check byte for byte, each with its one drafted sentence last; the forms as they were; unsealed", () => {
-    expect(REPORT_GOAL_DRAFT_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v5", "report.answer-check.v4"]);
-    expect(REPORT_GOAL_DRAFT_CONTRACTS).toEqual([REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT]);
+    // Task 50c adds the later version's draft between them, so the list reads as the sealed groups do (writer, later writer, check).
+    expect(REPORT_GOAL_DRAFT_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v5", "report.answer.later.v5", "report.answer-check.v4"]);
+    expect(REPORT_GOAL_DRAFT_CONTRACTS).toEqual([REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT]);
     expect(Object.isFrozen(REPORT_GOAL_DRAFT_CONTRACTS)).toBe(true);
     expect(REPORT_ANSWER_V5_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`);
     expect(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction}\n\n${GOAL_CHECKER_SENTENCE}`);
@@ -417,14 +424,38 @@ describe("Task 50b: the person's stated goal", () => {
     expect(PurposeLinesSchema.parse({ answers: [CARES] })).toEqual({ answers: [CARES] });
   });
 
-  it("a later version has no goal draft: asking for both is refused before any call", async () => {
-    const { gateway, requests } = team();
-    const maker = (providerRef: string) => Object.freeze({ provider: gateway, providerRef });
-    await expect(writeOverallAnswer({ runId: RUN, subjectItemId: "s", contractHash: "h", maxRounds: 1, later: true, goalStated: true,
-      writer: maker(HAIKU.providerRef), checker: maker(GLM.providerRef), backupCandidates: [], material: dossierOf(pathsInput()).material,
-      send: (author, request) => author.provider.call(request), guard: investigationReportGuard, log: () => undefined }))
-      .rejects.toMatchObject({ code: "INVESTIGATION_REPORT_GOAL_LATER_INVALID" });
-    expect(requests).toEqual([]);
+  // Task 50c lifts Task 50b's refusal of a later version with a stated goal: it now asks the later draft.
+  it("Task 50c: a later version with a stated goal asks report.answer.later.v5 and report.answer-check.v4, over the very same material", async () => {
+    const earlier = Object.freeze({ version: 1, segments: Object.freeze(["Build the second pier for the summer months."]) });
+    const material = dossierOf({ ...pathsInput(), earlier }).material;
+    const write = async (goalStated: boolean) => {
+      const { gateway, requests } = team();
+      const maker = (providerRef: string) => Object.freeze({ provider: gateway, providerRef });
+      const written = await writeOverallAnswer({ runId: RUN, subjectItemId: "s", contractHash: "h", maxRounds: 1, later: true, goalStated,
+        writer: maker(HAIKU.providerRef), checker: maker(GLM.providerRef), backupCandidates: [], material,
+        send: (author, request) => author.provider.call(request), guard: investigationReportGuard, log: () => undefined });
+      return { written, requests };
+    };
+    const goal = await write(true);
+    expect(goal.written.outcome).toMatchObject({ outcome: "READY", body: ANSWER });
+    expect(callsOf(goal.requests).map(([, , contractId]) => contractId)).toEqual(["report.answer.later.v5", "report.answer-check.v4"]);
+    expect(instructionOf(goal.requests[0]!).startsWith(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(goal.requests[0]!)).toContain(GOAL_WRITER_SENTENCE);
+    expect(instructionOf(goal.requests[1]!).startsWith(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(goal.requests[1]!)).toContain(GOAL_CHECKER_SENTENCE);
+    // Without a goal: today's later writer and check, with no goal sentence.
+    const plain = await write(false);
+    expect(callsOf(plain.requests).map(([, , contractId]) => contractId)).toEqual(["report.answer.later.v4", "report.answer-check.v3"]);
+    expect(instructionOf(plain.requests[0]!).startsWith(REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction)).toBe(true);
+    for (const request of plain.requests) {
+      expect(instructionOf(request)).not.toContain(GOAL_WRITER_SENTENCE);
+      expect(instructionOf(request)).not.toContain(GOAL_CHECKER_SENTENCE);
+    }
+    // Only the instruction changes: the same material, the earlier answer included, field for field.
+    const fieldsOf = (request: ProviderCallRequest) => frameOf(request.packet).fields.map((entry) => [entry.name, entry.content]);
+    expect(fieldsOf(goal.requests[0]!)).toEqual(fieldsOf(plain.requests[0]!));
+    expect(fieldsOf(goal.requests[1]!)).toEqual(fieldsOf(plain.requests[1]!));
+    expect(fieldsOf(goal.requests[0]!).map(([name]) => name)).toContain("earlier_report");
   });
 
   it("the runner tells the main answer whether the person stated a goal, from the run's own purpose lines", () => {
@@ -432,6 +463,39 @@ describe("Task 50b: the person's stated goal", () => {
     const at = runner.indexOf("main = await runPathsMainAnswer({");
     expect(at).toBeGreaterThan(0);
     expect(runner.slice(at, runner.indexOf("});", at))).toContain("goalStated: pathsGoalStated(pathsPurposeLines)");
+  });
+});
+
+/* ----------------------------------------------------------------- Task 50c: the later answers say it too */
+
+// Task 50c (follow-up to Task 50b's review; the owner's "the main answer always says … how a stated goal fares" and Q4 "the final answer
+// says how the person's goal fares"): the main answer's later versions (the update after a dig) and the person's report say it too. One
+// more draft, report.answer.later.v5: the sealed report.answer.later.v4 byte for byte with Task 50b's one marked sentence last, the form
+// unchanged, checked by Task 50b's report.answer-check.v4; Task 92 seals it with Task 50b's two. The update and the report learn of the
+// goal from the ROOT debate's purpose lines (a dig's own are copies, Task 35).
+describe("Task 50c: the later answers say how the goal fares too", () => {
+  it("the later draft: report.answer.later.v4 byte for byte with Task 50b's one sentence last; the form as it was; unsealed", () => {
+    expect(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.contractId).toBe("report.answer.later.v5");
+    expect(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`);
+    expect(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.answerForm).toBe(REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.answerForm);
+    expect(Object.isFrozen(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT)).toBe(true);
+    expect(engineSealedContracts().map((contract) => contract.contractId)).not.toContain("report.answer.later.v5");
+    // The new sentence is Task 50b's marked one, the same constant, never a second copy of its words.
+    const source = readFileSync(join(process.cwd(), "packages/story/src/investigation-report.ts"), "utf8");
+    expect(source).toContain("[REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join(\"\\n\\n\"), REPORT_ANSWER_V3_FORM)");
+    expect(source.split(GOAL_WRITER_SENTENCE)).toHaveLength(2);
+  });
+
+  it("the update and the report learn of a stated goal from the ROOT's purpose lines, read once with the rest of the question", () => {
+    const sources = readFileSync(join(process.cwd(), "apps/runner/src/investigation-close-sources.ts"), "utf8");
+    // One read for both: the closing's and the update's material are read by the investigation's root (path-climb-sources.ts hands
+    // the tree the closing's own reader).
+    expect(sources).toContain("const purpose = await purposeLinesOf(pool, root, ask.questionLine);");
+    expect(sources).toContain("goalStated: pathsGoalStated(lines.data)");
+    expect(sources).toContain("...(purpose.goalStated ? { goalStated: true } : {})");
+    // The question the AIs read takes the place, time and purpose lines by name: the mark itself never reaches the material.
+    expect(sources).toContain("question: Object.freeze({ line: ask.questionLine, place: purpose.place, time: purpose.time, purpose: purpose.purpose,");
+    expect(readFileSync(join(process.cwd(), "apps/runner/src/path-climb-sources.ts"), "utf8")).toContain("answerInputOf: closing.investigationInputOf,");
   });
 });
 
@@ -452,6 +516,57 @@ function fullPath(no: number): PathsDossierPath {
 const SEVEN: readonly PathsDossierPath[] = Object.freeze([1, 2, 3, 4, 5, 6, 7].map(fullPath));
 const BIG_ANSWER = JSON.stringify({ segments: [{ text: CJK.repeat(3000), rests_on: ["A1"] }, { text: CJK.repeat(3000), rests_on: ["A7"] }] });
 const BIG_OBJECTION = JSON.stringify({ satisfied: false, problem: CJK.repeat(2000), part: "segments" });
+
+/* Task 50c: the later answers over the same seven paths. */
+const SEVEN_INPUT: DossierInput = pathsDossierInput({ runId: RUN, question: CJK_QUESTION, paths: SEVEN, answerWords: 300 });
+const BIG_STORY = JSON.stringify({ short_answer: CJK.repeat(3000), what_would_change: CJK.repeat(3000), how_it_went: [],
+  still_open: [CJK.repeat(1000), CJK.repeat(1000)] });
+const BIG_STORY_OBJECTION = JSON.stringify({ satisfied: false, problem: CJK.repeat(2000), part: "short_answer", misleading: true });
+const SATISFIED_STORY = JSON.stringify({ satisfied: true, problem: null, part: null, misleading: false });
+const MORE_DIG = "66666666-6666-4666-8666-666666666666";
+/** A main-answer version already stored, so the next one is a later version (made up). */
+const STORED_VERSION: MainAnswerUpdateRead = Object.freeze({ update_id: "77777777-7777-4777-8777-777777777777", answer_seq: 1,
+  based_on_update_id: null, trigger_kind: "PATH_ADDED", trigger_id: "88888888-8888-4888-8888-888888888888",
+  trigger_run_id: "88888888-8888-4888-8888-888888888888", paid_by_owner_ref: null, outcome: "READY", failure_code: null,
+  recorded_at: "2026-11-05T10:00:00.000Z", content: null });
+const rolesOver = (gateway: ProviderGateway) => Object.freeze({
+  resolveProvider: (roleRef: string) => (roleRef === HAIKU.providerRef || roleRef === GLM.providerRef ? { provider: gateway, providerRef: roleRef } : null),
+  backupCandidates: [], backupMakers: []
+});
+
+/**
+ * The tree's runner (path-climb.ts) for one '+ N more' dig of this run, with a version already stored (so the update is a later version,
+ * its earlier answer a big one), the read's `goalStated` as the ROOT's purpose lines would say; both members are this file's gateway.
+ */
+function updateTreeOf(gateway: ProviderGateway, input: DossierInput, goalStated: boolean) {
+  const recorded: MainAnswerUpdateRecord[] = [];
+  const refused = async (): Promise<never> => { throw new Error("test: not read here"); };
+  const ports: TreeUpdatePorts = {
+    tree: {
+      takeTurn: refused, readTurn: refused, record: refused, readLine: async () => [], readClimbNext: async () => null,
+      recordMainAnswer: async (record: MainAnswerUpdateRecord) => { recorded.push(record); return Object.freeze({ outcome: "RECORDED" as const, answerSeq: 2 }); },
+      readMainAnswers: async () => [STORED_VERSION], markDigSettled: async () => undefined
+    },
+    digOf: async () => null, ownRewriteOf: async () => null, parentPathOf: refused, childOf: refused, sealUpdate: refused,
+    sealMainAnswer: async (_rootRunId: string, updateId: string) => Object.freeze({ envelope: { sealed: updateId } as never, attestation: Buffer.from("made-up") }),
+    openMainAnswer: async () => [CJK.repeat(3000), CJK.repeat(3000)],
+    answerInputOf: async (_rootRunId, earlier) => Object.freeze({ input: { ...input, earlier }, free: false, questionLine: input.question.line,
+      ...(goalStated ? { goalStated: true } : {}) }),
+    payerOf: async () => null, answerSpentMicros: async () => 0,
+    addedPathOf: async (runId: string) => (runId === MORE_DIG ? Object.freeze({ rootRunId: RUN, positionRef: "more-kp07", free: false }) : null)
+  };
+  const settings: TreeUpdateSettings = { ports, writerRoleRef: HAIKU.providerRef, checkerRoleRef: GLM.providerRef, roles: rolesOver(gateway) };
+  return { settings, recorded };
+}
+
+/** The closing's world (investigation-close-world.ts) over the seven paths; both members are this file's gateway; `goalStated` as the root says. */
+function reportSettingsOf(gateway: ProviderGateway, store: ReturnType<typeof memoryReports>, goalStated: boolean): InvestigationCloseSettings {
+  const base = settingsOver({ store, vendors: closingTeam(), dossier: SEVEN_INPUT });
+  return { ...base, roles: rolesOver(gateway), sources: { inputOf: async (closing, earlier) => {
+    const read = await base.sources.inputOf(closing, earlier);
+    return read === null || !goalStated ? read : { ...read, goalStated: true };
+  } } };
+}
 
 describe("seven full paths in \"中\"", () => {
   it("every body sent, round 2's included, stays at or under 195,904 bytes; every path keeps its line and fate", async () => {
@@ -478,6 +593,57 @@ describe("seven full paths in \"中\"", () => {
       .toEqual(["report.answer.v5", "report.answer-check.v4", "report.answer.v5", "report.answer-check.v4"]);
     expect(written.outcome.outcome).toBe("READY");
     expect(sent.length).toBeGreaterThanOrEqual(4);
+    for (const one of sent) expect(pathRewriteBodyBytes(one.packet), one.key).toBeLessThanOrEqual(LINE);
+  });
+
+  // Task 50c (plan Review Focus 5): the later answers with a stated goal read the same largest material and an earlier answer of their
+  // own beside it. The main-answer update after a dig (a later version, report.answer.later.v5) and the person's report (version 1 with
+  // report.answer.v5, version 2 with report.answer.later.v5, each with its story and the story's check), every check objecting once:
+  // every body sent, round 2's and any repair's included, stays at or under the line.
+  it("Task 50c: the update after a dig, a later version with a stated goal, sends every body at or under 195,904 bytes", async () => {
+    let checked = 0;
+    const { gateway, requests, sent } = team(() => BIG_ANSWER, () => { checked += 1; return checked === 1 ? BIG_OBJECTION : SATISFIED; });
+    const update = updateTreeOf(gateway, SEVEN_INPUT, true);
+    expect(await advanceTree(update.settings, MORE_DIG)).toBe("ANSWER_UPDATED");
+    expect(callsOf(requests).map(([key, , contractId]) => [key, contractId])).toEqual([
+      ["ANSWER_UPDATE:ANSWER:1", "report.answer.later.v5"], ["ANSWER_UPDATE:ANSWER_CHECK:1", "report.answer-check.v4"],
+      ["ANSWER_UPDATE:ANSWER:2", "report.answer.later.v5"], ["ANSWER_UPDATE:ANSWER_CHECK:2", "report.answer-check.v4"]]);
+    expect(update.recorded.map((record) => [record.outcome, record.rounds])).toEqual([["READY", 2]]);
+    const writer = new Map(frameOf(requests[0]!.packet).fields.map((entry) => [entry.name, entry.content] as const));
+    expect(JSON.parse(writer.get("earlier_report")!)).toMatchObject({ version: 1 });
+    // Review of Task 50c: the goal drafts rode the largest material the line allows: the dossier, its earlier answer beside it, was cut
+    // down the ladder to fit, and the writer read exactly that.
+    const largest = dossierOf({ ...SEVEN_INPUT, earlier: Object.freeze({ version: 1, segments: Object.freeze([CJK.repeat(3000), CJK.repeat(3000)]) }) });
+    expect(largest.ladderStep).toBeGreaterThan(1);
+    expect(largest.leftOut).toBeGreaterThan(0);
+    expect([...writer]).toEqual(largest.material.answerWriter.map((entry) => [entry.name, entry.content]));
+    expect(sent.length).toBeGreaterThanOrEqual(4);
+    for (const one of sent) expect(pathRewriteBodyBytes(one.packet), one.key).toBeLessThanOrEqual(LINE);
+  });
+
+  it("Task 50c: the report with a stated goal, version 1 and version 2, its story and the story's check, sends every body at or under 195,904 bytes", async () => {
+    const store = memoryReports();
+    const checks = new Map<string, number>();
+    const { gateway, requests, sent } = team(
+      (request) => (frameOf(request.packet).contractId.startsWith("report.story") ? BIG_STORY : BIG_ANSWER),
+      (request) => {
+        const contractId = frameOf(request.packet).contractId;
+        const at = (checks.get(contractId) ?? 0) + 1;
+        checks.set(contractId, at);
+        const story = contractId === "report.story-check.v1";
+        return at % 2 === 1 ? (story ? BIG_STORY_OBJECTION : BIG_OBJECTION) : (story ? SATISFIED_STORY : SATISFIED);
+      });
+    for (const version of [1, 2]) expect(await closeInvestigation(reportSettingsOf(gateway, store, true), closingOf(version))).toBe("RECORDED");
+    const step = (writer: string) => [writer, "report.answer-check.v4", writer, "report.answer-check.v4",
+      "report.story.v1", "report.story-check.v1", "report.story.v1", "report.story-check.v1"];
+    expect(callsOf(requests).map(([, , contractId]) => contractId)).toEqual([...step("report.answer.v5"), ...step("report.answer.later.v5")]);
+    expect(store.records.map((record) => [record.reportVersion, record.outcome, record.storyOutcome, record.answerRounds, record.storyRounds]))
+      .toEqual([[1, "READY", "READY", 2, 2], [2, "READY", "READY", 2, 2]]);
+    // Review of Task 50c: each version's goal writer read the largest material the line allows (the dossier cut down the ladder to fit).
+    const v1Writer = frameOf(requests[0]!.packet).fields.map((entry) => [entry.name, entry.content]);
+    expect(v1Writer).toEqual(dossierOf(SEVEN_INPUT).material.answerWriter.map((entry) => [entry.name, entry.content]));
+    for (const at of [0, 8]) expect(frameOf(requests[at]!.packet).fields.map((entry) => entry.name), String(at)).toContain("left_out");
+    expect(sent.length).toBeGreaterThanOrEqual(16);
     for (const one of sent) expect(pathRewriteBodyBytes(one.packet), one.key).toBeLessThanOrEqual(LINE);
   });
 

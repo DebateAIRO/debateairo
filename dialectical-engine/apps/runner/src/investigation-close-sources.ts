@@ -21,6 +21,7 @@ import {
 import type { DossierAddedPage, DossierDig, DossierPath, DossierRewrite, DossierSource, DossierText, DossierView } from "./investigation-dossier.js";
 import { pathRewriteBodyBytes, type PathRewriteDigPath, type PathRewritePoint } from "./path-rewrite-material.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
+import { pathsGoalStated } from "./paths-main-answer.js";
 import { backfillShownQuotes } from "./passage-sweep.js";
 import { pathOutcomeBaseOf, pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
@@ -287,14 +288,19 @@ export async function v2FirstPathsOf(input: Readonly<{ set: StoredStartPathSet; 
   return Object.freeze(paths);
 }
 
-/** The debate's step-2 lines (decisions 5 and 29), opened under its key, as the material's three fields; all null for an old debate. */
-async function purposeLinesOf(pool: Pool, runId: string, questionLine: string): Promise<Readonly<{ place: string | null; time: string | null; purpose: string | null }>> {
+/**
+ * The debate's step-2 lines (decisions 5 and 29), opened under its key, as the material's three fields; all null for an old debate. V4
+ * start step, Task 50c: and whether the person said what they care about (the page's mark on the care answer, `pathsGoalStated`), which
+ * picks the answer's goal drafts and never reaches the material.
+ */
+async function purposeLinesOf(pool: Pool, runId: string, questionLine: string)
+  : Promise<Readonly<{ place: string | null; time: string | null; purpose: string | null; goalStated: boolean }>> {
   const sealed = await new PostgresTreeUpdateRunnerRepository(pool).readPurposeLines(runId);
-  const none = Object.freeze({ place: null, time: null, purpose: null });
+  const none = Object.freeze({ place: null, time: null, purpose: null, goalStated: false });
   if (sealed === null) return none;
   const opened = await withRunContentLease(pool, [runId], () => decryptContentForRun<unknown>(pool, runId, RUN_PURPOSE_LINES_CARRIER, runId.toLowerCase(), sealed, null));
   const lines = PurposeLinesSchema.safeParse(opened);
-  return lines.success ? purposeLinesMaterial(questionLine, lines.data) : none;
+  return lines.success ? Object.freeze({ ...purposeLinesMaterial(questionLine, lines.data), goalStated: pathsGoalStated(lines.data) }) : none;
 }
 
 type StoredRewrite = Readonly<{ text: DossierText; whatChanged: readonly string[]; viewReason: string | null;
@@ -545,6 +551,9 @@ export function postgresInvestigationCloseSources(pool: Pool, log?: (event: stri
     return Object.freeze({
       free: ask.planTier === "free",
       questionLine: ask.questionLine,
+      // V4 start step, Task 50c: the ROOT's purpose lines carry the person's marked care answer, so the report's answer and every main-answer
+      // update say how that goal fares. Absent when not, so a read without a goal keeps its members (and every byte sent) as before.
+      ...(purpose.goalStated ? { goalStated: true } : {}),
       input: Object.freeze({
         question: Object.freeze({ line: ask.questionLine, place: purpose.place, time: purpose.time, purpose: purpose.purpose,
           readingLevel: readingLevelOf(ask.depthParams), language: null }),

@@ -76,7 +76,10 @@ const NOT_ANSWERED_BY_DEFAULT: Readonly<Record<string, string>> = Object.freeze(
   // REPORT_ANSWER_CHECK in tests/support/gate-later-steps.ts). A path run asks them only when the person stated a goal, which only the
   // clarifying call's version 2 (sealed by the same Task 92) offers, so nothing the practice runs sends them before then.
   "report.answer.v5": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers",
-  "report.answer-check.v4": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers"
+  "report.answer-check.v4": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers",
+  // V4 start step (Task 50c): the later version's goal writer (a main-answer update after a dig, a report's version 2 on), the same kind
+  // of draft for the same reason; Task 92 seals it and maps it to REPORT_ANSWER with Task 50b's two.
+  "report.answer.later.v5": "Task 50c's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers"
 });
 
 const chatOf = (contract: PromptContract, material: readonly FramedMaterialField[]): string =>

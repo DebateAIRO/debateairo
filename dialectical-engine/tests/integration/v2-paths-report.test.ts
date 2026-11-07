@@ -8,9 +8,10 @@
 // A dig of a path left out before Start ("+ N more") is a new first-level path. An R22 debate's dossier keeps its shape.
 // Task 55e (spec §4.4): that dig updates the main answer (trigger PATH_ADDED), a deeper dig under the new path climbs to the main
 // answer, and the tree's sweep writes the update a runner left undone.
+// Review of Task 50c: the ROOT's care mark, read from the database, makes the update a dig causes and the next report ask the goal drafts.
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every name, question and page is made up.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { StoryBodySchema, type PathOutcome } from "@debateai/contract";
+import { StoryBodySchema, type PathOutcome, type PurposeLines } from "@debateai/contract";
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PostgresDigPicksRepository, PostgresInvestigationReportRunnerRepository, PostgresInvestigationRepository,
   PostgresPathResultsRepository, PostgresStartPathsStore, PostgresTreeUpdateRunnerRepository, decryptContentForRun, migrate, withRunContentLease,
@@ -21,6 +22,7 @@ import {
   engineSettingsOf, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues, resolveLengthGuidance
 } from "@debateai/register";
 import { serveMainAnswer } from "@debateai/serve";
+import { postgresPurposeLines } from "../../apps/api/src/purpose-lines.js";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { closeInvestigation, type InvestigationReportContent } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose, postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
@@ -29,7 +31,7 @@ import { TREE_SWEEP_DEFAULTS, sweepTreeUpdates } from "../../apps/runner/src/pat
 import { postgresTreeUpdatePorts, readRecentTreeDigs } from "../../apps/runner/src/path-climb-sources.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import { scriptedShapeAnswers, shapeForTest } from "../support/debate-shape-harness.js";
-import { CLOSING_RESERVES, fieldsOf, team } from "../support/investigation-close-world.js";
+import { CLOSING_RESERVES, contractOf, fieldsOf, team } from "../support/investigation-close-world.js";
 import { FIVE_MAKER_REFS, OWNER_CALL_CONCURRENCY, PANEL_REFS, previewDebateHarness } from "../support/preview-debate-harness.js";
 import { PATHS_SETTINGS, materialOf, pathsShapeOf, storedPathsOf } from "../support/paths-run-harness.js";
 import type { GateOverride, GateRecord, GateRequest } from "../support/preview-gate-stubs.js";
@@ -117,6 +119,12 @@ const DEEPER_PICKS: readonly DigPick[] = Object.freeze([
 const SWEPT_PICKS: readonly DigPick[] = Object.freeze([
   { kind: "HELPS_MAIN_QUESTION", suggestionId: "more-kp09", place: "more-kp09", author: "AI_SUGGESTION", text: "Q9?" }
 ]);
+/** Review of Task 50c: a fourth path left out before Start, dug once the person's goal is in play. */
+const GOAL_PICKS: readonly DigPick[] = Object.freeze([
+  { kind: "HELPS_MAIN_QUESTION", suggestionId: "more-kp10", place: "more-kp10", author: "AI_SUGGESTION", text: "Q10?" }
+]);
+/** Review of Task 50c: step 2's lines with the answer the page marked as the answer to "What do you care about most?" (Task 50b). */
+const CARE_LINES: PurposeLines = Object.freeze({ answers: [Object.freeze({ question: "What do you care about most?", answer: "Keeping bills low", cares: true as const })] });
 
 /**
  * One path debate on the five companies (GLM by its writer ref beside the four, so the rewrite's Haiku and GLM are the run's own),
@@ -193,7 +201,7 @@ async function writeReport(root: string, investigationId: string) {
   const row = read.reports.find((entry) => entry.report_version === closing!.reportVersion)!;
   expect(row.outcome).toBe("READY");
   const writer = vendors.haiku.requests.find((request) => fieldsOf(request.packet).has("answer_length"))!;
-  return { closing: closing!, content: contents.get(row.report_id)!, writer: fieldsOf(writer.packet), read };
+  return { closing: closing!, content: contents.get(row.report_id)!, writer: fieldsOf(writer.packet), read, vendors };
 }
 
 type FirstDebate = { paths: { ref: string; line: string; story_line?: string }[] };
@@ -461,5 +469,60 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
     await sweepTreeUpdates(sweep);
     expect(vendors.haiku.requests.length + vendors.glm.requests.length).toBe(calls);
     expect(await versionsOf(parent.rootId)).toEqual(after);
+  }, 1_800_000);
+
+  /**
+   * Review of Task 50c (the builder's coverage gap 4: the read of the root's mark was proven only by a source scan). Over the real database:
+   * a care mark on a dig's own purpose lines (copies, Task 35) is not read; the ROOT's is. Then the main-answer update the dig causes (the
+   * sweep's, as main.ts composes it) asks the draft report.answer.later.v5 checked by report.answer-check.v4, and so does the next report
+   * version, its story and the story's check as today. The care answer reaches the AIs as words only, never its mark. LAST in the file:
+   * from here on the parent states a goal.
+   */
+  it("a root whose purpose lines carry the care mark: the update a dig causes and the next report ask report.answer.later.v5, checked by report.answer-check.v4", async () => {
+    const parent = await parentDebate();
+    await investigations().reopen(own().ownerRef, parent.investigationId);
+    const goal = await runOnFive("v2-report-goal", { count: 1, set: digSetOf(GOAL_PICKS, () => "T10"), pathRewrite: false,
+      dig: { parentRunId: parent.rootId, positionRef: null, places: ["more-kp10"], picks: GOAL_PICKS } });
+    const goalId = goal.debate.runId.toLowerCase();
+    const lines = postgresPurposeLines(database.pool);
+    const tree = postgresTreeUpdatePorts(database.pool);
+    // The dig's own lines are copies: a mark there alone is not read.
+    expect(await lines.record(own().ownerRef, goalId, CARE_LINES)).toBe("RECORDED");
+    expect(await tree.answerInputOf(parent.rootId, null)).not.toHaveProperty("goalStated");
+    // The root's lines with the mark: read, by the tree's reader and the closing's alike; the care answer is in the question's words only.
+    expect(await lines.record(own().ownerRef, parent.rootId, CARE_LINES)).toBe("RECORDED");
+    const read = (await tree.answerInputOf(parent.rootId, null))!;
+    expect(read.goalStated).toBe(true);
+    expect(read.input.question.purpose).toContain("Keeping bills low");
+    expect(JSON.stringify(read.input)).not.toContain("\"cares\"");
+    // The update the dig causes, as the sweep writes it (Haiku writes, GLM checks; scripted): a later version (versions are stored already).
+    const before = await versionsOf(parent.rootId);
+    expect(before.length).toBeGreaterThan(0);
+    const now = Date.now() + TREE_SWEEP_DEFAULTS.staleMs + 60_000;
+    const update = team();
+    const composed = composePathRewrite({ pool: database.pool,
+      targets: [{ providerRef: "ref-haiku", model: PATH_REWRITE_WRITER_MODEL }, { providerRef: "ref-glm", model: PATH_REWRITE_CHECKER_MODEL }],
+      members: [{ provider: update.haiku.provider, providerRef: "ref-haiku", maker: "Anthropic" }, { provider: update.glm.provider, providerRef: "ref-glm", maker: "Z.AI" }],
+      log: () => undefined });
+    if (composed === undefined) throw new Error("test: no Haiku or no GLM for the tree's sweep");
+    await sweepTreeUpdates({ ...composed.treeSweep, now: () => new Date(now) });
+    expect(update.haiku.requests.map((request) => [request.runId?.toLowerCase(), request.callSiteKey, contractOf(request.packet)]))
+      .toEqual([[goalId, "ANSWER_UPDATE:ANSWER:1", "report.answer.later.v5"]]);
+    expect(update.glm.requests.map((request) => [request.callSiteKey, contractOf(request.packet)])).toEqual([["ANSWER_UPDATE:ANSWER_CHECK:1", "report.answer-check.v4"]]);
+    expect(fieldsOf(update.haiku.requests[0]!.packet).has("earlier_report")).toBe(true);
+    const after = await versionsOf(parent.rootId);
+    expect(after.slice(0, before.length)).toEqual(before);
+    expect(after.slice(before.length)).toEqual([{ trigger_kind: "PATH_ADDED", trigger_id: goalId, trigger_run_id: goalId, outcome: "READY" }]);
+    // The next report version: the answer asks the goal drafts, the story and its check are today's.
+    expect(await closeAgain(parent.investigationId)).toBeGreaterThan(1);
+    const report = await writeReport(parent.rootId, parent.investigationId);
+    expect(report.vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.later.v5", "report.story.v1"]);
+    expect(report.vendors.glm.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer-check.v4", "report.story-check.v1"]);
+    // Every AI read the care answer's words, and none read its mark.
+    for (const request of [update.haiku, update.glm, report.vendors.haiku, report.vendors.glm].flatMap((vendor) => vendor.requests)) {
+      const contents = [...fieldsOf(request.packet).values()];
+      expect(contents.some((content) => content.includes("Keeping bills low")), request.callSiteKey).toBe(true);
+      for (const content of contents) expect(content, request.callSiteKey).not.toContain("\"cares\"");
+    }
   }, 1_800_000);
 });

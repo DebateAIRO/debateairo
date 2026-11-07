@@ -591,6 +591,8 @@ async function composeAnswer(settings: TreeUpdateSettings, update: AnswerUpdate,
       runId, subjectItemId: subject, contractHash: settings.contractHash ?? engineContractHash(), callSiteOf: answerUpdateCallSiteKey,
       maxRounds: update.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
       later: read.input.earlier !== null,
+      // V4 start step, Task 50c: the root's stated goal (its purpose lines, read with the material); a later version asks its own draft.
+      goalStated: read.goalStated === true,
       writer, checker, backupCandidates: settings.roles.backupCandidates ?? [], backupMakers: settings.roles.backupMakers,
       material: dossier.material, send, guard: investigationReportGuard, randomBytes: closingRandomBytes(cryptoRandomBytes(32)),
       answerLanguageCheck: replyLanguageCheckFor(read.questionLine, language, REPORT_ANSWER_PROSE),

@@ -82,6 +82,7 @@ const PATHS_MAIN_ANSWER_SUBJECT = "paths-main-answer";
 /**
  * Task 50b: whether the person said what they care about: an answer in the run's purpose lines that the page marked as the answer to
  * "What do you care about most?" (`cares: true`, offered or typed). Never read from the words of the question, the answers or any line.
+ * Task 50c: the report and every main-answer update read it too, over the ROOT debate's purpose lines (investigation-close-sources.ts).
  */
 export function pathsGoalStated(lines: PurposeLines | null): boolean {
   return (lines?.answers ?? []).some((answer) => answer.cares === true);

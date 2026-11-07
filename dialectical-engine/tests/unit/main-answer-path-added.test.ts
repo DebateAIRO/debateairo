@@ -5,15 +5,19 @@
 // written by the Overall-view writer, the dig marked settled), a deeper dig's change of that new path climbing to the main answer, the
 // sweep retrying an update left undone, and nothing for a first debate, an R22 dig under the question or a runner without the read. The
 // database side runs in tests/integration/v2-paths-report.test.ts. Every id, question and text here is made up.
+// Task 50c: an update whose root question states what the person cares about says how that goal fares (the drafts).
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { MainAnswerUpdateRead, MainAnswerUpdateRecord, WebSealed } from "@debateai/db";
+import { readPromptFrame, type ProviderCallRequest } from "@debateai/providers";
+import { REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT } from "@debateai/story";
 import { AnswerMainAnswerSchema, MAIN_ANSWER_TRIGGERS, MainAnswerVersionSchema } from "../../packages/contract/src/web.js";
 import { serveMainAnswer } from "../../packages/serve/src/path-rewrites.js";
 import {
   advanceAfterStory, advanceTree, climbFrom, mainAnswerUpdateIdOf, sweepTreeUpdates, type MainAnswerContent, type TreeUpdatePorts, type TreeUpdateSettings
 } from "../../apps/runner/src/path-climb.js";
 import { createPathRewriteInFlight, type PathRewriteDig } from "../../apps/runner/src/path-rewrite.js";
-import { ROOT, investigationInput, team } from "../support/investigation-close-world.js";
+import { ROOT, contractOf, fieldsOf, investigationInput, team } from "../support/investigation-close-world.js";
 
 const MORE_DIG = "66666666-6666-4666-8666-666666666666";
 const DEEPER_DIG = "77777777-7777-4777-8777-777777777777";
@@ -51,12 +55,22 @@ describe("the contract: a dig added a path to the question (PATH_ADDED)", () => 
   });
 });
 
-/** A tree in memory: the climb's next steps, the digs, what each `addedPathOf` read finds, and what the runner recorded. */
+/** Task 50c: a main-answer version already stored, so the next update is a later version (made up). */
+const STORED_VERSION: MainAnswerUpdateRead = Object.freeze({ update_id: "12121212-1212-4121-8121-121212121212", answer_seq: 1, based_on_update_id: null,
+  trigger_kind: "PATH_REWRITE", trigger_id: REWRITE, trigger_run_id: R22_DIG, paid_by_owner_ref: null, outcome: "READY", failure_code: null,
+  recorded_at: AT, content: null });
+
+/**
+ * A tree in memory: the climb's next steps, the digs, what each `addedPathOf` read finds, and what the runner recorded. Task 50c:
+ * `stored`, a version is already stored (the next is a later one); `goalStated`, the root's purpose lines carry the care mark.
+ */
 function treeOf(input: Readonly<{
   next?: Readonly<Record<string, Readonly<{ parent_run_id: string; root_run_id: string; position_ref: string | null }>>>;
   added?: Readonly<Record<string, Readonly<{ rootRunId: string; positionRef: string; free: boolean }>>>;
   digs?: Readonly<Record<string, PathRewriteDig>>;
   withoutAddedPathRead?: boolean;
+  stored?: boolean;
+  goalStated?: boolean;
 }>) {
   const recorded: MainAnswerUpdateRecord[] = [];
   const sealed: Array<Readonly<{ rootRunId: string; updateId: string; content: MainAnswerContent }>> = [];
@@ -80,7 +94,7 @@ function treeOf(input: Readonly<{
         recorded.push(record);
         return Object.freeze({ outcome: "RECORDED" as const, answerSeq: recorded.length });
       },
-      readMainAnswers: async () => recorded.map(readOf),
+      readMainAnswers: async () => [...(input.stored === true ? [STORED_VERSION] : []), ...recorded.map(readOf)],
       markDigSettled: async (runId: string) => { settled.push(runId); }
     },
     digOf: async (runId: string) => input.digs?.[runId] ?? null,
@@ -93,7 +107,8 @@ function treeOf(input: Readonly<{
       return Object.freeze({ envelope: { sealed: updateId } as never, attestation: Buffer.from("made-up") });
     },
     openMainAnswer: async () => ["The answer before."],
-    answerInputOf: async () => Object.freeze({ input: investigationInput(), free: false, questionLine: QUESTION }),
+    answerInputOf: async (_rootRunId, earlier) => Object.freeze({ input: investigationInput({ earlier }), free: false, questionLine: QUESTION,
+      ...(input.goalStated === true ? { goalStated: true } : {}) }),
     payerOf: async () => "owner-ref",
     answerSpentMicros: async () => 0,
     ...(input.withoutAddedPathRead === true ? {} : {
@@ -203,5 +218,67 @@ describe("a deeper dig under the new path climbs to the main answer", () => {
     expect(await climbFrom(tree.settings, start)).toBe("STOPPED");
     expect(tree.recorded).toEqual([]);
     expect(tree.logged).toContain("PATH_CLIMB_UNDER_THE_QUESTION");
+  });
+});
+
+/* ----------------------------------------------------------------- Task 50c: the person's stated goal */
+
+// V4 start step, Task 50c (follow-up to Task 50b; the owner, 4 Nov, "Always say it": "the main answer always says in one or two plain
+// sentences how a stated goal fares"): an update of the main answer after a dig says how the person's stated goal fares too. Nothing
+// earlier stored: Task 50b's draft report.answer.v5; a later version: the draft report.answer.later.v5; both checked by Task 50b's draft
+// report.answer-check.v4. Whether a goal was stated is the ROOT's purpose lines' (the tree reads the closing's own material reader). Without
+// a goal, every byte is today's: the digests below were taken on this file's world before Task 50c changed any code (wave16-t50c-1.log
+// and -2.log).
+const GOAL_WRITER_SENTENCE = "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";
+const GOAL_CHECKER_SENTENCE = "If the question says what the person cares about, the answer must say how that goal fares across the paths.";
+const instructionOf = (request: ProviderCallRequest): string => request.packet.messages[0]!.content;
+/** Every call's bytes as sent, in each member's order, the fence and the canary masked (each update draws its own). */
+function sentDigest(requests: readonly ProviderCallRequest[]): string {
+  return createHash("sha256").update(JSON.stringify(requests.map((request) => {
+    const frame = readPromptFrame({ messages: request.packet.messages.slice(0, 2) });
+    return [request.callSiteKey, request.providerRef,
+      JSON.stringify(request.packet.messages).split(frame.fence).join("<fence>").split(frame.canary).join("<canary>")];
+  })), "utf8").digest("hex");
+}
+
+describe("Task 50c: the update after a dig says how the person's stated goal fares", () => {
+  it("the first version of a root that stated a goal (nothing earlier stored): report.answer.v5, checked by report.answer-check.v4", async () => {
+    const tree = treeOf({ added: MORE, goalStated: true });
+    expect(await advanceTree(tree.settings, MORE_DIG)).toBe("ANSWER_UPDATED");
+    expect(tree.vendors.haiku.requests.map((request) => [request.callSiteKey, contractOf(request.packet)])).toEqual([["ANSWER_UPDATE:ANSWER:1", "report.answer.v5"]]);
+    expect(tree.vendors.glm.requests.map((request) => [request.callSiteKey, contractOf(request.packet)]))
+      .toEqual([["ANSWER_UPDATE:ANSWER_CHECK:1", "report.answer-check.v4"]]);
+    expect(instructionOf(tree.vendors.haiku.requests[0]!)).toContain(GOAL_WRITER_SENTENCE);
+    expect(instructionOf(tree.vendors.glm.requests[0]!)).toContain(GOAL_CHECKER_SENTENCE);
+    expect(tree.recorded.map((record) => [record.basedOnUpdateId, record.outcome])).toEqual([[null, "READY"]]);
+  });
+
+  it("a later version of a root that stated a goal: report.answer.later.v5 (later.v4 and the one sentence), checked by report.answer-check.v4, over the same material", async () => {
+    const plain = treeOf({ added: MORE, stored: true });
+    await advanceTree(plain.settings, MORE_DIG);
+    const tree = treeOf({ added: MORE, stored: true, goalStated: true });
+    expect(await advanceTree(tree.settings, MORE_DIG)).toBe("ANSWER_UPDATED");
+    expect(tree.vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.later.v5"]);
+    expect(tree.vendors.glm.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer-check.v4"]);
+    expect(instructionOf(tree.vendors.haiku.requests[0]!).startsWith(`${REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`)).toBe(true);
+    expect(instructionOf(tree.vendors.glm.requests[0]!)).toContain(GOAL_CHECKER_SENTENCE);
+    expect(tree.recorded.map((record) => [record.basedOnUpdateId, record.outcome])).toEqual([[STORED_VERSION.update_id, "READY"]]);
+    // Only the instructions change: the same material, the earlier answer included, field for field.
+    expect(JSON.parse(fieldsOf(tree.vendors.haiku.requests[0]!.packet).get("earlier_report")!)).toMatchObject({ version: 1 });
+    for (const member of ["haiku", "glm"] as const) {
+      expect(tree.vendors[member].requests.map((request) => [...fieldsOf(request.packet)]))
+        .toEqual(plain.vendors[member].requests.map((request) => [...fieldsOf(request.packet)]));
+    }
+  });
+
+  it("without a goal, the first and a later version send today's bytes", async () => {
+    const first = treeOf({ added: MORE });
+    expect(await advanceTree(first.settings, MORE_DIG)).toBe("ANSWER_UPDATED");
+    const later = treeOf({ added: MORE, stored: true });
+    expect(await advanceTree(later.settings, MORE_DIG)).toBe("ANSWER_UPDATED");
+    expect([first, later].map((tree) => [...tree.vendors.haiku.requests, ...tree.vendors.glm.requests].map((request) => contractOf(request.packet))))
+      .toEqual([["report.answer.v4", "report.answer-check.v3"], ["report.answer.later.v4", "report.answer-check.v3"]]);
+    expect(sentDigest([...first.vendors.haiku.requests, ...first.vendors.glm.requests])).toBe("9cf243d841e5e29022dbfca1ecba1f2fb1fca3cffa46acae8cf44fc132acc170");
+    expect(sentDigest([...later.vendors.haiku.requests, ...later.vendors.glm.requests])).toBe("d0095301ddb0c7d7f656c118ee4effd9ca75fa3af0fa23c615540d92f435e717");
   });
 });

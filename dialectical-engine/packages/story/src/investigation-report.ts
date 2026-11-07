@@ -378,9 +378,19 @@ export const REPORT_ANSWER_V5_PROMPT_CONTRACT = contract(REPORT_ANSWER_V5_CONTRA
   [REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
 export const REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT = contract(REPORT_ANSWER_CHECK_V4_CONTRACT_ID,
   [REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction, REPORT_CHECKER_GOAL_CRITERION].join("\n\n"), REPORT_ANSWER_CHECK_FORM);
-/** Task 50b's two drafts, the writer then the check; Task 92 seals them. */
+/**
+ * V4 start step, Task 50c (the same owner answer; Q4: "the final answer says how the person's goal fares"): the main answer's later
+ * versions (an update after a dig) and the person's report say it too. A later version's writer is the next version of
+ * `report.answer.later.v4`: its words byte for byte with Task 50b's one drafted sentence (REPORT_WRITER_GOAL_SENTENCE, OWNER WORDING
+ * above) at its end, the form as it was; checked by Task 50b's `report.answer-check.v4`. A DRAFT: the owner reads it with Task 50b's two at
+ * Task 92, which seals all three; until then it is in no seal.
+ */
+export const REPORT_ANSWER_LATER_V5_CONTRACT_ID = "report.answer.later.v5" as const;
+export const REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT = contract(REPORT_ANSWER_LATER_V5_CONTRACT_ID,
+  [REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+/** The goal drafts as the sealed groups list theirs: Task 50b's writer, Task 50c's later writer, Task 50b's check; Task 92 seals them. */
 export const REPORT_GOAL_DRAFT_CONTRACTS: readonly PromptContract[] = Object.freeze([
-  REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT
+  REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT
 ]);
 
 /* ----------------------------------------------------------------- the call sites */
@@ -620,6 +630,11 @@ export type ReportRunCall = Readonly<{
   free: boolean;
   /** Version 2 and later: the writer reads the earlier report's answer (F8 A). */
   later: boolean;
+  /**
+   * V4 start step, Tasks 50b and 50c: the person said what they care about (the ROOT question's purpose lines carry the marked care
+   * answer): the answer's writer and check are the goal drafts. Absent or false: as before, byte for byte. The story is not changed.
+   */
+  goalStated?: boolean;
   /** The call site of each round; absent: the report's own `INVESTIGATION_REPORT:` sites. */
   callSiteOf?: (site: ReportSite, round: number) => string;
   writer: StoryRoleMaker;
@@ -825,28 +840,29 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
 }
 
 /**
- * What the overall answer needs: a report call without the story's parts. V4 start step, Task 50b: `goalStated`, the person said what
- * they care about (a path debate's main answer only): the writer and the check are Task 50b's drafts; absent or false, as before. A later
- * version has no goal draft, so `later` with `goalStated` is refused before any call.
+ * What the overall answer needs: a report call without the story's parts. V4 start step, Tasks 50b and 50c: `goalStated` (ReportRunCall's),
+ * the person said what they care about: the writer and the check are the goal drafts, a later version's writer too; absent or false, as before.
  */
-export type OverallAnswerCall = Omit<ReportRunCall, "free" | "storyLanguageCheck"> & Readonly<{ goalStated?: boolean }>;
+export type OverallAnswerCall = Omit<ReportRunCall, "free" | "storyLanguageCheck">;
 
 /**
  * THE OVERALL ANSWER, the one checked step the final report and every automatic main-answer update share (decisions 3, 4 and 26):
  * the writer and the checker in their approved v3 wording, the later-version writer when `later`. The caller brings the
  * material (`buildInvestigationDossier`), the money (`send`), and, when it is not a report, its own `callSiteOf`.
- * V4 start step, Task 50b: with `goalStated` (a path debate's main answer whose person said what they care about), the writer and
- * the check are the next versions, Task 50b's drafts (report.answer.v5, report.answer-check.v4); the material is the same.
+ * V4 start step, Task 50b: with `goalStated` (the person said what they care about), the writer and the check are the next versions,
+ * Task 50b's drafts (report.answer.v5, report.answer-check.v4); Task 50c: a later version's writer is the draft report.answer.later.v5,
+ * checked by the same report.answer-check.v4 (the first answer of a path debate, every main-answer update and the report all pass it). The
+ * material is the same.
  * Never throws for a provider or a refused call: it keeps its last checked draft or ends FAILED, as the story loop does.
  */
 export async function writeOverallAnswer(call: OverallAnswerCall): Promise<OverallAnswerWritten> {
   const goal = call.goalStated === true;
-  if (goal && call.later) throw new TypedDomainError("INVESTIGATION_REPORT_GOAL_LATER_INVALID", "A later version has no goal draft");
   let material = call.material;
   let askArtifactRef: string | null = null;
   const written = await writeStep<ReportAnswerDraft>(call, {
     writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
-    writerContract: call.later ? REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT : goal ? REPORT_ANSWER_V5_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
+    writerContract: call.later ? (goal ? REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT : REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT)
+      : goal ? REPORT_ANSWER_V5_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
     checkerContract: goal ? REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT : REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, rules: ANSWER_RULES,
     writerMaterial: () => material.answerWriter, checkerMaterialOf: (candidate) => material.answerCheckerOf(candidate), index: () => material.index,
     asking: {
