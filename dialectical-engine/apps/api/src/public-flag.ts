@@ -12,7 +12,9 @@ import { correctedPiece, textPiecesOf } from "./public-tree.js";
 /**
  * THE REPORT BUTTON (plan 2026-10-31-r22-owner-changes decision 35; migration 0151). A signed-in person says what is wrong and where; an AI reads it beside the public text. The site pays, so the checks are bounded.
  * WHAT THE PERSON HEARS: one of three states, and refused things all read the same: `NOT_FOUND` for a check that did not agree, a guessed or private debate and a person over their limit alike.
- * THE LIMITS are the register's abuseLimits row (R22 decision 18), and nothing in the code stands in for it. The database enforces them from its rows, so a restart forgets nothing.
+ * THE LIMITS are the register's abuseLimits row (R22 decision 18), and nothing in the code stands in for it. The database enforces them from its rows, so a restart forgets nothing; since 0154 it reads the same row
+ * itself, at the CURRENT release's own version, and counts against the lower of the two, so a request cannot loosen them.
+ * THE VERDICT is the judge's, recorded only by the API's system login (0154 makes the settlement the cross-account marker's alone; main.ts, X29), so no request login can settle a report or hide a debate.
  * WHY A QUOTE: the judge must copy the words that break the rules. Words that are not on the page are a judge that obeyed the claim, and they hide nothing: a person reads it.
  */
 /** The whole check, inside what the website's proxy waits. */
@@ -22,7 +24,10 @@ const PUBLIC_FLAG_TEXT_CODE_POINTS = 60_000;
 
 export type PublicFlagAnswer = contract.PublicFlagAnswer["state"];
 export type PublicFlagPorts = Readonly<{
-  repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open" | "settle">;
+  /** The target read and the opening, on the request's own login, under the reporter's session. */
+  repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open">;
+  /** The judge's verdict, on the API's system login: 0154 makes it the cross-account marker's alone (main.ts, X29). */
+  settlement: Pick<PostgresPublicFlagRepository, "settle">;
   judge: () => PublicationJudgePort | null;
   /** Seals under the publication's key, public or hidden. */
   seal: (publicationRef: string, runId: string, value: unknown) => Promise<CryptoEnvelope>;
@@ -68,7 +73,7 @@ export async function pressPublicFlag(input: Readonly<{ ownerRef: string; public
   if (opened === "QUEUE") return "WITH_A_PERSON";
   const debate = await ports.readPublicDebate(input.publicationRef).catch(() => null);
   const result = await judged({ where: input.where, claim: input.claim, debate }, ports.judge());
-  const settled = await ports.repository.settle({ flagId: input.flagId, ...result });
+  const settled = await ports.settlement.settle({ flagId: input.flagId, ...result });
   try { ports.log?.("PUBLIC_FLAG_CHECKED", { flagId: input.flagId, verdict: result.verdict, settled }); } catch { /* A failing log sink costs nothing. */ }
   return settled === "HIDDEN" ? "HIDDEN" : settled === "NOT_FOUND" ? "NOT_FOUND" : "WITH_A_PERSON";
 }

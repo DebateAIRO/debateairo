@@ -108,6 +108,8 @@ import {
   PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
   PublicationContentRefusalSchema,
+  RunVisibilitySchema,
+  type RunVisibility,
   type PublicationRefusalStatement,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -444,7 +446,8 @@ export interface ContractClient {
     total: number;
   }>>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
-  readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  /** Security review F2: `dig` is true for a dig, which is never published (absent from an API before 0154). */
+  readRunVisibility(runId: string): Promise<RunVisibility>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
   readPublicationReview(runId: string): Promise<PublicationReviewState>;
@@ -786,7 +789,7 @@ export function createContractClient(
     ),
     readRunVisibility: (runId: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/visibility`,
-      PublicationTransitionSchema
+      RunVisibilitySchema
     ),
     publishRun: (runId: string, stepUpGrant: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/publish`,

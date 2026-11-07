@@ -458,6 +458,30 @@ describe("a member's debate, end to end at database level", () => {
     expect(await on(other, otherGrant, (await current(other))!.grantEventId)).toBe(0);
     expect(await spentNow()).toBe(before + charged);
     expect((await pageFor(owner)).members.find(x => x.staff_id === m.staffId)?.allowance?.spent_micros).toBe(charged);
+    // 0154: another member's clarify charge naming m's grant is recorded on their own plan: nothing moves on m's grant, in the team's month or on the page.
+    const borrowed = randomUUID();
+    expect((await runtime.query("SELECT identity.record_ask_clarify_charge($1,$2,$3,$4,'ask-clarify:fixture:model',(now() AT TIME ZONE 'UTC')::date,$5,1,1) AS v", [borrowed, other.ownerRef, grant.grantId, grant.grantEventId, 999])).rows[0].v).toBe("RECORDED");
+    expect((await database.pool.query("SELECT funding_kind,internal_grant_id FROM identity.ask_clarify_charge WHERE charge_id=$1", [borrowed])).rows[0]).toEqual({ funding_kind: "SUBSCRIPTION", internal_grant_id: null });
+    expect([await on(m, grantId, grant.grantEventId), await on(other, grantId, grant.grantEventId), await spentNow()]).toEqual([charged, 0, before + charged]);
+    expect((await pageFor(owner)).members.find(x => x.staff_id === m.staffId)?.allowance?.spent_micros).toBe(charged);
+  });
+  it("an allowance taken back while a clarify call runs still holds the call it admitted; a call reserved after it was taken back is the member's own plan's", async () => {
+    const m = await member(), grantId = await give(owner, m), grant = (await current(m))!;
+    const before = await spentNow();
+    const clarify = (chargeId: string, micros: number) => runtime.query("SELECT identity.record_ask_clarify_charge($1,$2,$3,$4,'ask-clarify:fixture:model',(now() AT TIME ZONE 'UTC')::date,$5,1,1) AS v",
+      [chargeId, m.ownerRef, grant.grantId, grant.grantEventId, micros]).then((result) => result.rows[0].v as string);
+    const reserve = (chargeId: string) => runtime.query("SELECT identity.reserve_ask_clarify_charge($1,$2) AS v", [chargeId, m.ownerRef]).then((result) => result.rows[0].v as string);
+    const fundingOf = async (chargeId: string) => (await database.pool.query("SELECT funding_kind FROM identity.ask_clarify_charge WHERE charge_id=$1", [chargeId])).rows[0]?.funding_kind as string;
+    const [during, after] = [randomUUID(), randomUUID()];
+    expect(await reserve(during)).toBe("RESERVED");
+    await takeBack(owner, m, grantId);
+    expect(await clarify(during, 33)).toBe("RECORDED");
+    expect(await fundingOf(during)).toBe("INTERNAL");
+    expect(await reserve(after)).toBe("RESERVED");
+    expect(await clarify(after, 44)).toBe("RECORDED");
+    expect(await fundingOf(after)).toBe("SUBSCRIPTION");
+    expect(Number((await runtime.query("SELECT billing.read_internal_grant_spent($1,$2,$3,now()-interval '1 hour',now()+interval '1 hour',false) v", [m.ownerRef, grant.grantId, grant.grantEventId])).rows[0].v)).toBe(33);
+    expect(await spentNow()).toBe(before + 33);
   });
   it("is held to the member's own day: past it, the next call on their grant is refused while another member's is not", async () => {
     const m = await member(), other = await member(), grantId = await give(owner, m, { amount_micros: 1000, day_micros: 100, week_micros: 500 }), otherGrant = await give(owner, other), run = await pinnedRun(m, grantId), otherRun = await pinnedRun(other, otherGrant);

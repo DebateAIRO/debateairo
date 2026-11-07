@@ -55,6 +55,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "account_recovery_state_event", "account_security_hold", "age_check",
       // 0144 the small AI at step 2: one row naming the person, the cost and the time of each call.
       "ask_clarify_charge",
+      // 0154 (the security review, F5): a call's charge reserved for its person before the call is paid, until the charge takes it or, an hour old, a
+      // later reservation or the API's hourly sweep.
+      "ask_clarify_reservation",
       "audit_event", "authentication_risk_signal",
       // 0105 backup-email verification, 0106 known-password MFA recovery, 0104 password-only reset.
       "backup_email_control", "backup_email_notice", "backup_email_notice_binding", "backup_email_proof_window", "backup_email_source_window",
@@ -67,6 +70,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "debate_last_visit", "dig_link",
       // 0135 a dig's picks: the set and each pick.
       "dig_pick", "dig_pick_set",
+      // 0154 (the security review, F2): a dig's own row, written with its run, so it is known as a dig whatever becomes of its parent.
+      "dig_run",
       // 0153: the runner's mark that a dig has ended.
       "dig_tree_settled",
       "email_change_request",
@@ -99,6 +104,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // 0138 tree updates: a path's rewrites that a dig did not start, and the turns that order them.
       "path_update", "path_update_turn",
       "private_erasure_audit_binding",
+      // 0154 (the security review, F4a): the forget scopes, one row while a definer's deletes run under an append-only guard.
+      "private_forget_scope",
       // 0137 public debates: the public debates' contributions, updates and report charges. 0147 the public tree: the sealed copy, a dig's paths, the
       // AI check's pass, the climb's end, the answer's versions, a report and its copy, the skipped texts.
       "public_answer_update",

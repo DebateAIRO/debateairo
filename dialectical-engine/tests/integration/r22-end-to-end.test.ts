@@ -106,6 +106,14 @@ const listedRef = async (question: string): Promise<string | undefined> => (awai
 /** What each path saw, in plain words, in the run's log. */
 const saw = (path: string, what: string): void => { console.info(`SEEN ${path}: ${what}`); };
 
+/**
+ * Security review F2 (0154): a dig's own row, and whether it was written in its run's own transaction (one xmin): the statement that creates the run
+ * writes it, so it is there whatever the route does after the submit (the world composes an account-memory store, which no longer writes it).
+ * Null: no row.
+ */
+const markedAtCreation = async (runId: string): Promise<boolean | null> => (await world.database.pool.query<{ same: boolean }>(
+  "SELECT mark.xmin::text = run.xmin::text AS same FROM identity.dig_run AS mark JOIN core.run AS run USING (run_id) WHERE mark.run_id=$1", [runId])).rows[0]?.same ?? null;
+
 /** What the start-of-debate estimate still holds right now: a finished dig must not be here, or a few digs refuse the next question. */
 const heldByEstimate = async (): Promise<number> => (await world.database.pool.query(PREVIEW_UNFINISHED_RUNS_SQL, [true, 3600])).rows.length;
 
@@ -189,6 +197,8 @@ describe("R22 on the real API", () => {
     expect(offered.length).toBeGreaterThan(0);
     const view = "My own view: tourists keep the second pier full.";
     digRun = await dig(ana, firstRun, path, [suggestionPick(path.id, offered[0]!), ownViewPick(path.id, view, 0)], answer.question_line);
+    // The dig started through POST /v1/asks is marked a dig by its run's creation, before anything else is written for it; its parent is no dig.
+    expect([await markedAtCreation(digRun), await markedAtCreation(firstRun)]).toEqual([true, null]);
     await world.settle();
     const child = await readPage(ana, digRun);
     const rewrite = child.answer.dig?.rewrite;
@@ -354,6 +364,8 @@ describe("R22 on the real API", () => {
       return ask(who, built!.questionLine, { settings: FREE, publicLane: { publicParent: built!.parent } }); };
     const allowed = await send("Winter stalls would need heating.");
     expect(allowed.public_dig_not_joined).toBeUndefined();
+    // A stranger's dig on a public debate is a dig from its run's creation too; the public debate it was dug from is none.
+    expect([await markedAtCreation(allowed.id), await markedAtCreation(publicRunIds.get(publicRef)!)]).toEqual([true, null]);
     await world.settle();
     const shown = await world.stranger.readPublicDebate(publicRef);
     expect(shown.contributions?.[0]).toMatchObject({ position_ref: views[0]!.ref, contributor: dan.pseudonym, own_rewrite: true });

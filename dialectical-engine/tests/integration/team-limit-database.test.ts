@@ -5,6 +5,7 @@ import { canonicalTeamLimitActionBinding } from "../../apps/api/src/staff/team-l
 import { withMailLocale } from "../../packages/db/src/mail-locale.js";
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -12,6 +13,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * way the ceremony stores one (the ceremony itself: the begin test below and staff-webauthn-database.test.ts).
  */
 let database: TestDatabase, runtime: Pool, fixture: ReturnType<typeof internalFundingFixture>, repository: PostgresTeamLimitRepository;
+/** The mail loop's login: the API drains the notices only from its gated timer, outside any request, so on its system login (the marker's, 0154). */
+let system: Pool, notices: PostgresTeamLimitRepository;
 const hash = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 const FUNDING = { code: "FUNDING_APPROVAL" } as const;
 type Actor = Readonly<{ userId: string; sessionId: string; staffId: string; privilegeId: string; context: Record<string, unknown> }>;
@@ -78,7 +81,8 @@ async function takeBack(actor: Actor, target: Actor) {
 }
 async function clearPartner() { const h = (await database.pool.query("SELECT staff_id FROM staff.team_limit_holder WHERE active")).rows[0]; if (h !== undefined) await database.pool.query("SELECT staff.end_team_limit_holder($1,'OWNER_REVOKED')", [h.staff_id]); }
 const roomFor = (estimate: number) => readTeamRoom(runtime, estimate);
-const authorized = async (a: Actor) => (await runtime.query("SELECT staff.authorize_action($1::jsonb,'TEAM_LIMIT_SET') AS ok", [a.context])).rows[0].ok as boolean;
+/** The capability check, as the staff routes ask it through the staff repository on the system login (X14): the marker's since 0154. */
+const authorized = async (a: Actor) => (await system.query("SELECT staff.authorize_action($1::jsonb,'TEAM_LIMIT_SET') AS ok", [a.context])).rows[0].ok as boolean;
 
 beforeAll(async () => {
   database = await startTestDatabase();
@@ -89,9 +93,11 @@ beforeAll(async () => {
   runtime = createPool(url.toString());
   fixture = internalFundingFixture(database.pool, runtime);
   repository = new PostgresTeamLimitRepository(runtime);
+  system = createPool(await createSystemTwin(database, "team_limit_system", ["debateai_runtime", "debateai_billing_runtime"]));
+  notices = new PostgresTeamLimitRepository(system);
   owner = await fixture.fundedActor() as unknown as Actor;
 }, 120000);
-afterAll(async () => { await runtime?.end(); await database?.stop(); });
+afterAll(async () => { await Promise.all([runtime?.end(), system?.end()]); await database?.stop(); });
 
 describe("no limit set", () => {
   it("means no team room at all, and the page says none", async () => {
@@ -202,7 +208,7 @@ describe("the proof", () => {
     expect(await state()).toMatchObject({ revision: now.revision });
   });
   it("the ceremony itself admits exactly these actions: Owner yes, delegate no, and allowances at last", async () => {
-    const challenge = async (a: Actor, binding: Record<string, unknown>) => runtime.query(
+    const challenge = async (a: Actor, binding: Record<string, unknown>) => system.query(
       "SELECT staff.begin_owned_webauthn($1,$2,'ACTION',$3,$4,'localhost','https://localhost',NULL,NULL,$5::jsonb,$6::jsonb,'{}'::jsonb)",
       [a.userId, a.sessionId, hash(randomUUID()), hash(randomUUID()), a.context, binding]);
     const key = async (a: Actor) => {
@@ -289,7 +295,7 @@ describe("when the people change", () => {
     expect(row).toMatchObject({ active: false, revoked_cause: "OWNER_CHANGED" });
     expect(await authorized(p)).toBe(false);
     const fresh = await contextOf(next);
-    expect((await runtime.query("SELECT staff.authorize_action($1::jsonb,'TEAM_LIMIT_SET') AS ok", [fresh])).rows[0].ok).toBe(true);
+    expect((await system.query("SELECT staff.authorize_action($1::jsonb,'TEAM_LIMIT_SET') AS ok", [fresh])).rows[0].ok).toBe(true);
     const told = (await database.pool.query("SELECT recipient_staff_id FROM staff.team_limit_notice WHERE operation_id=$1", [row.revoked_operation_id])).rows.map((x) => x.recipient_staff_id).sort();
     expect(told).toEqual([p.staffId, next.staffId].sort());
     // Back to the fixture's Owner for the rest of the file.
@@ -299,29 +305,36 @@ describe("when the people change", () => {
 });
 
 describe("the notices", () => {
+  it("the mail loop is the system login's alone: the runtime role a request login holds is refused each of its three (0154)", async () => {
+    for (const [sql, values] of [["SELECT * FROM staff.claim_team_limit_notices(1)", []],
+      ["SELECT staff.complete_team_limit_notice($1,$2,true)", [randomUUID(), randomUUID()]],
+      ["SELECT staff.team_limit_notice_user($1,$2)", [randomUUID(), randomUUID()]]] as const) {
+      await expect(runtime.query(sql, [...values]), sql).rejects.toMatchObject({ code: "42501" });
+    }
+  });
   it("every limit change and partner change tells both, and no notice row or claim holds an amount", async () => {
     await clearPartner();
     await database.pool.query("UPDATE staff.team_limit_notice SET delivered_at=now(),claim_token=NULL,claim_expires_at=NULL WHERE delivered_at IS NULL AND failed_at IS NULL");
     const d = await delegate();
     await pick(owner, d);
-    const claims = await repository.claimNotices(100);
+    const claims = await notices.claimNotices(100);
     expect(claims.map((c) => c.recipient_staff_id).sort()).toEqual([owner.staffId, d.staffId].sort());
     expect(claims.every((c) => c.kind === "PARTNER_CHANGED")).toBe(true);
     expect(Object.keys(claims[0]!).sort()).toEqual(["claim_token", "kind", "notice_id", "recipient_staff_id"]);
-    for (const c of claims) await repository.completeNotice(c.notice_id, c.claim_token, true);
+    for (const c of claims) await notices.completeNotice(c.notice_id, c.claim_token, true);
     await setLimit(owner, 444);
-    const next = await repository.claimNotices(100);
+    const next = await notices.claimNotices(100);
     expect(next.map((c) => c.recipient_staff_id).sort()).toEqual([owner.staffId, d.staffId].sort());
     expect(next.every((c) => c.kind === "LIMIT_CHANGED")).toBe(true);
-    for (const c of next) await repository.completeNotice(c.notice_id, c.claim_token, true);
+    for (const c of next) await notices.completeNotice(c.notice_id, c.claim_token, true);
   });
   it("a failed email does not undo the change, and the page shows it failed", async () => {
     await setLimit(owner, 333);
     for (let attempt = 0; attempt < 20; attempt++) {
-      const claims = await repository.claimNotices(100);
-      for (const c of claims) await repository.completeNotice(c.notice_id, c.claim_token, false);
+      const claims = await notices.claimNotices(100);
+      for (const c of claims) await notices.completeNotice(c.notice_id, c.claim_token, false);
     }
-    expect(await repository.claimNotices(100)).toEqual([]);
+    expect(await notices.claimNotices(100)).toEqual([]);
     expect(await state()).toMatchObject({ amount: "333" });
     const page = await repository.readPage(owner.context as never, hash(owner.sessionId)) as { amount_micros: number; log: Array<{ kind: string; amount_micros?: number; notice: string }> };
     expect(page.amount_micros).toBe(333);
@@ -342,14 +355,15 @@ describe("the team's month", () => {
   };
   it("counts funded spend across every grant against the current amount, and a new month starts clean", async () => {
     const { run } = await scope();
-    const spent = Number((await runtime.query("SELECT staff.read_team_internal_spent(date_trunc('month',now()),date_trunc('month',now())+interval '1 month') v")).rows[0].v);
+    // 0154 took 0140's team spend sum back from every role: staff's month reader asks it as its owner, so the test reads it as the superuser.
+    const spent = Number((await database.pool.query("SELECT staff.read_team_internal_spent(date_trunc('month',now()),date_trunc('month',now())+interval '1 month') v")).rows[0].v);
     await setLimit(owner, spent + 1000);
     await expect(roomFor(1000)).resolves.toBe("FITS");
     await expect(roomFor(1001)).resolves.toBe("FULL");
     await database.pool.query("INSERT INTO ledger.model_spend(spend_id,spend_source,run_id,spend_phase,provider_ref,charged_on,charge_micros,input_tokens,output_tokens) VALUES(gen_random_uuid(),'RUN',$1,'BODY','fake-provider',(now() AT TIME ZONE 'UTC')::date,400,1,1)", [run]);
     await expect(roomFor(601)).resolves.toBe("FULL");
     await expect(roomFor(600)).resolves.toBe("FITS");
-    const lastMonth = await runtime.query("SELECT staff.read_team_internal_spent(date_trunc('month',now())-interval '1 month',date_trunc('month',now())) v");
+    const lastMonth = await database.pool.query("SELECT staff.read_team_internal_spent(date_trunc('month',now())-interval '1 month',date_trunc('month',now())) v");
     expect(Number(lastMonth.rows[0].v)).toBe(0);
   });
   it("a running debate's unspent hold is held back from the room; a finished debate's is not", async () => {

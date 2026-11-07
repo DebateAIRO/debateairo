@@ -86,7 +86,8 @@ const forget = async (runId: string): Promise<number> =>
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  for (const [login, role] of [["ps_runner", "debateai_runtime"], ["ps_billing", "debateai_billing_runtime"], ["ps_erasure", "debateai_erasure_runtime"],
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the suggestions' writer is the marker's.
+  for (const [login, role] of [["ps_runner", "debateai_runtime,debateai_rls_all_accounts"], ["ps_billing", "debateai_billing_runtime"], ["ps_erasure", "debateai_erasure_runtime"],
     ["ps_worker", "debateai_data_export_worker"], ["ps_authorization", "debateai_authorization_runtime"], ["ps_replay", "debateai_replay"]] as const) {
     await database.pool.query(`CREATE ROLE ${login} LOGIN PASSWORD '${login}-test-only' IN ROLE ${role}`);
   }
@@ -250,12 +251,13 @@ describe("0141: the export and the roles", () => {
       expect((await sqlError(() => pool.query("SELECT * FROM identity.path_suggestions"))).code).toBe("42501");
     }
     const debate = randomUUID();
-    // The API's two roles inherit debateai_runtime (0039, 0093), as they do for 0134's reader.
-    const allowed = new Map<Pool, string>([[runner, "RUNTIME"], [billing, "RUNTIME"], [authorization, "RUNTIME"], [erasure, "ERASURE"], [worker, "WORKER"], [replay, ""]]);
+    // The API's two roles inherit debateai_runtime (0039, 0093), as they do for 0134's reader. The writer is the runner's alone: since 0154 (F5) it
+    // is the cross-account marker's, which the API's request logins do not hold.
+    const allowed = new Map<Pool, string>([[runner, "RUNNER"], [billing, "RUNTIME"], [authorization, "RUNTIME"], [erasure, "ERASURE"], [worker, "WORKER"], [replay, ""]]);
     for (const [pool, kind] of allowed) {
       const denied = async (sql: string, values: readonly unknown[]) => (await sqlError(() => pool.query(sql, [...values]))).code === "42501";
-      expect(await denied("SELECT identity.read_path_suggestions_of_run($1)", [debate]), kind).toBe(kind !== "RUNTIME");
-      expect(await denied("SELECT identity.record_path_suggestions($1,$1,$1,'pos-1','{}'::jsonb,'\\x00'::bytea)", [debate]), kind).toBe(kind !== "RUNTIME");
+      expect(await denied("SELECT identity.read_path_suggestions_of_run($1)", [debate]), kind).toBe(kind !== "RUNTIME" && kind !== "RUNNER");
+      expect(await denied("SELECT identity.record_path_suggestions($1,$1,$1,'pos-1','{}'::jsonb,'\\x00'::bytea)", [debate]), kind).toBe(kind !== "RUNNER");
       expect(await denied("SELECT identity.forget_erased_debate_path_suggestions($1)", [debate]), kind).toBe(kind !== "ERASURE");
       expect(await denied("SELECT identity.read_data_export_path_suggestions($1,$1)", [debate]), kind).toBe(kind !== "WORKER");
     }

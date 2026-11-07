@@ -180,6 +180,9 @@ const SEARCH_PATH_PINNED_FUNCTIONS = [
   "serve.conformance_segment_results_are_valid(jsonb)"
 ] as const;
 const PINNED_SEARCH_PATH = "search_path=pg_catalog, pg_temp";
+// The security review's 0154 made 0000's allocator a definer of the sequence counter's owner, with this same search path,
+// so no login holding debateai_runtime writes the counter row itself; the other thirteen stay invoker-rights.
+const DEFINER_SINCE_0154 = "ledger.allocate_sequence()";
 
 let database: TestDatabase;
 
@@ -331,7 +334,7 @@ describe("0056 EXECUTE privileges (L5-F1)", () => {
 });
 
 describe("0056 search_path pins (L5-F10)", () => {
-  it("pins search_path on the 14 invoker-rights trigger and validator functions", async () => {
+  it("pins search_path on the 14 trigger and validator functions, invoker-rights but 0154's allocator", async () => {
     const result = await database.pool.query<{ signature: string; proconfig: string[] | null; prosecdef: boolean | null }>(`
       SELECT candidate.signature, proc.proconfig, proc.prosecdef
       FROM unnest($1::text[]) AS candidate(signature)
@@ -340,7 +343,7 @@ describe("0056 search_path pins (L5-F10)", () => {
     `, [[...SEARCH_PATH_PINNED_FUNCTIONS]]);
     expect(result.rows).toHaveLength(SEARCH_PATH_PINNED_FUNCTIONS.length);
     for (const row of result.rows) {
-      expect(row.prosecdef, `${row.signature} exists as invoker-rights`).toBe(false);
+      expect(row.prosecdef, `${row.signature} exists, as invoker-rights unless 0154 made it a definer`).toBe(row.signature === DEFINER_SINCE_0154);
       expect(row.proconfig ?? [], row.signature).toContain(PINNED_SEARCH_PATH);
     }
   });

@@ -95,6 +95,19 @@ describe("publishing", () => {
     expect(document.querySelector('a[href="/public/debate/22222222-2222-4222-8222-222222222222"]')).not.toBeNull();
     expect([...document.querySelectorAll("section button")]).toEqual([]);
   });
+
+  it("a dig says it is private and offers Delete, but no Publish… and no review of a flagged synthesis (security review F2: a dig is never published)", async () => {
+    const api = client({
+      readRunVisibility: vi.fn(async () => ({ state: "PRIVATE" as const, public_ref: null, dig: true })),
+      readPublicationReview: vi.fn(async () => ({ flagged: true, state: "NONE", categories: ["HATE_SPEECH"], asks_used: 0, may_ask: true, refusal: null }))
+    });
+    await mount(api);
+    expect(document.body.textContent).toContain(pub["public.publication.privateStatus"]);
+    expect(document.body.textContent).not.toContain(pub["public.publicationReview.askButton"]);
+    expect([...document.querySelectorAll("section button")].map((node) => node.textContent?.trim()))
+      .toEqual([pub["public.publication.deletePrivateEllipsis"]]);
+    expect(api.publishRun).not.toHaveBeenCalled();
+  });
 });
 
 describe("deleting a private debate", () => {

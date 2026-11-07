@@ -8549,7 +8549,17 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       ipArgon2id: "argon2id-audit:v1:" + "1".repeat(64),
       userAgentArgon2id: "argon2id-audit:v1:" + "2".repeat(64)
     });
-    const signature = "identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)";
+    // The security review's 0154: the delivery names the token its mail carried; 0085's own, which named none, is no role's.
+    const signature = "identity.record_verification_delivery_with_audit(uuid,text,timestamp with time zone,boolean,text,jsonb)";
+    const original = "identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)";
+    expect((await database.pool.query<{ runtime: boolean; authorization: boolean }>(`SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS runtime,
+      has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') AS authorization`, [original])).rows[0]).toEqual({ runtime: false, authorization: false });
+    const tokenHash = (await database.pool.query<{ token_hash: string }>(`SELECT credential.token_hash FROM identity.verification_token_credential AS credential
+      JOIN identity.channel_binding AS channel ON channel.channel_binding_id=credential.channel_binding_id
+      WHERE channel.user_id=$1 AND channel.channel_type='email' ORDER BY credential.issued_at DESC LIMIT 1`, [userId])).rows[0]!.token_hash;
+    // A saved code's use is the marker's since 0154 (X36): the API's system login holds it beside the runtime role, as this role does.
+    await database.pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='registration_test_system') THEN
+      CREATE ROLE registration_test_system NOLOGIN IN ROLE debateai_runtime,debateai_rls_all_accounts; END IF; END $$`);
     const catalog = await database.pool.query<{
       runtime_cap: boolean;
       authorization_cap: boolean;
@@ -8578,8 +8588,8 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       await roleClient.query("BEGIN");
       await roleClient.query("SET LOCAL ROLE debateai_runtime");
       await expect(roleClient.query(`SELECT identity.record_verification_delivery_with_audit(
-        $1,$2,true,NULL,$3::jsonb
-      )`, [userId,deliveryAt,sourceContext])).rejects.toMatchObject({
+        $1,$2,$3,true,NULL,$4::jsonb
+      )`, [userId,tokenHash,deliveryAt,sourceContext])).rejects.toMatchObject({
         code: "55000", message: "AUDIT_ATTEMPT_REQUIRED"
       });
       await roleClient.query("ROLLBACK");
@@ -8589,9 +8599,9 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const recorded = await roleClient.query<{ recorded: boolean }>(`
         SELECT identity.record_verification_delivery_with_audit(
-          $1,$2,true,NULL,$3::jsonb
+          $1,$2,$3,true,NULL,$4::jsonb
         ) AS recorded
-      `, [userId,deliveryAt,sourceContext]);
+      `, [userId,tokenHash,deliveryAt,sourceContext]);
       expect(recorded.rows[0]?.recorded).toBe(true);
       await roleClient.query("COMMIT");
 
@@ -8600,23 +8610,23 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const replay = await roleClient.query<{ recorded: boolean }>(`
         SELECT identity.record_verification_delivery_with_audit(
-          $1,$2,true,NULL,$3::jsonb
+          $1,$2,$3,true,NULL,$4::jsonb
         ) AS recorded
-      `, [userId,deliveryAt,sourceContext]);
+      `, [userId,tokenHash,deliveryAt,sourceContext]);
       expect(replay.rows[0]?.recorded).toBe(false);
       await roleClient.query("COMMIT");
 
       await roleClient.query("BEGIN");
       await roleClient.query("SET LOCAL ROLE debateai_runtime");
       await expect(roleClient.query(`SELECT identity.record_verification_delivery_with_audit(
-        $1,$2,true,NULL,$3::jsonb
-      )`, [userId,deliveryAt,sourceContext])).rejects.toMatchObject({
+        $1,$2,$3,true,NULL,$4::jsonb
+      )`, [userId,tokenHash,deliveryAt,sourceContext])).rejects.toMatchObject({
         code: "55000", message: "AUDIT_ATTEMPT_REQUIRED"
       });
       await roleClient.query("ROLLBACK");
 
       await roleClient.query("BEGIN");
-      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SET LOCAL ROLE registration_test_system");
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const pendingRecovery = await roleClient.query<{ valid: boolean }>(`
         SELECT identity.consume_recovery_code_with_audit(
@@ -8630,7 +8640,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       // been removed/revoked; the capability revalidates the factor itself.
       await database.pool.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [userId]);
       await roleClient.query("BEGIN");
-      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SET LOCAL ROLE registration_test_system");
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const noFactorRecovery = await roleClient.query<{ valid: boolean }>(`
         SELECT identity.consume_recovery_code_with_audit(

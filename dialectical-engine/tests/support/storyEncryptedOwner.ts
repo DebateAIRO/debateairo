@@ -97,20 +97,27 @@ function storyRunInput(input: {
   };
 }
 
-/** `language` is the run's question language (core.run.argument_language_*); dev's default "und" when absent. */
+/**
+ * `language` is the run's question language (core.run.argument_language_*); dev's default "und" when absent. `mark.digRun`: the run is a dig's,
+ * marked so by the statement that creates it (0154), as the API creates every dig's run.
+ */
 export function createEncryptedStoryRun(
   pool: Pool,
   owner: StoryEncryptedOwner,
   questionLine: string,
-  language?: Readonly<{ tag: string; name: string }>
+  language?: Readonly<{ tag: string; name: string }>,
+  mark: Readonly<{ digRun?: true }> = {}
 ): Promise<string> {
-  return new RunRepository(pool).startRun(storyRunInput({
-    questionLine,
-    principal: { kind: "server", userId: owner.userId, ownerRef: owner.ownerRef },
-    sessionId: owner.sessionId,
-    maxModelAttempts: 10,
-    ...(language === undefined ? {} : { language })
-  }));
+  return new RunRepository(pool).startRun({
+    ...storyRunInput({
+      questionLine,
+      principal: { kind: "server", userId: owner.userId, ownerRef: owner.ownerRef },
+      sessionId: owner.sessionId,
+      maxModelAttempts: 10,
+      ...(language === undefined ? {} : { language })
+    }),
+    ...(mark.digRun === true ? { digRun: true as const } : {})
+  });
 }
 
 export function createLegacyStoryRun(

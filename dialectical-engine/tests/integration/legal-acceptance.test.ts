@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   AcceptanceRepository,
+  createPool,
   migrate,
   PostgresIdentityRepository,
   type PendingAccountInput,
@@ -23,6 +24,7 @@ import {
 } from "@debateai/crypto";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } from "../../packages/register/src/auth-policy.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const SHA = "a".repeat(64);
@@ -415,24 +417,28 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       await shared.query("ROLLBACK");
       shared.release();
     }
-    // A clock far in the future is clamped to now: the five-year closure survives. R-36: the
-    // API's runtime role (P16c's yearly job; debateai_billing_runtime since 0094) may call the function,
-    // though it may not DELETE itself.
+    // 0154: the API billing role alone (debateai_billing_runtime since 0094), which the API's request login holds, may not call it either.
+    const billing = await database.pool.connect();
+    try {
+      await billing.query("BEGIN");
+      await billing.query("SET LOCAL ROLE debateai_billing_runtime");
+      expect(await sqlState(() => billing.query(
+        "SELECT legal.purge_expired_acceptance('3000-01-01T00:00:00Z')"))).toBe("42501");
+    } finally {
+      await billing.query("ROLLBACK");
+      billing.release();
+    }
+    // A clock far in the future is clamped to now: the five-year closure survives. R-36: P16c's yearly job runs it from its gated timer, outside
+    // any request, on the API's system login, which holds the billing role and, since 0154, 0130's cross-account marker; it may not DELETE itself.
     // Two rows go: the old owner's one acceptance row and its closure date (A15: the record, and
     // the date that links the erased owner_ref to its closure, end together).
-    const runtime = await database.pool.connect();
+    const system = createPool(await createSystemTwin(database, "legal_purge_system", ["debateai_billing_runtime"]));
     try {
-      await runtime.query("BEGIN");
-      await runtime.query("SET LOCAL ROLE debateai_billing_runtime");
-      await expect(runtime.query<{ purged: string }>(
+      await expect(system.query<{ purged: string }>(
         "SELECT legal.purge_expired_acceptance('3000-01-01T00:00:00Z')::text AS purged"))
         .resolves.toMatchObject({ rows: [{ purged: "2" }] });
-      await runtime.query("COMMIT");
-    } catch (error) {
-      await runtime.query("ROLLBACK");
-      throw error;
     } finally {
-      runtime.release();
+      await system.end();
     }
     expect(await count(oldOwner)).toBe(0);
     expect(await closures(oldOwner)).toBe(0);

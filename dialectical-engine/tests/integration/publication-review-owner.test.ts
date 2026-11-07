@@ -58,8 +58,9 @@ afterAll(async () => {
   if (owner) await releaseStoryEncryptedOwner(owner);
 });
 
-async function debate(verdict: "FLAGGED" | "CLEAR" = "FLAGGED") {
-  const runId = await createEncryptedStoryRun(database.pool, owner, `Review ${randomUUID()}?`);
+/** `dig`: the run is a dig's, marked so by the statement that creates it (security review F2, 0154). */
+async function debate(verdict: "FLAGGED" | "CLEAR" = "FLAGGED", dig = false) {
+  const runId = await createEncryptedStoryRun(database.pool, owner, `Review ${randomUUID()}?`, undefined, dig ? { digRun: true } : {});
   const { answerId } = await persistTerminalRun({
     pool: database.pool, runId, fixtureKey: randomUUID(),
     factBundle: {
@@ -95,7 +96,7 @@ async function grant(target: Debate, token: string): Promise<void> {
 }
 
 function apiFor(target: Debate, validGrant: boolean, token = grantToken(), options: {
-  gate?: SynthesisPublishGate; answer?: Answer
+  gate?: SynthesisPublishGate; answer?: Answer; isDig?: boolean
 } = {}) {
   const base = testHttpIdentity(randomUUID());
   const identity = {
@@ -118,7 +119,8 @@ function apiFor(target: Debate, validGrant: boolean, token = grantToken(), optio
   const publications = {
     preflightGrant: async () => validGrant,
     auditPreflightDenial: async () => { denials++; return true; },
-    publish: async () => { publicationCalls++; return { state: "PUBLISHED", public_ref: randomUUID() }; }
+    publish: async () => { publicationCalls++; return { state: "PUBLISHED", public_ref: randomUUID() }; },
+    ...(options.isDig === undefined ? {} : { isDig: async () => options.isDig })
   } as unknown as NonNullable<ApiOptions["publications"]>;
   const api = buildApi({
     application, publications, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
@@ -281,6 +283,36 @@ describe("publication review owner routes over migrated database", () => {
       );
       expect(rows.rows[0]?.n).toBe(1);
     } finally { await fixture.api.close(); }
+  });
+
+  // Security review F2 (0154): a dig is never published, so it is never put in the team's queue either. Only a dig flagged before the step can
+  // reach the ask at all (the publish route refuses a dig before its synthesis gate, so a new one is never flagged).
+  it("a dig's ask is refused: the database answers NOT_ALLOWED and consumes no grant, the route answers 409, and nothing is queued", async () => {
+    const target = await debate("FLAGGED", true);
+    const requests = async (): Promise<number> => (await database.pool.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM serve.publication_review_request WHERE run_id=$1", [target.runId])).rows[0]!.n;
+    const unspent = async (token: string): Promise<boolean> => (await database.pool.query(
+      "SELECT 1 FROM identity.step_up_grant WHERE token_hash=$1 AND consumed_at IS NULL", [hashToken("step-up-grant", token)])).rowCount === 1;
+    const token = grantToken();
+    await grant(target, token);
+    expect(await reviews.ask({ grantTokenHash: hashToken("step-up-grant", token), sessionId: owner.sessionId, userId: owner.userId,
+      ownerRef: owner.ownerRef, runId: target.runId, answerId: target.answerId, originVersion: 1 })).toBe("NOT_ALLOWED");
+    expect([await requests(), await unspent(token)]).toEqual([0, true]);
+    // The route: the application's own question first (409 DIG_NOT_PUBLISHABLE); without it, the database's refusal (409 NOT_ALLOWED).
+    for (const [isDig, code] of [[true, "DIG_NOT_PUBLISHABLE"], [undefined, "PUBLICATION_REVIEW_NOT_ALLOWED"]] as const) {
+      const fixture = apiFor(target, true, token, isDig === undefined ? {} : { isDig });
+      try {
+        const response = await fixture.post();
+        expect(response.statusCode, code).toBe(409);
+        expect(response.json(), code).toEqual({ error: code, message: code });
+      } finally { await fixture.api.close(); }
+    }
+    expect([await requests(), await unspent(token)]).toEqual([0, true]);
+    // A debate that is no dig is asked about as before.
+    const plain = await debate();
+    const fixture = apiFor(plain, true, grantToken(), { isDig: false });
+    await grant(plain, fixture.token);
+    try { expect((await fixture.post()).statusCode).toBe(201); } finally { await fixture.api.close(); }
   });
 
   it("Ask answers RUN_NOT_FOUND if erasure wins during the request insert", async () => {

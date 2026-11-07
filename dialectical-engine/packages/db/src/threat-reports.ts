@@ -28,26 +28,14 @@ export type ThreatReportAlertClaim = Readonly<{
   alert_id: string; recipient_staff_id: string; claim_token: string;
 }>;
 
-/** Every operation delegates to one 0128 function; no application clock enters these calls. */
+/**
+ * Every operation delegates to one 0128 function; no application clock enters these calls. Nothing here keeps a report: no product code did since the
+ * question check stopped keeping questions, and 0154 took 0128's two keepers back from the API's runtime role. `eraseDue`, `claimAlerts` and
+ * `completeAlert` are the cross-account marker's since 0154 (the API calls them only from its gated timers, outside any request, so on its system
+ * login); the staff reads, the decision and `holdEmails` stay debateai_runtime's.
+ */
 export class PostgresThreatReportRepository {
   constructor(private readonly pool: Pick<Pool, "query">) {}
-
-  async keep(question: string, account: string | null): Promise<string> {
-    try {
-      const result = await this.pool.query<{ report_ref: string }>(
-        "SELECT staff.keep_threat_report($1::text,$2::uuid) report_ref", [question, account]);
-      return result.rows[0]!.report_ref;
-    } catch (error) { return rethrow(error); }
-  }
-
-  async keepWithHeldEmail(question: string, account: string, email: string): Promise<string> {
-    try {
-      const result = await this.pool.query<{ report_ref: string }>(
-        "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) report_ref",
-        [question, account, email]);
-      return result.rows[0]!.report_ref;
-    } catch (error) { return rethrow(error); }
-  }
 
   async list(context: unknown, token: string): Promise<ThreatReportListRow[]> {
     try {

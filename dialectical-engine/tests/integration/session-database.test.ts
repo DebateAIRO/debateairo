@@ -136,6 +136,8 @@ beforeAll(async () => {
     }};
   }} as unknown as Pool;
   await migrate(facade);
+  // The security review's 0154: a saved code's use is the marker's (the API's system login, X36), which holds the runtime role beside it.
+  await database.pool.query("CREATE ROLE session_test_system NOLOGIN IN ROLE debateai_runtime,debateai_rls_all_accounts");
 }, 120_000);
 
 afterAll(async () => database?.stop());
@@ -346,7 +348,7 @@ describe("S5 sessions on real PostgreSQL", () => {
     const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SET LOCAL ROLE session_test_system");
       await client.query("SELECT identity.begin_runtime_audit_attempt()");
       await client.query("SELECT set_config('debateai.mail_locale', 'en', true)");
       const consumed = await client.query(`SELECT identity.consume_recovery_code_with_audit($1,$2,NULL,clock_timestamp(),$3::jsonb) AS valid`,
@@ -1007,7 +1009,7 @@ describe("S5 sessions on real PostgreSQL", () => {
         await barrier.query("BEGIN");
         await barrier.query("SELECT pg_advisory_xact_lock($1)",[pauseKey]);
         await recoveryClient.query("BEGIN");
-        await recoveryClient.query("SET LOCAL ROLE debateai_runtime");
+        await recoveryClient.query("SET LOCAL ROLE session_test_system");
         await recoveryClient.query("SELECT identity.begin_runtime_audit_attempt()");
         await factorClient.query("BEGIN");
         await factorClient.query("SET LOCAL ROLE debateai_authorization_runtime");

@@ -4,6 +4,7 @@ import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 import type { ConsumerLegalPair, ConsumerSessionCommit } from './consumer-auth.js';
 import { ProfileTransactions } from './account-profile.js';
+import { crossAccount } from './account-context.js';
 export type RecoveryDelivery = Readonly<{
     userId: string;
     channelType: 'email' | 'recovery_email';
@@ -32,10 +33,11 @@ export class PostgresConsumerRecoveryRepository {
     private readonly tx: ProfileTransactions;
     constructor(private readonly pool: Pool, audit: AuditContextHasher) { this.tx = new ProfileTransactions(pool, audit); }
     async start(index: Buffer, tokenHash: string, source: AuthSourceContext): Promise<RecoveryDelivery | null> { return this.tx.audited(source, async (c, context) => (await c.query('SELECT identity.start_consumer_recovery($1,$2,$3) value', [index, tokenHash, context])).rows[0].value); }
-    async readProof(tokenHash: string, slot: number): Promise<RecoveryProof | null> { return (await this.pool.query('SELECT identity.read_consumer_recovery_proof($1,$2) value', [tokenHash, slot])).rows[0].value; }
+    /** A recovery's stored proof and its proof, which the API checks and then records: the system login's alone (0154, X36), as a request begins its own recovery. */
+    async readProof(tokenHash: string, slot: number): Promise<RecoveryProof | null> { return (await crossAccount("X36", () => this.pool.query('SELECT identity.read_consumer_recovery_proof($1,$2) value', [tokenHash, slot]))).rows[0].value; }
     async prove(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<{
         expiresAt: string;
-    }> { return this.tx.audited(source, async (c, context) => (await c.query('SELECT identity.prove_consumer_recovery($1,$2) value', [input, context])).rows[0].value); }
+    }> { return crossAccount("X36", () => this.tx.audited(source, async (c, context) => (await c.query('SELECT identity.prove_consumer_recovery($1,$2) value', [input, context])).rows[0].value)); }
     async prepareEnrollment(capHash: string): Promise<{
         userId: string;
         method: 'passkey' | 'totp';
@@ -51,9 +53,9 @@ export class PostgresConsumerRecoveryRepository {
     async completeEnrollment(input: Readonly<Record<string, unknown>>, legal: readonly ConsumerLegalPair[], source: AuthSourceContext): Promise<ConsumerSessionCommit> { return this.tx.audited(source, async (c, context) => (await c.query('SELECT identity.complete_recovery_enrollment($1,$2,$3) value', [input, JSON.stringify(legal), context])).rows[0].value); }
     /** Same key-destruction lease as erasure. Current-channel account locks live through the bounded send. */
     async withDeliveryLease<T>(userId: string, tokenHash: string, use: (record: RecoveryDelivery) => Promise<T>): Promise<T | null> {
-        return withConsumerMailLease(this.pool, userId, async (c) => {
+        return crossAccount("X36", () => withConsumerMailLease(this.pool, userId, async (c) => {
             const record = (await c.query('SELECT identity.read_consumer_recovery_proof($1,NULL) value', [tokenHash])).rows[0].value as RecoveryDelivery | null;
             return record !== null && record.userId === userId ? use(record) : null;
-        });
+        }));
     }
 }

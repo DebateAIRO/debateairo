@@ -376,8 +376,10 @@ export class PostgresIdentityRepository {
     });
   }
 
+  /** Records a verification mail's delivery for the token it carried (0154): the database records nothing for a token not of this account. */
   async recordVerificationDelivery(input: {
     readonly userId: string;
+    readonly tokenHash: string;
     readonly occurredAt: Date;
     readonly source: AuthSourceContext;
     readonly success: boolean;
@@ -386,9 +388,9 @@ export class PostgresIdentityRepository {
     const prepared = await this.prepareAuditContext(input.source);
     await this.transaction(async (client) => {
       await client.query(`SELECT identity.record_verification_delivery_with_audit(
-        $1,$2,$3,$4,$5::jsonb
+        $1,$2,$3,$4,$5,$6::jsonb
       )`, [
-        input.userId,input.occurredAt,input.success,input.errorCode,
+        input.userId,input.tokenHash,input.occurredAt,input.success,input.errorCode,
         JSON.stringify({
           ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id
@@ -813,7 +815,8 @@ export class PostgresIdentityRepository {
   }
 
   /** Consumes one saved recovery code. It is never refilled (design note 2026-10-09 item 3); the database tells every
-   * verified email that a code was used. The SQL keeps its old replacement argument, which it ignores. */
+   * verified email that a code was used. The SQL keeps its old replacement argument, which it ignores. The security
+   * review's 0154: it names any account's code, so it is the system login's alone (X36), after the code was verified. */
   async consumeRecoveryCode(input: {
     readonly userId: string;
     readonly recoveryCodeId: string;
@@ -821,7 +824,7 @@ export class PostgresIdentityRepository {
     readonly source: AuthSourceContext;
   }): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
-    return this.transaction(async (client) => {
+    return crossAccount("X36", () => this.transaction(async (client) => {
       // C07.4 (R-11, D-56): the request's mail language, first statement of this transaction.
       await client.query("SELECT set_config($1, $2, true)", [MAIL_LOCALE_SETTING, input.source.mailLocale ?? "en"]);
       const result = await client.query<{ valid: boolean }>(`
@@ -832,6 +835,6 @@ export class PostgresIdentityRepository {
         JSON.stringify({ ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id })]);
       return result.rows[0]?.valid === true;
-    });
+    }));
   }
 }

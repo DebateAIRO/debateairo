@@ -87,7 +87,9 @@ describe("atomic rolling verification reservations on real PostgreSQL", () => {
     const a = await account(10);
     await db.pool.query("UPDATE identity.verification_token_credential SET expires_at=issued_at+interval '10 milliseconds' WHERE channel_binding_id=$1", [a.channel]);
     await shift(a, 60); expect((await resend(a)).status).toBe("send"); await shift(a, 60); expect((await resend(a)).status).toBe("send");
-    await repository.recordVerificationDelivery({ userId: a.userId, occurredAt: new Date("2030-01-01"), success: false, errorCode: "MAIL_DELIVERY_FAILED", source });
+    // The late callback names the mail it was for (0154): the latest token's, which the pruning above kept.
+    const latest = (await db.pool.query("SELECT token_hash FROM identity.verification_token_credential WHERE channel_binding_id=$1 ORDER BY issued_at DESC LIMIT 1", [a.channel])).rows[0].token_hash as string;
+    await repository.recordVerificationDelivery({ userId: a.userId, tokenHash: latest, occurredAt: new Date("2030-01-01"), success: false, errorCode: "MAIL_DELIVERY_FAILED", source });
     await shift(a, 60); expect(await resend(a)).toEqual({ status: "ignored" }); expect(await count(a)).toBe(3);
     await db.pool.query("DELETE FROM identity.verification_token_credential WHERE channel_binding_id=$1", [a.channel]);
     expect(await resend(a)).toEqual({ status: "ignored" }); expect(await count(a)).toBe(3);

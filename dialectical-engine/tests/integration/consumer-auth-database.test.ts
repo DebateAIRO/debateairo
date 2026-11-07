@@ -36,7 +36,9 @@ beforeAll(async () => {
     runtime = createPool(url.toString());
     systemRuntime = createPool(await createSystemTwin(database, 'consumer_test_runtime_system', ['debateai_authorization_runtime']));
     scopedRuntime = createPool(url.toString(), { crossAccount: systemRuntime });
-    repo = new PostgresConsumerAuthRepository(runtime, audit);
+    // The security review's 0154: a passkey's stored credential and its sign-in completion are the system login's (X36), so the repository runs
+    // on the authorization pool as main.ts wires it; outside a request its statements go to the system twin.
+    repo = new PostgresConsumerAuthRepository(scopedRuntime, audit);
     sessions = await freshSessions();
     service = new ConsumerWebAuthnService(repo, sessions.consumerProducer(), { publicAppUrl: origin });
 }, 120000);
@@ -383,7 +385,7 @@ describe('restricted consumer passkey authority', () => {
     });
     it('rejects tampered audit source and rolls back the verified login transaction', async () => {
         const a = await enrolled(), l = await login(a, 1), bindingHash = sessions.consumerProducer().bindingHash(source), h = handleHash('LOGIN', l.options.challenge_handle);
-        const credential = (await repo.readCredential(h, a.f.credentialId, bindingHash))!, { sessionToken: _raw, csrfToken: _csrf, ...material } = sessions.consumerProducer().prepare(source), client = await runtime.connect();
+        const credential = (await repo.readCredential(h, a.f.credentialId, bindingHash))!, { sessionToken: _raw, csrfToken: _csrf, ...material } = sessions.consumerProducer().prepare(source), client = await systemRuntime.connect();
         try {
             await client.query('BEGIN');
             await client.query('SELECT identity.begin_runtime_audit_attempt()');
@@ -425,7 +427,8 @@ describe('restricted consumer passkey authority', () => {
         }
     });
     it('rechecks login expiry after waiting on its credential lock', async () => {
-        const a = await enrolled(), l = await login(a), blocker = await database.pool.connect(), client = await runtime.connect();
+        // The completion is the system login's (0154, X36): the isolated repository's one connection is the system twin's.
+        const a = await enrolled(), l = await login(a), blocker = await database.pool.connect(), client = await systemRuntime.connect();
         await database.pool.query("UPDATE identity.consumer_passkey_challenge SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE handle_hash=$1", [handleHash('LOGIN', l.options.challenge_handle)]);
         let blockerOpen = false;
         try {

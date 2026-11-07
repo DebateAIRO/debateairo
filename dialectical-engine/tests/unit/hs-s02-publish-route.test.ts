@@ -105,12 +105,14 @@ function publishedTexts(answer: Answer): string[] {
 }
 
 /** Memory fakes in the `publicationHarness` shape (s8-publication.test.ts), counting every side effect. */
-function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader } = {}) {
+function publicationFakes(options: { preflight?: boolean; dig?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader } = {}) {
   const counts = { prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 };
   const stored: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }[] = [];
   const repository = {
     preflightGrant: async () => options.preflight ?? true,
     auditAuthenticatedPreflightDenial: async () => true,
+    // Security review F2 (0154): whether the owner's debate is a dig (a dig is never published).
+    readRunIsDig: async () => options.dig ?? false,
     readAuthorPseudonym: async () => PSEUDONYM,
     readArgumentLanguageTag: async () => null,
     prepareKeyProvision: async () => { counts.prepareKeyProvision += 1; return true; },
@@ -225,9 +227,13 @@ function routeApi(input: {
   publicationContentCheck?: PublicationContentCheck;
   synthesisPublishGate?: SynthesisPublishGate | null;
   preflight?: boolean;
+  dig?: boolean;
   leases?: LeaseProbe;
 }) {
-  const fakes = publicationFakes(input.preflight === undefined ? {} : { preflight: input.preflight });
+  const fakes = publicationFakes({
+    ...(input.preflight === undefined ? {} : { preflight: input.preflight }),
+    ...(input.dig === undefined ? {} : { dig: input.dig })
+  });
   const api = buildApi({
     application: askApplication(input.answer ?? servedAnswer(), input.leases),
     sessions: sessions(),
@@ -349,6 +355,50 @@ describe("hate-speech S02 publish path", () => {
         expect(records).toEqual([]);
         expect(counts.prepareKeyProvision).toBe(0);
       }
+    });
+  });
+
+  describe("a dig is never published (security review F2, 0154)", () => {
+    // Property: a dig is refused before anything that costs or keeps: no answer read under a content lease, no synthesis
+    // gate, no judge call, no check record, no key provision, cipher or transition.
+    it("the route answers 409 DIG_NOT_PUBLISHABLE right after the grant's check, and reads, checks and provisions nothing", async () => {
+      const judge = createPartJudgeStub({});
+      const { check, records } = contentCheck(judge);
+      const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0 };
+      let gateCalls = 0;
+      const { api, publish, counts } = routeApi({
+        publicationContentCheck: check, leases, dig: true,
+        synthesisPublishGate: { decide: async () => { gateCalls += 1; return "PROCEED" as const; } }
+      });
+      const response = await publish();
+      await api.close();
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toStrictEqual({ error: "DIG_NOT_PUBLISHABLE", message: "DIG_NOT_PUBLISHABLE" });
+      expect(leases).toEqual({ held: 0, opened: 0, answerReads: 0 });
+      expect(gateCalls).toBe(0);
+      expect(judge.packets).toHaveLength(0);
+      expect(records).toEqual([]);
+      expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
+      // The same route and fakes publish a debate that is not a dig.
+      const topLevel = routeApi({ publicationContentCheck: check, dig: false });
+      expect((await topLevel.publish()).statusCode).toBe(201);
+      await topLevel.api.close();
+      expect(topLevel.counts).toEqual({ prepareKeyProvision: 1, publish: 1, abandonKeyProvision: 0, cipherCreate: 1 });
+    });
+
+    // Property: a caller that skips the route's question still publishes no dig: the application asks again before the judge.
+    it("the application itself refuses a dig before the judge, as for a debate it may not publish", async () => {
+      const judge = createPartJudgeStub({});
+      const { check, records } = contentCheck(judge);
+      const { application, counts } = publicationFakes({ dig: true });
+      await expect(application.publish({
+        runId: RUN_ID, answer: servedAnswer(), authenticated, grantToken: GRANT_TOKEN,
+        source: { ip: "192.0.2.1", userAgent: "hs-s02", requestId: "request:hs-s02" },
+        contentCheck: check
+      })).resolves.toBeNull();
+      expect(judge.packets).toHaveLength(0);
+      expect(records).toEqual([]);
+      expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
     });
   });
 

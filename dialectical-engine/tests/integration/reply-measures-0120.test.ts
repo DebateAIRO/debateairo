@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readTerminalRecordedFacts } from "@debateai/battery";
 import { LedgerRepository, type AppendRawArtifactInput } from "@debateai/ledger";
-import { RunRepository, migrate } from "../../packages/db/src/index.js";
+import { RunRepository, createPool, migrate } from "../../packages/db/src/index.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -107,13 +108,20 @@ describe("migration 0120 — the terminal recorded facts count a structure-repai
     ] as const) await modelCall(runId, callSiteKey, outcome);
     expect((await readTerminalRecordedFacts(database.pool, runId)).ledger).toMatchObject({
       judgeCallCount: 1, composerCallCount: 0, conformanceCallCount: 1, postComposeR9CallCount: 1 });
-    // 0049's grant re-asserted: the runtime role still calls it, and it still runs as its definer.
+    // 0120 re-asserted 0049's grant; 0154 moved it to the cross-account marker: the runner's login (debateai_runtime and the marker) calls it, and it
+    // still runs as its definer; the bare runtime role is refused.
+    const runnerTwin = createPool(await createSystemTwin(database, "reply_measures_runner_twin", ["debateai_runtime"]));
+    try {
+      expect((await runnerTwin.query(
+        "SELECT judge_calls, composer_calls, conformance_calls, r9_calls FROM core.read_terminal_recorded_facts($1)", [runId])).rows)
+        .toEqual([{ judge_calls: "1", composer_calls: "0", conformance_calls: "1", r9_calls: "1" }]);
+    } finally {
+      await runnerTwin.end();
+    }
     const runtime = await database.pool.connect();
     try {
       await runtime.query("SET ROLE debateai_runtime");
-      expect((await runtime.query(
-        "SELECT judge_calls, composer_calls, conformance_calls, r9_calls FROM core.read_terminal_recorded_facts($1)", [runId])).rows)
-        .toEqual([{ judge_calls: "1", composer_calls: "0", conformance_calls: "1", r9_calls: "1" }]);
+      await expect(runtime.query("SELECT judge_calls FROM core.read_terminal_recorded_facts($1)", [runId])).rejects.toMatchObject({ code: "42501" });
     } finally {
       await runtime.query("RESET ROLE").catch(() => undefined);
       runtime.release();

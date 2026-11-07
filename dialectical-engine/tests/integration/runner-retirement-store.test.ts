@@ -13,7 +13,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * DRAINING, its front pair stopped and no READY or CLAIMED item of it is left. Over embedded Postgres, read as the
  * live runner's own login: debateai_runtime and, since row-level security S01, the marker role
  * debateai_rls_all_accounts (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it); the
- * bare debateai_runtime login, with no account context, counts no open work. The superuser pool only arranges rows
+ * bare debateai_runtime login, with no account context, counts no open work: since 0154 (the security review, F5) it
+ * may not even ask whether a debate's work is parked, which is the marker's. The superuser pool only arranges rows
  * (the switch, the release events, a FAILED item). The cases run in order on one database; each name states what it
  * expects. CI skips this directory; run it before merging.
  */
@@ -89,9 +90,9 @@ describe("the retirement facts, read in one snapshot as the runner principal", (
     expect(await store(R2).readFacts(R2)).toEqual({ state: "CURRENT", frontPairStopped: false, retireRequested: false, openWork: 1 });
   });
 
-  it("the bare runtime login, with no account context, counts none of r2's open work (row-level security, 0126)", async () => {
+  it("the bare runtime login, with no account context, counts none of r2's open work: it may not ask whether work is parked (0154)", async () => {
     const bare = postgresRunnerRetirementStore(bareRuntime, { releaseKey: R2, workerId: "worker:retire" });
-    expect(await bare.readFacts(R2)).toEqual({ state: "CURRENT", frontPairStopped: false, retireRequested: false, openWork: 0 });
+    await expect(bare.readFacts(R2)).rejects.toMatchObject({ code: "42501", message: "permission denied for function run_work_is_parked" });
     // Not vacuous: the runner's own login still counts r2's item.
     expect((await store(R2).readFacts(R2)).openWork).toBe(1);
   });

@@ -15,8 +15,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 /**
  * 0118 (question-language spec 2026-10-13, plan P2L Task 19): the fast language check's cost is a SITE cost in the
  * day's pot (`readDaySpentMicros`), written before any debate exists, by ONE writer: the SECURITY DEFINER function
- * `ledger.record_language_check_spend`, which the API's runtime role may execute (pre-flight PF-L58, option (a)).
- * Embedded Postgres; run this file alone.
+ * `ledger.record_language_check_spend` (pre-flight PF-L58, option (a)). The API's runtime role executed it until the
+ * security review's 0154 (F5): since then only a login holding the cross-account marker may, and the API records each
+ * check on its system login (main.ts's site X30), which this file's API_SYSTEM twin stands for. Embedded Postgres; run
+ * this file alone.
  */
 let database: TestDatabase;
 /** The writer accepts UTC today +-1 only (fix round 2), so every day here is relative to now. */
@@ -25,14 +27,17 @@ const TODAY = dayOffset(0);
 const PROVIDER = "language-check:anthropic:claude-haiku-5-5";
 /**
  * Row-level security (0126, D29): a system login holds debateai_runtime and the cross-account marker (the runner's
- * shape); the bare runtime role with no account context may write no row that names no run of its account.
+ * shape). The bare runtime role may write no row of the day's table at all since 0154 (F5), which took its INSERT.
  */
 const RUNTIME_TWIN = "language_check_runtime_twin";
+/** The API's system login (the billing role and the cross-account marker), where it records each check since 0154. */
+const API_SYSTEM = "language_check_api_system_twin";
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await createSystemTwin(database, RUNTIME_TWIN, ["debateai_runtime"]);
+  await createSystemTwin(database, API_SYSTEM, ["debateai_billing_runtime"]);
 }, 600_000);
 
 afterAll(async () => {
@@ -62,8 +67,8 @@ async function createLegacyRun(): Promise<string> {
   });
 }
 
-/** One client acting as the API's runtime role (or `role`) for `work`; the role is reset before the client goes back. */
-async function asRuntime<T>(work: (client: { query: TestDatabase["pool"]["query"] }) => Promise<T>, role = "debateai_runtime"): Promise<T> {
+/** One client acting as the API's system login (or `role`) for `work`; the role is reset before the client goes back. */
+async function asRole<T>(work: (client: { query: TestDatabase["pool"]["query"] }) => Promise<T>, role = API_SYSTEM): Promise<T> {
   const client = await database.pool.connect();
   try {
     await client.query(`SET ROLE ${role}`);
@@ -75,9 +80,10 @@ async function asRuntime<T>(work: (client: { query: TestDatabase["pool"]["query"
 }
 
 describe("0118: the language check's site cost (one writer, the day's pot)", () => {
-  it("the boot probe sees the one writer once 0118 is applied", async () => {
+  it("the boot probe sees the one writer on the API's system login once 0118 is applied, and not on the runtime role since 0154", async () => {
     expect(LANGUAGE_CHECK_SPEND_WRITER).toBe("ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)");
-    expect(await asRuntime((client) => languageCheckSpendWriterPresent(client))).toBe(true);
+    expect(await asRole((client) => languageCheckSpendWriterPresent(client))).toBe(true);
+    expect(await asRole((client) => languageCheckSpendWriterPresent(client), "debateai_runtime")).toBe(false);
   });
 
   it("fix round 1: the probe is false for a role that may not EXECUTE the writer, and false when the writer is absent", async () => {
@@ -87,24 +93,24 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
       await client.query("SET ROLE debateai_replay");
       expect(await languageCheckSpendWriterPresent(client)).toBe(false);
       await client.query("RESET ROLE");
-      // The writer absent (dropped inside a transaction that is rolled back): false, for the runtime role too.
+      // The writer absent (dropped inside a transaction that is rolled back): false, for the API's system login too.
       await client.query("BEGIN");
       await client.query(`DROP FUNCTION ${LANGUAGE_CHECK_SPEND_WRITER}`);
-      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query(`SET LOCAL ROLE ${API_SYSTEM}`);
       expect(await languageCheckSpendWriterPresent(client)).toBe(false);
       await client.query("ROLLBACK");
     } finally {
       await client.query("RESET ROLE").catch(() => undefined);
       client.release();
     }
-    expect(await asRuntime((runtime) => languageCheckSpendWriterPresent(runtime))).toBe(true);
+    expect(await asRole((client) => languageCheckSpendWriterPresent(client))).toBe(true);
   });
 
-  it("the runtime role records one check through the function, and the day's pot grows by its charge", async () => {
+  it("the API's system login records one check through the function, and the day's pot grows by its charge", async () => {
     const store = new PostgresModelSpendStore(database.pool);
     const before = await store.readDaySpentMicros(TODAY);
     const spendId = randomUUID();
-    await asRuntime((client) => client.query("SELECT ledger.record_language_check_spend($1::uuid,$2,$3::date,$4,$5,$6)",
+    await asRole((client) => client.query("SELECT ledger.record_language_check_spend($1::uuid,$2,$3::date,$4,$5,$6)",
       [spendId, PROVIDER, TODAY, 85, 310, 28]));
     expect(await store.readDaySpentMicros(TODAY)).toBe(before + 85);
     const row = (await database.pool.query("SELECT spend_source, run_id, spend_phase, attempt_id, provider_ref, charge_micros::int, input_tokens::int, output_tokens::int FROM ledger.model_spend WHERE spend_id=$1", [spendId])).rows[0];
@@ -117,22 +123,22 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
     const tomorrow = dayOffset(1);
     const before = await store.readDaySpentMicros(tomorrow);
     const entry = { spendId: randomUUID(), providerRef: PROVIDER, chargedOn: tomorrow, chargeMicros: 45, inputTokens: 310, outputTokens: 28 };
-    await asRuntime((client) => recordLanguageCheckSpend(client, entry));
+    await asRole((client) => recordLanguageCheckSpend(client, entry));
     expect(await store.readDaySpentMicros(tomorrow)).toBe(before + 45);
-    await expect(asRuntime((client) => recordLanguageCheckSpend(client, entry))).rejects.toThrow(/model_spend_pkey/u);
+    await expect(asRole((client) => recordLanguageCheckSpend(client, entry))).rejects.toThrow(/model_spend_pkey/u);
     // A run-scoped reader never sees it: no run, no phase.
     expect((await database.pool.query("SELECT count(*)::int n FROM ledger.model_spend WHERE spend_source='LANGUAGE_CHECK' AND (run_id IS NOT NULL OR spend_phase IS NOT NULL)")).rows[0].n).toBe(0);
   });
 
   it("the function refuses what the table refuses: a negative charge or token count", async () => {
     for (const [charge, input, output] of [[-1, 1, 1], [1, -1, 1], [1, 1, -1]] as const) {
-      await expect(asRuntime((client) => client.query("SELECT ledger.record_language_check_spend($1::uuid,$2,$3::date,$4,$5,$6)",
+      await expect(asRole((client) => client.query("SELECT ledger.record_language_check_spend($1::uuid,$2,$3::date,$4,$5,$6)",
         [randomUUID(), PROVIDER, TODAY, charge, input, output]))).rejects.toMatchObject({ code: "23514" });
     }
   });
 
   it("fix round 2: the writer takes UTC today +-1 only, and a provider reference of the code shape only (23514)", async () => {
-    const call = (provider: string | null, day: string) => asRuntime((client) => client.query(
+    const call = (provider: string | null, day: string) => asRole((client) => client.query(
       "SELECT ledger.record_language_check_spend($1::uuid,$2,$3::date,1,1,1)", [randomUUID(), provider, day]));
     await call(PROVIDER, dayOffset(-1));
     await call(PROVIDER, dayOffset(1));
@@ -149,21 +155,25 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
   it("fix round 2: option (a) in the database — a raw INSERT of a LANGUAGE_CHECK row is refused for the runtime role and for anyone but the writer's owner", async () => {
     const raw = `INSERT INTO ledger.model_spend (spend_id, spend_source, run_id, provider_ref, charged_on, charge_micros, input_tokens, output_tokens)
        VALUES ($1,'LANGUAGE_CHECK',NULL,$2,$3::date,1,1,1)`;
-    await expect(asRuntime((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY])))
+    // The runtime role holds no INSERT on the table since 0154 (F5).
+    await expect(asRole((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY]), "debateai_runtime"))
+      .rejects.toMatchObject({ code: "42501", message: "permission denied for table model_spend" });
+    // The API's system login, which holds the marker and so the table's INSERT, is refused by the guard.
+    await expect(asRole((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY])))
       .rejects.toMatchObject({ code: "42501", message: "LANGUAGE_CHECK_SPEND_WRITER_ONLY" });
     // The migration owner (this database's superuser) too: only the writer's owner, inside the writer, may.
     await expect(database.pool.query(raw, [randomUUID(), PROVIDER, TODAY]))
       .rejects.toMatchObject({ code: "42501", message: "LANGUAGE_CHECK_SPEND_WRITER_ONLY" });
     // On a system login (RUNTIME_TWIN), whose row-level security admits the row, the guard alone refuses it.
-    await expect(asRuntime((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY]), RUNTIME_TWIN))
+    await expect(asRole((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY]), RUNTIME_TWIN))
       .rejects.toMatchObject({ code: "42501", message: "LANGUAGE_CHECK_SPEND_WRITER_ONLY" });
     // The runtime role's other sources are untouched by the guard (on the system login; row-level security, 0126).
     const other = `INSERT INTO ledger.model_spend (spend_id, spend_source, run_id, provider_ref, charged_on,
       charge_micros, input_tokens, output_tokens) VALUES ($1,'SUPPORT',NULL,'support:x',$2::date,1,1,1)`;
-    await asRuntime((client) => client.query(other, [randomUUID(), TODAY]), RUNTIME_TWIN);
-    // The bare runtime role with no account context may not write a row that names no run of its account.
-    await expect(asRuntime((client) => client.query(other, [randomUUID(), TODAY])))
-      .rejects.toMatchObject({ code: "42501", message: 'new row violates row-level security policy for table "model_spend"' });
+    await asRole((client) => client.query(other, [randomUUID(), TODAY]), RUNTIME_TWIN);
+    // The bare runtime role may not write a row of the table at all (0154).
+    await expect(asRole((client) => client.query(other, [randomUUID(), TODAY]), "debateai_runtime"))
+      .rejects.toMatchObject({ code: "42501", message: "permission denied for table model_spend" });
   });
 
   it("a LANGUAGE_CHECK row that names a run, a phase or an attempt is refused by the CHECK, even as the writer's owner", async () => {
@@ -200,15 +210,16 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
     expect((await database.pool.query("SELECT count(*)::int n FROM ledger.model_spend WHERE spend_id=$1", [base.spendId])).rows[0].n).toBe(0);
   });
 
-  it("only the runtime role may execute the writer; the function runs as the spend writers' owner, never PUBLIC", async () => {
+  it("only the cross-account marker may execute the writer (the runtime role until 0154); the function runs as the spend writers' owner, never PUBLIC", async () => {
     const acl = (await database.pool.query(`SELECT pg_get_userbyid(p.proowner) AS owner, p.prosecdef, p.proconfig,
+        has_function_privilege('debateai_rls_all_accounts', p.oid, 'EXECUTE') AS marker,
         has_function_privilege('debateai_runtime', p.oid, 'EXECUTE') AS runtime,
         has_function_privilege('debateai_replay', p.oid, 'EXECUTE') AS replay,
         has_function_privilege('debateai_staff_recovery', p.oid, 'EXECUTE') AS recovery,
         EXISTS(SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS public
       FROM pg_proc p WHERE p.oid=to_regprocedure($1)`, [LANGUAGE_CHECK_SPEND_WRITER])).rows[0];
     expect(acl).toEqual({ owner: "debateai_staff_security_owner", prosecdef: true, proconfig: ["search_path=pg_catalog"],
-      runtime: true, replay: false, recovery: false, public: false });
+      marker: true, runtime: false, replay: false, recovery: false, public: false });
   });
 });
 

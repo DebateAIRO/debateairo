@@ -10,6 +10,7 @@ import {
   type Pool,
   type WebSealed
 } from "@debateai/db";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -19,10 +20,13 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * (and 0133's closing records it), reads the reports and when the newest unreported closing was made; the API's role
  * reads the person's reports; the content trigger binds the envelope to the root's run and the report id; the spend
  * source INVESTIGATION_REPORT must name its run; erasing the root and deleting the account remove the reports; no
- * request role reads the table. Data is made up.
+ * request role reads the table. Data is made up. Since the security review's 0154 (F5) the API's role runs here as each person's own
+ * request (its login carrying their live session), as its functions believe no other owner.
  */
 let database: TestDatabase;
 let api: Pool;
+/** The API's role wired as main.ts wires its request pool: inside a request its own connections carry the person's session. */
+let requests: Pool;
 let runner: Pool;
 let erasure: Pool;
 let worker: Pool;
@@ -43,14 +47,16 @@ const loginPool = (role: string, password: string): Pool => {
   url.password = password;
   return createPool(url.toString());
 };
-type Account = Readonly<{ userId: string; ownerRef: string }>;
+type Account = Readonly<{ userId: string; ownerRef: string; token: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
     VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `rep-${userId}`]);
   const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
-  return { userId, ownerRef };
+  return { userId, ownerRef, token: await seedLiveSession(database.pool, userId) };
 }
+/** The person's own request, on the API's role. */
+const asking = (person: Account): Pool => asRequestOf(requests, person.token);
 /** Runs a few statements as the superuser with triggers off (seeding rows the runner or the scheduler would write). */
 async function seeded(statements: ReadonlyArray<readonly [string, readonly unknown[]]>): Promise<void> {
   const seed = await database.pool.connect();
@@ -109,7 +115,7 @@ async function seedTombstone(runId: string): Promise<void> {
 }
 /** An investigation of a settled root, with its digs joined; closed when `close` is set. */
 async function investigation(owner: Account, digs = 0, close = true): Promise<Readonly<{ id: string; root: string; digs: string[] }>> {
-  const investigations = new PostgresInvestigationRepository(api);
+  const investigations = new PostgresInvestigationRepository(asking(owner));
   const root = await run(owner);
   await work(root, "DONE");
   const id = (await investigations.open(owner.ownerRef, root))!;
@@ -142,7 +148,8 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE rep_api LOGIN PASSWORD 'rep-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  await database.pool.query("CREATE ROLE rep_runner LOGIN PASSWORD 'rep-runner-test-only' IN ROLE debateai_runtime");
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the closings' sweep list is the marker's alone.
+  await database.pool.query("CREATE ROLE rep_runner LOGIN PASSWORD 'rep-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE rep_erasure LOGIN PASSWORD 'rep-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE rep_worker LOGIN PASSWORD 'rep-worker-test-only' IN ROLE debateai_data_export_worker");
   api = loginPool("rep_api", "rep-api-test-only");
@@ -150,10 +157,14 @@ beforeAll(async () => {
   erasure = loginPool("rep_erasure", "rep-erasure-test-only");
   worker = loginPool("rep_worker", "rep-worker-test-only");
   expect((await runner.query("SELECT current_user AS name")).rows[0].name).toBe("rep_runner");
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.username = "rep_api";
+  apiUrl.password = "rep-api-test-only";
+  requests = createPool(apiUrl.toString(), { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([api?.end(), runner?.end(), erasure?.end(), worker?.end()]);
+  await Promise.all([api?.end(), runner?.end(), erasure?.end(), worker?.end(), requests?.end()]);
   await database?.stop();
 });
 
@@ -164,7 +175,7 @@ describe("0136 the runner's side", () => {
     const first = await investigation(person);
     const second = await investigation(person);
     const reopened = await investigation(person);
-    expect(await new PostgresInvestigationRepository(api).reopen(person.ownerRef, reopened.id)).toBe("REOPENED");
+    expect(await new PostgresInvestigationRepository(asking(person)).reopen(person.ownerRef, reopened.id)).toBe("REOPENED");
     const done = await investigation(person);
     expect(await reports.record(failed(done.id, 1))).toBe("RECORDED");
     const ours = new Set([first.id, second.id, reopened.id, done.id]);
@@ -229,7 +240,7 @@ describe("0136 the runner's side", () => {
     // No such closing; a closing reopened before its report.
     expect(await reports.record(failed(randomUUID(), 1))).toBe("NO_CLOSING");
     expect(await reports.record(failed(id, 2))).toBe("NO_CLOSING");
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     expect(await investigations.reopen(person.ownerRef, id)).toBe("REOPENED");
     expect(await investigations.close(person.ownerRef, id)).toMatchObject({ outcome: "CLOSED", reportVersion: 2 });
     const second = (await database.pool.query<{ closed_at: Date }>(
@@ -292,13 +303,16 @@ describe("0136 the API's reader, the spend source, the grants", () => {
     const { id, root, digs } = await investigation(person, 1);
     const record = await written(id, 1, root);
     expect(await new PostgresInvestigationReportRunnerRepository(runner).record(record)).toBe("RECORDED");
-    const reports = new PostgresInvestigationReportRepository(api);
+    const reports = new PostgresInvestigationReportRepository(asking(person));
     const read = await reports.read(person.ownerRef, digs[0]!);
     expect(read).toMatchObject({ investigation: { investigation_id: id, root_run_id: root, state: "closed" }, waiting: 1 });
     expect(read!.investigation.closings[0]).toMatchObject({ report_version: 1, report_ref: record.reportId });
     expect(read!.reports).toEqual([expect.objectContaining({ report_version: 1, report_id: record.reportId, content: ENVELOPE })]);
-    expect(await reports.read(stranger.ownerRef, root)).toBeNull();
+    expect(await new PostgresInvestigationReportRepository(asking(stranger)).read(stranger.ownerRef, root)).toBeNull();
     expect(await reports.read(person.ownerRef, await run(person))).toBeNull();
+    // 0154 (F5): the person's request names no one else, and with no session the API's role names no one.
+    expect(await new PostgresInvestigationReportRepository(asking(stranger)).read(person.ownerRef, root)).toBeNull();
+    expect(await new PostgresInvestigationReportRepository(api).read(person.ownerRef, root)).toBeNull();
     // The runner's role cannot reach the API's reader.
     expect(await sqlError(() => new PostgresInvestigationReportRepository(runner).read(person.ownerRef, root))).toMatchObject({ code: "42501" });
   });
@@ -325,7 +339,8 @@ describe("0136 the API's reader, the spend source, the grants", () => {
         expect(await sqlError(() => pool.query(statement, [...values])), statement).toMatchObject({ code: "42501" });
       }
     }
-    for (const pool of [erasure, worker]) {
+    // The closings' list and the closing's spend window are the runner's alone: since 0154 (F5) the cross-account marker's, which the API's role lacks.
+    for (const pool of [api, erasure, worker]) {
       expect(await sqlError(() => pool.query("SELECT identity.read_unreported_closings(10)"))).toMatchObject({ code: "42501" });
       expect(await sqlError(() => pool.query("SELECT identity.read_closing_since_of_root($1)", [root]))).toMatchObject({ code: "42501" });
     }

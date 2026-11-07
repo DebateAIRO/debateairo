@@ -8,21 +8,20 @@ export * from "./public-flag.js";
 export * from "./tree-updates.js";
 export * from "./passage-retention.js";
 export * from "./team-limit.js";
-export * from "./team-spend.js";
 export * from "./path-suggestions.js";
 import type { InvestigationRead } from "./investigations.js";
 import type { WebSealed } from "./web-evidence.js";
 
 /**
- * The final report over an investigation (migration 0136; plan task W5-1; owner answer F7 A), through 0136's definers
- * only. `PostgresInvestigationReportRunnerRepository` runs on the runner's or the scheduler's pool (debateai_runtime):
- * it lists the closings still waiting for their report, reads what a report still waits for (the digs still running and
- * the path rewrites still being written; a dig paused at the month wall does not count and goes to the next version),
- * stores the report once (which also records it on 0133's closing, in the same transaction), reads the reports of an
- * investigation and when its newest closing without a report was made (the money seam sums that closing's
- * INVESTIGATION_REPORT charges, which name the ROOT's run, from then on). `PostgresInvestigationReportRepository` runs on
- * the API's own pool (debateai_billing_runtime): the person's reports, with the investigation and how many debates the
- * report still waits for.
+ * The final report over an investigation (migration 0136; plan task W5-1; owner answer F7 A), through 0136's definers only.
+ * `PostgresInvestigationReportRunnerRepository` runs on the runner's pool (since 0154 every method but `readOfRun`, debateai_runtime's, which the
+ * API's answer read calls too, needs the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool
+ * outside a request hold and the API's request login does not): it lists the closings still waiting for their report, reads what a report still
+ * waits for (the digs still running and the path rewrites still being written; a dig paused at the month wall does not count and goes to the next
+ * version), stores the report once (which also records it on 0133's closing, in the same transaction), reads the reports of an investigation and when
+ * its newest closing without a report was made (the money seam sums that closing's INVESTIGATION_REPORT charges, which name the ROOT's run, from then
+ * on). `PostgresInvestigationReportRepository` runs on the API's own pool (debateai_billing_runtime): the person's reports, with the investigation
+ * and how many debates the report still waits for.
  *
  * Carrier (packages/crypto CONTENT_CARRIERS): `identity.investigation_report`, sealed by the caller under the
  * investigation's ROOT run key and bound to the report id (lower-case, as Postgres renders a uuid), checked on insert by
@@ -58,7 +57,7 @@ export type InvestigationReportsRead = Readonly<{ investigation_id: string; root
 export type InvestigationReportsOwnerRead = Readonly<{ investigation: InvestigationRead; waiting: number; reports: readonly InvestigationReportEntry[] }>;
 export type InvestigationReportWriteOutcome = "RECORDED" | "ALREADY" | "NO_CLOSING";
 
-/** Runner / scheduler pool (debateai_runtime). */
+/** Runner pool (the cross-account marker since 0154, but `readOfRun`: debateai_runtime). */
 export class PostgresInvestigationReportRunnerRepository {
   constructor(private readonly pool: Executor) {}
 
@@ -90,7 +89,7 @@ export class PostgresInvestigationReportRunnerRepository {
         record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!.outcome;
   }
 
-  /** The reports of the debate's investigation, oldest version first; null when it is not live or in no investigation. */
+  /** The reports of the debate's investigation, oldest version first; null when it is not live, in no investigation or, in a request, not the connection's own (0154). */
   async readOfRun(runId: string): Promise<InvestigationReportsRead | null> {
     return (await this.pool.query<{ reports: InvestigationReportsRead | null }>(
       "SELECT identity.read_investigation_reports_of_run($1) AS reports", [runId])).rows[0]?.reports ?? null;

@@ -499,7 +499,9 @@ describe("data export database authority", () => {
       quote: await sealed("identity.web_extract", extract, "cXVvdGU=") })).toBe("RECORDED");
     const investigations = new PostgresInvestigationRepository(db.pool);
     const investigationId = (await investigations.open(owner, runId))!;
-    expect(await investigations.recordReserveEvent(owner, { kind: "HELD", amountMicros: 440_000 })).toBe("RECORDED");
+    // 0133's reserve writer had no caller; 0154 took its grant back, so the migrator records the reserve here.
+    expect((await db.pool.query<{ outcome: string }>("SELECT identity.record_reserve_event($1,'HELD',440000,NULL,NULL,NULL,NULL) AS outcome", [owner]))
+      .rows[0]!.outcome).toBe("RECORDED");
     await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
       VALUES($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '45 seconds')`, [exportId, a.user, a.session, worker]);
     try {

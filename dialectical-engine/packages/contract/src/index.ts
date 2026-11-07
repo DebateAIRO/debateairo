@@ -1147,6 +1147,16 @@ export const PublicationContentRefusalSchema = z.object({
   message: z.literal(PUBLICATION_CONTENT_REFUSED_MESSAGE),
   statement: PublicationRefusalStatementSchema
 }).strict();
+/**
+ * Security review F2 (migration 0154): the 409 body of a publish of a dig. The owner decided that a dig, a debate dug from another, is never
+ * published; nothing was read, checked or provisioned for the attempt, and the debate stays private.
+ */
+export const DIG_NOT_PUBLISHABLE = "DIG_NOT_PUBLISHABLE" as const;
+export const DigNotPublishableSchema = z.object({
+  error: z.literal(DIG_NOT_PUBLISHABLE),
+  message: z.literal(DIG_NOT_PUBLISHABLE)
+}).strict();
+export type DigNotPublishable = z.infer<typeof DigNotPublishableSchema>;
 
 export const PublishDebateRequestSchema = z.object({
   step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
@@ -1236,6 +1246,16 @@ export const PublicationTransitionSchema = z.object({
   state: z.enum(["PRIVATE", "PUBLISHED"]),
   public_ref: z.uuid().nullable()
 }).strict();
+/**
+ * GET /v1/runs/{id}/visibility: the publish's own two fields and, security review F2, `dig`: sent (true) only for a dig, which is never published,
+ * so the page offers no Publish for it. The publish's 201 keeps the two fields alone.
+ */
+export const RunVisibilitySchema = z.object({
+  state: z.enum(["PRIVATE", "PUBLISHED"]),
+  public_ref: z.uuid().nullable(),
+  dig: z.boolean().optional()
+}).strict();
+export type RunVisibility = z.infer<typeof RunVisibilitySchema>;
 
 export const PublicDebateSummarySchema = z.object({
   public_ref: z.uuid(),
@@ -1986,7 +2006,7 @@ export const contractInventory = Object.freeze({
     RecoveryEmailSettingsSchema,RecoveryEmailRequestSchema,RecoveryEmailRemoveRequestSchema,
     AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
     EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
-    PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
+    PublicationTransitionSchema, RunVisibilitySchema, DigNotPublishableSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     SynthesisFlagSchema, SynthesisCheckHoldSchema, RemovalNoticeTakeSchema,
     AnswerSchema, InspectionSchema, NodeSchema,

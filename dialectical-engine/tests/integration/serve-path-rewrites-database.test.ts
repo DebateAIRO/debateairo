@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AnswerSchema, StoryBodySchema, type Answer, type StoryFate } from "@debateai/contract";
 import {
   PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRepository, PostgresInvestigationRepository,
-  PostgresInvestigationRunnerRepository, WEB_EVIDENCE_CARRIERS, configureContentEncryption, contentCipherFor, createPool,
+  WEB_EVIDENCE_CARRIERS, configureContentEncryption, contentCipherFor, createPool,
   encryptAttestedContentForRun, migrate, withRunContentLease, type DigPickInput, type Pool
 } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
@@ -260,7 +260,9 @@ describe("W4-5 the rewrites served from the real store", () => {
     // "Write my report": the investigation closes as version 1 and its report is stored; nothing changed since it.
     const closed = await new PostgresInvestigationRepository(api).close(owner.ownerRef, one.investigationId);
     expect(closed).toMatchObject({ outcome: "CLOSED", reportVersion: 1 });
-    expect(await new PostgresInvestigationRunnerRepository(runner).recordReport(one.investigationId, 1, randomUUID())).toBe("RECORDED");
+    // 0133's mark of the closing's report, as the migrator: 0136's report writer marks it as its owner, and since 0154 no role may call it.
+    expect((await database.pool.query<{ outcome: string }>("SELECT identity.record_investigation_report($1,1,$2) AS outcome", [one.investigationId, randomUUID()]))
+      .rows[0]!.outcome).toBe("RECORDED");
     expect((await read(api, root.answerId)).path_rewrites!.changed_since).toEqual({ count: 0, since_report_version: 1 });
 
     // Reopened, a later dig rewrites the same path on the first rewrite's text: the path counts again, since version 1.

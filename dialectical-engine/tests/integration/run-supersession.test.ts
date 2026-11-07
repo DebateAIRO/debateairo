@@ -718,3 +718,81 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
     expect(await resolveRunRef(fixture.database.pool, n)).toBe(n);
   });
 });
+
+/**
+ * Security review F2 (migration 0154): a dig is never published, and is known as one by its own row (identity.dig_run), which the statement that
+ * creates its run writes: 0123's core.create_encrypted_run, every owner's run's one writer (RunRepository's, for a new ask's run, the room's START
+ * and WAIT, and a re-admission's), patched in place by 0154. Its document may carry `digRun`, JSON true only; the row comes right after the run's
+ * ownership event, in the same statement, so nothing after the creation (a sign-out, a step-up, a failure, a crash) can leave a dig unmarked. A run
+ * that re-admits a dig gets its own row the same way, before its supersession edge exists.
+ */
+describe("0154 F2: a dig is marked a dig by the statement that creates its run", () => {
+  const marks = async (runId: string) => (await fixture.database.pool.query<{ owner_ref: string; same: boolean }>(
+    `SELECT mark.owner_ref::text AS owner_ref, mark.xmin::text = run.xmin::text AS same
+     FROM identity.dig_run AS mark JOIN core.run AS run USING (run_id) WHERE mark.run_id=$1`, [runId])).rows;
+  const marked = async (runId: string): Promise<number> =>
+    (await fixture.database.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM identity.dig_run WHERE run_id=$1", [runId])).rows[0]!.n;
+  const written = async (runId: string): Promise<number> =>
+    (await fixture.database.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM core.run WHERE run_id=$1", [runId])).rows[0]!.n;
+  /** A new run's key provision, prepared for the owner's live session, as RunRepository.startRun prepares it. */
+  async function provisioned(): Promise<Readonly<{ runId: string; executionRef: string }>> {
+    const runId = randomUUID();
+    const executionRef = (await fixture.database.pool.query("SELECT core.prepare_run_key_provision($1,$2,$3,$4) AS value",
+      [runId, fixture.userId, fixture.ownerRef, fixture.authSessionId])).rows[0].value as string;
+    return { runId, executionRef };
+  }
+
+  it("a document marked digRun: true writes the run and its one row in the run's own transaction; with the key absent, the run alone", async () => {
+    const dig = await provisioned();
+    const document = { ...await encryptedRunDocument(dig.runId, dig.executionRef), digRun: true };
+    expect(await asRole("debateai_content_provision", (client) => createDirectly(client, document))).toBe(true);
+    expect(await marks(dig.runId)).toEqual([{ owner_ref: fixture.ownerRef, same: true }]);
+    const plain = await provisioned();
+    expect(await asRole("debateai_content_provision", async (client) => createDirectly(client, await encryptedRunDocument(plain.runId, plain.executionRef)))).toBe(true);
+    expect([await written(plain.runId), await marked(plain.runId)]).toEqual([1, 0]);
+    // Through the repository, as the API creates a dig's run.
+    const repository = await fixture.createEncryptedRun("Should the ferry run at night? Dig: the cost of the crew.", { digRun: true });
+    expect(await marks(repository)).toEqual([{ owner_ref: fixture.ownerRef, same: true }]);
+  });
+
+  it("any other value of the mark refuses the document and writes nothing: no run, no row, the intent still prepared", async () => {
+    for (const value of [false, "true", 1, null, {}]) {
+      const attempt = await provisioned();
+      const document = { ...await encryptedRunDocument(attempt.runId, attempt.executionRef), digRun: value };
+      expect(await asRole("debateai_content_provision", (client) => createDirectly(client, document)), JSON.stringify(value)).toBe(false);
+      expect([await written(attempt.runId), await marked(attempt.runId)], JSON.stringify(value)).toEqual([0, 0]);
+      expect((await fixture.database.pool.query("SELECT cleanup_state FROM core.run_key_provision_intent WHERE run_id=$1", [attempt.runId])).rows,
+        JSON.stringify(value)).toEqual([{ cleanup_state: "PREPARED" }]);
+    }
+  });
+
+  it("a dig's creation refused because its session ended before it committed writes neither the run nor its row", async () => {
+    const attempt = await provisioned();
+    const document = { ...await encryptedRunDocument(attempt.runId, attempt.executionRef), digRun: true };
+    expect(await withSessionEnded(() => asRole("debateai_content_provision", (client) => createDirectly(client, document)))).toBe(false);
+    expect([await written(attempt.runId), await marked(attempt.runId)]).toEqual([0, 0]);
+  });
+
+  it("a re-admitted dig gets its own row from its first statement, before any edge; a re-admitted debate dug from nothing gets none", async () => {
+    const pool = fixture.database.pool;
+    const edgesOf = async (runId: string): Promise<number> =>
+      (await pool.query<{ n: number }>("SELECT count(*)::int AS n FROM core.run_supersession WHERE new_run_id=$1", [runId])).rows[0]!.n;
+    for (const dig of [true, false]) {
+      const old = await fixture.createEncryptedRun(`Should a waiting ${dig ? "dig" : "debate"} keep its mark?`, dig ? { digRun: true } : {});
+      await inTransaction(async (client) => {
+        await waits().enterWait(client, old, new Date());
+        await waits().recordReason(client, old, { waitsFor: "SITE", personRecheckAt: null, at: new Date() });
+      });
+      expect(await marked(old), String(dig)).toBe(dig ? 1 : 0);
+      const fresh = randomUUID();
+      const prepared = (await asRole("debateai_content_provision", (client) => prepareReadmitted(client, old, fresh))).rows[0]!;
+      // The re-admission's document carries no mark: the run it re-admits says what it is.
+      expect(await asRole("debateai_content_provision", async (client) => createDirectly(client, await encryptedRunDocument(fresh, prepared.execution_ref))),
+        String(dig)).toBe(true);
+      expect(await edgesOf(fresh), String(dig)).toBe(0);
+      expect(await marks(fresh), String(dig)).toEqual(dig ? [{ owner_ref: fixture.ownerRef, same: true }] : []);
+      await supersede(old, fresh);
+      expect(await resolveRunRef(pool, old), String(dig)).toBe(fresh);
+    }
+  });
+});

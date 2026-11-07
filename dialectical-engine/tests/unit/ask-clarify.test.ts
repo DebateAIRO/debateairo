@@ -10,7 +10,10 @@ import { AskClarifyResponseSchema, PurposeLinesSchema, purposeLinesMaterial, pur
 import { ASK_CLARIFY_CONTRACT_ID, ASK_CLARIFY_INSTRUCTION, ASK_CLARIFY_PROMPT_CONTRACT, framedAskClarify } from "@debateai/judgement";
 import { parsePreviewProviderTestConfig, type PromptPacket } from "@debateai/providers";
 import type { AskClarifyChargeEntry } from "@debateai/budget";
-import { ASK_CLARIFY_MODEL_SETTINGS, type AskClarifyTransportFor, ASK_CLARIFY_SPEND_REF, askClarifyTransportFor, createAskClarify, readAskClarifyReply } from "../../apps/api/src/ask-clarify.js";
+import {
+  ASK_CLARIFY_MODEL_SETTINGS, ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS, type AskClarifyTransportFor, ASK_CLARIFY_SPEND_REF, askClarifyTransportFor, createAskClarify,
+  readAskClarifyReply, sweepAskClarifyReservations
+} from "../../apps/api/src/ask-clarify.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { hostedQuestionLanguageRoute } from "../../apps/api/src/question-language/boot.js";
 import { questionWithPurposeLines } from "../../apps/api/src/purpose-lines.js";
@@ -43,6 +46,7 @@ function gateway(...replies: readonly (string | Error)[]) {
       if (next instanceof Error) throw next;
       return next;
     },
+    reserve: async () => undefined,
     record: async () => undefined,
     clock: () => new Date("2026-11-01T10:00:00.000Z"),
     report: (line) => reports.push(line.code)
@@ -146,7 +150,7 @@ describe("what the gateway's reply becomes", () => {
     vi.useFakeTimers();
     try {
       const reports: string[] = [];
-      const port = createAskClarify({ limits: ASK_LIMITS, transportFor: () => () => new Promise<string>(() => undefined), record: async () => undefined, clock: () => new Date(), report: (line) => reports.push(line.code) });
+      const port = createAskClarify({ limits: ASK_LIMITS, transportFor: () => () => new Promise<string>(() => undefined), reserve: async () => undefined, record: async () => undefined, clock: () => new Date(), report: (line) => reports.push(line.code) });
       const pending = port.read(OWNER, QUESTION, null);
       await vi.advanceTimersByTimeAsync(ASK_CLARIFY_MODEL_SETTINGS.timeoutMs);
       expect(await pending).toEqual({ source: "NONE" });
@@ -157,7 +161,7 @@ describe("what the gateway's reply becomes", () => {
   });
 
   it("no transport (local mode, no key): no questions, nothing sent", async () => {
-    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: null, record: async () => undefined, clock: () => new Date(), report: () => undefined });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: null, reserve: async () => undefined, record: async () => undefined, clock: () => new Date(), report: () => undefined });
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
   });
 });
@@ -178,7 +182,7 @@ describe("what one person can spend", () => {
     let now = Date.parse("2026-11-01T10:00:00.000Z");
     let calls = 0;
     const reports: string[] = [];
-    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: () => async () => { calls += 1; return good; }, record: async () => undefined, clock: () => new Date(now), report: (line) => reports.push(line.code) });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: () => async () => { calls += 1; return good; }, reserve: async () => undefined, record: async () => undefined, clock: () => new Date(now), report: (line) => reports.push(line.code) });
     let last = await port.read(OWNER, "Question number 0?", null);
     for (let at = 1; last.source === "AI" && at < 500; at += 1) last = await port.read(OWNER, `Question number ${at}?`, null);
     expect(last).toEqual({ source: "NONE" });
@@ -196,7 +200,7 @@ describe("what one person can spend", () => {
     let now = Date.parse("2026-11-01T10:00:00.000Z");
     const reports: string[] = [];
     let calls = 0;
-    const port = createAskClarify({ limits: { perHour: 2, perDay: 3 }, transportFor: () => async () => { calls += 1; return good; }, record: async () => undefined,
+    const port = createAskClarify({ limits: { perHour: 2, perDay: 3 }, transportFor: () => async () => { calls += 1; return good; }, reserve: async () => undefined, record: async () => undefined,
       clock: () => new Date(now), report: (line) => reports.push(line.code) });
     const ask = async (text: string) => (await port.read(OWNER, text, null)).source;
     expect([await ask("First question?"), await ask("Second question?")]).toEqual(["AI", "AI"]);
@@ -231,7 +235,7 @@ describe("what one person can spend", () => {
       const entries: AskClarifyChargeEntry[] = [];
       let skip: string | null = null;
       const transportFor = askClarifyTransportFor({ kind: "HOSTED", credential: HOSTED_KEY, recordSpend: async () => undefined, beforeSend: async () => skip })!;
-      const port = createAskClarify({ limits: ASK_LIMITS, transportFor, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+      const port = createAskClarify({ limits: ASK_LIMITS, transportFor, reserve: async () => undefined, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
       expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
       expect(entries).toEqual([expect.objectContaining({ ownerRef: OWNER, grant: null, providerRef: ASK_CLARIFY_SPEND_REF, inputTokens: 700, outputTokens: 90 })]);
       expect(entries[0]!.chargeMicros).toBeGreaterThan(0);
@@ -251,11 +255,11 @@ describe("what one person can spend", () => {
   it("preview: real counts reach the person's quota through the gate; a send the guarded fetch refused charges nothing", async () => {
     const entries: AskClarifyChargeEntry[] = [];
     const refusing = askClarifyTransportFor({ kind: "PREVIEW", fetch: (async () => { throw new Error("refused"); }) as typeof fetch })!;
-    const refused = createAskClarify({ limits: ASK_LIMITS, transportFor: refusing, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+    const refused = createAskClarify({ limits: ASK_LIMITS, transportFor: refusing, reserve: async () => undefined, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
     expect(await refused.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
     expect(entries).toEqual([]);
     const counted = askClarifyTransportFor({ kind: "PREVIEW", fetch: (async () => anthropicReply()) as typeof fetch })!;
-    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: counted, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor: counted, reserve: async () => undefined, record: async (entry) => { entries.push(entry); }, clock: () => new Date(), report: () => undefined });
     expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
     expect(entries).toEqual([expect.objectContaining({ inputTokens: 700, outputTokens: 90 })]);
   });
@@ -263,15 +267,140 @@ describe("what one person can spend", () => {
   it("a record that cannot be written stops the calls (never spend unrecorded), and the person carries on", async () => {
     let calls = 0;
     const transportFor: AskClarifyTransportFor = (onUsage) => async () => { calls += 1; await onUsage({ inputTokens: 1, outputTokens: 1, projected: false }); return good; };
-    const port = createAskClarify({ limits: ASK_LIMITS, transportFor, record: async () => { throw Object.assign(new Error("no right"), { code: "42501" }); }, clock: () => new Date(), report: () => undefined });
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor, reserve: async () => undefined, record: async () => { throw Object.assign(new Error("no right"), { code: "42501" }); }, clock: () => new Date(), report: () => undefined });
     expect((await port.read(OWNER, QUESTION, null)).source).toBe("AI");
     expect(await port.read(OWNER, "Another question?", null)).toEqual({ source: "NONE" });
     expect(calls).toBe(1);
   });
 
+  /** The order of what a read does with the money: each reservation, each send, each record, by the charge id. */
+  function ledgerOf(options: Readonly<{ reserve?: (entry: Readonly<{ spendId: string; ownerRef: string }>) => Promise<void>; replies?: readonly string[] }> = {}) {
+    const events: string[] = [];
+    const reports: string[] = [];
+    const left = [...(options.replies ?? [])];
+    let ids = 0;
+    const transportFor: AskClarifyTransportFor = (onUsage) => async () => {
+      events.push("send");
+      await onUsage({ inputTokens: 1, outputTokens: 1, projected: false });
+      return left.shift() ?? good;
+    };
+    const port = createAskClarify({ limits: ASK_LIMITS, transportFor, clock: () => new Date(), report: (line) => reports.push(line.code), newId: () => `charge-${String(ids += 1)}`,
+      reserve: async (entry) => { events.push(`reserve ${entry.spendId} ${entry.ownerRef}`); await options.reserve?.(entry); },
+      record: async (entry) => { events.push(`record ${entry.spendId} ${entry.ownerRef}`); } });
+    return { port, events, reports };
+  }
+  const refusedOwner = () => Object.assign(new Error("REQUEST_OWNER_MISMATCH"), { code: "42501" });
+
+  it("0154: each paid call's charge is reserved for the person first, while the request's session is live, and recorded under the id reserved", async () => {
+    const { port, events } = ledgerOf({ replies: [reply({ questions: [WHERE] }), reply({ questions: [WHERE], purpose: PURPOSE })] });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
+    // The re-ask is a second paid call: a reservation of its own, under a new id.
+    expect(events).toEqual([`reserve charge-1 ${OWNER}`, "send", `record charge-1 ${OWNER}`, `reserve charge-2 ${OWNER}`, "send", `record charge-2 ${OWNER}`]);
+  });
+
+  it("0154: a reservation the database refuses (the connection's session is not the person's any more) makes no paid call and gives no questions, and never stops the next person's", async () => {
+    let refuse = true;
+    const { port, events, reports } = ledgerOf({ reserve: async () => { if (refuse) throw refusedOwner(); } });
+    // More refusals in a row than any breaker counts: each is this request's alone.
+    for (const at of [1, 2, 3, 4]) expect(await port.read(OWNER, `Question ${String(at)}?`, null)).toEqual({ source: "NONE" });
+    expect(events.filter((event) => event === "send")).toEqual([]);
+    expect(reports).toEqual(["REQUEST_OWNER_MISMATCH", "REQUEST_OWNER_MISMATCH", "REQUEST_OWNER_MISMATCH", "REQUEST_OWNER_MISMATCH"]);
+    refuse = false;
+    expect((await port.read(OTHER_OWNER, QUESTION, null)).source).toBe("AI");
+    expect(events.filter((event) => event === "send")).toHaveLength(1);
+  });
+
+  it("0154: the re-ask's reservation refused: no second paid call, and the first reading, reserved while the session was live and charged, stands", async () => {
+    let reservations = 0;
+    const { port, events, reports } = ledgerOf({ replies: [reply({ questions: [WHERE] })], reserve: async () => { reservations += 1; if (reservations === 2) throw refusedOwner(); } });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
+    expect(events).toEqual([`reserve charge-1 ${OWNER}`, "send", `record charge-1 ${OWNER}`, `reserve charge-2 ${OWNER}`]);
+    expect(reports).toEqual([]);
+    // Remembered as any reading: the same text costs nothing again.
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
+    expect(events.filter((event) => event === "send")).toHaveLength(1);
+    // The breaker is untouched: the next person's call is reserved and sent.
+    expect((await port.read(OTHER_OWNER, QUESTION, null)).source).toBe("AI");
+    expect(events.filter((event) => event === "send")).toHaveLength(2);
+  });
+
+  it("0154: the re-ask's reservation refused after a first reply with no question to show: no questions for that request", async () => {
+    let reservations = 0;
+    const { port, events, reports } = ledgerOf({ replies: ["not json"], reserve: async () => { reservations += 1; if (reservations === 2) throw refusedOwner(); } });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
+    expect(events).toEqual([`reserve charge-1 ${OWNER}`, "send", `record charge-1 ${OWNER}`, `reserve charge-2 ${OWNER}`]);
+    expect(reports).toEqual(["REQUEST_OWNER_MISMATCH"]);
+  });
+
+  it("0154: a reservation that cannot be written for any other reason stops the calls as a record does: at once for a refusal every later one would meet, after three in a row otherwise", async () => {
+    const latching = ledgerOf({ reserve: async () => { throw Object.assign(new Error("no such function"), { code: "42883" }); } });
+    expect(await latching.port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
+    expect(await latching.port.read(OTHER_OWNER, "Another question?", null)).toEqual({ source: "NONE" });
+    expect(latching.events).toEqual([`reserve charge-1 ${OWNER}`]);
+    expect(latching.reports).toEqual(["RECORD_DOWN", "RECORD_DOWN"]);
+    const down = ledgerOf({ reserve: async () => { throw Object.assign(new Error("terminating connection"), { code: "57P01" }); } });
+    for (const at of [1, 2, 3, 4]) expect(await down.port.read(OWNER, `Question ${String(at)}?`, null)).toEqual({ source: "NONE" });
+    expect(down.events.filter((event) => event.startsWith("reserve"))).toHaveLength(3);
+    expect(down.events.filter((event) => event === "send")).toEqual([]);
+    expect(down.reports).toEqual(["RECORD_DOWN", "RECORD_DOWN", "RECORD_DOWN", "RECORD_DOWN"]);
+  });
+
+  it("0154: a refused reservation keeps the call it took from the person's limits, as any request that reaches a call does", async () => {
+    let refuse = true;
+    const reports: string[] = [];
+    let sends = 0;
+    const port = createAskClarify({ limits: { perHour: 2, perDay: 3 }, transportFor: () => async () => { sends += 1; return good; },
+      reserve: async () => { if (refuse) throw refusedOwner(); }, record: async () => undefined, clock: () => new Date(), report: (line) => reports.push(line.code) });
+    expect(await port.read(OWNER, "First question?", null)).toEqual({ source: "NONE" });
+    refuse = false;
+    expect((await port.read(OWNER, "Second question?", null)).source).toBe("AI");
+    // The hour's two are spent, the refused one among them: no third call.
+    expect(await port.read(OWNER, "Third question?", null)).toEqual({ source: "NONE" });
+    expect(reports).toEqual(["REQUEST_OWNER_MISMATCH", "RATE_LIMITED"]);
+    expect(sends).toBe(1);
+  });
+
+  it("0154: a charge id another person holds is refused (23505): the breaker counts it and does not latch on it at once", async () => {
+    const taken = () => Object.assign(new Error("ASK_CLARIFY_CHARGE_TAKEN"), { code: "23505" });
+    let refusals = 1;
+    const { port, events, reports } = ledgerOf({ reserve: async () => { if (refusals > 0) { refusals -= 1; throw taken(); } } });
+    expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
+    expect(reports).toEqual(["RECORD_DOWN"]);
+    // The next call is reserved and sent: one refusal is not three in a row, and 23505 is no refusal every later reservation would meet.
+    expect((await port.read(OTHER_OWNER, "Another question?", null)).source).toBe("AI");
+    expect(events.filter((event) => event.startsWith("reserve"))).toHaveLength(2);
+    expect(events.filter((event) => event === "send")).toHaveLength(1);
+  });
+
   it("the reference is one 0144's writer accepts", () => {
     const writer = /p_provider_ref !~ '([^']+)'/u.exec(readFileSync(resolve(import.meta.dirname, "../../migrations/0144_ask_clarify_charge.sql"), "utf8"))![1]!;
     expect(ASK_CLARIFY_SPEND_REF).toMatch(new RegExp(writer, "u"));
+  });
+});
+
+describe("0154: the reservations no charge takes", () => {
+  it("the API's sweep takes them in batches of 500 until one comes back short", async () => {
+    const limits: number[] = [];
+    const left = [500, 500, 7];
+    expect(await sweepAskClarifyReservations(async (limit) => { limits.push(limit); return left.shift() ?? 0; })).toBe(1007);
+    expect(limits).toEqual([500, 500, 500]);
+  });
+
+  it("one pass takes at most twenty batches, so a backlog never holds the timer; the next pass takes the rest", async () => {
+    let batches = 0;
+    expect(await sweepAskClarifyReservations(async (limit) => { batches += 1; return limit; })).toBe(10_000);
+    expect(batches).toBe(20);
+  });
+
+  it("a batch that fails ends the pass with its failure (the single-flight trigger logs one content-free line), and nothing after it runs", async () => {
+    let batches = 0;
+    await expect(sweepAskClarifyReservations(async () => { batches += 1; if (batches === 2) throw Object.assign(new Error("no such function"), { code: "42883" }); return 500; }))
+      .rejects.toThrow("no such function");
+    expect(batches).toBe(2);
+  });
+
+  it("runs hourly", () => {
+    expect(ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS).toBe(3_600_000);
   });
 });
 

@@ -16,16 +16,10 @@ describe("S04 threat report staff contract", () => {
     // Mutant: omit this page from SUPPORT_PAGE_ROUTES; changing its API path is a neighbour.
     expect(SUPPORT_PAGE_ROUTES).toContain("/admin/threat-reports");
   });
-  it("passes a retained email only to the prepared-erasure keep writer", async () => {
-    const accountId = randomUUID();
-    const seen: { sql: string; values: unknown[] | undefined }[] = [];
-    const repository = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) => {
-      seen.push({ sql, values });
-      return { rows: [{ report_ref: ref }] };
-    } } as never);
-    await expect(repository.keepWithHeldEmail("Kept question", accountId, "asker@example.test")).resolves.toBe(ref);
-    expect(seen).toEqual([{ sql: "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) report_ref",
-      values: ["Kept question", accountId, "asker@example.test"] }]);
+  it("keeps no report: the repository has no keeper since 0154 took 0128's two back from the API's runtime role", () => {
+    // Property: no product path keeps a threat report through the repository; only the database's own owner may call the keepers.
+    // Mutant: restore keepWithHeldEmail; a renamed list reader is a neighbour.
+    expect(Object.getOwnPropertyNames(PostgresThreatReportRepository.prototype).filter((name) => /^keep/u.test(name))).toEqual([]);
   });
 
   it("decrypts the live user's email with the user DEK and the identity AAD", async () => {

@@ -4,11 +4,15 @@ import type { MainAnswerUpdateRecord, MainAnswerUpdateRead, PathClimbNext, PathL
 import type { WebSealed } from "./web-evidence.js";
 
 /**
- * The public tree (migration 0147; plan 2026-10-31-r22-owner-changes decisions 13 and 22), through 0147's definers only. Every dig on a public debate, the
- * author's too, lives on the PUBLICATION (0137's identity.public_contribution), never in an investigation: an investigation goes with its first author's account.
- * `PostgresPublicTreeRepository` runs on the API's own pool (debateai_billing_runtime); `PostgresPublicTreeRunnerRepository` on the runner's pool
- * (debateai_runtime), whose `tree` side has the shape path-climb.ts asks of `PostgresTreeUpdateRunnerRepository`, with the public tree's rule: the
- * debate above may have no key left. `PostgresPublicPageRepository` is the API's sweep (debateai_runtime; the API's roles inherit it).
+ * The public tree (migration 0147; plan 2026-10-31-r22-owner-changes decisions 13 and 22), through 0147's definers only. Every dig on a public
+ * debate, the author's too, lives on the PUBLICATION (0137's identity.public_contribution), never in an investigation: an investigation goes with its
+ * first author's account. `PostgresPublicTreeRepository` runs on the API's own pool (debateai_billing_runtime); `PostgresPublicTreeRunnerRepository`
+ * on the runner's pool, whose `tree` side has the shape path-climb.ts asks of `PostgresTreeUpdateRunnerRepository`, with the public tree's rule: the
+ * debate above may have no key left. `PostgresPublicPageRepository` is the API's sweep, and its anonymous read. Since 0154 (the security review, F5)
+ * the readers, listers, marks and page writers here that take no owner need the cross-account marker (debateai_rls_all_accounts), which the runner,
+ * the scheduler and the API's system pool outside a request hold and the API's request login does not, and so do the runner's writers and turns of
+ * a public dig and the page sweep's report check: each class says which it needs. `readLine` (the API's own dig rewrite read too) and `readReports`
+ * (the public page's read) stay debateai_runtime's, which the API's roles inherit.
  */
 type Executor = Pick<Pool, "query"> | PoolClient;
 
@@ -41,7 +45,11 @@ export class PostgresPublicTreeRepository {
     return Object.freeze({ outcome: row.outcome, digLevel: row.dig_level });
   }
 
-  /** The public copy, sealed under `runId`'s key with PUBLIC_MATERIAL_CARRIER, the material id its binding. */
+  /**
+   * The public copy, sealed under `runId`'s key with PUBLIC_MATERIAL_CARRIER, the material id its binding. Since 0154 it is refused
+   * (REQUEST_OWNER_MISMATCH) unless it is a dig's copy keyed by the dig's own run, the connection's own, or a report's copy for a report still
+   * open on this publication and carrier that the connection's owner opened.
+   */
   async recordMaterial(materialId: string, runId: string, publicationRef: string, kind: "DIG" | "REPORT", sealed: WebSealed): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" }>(
       "SELECT identity.record_public_material($1,$2,$3,$4,$5::jsonb,$6) AS outcome",
@@ -73,7 +81,12 @@ export type PublicReportRecord = Readonly<{
 }>;
 const lineage = (value: Readonly<Record<string, unknown>> | null): string | null => value === null ? null : JSON.stringify(value);
 
-/** The runner's pool (debateai_runtime). `takeTurn`...`readClimbNext` are what path-climb.ts's `ports.tree` asks. */
+/**
+ * The runner's pool. `takeTurn`...`readClimbNext` are what path-climb.ts's `ports.tree` asks. Every method but `readLine` (debateai_runtime, the
+ * API's own dig rewrite read's too, which since 0154 hands a request only the rows of the connection's own runs) needs the cross-account marker
+ * (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's request login does not
+ * (0154): the public dig's input, turns, copies and report, and the sweeps' readers, listers and marks.
+ */
 export class PostgresPublicTreeRunnerRepository {
   constructor(private readonly pool: Executor) {}
 
@@ -112,7 +125,10 @@ export class PostgresPublicTreeRunnerRepository {
         record.content?.attestation ?? null])).rows[0]!.outcome;
   }
 
-  /** Every turn of a debate on a public tree, hidden ones marked, whether or not its own key still lives; null off a live publication's tree. */
+  /**
+   * Every turn of a debate on a public tree, hidden ones marked, whether or not its own key still lives, for a login that holds the cross-account
+   * marker (the runner's); in a request, only the rows of the connection's own runs (0154). Null off a live publication's tree.
+   */
   async readLine(runId: string): Promise<readonly PathLineEntry[] | null> {
     return (await this.pool.query<{ line: PathLineEntry[] | null }>("SELECT identity.read_public_path_line($1) AS line", [runId])).rows[0]?.line ?? null;
   }
@@ -172,7 +188,12 @@ export type PublicPageOwed = Readonly<{
 export type PublicReportOwed = Readonly<{ report_id: string; publication_ref: string; report_version: number; carrier_run_id: string; recorded_at: string; content: CryptoEnvelope }>;
 export type PublicReportCopyRead = Readonly<{ report_version: number; recorded_at: string; requested_at: string; writer: string | null; content: CryptoEnvelope }>;
 
-/** The API's sweep and its anonymous read (debateai_runtime; the API's roles inherit it). */
+/**
+ * The API's sweep and its anonymous read. The sweep's methods (`readChecksPassed`, `readPageOwed`, `readReportsOwed`, `recordReportCopy`,
+ * `recordSkip`, `recordReportCheck`, `readFreeOwner`) need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and
+ * the API's system pool outside a request hold and the API's request login does not (0154), so they run outside a request; `readReports` (the public
+ * page's read) stays debateai_runtime's, which the API's roles inherit.
+ */
 export class PostgresPublicPageRepository {
   constructor(private readonly pool: Executor) {}
 

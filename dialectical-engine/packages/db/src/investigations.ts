@@ -9,37 +9,23 @@ export * from "./investigation-reports.js";
  * server-side dig parent (joining writes 0131's dig link too), the person's ONE reserve, and the page texts' wipe on
  * closing and 30 days after the last activity. 0133's definers only; no table is read directly.
  *
- * Pools: `PostgresInvestigationRepository` on the API's own pool (debateai_billing_runtime), which also reaches the
- * runtime role's readers by membership; `PostgresInvestigationRunnerRepository` on the runner's or the scheduler's pool
- * (debateai_runtime).
+ * Pools: `PostgresInvestigationRepository` on the API's own pool (debateai_billing_runtime), which also reaches the runtime role's readers by
+ * membership; `PostgresInvestigationRunnerRepository` on the runner's or the scheduler's pool (debateai_runtime; `wipeInactivePageText`, the sweep's
+ * wipe, needs the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold
+ * and the API's request login does not, since 0154).
  *
  * What W3-2 and W5-1 must respect:
- * - The reserve is an event list; its state is the newest event (NONE, HELD, USED, RELEASED, BLOCKED). The database
- *   enforces only the order (one reserve: never HELD twice; USED and RELEASED only from HELD; BLOCKED never over HELD,
- *   with a reset ahead; HELD again after a BLOCKED only once its reset passed). WHEN to hold, release or block (credits
- *   left, which limit ran out, its reset) is decided by the room code from the windows, and recorded here.
- * - A closing is `close` (the investigation, the version, the wipe) and then a USED event naming that version.
+ * - A closing is `close` (the investigation, the version; since R22 decision 7 no wipe of every text).
  * - `wipeInactivePageText` is the scheduler's sweep (owner Q4: 30 days after the investigation's last activity, even
  *   while it is open). Call `touch` when the person acts on an investigation, so its texts stay while it is in use.
+ * - The security review (0154, F5): 0133's reserve writer and reader, its read of one investigation by its owner, its
+ *   first join, its first closing and its mark of a closing's report had no caller (0136's report writer marks the closing
+ *   as its owner) and are no role's any more, so nothing here offers them. The reserve's table stays (the data export
+ *   still reads its events), and the runner reads an investigation through `ofRun`.
  */
 type Executor = Pick<Pool, "query"> | PoolClient;
 
 export type JoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "CLOSED" | "CONFLICT" | "TOO_DEEP";
-export type ReserveState = "NONE" | "HELD" | "USED" | "RELEASED" | "BLOCKED";
-export type ReserveRead = Readonly<{
-  state: ReserveState;
-  /** The amount kept back (HELD only), in micros. */
-  heldMicros: number | null;
-  since: Date | null;
-  blockedWindow: "day" | "week" | "month" | null;
-  blockedUntil: Date | null;
-  openInvestigations: number;
-}>;
-export type ReserveEvent =
-  | Readonly<{ kind: "HELD"; amountMicros: number }>
-  | Readonly<{ kind: "USED"; investigationId: string; reportVersion: number }>
-  | Readonly<{ kind: "RELEASED" }>
-  | Readonly<{ kind: "BLOCKED"; window: "day" | "week" | "month"; until: Date }>;
 
 export type InvestigationRead = Readonly<{
   investigation_id: string; root_run_id: string; state: "open" | "closed"; opened_at: string; last_activity_at: string;
@@ -49,8 +35,6 @@ export type InvestigationRead = Readonly<{
   closings: readonly Readonly<{ report_version: number; closed_at: string; reopened_at: string | null;
     report_ref: string | null; report_written_at: string | null }>[];
 }>;
-
-const asNumber = (value: unknown): number | null => value === null || value === undefined ? null : Number(value);
 
 export class PostgresInvestigationRepository {
   constructor(private readonly pool: Executor) {}
@@ -94,26 +78,6 @@ export class PostgresInvestigationRepository {
     return (await this.pool.query<{ outcome: "REOPENED" | "ALREADY_OPEN" | "NOT_OWNED" }>(
       "SELECT identity.reopen_investigation($1,$2) AS outcome", [ownerRef, investigationId])).rows[0]!.outcome;
   }
-
-  async read(ownerRef: string, runId: string): Promise<InvestigationRead | null> {
-    return (await this.pool.query<{ investigation: InvestigationRead | null }>(
-      "SELECT identity.read_investigation($1,$2) AS investigation", [ownerRef, runId])).rows[0]?.investigation ?? null;
-  }
-
-  async recordReserveEvent(ownerRef: string, event: ReserveEvent): Promise<"RECORDED" | "NOT_ALLOWED" | "NOT_OWNED"> {
-    const values = [ownerRef, event.kind,
-      event.kind === "HELD" ? event.amountMicros : null,
-      event.kind === "USED" ? event.investigationId : null,
-      event.kind === "USED" ? event.reportVersion : null,
-      event.kind === "BLOCKED" ? event.window : null,
-      event.kind === "BLOCKED" ? event.until : null];
-    return (await this.pool.query<{ outcome: "RECORDED" | "NOT_ALLOWED" | "NOT_OWNED" }>(
-      "SELECT identity.record_reserve_event($1,$2,$3,$4,$5,$6,$7) AS outcome", values)).rows[0]!.outcome;
-  }
-
-  readReserve(ownerRef: string): Promise<ReserveRead> {
-    return readReserve(this.pool, ownerRef);
-  }
 }
 
 export class PostgresInvestigationRunnerRepository {
@@ -124,11 +88,6 @@ export class PostgresInvestigationRunnerRepository {
       "SELECT identity.read_investigation_of_run($1) AS investigation", [runId])).rows[0]?.investigation ?? null;
   }
 
-  async recordReport(investigationId: string, reportVersion: number, reportRef: string): Promise<"RECORDED" | "ALREADY" | "NO_CLOSING"> {
-    return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NO_CLOSING" }>(
-      "SELECT identity.record_investigation_report($1,$2,$3) AS outcome", [investigationId, reportVersion, reportRef])).rows[0]!.outcome;
-  }
-
   /**
    * The scheduler's sweep: at most `limit` texts whose investigation was idle more than 30 days, never of a debate that still
    * has open work or an investigation with a debate that has (0143: a paused debate needs them when it continues).
@@ -136,16 +95,4 @@ export class PostgresInvestigationRunnerRepository {
   async wipeInactivePageText(limit = 500): Promise<number> {
     return (await this.pool.query<{ wiped: number }>("SELECT identity.wipe_inactive_web_page_text_of_idle_debates($1) AS wiped", [limit])).rows[0]!.wiped;
   }
-
-  readReserve(ownerRef: string): Promise<ReserveRead> {
-    return readReserve(this.pool, ownerRef);
-  }
-}
-
-async function readReserve(pool: Executor, ownerRef: string): Promise<ReserveRead> {
-  const row = (await pool.query<{ state: ReserveState; held_micros: string | null; since: Date | null;
-    blocked_window: "day" | "week" | "month" | null; blocked_until: Date | null; open_investigations: number }>(
-    "SELECT * FROM identity.read_reserve($1)", [ownerRef])).rows[0]!;
-  return Object.freeze({ state: row.state, heldMicros: asNumber(row.held_micros), since: row.since,
-    blockedWindow: row.blocked_window, blockedUntil: row.blocked_until, openInvestigations: row.open_investigations });
 }

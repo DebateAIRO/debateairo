@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PoolClient } from "pg";
 // Test-only: loadMigrationPlan returns the real plan with its forward chain cut or extended while `chain.shape` is set
@@ -71,6 +72,8 @@ const PUBLIC_REVIEW = "0150_public_review.sql";
 const PUBLIC_FLAG = "0151_public_flag.sql";
 const REPORT_EXPORT = "0152_report_export_and_check_usage.sql";
 const DIG_TREE_SETTLED = "0153_dig_tree_settled.sql";
+/** The security review's fixes in the database: the chain's last step. */
+const SECURITY_REVIEW = "0154_security_review_hardening.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -103,42 +106,144 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(43);
-    expect(real.at(-24)).toBe(RLS);
-    expect(real.at(-23)).toBe(V4);
-    expect(real.at(-22)).toBe(WEB);
-    expect(real.at(-21)).toBe(INVESTIGATIONS);
-    expect(real.at(-20)).toBe(DIG_MODEL);
-    expect(real.at(-19)).toBe(DIG_PICKS);
-    expect(real.at(-18)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-17)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-16)).toBe(TREE_UPDATES);
-    expect(real.at(-15)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-14)).toBe(SPEND_KINDS);
-    expect(real.at(-13)).toBe(PATH_SUGGESTIONS);
-    expect(real.at(-12)).toBe(TEAM_LIMIT);
-    expect(real.at(-11)).toBe(RUN_HANDOVER);
-    expect(real.at(-10)).toBe(ASK_CLARIFY_CHARGE);
-    expect(real.at(-9)).toBe(WEB_RESEARCHED_UNSETTLED);
-    expect(real.at(-8)).toBe(TEAM_ALLOWANCES);
-    expect(real.at(-7)).toBe(PUBLIC_TREE);
-    expect(real.at(-6)).toBe(ERASURE_KEEPS_PUBLIC);
-    expect(real.at(-5)).toBe(PUBLIC_REPORT_TEAM_MONTH);
-    expect(real.at(-4)).toBe(PUBLIC_REVIEW);
-    expect(real.at(-3)).toBe(PUBLIC_FLAG);
-    expect(real.at(-2)).toBe(REPORT_EXPORT);
-    expect(real.at(-1)).toBe(DIG_TREE_SETTLED);
+    expect(real).toHaveLength(44);
+    expect(real.at(-25)).toBe(RLS);
+    expect(real.at(-24)).toBe(V4);
+    expect(real.at(-23)).toBe(WEB);
+    expect(real.at(-22)).toBe(INVESTIGATIONS);
+    expect(real.at(-21)).toBe(DIG_MODEL);
+    expect(real.at(-20)).toBe(DIG_PICKS);
+    expect(real.at(-19)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-18)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-17)).toBe(TREE_UPDATES);
+    expect(real.at(-16)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-15)).toBe(SPEND_KINDS);
+    expect(real.at(-14)).toBe(PATH_SUGGESTIONS);
+    expect(real.at(-13)).toBe(TEAM_LIMIT);
+    expect(real.at(-12)).toBe(RUN_HANDOVER);
+    expect(real.at(-11)).toBe(ASK_CLARIFY_CHARGE);
+    expect(real.at(-10)).toBe(WEB_RESEARCHED_UNSETTLED);
+    expect(real.at(-9)).toBe(TEAM_ALLOWANCES);
+    expect(real.at(-8)).toBe(PUBLIC_TREE);
+    expect(real.at(-7)).toBe(ERASURE_KEEPS_PUBLIC);
+    expect(real.at(-6)).toBe(PUBLIC_REPORT_TEAM_MONTH);
+    expect(real.at(-5)).toBe(PUBLIC_REVIEW);
+    expect(real.at(-4)).toBe(PUBLIC_FLAG);
+    expect(real.at(-3)).toBe(REPORT_EXPORT);
+    expect(real.at(-2)).toBe(DIG_TREE_SETTLED);
+    expect(real.at(-1)).toBe(SECURITY_REVIEW);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All forty-three real steps were applied by that same run and stay committed; the probe left nothing.
+    // All forty-four real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(43);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(44);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
     await migrate(db.pool);
     expect(await receipts()).toEqual(real);
+  }, 300_000);
+});
+
+/**
+ * Security review F2 (0154): a dig is known by its own row (identity.dig_run), which every dig's run is created with from 0154 on. A dig made before
+ * the step has only the records it left (its link to its parent, its place in an investigation under its parent, its picks, its public
+ * contribution), and its parent's erasure takes the first two, so the step marks each such dig as it applies, by its run's owner now, leaving out a
+ * run that was erased and an owner that is gone. Nothing published is touched (the operator's step, migrations/lineage/README.md).
+ */
+describe("0154's backfill: a dig made before the step has its own row after it, and stays a dig when its parent is erased", () => {
+  let seq = 8_800_000;
+  beforeAll(async () => {
+    db = await startTestDatabase();
+    chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SECURITY_REVIEW));
+    try { await migrate(db.pool); } finally { chain.shape = undefined; }
+    expect(await ledger()).toContain(DIG_TREE_SETTLED);
+    expect(await ledger()).not.toContain(SECURITY_REVIEW);
+  }, 300_000);
+  afterAll(async () => { await db?.stop(); });
+
+  /** Rows as the steps before 0154 left them, written past their guards and keys (the tests' own seeding). */
+  async function seeded(statements: ReadonlyArray<readonly [string, readonly unknown[]]>): Promise<void> {
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL session_replication_role = 'replica'");
+      for (const [sql, values] of statements) await client.query(sql, [...values]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
+  async function account(): Promise<string> {
+    const userId = randomUUID();
+    await db.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
+      VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `backfill-${userId}`]);
+    return (await db.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
+  }
+  /** A debate of `owner`'s (any id: an erased account's owner too), as its run row and its ownership event. */
+  async function debate(owner: string): Promise<string> {
+    const runId = randomUUID();
+    seq += 1;
+    await seeded([[`INSERT INTO core.run
+        (run_id,question_line,asker_id,session_id,caller_scope,as_of,asker_risk_tier,risk_tier,tier_source,tier_provenance_ref,composition_budget_tier,
+         depth_params,agent_count,discovered_panel,stranger_sample_rate,envelope_basis,register_version,battery_version,ask_contract,created_at_seq,
+         question_blind_index_version,content_encryption_version)
+        VALUES ($1,'Fixture question',$2,$3,'ASKER',now(),'standard','standard','ASKER','fixture','low','{}'::jsonb,2,'[{},{}]'::jsonb,0,'{}'::jsonb,1,
+         'fixture','{}'::jsonb,$4,1,1)`, [runId, `owner:${owner}`, randomUUID(), seq]],
+      ["INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq) VALUES ($1,$2,$3)", [runId, owner, seq]]]);
+    return runId;
+  }
+  const marks = async (): Promise<ReadonlyArray<Readonly<{ run_id: string; owner_ref: string }>>> =>
+    (await db.pool.query<{ run_id: string; owner_ref: string }>("SELECT run_id::text, owner_ref::text FROM identity.dig_run ORDER BY run_id")).rows;
+  const isDig = async (runId: string): Promise<boolean> =>
+    (await db.pool.query<{ dig: boolean }>("SELECT identity.run_is_dig($1) AS dig", [runId])).rows[0]!.dig;
+
+  it("marks the link-only, member-only, picks and public digs by their run's owner now, leaves out an erased run and a gone owner, and the marks outlive the parent", async () => {
+    const owner = await account();
+    const heir = await account();
+    const parent = await debate(owner);
+    const [linked, member, picked, contributed, erased, handedOver] = await Promise.all([debate(owner), debate(owner), debate(owner), debate(owner),
+      debate(owner), debate(owner)]);
+    const orphaned = await debate(randomUUID());
+    const investigationId = randomUUID();
+    const publicationRef = randomUUID();
+    seq += 1;
+    await seeded([
+      // A dig whose link alone was written (the page's own call after a join that did not take), and one whose link was all it had, then erased.
+      ...[linked, erased].map((dig) => ["INSERT INTO identity.dig_link (child_run_id,owner_ref,parent_run_id,places,mode) VALUES ($1,$2,$3,'{}','quick')",
+        [dig, owner, parent]] as const),
+      ["INSERT INTO serve.private_run_erasure_tombstone (run_id,completed_at,destroyed_key_count,already_absent_key_count) VALUES ($1,clock_timestamp(),1,0)", [erased]],
+      // A dig that is a member of its parent's investigation alone.
+      ["INSERT INTO identity.investigation (investigation_id,owner_ref,root_run_id,state) VALUES ($1,$2,$3,'open')", [investigationId, owner, parent]],
+      ["INSERT INTO identity.investigation_member (run_id,investigation_id,owner_ref) VALUES ($1,$2,$3)", [parent, investigationId, owner]],
+      ["INSERT INTO identity.investigation_member (run_id,investigation_id,owner_ref,parent_run_id,mode) VALUES ($1,$2,$3,$4,'quick')", [member, investigationId, owner, parent]],
+      // A dig with its picks, and one whose picks stayed when its run changed hands since (its row names its owner now).
+      ...[picked, handedOver].map((dig) => ["INSERT INTO identity.dig_pick_set (run_id,owner_ref,parent_run_id,pick_count) VALUES ($1,$2,$3,0)", [dig, owner, parent]] as const),
+      ["INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq) VALUES ($1,$2,$3)", [handedOver, heir, seq]],
+      // A public dig whose contribution was written, and one whose account was erased since (0137 sets the contribution's owner to none).
+      ["INSERT INTO identity.public_contribution (dig_run_id,owner_ref,publication_ref,root_run_id,parent_run_id) VALUES ($1,$2,$3,$4,$4)", [contributed, owner, publicationRef, parent]],
+      ["INSERT INTO identity.public_contribution (dig_run_id,owner_ref,publication_ref,root_run_id,parent_run_id) VALUES ($1,NULL,$2,$3,$3)", [orphaned, publicationRef, parent]]
+    ]);
+    // The step applies over them.
+    await migrate(db.pool);
+    expect(await ledger()).toContain(SECURITY_REVIEW);
+    const expected = [...[linked, member, picked, contributed].map((run_id) => ({ run_id, owner_ref: owner })), { run_id: handedOver, owner_ref: heir }]
+      .sort((left, right) => left.run_id.localeCompare(right.run_id));
+    expect(await marks()).toEqual(expected);
+    expect([await isDig(parent), await isDig(orphaned)]).toEqual([false, true]);
+    // The parent erased as a deletion finishes it: its tombstone, then its per-debate forgets, which take its links and its investigation.
+    await seeded([["INSERT INTO serve.private_run_erasure_tombstone (run_id,completed_at,destroyed_key_count,already_absent_key_count) VALUES ($1,clock_timestamp(),1,0)", [parent]]]);
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const forget of ["page_memory", "investigation"]) await client.query(`SELECT identity.forget_erased_debate_${forget}($1)`, [parent]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    expect(Number((await db.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.dig_link WHERE parent_run_id=$1", [parent])).rows[0]!.n)).toBe(0);
+    expect(Number((await db.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.investigation_member WHERE run_id=$1", [member])).rows[0]!.n)).toBe(0);
+    for (const dig of [linked, member, picked, contributed, handedOver]) expect(await isDig(dig), dig).toBe(true);
+    // Applied again (the next migrate()), nothing moves.
+    await migrate(db.pool);
+    expect(await marks()).toEqual(expected);
   }, 300_000);
 });
 
@@ -175,6 +280,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     expect(await ledger()).not.toContain(PUBLIC_REVIEW);
     expect(await ledger()).not.toContain(PUBLIC_FLAG);
     expect(await ledger()).not.toContain(DIG_TREE_SETTLED);
+    expect(await ledger()).not.toContain(SECURITY_REVIEW);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 

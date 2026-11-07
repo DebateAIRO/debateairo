@@ -190,10 +190,12 @@ describe("side-by-side §9, C10: a set-aside debate uses none of the person's qu
       .toEqual([{ reason: "BACKSTOP" }]);
   });
 
-  it("row-level security (0126): the same roles with no account context read none of the window and write no waiver", async () => {
+  it("row-level security (0126): the same roles with no account context are refused the person's window and write no waiver", async () => {
     // The control on the runner's login: the person's window holds the second run's 200 (the first is waived).
     expect(await new PostgresModelSpendStore(runner).readOwnerSpentMicros(ownerRef, from, to)).toBe(200);
-    expect(await new PostgresModelSpendStore(bare).readOwnerSpentMicros(ownerRef, from, to)).toBe(0);
+    // Its runs' rows are hidden (0126), and 0154's spend totals in it refuse a connection that is not the person's: a window that caps is never read
+    // as nothing spent.
+    expect(await refusalCode(new PostgresModelSpendStore(bare).readOwnerSpentMicros(ownerRef, from, to))).toBe("42501");
     const runId = await subscriptionRun(ownerRef, new Date());
     expect(await refusalCode(recordSpendWaiver(bare, runId, "BACKSTOP"))).toBe("42501");
     expect((await database.pool.query("SELECT count(*)::int AS n FROM ledger.model_spend_waiver WHERE run_id=$1", [runId])).rows[0].n)

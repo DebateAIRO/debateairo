@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BillingJobQueries, BillingRepository, migrate } from "@debateai/db";
+import { BillingJobQueries, BillingRepository, createPool, migrate } from "@debateai/db";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { recordingAudit } from "../support/billingSubscriptionFixtures.js";
 import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
@@ -37,18 +38,26 @@ describe("P16c scheduling on real PostgreSQL", () => {
     expect(await rowsFor("RETENTION_PURGE")).toEqual([]);
   });
 
-  it("purges as the API's own role, with no billing composed at all", async () => {
-    // The main pool's principal (api-runtime: debateai_billing_runtime since 0093, which inherits debateai_runtime)
-    // runs both functions; nothing of the billing runtime is needed.
+  it("purges as the API's system login, with no billing composed at all", async () => {
+    // The main pool's timer runs outside any request, so on its system login (api-system: debateai_billing_runtime since 0093, which inherits
+    // debateai_runtime, and 0130's cross-account marker, which 0080's legal purge needs since 0154); nothing of the billing runtime is needed.
+    const system = createPool(await createSystemTwin(database, "p16c_system", ["debateai_billing_runtime"]));
+    try {
+      const counts = await createRetentionPurge({
+        pool: system, clock: () => new Date(), log: () => undefined
+      }).run();
+      expect(counts).toEqual({ legal: 0, records: 0 });
+    } finally {
+      await system.end();
+    }
     const client = await database.pool.connect();
     try {
+      // 0154: the request login's billing role alone may not run the legal purge any more; billing's stays its own.
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_billing_runtime");
-      const counts = await createRetentionPurge({
-        pool: client, clock: () => new Date(), log: () => undefined
-      }).run();
-      await client.query("COMMIT");
-      expect(counts).toEqual({ legal: 0, records: 0 });
+      await expect(client.query("SELECT legal.purge_expired_acceptance(clock_timestamp())"))
+        .rejects.toMatchObject({ code: "42501" });
+      await client.query("ROLLBACK");
       // Go-live row 41: the role the runner and the liveness sweep hold cannot run billing's purge.
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_runtime");

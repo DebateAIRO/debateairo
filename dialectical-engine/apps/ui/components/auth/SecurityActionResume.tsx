@@ -143,9 +143,10 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
             if (active.current) {
                 setProof(null);
                 if (asksReview) {
+                    // Security review F2 (0154): a dig is never put in the team's queue; the page says the ask is not allowed.
                     const key = failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_REVIEW_PENDING'
                         ? 'public.publicationReview.pendingError'
-                        : failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_REVIEW_NOT_ALLOWED'
+                        : failure instanceof ContractHttpError && (failure.serverCode === 'PUBLICATION_REVIEW_NOT_ALLOWED' || failure.serverCode === 'DIG_NOT_PUBLISHABLE')
                             ? 'public.publicationReview.notAllowed'
                             : failure instanceof ContractHttpError && failure.status === 404
                                 ? 'public.publication.changeUnauthorized'
@@ -160,6 +161,10 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                 }
                 if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_APPROVAL_REQUIRED') {
                     setStatus(t(publicCatalog, 'public.publication.approvalRequired'));
+                }
+                // Security review F2 (0154): a dig is never published; a resumed publish of one is no failed proof.
+                else if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'DIG_NOT_PUBLISHABLE') {
+                    setStatus(t(publicCatalog, 'public.publication.statusUnavailable'));
                 }
                 else if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.statement) {
                     setStatement(failure.statement);

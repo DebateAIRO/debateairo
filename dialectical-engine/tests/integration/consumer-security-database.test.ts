@@ -2,8 +2,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, type Pool } from '@debateai/db';
 import { hashToken } from '@debateai/crypto';
+import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 let database: TestDatabase, runtime: Pool;
+/** 0154: the notice loop is the cross-account marker's, which the authorization pool's system login holds (the API's erasure reconciler's timer). */
+let system: Pool;
 const source = { ipArgon2id: 'argon2id-audit:v1:' + 'ab'.repeat(32), userAgentArgon2id: 'argon2id-audit:v1:' + 'cd'.repeat(32) };
 const fixturePasswordHash = '$argon2id$v=19$m=65536,t=3,p=1$' + Buffer.alloc(16, 1).toString('base64').replace(/=/g, '') + '$' + Buffer.alloc(32, 1).toString('base64').replace(/=/g, '');
 const token = () => randomBytes(32).toString('base64url');
@@ -41,8 +44,8 @@ async function grant(a: Awaited<ReturnType<typeof account>>, factor: string) {
     await database.pool.query(`INSERT INTO identity.step_up_grant(step_up_grant_id,token_hash,session_id,user_id,action,target_account_id,target_factor_id,issued_at,expires_at) VALUES($1,$2,$3,$4,'REMOVE_AUTH_METHOD',$4,$5,statement_timestamp(),statement_timestamp()+interval '5 minutes')`, [randomUUID(), hashToken('step-up-grant', value), a.sessionId, a.userId, factor]);
     return hashToken('step-up-grant', value);
 }
-beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); await database.pool.query("CREATE ROLE security_test_runtime LOGIN PASSWORD 'security-test-only' IN ROLE debateai_authorization_runtime"); const url = new URL(database.connectionString); url.username = 'security_test_runtime'; url.password = 'security-test-only'; runtime = createPool(url.toString()); }, 120000);
-afterAll(async () => { await runtime?.end(); await database?.stop(); });
+beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); await database.pool.query("CREATE ROLE security_test_runtime LOGIN PASSWORD 'security-test-only' IN ROLE debateai_authorization_runtime"); const url = new URL(database.connectionString); url.username = 'security_test_runtime'; url.password = 'security-test-only'; runtime = createPool(url.toString()); system = createPool(await createSystemTwin(database, 'security_test_system', ['debateai_authorization_runtime'])); }, 120000);
+afterAll(async () => { await runtime?.end(); await system?.end(); await database?.stop(); });
 describe('consumer security execute-only authority', () => {
     it('serializes two removals and preserves exactly one viable ordinary sign-in path', async () => {
         const a = await account();
@@ -85,12 +88,15 @@ describe('consumer security execute-only authority', () => {
     it('claims bounded verified-channel notices and preserves a newer coalesced event on old acknowledgement', async () => {
         const a = await account();
         await mutation('remove_consumer_auth_method', { ...a, factorId: a.factors[0], grantHash: await grant(a, a.factors[0]!) });
-        const claimed = (await runtime.query('SELECT * FROM identity.claim_consumer_security_notices(100)')).rows.find(x => x.user_id === a.userId);
+        // The authorization request login, with no session, is refused the loop; its system login drains it.
+        await expect(runtime.query('SELECT * FROM identity.claim_consumer_security_notices(100)')).rejects.toMatchObject({ code: '42501' });
+        const claimed = (await system.query('SELECT * FROM identity.claim_consumer_security_notices(100)')).rows.find(x => x.user_id === a.userId);
         expect(claimed).toBeTruthy();
         await database.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query("SELECT identity.enqueue_consumer_security_notice_internal($1,'METHOD_CHANGED')", [a.userId]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
-        expect((await runtime.query('SELECT identity.ack_consumer_security_notice($1,$2) value', [claimed.notice_id, claimed.claim_token])).rows[0].value).toBe(true);
+        await expect(runtime.query('SELECT identity.ack_consumer_security_notice($1,$2) value', [claimed.notice_id, claimed.claim_token])).rejects.toMatchObject({ code: '42501' });
+        expect((await system.query('SELECT identity.ack_consumer_security_notice($1,$2) value', [claimed.notice_id, claimed.claim_token])).rows[0].value).toBe(true);
         expect((await database.pool.query('SELECT count(*)::int n FROM identity.consumer_security_notice WHERE user_id=$1', [a.userId])).rows[0].n).toBe(1);
-        await expect(runtime.query('SELECT * FROM identity.claim_consumer_security_notices(101)')).rejects.toThrow();
+        await expect(system.query('SELECT * FROM identity.claim_consumer_security_notices(101)')).rejects.toThrow();
     });
     it('refuses an unconsumed grant after a later session-token generation replaces its issuing generation', async () => {
         const a = await account(), grantHash = await grant(a, a.factors[0]!);

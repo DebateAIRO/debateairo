@@ -67,7 +67,7 @@ import { questionLanguageSiteRoute } from "../../apps/api/src/question-language/
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import { PostgresAskAdmissionGate, settingsVersionPassed } from "../../apps/api/src/release-state.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
-import { recordAskClarifyCharge } from "@debateai/budget";
+import { recordAskClarifyCharge, reserveAskClarifyCharge } from "@debateai/budget";
 import { closingReservesOf, readAbuseLimits } from "@debateai/register";
 import { sweepInvestigationClosings } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
@@ -255,7 +255,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     transportFor: askClarifyTransportFor(await questionLanguageSiteRoute({ mode: environment.DEPLOYMENT_MODE, policy: ASK_CLARIFY_ROUTE_POLICY, dayCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros,
       previewGate: gate, previewFetch, readCredential: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, spend: { writerPresent: async () => true, record: async () => undefined },
       daySpentMicros: (day: string) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day), report: () => undefined } as never)),
-    record: (entry) => recordAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
+    record: (entry) => recordAskClarifyCharge(apiPool, entry), reserve: (entry) => reserveAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
   const api: FastifyInstance = buildApi({
     questionCheck: questionCheckPass, previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds, application, sessions, allowedOrigin: TEST_APP_ORIGIN,
     stories: new RepositoryAnswerStoryApplication(storyRepository), disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(apiPool)), mapViews, accountMemory,
@@ -265,7 +265,8 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     webResearched: { record: (ownerRef: string, runId: string, pageId: string) => new PostgresWebResearchedRepository(apiPool).record(ownerRef, runId, pageId),
       markActivity: async (ownerRef: string, runId: string) => { if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId); } },
     digPicks: new PostgresDigPicksRepository(apiPool), purposeLines: postgresPurposeLines(apiPool),
-    publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), judge: () => flagJudge,
+    // The settlement on the same pool: the harness's login is a superuser, so it holds the cross-account marker that 0154 makes it need (main.ts: X29).
+    publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), settlement: new PostgresPublicFlagRepository(apiPool), judge: () => flagJudge,
       seal: (ref: string, runId: string, value: unknown) => publications.withReviewKey(ref, runId, (each) => each.encrypt(value)), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     publicTree: { pool: apiPool, tree: new PostgresPublicTreeRepository(apiPool), contributions: new PostgresPublicDebateRepository(apiPool), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     askClarify, monthRoom: askRoom,

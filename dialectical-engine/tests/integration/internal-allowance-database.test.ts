@@ -36,13 +36,33 @@ async function owner() {
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE task10_runtime LOGIN PASSWORD 'task10-private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");
+  // With 0130's cross-account marker: since 0154 the funded run's admission and settlement, its pin and the funding and grant readers ask the
+  // connection, and this login stands for their callers that name an account with no session, the runner's login and the API's system login
+  // (P3-01's runner-runtime and api-system), which hold the marker; a request login answers only for its own session's account
+  // (tests/integration/security-review-hardening-database.test.ts).
+  await database.pool.query("CREATE ROLE task10_runtime LOGIN PASSWORD 'task10-private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime,debateai_rls_all_accounts");
   const url = new URL(database.connectionString);
   url.username = "task10_runtime";
   url.password = "task10-private-fixture-only";
   runtime = createPool(url.toString());
 }, 120000);
 afterAll(async () => { await runtime?.end(); await database?.stop(); });
+/**
+ * One statement as the API's system login (P3-01's api-system: the billing runtime plus 0130's cross-account marker), in a
+ * transaction of its own; the shape is built for that transaction only and rolled back with it.
+ */
+async function asApiSystem(statement: string, values: unknown[]): Promise<Record<string, unknown>> {
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("CREATE ROLE task10_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
+    await client.query("SET LOCAL ROLE task10_api_system");
+    return (await client.query(statement, values)).rows[0]!;
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+}
 
 describe("internal funding is explicit database policy, never a staff role effect", () => {
   it("returns no enabled funding policy before explicit sealed selection", async () => {
@@ -54,7 +74,8 @@ describe("internal funding is explicit database policy, never a staff role effec
     const actor = await owner();
     const context = (await runtime.query("SELECT staff.read_context($1,$2,$3) AS context", [actor.userId, actor.sessionId, hash(actor.privilegeId)])).rows[0].context;
     expect(context.capabilities).toEqual(coreCapabilities);
-    expect((await runtime.query("SELECT staff.authorize_action($1::jsonb,'ALLOWANCE_WRITE') AS allowed", [context])).rows[0].allowed).toBe(false);
+    // 0154: the capability check is the cross-account marker's (the staff repository's site X14), so it is asked as the API's system login.
+    expect((await asApiSystem("SELECT staff.authorize_action($1::jsonb,'ALLOWANCE_WRITE') AS allowed", [context])).allowed).toBe(false);
     expect((await database.pool.query("SELECT count(*)::int AS count FROM billing.internal_grant")).rows[0].count).toBe(0);
   });
 

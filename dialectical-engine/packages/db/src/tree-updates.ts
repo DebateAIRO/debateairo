@@ -4,8 +4,10 @@ import type { WebSealed } from "./web-evidence.js";
 import type { PathFate, PathRewriteRecord } from "./dig-model.js";
 
 /**
- * Tree updates, main-answer updates and purpose lines (migration 0138; plan 2026-10-31-r22-owner-changes decisions 2, 3, 5), through
- * 0138's definers only. `PostgresTreeUpdateRunnerRepository` runs on the runner's pool (debateai_runtime);
+ * Tree updates, main-answer updates and purpose lines (migration 0138; plan 2026-10-31-r22-owner-changes decisions 2, 3, 5), through 0138's definers
+ * only. `PostgresTreeUpdateRunnerRepository` runs on the runner's pool (since 0154 its writers, its mark, its turns and `readClimbNext` need the
+ * cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's request login
+ * does not; the readers the API's answer read calls too, `readLine`, `readMainAnswers` and `readPurposeLines`, stay debateai_runtime's);
  * `PostgresTreeUpdateRepository` on the API's own pool (debateai_billing_runtime).
  *
  * What the Tree lane must respect:
@@ -18,6 +20,10 @@ import type { PathFate, PathRewriteRecord } from "./dig-model.js";
  * - `recordMainAnswer` writes the answer's new version under the ROOT's key, `MAIN_ANSWER_UPDATE_CARRIER`; charged ANSWER_UPDATE on the
  *   triggering dig's run, `paidByOwnerRef` the digger's. BASE_MOVED: a newer version came, rebuild on it.
  * - `recordPurposeLines` at the ask, sealed under the run's key, `RUN_PURPOSE_LINES_CARRIER`, bound to the run's id; a dig reads its root's.
+ * - The security review (0154, F5): 0138's owner readers of a path's line and of the main answer's versions, and its public closing and
+ *   reopening, had no caller (the runner and the answer read use the no-owner readers, and 0147's public report took the closing's place);
+ *   they are no role's any more, and nothing here offers them. The climb's turns and records and `recordMainAnswer` are the cross-account
+ *   marker's now, as the runner's.
  */
 type Executor = Pick<Pool, "query"> | PoolClient;
 
@@ -71,7 +77,7 @@ export type MainAnswerUpdateRead = Readonly<{
 
 const lineage = (value: Readonly<Record<string, unknown>> | null): string | null => value === null ? null : JSON.stringify(value);
 
-/** Runner / scheduler pool (debateai_runtime). */
+/** Runner pool (the cross-account marker since 0154, but `readLine`, `readMainAnswers` and `readPurposeLines`: debateai_runtime). */
 export class PostgresTreeUpdateRunnerRepository {
   constructor(private readonly pool: Executor) {}
 
@@ -112,7 +118,7 @@ export class PostgresTreeUpdateRunnerRepository {
         record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!.outcome;
   }
 
-  /** A live debate's paths, every turn in order, a public dig the check has not allowed marked; null when not live. */
+  /** A live debate's paths, every turn in order, a public dig the check has not allowed marked; null when not live or, in a request, not the connection's own (0154). */
   async readLine(runId: string): Promise<readonly PathLineEntry[] | null> {
     return (await this.pool.query<{ line: PathLineEntry[] | null }>("SELECT identity.read_path_line_of_run($1) AS line", [runId])).rows[0]?.line ?? null;
   }
@@ -137,16 +143,10 @@ export class PostgresTreeUpdateRunnerRepository {
       "SELECT identity.read_main_answer_updates_of_run($1) AS updates", [runId])).rows[0]?.updates ?? null;
   }
 
-  /** The debate's sealed purpose lines; null when it has none (an old debate) or is not live. */
+  /** The debate's sealed purpose lines; null when it has none (an old debate), is not live or, in a request, is not the connection's own (0154). */
   async readPurposeLines(runId: string): Promise<CryptoEnvelope | null> {
     return (await this.pool.query<{ lines: CryptoEnvelope | null }>(
       "SELECT identity.read_run_purpose_lines_of_run($1) AS lines", [runId])).rows[0]?.lines ?? null;
-  }
-
-  /** The report of that closing is written: the public debate opens again. */
-  async reopenPublic(investigationId: string, reportVersion: number): Promise<"REOPENED" | "NOT_WRITTEN" | "ALREADY_OPEN"> {
-    return (await this.pool.query<{ outcome: "REOPENED" | "NOT_WRITTEN" | "ALREADY_OPEN" }>(
-      "SELECT identity.reopen_public_investigation($1,$2) AS outcome", [investigationId, reportVersion])).rows[0]!.outcome;
   }
 }
 
@@ -160,26 +160,8 @@ export class PostgresTreeUpdateRepository {
       [ownerRef, runId, JSON.stringify(sealed.envelope), sealed.attestation])).rows[0]!.outcome;
   }
 
-  /** The debate's paths for its owner, without a public dig the check did not allow; null when it is not theirs. */
-  async readLine(ownerRef: string, runId: string): Promise<readonly PathLineEntry[] | null> {
-    return (await this.pool.query<{ line: PathLineEntry[] | null }>("SELECT identity.read_path_line($1,$2) AS line", [ownerRef, runId])).rows[0]?.line ?? null;
-  }
-
-  async readMainAnswers(ownerRef: string, runId: string): Promise<readonly MainAnswerUpdateRead[] | null> {
-    return (await this.pool.query<{ updates: MainAnswerUpdateRead[] | null }>(
-      "SELECT identity.read_main_answer_updates($1,$2) AS updates", [ownerRef, runId])).rows[0]?.updates ?? null;
-  }
-
   async readPurposeLines(ownerRef: string, runId: string): Promise<CryptoEnvelope | null> {
     return (await this.pool.query<{ lines: CryptoEnvelope | null }>(
       "SELECT identity.read_run_purpose_lines($1,$2) AS lines", [ownerRef, runId])).rows[0]?.lines ?? null;
-  }
-
-  /** "Write my report" on a public debate, by anyone with credit, while nothing is ongoing. */
-  async closePublic(ownerRef: string, investigationId: string): Promise<Readonly<{
-    outcome: "CLOSED" | "ALREADY_CLOSED" | "NOT_PUBLIC" | "ONGOING"; reportVersion: number | null }>> {
-    const row = (await this.pool.query<{ outcome: "CLOSED" | "ALREADY_CLOSED" | "NOT_PUBLIC" | "ONGOING"; report_version: number | null }>(
-      "SELECT outcome,report_version FROM identity.close_public_investigation($1,$2)", [ownerRef, investigationId])).rows[0]!;
-    return Object.freeze({ outcome: row.outcome, reportVersion: row.report_version });
   }
 }

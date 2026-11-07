@@ -380,6 +380,68 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     }
   });
 
+  // Security review F2 (0154): a dig is marked a dig by the statement that creates its run (0123's writer, patched by 0154), so nothing that
+  // happens after the run is written can leave it unmarked. The mark is one member of the run's document, sent for a dig alone; a legacy asker's
+  // run is written in the clear by no such statement, so a dig of one is refused before anything is asked of the database.
+  it("sends a dig's mark in the document that creates its run, only for a dig, and refuses a legacy asker's dig before any query", async () => {
+    const created: string[] = [];
+    const dataPool = { query: async () => { throw new Error("UNEXPECTED_DATA_POOL_QUERY"); } };
+    const provisionPool = {
+      query: async (statement: string, values?: readonly unknown[]) => {
+        if (statement.includes("prepare_run_key_provision")) return { rows: [{ execution_ref: "55555555-5555-4555-8555-555555555555" }] };
+        if (statement.includes("create_encrypted_run")) {
+          created.push(String(values?.[0]));
+          return { rows: [{ created: true, plan_tier_supported: true, argument_language_supported: true }] };
+        }
+        throw new Error(`UNEXPECTED_PROVISION_QUERY:${statement}`);
+      }
+    };
+    configureContentEncryption(dataPool as never, {
+      provisionRun: async () => undefined,
+      destroyRunKey: async () => undefined,
+      prepareRun: async () => ({
+        encrypt: () => ({ v: 1, alg: "A256GCM", nonce: "AA==", ct: "AA==", tag: "AA==" }),
+        attestEnvelope: () => Buffer.alloc(32),
+        databaseAttestationSecret: () => Buffer.alloc(32),
+        close: () => undefined
+      })
+    } as never);
+    const runs = new RunRepository(dataPool as never, provisionPool as never);
+    const input = {
+      questionLine: "Is the dig marked as it is written?",
+      principal: { kind: "server" as const, userId: "66666666-6666-4666-8666-666666666666", ownerRef: "77777777-7777-4777-8777-777777777777" },
+      sessionId: "88888888-8888-4888-8888-888888888888",
+      callerScope: "ASKER" as const,
+      asOf: new Date("2026-11-04T00:00:00.000Z"),
+      askerRiskTier: "casual" as const,
+      effectiveRiskTier: "casual" as const,
+      tierSource: "ASKER" as const,
+      tierProvenanceRef: "test:dig-mark",
+      compositionBudgetTier: "low" as const,
+      planTier: "free" as const,
+      depthParams: { depth: 1 },
+      discoveredPanel: rosterPanel("free"),
+      strangerSampleRate: 0,
+      envelopeBasis: { max_model_attempts: 1 },
+      registerVersion: 1,
+      batteryVersion: "battery:test",
+      batteryRows: []
+    };
+    await runs.startRun({ ...input, digRun: true });
+    await runs.startRun(input);
+    expect(created).toHaveLength(2);
+    expect(JSON.parse(created[0]!)).toMatchObject({ digRun: true });
+    // A debate dug from nothing sends the document it always sent: no mark, not even a false one.
+    expect(Object.keys(JSON.parse(created[1]!) as object)).not.toContain("digRun");
+    const { digRun: _mark, ...undug } = JSON.parse(created[0]!) as Record<string, unknown>;
+    expect(Object.keys(undug)).toEqual(Object.keys(JSON.parse(created[1]!) as object));
+    // A legacy asker's dig: refused before any query (the data pool throws on any).
+    await expect(new RunRepository(dataPool as never, dataPool as never).startRun({
+      ...input, principal: { kind: "legacy", legacyAskerId: "legacy-dig-mark" }, digRun: true
+    })).rejects.toMatchObject({ code: "RUN_DIG_REQUIRES_OWNER" });
+    expect(created).toHaveLength(2);
+  });
+
   it("maps ask-boundary domain refusals to 422 with their real code and message", async () => {
     const application = fixtureApplication();
     application.submit = async () => {

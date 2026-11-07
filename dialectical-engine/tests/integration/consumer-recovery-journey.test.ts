@@ -19,6 +19,8 @@ let db: TestDatabase, runtime: Pool, p2Runtime: Pool, argon2: Argon2WorkerPool, 
 // Row-level security (0126; D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own
 // login with that request's account context; outside one, or inside a crossAccount frame (X18a), on its system twin.
 let runtimeSystem: Pool, scopedRuntime: Pool;
+// The security review's 0154: a recovery's proof, its stored proof and a passkey's stored credential and sign-in are the system login's (X36), so
+// the consumer recovery and passkey repositories run on the routed pool, as main.ts builds them on the authorization pool.
 const audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
 const mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), blindKey = Buffer.alloc(32, 7), recordsKey = Buffer.alloc(32, 9);
 let sequence = 0;
@@ -43,8 +45,8 @@ async function account() {
         token: string;
         expiresAt: Date;
     }[] = [];
-    const recovery = new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(runtime, audit), sessions.consumerProducer(), { publicAppUrl: origin, users: users as never, argon2, mfaPolicy, authPolicy, policy: consumerRecoveryPolicyFromValue(CONSUMER_RECOVERY_POLICY_REGISTER_ROW.value, CONSUMER_RECOVERY_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: blindKey, mail: { sendRecovery: async (m) => { delivered.push(m); } }, onMailFailure: () => { throw new Error('UNEXPECTED_DELIVERY_FAILURE'); } });
-    const evidence = new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(runtime, audit), sessions.consumerProducer(), recordsKey), passkeys = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(runtime, audit), sessions.consumerProducer(), { publicAppUrl: origin });
+    const recovery = new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(scopedRuntime, audit), sessions.consumerProducer(), { publicAppUrl: origin, users: users as never, argon2, mfaPolicy, authPolicy, policy: consumerRecoveryPolicyFromValue(CONSUMER_RECOVERY_POLICY_REGISTER_ROW.value, CONSUMER_RECOVERY_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: blindKey, mail: { sendRecovery: async (m) => { delivered.push(m); } }, onMailFailure: () => { throw new Error('UNEXPECTED_DELIVERY_FAILURE'); } });
+    const evidence = new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(runtime, audit), sessions.consumerProducer(), recordsKey), passkeys = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(scopedRuntime, audit), sessions.consumerProducer(), { publicAppUrl: origin });
     return { userId, ownerRef, channelId, code, email, source, old, delivered, recovery, evidence, passkeys, sessions, users };
 }
 /** Design note 2026-10-09 item 3: a used code is no longer refilled, so a restart needs another saved code. */
@@ -133,7 +135,7 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         const current = await a.sessions.authenticate(rotated.sessionToken, a.source);
         if (!current || !rotated.response.step_up_grant)
             throw new Error('NO_ROTATED_SESSION');
-        const mfa = new MfaEnrollmentService({ repository: new PostgresIdentityRepository(p2Runtime, audit), consumerRepository: new PostgresConsumerAuthRepository(runtime, audit), sessions: a.sessions.consumerProducer(), dekStore: a.users as never, argon2, policy: mfaPolicy });
+        const mfa = new MfaEnrollmentService({ repository: new PostgresIdentityRepository(p2Runtime, audit), consumerRepository: new PostgresConsumerAuthRepository(scopedRuntime, audit), sessions: a.sessions.consumerProducer(), dekStore: a.users as never, argon2, policy: mfaPolicy });
         const totp = await mfa.beginTotp({ stepUpGrant: rotated.response.step_up_grant.token }, a.source, current), secret = decodeBase32(totp.secret);
         expect(await mfa.verifyTotp({ enrollmentToken: totp.enrollment_token, code: totpCodeAtStep(secret, Math.floor(Date.now() / 30000)) }, a.source, current)).toEqual({ status: 'enrolled' });
         secret.fill(0);
@@ -216,7 +218,8 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         expect((await db.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1', [a.userId])).rows[0].n).toBe(0);
     });
     it('holds the same erasure key-destruction lease through notice send and zeroes the loaded DEK before release', async () => {
-        const a = await account(), repository = new PostgresConsumerSecurityNoticeRepository(runtime), claim = (await repository.claim(100)).find(c => c.userId === a.userId);
+        // 0154: the notice loop is the cross-account marker's; the reconciler drains it outside any request, on the authorization pool's system login.
+        const a = await account(), repository = new PostgresConsumerSecurityNoticeRepository(scopedRuntime), claim = (await repository.claim(100)).find(c => c.userId === a.userId);
         if (!claim)
             throw new Error('NOTICE_MISSING');
         let entered!: () => void, release!: () => void;

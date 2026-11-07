@@ -6,6 +6,7 @@ import { expect, it } from 'vitest';
 import { createPool, migrate, type Pool } from '@debateai/db';
 import { ownerCandidate, ownerNativeReceipts } from '../support/ownerRecoveryFixtures.js';
 import { digest } from '../support/staffWebAuthnFixtures.js';
+import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 import { runStaffSecurityJourney } from '../support/staffSecurityJourney.js';
 
@@ -75,7 +76,9 @@ it('requires both distinct matching current proofs for a fixed two-key command a
   try {
    await jit.query('SELECT staff.install_owner_recovery_generation($1,$2,$3)',[generation,verifier,randomUUID()]);
    await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'BOOTSTRAP',target.userId,null,null,false,target.credentialIds,operationId,digest(nonce),generation,verifier]);
-   const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce),next=randomUUID(),nextVerifier=digest('fixed-two-next'),lineage=randomUUID();
+   // 0154: the owned ceremony is the cross-account marker's, so its receipts go through a login shaped as the API's system login (X14).
+   const staff=createPool(await createSystemTwin(database,'step6c1_system',['debateai_runtime']));
+   const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,staff).finally(()=>staff.end()),next=randomUUID(),nextVerifier=digest('fixed-two-next'),lineage=randomUUID();
    const commit=(selection:unknown)=>jit.query('SELECT staff.commit_owner_command($1,$2::uuid[],$3,$4,$5,$6,$7,$8,$9,$10::jsonb)',[commandId,selection,operationId,'BOOTSTRAP',generation,verifier,next,nextVerifier,lineage,{schema:'staff-alert-v1',event:'BOOTSTRAP',operationId,envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}}]);
    for(const selection of [[receipts[0]],[receipts[0],receipts[0]],[receipts[0],randomUUID()],[receipts[0],null],[[receipts[0],receipts[1]]],`[0:1]={${receipts.join(',')}}`])await expect(commit(selection)).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');
    await expect(jit.query('SELECT staff.read_owner_receipts($1,$2::uuid[])',[commandId,[receipts[0]]])).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');
@@ -101,7 +104,8 @@ it('upgrades all original migrations with a pending native two-key command witho
   const target=await ownerCandidate(database.pool),generation=randomUUID(),verifier=digest('upgrade-offline-proof'),commandId=randomUUID(),operationId=randomUUID(),nonce=Buffer.alloc(32,12).toString('base64url');
   await jit.query('SELECT staff.install_owner_recovery_generation($1,$2,$3)',[generation,verifier,randomUUID()]);
   await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'BOOTSTRAP',target.userId,null,null,false,target.credentialIds,operationId,digest(nonce),generation,verifier]);
-  const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce);
+  // Before 0094 (and so before 0154) the owned ceremony was still the runtime role's.
+  const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,runtime);
   const evidence=async()=>({command:(await database.pool.query('SELECT * FROM staff.owner_command WHERE command_id=$1',[commandId])).rows,receipts:(await database.pool.query('SELECT * FROM staff.owner_possession_receipt WHERE command_id=$1 ORDER BY receipt_id',[commandId])).rows,prerequisites:(await database.pool.query('SELECT * FROM staff.prerequisite_receipt WHERE command_id=$1 ORDER BY receipt_id',[commandId])).rows});
   const before=await evidence(),ddl=await readFile('migrations/0094_owner_one_verified_key.sql','utf8');await database.pool.query(ddl);expect(await evidence()).toEqual(before);
   const next=randomUUID(),nextVerifier=digest('upgrade-next'),lineage=randomUUID(),alert={schema:'staff-alert-v1',event:'BOOTSTRAP',operationId,envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}};

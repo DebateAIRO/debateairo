@@ -171,7 +171,7 @@ function arrange(input: {
   const submit = (request: AskRequest = ask) => application.submit(request, session, {
     kind: "server", userId: "b6b-user", ownerRef: OWNER_REF
   });
-  return { submit, order, recorded, failure, holds, logged, enqueueOn, enqueueApart };
+  return { submit, application, order, recorded, failure, holds, logged, enqueueOn, enqueueApart };
 }
 
 const recordFor = (reason: string) => ({ runId: RUN_ID, batteryRowId: "Q1", commandKey: `S00:${RUN_ID}:Q1`, reason });
@@ -214,6 +214,37 @@ describe("B6b an ask with a room", () => {
     expect(hostedRuns).toHaveLength(1);
     expect(hostedRuns).toEqual(todayRuns);
     expect(hostedQuestions).toEqual(todayQuestions);
+  });
+
+  // Security review F2 (0154): a dig is marked a dig by the statement that creates its run, so the ask hands RunRepository the mark itself, on the
+  // room's START and WAIT and on the path with no room alike: an ask with a parent (a private dig) or a public parent (a dig on a public debate).
+  // A debate dug from nothing carries no mark at all, so its run's document is the one it always was.
+  it("a dig's run is created marked a dig, START, WAIT and with no room alike; a debate dug from nothing carries no mark", async () => {
+    const parent = { parent_run_id: "55555555-5555-4555-8555-555555555555", places: ["path:pos-a"], mode: "quick" };
+    const publicParent = { public_ref: "66666666-6666-4666-8666-666666666666", places: ["path:pos-a"], mode: "quick" };
+    const asks = [
+      ["parent", { ...ask, parent } as unknown as AskRequest, true],
+      ["public parent", { ...ask, public_parent: publicParent } as unknown as AskRequest, true],
+      ["nothing", ask, false]
+    ] as const;
+    for (const [label, request, dig] of asks) {
+      for (const [path, given] of [["START", { decision: START }], ["WAIT", { decision: WAIT }], ["no room", { withoutRoom: {} }]] as const) {
+        const { submit } = arrange(given);
+        await submit(request).catch(() => undefined);
+        const runs = vi.mocked(RunRepository.prototype.startRun).mock.calls.map(([input]) => input);
+        expect(runs, `${label}, ${path}`).toHaveLength(1);
+        if (dig) expect(runs[0]!.digRun, `${label}, ${path}`).toBe(true);
+        else expect(Object.keys(runs[0]!), `${label}, ${path}`).not.toContain("digRun");
+        vi.restoreAllMocks();
+      }
+    }
+    // A legacy asker's ask names no owner, so a parent it sends marks nothing (its run is written in the clear, by no statement that could).
+    const { application } = arrange({ decision: START });
+    await application.submit({ ...ask, parent } as unknown as AskRequest, { ...session, asker_id: "legacy-b6b-dig", ownership_provenance: "legacy" as never },
+      { kind: "legacy", legacyAskerId: "legacy-b6b-dig" }).catch(() => undefined);
+    const legacyRuns = vi.mocked(RunRepository.prototype.startRun).mock.calls.map(([input]) => input);
+    expect(legacyRuns).toHaveLength(1);
+    expect(Object.keys(legacyRuns[0]!)).not.toContain("digRun");
   });
 
   it("WAIT: inside the lease, creates the run and its place in line, queues nothing, dispatches nothing, and says when", async () => {

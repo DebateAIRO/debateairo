@@ -14,9 +14,11 @@ import { ACCOUNT_MEMORY_LIMITS, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, type AskParen
  *     (apps/ui/lib/v4/mapModel.ts): "path:<id>" is that path; "p:<node>" is every story path whose points include the
  *     node, or the question itself when none does (or there is no story yet); an objection ("o:<n>"), "w" and anything
  *     else hang under the question itself. The places must share one anchor.
- * At start, `joinAtStart` joins the dig to its parent's investigation through `PostgresInvestigationRepository.join`
- * (0134's join_investigation_nested, which writes 0131's dig link too and answers TOO_DEEP itself under its locks).
- * There are no search words: what is searched stays the planner's decision.
+ * At start the dig's own row is already written, by the statement that created its run (the security review's F2, a dig
+ * is never published: the submit marks the run, `digRun`, and 0154's patch of 0123's core.create_encrypted_run writes
+ * identity.dig_run with it); then `joinAtStart` joins the dig to its parent's investigation through
+ * `PostgresInvestigationRepository.join` (0134's join_investigation_nested, which writes 0131's dig link too and answers
+ * TOO_DEEP itself under its locks). There are no search words: what is searched stays the planner's decision.
  *
  * W3-7: once the dig joined, `recordDigPicksAtStart` keeps what it was made of (0135, `PostgresDigPicksRepository`): the
  * path its places share (`digAnchorOf`, the one its path rewrite changes; none when they hang under the main question)
@@ -137,13 +139,14 @@ export interface DigJoinPort {
 }
 
 /**
- * At start (the dig's run exists, started or waiting in line): the dig joins its parent's investigation, and its dig
- * link is written with it. Its places are the dig's own and its picks', each once, in order. A join that does not take
- * (two quick clicks raced past level 10, the parent closed or changed hands meanwhile) leaves the run as it is: the
- * page's own after-start call (POST /v1/runs/{id}/dig-links) stays as the fallback, and the line names only the
- * outcome code, never the question. The link's places are the dig's own, or (a page that names none) its picks', each
- * once, at most the link's 16. Digging into a CLOSED investigation (after "Write my report") reopens it first, then
- * joins: a new dig always belongs to its parent's investigation, at any level.
+ * At start (the dig's run exists, started or waiting in line, and its own row is written): the dig joins its parent's
+ * investigation, and its dig link is written with it. Its places are the dig's own and its picks', each once, in order.
+ * A join that does not take (two quick clicks raced past level 10, the parent closed, erased or changed hands
+ * meanwhile) leaves the run as it is, out of the investigation and a dig all the same by its own row; the line names
+ * only the outcome code, never the question. Its link is then the page's own after-start call's (POST
+ * /v1/runs/{id}/dig-links), which asks the same of both debates as the join. The link's places are the dig's own, or (a
+ * page that names none) its picks', each once, at most the link's 16. Digging into a CLOSED investigation (after "Write
+ * my report") reopens it first, then joins: a new dig always belongs to its parent's investigation, at any level.
  */
 export async function joinAtStart(input: Readonly<{ ownerRef: string; parent: AskParent; childRunId: string }>,
   port: DigJoinPort, log: (line: string) => void = (line) => console.error(line)): Promise<DigJoinOutcome> {

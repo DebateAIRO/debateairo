@@ -10,6 +10,7 @@ import { QuestionCheckFailure, type QuestionCheckPort } from "../../apps/api/src
 import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -22,13 +23,15 @@ const labels = ["NONE healthy", "DRUGS healthy", "HARM_TO_OTHERS not", "WEAPONS_
   "QUESTION_CHECK_HTTP_STATUS"] as const;
 const starts = (label: string) => label.endsWith(" healthy") && !label.startsWith("SUICIDE_METHODS");
 
-async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
+/** The API's system login (the billing role and the cross-account marker), where it records each check's cost since 0154 (main.ts's site X31). */
+const API_SYSTEM = "s04_gate_api_system";
+async function asSystem<T extends Record<string, unknown> = Record<string, unknown>>(
   statement: string, values: unknown[] = []
 ): Promise<T[]> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
+    await client.query(`SET LOCAL ROLE ${API_SYSTEM}`);
     const rows = (await client.query<T>(statement, values)).rows;
     await client.query("COMMIT");
     return rows;
@@ -87,7 +90,7 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
   const check = createQuestionCheck({ subjects: readQuestionSubjects(), port: () => port, deadlineMs: 1_000,
     price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date(),
     spend: { record: entry => recordQuestionCheckSpend({ query: async (sql: string, values?: unknown[]) =>
-      ({ rows: await asRuntime(sql, values) }) } as never, entry) }, report: line => { reports.push(line); } });
+      ({ rows: await asSystem(sql, values) }) } as never, entry) }, report: line => { reports.push(line); } });
   const application = new Proxy({}, { get: (_target, key) => key === "submit"
     ? async () => {
       const runId = await new RunRepository(database.pool).startRun({
@@ -111,6 +114,7 @@ describe("S04 ask gate over the database", () => {
   beforeAll(async () => {
     database = await startTestDatabase();
     await migrate(database.pool);
+    await createSystemTwin(database, API_SYSTEM, ["debateai_billing_runtime"]);
     await database.pool.query(`INSERT INTO identity."user"
       (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,owner_ref,state,adult_affirmed_at)
       VALUES ($1,$2,'{}','{}','fixture-password',$3,$4,'active',now())`,

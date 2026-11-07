@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 import { MAIL_LOCALE_SETTING } from './mail-locale.js';
+import { crossAccount } from './account-context.js';
 export type ConsumerLegalPair = Readonly<{
     kind: 'TERMS' | 'PRIVACY';
     locale: string;
@@ -181,8 +182,9 @@ export class PostgresConsumerAuthRepository {
         const result = await this.pool.query('SELECT identity.read_consumer_passkey_challenge($1,$2,$3) AS value', [handleHash, purpose, bindingHash]);
         return result.rows[0].value;
     }
+    /** A passkey's stored credential, before any session: the system login's alone (0154, X36), as the request's challenge is its own to begin. */
     async readCredential(handleHash: string, credentialId: string, bindingHash: string): Promise<ConsumerCredential | null> {
-        const result = await this.pool.query('SELECT identity.read_consumer_passkey_credential($1,$2,$3) AS value', [handleHash, credentialId, bindingHash]);
+        const result = await crossAccount("X36", () => this.pool.query('SELECT identity.read_consumer_passkey_credential($1,$2,$3) AS value', [handleHash, credentialId, bindingHash]));
         return result.rows[0].value;
     }
     async completeEnrollment(input: ConsumerEnrollmentCompletion, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext, validateFutureOptions: (candidate: ConsumerEnrollmentOptions) => Promise<unknown>): Promise<ConsumerSessionCommit> {
@@ -197,9 +199,10 @@ export class PostgresConsumerAuthRepository {
             return committed;
         });
     }
+    /** Opens the session the API verified the assertion for: the system login's alone (0154, X36), as no secret the database holds gates it. */
     async completeLogin(input: ConsumerLoginCompletion, source: AuthSourceContext): Promise<ConsumerSessionCommit> {
-        return this.audited(source, async (client, prepared) => { const result = await client.query<{
+        return crossAccount("X36", () => this.audited(source, async (client, prepared) => { const result = await client.query<{
             value: ConsumerSessionCommit;
-        }>('SELECT identity.complete_consumer_passkey_login($1,$2) AS value', [input, prepared]); return result.rows[0]!.value; });
+        }>('SELECT identity.complete_consumer_passkey_login($1,$2) AS value', [input, prepared]); return result.rows[0]!.value; }));
     }
 }

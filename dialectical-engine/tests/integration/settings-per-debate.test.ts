@@ -200,9 +200,13 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   // Case 9's funding: a runtime login (debateai_runtime + debateai_billing_runtime), and the fixture's funding publication.
+  // With 0130's cross-account marker: since 0154 the funded run's admission and settlement, its pin and the funding and grant readers ask the
+  // connection, and this login stands for their callers that name an account with no session, the runner's login and the API's system login
+  // (P3-01's runner-runtime and api-system), which hold the marker; a request login answers only for its own session's account
+  // (tests/integration/security-review-hardening-database.test.ts).
   const login = ["s19", "funding"].join("_");
   const password = ["private", "fixture", login].join("-");
-  await database.pool.query(`CREATE ROLE ${login} LOGIN PASSWORD '${password}' IN ROLE debateai_runtime,debateai_billing_runtime`);
+  await database.pool.query(`CREATE ROLE ${login} LOGIN PASSWORD '${password}' IN ROLE debateai_runtime,debateai_billing_runtime,debateai_rls_all_accounts`);
   const url = new URL(database.connectionString);
   url.username = login;
   url.password = password;

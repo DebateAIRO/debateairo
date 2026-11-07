@@ -27,6 +27,27 @@ async function asRole<T extends Record<string, unknown> = Record<string, unknown
   } finally { client.release(); }
 }
 
+/**
+ * `statement` on the API's system login, where it records each question check's cost since 0154 (F5; main.ts's site X31): its capability role and
+ * the cross-account marker. That shape lives for this transaction only, as the X27 case's below, so the role catalogue the last case reads gains no role.
+ */
+async function asApiSystem<T extends Record<string, unknown> = Record<string, unknown>>(statement: string, values: unknown[] = []): Promise<T[]> {
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("CREATE ROLE threat_report_x31_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
+    await client.query("SET LOCAL ROLE threat_report_x31_api_system");
+    const rows = (await client.query<T>(statement, values)).rows;
+    await client.query("RESET ROLE");
+    await client.query("DROP ROLE threat_report_x31_api_system");
+    await client.query("COMMIT");
+    return rows;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+}
+
 async function actor(capabilities: string[], owner = false) {
   const userId = randomUUID(), sessionId = randomUUID(), staffId = randomUUID();
   const privilegeSessionId = randomUUID(), tokenHash = hash(sessionId);
@@ -70,9 +91,12 @@ async function proof(holder: Awaited<ReturnType<typeof actor>>, action: string, 
   return { proofId,binding };
 }
 
+/**
+ * Keeps a report as a seed would, on the test's own connection: no product code keeps one, and 0154 took 0128's two keepers back from
+ * debateai_runtime, so only their owner's side of the database may call them.
+ */
 async function keep(question: string, account: string | null = null): Promise<string> {
-  return (await asRole<{ ref: string }>("debateai_runtime",
-    "SELECT staff.keep_threat_report($1,$2) ref", [question,account]))[0]!.ref;
+  return (await database.pool.query<{ ref: string }>("SELECT staff.keep_threat_report($1,$2) ref", [question,account])).rows[0]!.ref;
 }
 
 describe("0128 threat report database boundary", () => {
@@ -123,24 +147,38 @@ describe("0128 applied database", () => {
     }
   });
 
-  it("grants twelve staff functions to runtime and none to erasure runtime", async () => {
-    for (const signature of ["keep_threat_report(text,uuid)","keep_threat_report_with_email(text,uuid,text)",
-      "list_threat_reports(jsonb,text)",
-      "count_unread_threat_reports(jsonb,text)","peek_threat_report_account(jsonb,text,uuid)",
-      "read_threat_report(jsonb,text,uuid)","threat_report_recipient_user(uuid)",
-      "decide_threat_report(jsonb,text,uuid,text,jsonb)","erase_due_threat_reports()",
-      "hold_threat_report_email(uuid,text)","claim_threat_report_alerts(integer)",
-      "complete_threat_report_alert(uuid,uuid,boolean)"]) {
+  it("grants six staff functions to runtime, the alert loop and the erasure to the system logins' marker, and none to erasure runtime; no role may keep a report since 0154", async () => {
+    for (const signature of ["keep_threat_report(text,uuid)","keep_threat_report_with_email(text,uuid,text)"]) {
       const rows = (await database.pool.query<{ runtime: boolean; erasure: boolean }>(
         "SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') runtime, has_function_privilege('debateai_erasure_runtime',$1,'EXECUTE') erasure",
         [`staff.${signature}`])).rows;
-      expect(rows[0],signature).toEqual({runtime:true,erasure:false});
+      expect(rows[0],signature).toEqual({runtime:false,erasure:false});
     }
+    await expect(asRole("debateai_runtime","SELECT staff.keep_threat_report($1,$2)",["A made-up question",noHolder.userId]))
+      .rejects.toMatchObject({ code: "42501" });
+    for (const signature of ["list_threat_reports(jsonb,text)",
+      "count_unread_threat_reports(jsonb,text)","peek_threat_report_account(jsonb,text,uuid)",
+      "read_threat_report(jsonb,text,uuid)","decide_threat_report(jsonb,text,uuid,text,jsonb)",
+      "hold_threat_report_email(uuid,text)"]) {
+      const rows = (await database.pool.query<{ runtime: boolean; erasure: boolean; marker: boolean }>(
+        "SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') runtime, has_function_privilege('debateai_erasure_runtime',$1,'EXECUTE') erasure, has_function_privilege('debateai_rls_all_accounts',$1,'EXECUTE') marker",
+        [`staff.${signature}`])).rows;
+      expect(rows[0],signature).toEqual({runtime:true,erasure:false,marker:false});
+    }
+    // 0154: the alert loop (its staff holder's account, its claim and its completion) and the erasure of the reports due run only on the API's gated
+    // timers, outside any request, so on its system login: the cross-account marker's alone, never a request login's.
+    for (const signature of ["threat_report_recipient_user(uuid)","erase_due_threat_reports()","claim_threat_report_alerts(integer)",
+      "complete_threat_report_alert(uuid,uuid,boolean)"]) {
+      const rows = (await database.pool.query<{ runtime: boolean; erasure: boolean; marker: boolean }>(
+        "SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') runtime, has_function_privilege('debateai_erasure_runtime',$1,'EXECUTE') erasure, has_function_privilege('debateai_rls_all_accounts',$1,'EXECUTE') marker",
+        [`staff.${signature}`])).rows;
+      expect(rows[0],signature).toEqual({runtime:false,erasure:false,marker:true});
+    }
+    await expect(asRole("debateai_runtime","SELECT * FROM staff.claim_threat_report_alerts(1)")).rejects.toMatchObject({ code: "42501" });
   });
 
   it("keeps the question as UNREAD and alerts exactly the owner and invited holder", async () => {
-    const ref = (await asRole<{ ref: string }>("debateai_runtime",
-      "SELECT staff.keep_threat_report($1,$2) ref", ["Fixture threat question",noHolder.userId]))[0]!.ref;
+    const ref = await keep("Fixture threat question",noHolder.userId);
     const report = (await database.pool.query("SELECT * FROM staff.threat_report WHERE report_ref=$1", [ref])).rows[0];
     expect(report).toMatchObject({report_ref:ref,question:"Fixture threat question",account_user_id:noHolder.userId,
       held_email:null,decision:"UNREAD",decided_at:null,decided_by_staff_id:null});
@@ -247,7 +285,22 @@ describe("0128 applied database", () => {
         [ref,`Retention ${i}`,i%2===0?-1:1,reported?"REPORTED":"UNREAD",reported,
           reported?holder.staffId:null]);
     }
-    const erased=(await asRole<{erased:number}>("debateai_runtime","SELECT staff.erase_due_threat_reports() erased"))[0]!.erased;
+    // The API's gated hourly sweep, on its system login: its capability role and the cross-account marker, which holds the sweep since 0154. That
+    // shape lives for this transaction only, as the X27 case's below, so the role catalogue the last case reads gains no role.
+    const sweep = await database.pool.connect();
+    let erased = 0;
+    try {
+      await sweep.query("BEGIN");
+      await sweep.query("CREATE ROLE threat_report_erasure_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
+      await sweep.query("SET LOCAL ROLE threat_report_erasure_api_system");
+      erased = (await sweep.query<{ erased: number }>("SELECT staff.erase_due_threat_reports() erased")).rows[0]!.erased;
+      await sweep.query("RESET ROLE");
+      await sweep.query("DROP ROLE threat_report_erasure_api_system");
+      await sweep.query("COMMIT");
+    } catch (error) {
+      await sweep.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally { sweep.release(); }
     expect(erased).toBeGreaterThanOrEqual(2);
     const remaining=(await database.pool.query<{report_ref:string}>(
       "SELECT report_ref FROM staff.threat_report WHERE report_ref=ANY($1::uuid[]) ORDER BY report_ref",[refs])).rows.map(row=>row.report_ref);
@@ -315,9 +368,9 @@ describe("0128 applied database", () => {
     await expect(keep(question, asker.userId)).rejects.toMatchObject({ message: "THREAT_REPORT_ACCOUNT_ERASING" });
     expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report WHERE question=$1", [question])).rows[0].n).toBe(0);
     const email = "prepared-asker@example.test";
-    const ref = (await asRole<{ ref: string }>("debateai_runtime",
+    const ref = (await database.pool.query<{ ref: string }>(
       "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) ref",
-      [question, asker.userId, email]))[0]!.ref;
+      [question, asker.userId, email])).rows[0]!.ref;
     expect((await database.pool.query("SELECT account_user_id,held_email FROM staff.threat_report WHERE report_ref=$1", [ref])).rows[0])
       .toEqual({ account_user_id: null, held_email: email });
     const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
@@ -351,25 +404,31 @@ describe("0128 applied database", () => {
     }
   });
 
-  it("writes QUESTION_CHECK spend through its writer and rejects direct or malformed writes", async () => {
+  it("writes QUESTION_CHECK spend through its writer on the API's system login and rejects direct or malformed writes", async () => {
     const spendId=randomUUID();
     const entry={spendId,providerRef:`question-check:${SUPPORT_RELAY_PROVIDER_REF}:claude-haiku-5-5`,
       chargedOn:new Date().toISOString().slice(0,10),chargeMicros:4,inputTokens:3,outputTokens:2};
-    await budget.recordQuestionCheckSpend({query: (sql:string,values?:unknown[]) =>
-      asRole("debateai_runtime",sql,values)} as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0],entry);
+    await budget.recordQuestionCheckSpend({query: async (sql:string,values?:unknown[]) =>
+      ({rows: await asApiSystem(sql,values)})} as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0],entry);
     expect((await database.pool.query("SELECT spend_source,run_id,spend_phase,attempt_id FROM ledger.model_spend WHERE spend_id=$1",[spendId])).rows[0])
       .toEqual({spend_source:"QUESTION_CHECK",run_id:null,spend_phase:null,attempt_id:null});
-    await expect(asRole("debateai_runtime",`INSERT INTO ledger.model_spend
+    // Since 0154 (F5) the runtime role may neither call the writer nor insert into the day's table; the system login, which may insert, meets the guard.
+    await expect(asRole("debateai_runtime","SELECT ledger.record_question_check_spend($1,$2,$3,4,3,2)",
+      [randomUUID(),entry.providerRef,entry.chargedOn])).rejects.toMatchObject({message:"permission denied for function record_question_check_spend",code:"42501"});
+    const raw=`INSERT INTO ledger.model_spend
       (spend_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens)
-      VALUES($1,'QUESTION_CHECK',$2,$3,4,3,2)`,
-      [randomUUID(),entry.providerRef,entry.chargedOn])).rejects.toMatchObject({message:"QUESTION_CHECK_SPEND_WRITER_ONLY",code:"42501"});
-    await expect(asRole("debateai_runtime",
+      VALUES($1,'QUESTION_CHECK',$2,$3,4,3,2)`;
+    await expect(asRole("debateai_runtime",raw,[randomUUID(),entry.providerRef,entry.chargedOn]))
+      .rejects.toMatchObject({message:"permission denied for table model_spend",code:"42501"});
+    await expect(asApiSystem(raw,[randomUUID(),entry.providerRef,entry.chargedOn]))
+      .rejects.toMatchObject({message:"QUESTION_CHECK_SPEND_WRITER_ONLY",code:"42501"});
+    await expect(asApiSystem(
       "SELECT ledger.record_question_check_spend($1,$2,$3,4,3,2)",
       [randomUUID(),"wrong-provider",entry.chargedOn])).rejects.toMatchObject({message:"QUESTION_CHECK_SPEND_INVALID",code:"23514"});
-    await expect(asRole("debateai_runtime",
+    await expect(asApiSystem(
       "SELECT ledger.record_question_check_spend($1,$2,$3,NULL,3,2)",
       [randomUUID(),entry.providerRef,entry.chargedOn])).rejects.toMatchObject({message:"QUESTION_CHECK_SPEND_INVALID",code:"23514"});
-    await expect(asRole("debateai_runtime",
+    await expect(asApiSystem(
       "SELECT ledger.record_question_check_spend($1,$2,$3,-1,3,2)",
       [randomUUID(),entry.providerRef,entry.chargedOn])).rejects.toMatchObject({message:"QUESTION_CHECK_SPEND_INVALID",code:"23514"});
     await expect(new budget.PostgresModelSpendStore(database.pool).recordSpend({
@@ -378,15 +437,15 @@ describe("0128 applied database", () => {
   });
 
   it("records spend for both provider references made by the deployed transport", async () => {
-    // Property: each configured transport's provider identity is accepted by the real runtime writer.
+    // Property: each configured transport's provider identity is accepted by the real writer, on the API's system login (0154).
     // Mutant: reject a colon in the provider reference; changing chargeMicros is a neighbour.
     for (const providerRef of [SUPPORT_RELAY_PROVIDER_REF, "vendor:anthropic"] as const) {
       const port = createQuestionCheckTransport({ providerRef, baseUrl: "http://127.0.0.1:1/v1",
         model: "claude-haiku-5-5", authorizationHeader: "Bearer synthetic-not-a-key" },
       { readAuthorizationHeader: () => "", deadlineMs: 1_000 });
       const spendId = randomUUID();
-      await budget.recordQuestionCheckSpend({ query: (sql: string, values?: unknown[]) =>
-        asRole("debateai_runtime", sql, values) } as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0], {
+      await budget.recordQuestionCheckSpend({ query: async (sql: string, values?: unknown[]) =>
+        ({ rows: await asApiSystem(sql, values) }) } as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0], {
         spendId, providerRef: `question-check:${port.providerRef}:${port.modelId}`,
         chargedOn: new Date().toISOString().slice(0, 10), chargeMicros: 1, inputTokens: 1, outputTokens: 1
       });
@@ -429,9 +488,19 @@ describe("0128 applied database", () => {
   it("backfills the active owner capability with a revision, epoch and session revoke", async () => {
     expect((await database.pool.query("SELECT staff.valid_capabilities(ARRAY['THREAT_REPORT']::text[]) valid")).rows[0].valid)
       .toBe(true);
-    expect((await asRole<{allowed:boolean}>("debateai_runtime",
-      "SELECT staff.authorize_action($1::jsonb,'THREAT_REPORT') allowed",[holder.context]))[0]!.allowed)
-      .toBe(true);
+    // 0154: the capability check is the cross-account marker's, which the API's staff repository's login holds (X14). It
+    // is asked as that login's shape, built for this transaction only, so the role catalogue the last case reads gains no role.
+    const system = await database.pool.connect();
+    try {
+      await system.query("BEGIN");
+      await system.query("CREATE ROLE threat_report_x14_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
+      await system.query("SET LOCAL ROLE threat_report_x14_api_system");
+      expect((await system.query<{allowed:boolean}>("SELECT staff.authorize_action($1::jsonb,'THREAT_REPORT') allowed",
+        [holder.context])).rows[0]!.allowed).toBe(true);
+    } finally {
+      await system.query("ROLLBACK").catch(() => undefined);
+      system.release();
+    }
     const client=await database.pool.connect();
     try {
       await client.query("BEGIN");

@@ -10,6 +10,7 @@ import {
   PostgresDigModelRepository,
   PostgresDigModelRunnerRepository,
   PostgresInvestigationRepository,
+  PostgresInvestigationRunnerRepository,
   type Pool
 } from "@debateai/db";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, planById } from "@debateai/register";
@@ -18,6 +19,7 @@ import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { admitDig, joinAtStart } from "../../apps/api/src/dig-admission.js";
 import { continuePausedRun } from "../../apps/api/src/month-pause.js";
 import { MonthPause } from "../../apps/runner/src/month-pause.js";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -25,10 +27,14 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * start (level 10 admitted, past it refused with nothing written, a closed investigation reopened), the money rule's
  * room and usage over the real ledger (the day's borrow derived from recorded charges, PATH_REWRITE counted, new starts
  * waiting for the reset, the run that borrowed named), and the month pause from the runner's record to the person's
- * Continue. Data is made up.
+ * Continue. Data is made up. Since the security review's 0154 (F5) the API's role runs here as each person's own request (its login
+ * carrying their live session), as its functions believe no other owner; 0133's owner read of an investigation is no role's any more,
+ * so the runner's reader reads it.
  */
 let database: TestDatabase;
 let api: Pool;
+/** The API's role wired as main.ts wires its request pool: inside a request its own connections carry the person's session. */
+let requests: Pool;
 let runner: Pool;
 let sequence = 9_400_000;
 const SECRET = Buffer.alloc(32, 9);
@@ -40,14 +46,16 @@ const loginPool = (role: string, password: string): Pool => {
   url.password = password;
   return createPool(url.toString());
 };
-type Account = Readonly<{ userId: string; ownerRef: string }>;
+type Account = Readonly<{ userId: string; ownerRef: string; token: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
     VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `inv-room-${userId}`]);
   const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
-  return { userId, ownerRef };
+  return { userId, ownerRef, token: await seedLiveSession(database.pool, userId) };
 }
+/** The person's own request, on the API's role. */
+const asking = (person: Account): Pool => asRequestOf(requests, person.token);
 /** A private debate with content encryption, owned by `owner`. */
 async function run(owner: Account): Promise<string> {
   const runId = randomUUID();
@@ -72,7 +80,7 @@ async function run(owner: Account): Promise<string> {
 }
 /** A first debate and `levels` digs under it, each joined through the API's repository: [root, level 1, …]. */
 async function chain(owner: Account, levels: number): Promise<string[]> {
-  const investigations = new PostgresInvestigationRepository(api);
+  const investigations = new PostgresInvestigationRepository(asking(owner));
   const runs = [await run(owner)];
   for (let level = 1; level <= levels; level += 1) {
     const child = await run(owner);
@@ -91,13 +99,18 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE inv_room_api LOGIN PASSWORD 'inv-room-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  await database.pool.query("CREATE ROLE inv_room_runner LOGIN PASSWORD 'inv-room-runner-test-only' IN ROLE debateai_runtime");
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the runner's own steps of a debate are the marker's.
+  await database.pool.query("CREATE ROLE inv_room_runner LOGIN PASSWORD 'inv-room-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   api = loginPool("inv_room_api", "inv-room-api-test-only");
   runner = loginPool("inv_room_runner", "inv-room-runner-test-only");
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.username = "inv_room_api";
+  apiUrl.password = "inv-room-api-test-only";
+  requests = createPool(apiUrl.toString(), { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([api?.end(), runner?.end()]);
+  await Promise.all([api?.end(), runner?.end(), requests?.end()]);
   await database?.stop();
 });
 
@@ -105,22 +118,23 @@ describe("a dig's admission and its join at start", () => {
   it("level 10 is admitted and joins; a dig of it is refused before anything is written; another account's parent is not found", async () => {
     const person = await account();
     const runs = await chain(person, 9);
-    const levels = new PostgresDigModelRepository(api);
+    const levels = new PostgresDigModelRepository(asking(person));
     expect(await admitDig({ ownerRef: person.ownerRef, parent: parentOf(runs[9]!), free: false }, levels))
       // W3-7: the admission names the path the dig's places share (its picks are kept on it).
       .toEqual({ kind: "ADMIT", parentLevel: 9, positionRef: "p1" });
     const tenth = await run(person);
     expect(await joinAtStart({ ownerRef: person.ownerRef, parent: parentOf(runs[9]!), childRunId: tenth },
-      new PostgresInvestigationRepository(api))).toBe("JOINED");
+      new PostgresInvestigationRepository(asking(person)))).toBe("JOINED");
     expect(await levels.readDigLevel(person.ownerRef, tenth)).toBe(10);
     expect(await admitDig({ ownerRef: person.ownerRef, parent: parentOf(tenth), free: false }, levels)).toEqual({ kind: "TOO_DEEP" });
     const stranger = await account();
-    expect(await admitDig({ ownerRef: stranger.ownerRef, parent: parentOf(tenth), free: false }, levels)).toEqual({ kind: "NOT_FOUND" });
+    expect(await admitDig({ ownerRef: stranger.ownerRef, parent: parentOf(tenth), free: false }, new PostgresDigModelRepository(asking(stranger))))
+      .toEqual({ kind: "NOT_FOUND" });
     // Two quick clicks that raced past the route's check: the database itself refuses an eleventh level, writing nothing.
     const eleventh = await run(person);
     const lines: string[] = [];
     expect(await joinAtStart({ ownerRef: person.ownerRef, parent: parentOf(tenth), childRunId: eleventh },
-      new PostgresInvestigationRepository(api), (line) => lines.push(line))).toBe("TOO_DEEP");
+      new PostgresInvestigationRepository(asking(person)), (line) => lines.push(line))).toBe("TOO_DEEP");
     expect(await levels.readDigLevel(person.ownerRef, eleventh)).toBe(0);
     expect(lines).toEqual([JSON.stringify({ kind: "DEBATEAI_DIG_JOIN", code: "DIG_JOIN_TOO_DEEP" })]);
   });
@@ -128,14 +142,14 @@ describe("a dig's admission and its join at start", () => {
   it("a dig of a dig of a closed investigation reopens it, then joins at level 3", async () => {
     const person = await account();
     const runs = await chain(person, 2);
-    const investigations = new PostgresInvestigationRepository(api);
-    const opened = await investigations.read(person.ownerRef, runs[2]!);
+    const investigations = new PostgresInvestigationRepository(asking(person));
+    const opened = await new PostgresInvestigationRunnerRepository(runner).ofRun(runs[2]!);
     expect(await investigations.close(person.ownerRef, opened!.investigation_id)).toMatchObject({ outcome: "CLOSED" });
     const dig = await run(person);
     expect(await joinAtStart({ ownerRef: person.ownerRef, parent: parentOf(runs[2]!), childRunId: dig }, investigations)).toBe("JOINED");
-    const after = await investigations.read(person.ownerRef, dig);
+    const after = await new PostgresInvestigationRunnerRepository(runner).ofRun(dig);
     expect(after).toMatchObject({ investigation_id: opened!.investigation_id, state: "open" });
-    expect(await new PostgresDigModelRepository(api).readDigLevel(person.ownerRef, dig)).toBe(3);
+    expect(await new PostgresDigModelRepository(asking(person)).readDigLevel(person.ownerRef, dig)).toBe(3);
   });
 });
 
@@ -221,7 +235,7 @@ describe("the month pause, from the runner's record to the person's Continue", (
     const debate = await run(person);
     const resumableAt = new Date(Date.now() + 60_000);
     const runnerSide = new PostgresDigModelRunnerRepository(runner);
-    const apiSide = new PostgresDigModelRepository(api);
+    const apiSide = new PostgresDigModelRepository(asking(person));
     expect(await runnerSide.recordPause({ runId: debate, reason: "MONTH_WALL", resumableAt, plannedCalls: 3, plannedSearches: 2, plannedMicros: 0 }))
       .toBe("RECORDED");
     const room = { monthHasRoom: async () => true };
@@ -229,8 +243,8 @@ describe("the month pause, from the runner's record to the person's Continue", (
       .toEqual({ kind: "UNTIL_RESET", until: resumableAt.toISOString() });
     expect((await apiSide.readPause(person.ownerRef, debate))?.state).toBe("PAUSED");
     const stranger = await account();
-    expect((await continuePausedRun({ ownerRef: stranger.ownerRef, runId: debate, now: new Date(resumableAt.getTime() + 1) }, apiSide, room)).kind)
-      .toBe("NOT_FOUND");
+    expect((await continuePausedRun({ ownerRef: stranger.ownerRef, runId: debate, now: new Date(resumableAt.getTime() + 1) },
+      new PostgresDigModelRepository(asking(stranger)), room)).kind).toBe("NOT_FOUND");
     expect(await continuePausedRun({ ownerRef: person.ownerRef, runId: debate, now: new Date(resumableAt.getTime() + 1) }, apiSide, room))
       .toEqual({ kind: "CONTINUING" });
     // W3-8: a second press is idempotent (CONTINUING again, nothing recorded again).

@@ -42,7 +42,7 @@ const APPLICATION_SCHEMAS = [
 const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   // Work queue and allocator: rows are updated in place by the runtime.
   "core.work_item": "runtime holds UPDATE (0000): claimed/leased in place",
-  "ledger.sequence_allocator": "runtime/evaluator/settlement hold UPDATE: the counter row",
+  "ledger.sequence_allocator": "evaluator/settlement hold UPDATE, runtime draws through 0154's definer: the counter row",
   // Provisioning intents and per-run secrets: consumed and cleared by design.
   "core.run_content_attestation_secret": "0040 erasure deletes the secret on account erasure",
   "core.run_key_provision_intent": "0038 intent row is consumed by the provisioner",
@@ -115,6 +115,8 @@ const PRIVATE_READERS = [STAFF_OWNER, ...RECOVERY_READERS];
 const PRIVATE_TABLE_OWNERS: Readonly<Record<string, string>> = Object.fromEntries([
   ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "public_flag_notice", "public_review_notice", "publication_review_event", "subject", "team_limit_event", "team_limit_holder", "team_limit_notice", "internal_grant_holder", "internal_grant_end", "allowance_notice", "team_practice_spend", "team_public_report_spend", "threat_report", "threat_report_alert", "threat_report_event", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
   ...["internal_grant", "internal_grant_event", "internal_provider_admission"].map((name) => [`billing.${name}`, STAFF_OWNER]),
+  // 0154 (the security review, F5): a clarify call's charge reserved for its person until the charge takes it; 0144's charge writer's own, so no role's.
+  ["identity.ask_clarify_reservation", STAFF_OWNER],
   ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
   ...["backup_email_control", "backup_email_notice_binding", "backup_email_notice", "backup_email_source_window", "backup_email_proof_window"].map((name) => [`identity.${name}`, "debateai_backup_email_owner"]),
   ...["mfa_recovery_control", "mfa_recovery_staged_code", "mfa_recovery_notice_binding", "mfa_recovery_notice", "mfa_recovery_source_window", "mfa_recovery_legacy_cohort"].map((name) => [`identity.${name}`, "debateai_mfa_recovery_owner"]),
@@ -674,7 +676,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_security_review_hardening.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

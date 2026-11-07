@@ -3,11 +3,13 @@ import type { CryptoEnvelope } from "@debateai/crypto";
 import { decryptLeasedContentForRun, encryptAttestedContentForRun, prepareLeasedContentEncryptionForRun, withRunContentLease } from "./index.js";
 
 /**
- * A dig's picks and its path rewrite's material (migration 0135; dig-model revision task W3-7), through 0135's definers
- * only. `PostgresDigPicksRepository` runs on the API's own pool (debateai_billing_runtime): the asks route writes a dig's
- * picks at start, each pick's text sealed under the DIG's run key here before the call. `PostgresDigPicksRunnerRepository`
- * runs on the runner's pool (debateai_runtime): the path rewrite reads the picks back (the runner's `digOf`), stores the
- * dig's own paths before it takes its turn, and the sweep lists the settled digs whose rewrite has no row.
+ * A dig's picks and its path rewrite's material (migration 0135; dig-model revision task W3-7), through 0135's definers only.
+ * `PostgresDigPicksRepository` runs on the API's own pool (debateai_billing_runtime): the asks route writes a dig's picks at start, each pick's text
+ * sealed under the DIG's run key here before the call. `PostgresDigPicksRunnerRepository` runs on the runner's pool: the path rewrite reads the
+ * picks back (the runner's `digOf`; `read`, debateai_runtime's, which the API's answer read calls too), stores the dig's own paths before it takes
+ * its turn (`recordInput`), and the sweep lists the settled digs whose rewrite has no row (`readUnwritten`); since 0154 those two need the
+ * cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's
+ * request login does not.
  *
  * Carriers (packages/crypto CONTENT_CARRIERS), each checked by 0132's content trigger: `identity.dig_pick` bound to the
  * pick's number ("1", "2", …), `identity.path_rewrite_input` bound to the dig's run id. A run without content encryption
@@ -73,11 +75,11 @@ type PicksRow = Readonly<{
   input: Readonly<{ work_item_id: string; recorded_at: string; content: CryptoEnvelope }> | null;
 }>;
 
-/** The runner's side (debateai_runtime). */
+/** The runner's side (`read`: debateai_runtime; `recordInput` and `readUnwritten`, the sweep's list: the cross-account marker, since 0154). */
 export class PostgresDigPicksRunnerRepository {
   constructor(private readonly pool: Pool, private readonly executor: Executor = pool) {}
 
-  /** A run's picks and its rewrite's material, opened under its key; null when it keeps none or is not live. */
+  /** A run's picks and its rewrite's material, opened under its key; null when it keeps none, is not live or, in a request, is not the connection's own (0154). */
   async read(runId: string): Promise<DigPicksRead | null> {
     const row = (await this.executor.query<{ picks: PicksRow | null }>("SELECT identity.read_dig_picks_of_run($1) AS picks", [runId]))
       .rows[0]?.picks ?? null;

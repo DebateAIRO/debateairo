@@ -25,7 +25,8 @@ import { readReplayBook } from "./run-replay.js";
  *    ALLOWED counts; the author's private rewrites on the same line, and a held or refused dig, never do. The newer of the two wins (`written_at`); a digger who erased their account
  *    leaves no row, and the page's copy of their text stands.
  *  - What the dig made of itself (its picks, its stored paths) is its own, under its own key.
- * WHY THE LINE IS SAFE TO READ: 0147's identity.read_public_path_line lists every row of a path, private ones too, and the runner holds every live key, so this is a rule of code, not a
+ * WHY THE LINE IS SAFE TO READ: 0147's identity.read_public_path_line lists every row of a path, private ones too, to the runner's login (a request connection gets only its own runs'
+ * rows since 0154), and the runner holds every live key, so this is a rule of code, not a
  * key boundary. It holds in one place: `allowedTextsOf` is the only reader of those rows' text here, and it opens a row only when it is a PATH_UPDATE whose dig's contribution is ALLOWED. A 0134
  * rewrite of the author's is never opened; its id may stand as a turn's "based on", which is bookkeeping and carries no text. tests/integration/public-tree-flow.test.ts holds this.
  * THE MAIN ANSWER: while the root's key lives, 0138's row under the root's key, so its author's page shows it too. Once it is gone, 0147's row under the dig's key. Either way the API's

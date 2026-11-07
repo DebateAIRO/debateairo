@@ -190,6 +190,8 @@ async function publishThroughProduct(answer: Answer): Promise<PublicDebate> {
   const projectedDebates: PublicDebate[] = [];
   const repository = {
     preflightGrant: async () => true,
+    // Security review F2 (0154): not a dig, so it may be published.
+    readRunIsDig: async () => false,
     readAuthorPseudonym: async () => "Stable Public Name",
     readArgumentLanguageTag: async () => null,
     prepareKeyProvision: async () => true,

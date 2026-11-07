@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, PostgresWebEvidenceRepository, type Pool, type WebSealed } from "@debateai/db";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -8,11 +9,15 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * The runner's role writes and reads one debate's searches, pages, transient page texts, readings, extracts, top pages and
  * packs; every content value is an attested envelope under the run's key, never plaintext; the API's role records the
  * person's "added to researched" choices; no role reads a table; the rows are append-only; deleting one debate (R22 item
- * 16) and deleting the account remove them; the export worker reads them behind its lease. Pages are made up.
+ * 16) and deleting the account remove them; the export worker reads them behind its lease. Pages are made up. Since the security review's
+ * 0154 (F5) the API's role runs here as each person's own request (its login carrying their live session), as its functions believe no
+ * other owner, and the runner's login holds the cross-account marker as production's does (0154 moved the page texts' reader to it).
  */
 let database: TestDatabase;
 let runner: Pool;
 let api: Pool;
+/** The API's role wired as main.ts wires its request pool: inside a request its own connections carry the person's session. */
+let requests: Pool;
 let erasure: Pool;
 let worker: Pool;
 let sequence = 9_100_000;
@@ -31,14 +36,16 @@ const loginPool = (role: string, password: string): Pool => {
   return createPool(url.toString());
 };
 
-type Account = Readonly<{ userId: string; ownerRef: string }>;
+type Account = Readonly<{ userId: string; ownerRef: string; token: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
     VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `web-${userId}`]);
   const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
-  return { userId, ownerRef };
+  return { userId, ownerRef, token: await seedLiveSession(database.pool, userId) };
 }
+/** The person's own request, on the API's role. */
+const asking = (person: Account): Pool => asRequestOf(requests, person.token);
 /** A private debate with content encryption (0038) and its attestation secret, seeded as 0127's suite seeds one. */
 async function encryptedRun(owner: Account, encrypted = true): Promise<string> {
   const runId = randomUUID();
@@ -120,7 +127,7 @@ const rowsOf = async (run: string): Promise<number> => Number((await database.po
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE web_runner LOGIN PASSWORD 'web-runner-test-only' IN ROLE debateai_runtime");
+  await database.pool.query("CREATE ROLE web_runner LOGIN PASSWORD 'web-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE web_api LOGIN PASSWORD 'web-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
   await database.pool.query("CREATE ROLE web_erasure LOGIN PASSWORD 'web-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE web_worker LOGIN PASSWORD 'web-worker-test-only' IN ROLE debateai_data_export_worker");
@@ -129,10 +136,14 @@ beforeAll(async () => {
   erasure = loginPool("web_erasure", "web-erasure-test-only");
   worker = loginPool("web_worker", "web-worker-test-only");
   expect((await runner.query("SELECT current_user AS name")).rows[0].name).toBe("web_runner");
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.username = "web_api";
+  apiUrl.password = "web-api-test-only";
+  requests = createPool(apiUrl.toString(), { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([runner?.end(), api?.end(), erasure?.end(), worker?.end()]);
+  await Promise.all([runner?.end(), api?.end(), erasure?.end(), worker?.end(), requests?.end()]);
   await database?.stop();
 });
 
@@ -269,11 +280,15 @@ describe("0132 the person's choice and who may reach it", () => {
     const step = await webStep(new PostgresWebEvidenceRepository(runner), run);
     const record = async (pool: Pool, owner: string, page: string) =>
       (await pool.query<{ o: string }>("SELECT identity.record_web_researched($1,$2,$3) AS o", [owner, run, page])).rows[0]!.o;
-    expect(await record(api, person.ownerRef, step.pages[2]!)).toBe("RECORDED");
-    expect(await record(api, person.ownerRef, step.pages[2]!)).toBe("ALREADY");
-    expect(await record(api, person.ownerRef, step.pages[0]!)).toBe("NOT_OTHER_PAGE");
-    expect(await record(api, person.ownerRef, randomUUID())).toBe("NOT_OTHER_PAGE");
-    expect(await record(api, stranger.ownerRef, step.pages[2]!)).toBe("NOT_OWNED");
+    expect(await record(asking(person), person.ownerRef, step.pages[2]!)).toBe("RECORDED");
+    expect(await record(asking(person), person.ownerRef, step.pages[2]!)).toBe("ALREADY");
+    expect(await record(asking(person), person.ownerRef, step.pages[0]!)).toBe("NOT_OTHER_PAGE");
+    expect(await record(asking(person), person.ownerRef, randomUUID())).toBe("NOT_OTHER_PAGE");
+    expect(await record(asking(stranger), stranger.ownerRef, step.pages[2]!)).toBe("NOT_OWNED");
+    // 0154 (F5): a request names only its own session's account, and with no session the API's role names no one.
+    for (const pool of [asking(stranger), api]) {
+      expect(await sqlError(() => record(pool, person.ownerRef, step.pages[1]!))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
+    }
     const repository = new PostgresWebEvidenceRepository(runner);
     expect(await repository.settleResearched(run, step.pages[2]!, "ADDS")).toBe("SETTLED");
     expect(await repository.settleResearched(run, step.pages[2]!, "DOES_NOT_ADD")).toBe("ALREADY");
@@ -311,7 +326,8 @@ describe("0132 deleting", () => {
     const repository = new PostgresWebEvidenceRepository(runner);
     const step = await webStep(repository, run);
     await webStep(repository, kept);
-    expect((await api.query("SELECT identity.record_web_researched($1,$2,$3) AS o", [person.ownerRef, run, step.pages[2]])).rows[0].o).toBe("RECORDED");
+    expect((await asking(person).query("SELECT identity.record_web_researched($1,$2,$3) AS o", [person.ownerRef, run, step.pages[2]])).rows[0].o)
+      .toBe("RECORDED");
     expect(await sqlError(() => erasure.query("SELECT identity.forget_erased_debate_web_evidence($1)", [run])))
       .toMatchObject({ code: "55000", message: "WEB_EVIDENCE_DEBATE_NOT_ERASED" });
     const before = await rowsOf(run);

@@ -64,6 +64,7 @@ export class PostgresPublicReviewRepository {
   async isHeld(publicationRef: string): Promise<boolean> {
     return await this.one("SELECT identity.public_review_held($1::uuid) AS value", [publicationRef]) === true;
   }
+  /** The mail loop's leases over 0150's notices: the cross-account marker's since 0154, called only from the API's gated timer on its system login. */
   async claimNotices(limit: number): Promise<readonly PublicReviewNoticeClaim[]> {
     return (await this.pool.query<PublicReviewNoticeClaim>("SELECT notice_id,kind,recipient_staff_id,claim_token FROM staff.claim_public_review_notices($1)", [limit])).rows;
   }

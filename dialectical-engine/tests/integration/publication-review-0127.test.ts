@@ -5,6 +5,7 @@ import { createPool, migrate, type Pool } from "../../packages/db/src/index.js";
 import { ownerCandidate, ownerNativeReceipts } from "../support/ownerRecoveryFixtures.js";
 import { authorizeStaffAlertFixture } from "../support/staffAlertReadiness.js";
 import { digest } from "../support/staffWebAuthnFixtures.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -185,6 +186,9 @@ async function seedDecision(reviewRef:string,runId:string,staffId:string,outcome
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  // The API's system login's shape (P3-01's api-system: the billing runtime plus 0130's cross-account marker), which the
+  // staff repository runs on since 0154 (X14).
+  await database.pool.query('CREATE ROLE publication_review_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts');
 }, 180_000);
 afterAll(async () => database?.stop());
 
@@ -534,7 +538,8 @@ describe("0127 publication review database boundary", () => {
     await authorizeStaffAlertFixture(database.pool,operationId);
     const alert={schema:'staff-alert-v1',event:'GRANT',operationId,
       envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}};
-    await asRole('debateai_runtime',
+    // 0154: the grant is the cross-account marker's, which the API's staff repository's login holds (X14).
+    await asRole('publication_review_api_system',
       'SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',
       [ownerContext,proofId,binding,reviewer.staffId,['PUBLICATION_REVIEW'],operationId,
         {code:'GRANT_CHANGE'},alert]
@@ -741,7 +746,9 @@ describe("0127 publication review database boundary", () => {
       await jit.query('SELECT staff.install_owner_recovery_generation($1,$2,$3)',[generation,verifier,randomUUID()]);
       await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',
         [commandId,'BOOTSTRAP',target.userId,null,null,false,target.credentialIds,operationId,digest(nonce),generation,verifier]);
-      const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce);
+      // 0154: the owned ceremony is the cross-account marker's: its receipts go through a login shaped as the API's system login (X14).
+      const staff=createPool(await createSystemTwin(isolated,'publication_review_fixture_system',['debateai_runtime']));
+      const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,staff).finally(()=>staff.end());
       const readiness=randomUUID();
       await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',
         ['f'.repeat(64),readiness,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);
