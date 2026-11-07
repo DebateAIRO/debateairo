@@ -87,7 +87,7 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // The owner's third round (5 Nov afternoon): a dig that keeps failing because the AIs were unavailable says its reason
   // without "You can try it again in a while.", so it does not disagree with "This keeps failing. Write your report; ...".
   "v4.digFailed.unavailableKeepsFailing",
-  "v4.debate.failedSomeTaken",
+  // v4.debate.failedSomeTaken left this list: approved as built (owner 7 Nov, question 43 A; QUESTIONS_42_43_ANSWER_LINES below).
   // ACCESS-13 (the wave-2 checks): "Light or dark"'s name also says what a press does. Owner question.
   "v4.header.menu.themeToDark",
   "v4.header.menu.themeToLight",
@@ -742,8 +742,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.digPaths.ownTooLong",
   // V4 start step, Task 57g (the owner's 7 Nov answers, his card "Button on the stopped page"): the stopped page's "Continue where it
   // stopped", its line when some quota was used, and "Ask this again" as "Change the question" (draft wording), shown at the click-test.
+  // The line when some quota was used (v4.failed.continueLine) is approved as built (owner 7 Nov, question 43 A).
   "v4.failed.continue",
-  "v4.failed.continueLine",
   "v4.failed.changeQuestion",
   // V4 start step, Task 55c (report-f4, the owner's words, record OWNER-PICKS-2026-11-03.md:954): the report page's fold of the paths
   // dug later under their first-level path, shown at the click-test.
@@ -756,7 +756,11 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.money.startsWait.PERSON_MONTH_NO_REPORT",
   // V4 start step, Task 55f (the coordinator's ruling on Task 55c's open point 3): the report page's own fold for the digs on the main
   // question, after the paths (draft wording), shown at the click-test.
-  "v4.investigation.updatedByQuestionDig"
+  "v4.investigation.updatedByQuestionDig",
+  // V4 start step, Task 57k (owner 7 Nov, question 42 A, relayed by the review session): with Continue offered, the other our-side reasons
+  // without their "ask again" ending (CONTINUE_REASON_DRAFTS below; STOPPED's cut line is the owner's), shown at the click-test.
+  "v4.failed.continueReason.NOT_STARTED",
+  "v4.failed.continueReason.SET_ASIDE"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -1091,6 +1095,47 @@ const SIXTH_ROUND_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze
     "Your question and your picks are kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped."
 });
 
+/**
+ * Owner 7 Nov ~15:00 EET, questions 42 A and 43 A (cards in the review session, relayed to the start-step session; both recommended):
+ * 42: when the stopped page offers "Continue where it stopped", the reason sentence above it drops its "ask again" ending. The STOPPED
+ * line is the owner's own words; the other cut lines (CONTINUE_REASON_DRAFTS) are drafts until the click-test. The shared runFailure.*
+ * sentences (35 languages) are untouched. 43: the three quota lines are approved as built.
+ */
+const QUESTIONS_42_43_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.failed.continueReason.STOPPED": "This debate stopped partway because of a problem on our side.",
+  "v4.debate.failedSomeTaken": "The part that ran used some of your quota.",
+  "v4.debate.failedNothingTaken": "Nothing was taken for the failed try.",
+  "v4.failed.continueLine": "What already ran is kept. Continuing pays only for what has not run yet."
+});
+/** Question 42 A's other our-side sentences, each the shared sentence without its "ask again" ending (drafted). */
+const CONTINUE_REASON_DRAFTS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.failed.continueReason.NOT_STARTED": "runFailure.NOT_STARTED",
+  "v4.failed.continueReason.SET_ASIDE": "runFailure.SET_ASIDE"
+});
+
+describe("the owner's questions 42 A and 43 A (7 Nov): the stopped page's reason with Continue, and its quota lines", () => {
+  const home = JSON.parse(readFileSync(join(ui, "messages/en/home.json"), "utf8")) as Record<string, string>;
+
+  it("are the owner's words, pinned here, and wait on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(QUESTIONS_42_43_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(QUESTIONS_42_43_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in QUESTIONS_42_43_ANSWER_LINES)).toEqual([]);
+    // The STOPPED line is the shared sentence without its last sentence, which stays as it was.
+    expect(home["runFailure.STOPPED"]).toBe(`${catalog["v4.failed.continueReason.STOPPED"]} Please ask your question again.`);
+  });
+
+  it("the other cut lines drop only the shared sentence's ask-again ending, and are drafts until the click-test", () => {
+    for (const [key, shared] of Object.entries(CONTINUE_REASON_DRAFTS)) {
+      expect(catalog[key], key).toBeDefined();
+      expect(home[shared]!.startsWith(`${catalog[key]} `), key).toBe(true);
+      expect(home[shared]!.slice(catalog[key]!.length).trim(), key).toMatch(/^Please ask (your question )?again\.$/u);
+      expect(catalog[key], key).not.toMatch(/again/iu);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+    // SET_ASIDE keeps its "It did not use your quota." (the page shows no second quota line beside it).
+    expect(catalog["v4.failed.continueReason.SET_ASIDE"]).toMatch(/It did not use your quota\.$/u);
+  });
+});
+
 describe("the owner's sixth round (7 Nov, question 41 A): the grey line under \"Change the question\" says both ways", () => {
   it("is the owner's words, pinned here, and waits on no drafted list", () => {
     expect(Object.fromEntries(Object.keys(SIXTH_ROUND_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(SIXTH_ROUND_ANSWER_LINES);
@@ -1235,9 +1280,9 @@ describe("the owner's 5 Nov answers: failed digs and questions, one pick, the pu
     expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.digFailedTitle");
   });
 
-  it("question 20 A: the failed question's 'used some' line is the answer's words, a draft until the click-test", () => {
+  it("question 20 A: the failed question's 'used some' line is the answer's words, approved as built (question 43 A, 7 Nov)", () => {
     expect(catalog["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
-    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.failedSomeTaken");
+    expect(DRAFTED_UNTIL_CLICK_TEST).not.toContain("v4.debate.failedSomeTaken");
     // The two "nothing taken" lines are the record's (map-f30, wait-f18), not drafts.
     expect([catalog["v4.debate.failedNothingTaken"], catalog["v4.digFailed.nothingTaken"]])
       .toEqual(["Nothing was taken for the failed try.", "Nothing was taken from your quota for this."]);

@@ -179,6 +179,48 @@ describe("the owner's question 41 A (7 Nov): the grey line under 'Change the que
   });
 });
 
+/*
+ * Owner 7 Nov, question 42 A (relayed by the review session): with "Continue where it stopped" offered, the reason sentence above it drops
+ * its "ask again" ending (STOPPED: the owner's words; the others drafted, new V4 lines). Without Continue the shared sentence is as before.
+ */
+describe("the owner's question 42 A (7 Nov): with Continue offered, the reason drops its 'ask again' ending", () => {
+  const STOPPED_CUT = "This debate stopped partway because of a problem on our side.";
+
+  it("a debate that can continue: the STOPPED sentence ends before 'Please ask your question again.'", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME", continuable: true });
+    await mountMap(1600, runId);
+    expect(text()).toContain(STOPPED_CUT);
+    expect(text()).not.toContain(HOME["runFailure.STOPPED"]);
+    expect(text()).not.toMatch(/ask (your question )?again\./iu);
+  });
+
+  it("not continuable: the shared STOPPED sentence, whole", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME" });
+    await mountMap(1600, runId);
+    expect(text()).toContain(HOME["runFailure.STOPPED"]);
+  });
+
+  it("the other reasons: NOT_STARTED and SET_ASIDE are cut the same way; a reason with no 'ask again' ending is as before", async () => {
+    const screen = async (reason: string, quotaUsed: string) => {
+      const run = failedRun("7b000000-0000-4000-8000-000000000004", { quota_used: quotaUsed, continuable: true }, reason);
+      return draw(<V4FailedScreen run={run} askAgainHref="/v4?again=7b000000-0000-4000-8000-000000000004" askHref="/v4" dig={null}
+        onContinue={() => undefined} catalog={CATALOG} homeCatalog={HOME} />);
+    };
+    const notStarted = await screen("RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID", "NONE");
+    expect(notStarted).toContain(CATALOG["v4.failed.continueReason.NOT_STARTED"]);
+    expect(notStarted).not.toContain(HOME["runFailure.NOT_STARTED"]);
+    const setAside = await screen("RUN_SET_ASIDE:BACKSTOP", "NONE");
+    expect(setAside).toContain(CATALOG["v4.failed.continueReason.SET_ASIDE"]);
+    expect(setAside).not.toContain(HOME["runFailure.SET_ASIDE"]);
+    // Never two quota lines: its own "It did not use your quota." and no "Nothing was taken for the failed try.".
+    expect(setAside).not.toContain(CATALOG["v4.debate.failedNothingTaken"]);
+    const unavailable = await screen("RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", "NONE");
+    expect(unavailable).toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
+  });
+});
+
 describe("the press: the shared 10-second Undo, then one Continue (Task 57g)", () => {
   it("shows Start's Undo note and sends nothing for 10 seconds; Undo sends nothing, ever", async () => {
     const runId = crypto.randomUUID();

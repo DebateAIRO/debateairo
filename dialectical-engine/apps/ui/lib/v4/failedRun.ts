@@ -57,6 +57,23 @@ export function saySomeUsed(reason: string | null | undefined, some: boolean): b
 }
 
 /**
+ * Owner 7 Nov, question 42 A (relayed by the review session): with "Continue where it stopped" offered, the reason sentence above it drops
+ * its "ask again" ending. Each cut line is a V4 line of its own (STOPPED is the owner's words, the others drafted); the shared runFailure.*
+ * sentences (35 languages) are untouched. A reason whose sentence has no such ending keeps it (`null` here: the shared sentence).
+ */
+const CONTINUE_REASON_KEYS: Readonly<Partial<Record<ReturnType<typeof runFailureKind>, string>>> = Object.freeze({
+  STOPPED: "v4.failed.continueReason.STOPPED",
+  NOT_STARTED: "v4.failed.continueReason.NOT_STARTED",
+  SET_ASIDE: "v4.failed.continueReason.SET_ASIDE"
+});
+
+/** Question 42 A: the reason sentence of a question whose stopped page offers Continue, or null for the shared sentence as it is. */
+export function continuingReason(reason: string | null | undefined, catalog: MessageCatalog): string | null {
+  const key = CONTINUE_REASON_KEYS[runFailureKind(reason)];
+  return key === undefined ? null : t(catalog, key);
+}
+
+/**
  * Question 20 A: the one quota line under a failed run's reason, as its catalogue key, or null when nothing is said. A
  * question: "Nothing was taken for the failed try." (NONE) or "The part that ran used some of your quota." (SOME). A dig:
  * "Nothing was taken from your quota for this." (NONE) only; a dig that used some says nothing about it (dig-f12).

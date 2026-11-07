@@ -7,7 +7,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { ownWords } from "@/lib/v4/askText";
 import type { DigRetry } from "@/lib/v4/digRetry";
-import { digFailureMessage, failedQuotaKey, quotaSomeUsed } from "@/lib/v4/failedRun";
+import { continuingReason, digFailureMessage, failedQuotaKey, quotaSomeUsed } from "@/lib/v4/failedRun";
 
 /*
  * Owner review 3 Nov 2026 (wait-f11, map-f30): the page of a debate that did not finish. Its plain reason sentence (one of
@@ -40,6 +40,8 @@ import { digFailureMessage, failedQuotaKey, quotaSomeUsed } from "@/lib/v4/faile
  * Owner 7 Nov, question 41 A ("say both ways"; OPEN-OWNER-QUESTIONS-2026-11-04.md, sixth round): with `onContinue`, the grey line under
  * "Change the question" says what each way does (v4.failed.changeQuestionNote, or …NotePicks with the picks kept): changed, it is a new
  * question; left as it is, this debate continues where it stopped. Without `onContinue` the grey line is the one above, as before.
+ * Owner 7 Nov, questions 42 A and 43 A (relayed by the review session): with `onContinue`, a question's reason drops its "ask again" ending
+ * (lib/v4/failedRun.ts continuingReason; a reason without one keeps the shared sentence), and the three quota lines are the owner's, as built.
  */
 
 export function V4FailedScreen({
@@ -93,7 +95,11 @@ export function V4FailedScreen({
       <p className="v4Eyebrow">{t(catalog, dig === null ? "v4.debate.yourQuestion" : "v4.seed.yourDig")}</p>
       <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
       <h1 className="v4DebStatusTitle">{t(catalog, dig === null ? "v4.debate.failedTitle" : "v4.debate.digFailedTitle")}</h1>
-      <p>{dig === null ? runFailureMessage(run.terminal_reason, homeCatalog) : digFailureMessage(run.terminal_reason, catalog, keepsFailing)}</p>
+      <p>
+        {dig !== null
+          ? digFailureMessage(run.terminal_reason, catalog, keepsFailing)
+          : (continuing ? continuingReason(run.terminal_reason, catalog) : null) ?? runFailureMessage(run.terminal_reason, homeCatalog)}
+      </p>
       {quotaKey === null ? null : <p>{t(catalog, quotaKey)}</p>}
       {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}
       {run.found === undefined || run.found.length === 0 ? null : (
