@@ -26,7 +26,7 @@
     },
     {
       "name": "tests/integration/identity-database.test.ts > S2 identity schema on real PostgreSQL > creates the exact identity table inventory with the required contact, audit, and erasure column types",
-      "reason": "pins the exact list of identity tables its own migration chain creates; a database migrated ahead holds the tables later expand steps add (0156 and 0157: 11), which the released code never reads"
+      "reason": "pins the exact list of identity tables its own migration chain creates; a database migrated ahead holds the tables later expand steps add (0156 and 0157: 11; 0170, the daily mail limit: 2), which the released code never reads"
     }
   ],
   "knownRed": []
