@@ -35,7 +35,11 @@ const lane = vi.hoisted(() => ({
   room: null as Record<string, unknown> | null,
   // dig-f9 (the wave-2 review): the click's own checks, lent by useV4Ask.
   ensureConsent: vi.fn(async () => true),
-  crisis: vi.fn((_words: readonly string[]) => false)
+  crisis: vi.fn((_words: readonly string[]) => false),
+  // The reading level the page hands the one ask hook: the level a dig is asked and priced at.
+  askLevels: [] as string[],
+  // The visitor's own account level (which a public page must not use).
+  accountLevel: "plain"
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: lane.push, refresh: lane.refresh }) }));
 vi.mock("@/lib/api", async (original) => ({
@@ -49,12 +53,12 @@ vi.mock("@/lib/api", async (original) => ({
     readPublicDebate: (...args: unknown[]) => lane.readPublicDebate(...args),
     readRun: (...args: unknown[]) => lane.readRun(...args),
     readRunAnswer: (...args: unknown[]) => lane.readRunAnswer(...args),
-    readReadingLevel: async () => ({ reading_level: "plain" }),
+    readReadingLevel: async () => ({ reading_level: lane.accountLevel }),
     saveReadingLevel: async () => ({ reading_level: "plain" })
   }
 }));
 vi.mock("@/lib/v4/useV4Ask", () => ({
-  useV4Ask: () => ({ planTier: lane.planTier, room: lane.room, submit: (...args: unknown[]) => lane.submit(...args), submitting: false, dialogs: null, flagsCrisis: () => false,
+  useV4Ask: (input: { readingLevel: string }) => (lane.askLevels.push(input.readingLevel), { planTier: lane.planTier, room: lane.room, submit: (...args: unknown[]) => lane.submit(...args), submitting: false, dialogs: null, flagsCrisis: () => false,
     ensureConsent: () => lane.ensureConsent(), offerCrisisHelp: (words: readonly string[]) => lane.crisis(words) })
 }));
 
@@ -120,6 +124,8 @@ beforeEach(() => {
   lane.submit = vi.fn(async () => ({ kind: "STARTED", runId: "99999999-9999-4999-8999-999999999999" }));
   lane.writePublicReport = vi.fn(async () => ({ state: "WRITING", report_version: 2 }));
   lane.readPublicDebate = vi.fn(async () => debate());
+  lane.askLevels = [];
+  lane.accountLevel = "plain";
 });
 afterEach(async () => {
   await act(async () => root?.unmount());
@@ -1048,5 +1054,52 @@ describe("Write a report", () => {
     expect(debate(1).public_ref).toBe(PUBLIC_REF_AUTHOR_GONE);
     await click(press());
     expect(host!.querySelector("[role=alert]")!.textContent).toBe(V4["v4.public.report.failed"]);
+  });
+});
+
+/*
+ * The owner's level ruling (5 Nov 2026, question 15 and the second round): a debate keeps the level it was asked at, and a
+ * public page shows each debate at that level. The public read says it (`reading_level`, the start-step session's Task 75d;
+ * not yet in this branch's contract, so these tests hand the page a read that carries it); one without it reads as Plain
+ * words. A dig asked there is asked, and its share read, at the debate's level, never the visitor's own, so "up to N%"
+ * agrees with what the dig is charged.
+ */
+describe("a public debate at its own reading level", () => {
+  const atLevel = (level: string): PublicDebate => ({ ...debate(), reading_level: level }) as PublicDebate;
+  const firstOpen = (): HTMLButtonElement => buttons(V4["v4.public.dig.open"]!)[0]!;
+  const basisLines = (): number => host!.querySelectorAll(".v4PubFound .v4PanelBasis").length;
+
+  it("a dig asked there is asked and priced at the debate's level, and its card opens the dig at that level", async () => {
+    vi.useFakeTimers();
+    await mount(atLevel("expert"));
+    expect(lane.askLevels.length).toBeGreaterThan(0);
+    expect(new Set(lane.askLevels)).toEqual(new Set(["expert"]));
+    await openRows();
+    await click(firstOpen());
+    await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Rural towns differ.");
+    await click(startButtons()[0]!);
+    await undoRunsOut();
+    expect(lane.submit).toHaveBeenCalledTimes(1);
+    const card = host!.querySelector("[data-public-dig-card]")!;
+    expect(card.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999?level=expert");
+  });
+
+  it("a debate with no level of its own is asked at Plain words, whatever the visitor's account or the address holds", async () => {
+    lane.accountLevel = "expert";
+    window.history.replaceState(null, "", "/?level=background");
+    await mount(debate());
+    await flush();
+    expect(new Set(lane.askLevels)).toEqual(new Set(["plain"]));
+  });
+
+  it("the points under a path show at the debate's level: Plain words leave out what Some background adds", async () => {
+    await mount(debate());
+    await openRows();
+    expect(basisLines()).toBe(0);
+    await act(async () => root?.unmount());
+    host?.remove();
+    await mount(atLevel("background"));
+    await openRows();
+    expect(basisLines()).toBeGreaterThan(0);
   });
 });

@@ -977,6 +977,7 @@ apps/ui/lib/v4/askConfig.ts
 apps/ui/lib/v4/askText.ts
 apps/ui/lib/v4/changes.ts
 apps/ui/lib/v4/clock.ts
+apps/ui/lib/v4/debateLevel.ts
 apps/ui/lib/v4/digDock.ts
 apps/ui/lib/v4/digIndex.ts
 apps/ui/lib/v4/digProgress.ts
