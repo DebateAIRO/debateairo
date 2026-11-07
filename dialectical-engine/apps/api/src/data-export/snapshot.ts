@@ -1,7 +1,7 @@
 import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry, WebSourceEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 import { TypedDomainError } from "@debateai/kernel";
-import { SavedQuestionDocSchema } from "@debateai/contract";
+import { SavedQuestionDocSchema, savedQuestionOwnWords } from "@debateai/contract";
 
 export type ExportClaim = Readonly<{
   exportId: string; userId: string; ownerRef: string; sessionId: string;
@@ -391,6 +391,9 @@ async function collectWebSources(raw: RawExportRows, ownerView: OwnerViewPort, d
  * as it reads, the line the AIs read, the answers, the paths and the other suggestions as titles and questions, How wide, Quick look or
  * Thorough, the carry-on tick, and when it was first and last saved. Never a signed reference (each carries a fingerprint of the words),
  * a key name or an envelope. A question whose key is gone is left out; a key that is there but does not open fails the export.
+ * Review of Task 76m (privacy policy 3.12, section 10 "Access"): `own_words`, every word of the person's the question keeps, once each,
+ * as a save screens them (savedQuestionOwnWords), so also those the paths do not show: in an Undo step, in an own chip of a path the
+ * AI combined, and in an own chip of a combine undone before the save (`combined_written`).
  */
 async function collectQuestionsNotStarted(raw: RawExportRows, claim: ExportClaim, decrypt: ExportDecryptors): Promise<Row[]> {
   const entries: Row[] = [];
@@ -399,12 +402,13 @@ async function collectQuestionsNotStarted(raw: RawExportRows, claim: ExportClaim
     if (decrypt.openSavedQuestion === undefined) throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
     const text = await decrypt.openSavedQuestion(claim.userId, claim.ownerRef, string(id), "content", envelope);
     if (text === null) continue;
-    const { reading, page } = SavedQuestionDocSchema.parse(JSON.parse(text));
+    const doc = SavedQuestionDocSchema.parse(JSON.parse(text));
+    const { reading, page } = doc;
     const titled = (paths: readonly Readonly<{ title: string; question: string }>[]) => paths.map(({ title, question }) => ({ title, question }));
     entries.push({
       question: page.box.text, read_question: reading.read_line,
       answers: page.sent_goal.answers.map(({ question, answer }) => ({ question, answer })),
-      paths: titled(page.plan.paths), other_suggestions: titled(page.plan.more),
+      paths: titled(page.plan.paths), other_suggestions: titled(page.plan.more), own_words: [...savedQuestionOwnWords(doc)],
       how_wide: page.width, mode: page.mode, carry_on_to_report: page.carry_on, created_at, saved_at: updated_at
     });
   }

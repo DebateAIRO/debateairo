@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { AccountReadingLevelSchema } from "./account-memory.js";
 import { NamedLanguageSchema } from "./question-language.js";
-import { START_STEP_LIMITS, START_STEP_NONE_REASONS, SignedStartListSchema, SignedStartMenuSchema, StartCheckSchema } from "./start-paths.js";
+import {
+  START_STEP_LIMITS, START_STEP_NONE_REASONS, SignedStartListSchema, SignedStartMenuSchema, StartCheckSchema, StartCombineMemberSchema,
+  type StartCombineMember
+} from "./start-paths.js";
 import { AskClarifyResponseSchema } from "./web.js";
 
 /**
@@ -90,6 +93,34 @@ const PagePlanStepSchema = z.object({
 }).passthrough();
 const PageSentenceSchema = z.string().max(S.boxMaxBytes);
 
+const CombineMembersSchema = z.array(StartCombineMemberSchema).min(1).max(L.pathMembersMax);
+/**
+ * A combine's members as the page keys them (its combineMembersKey: the members' JSON), as sent (never trimmed); null when the
+ * text is not a list of combine members.
+ */
+function combineMembersOf(members: string): readonly StartCombineMember[] | null {
+  let held: unknown;
+  try {
+    held = JSON.parse(members);
+  } catch {
+    return null;
+  }
+  return CombineMembersSchema.safeParse(held).success ? held as StartCombineMember[] : null;
+}
+/**
+ * Task 76m (spec §3.2: "the combined questions already written, so that Undo and combine again stays free"): the AI's words for one
+ * set of viewpoints put together in this reading, also one undone before the save (then neither the plan nor its Undo steps hold
+ * them), by their members, with the combine's reference, character for character. A member with no viewpoint and no pick is the
+ * person's own words, which savedQuestionOwnWords screens; so the members must read as a combine's members, and an entry holds
+ * nothing else (strict). The page's whole half stays within pageMaxBytes.
+ */
+const PageCombinedWrittenSchema = z.object({
+  members: z.string().refine((members) => combineMembersOf(members) !== null, { message: "a combine's members, as the page keys them" }),
+  title: z.string().max(L.pathTitleMaxChars),
+  question: z.string().max(L.pathQuestionMaxChars),
+  combine_ref: z.string().max(L.refMaxChars)
+}).strict();
+
 export const SavedQuestionPageSchema = z.object({
   /** The question box: its text (at most boxMaxBytes of UTF-8, which savedQuestionDocFits checks) and the sentences placed in it. */
   box: z.object({
@@ -105,7 +136,9 @@ export const SavedQuestionPageSchema = z.object({
   width: z.number().int().min(1).max(L.pathsMax),
   /** Quick look or Thorough. */
   mode: z.enum(["quick", "thorough"]),
-  carry_on: z.boolean()
+  carry_on: z.boolean(),
+  /** Task 76m: the AI's combined words of this reading, oldest first (absent: none, or a page from before). */
+  combined_written: z.array(PageCombinedWrittenSchema).optional()
 }).passthrough();
 
 export const SavedQuestionDocSchema = z.object({
@@ -179,11 +212,13 @@ export function savedQuestionTitleOf(doc: SavedQuestionDoc): string {
 
 /**
  * What a save screens for crisis words, once each: the box; the title and question of every path in the person's wording
- * and the question of every chip in their own words, on the list, under "+ N more" and in every Undo step; and every answer
- * they typed ("Other…"). Never the AIs' text (their paths, chips, clarifying questions and answer options).
+ * and the question of every chip in their own words, on the list, under "+ N more" and in every Undo step; every answer
+ * they typed ("Other…"); and (Task 76m) each of their own chips among the members of the combined words kept
+ * (`combined_written`: a member with no viewpoint and no pick). Never the AIs' text (their paths, chips, combined words,
+ * clarifying questions and answer options).
  */
 export function savedQuestionOwnWords(doc: SavedQuestionDoc): readonly string[] {
-  const { box, plan, sent_goal: goal } = doc.page;
+  const { box, plan, sent_goal: goal, combined_written: combined } = doc.page;
   const paths = [plan, ...plan.undo].flatMap((step) => [...step.paths, ...step.more]);
   const words = [
     box.text,
@@ -191,7 +226,14 @@ export function savedQuestionOwnWords(doc: SavedQuestionDoc): readonly string[] 
       ...(path.wording === "PERSON" ? [path.title, path.question] : []),
       ...path.viewpoints.flatMap((viewpoint) => viewpoint.source.kind === "OWN" ? [viewpoint.question] : [])
     ]),
-    ...goal.answers.flatMap((answer) => answer.other ? [answer.answer] : [])
+    ...goal.answers.flatMap((answer) => answer.other ? [answer.answer] : []),
+    ...(combined ?? []).flatMap((written) => {
+      const members = combineMembersOf(written.members);
+      // The schema refuses members that are not a combine's; should such a text come here unchecked, all of it is screened.
+      if (members === null) return [written.members];
+      return members.flatMap((member) => member.viewpoint_id === null && member.pick_no === null
+        ? [member.question, ...(member.title === null ? [] : [member.title])] : []);
+    })
   ];
   return Object.freeze([...new Set(words.filter((text) => text.trim() !== ""))]);
 }

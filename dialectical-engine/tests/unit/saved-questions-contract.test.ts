@@ -15,7 +15,7 @@ import {
   SavedQuestionReadingSchema, SavedQuestionSaveSchema, SavedQuestionSummarySchema, SavedQuestionWrittenSchema, askQuestionMaxBytes,
   savedQuestionDocFits, savedQuestionOwnWords, savedQuestionPartBytes, savedQuestionTitleOf, type SavedQuestionDoc
 } from "@debateai/contract";
-import { PATH_PLAN_LIMITS, pathPlanFromMenu, pathPlanReduce } from "../../apps/ui/lib/v4/pathPlan.js";
+import { PATH_PLAN_LIMITS, combineMembersKey, pathPlanFromMenu, pathPlanReduce } from "../../apps/ui/lib/v4/pathPlan.js";
 import { NUCLEAR_MENU, START_FIXTURE_QUESTION, TWO_PATH_MENU, signedList, signedMenu } from "../support/v4-start-menu.js";
 
 const ID = "3f2c1a9e-7b4d-4c2a-9e8f-1a2b3c4d5e6f";
@@ -315,6 +315,87 @@ describe("savedQuestionOwnWords (what a save screens for crisis words)", () => {
       ...NUCLEAR_MENU.paths.flatMap((path) => [path.title, path.question]),
       ...NUCLEAR_MENU.viewpoints.flatMap((viewpoint) => [viewpoint.title, viewpoint.question])];
     for (const text of aiText) expect(words).not.toContain(text);
+  });
+});
+
+/**
+ * Task 76m (spec §3.2: "the combined questions already written, so that Undo and combine again stays free"): the AI's words of a
+ * combine the person undid before the save sit in neither the plan nor its Undo steps, so the page keeps them in `combined_written`,
+ * by their members as the page keys them (combineMembersKey), with the combine's reference, character for character. A member with
+ * no viewpoint and no pick is the person's own words: a save screens it like the rest. The page's size limit holds it too.
+ */
+describe("combined_written (Task 76m: a combine undone before the save)", () => {
+  const OWN_CHIP = "My street floods every spring";
+  const UNDONE_TITLE = "Floods and cooling ";
+  const UNDONE_QUESTION = "Would floods on the Danube stop the plants from cooling?";
+  const pt14 = NUCLEAR_MENU.viewpoints.find((viewpoint) => viewpoint.viewpoint_id === "pt14")!;
+  const MEMBERS = combineMembersKey([{ viewpoint_id: "pt14", pick_no: null, title: pt14.title, question: pt14.question },
+    { viewpoint_id: null, pick_no: null, title: null, question: OWN_CHIP }]);
+  const UNDONE = { members: MEMBERS, title: UNDONE_TITLE, question: UNDONE_QUESTION, combine_ref: "cmb2.sig" };
+  const withCombined = (...written: object[]) => docOf({ page: { combined_written: written } });
+
+  it("parses, and comes back character for character (a title ending in a space stays)", () => {
+    expect(parses(withCombined(UNDONE))).toBe(true);
+    expect(SavedQuestionDocSchema.parse(withCombined(UNDONE)).page.combined_written).toEqual([UNDONE]);
+    expect(parses(withCombined())).toBe(true);
+    expect(parses(DOC)).toBe(true);
+  });
+
+  it("refuses members that are not a combine's members, a key of its own, and words over the path caps", () => {
+    const member = { pick_no: null, question: OWN_CHIP, title: null, viewpoint_id: null };
+    for (const members of ["not a list", "", "[]", "{}", JSON.stringify([{ question: OWN_CHIP }]), JSON.stringify([{ ...member, note: "x" }]),
+      JSON.stringify([{ ...member, question: " " }]), JSON.stringify(Array.from({ length: START_STEP_LIMITS.pathMembersMax + 1 }, () => member))]) {
+      expect(parses(withCombined({ ...UNDONE, members })), members.slice(0, 40)).toBe(false);
+    }
+    const { pathTitleMaxChars: title, pathQuestionMaxChars: question } = START_STEP_LIMITS;
+    expect(parses(withCombined({ ...UNDONE, title: "t".repeat(title), question: "q".repeat(question) }))).toBe(true);
+    expect(parses(withCombined({ ...UNDONE, title: "t".repeat(title + 1) }))).toBe(false);
+    expect(parses(withCombined({ ...UNDONE, question: "q".repeat(question + 1) }))).toBe(false);
+    expect(parses(withCombined({ ...UNDONE, note: "x" }))).toBe(false);
+    const { combine_ref: _ref, ...noRef } = UNDONE;
+    expect(parses(withCombined(noRef))).toBe(false);
+    expect(parses(docOf({ page: { combined_written: UNDONE } }))).toBe(false);
+  });
+
+  it("savedQuestionOwnWords holds the person's own chip in its members, and none of the AI's words there", () => {
+    const words = savedQuestionOwnWords(withCombined(UNDONE));
+    expect(words).toContain(OWN_CHIP);
+    for (const text of [MEMBERS, UNDONE_TITLE, UNDONE_QUESTION, pt14.title, pt14.question]) expect(words).not.toContain(text);
+    expect([...words].sort()).toEqual([...savedQuestionOwnWords(DOC), OWN_CHIP].sort());
+  });
+
+  it("counts toward the page's 262_144 bytes: one byte over is the page's size refusal", () => {
+    /** The page with combined_written made of own-word members (letters only, one byte each) until it is exactly `bytes` long. */
+    const ofBytes = (bytes: number): SavedQuestionDoc => {
+      const memberOf = (length: number) => ({ pick_no: null, question: "x".repeat(length), title: null, viewpoint_id: null });
+      const docWith = (lengths: readonly (readonly number[])[]) => withCombined(...lengths.map((one) => ({ ...UNDONE,
+        members: JSON.stringify(one.map(memberOf)) })));
+      const size = (lengths: readonly (readonly number[])[]) => savedQuestionPartBytes(docWith(lengths).page);
+      const groups: number[][] = [[]];
+      while (groups.flat().length === 0 || size(groups) < bytes) {
+        const last = groups.at(-1)!;
+        if (last.length === START_STEP_LIMITS.pathMembersMax) groups.push([1_000]);
+        else last.push(1_000);
+      }
+      // The overshoot comes back off the newest members, each keeping at least one letter.
+      let over = size(groups) - bytes;
+      for (const one of [...groups].reverse()) {
+        for (let at = one.length - 1; at >= 0 && over > 0; at -= 1) {
+          const cut = Math.min(over, one[at]! - 1);
+          one[at] = one[at]! - cut;
+          over -= cut;
+        }
+      }
+      return docWith(groups);
+    };
+    const fits = ofBytes(SAVED_QUESTION_LIMITS.pageMaxBytes);
+    expect(savedQuestionPartBytes(fits.page)).toBe(262_144);
+    expect(parses(fits)).toBe(true);
+    expect(savedQuestionDocFits(fits)).toBe("FITS");
+    const over = ofBytes(SAVED_QUESTION_LIMITS.pageMaxBytes + 1);
+    expect(savedQuestionPartBytes(over.page)).toBe(262_145);
+    expect(parses(over)).toBe(true);
+    expect(savedQuestionDocFits(over)).toBe("TOO_LARGE");
   });
 });
 

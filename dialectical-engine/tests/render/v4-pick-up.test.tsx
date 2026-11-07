@@ -126,7 +126,9 @@ vi.mock("@/lib/api", async () => {
 });
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
-import { pathPlanFromMenu, pathPlanReduce, pathPlanToStartPaths, type PathPlan, type PathPlanAction } from "../../apps/ui/lib/v4/pathPlan.js";
+import {
+  combineMembersKey, pathPlanCombineMembers, pathPlanFromMenu, pathPlanReduce, pathPlanToStartPaths, type PathPlan, type PathPlanAction
+} from "../../apps/ui/lib/v4/pathPlan.js";
 import { boxOf, boxPlace } from "../../apps/ui/lib/v4/questionBox.js";
 import { savedDocOf } from "../../apps/ui/lib/v4/savedQuestion.js";
 import type { V4StartKept, V4StartReading } from "../../apps/ui/lib/v4/startKept.js";
@@ -379,6 +381,27 @@ describe("Pick up: no AI call (owner card 'Where shown'; read-f23)", () => {
     expect(callNames(accountCalls().filter((call) => call.method === "DELETE"))).toEqual([`DELETE ${SAVED}/${PICKED}`]);
   });
 
+  // Task 76m (spec §3.2: "the combined questions already written, so that Undo and combine again stays free"): a combine the
+  // person undid before the save is in neither the plan nor its Undo steps; the saved page keeps its AI words beside them.
+  it("a combine undone before the save: combining the same paths again takes its kept AI words at once, and Start sends them", async () => {
+    const plan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
+    const applied = reduced(plan, { type: "APPLY_SUGGESTION", suggestionId: "sg1" });
+    const members = combineMembersKey(pathPlanCombineMembers(applied.paths.find((path) => path.wording === "WRITING")!));
+    keep(keptOf(plan, { written: [{ members, title: "Hard weeks, two ways", question: "How would Romania get through its two hardest weeks?",
+      combineRef: "cmb2.sig" }] }));
+    await pickedUp();
+    expect(rows().some((row) => row.textContent?.includes("Hard weeks, two ways"))).toBe(false);
+    const suggestion = [...host!.querySelectorAll(".v4StartSuggestion")].find((one) => buttonNamed("Combine", one) !== undefined)!;
+    await click(buttonNamed("Combine", suggestion)!);
+    expect(rows().filter((row) => row.textContent?.includes("Hard weeks, two ways"))).toHaveLength(1);
+    noAiCall();
+    await press(startButton());
+    const paths = (lane()!.startPaths as { paths: Array<{ combine_ref?: string; question?: string }> }).paths;
+    expect(paths.filter((path) => path.combine_ref === "cmb2.sig")).toEqual([
+      expect.objectContaining({ question: "How would Romania get through its two hardest weeks?" })]);
+    noAiCall();
+  });
+
   it("a path still being written shows its joined words, and no combine request is sent", async () => {
     const writing = writingPlan();
     const key = writing.paths.find((path) => path.wording === "WRITING")!.key;
@@ -473,6 +496,17 @@ describe("what Pick up can meet (spec §3.5, §3.10)", () => {
 
   it("crisis words in a saved own path open the help screen instead of step 2", async () => {
     keep(keptOf(shapedPlan(CRISIS)));
+    await pickedUp();
+    expect(document.querySelector('[data-dialog="crisis-support"]')).not.toBeNull();
+    expect(onStepTwo()).toBe(false);
+    noAiCall();
+  });
+
+  // Task 76m (spec §3.2, §3.12): the person's own chip of a combine undone before the save is screened like the rest of their words.
+  it("crisis words in an own chip of a combine undone before the save open the help screen instead of step 2", async () => {
+    const plan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
+    const members = combineMembersKey([...pathPlanCombineMembers(plan.paths[0]!), { viewpoint_id: null, pick_no: null, title: null, question: CRISIS }]);
+    keep(keptOf(plan, { written: [{ members, title: "Hard weeks and me", question: "How would my family get through the hardest weeks?", combineRef: "cmb2.sig" }] }));
     await pickedUp();
     expect(document.querySelector('[data-dialog="crisis-support"]')).not.toBeNull();
     expect(onStepTwo()).toBe(false);

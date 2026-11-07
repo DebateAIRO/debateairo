@@ -4,9 +4,11 @@
  * as it reads, the line the AIs read, the answers, the paths and the other suggestions, How wide, Quick look or Thorough, the carry-on
  * tick, and when it was first and last saved, each opened under the question's own key. No signed reference, hash, key name or envelope
  * goes out. A question whose key is gone is deleted in effect and left out; a key that is there but does not open fails the export.
- * The worker reaches 0162's reader: its function count is one more. Every question here is made up.
+ * The worker reaches 0162's reader: its function count is one more. Every question here is made up. Review of Task 76m: `own_words`,
+ * every word of the person's the question keeps (as a save screens them), also those the paths do not show.
  */
 import { describe, expect, it } from "vitest";
+import { savedQuestionOwnWords } from "@debateai/contract";
 import { KEEP_COLUMNS, RAW_SECTIONS, collectSnapshot, type ExportDecryptors } from "../../apps/api/src/data-export/snapshot.js";
 import { buildArchive } from "../../apps/api/src/data-export/archive.js";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
@@ -14,6 +16,7 @@ import { renderReadme } from "../../apps/api/src/data-export/readme.js";
 import { MemorySavedQuestionKeyStore, SavedQuestionKeyUnresolvedError, generateDek } from "../../packages/crypto/src/index.js";
 import { assertDataExportDatabaseRoles, PostgresDataExportSource } from "../../packages/db/src/data-export.js";
 import { createSavedQuestionService, savedQuestionOpener, type SavedQuestionGate } from "../../apps/api/src/saved-questions/service.js";
+import { combineMembersKey } from "../../apps/ui/lib/v4/pathPlan.js";
 import {
   FakeSavedQuestionStore, MemoryUserDekStore, SAVED_BOX_TEXT, SAVED_Q, SAVED_TRAILING_TITLE, newSavedPerson, newStartStepKey, savedDocOf,
   savedOwnPath, savedScopeOf, savedSigner
@@ -76,13 +79,38 @@ describe("the questions not started yet in account.json", () => {
       answers: [{ question: "Up to when?", answer: "Up to 2050" }],
       paths: first.page.plan.paths.map((path) => ({ title: path.title, question: path.question })),
       other_suggestions: first.page.plan.more.map((path) => ({ title: path.title, question: path.question })),
+      own_words: [SAVED_BOX_TEXT],
       how_wide: 5, mode: "thorough", carry_on_to_report: true,
       created_at: w.store.rows.get(one.id)!.createdAt.toISOString(), saved_at: w.store.rows.get(one.id)!.updatedAt.toISOString()
     });
     expect((a!.paths as { title: string }[])[0]!.title).toBe(SAVED_TRAILING_TITLE);
     expect(b).toMatchObject({ answers: [{ question: "What is the answer for?", answer: "For my town council" }],
-      paths: [{ title: "What about the workers?", question: "What about the workers?" }], other_suggestions: [], how_wide: 3, mode: "quick",
+      paths: [{ title: "What about the workers?", question: "What about the workers?" }], other_suggestions: [],
+      own_words: [SAVED_BOX_TEXT, "What about the workers?", "For my town council"], how_wide: 3, mode: "quick",
       carry_on_to_report: false, created_at: w.store.rows.get(two.id)!.createdAt.toISOString() });
+  });
+
+  it("own_words: every word of the person's the question keeps, once each, as a save screens them: also one only in an Undo step or "
+    + "in an own chip of a combine undone before the save (combined_written)", async () => {
+    // Review of Task 76m (spec §3.2, §3.9; privacy policy 3.12, section 10 "Access"): paths and other_suggestions hold neither of these
+    // words, yet the question keeps them, so the person's copy must too. The AI's words of that combine and its reference stay out.
+    const w = await world();
+    const OWN_CHIP = "My street floods every spring";
+    const REMOVED_OWN_PATH = "What about the fishermen on the Danube?";
+    const doc = savedDocOf(ANA_SIGNS, {
+      page: { combined_written: [{ members: combineMembersKey([
+        { viewpoint_id: "pt14", pick_no: null, title: "Gas bought abroad", question: "Would new plants cut the gas Romania buys?" },
+        { viewpoint_id: null, pick_no: null, title: null, question: OWN_CHIP }]),
+      title: "Floods and gas", question: "Would floods change how much gas Romania buys?", combine_ref: "cmb2.sig" }] },
+      plan: { undo: [{ paths: [savedOwnPath("p9", REMOVED_OWN_PATH)], more: [] }] }
+    });
+    await w.service.create(ANA, { doc }, GATE);
+    const snapshot = await collect(rawRows(w.store.exportRows(ANA.ownerRef)), savedQuestionOpener(w.keys));
+    const [entry] = snapshot.account.questions_not_started;
+    expect(entry!.own_words).toEqual([SAVED_BOX_TEXT, REMOVED_OWN_PATH, OWN_CHIP]);
+    expect(entry!.own_words).toEqual([...savedQuestionOwnWords(doc)]);
+    const text = JSON.stringify(entry);
+    for (const ai of ["Floods and gas", "Gas bought abroad", "cmb2.sig", "viewpoint_id", "combine"]) expect(text).not.toContain(ai);
   });
 
   it("carries no reference, hash, key name or envelope: the archive's forbidden-key scan passes and no value names saved-question:", async () => {
@@ -96,7 +124,7 @@ describe("the questions not started yet in account.json", () => {
     expect(text).not.toContain("saved-question:");
     expect(text).not.toMatch(/\.sig|"ref"|menu_id|"check"|ciphertext|keyId|"nonce"/u);
     expect(Object.keys(account.questions_not_started[0]).sort()).toEqual(["answers", "carry_on_to_report", "created_at", "how_wide", "mode",
-      "other_suggestions", "paths", "question", "read_question", "saved_at"]);
+      "other_suggestions", "own_words", "paths", "question", "read_question", "saved_at"]);
     expect(account).not.toHaveProperty("saved_questions");
     expect(account.kept_questions).toEqual([]);
   });

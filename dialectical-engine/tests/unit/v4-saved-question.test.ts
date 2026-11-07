@@ -7,10 +7,13 @@ import {
 // @ts-expect-error -- the root test compiler has no JSX mode; Vitest transpiles this TSX module.
 import { buildNewDebateAskConfig } from "../../apps/ui/app/new/defaults.js";
 import { createDebate } from "../../apps/ui/lib/api.js";
-import { pathPlanChanged, pathPlanFromMenu, pathPlanReduce, type PathPlan, type PathPlanAction, type PathPlanSnapshot } from "../../apps/ui/lib/v4/pathPlan.js";
+import {
+  combineMembersKey, pathPlanChanged, pathPlanCombineMembers, pathPlanFromMenu, pathPlanReduce, type PathPlan, type PathPlanAction,
+  type PathPlanSnapshot
+} from "../../apps/ui/lib/v4/pathPlan.js";
 import { boxOf, boxPlace } from "../../apps/ui/lib/v4/questionBox.js";
 import { keptOfSaved, SAVE_PAUSE_MS, savedDocOf, withUndoTrimmed } from "../../apps/ui/lib/v4/savedQuestion.js";
-import type { V4StartKept, V4StartReading } from "../../apps/ui/lib/v4/startKept.js";
+import { startKeptOf, type V4StartKept, type V4StartReading, type V4StartWritten } from "../../apps/ui/lib/v4/startKept.js";
 import { NUCLEAR_MENU, START_FIXTURE_QUESTION, signedList, signedMenu } from "../support/v4-start-menu.js";
 
 /*
@@ -135,6 +138,65 @@ describe("the saved document (saved-questions spec §3.2)", () => {
     expect(keptOfSaved(noPage as unknown as SavedQuestionDoc)).toBeNull();
     expect(keptOfSaved(null as unknown as SavedQuestionDoc)).toBeNull();
     expect(keptOfSaved({ ...doc, reading: { ...doc.reading, end: "READY", menu: null } })).toBeNull();
+  });
+});
+
+/**
+ * Task 76m (spec §3.2: "the combined questions already written, so that Undo and combine again stays free"): the AI's words of a
+ * combine undone before the save are in neither the plan nor its Undo steps, so the kept step 2 carries the reading's whole cache
+ * (`written`, by combineMembersKey) and the document keeps it as `combined_written`, in the room the page's half leaves.
+ */
+describe("the AI's combined words of this reading (Task 76m)", () => {
+  /** sg1 (kp02 with kp04) applied, then undone: the plan holds it nowhere. */
+  const UNDONE_MEMBERS = (() => {
+    const applied = reduced(pathPlanFromMenu(NUCLEAR_MENU, 5, false), { type: "APPLY_SUGGESTION", suggestionId: "sg1" });
+    return combineMembersKey(pathPlanCombineMembers(applied.paths.find((path) => path.wording === "WRITING")!));
+  })();
+  const UNDONE: V4StartWritten = { members: UNDONE_MEMBERS, title: "Hard weeks, two ways ", question: "How would Romania get through its hardest weeks?",
+    combineRef: "cmb2.sig" };
+
+  it("savedDocOf carries them as combined_written, and keptOfSaved over the wire gives them back as written", () => {
+    const kept = keptOf(shapedPlan(), { written: [UNDONE] });
+    const doc = savedDocOf({ kept, reading: readingOf() });
+    expect(doc.page.combined_written).toEqual([{ members: UNDONE_MEMBERS, title: "Hard weeks, two ways ",
+      question: "How would Romania get through its hardest weeks?", combine_ref: "cmb2.sig" }]);
+    expect(SavedQuestionDocSchema.safeParse(doc).success).toBe(true);
+    expect(JSON.stringify(doc.page.plan)).not.toContain("Hard weeks, two ways");
+    const back = keptOfSaved(overTheWire(doc))!;
+    expect(back.written).toEqual([UNDONE]);
+    expect(back.plan).toEqual(kept.plan);
+  });
+
+  it("with none, the document has no combined_written, as before; a kept step 2 whose written words are not words is not read", () => {
+    const doc = savedDocOf({ kept: keptOf(), reading: readingOf() });
+    expect(doc.page).not.toHaveProperty("combined_written");
+    expect(keptOfSaved(overTheWire(doc))!).not.toHaveProperty("written");
+    expect(savedDocOf({ kept: keptOf(shapedPlan(), { written: [] }), reading: readingOf() }).page).not.toHaveProperty("combined_written");
+    expect(startKeptOf({ ...keptOf(), written: [UNDONE] })).not.toBeNull();
+    for (const written of [{}, [null], [{ ...UNDONE, combineRef: 3 }], [{ title: "t", question: "q", combineRef: "c.s" }]]) {
+      expect(startKeptOf({ ...keptOf(), written })).toBeNull();
+    }
+  });
+
+  it("they take only the room the page's half leaves: no Undo step goes for them, the newest stay and the oldest go first", () => {
+    // Six made-up combines of 54 own-word chips each, about 57 KB apiece: more than the page's half holds.
+    const big = (n: number): V4StartWritten => ({ title: `Entry ${String(n)}`, question: `What does entry ${String(n)} ask?`, combineRef: `cmb${String(n)}.sig`,
+      members: combineMembersKey(Array.from({ length: 54 }, (_, at) => ({ viewpoint_id: null, pick_no: null, title: null,
+        question: `${String(n)}-${String(at)} ${"x".repeat(990)}` }))) });
+    const all = [1, 2, 3, 4, 5, 6].map(big);
+    const kept = keptOf(shapedPlan(), { written: all });
+    expect(kept.plan.undo.length).toBeGreaterThan(0);
+    const doc = savedDocOf({ kept, reading: readingOf() });
+    const wire = all.map((one) => ({ members: one.members, title: one.title, question: one.question, combine_ref: one.combineRef }));
+    const held = doc.page.combined_written!;
+    expect(held.length).toBeGreaterThan(0);
+    expect(held.length).toBeLessThan(all.length);
+    expect(held).toEqual(wire.slice(-held.length));
+    expect(doc.page.plan).toEqual(kept.plan);
+    expect(savedQuestionPartBytes(doc.page)).toBeLessThanOrEqual(PAGE_MAX);
+    expect(savedQuestionPartBytes({ ...doc.page, combined_written: wire.slice(-(held.length + 1)) })).toBeGreaterThan(PAGE_MAX);
+    expect(SavedQuestionDocSchema.safeParse(doc).success).toBe(true);
+    expect(savedQuestionDocFits(doc)).toBe("FITS");
   });
 });
 

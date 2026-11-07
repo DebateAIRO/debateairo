@@ -6,10 +6,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApi, type AdmissionView, type AskApplication } from "@debateai/api";
-import { SAVED_QUESTION_LIMITS, createContractClient, type AskRequest, type SavedQuestionDoc } from "@debateai/contract";
+import { SAVED_QUESTION_LIMITS, createContractClient, savedQuestionPartBytes, type AskRequest, type SavedQuestionDoc } from "@debateai/contract";
 import { MemorySavedQuestionKeyStore, decrypt, generateDek } from "../../packages/crypto/src/index.js";
 import type { QuestionCheckOutcome } from "../../apps/api/src/question-check/contract.js";
 import { createSavedQuestionService, savedQuestionAad } from "../../apps/api/src/saved-questions/service.js";
+import { combineMembersKey } from "../../apps/ui/lib/v4/pathPlan.js";
 import {
   FakeSavedQuestionStore, MemoryUserDekStore, SAVED_ACTIVE, SAVED_BOX_TEXT, SAVED_Q, SAVED_TRAILING_TITLE, newStartStepKey, savedDocOf, savedSigner
 } from "../support/saved-questions.js";
@@ -247,6 +248,38 @@ describe("refusals and limits", () => {
     expect(malformed.statusCode).toBe(400);
     expect(malformed.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     expect(h.store.rows.size).toBe(0);
+    await h.api.close();
+  });
+
+  // Task 76m (spec §3.2): the AI's words of a combine undone before the save. The routes keep them as sent; only the person's own
+  // chips among the members are screened, and the page's size limit holds them too.
+  it("combined_written: stored and read back as sent; crisis words in an own chip 422; over 262_144 bytes 400 TOO_LARGE; members of no combine 400", async () => {
+    const h = await harness();
+    const entry = (own: string, extra: Readonly<Record<string, string>> = {}) => ({ members: combineMembersKey([
+      { viewpoint_id: "pt14", pick_no: null, title: "Gas from Russia", question: "Would new plants cut the gas Romania buys?" },
+      { viewpoint_id: null, pick_no: null, title: null, question: own }]),
+    title: "Gas and my bills ", question: "Would new plants change what my family pays for gas?", combine_ref: "cmb2.sig", ...extra });
+    const kept = savedDocOf(ANA_SIGNS, { page: { combined_written: [entry("My bills went up this winter")] } });
+    const id = await h.create(ANA, kept);
+    const read = await h.send(ANA, "GET", `${BASE}/${id}`);
+    expect(JSON.stringify(read.json().doc)).toBe(JSON.stringify(kept));
+    expect(read.json().doc.page.combined_written[0].title).toBe("Gas and my bills ");
+    const crisis = await h.send(ANA, "PUT", `${BASE}/${id}`, { revision: 1,
+      doc: savedDocOf(ANA_SIGNS, { page: { combined_written: [entry("I want to kill myself tonight")] } }) });
+    expect(crisis.statusCode).toBe(422);
+    expect(crisis.json().error).toBe("CRISIS_SUPPORT_OFFERED");
+    const base = savedQuestionPartBytes(savedDocOf(ANA_SIGNS, { page: { combined_written: [entry("x")] } }).page);
+    const large = savedDocOf(ANA_SIGNS, { page: { combined_written: [entry("x"), ...Array.from({ length: 300 }, () => entry("x".repeat(1_000)))] } });
+    expect(base).toBeLessThan(SAVED_QUESTION_LIMITS.pageMaxBytes);
+    expect(savedQuestionPartBytes(large.page)).toBeGreaterThan(SAVED_QUESTION_LIMITS.pageMaxBytes);
+    const tooLarge = await h.send(ANA, "PUT", `${BASE}/${id}`, { revision: 1, doc: large });
+    expect(tooLarge.statusCode).toBe(400);
+    expect(tooLarge.json()).toEqual({ error: "SAVED_QUESTION_TOO_LARGE", message: "SAVED_QUESTION_TOO_LARGE" });
+    const noCombine = await h.send(ANA, "PUT", `${BASE}/${id}`, { revision: 1,
+      doc: savedDocOf(ANA_SIGNS, { page: { combined_written: [entry("x", { members: "I want to kill myself tonight" })] } }) });
+    expect(noCombine.statusCode).toBe(400);
+    expect(noCombine.json().error).toBe("MALFORMED_REQUEST");
+    expect(JSON.stringify((await h.send(ANA, "GET", `${BASE}/${id}`)).json().doc)).toBe(JSON.stringify(kept));
     await h.api.close();
   });
 

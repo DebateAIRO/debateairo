@@ -41,7 +41,9 @@ import {
   type PathPlanAction,
   type PathPlanRefusal
 } from "./pathPlan.js";
-import { keptLineOf, type V4StartEnd, type V4StartKept, type V4StartLanguage, type V4StartReading } from "./startKept.js";
+import {
+  keptLineOf, type V4StartEnd, type V4StartKept, type V4StartLanguage, type V4StartReading, type V4StartWritten
+} from "./startKept.js";
 import type { ReadingLevel, V4StartHandOver } from "./types.js";
 import { useBrowserLayoutEffect } from "./useBrowserLayoutEffect.js";
 
@@ -135,6 +137,11 @@ export type V4StartCardState = Readonly<{
   shaped: boolean;
   /** Task 76e: what the server signed for this reading once the check passed (Task 76f saves it); null before the check. */
   reading: V4StartReading | null;
+  /**
+   * Task 76m (saved-questions spec §3.2): the AI's combined words of this reading, oldest first, also those of a combine undone
+   * since, which neither the plan nor its Undo steps hold (Task 76f saves them, so Undo and combine again stays free after Pick up).
+   */
+  written: readonly V4StartWritten[];
 }>;
 
 /**
@@ -188,6 +195,8 @@ type Reading = Readonly<{
   seats: number | null;
   /** Task 76e: a kept step 2 whose AIs had not finished when the person left (NONE on the card, LEFT_EARLY when saved). */
   leftEarly: boolean;
+  /** Task 76m: the run's `written` as it stands, for the card's state (every change to it goes through `commit`). */
+  written: readonly V4StartWritten[];
 }>;
 type Timer = ReturnType<typeof setTimeout>;
 /** The AI's words for a set of viewpoints put together, with its combine reference (Task 71). */
@@ -212,13 +221,19 @@ type Run = {
 };
 
 const WAITING: ReadonlySet<ReadingPhase> = new Set(["CHECKING", "READING", "MERGING"]);
+const NO_WRITTEN: readonly V4StartWritten[] = Object.freeze([]);
 
 function freshReading(line: string, choiceMade: boolean, level: ReadingLevel): Reading {
   return {
     line, phase: "CHECKING", progress: null, checkRef: null, checkedLine: null, originalLine: null, rewrite: null, choiceMade,
     languageOffer: null, refusal: null, lists: [], late: [], merging: false, menu: null, plan: null, landedKeys: [], noneReason: null,
-    noneLine: null, justLanded: false, level, language: null, seats: null, leftEarly: false
+    noneLine: null, justLanded: false, level, language: null, seats: null, leftEarly: false, written: NO_WRITTEN
   };
+}
+
+/** Task 76m: a run's AI combined words as the card's state shows them, oldest first. */
+function writtenOf(written: ReadonlyMap<string, Written>): readonly V4StartWritten[] {
+  return Object.freeze([...written].map(([members, words]) => ({ members, ...words })));
 }
 
 /**
@@ -234,9 +249,10 @@ function settledPlan(plan: PathPlan): PathPlan {
 /**
  * Task 76e: a kept step 2 as this hook's reading of `line`. READY with its menu, lists and plan (every path counted as landed, so
  * no late ideas are announced and no ready note shows); NONE with its reason's line; LEFT_EARLY as NONE on the card (Start works,
- * and the debate chooses its own paths), still LEFT_EARLY in `reading`. Nothing is asked from here.
+ * and the debate chooses its own paths), still LEFT_EARLY in `reading`. Nothing is asked from here. Task 76m: `written`, the AI's
+ * combined words the restored run knows (keptWritten).
  */
-function keptReading(kept: V4StartKept, line: string, level: ReadingLevel): Reading {
+function keptReading(kept: V4StartKept, line: string, level: ReadingLevel, written: readonly V4StartWritten[]): Reading {
   const original = kept.check.original_question_line ?? null;
   const ready = kept.end === "READY" && kept.menu !== null;
   const plan = ready ? settledPlan(kept.plan) : null;
@@ -248,7 +264,7 @@ function keptReading(kept: V4StartKept, line: string, level: ReadingLevel): Read
     landedKeys: plan === null ? [] : [...plan.paths, ...plan.more].map((path) => path.key),
     noneReason: ready || kept.end === "LEFT_EARLY" ? null : reason,
     noneLine: ready ? null : kept.end === "LEFT_EARLY" || reason === null ? "PASSING" : noneLineOf(reason),
-    justLanded: false, level, language: null, seats: null, leftEarly: !ready && kept.end === "LEFT_EARLY"
+    justLanded: false, level, language: null, seats: null, leftEarly: !ready && kept.end === "LEFT_EARLY", written
   };
 }
 
@@ -256,10 +272,13 @@ function keptReading(kept: V4StartKept, line: string, level: ReadingLevel): Read
  * Review (wave 16; saved-questions spec §3.2, "the combined questions already written, so that Undo and combine again stays
  * free"): the AI's combined words a kept plan holds, on the list, under "+ N more" and in every Undo step, by their members, so
  * the restored reading knows them as the reading that wrote them did: combining the same paths again after Undo takes them at
- * once, with no call. The plan's own paths win over its Undo steps.
+ * once, with no call. The plan's own paths win over its Undo steps. Task 76m: first the words the kept step 2 carries itself
+ * (`written`, also those of a combine undone before the save, which neither the plan nor its Undo steps hold); the plan wins.
  */
-function keptWritten(plan: PathPlan): ReadonlyMap<string, Written> {
+function keptWritten(kept: V4StartKept): ReadonlyMap<string, Written> {
   const written = new Map<string, Written>();
+  for (const { members, title, question, combineRef } of kept.written ?? []) written.set(members, { title, question, combineRef });
+  const { plan } = kept;
   for (const step of [...plan.undo, plan]) {
     for (const path of [...step.paths, ...step.more]) {
       if (path.wording !== "COMBINED" || path.combineRef === null) continue;
@@ -683,9 +702,9 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     opened.current = kept;
     stop();
     const run = freshRun();
-    for (const [members, words] of keptWritten(kept.plan)) run.written.set(members, words);
+    for (const [members, words] of keptWritten(kept)) run.written.set(members, words);
     runRef.current = run;
-    const restored = keptReading(kept, questionLine, latest.current.readingLevel);
+    const restored = keptReading(kept, questionLine, latest.current.readingLevel, writtenOf(run.written));
     readingRef.current = restored;
     setReading(restored);
   }, [kept, questionLine, stop]);
@@ -792,6 +811,8 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
         if (runRef.current !== run) return;
         if (answer !== null && answer.source === "AI") {
           run.written.set(membersKey, { title: answer.title, question: answer.question, combineRef: answer.combine_ref });
+          // Task 76m: the card's state holds them too (saved even when the path was undone before they came).
+          commit(run, (now) => ({ ...now, written: writtenOf(run.written) }));
           combine(run);
         } else {
           failCombine(run, key, membersKey);
@@ -1019,6 +1040,7 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     keepMyWords,
     // Task 71: what the page's leave rule reads (Task 76c); the hook itself adds no beforeunload listener.
     shaped: plan !== null && (pathPlanChanged(plan) || plan.paths.some(isPersonPath)),
-    reading: signed
+    reading: signed,
+    written: own?.written ?? NO_WRITTEN
   };
 }

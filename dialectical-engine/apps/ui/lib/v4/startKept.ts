@@ -22,10 +22,17 @@ import type { DigMode, ReadingLevel, V4Goal } from "./types.js";
 export type V4StartEnd = "READY" | "NONE" | "LEFT_EARLY";
 
 /**
+ * Task 76m (saved-questions spec §3.2, "the combined questions already written"): the AI's words for one set of viewpoints put
+ * together in this reading, by their members (combineMembersKey), with the combine's reference, character for character.
+ */
+export type V4StartWritten = Readonly<{ members: string; title: string; question: string; combineRef: string }>;
+
+/**
  * Step 2 as kept. `readLine` is the line the check read at Next: the person's words, or after an accepted language rewrite the
  * rewrite, whose words before it are then `check.original_question_line` (as Start sends the check). `clarify`: step 2's
  * questions as shown, so they come back without a call (null: none had come). `lists`: only the signed lists the menu does not
  * hold; `lateLists`: the late lists not merged yet. `plan` holds its Undo steps; a reading with no list keeps an empty one.
+ * Task 76m: `written`, the AI's combined words of the reading, oldest first, also those of a combine undone since (absent: none).
  */
 export type V4StartKept = Readonly<{
   v: 1;
@@ -43,6 +50,7 @@ export type V4StartKept = Readonly<{
   width: number;
   mode: DigMode;
   carryOn: boolean;
+  written?: readonly V4StartWritten[];
 }>;
 
 /** The question's language as the lists stream's check event names it. */
@@ -110,5 +118,13 @@ export function startKeptOf(value: unknown): V4StartKept | null {
   if (!arrays(plan, "paths", "more", "undo", "selected") || typeof plan?.width !== "number") return null;
   if (typeof kept.width !== "number" || !Number.isSafeInteger(kept.width) || kept.width < 1) return null;
   if (!MODES.has(kept.mode) || typeof kept.carryOn !== "boolean") return null;
+  if (kept.written !== undefined && (!Array.isArray(kept.written) || !kept.written.every(writtenWords))) return null;
   return value as V4StartKept;
+}
+
+/** Task 76m: one entry of the AI's combined words, every member a text. */
+function writtenWords(value: unknown): boolean {
+  const written = recordOf(value);
+  return written !== null && typeof written.members === "string" && typeof written.title === "string"
+    && typeof written.question === "string" && typeof written.combineRef === "string";
 }

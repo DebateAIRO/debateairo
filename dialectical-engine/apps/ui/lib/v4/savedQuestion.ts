@@ -1,6 +1,6 @@
 import { SAVED_QUESTION_LIMITS, savedQuestionPartBytes, type SavedQuestionDoc } from "@debateai/contract";
 import { pathPlanChanged, type PathPlan, type PathPlanSnapshot } from "./pathPlan.js";
-import { startKeptOf, type V4StartKept, type V4StartReading } from "./startKept.js";
+import { startKeptOf, type V4StartKept, type V4StartReading, type V4StartWritten } from "./startKept.js";
 
 /*
  * V4 start step, Task 76f (saved-questions spec 2026-11-04 §3.2, §3.3, §3.14; owner answers S1 A and S3 A): step 2 as the
@@ -19,7 +19,8 @@ type SavedPage = SavedQuestionDoc["page"];
  * event's language and seats when known, the clarifying questions as shown, the menu, the lists the menu does not hold, how
  * the reading ended) and the page's own state (the box, the answers, the plan with its Undo steps, How wide, the mode and the
  * carry-on tick). The oldest Undo steps go first when the page's half would not fit (withUndoTrimmed); when it does not fit
- * even with none, every step goes and the save itself finds the document too large.
+ * even with none, every step goes and the save itself finds the document too large. Task 76m: then the AI's combined words of
+ * the reading (`combined_written`), in the room the rest leaves (writtenThatFits).
  */
 export function savedDocOf(input: Readonly<{ kept: V4StartKept; reading: V4StartReading }>): SavedQuestionDoc {
   const { kept, reading } = input;
@@ -31,6 +32,7 @@ export function savedDocOf(input: Readonly<{ kept: V4StartKept; reading: V4Start
     carry_on: kept.carryOn
   };
   const plan = withUndoTrimmed(kept.plan, SAVED_QUESTION_LIMITS.pageMaxBytes, rest) ?? { ...kept.plan, undo: [] };
+  const combined = writtenThatFits(kept.written ?? [], SAVED_QUESTION_LIMITS.pageMaxBytes, { ...rest, plan });
   return {
     v: 1,
     reading: {
@@ -46,8 +48,31 @@ export function savedDocOf(input: Readonly<{ kept: V4StartKept; reading: V4Start
       ...(reading.noneReason === undefined ? {} : { none_reason: reading.noneReason })
     },
     // The plan is the page's own data, kept whole (its keys, tags and Undo steps); the schema reads only the parts it names.
-    page: { ...rest, plan: plan as unknown as SavedPage["plan"] }
+    page: { ...rest, plan: plan as unknown as SavedPage["plan"], ...(combined.length === 0 ? {} : { combined_written: combined }) }
   };
+}
+
+type SavedCombined = NonNullable<SavedPage["combined_written"]>[number];
+
+/**
+ * Task 76m (saved-questions spec §3.2: "the combined questions already written, so that Undo and combine again stays free"): as
+ * many of the newest entries of the AI's combined words as let the page's half (`page`, without them) stay within
+ * `pageMaxBytes`; the oldest go first. They only fill the room the rest leaves, so they never cost an Undo step and never stop a
+ * save; none when the rest does not fit by itself.
+ */
+function writtenThatFits(written: readonly V4StartWritten[], pageMaxBytes: number, page: Readonly<Record<string, unknown>>): SavedCombined[] {
+  if (written.length === 0) return [];
+  const entries = written.map((one): SavedCombined => ({ members: one.members, title: one.title, question: one.question, combine_ref: one.combineRef }));
+  // An array's JSON is "[" + its entries' JSON joined by "," + "]": counted from the page with an empty one.
+  let bytes = savedQuestionPartBytes({ ...page, combined_written: [] });
+  let from = entries.length;
+  for (let at = entries.length - 1; at >= 0; at -= 1) {
+    const added = savedQuestionPartBytes(entries[at]) + (from === entries.length ? 0 : 1);
+    if (bytes + added > pageMaxBytes) break;
+    bytes += added;
+    from = at;
+  }
+  return entries.slice(from);
 }
 
 function recordOf(value: unknown): Readonly<Record<string, unknown>> | null {
@@ -57,7 +82,7 @@ function recordOf(value: unknown): Readonly<Record<string, unknown>> | null {
 /**
  * The kept step 2 a saved document holds, for the page's restore (Task 76e's); null for a document the page cannot read
  * (another `v`, a missing half or member: the page then shows step 1 with its title). The lists the menu does not hold come
- * back as the late lists, which go with Start unmerged.
+ * back as the late lists, which go with Start unmerged. Task 76m: the AI's combined words come back as `written`.
  */
 export function keptOfSaved(doc: SavedQuestionDoc): V4StartKept | null {
   const held = recordOf(doc);
@@ -66,6 +91,11 @@ export function keptOfSaved(doc: SavedQuestionDoc): V4StartKept | null {
   const page = recordOf(held.page);
   const goal = recordOf(page?.sent_goal);
   if (reading === null || page === null || goal === null) return null;
+  const combined = page.combined_written;
+  const written = Array.isArray(combined) ? combined.map((one: unknown) => {
+    const entry = recordOf(one);
+    return { members: entry?.members, title: entry?.title, question: entry?.question, combineRef: entry?.combine_ref };
+  }) : undefined;
   return startKeptOf({
     v: 1,
     readLine: reading.read_line,
@@ -81,7 +111,8 @@ export function keptOfSaved(doc: SavedQuestionDoc): V4StartKept | null {
     plan: page.plan,
     width: page.width,
     mode: page.mode,
-    carryOn: page.carry_on
+    carryOn: page.carry_on,
+    ...(written === undefined ? {} : { written })
   });
 }
 

@@ -135,6 +135,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
+import { combineMembersKey } from "../../apps/ui/lib/v4/pathPlan.js";
 import { NUCLEAR_MENU, START_FIXTURE_QUESTION, signedList, signedMenu } from "../support/v4-start-menu.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -569,6 +570,64 @@ describe("Start names the saved question and removes it (spec §3.7)", () => {
     expect(last.path).toBe(`${SAVED}/${ID}`);
     expect(last.body!.doc!.reading.read_line).toBe(changed);
     expect(last.body!.doc!.reading.end).toBe("LEFT_EARLY");
+  });
+});
+
+// Task 76m (spec §3.2: "the combined questions already written, so that Undo and combine again stays free"; the 76f review): the
+// AI's words of a combine the person undid before the save are in neither the plan nor its Undo steps, so the save carries them
+// beside the page's state, and after Pick up combining the same paths again asks nothing and counts nothing.
+describe("a combine undone before the save (Task 76m)", () => {
+  const TITLE = "Hard weeks and using less";
+  const QUESTION = "How would Romania get through its hardest weeks?";
+  const suggested = (): HTMLButtonElement =>
+    buttonNamed("Combine", [...host!.querySelectorAll(".v4StartSuggestion")].find((one) => buttonNamed("Combine", one) !== undefined)!)!;
+
+  it("combine, Undo: the save carries the AI's words by their members; Pick up, combine again: no combine call, the kept words", async () => {
+    vi.useFakeTimers();
+    await toSaved();
+    await click(suggested());
+    expect(server.combines).toHaveLength(1);
+    await act(async () => { server.combines[0]!.answer({ source: "AI", title: TITLE, question: QUESTION, combine_ref: "cmb.sig" }); });
+    await settle();
+    await click(host!.querySelector(".v4StartTools .v4StartUndo")!);
+    expect(host!.textContent).not.toContain(TITLE);
+    await wait(1_000);
+    const saved = writes("PUT").at(-1)!.body!.doc!;
+    // The plan holds the combine nowhere (the list, "+ N more", the Undo steps): only the cache keeps its words.
+    expect(JSON.stringify(saved.page.plan)).not.toContain(TITLE);
+    expect(saved.page.combined_written).toEqual([{ members: combineMembersKey(server.combines[0]!.input.members), title: TITLE,
+      question: QUESTION, combine_ref: "cmb.sig" }]);
+
+    await unmount();
+    window.history.replaceState({ __NA: true, v4ask: { step: "ask", words: Q } }, "", "/v4");
+    net.list = [{ id: ID, question: Q, saved_at: "2026-11-05T09:00:00.000Z" }];
+    net.answer = (call) => call.method === "GET" && call.path === `${SAVED}/${ID}`
+      ? net.json(200, { id: ID, revision: writes("PUT").length + 1, saved_at: "2026-11-05T09:00:00.000Z", state: "READY", doc: saved })
+      : undefined;
+    await mount();
+    await click(buttonNamed("Pick up", lineOf(Q))!);
+    expect(onStepTwo()).toBe(true);
+    expect(host!.textContent).not.toContain(TITLE);
+    await click(suggested());
+    expect(server.combines).toHaveLength(1);
+    expect(host!.textContent).toContain(TITLE);
+  });
+
+  it("Undo before the AI's words come: when they come, nothing on the card changes, and the next save carries them", async () => {
+    vi.useFakeTimers();
+    await toSaved();
+    await click(suggested());
+    await click(host!.querySelector(".v4StartTools .v4StartUndo")!);
+    await wait(1_000);
+    const puts = writes("PUT").length;
+    expect(writes("PUT").at(-1)!.body!.doc!.page).not.toHaveProperty("combined_written");
+    await act(async () => { server.combines[0]!.answer({ source: "AI", title: TITLE, question: QUESTION, combine_ref: "cmb.sig" }); });
+    await settle();
+    expect(host!.textContent).not.toContain(TITLE);
+    await wait(1_000);
+    expect(writes("PUT")).toHaveLength(puts + 1);
+    expect(writes("PUT").at(-1)!.body!.doc!.page.combined_written).toEqual([{ members: combineMembersKey(server.combines[0]!.input.members),
+      title: TITLE, question: QUESTION, combine_ref: "cmb.sig" }]);
   });
 });
 

@@ -793,10 +793,12 @@ function V4AskForm({
     const kept: V4StartKept = {
       v: 1, readLine: reading.checkedLine, box, sentGoal, clarify: clarifyReplyShown, check: reading.check, menu: reading.menu, lists: [],
       lateLists: reading.lateLists, end: reading.end, ...(reading.noneReason === undefined ? {} : { noneReason: reading.noneReason }),
-      plan: plan ?? { ...pathPlanFromPicks([], freePlan), width: start.width }, width: start.width, mode, carryOn
+      plan: plan ?? { ...pathPlanFromPicks([], freePlan), width: start.width }, width: start.width, mode, carryOn,
+      // Task 76m (spec §3.2): the AI's combined words of the reading, also a combine undone before this save.
+      written: start.written
     };
     return savedDocOf({ kept, reading: signed });
-  }, [reading, savedExtras, box, sentGoal, clarifyReplyShown, plan, freePlan, start.width, mode, carryOn]);
+  }, [reading, savedExtras, box, sentGoal, clarifyReplyShown, plan, freePlan, start.width, mode, carryOn, start.written]);
   // What goes at once (spec §3.3): the reading's end (the list landing) and a late merge (a new menu), and a path's AI words
   // written or given up (COMBINE_WRITTEN, COMBINE_FAILED). Every other change waits SAVE_PAUSE_MS.
   const savedMoment = `${reading?.end ?? ""} ${reading?.menu?.ref ?? ""}`;

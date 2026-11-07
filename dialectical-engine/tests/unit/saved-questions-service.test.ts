@@ -14,6 +14,7 @@ import {
   SavedQuestionRefused, createSavedQuestionService, savedQuestionAad, type SavedQuestionBinding, type SavedQuestionGate
 } from "../../apps/api/src/saved-questions/service.js";
 import { startQuestionHashOf } from "../../apps/api/src/start-step/signing.js";
+import { combineMembersKey } from "../../apps/ui/lib/v4/pathPlan.js";
 import {
   FakeSavedQuestionStore, MemoryUserDekStore, SAVED_BOX_TEXT, SAVED_CRISIS, SAVED_OTHER_Q, SAVED_Q, SAVED_TRAILING_TITLE, newSavedPerson,
   newStartStepKey, savedDocOf, savedOwnPath, savedRewrittenPath, savedScopeOf, savedSigner, type SavedPerson
@@ -332,7 +333,12 @@ describe("crisis words, the consent, the team and the switch", () => {
     ["in a rewritten path", { plan: { paths: [savedRewrittenPath("kp01", "My own words", SAVED_CRISIS)] } }],
     ["in a typed answer", { page: { sent_goal: { answers: [{ question: "What is the answer for?", answer: SAVED_CRISIS, other: true }] } } }],
     ["in an own path under + N more", { plan: { more: [savedOwnPath("p9", SAVED_CRISIS)] } }],
-    ["in an own path only in an Undo step", { plan: { undo: [{ paths: [savedOwnPath("p9", SAVED_CRISIS)], more: [] }] } }]
+    ["in an own path only in an Undo step", { plan: { undo: [{ paths: [savedOwnPath("p9", SAVED_CRISIS)], more: [] }] } }],
+    // Task 76m: an own chip of a combine undone before the save, kept only beside the AI's words of that combine.
+    ["in an own chip of a combine undone before the save", { page: { combined_written: [{ members: combineMembersKey([
+      { viewpoint_id: "pt14", pick_no: null, title: "Gas from Russia", question: "Would new plants cut the gas Romania buys?" },
+      { viewpoint_id: null, pick_no: null, title: null, question: SAVED_CRISIS }]),
+    title: "Gas and me", question: "Would new plants change how much gas Romania buys?", combine_ref: "cmb.sig" }] } }]
   ])("%s: CRISIS_SUPPORT_OFFERED, nothing stored, and the earlier copy still reads back", async (_name, parts) => {
     const w = await world();
     const clean = savedDocOf(ANA_SIGNS);
