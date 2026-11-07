@@ -1440,6 +1440,8 @@ function VersionPathRow({ path, as: Row, language, catalog }: Readonly<{
  * "Your point of view" under it when the path holds the person's own words. The paths dug later sit under their first-level row
  * in one fold, "Updated by your dig", closed by default so the row stays one glance long, as the map's rows are (the brief's
  * ruling); each keeps its level's indent, and a dig's first path says what the dig changed. The PDF already prints all of it.
+ * Task 55f: the digs on the main question, with the paths dug from them, are the last item: no row of their own (the question is
+ * the page's title), their own closed fold, "Dug from your question".
  */
 function VersionPaths({ paths, isCurrent, language, catalog }: Readonly<{
   paths: readonly VersionPath[] | undefined;
@@ -1455,10 +1457,12 @@ function VersionPaths({ paths, isCurrent, language, catalog }: Readonly<{
       <ol className="v4RepPaths">
         {versionPathGroups(paths).map((group, at) => (
           <li key={at} className="v4RepPathGroup">
-            <VersionPathRow path={group.first} as="div" language={language} catalog={catalog} />
+            {group.first === null ? null : <VersionPathRow path={group.first} as="div" language={language} catalog={catalog} />}
             {group.dug.length === 0 ? null : (
               <details className="v4RepDug">
-                <summary className="v4RepDugSummary">{t(catalog, "v4.investigation.updatedByDig")}</summary>
+                <summary className="v4RepDugSummary">
+                  {t(catalog, group.first === null ? "v4.investigation.updatedByQuestionDig" : "v4.investigation.updatedByDig")}
+                </summary>
                 <ol className="v4RepPaths v4RepDugPaths">
                   {group.dug.map((path, place) => <VersionPathRow key={place} path={path} as="li" language={language} catalog={catalog} />)}
                 </ol>

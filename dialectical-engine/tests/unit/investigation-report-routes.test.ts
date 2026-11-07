@@ -208,6 +208,21 @@ describe("GET /v1/runs/{id}/investigation", () => {
     await api.close();
   });
 
+  it("V4 start step, Task 55f: every version keeps the mark of a dig on the main question, earlier ones too, so the page folds it under the question", async () => {
+    const first = { line: "A made-up first path.", summary: null, fate: "HELD_UP", level: 0 };
+    const onQuestion = { line: "A made-up dig on the question.", summary: null, fate: "HELD_UP", level: 1,
+      points: [{ text: "A made-up point.", trust: "SURE", side: "for", sources: [0] }],
+      dig: { picks: ["A made-up pick."], own_words: [], view: null, changed: ["A made-up change."] }, under: "QUESTION" };
+    const world = worldOf({ state: "closed", closings: [closing(1, 1), closing(2, 2)], reports: [report(1, "r-1", "READY", 3), report(2, "r-2", "READY", 4)],
+      sealed: new Map([["r-1", content({ paths: [first, onQuestion] })], ["r-2", content({ paths: [first, onQuestion] })]]) });
+    const { api } = apiOver(world);
+    const read = InvestigationReportsSchema.parse((await get(api, OWNER, ROOT)).json());
+    const [older, current] = read.versions as Array<{ paths: unknown[] }>;
+    expect(older!.paths).toEqual([first, { line: "A made-up dig on the question.", summary: null, fate: "HELD_UP", level: 1, under: "QUESTION" }]);
+    expect(current!.paths).toEqual([first, onQuestion]);
+    await api.close();
+  });
+
   it("a dig answers its investigation's versions too", async () => {
     const { api } = apiOver(threeVersions());
     const read = InvestigationReportsSchema.parse((await get(api, OWNER, DIG)).json());

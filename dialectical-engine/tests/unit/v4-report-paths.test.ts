@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InvestigationReportPathSchema } from "../../packages/contract/src/index.js";
-import { ownViewLineKey, ownViewOf, versionPathGroups, versionPathWord, type VersionPath } from "../../apps/ui/lib/v4/reportPaths.js";
+import { apartFromQuestion, ownViewLineKey, ownViewOf, versionPathGroups, versionPathWord, type VersionPath } from "../../apps/ui/lib/v4/reportPaths.js";
 
 /*
  * V4 start step, Task 55c (report-f4, the owner's "All in this build"; r2-20 A, r2-1 A): what the report page reads from a version's
@@ -12,7 +12,8 @@ import { ownViewLineKey, ownViewOf, versionPathGroups, versionPathWord, type Ver
 /** A stored path, checked against the contract, so no fixture holds what a version cannot. */
 const path = (line: string, level: number, extra: Record<string, unknown> = {}): VersionPath =>
   InvestigationReportPathSchema.parse({ line, summary: null, fate: null, level, ...extra });
-const lines = (groups: ReturnType<typeof versionPathGroups>) => groups.map((group) => [group.first.line, group.dug.map((dug) => dug.line)]);
+/** Each group as [its first-level line, the lines dug later]; the main question's own group (Task 55f) has no line of its own. */
+const lines = (groups: ReturnType<typeof versionPathGroups>) => groups.map((group) => [group.first?.line ?? null, group.dug.map((dug) => dug.line)]);
 
 describe("versionPathGroups", () => {
   it("puts each first-level path with the deeper paths after it, in the stored tree order", () => {
@@ -32,6 +33,53 @@ describe("versionPathGroups", () => {
     const [group] = versionPathGroups([first, dug]);
     expect(group!.first).toBe(first);
     expect(group!.dug[0]).toBe(dug);
+  });
+});
+
+/*
+ * V4 start step, Task 55f: a dig on the MAIN QUESTION comes after the last path's own digs in the stored order. Each row such a dig adds
+ * carries `under: "QUESTION"` (the contract's last, optional member), and so does each row dug from it (review of Task 55f), so the
+ * page lists those rows after every path in a group of their own. A version written before Task 55f has no mark and reads as it always did.
+ */
+describe("Task 55f: a dig on the main question", () => {
+  const onQuestion = (line: string, level = 1) => path(line, level, { under: "QUESTION" });
+
+  it("the contract keeps the mark, last and optional, on a dig's path only", () => {
+    const marked = InvestigationReportPathSchema.parse({ line: "q", summary: null, fate: null, level: 1,
+      dig: { picks: ["Is it worth it at all?"], own_words: [], view: null, changed: [] }, under: "QUESTION" });
+    expect(Object.keys(marked).at(-1)).toBe("under");
+    expect(Object.keys(InvestigationReportPathSchema.shape).at(-1)).toBe("under");
+    expect(InvestigationReportPathSchema.safeParse({ line: "q", summary: null, fate: null, level: 1 }).success).toBe(true);
+    expect(InvestigationReportPathSchema.safeParse({ line: "q", summary: null, fate: null, level: 1, under: "PATH" }).success).toBe(false);
+    // A first-level path is the first debate's own, never dug from the question.
+    expect(InvestigationReportPathSchema.safeParse({ line: "q", summary: null, fate: null, level: 0, under: "QUESTION" }).success).toBe(false);
+  });
+
+  it("lists the digs on the question, with the paths dug from them, after every path in a group of their own", () => {
+    const groups = versionPathGroups([path("a", 0), path("b", 1), path("d", 0), path("e", 1), onQuestion("q1"), onQuestion("q1x", 2), onQuestion("q2"),
+      onQuestion("r1")]);
+    expect(lines(groups)).toEqual([["a", ["b"]], ["d", ["e"]], [null, ["q1", "q1x", "q2", "r1"]]]);
+  });
+
+  it("a dig the walk did not reach, after them and unmarked, keeps today's place under the last path, at any level", () => {
+    const groups = versionPathGroups([path("a", 0), path("e", 1), onQuestion("q1"), onQuestion("q1x", 2), path("lost", 2), path("lost too", 1)]);
+    expect(lines(groups)).toEqual([["a", ["e", "lost", "lost too"]], [null, ["q1", "q1x"]]]);
+    // Review of Task 55f: deeper than the dig on the question and right after it, a lost dig is still not dug from it (the paths dug
+    // from it carry the mark too); only the mark decides.
+    expect(apartFromQuestion([path("a", 0), onQuestion("q1"), path("lost", 2)]))
+      .toEqual({ tree: [path("a", 0), path("lost", 2)], question: [onQuestion("q1")] });
+    expect(apartFromQuestion([path("a", 0), onQuestion("q1"), onQuestion("q1x", 2), path("lost", 3)]))
+      .toEqual({ tree: [path("a", 0), path("lost", 3)], question: [onQuestion("q1"), onQuestion("q1x", 2)] });
+  });
+
+  it("a version written before Task 55f has no mark: the dig on the question folds under the last path, as before", () => {
+    expect(lines(versionPathGroups([path("a", 0), path("d", 0), path("e", 1), path("q1", 1), path("q1x", 2)])))
+      .toEqual([["a", []], ["d", ["e", "q1", "q1x"]]]);
+    expect(apartFromQuestion([path("a", 0), path("e", 1)])).toEqual({ tree: [path("a", 0), path("e", 1)], question: [] });
+  });
+
+  it("with no first-level path at all, the digs on the question still make their own group", () => {
+    expect(lines(versionPathGroups([onQuestion("q1"), onQuestion("q1x", 2)]))).toEqual([[null, ["q1", "q1x"]]]);
   });
 });
 

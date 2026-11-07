@@ -847,6 +847,7 @@
   "v4.investigation.heading.paths": "The paths",
   "v4.investigation.onlyAnswer": "This earlier version keeps only its written answer.",
   "v4.investigation.updatedByDig": "Updated by your dig",
+  "v4.investigation.updatedByQuestionDig": "Dug from your question",
   "v4.investigation.loadFailed": "We couldn't load your report just now.",
   "v4.investigation.startUnconfirmed": "We couldn't confirm your report started.",
   "v4.investigation.reopenUnconfirmed": "We couldn't confirm digging is open again.",

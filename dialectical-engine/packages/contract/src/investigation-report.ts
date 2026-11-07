@@ -122,10 +122,19 @@ export const InvestigationReportPathSchema = z.object({
   own: z.object({
     own_words: z.array(Part).min(1).max(INVESTIGATION_REPORT_LIMITS.pathOwnWordsMax),
     view: z.object({ outcome: z.enum(["HELPED", "DID_NOT_HELP", "NOT_SETTLED"]), scope: z.enum(["PATH", "MAIN_QUESTION"]), reason: Part }).strict().nullable()
-  }).strict().optional()
+  }).strict().optional(),
+  /**
+   * V4 start step, Task 55f: on each path of a dig on the main question itself (not on one of its paths), and on each path of the digs
+   * dug from it, so the page and the PDF place that dig, with the paths dug from it, under the question rather than under the last path.
+   * Absent on every other path, a dig the walk did not reach among them, and on every version written before it.
+   */
+  under: z.literal("QUESTION").optional()
 }).strict().superRefine((path, context) => {
   if (path.level !== 0 && (path.path_id !== undefined || path.trust !== undefined || path.own !== undefined)) {
     context.addIssue({ code: "custom", message: "a path's id, trust word and own words are kept on a first-level path only" });
+  }
+  if (path.level === 0 && path.under !== undefined) {
+    context.addIssue({ code: "custom", message: "a first-level path is the first debate's own, never dug from the question" });
   }
 });
 export type InvestigationReportPath = z.infer<typeof InvestigationReportPathSchema>;

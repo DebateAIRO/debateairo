@@ -48,10 +48,14 @@ function v2Paths(view: unknown): unknown[] {
     { line: "A made-up third path.", summary: null, fate: "FELL", level: 0, path_id: "b3", trust: "DIDNT_HOLD", points: [point("DIDNT_HOLD")] }
   ];
 }
-/** An earlier version as the API serves it (Task 55b's review fix): line, summary, fate, level, and path_id, trust and own. */
+/**
+ * An earlier version as the API serves it (Task 55b's review fix): line, summary, fate, level, and path_id, trust and own; Task 55f: and
+ * the mark of a dig on the main question.
+ */
 const earlier = (paths: unknown[]) => paths.map((path) => {
-  const { line, summary, fate, level, path_id, trust, own } = path as Record<string, unknown>;
-  return { line, summary, fate, level, ...(path_id === undefined ? {} : { path_id }), ...(trust === undefined ? {} : { trust }), ...(own === undefined ? {} : { own }) };
+  const { line, summary, fate, level, path_id, trust, own, under } = path as Record<string, unknown>;
+  return { line, summary, fate, level, ...(path_id === undefined ? {} : { path_id }), ...(trust === undefined ? {} : { trust }), ...(own === undefined ? {} : { own }),
+    ...(under === undefined ? {} : { under }) };
 });
 const R22_REASON = "A made-up reason the angle helped.";
 const R22_PATHS = [
@@ -260,5 +264,68 @@ describe("report-f4: the paths dug later, folded under theirs, and what each dig
     const labels = [...paths.querySelectorAll("[aria-label]")].map((labelled) => labelled.getAttribute("aria-label") ?? "");
     expect(labels.length).toBeGreaterThan(0);
     expect(labels.filter((label) => /\d/u.test(label))).toEqual([]);
+  });
+});
+
+/*
+ * V4 start step, Task 55f (the coordinator's ruling on Task 55c's open point 3): a dig on the MAIN QUESTION comes after the last path's
+ * own digs in the stored order. Its rows carry the mark `under: "QUESTION"`, so the page folds them, with the paths dug from them, after
+ * the paths in a closed fold of their own, "Dug from your question", never under the last path. A version written before the mark folds
+ * them as it always did. Made-up texts only.
+ */
+const ON_QUESTION_LINE = "A made-up dig on the question itself.";
+const R22_ON_QUESTION: Array<Record<string, unknown>> = [
+  ...R22_PATHS,
+  { line: ON_QUESTION_LINE, summary: null, fate: "HELD_UP", level: 1, points: [point("SURE")],
+    dig: { picks: ["Is it worth it at all?"], own_words: [], view: null, changed: ["A made-up change to the main answer."] }, under: "QUESTION" },
+  // Review of Task 55f: a path dug from that dig carries the mark too.
+  { line: "A made-up path dug from it.", summary: null, fate: null, level: 2, under: "QUESTION" },
+  { line: "A made-up second path of that dig.", summary: null, fate: null, level: 1, under: "QUESTION" }
+];
+const lineOf = (row: Element) => flat(row.querySelector(".v4RepPathLine"));
+
+describe("Task 55f: a dig on the main question folds under its own place, not under the last path", () => {
+  it("folds after the paths in its own closed \"Dug from your question\"; the last path keeps only its own dig", async () => {
+    const node = await mountReport([finished(1, "2026-11-07T10:00:00.000Z", R22_ON_QUESTION)]);
+    const all = groups(node);
+    expect(all).toHaveLength(3);
+    expect(all.slice(0, 2).map((group) => lineOf(rowOf(group)))).toEqual(["A made-up first R22 path.", "A made-up second R22 path."]);
+    expect(groupOf(node, "A made-up second R22 path.").querySelector("details")).toBeNull();
+    const own = all[2]!;
+    // No row of its own: the question is the page's title.
+    expect(own.querySelector(":scope > .v4RepPath")).toBeNull();
+    const fold = own.querySelector<HTMLDetailsElement>(":scope > details")!;
+    expect(fold.open).toBe(false);
+    expect(flat(fold.querySelector("summary"))).toBe("Dug from your question");
+    expect(flat(fold.querySelector("summary"))).toBe(word("v4.investigation.updatedByQuestionDig"));
+    await openFold(fold);
+    const dug = [...fold.querySelectorAll<HTMLElement>(".v4RepPath")];
+    expect(dug.map(lineOf)).toEqual([ON_QUESTION_LINE, "A made-up path dug from it.", "A made-up second path of that dig."]);
+    expect(dug.map((row) => row.dataset.level)).toEqual(["1", "2", "1"]);
+    expect(flat(dug[0]!.querySelector(".v4RepChanged li"))).toBe("A made-up change to the main answer.");
+    // Two folds in all: the first path's dig, and the question's.
+    const folds = [...node.querySelectorAll<HTMLDetailsElement>(".v4RepVersionBody details")];
+    expect(folds.map((each) => flat(each.querySelector("summary")))).toEqual(["Updated by your dig", "Dug from your question"]);
+  });
+
+  it("an earlier version keeps the mark, so it folds the same way", async () => {
+    const node = await mountReport([finished(1, "2026-11-06T10:00:00.000Z", earlier(R22_ON_QUESTION)),
+      finished(2, "2026-11-07T10:00:00.000Z", R22_PATHS)]);
+    await press([...node.querySelectorAll<HTMLButtonElement>(".v4RepVersion")][1]!);
+    expect(flat(node.querySelector(".v4RepVersionLine"))).toContain("Version 1");
+    const own = groups(node).at(-1)!;
+    expect(own.querySelector(":scope > .v4RepPath")).toBeNull();
+    expect(flat(own.querySelector(":scope > details > summary"))).toBe("Dug from your question");
+    expect([...own.querySelectorAll(".v4RepPath")].map(lineOf)).toEqual([ON_QUESTION_LINE, "A made-up path dug from it.", "A made-up second path of that dig."]);
+  });
+
+  it("a version written before the mark reads as it always did: the dig on the question folds under the last path", async () => {
+    const unmarked = R22_ON_QUESTION.map(({ under: _under, ...rest }) => rest);
+    const node = await mountReport([finished(1, "2026-11-05T10:00:00.000Z", unmarked)]);
+    expect(groups(node)).toHaveLength(2);
+    const fold = groupOf(node, "A made-up second R22 path.").querySelector<HTMLDetailsElement>(":scope > details")!;
+    expect(flat(fold.querySelector("summary"))).toBe("Updated by your dig");
+    expect([...fold.querySelectorAll(".v4RepPath")].map(lineOf)).toEqual([ON_QUESTION_LINE, "A made-up path dug from it.", "A made-up second path of that dig."]);
+    expect(flat(node)).not.toContain("Dug from your question");
   });
 });

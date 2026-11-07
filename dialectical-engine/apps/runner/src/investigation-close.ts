@@ -394,9 +394,9 @@ async function composeRecord(settings: InvestigationCloseSettings, closing: Unre
       const parsed = InvestigationReportPathSchema.safeParse(placed);
       if (parsed.success) return [parsed.data];
       // A detail the contract refuses (a runaway text) costs the details, not the path. V4 start step, Task 55b: a path debate's path
-      // id, trust word and own words stay, each when it parses.
+      // id, trust word and own words stay, each when it parses; Task 55f: and the mark of a dig on the main question.
       const base = { line: path.line, summary: path.summary, fate: path.fate, level: path.level };
-      const kept = (["path_id", "trust", "own"] as const).reduce<Record<string, unknown>>((bare, member) => {
+      const kept = (["path_id", "trust", "own", "under"] as const).reduce<Record<string, unknown>>((bare, member) => {
         if (path[member] === undefined) return bare;
         return InvestigationReportPathSchema.safeParse({ ...bare, [member]: path[member] }).success ? { ...bare, [member]: path[member] } : bare;
       }, base);

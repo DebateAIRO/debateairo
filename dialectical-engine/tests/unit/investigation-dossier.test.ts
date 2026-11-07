@@ -3,17 +3,20 @@
 // paths with the story's line beside them, a FAILED rewrite bringing its dig's own material, the person's views beside
 // their verdicts, the shown quotes cut to 120 characters, the earlier report from version 2 on, the 100K guard and the
 // ladder: a level-10 tree still fits, whole statements only, and every shortening counted.
-import { purposeLinesMaterial } from "@debateai/contract";
+import { InvestigationReportPathSchema, purposeLinesMaterial } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt } from "@debateai/providers";
 import { REPORT_STORY_PROMPT_CONTRACT } from "@debateai/story";
 import {
   buildInvestigationDossier, digsInTreeOrder, dossierFieldsOf, investigationReportGuard, INVESTIGATION_REPORT_INPUT_OVER_LIMIT,
-  type Dossier
+  type Dossier, type DossierDig
 } from "../../apps/runner/src/investigation-dossier.js";
+import { closeInvestigation, type InvestigationReportContent } from "../../apps/runner/src/investigation-close.js";
 import { pathRewriteBodyBytes, pathRewriteBodyFits } from "../../apps/runner/src/path-rewrite-material.js";
+import { versionPathGroups } from "../../apps/ui/lib/v4/reportPaths.js";
 import {
-  DIG_FAILED, DIG_NESTED, DIG_READY, OWN_VIEW, PATH_NO, PATH_YES, deepChain, failedDig, investigationInput, nestedDig, readyDig
+  DIG_FAILED, DIG_NESTED, DIG_READY, OWN_VIEW, PATH_NO, PATH_YES, ROOT, closingOf, deepChain, failedDig, investigationInput, memoryReports,
+  nestedDig, readyDig, settingsOver, team
 } from "../support/investigation-close-world.js";
 
 const built = (input = investigationInput()): Dossier => {
@@ -335,3 +338,75 @@ describe("W4-4: pages added to researched", () => {
   });
 });
 
+
+/*
+ * V4 start step, Task 55f (the coordinator's ruling on Task 55c's open point 3): a dig on the MAIN QUESTION itself is listed after the
+ * first debate's paths and their digs, so with no mark the report page folded it under the last path. Each row such a dig adds to the
+ * stored version says so, last, and so does each row of the digs dug from it (review of Task 55f: a dig the walk did not reach follows
+ * them at any level, so only the mark tells the two apart); a dig of a first-level path and a dig the walk did not reach say nothing.
+ * Made-up texts only.
+ */
+describe("Task 55f: a dig on the main question is marked in the stored version", () => {
+  const ON_QUESTION = "66666666-0000-4000-8000-000000000001";
+  const UNDER_IT = "66666666-0000-4000-8000-000000000002";
+  const LOST = "66666666-0000-4000-8000-000000000003";
+  const BRIDGE = "66666666-0000-4000-8000-0000000000d1";
+  const onQuestion = (over: Partial<DossierDig> = {}): DossierDig => failedDig({ runId: ON_QUESTION, parentRunId: ROOT, positionRef: null,
+    finishedAt: "2026-10-31T11:30:00.000Z", picks: [{ text: "Is a pier the right tool at all?", by: "AI_SUGGESTION" }], rewrite: null,
+    ownMaterial: { answer: [], sources: [], paths: [
+      { positionRef: BRIDGE, statement: "A bridge would cost less.", points: [], extracts: [] },
+      { positionRef: "66666666-0000-4000-8000-0000000000d2", statement: "Boats are greener than cars.", points: [], extracts: [] }] }, ...over });
+  // A dig of the question dig's first path, and a dig whose parent was erased (the walk does not reach it).
+  const underIt = failedDig({ runId: UNDER_IT, parentRunId: ON_QUESTION, positionRef: BRIDGE, level: 2, finishedAt: "2026-10-31T11:40:00.000Z",
+    picks: [{ text: "What would a bridge cost?", by: "AI_SUGGESTION" }], rewrite: null, ownMaterial: null });
+  const lost = failedDig({ runId: LOST, parentRunId: "66666666-0000-4000-8000-000000000009", positionRef: null, level: 2, finishedAt: "2026-10-31T11:50:00.000Z",
+    picks: [{ text: "A dig whose parent was erased.", by: "AI_SUGGESTION" }], rewrite: null, ownMaterial: null });
+
+  it("marks each row of a dig under the main question and of the digs dug from it, last; a dig of a first-level path and a lost dig carry no mark", () => {
+    const paths = built(investigationInput({ digs: [readyDig(), nestedDig(), failedDig(), onQuestion(), underIt, lost] })).paths;
+    expect(paths.map((path) => [path.level, path.line, path.under ?? null])).toEqual([
+      [0, "Partly: a second pier helps at rush hour, not in winter.", null],
+      [1, "Winter ridership falls.", null],
+      [2, "Does the summer peak last?", null],
+      [0, "No: the money is better spent on buses.", null],
+      [1, "Buses carry fewer at the peak.", null],
+      // The dig on the question: its first path (with what was dug), the dig dug from it, and its second path, each marked.
+      [1, "A bridge would cost less.", "QUESTION"],
+      [2, "What would a bridge cost?", "QUESTION"],
+      [1, "Boats are greener than cars.", "QUESTION"],
+      [2, "A dig whose parent was erased.", null]
+    ]);
+    // Review of Task 55f: the page reads each where it belongs. The lost dig, as deep as a dig dug from the question's, keeps today's
+    // place under the last path; the question's own part is last.
+    const groups = versionPathGroups(paths.map((path) => InvestigationReportPathSchema.parse(path)));
+    expect(groups.map((group) => [group.first?.line ?? null, group.dug.map((dug) => dug.line)])).toEqual([
+      ["Partly: a second pier helps at rush hour, not in winter.", ["Winter ridership falls.", "Does the summer peak last?"]],
+      ["No: the money is better spent on buses.", ["Buses carry fewer at the peak.", "A dig whose parent was erased."]],
+      [null, ["A bridge would cost less.", "What would a bridge cost?", "Boats are greener than cars."]]
+    ]);
+    const bridge = paths[5]!;
+    expect(bridge.dig?.picks).toEqual(["Is a pier the right tool at all?"]);
+    expect(Object.keys(bridge).at(-1)).toBe("under");
+    // A dig on the question with no path of its own keeps its one row, marked.
+    const bare = built(investigationInput({ digs: [onQuestion({ ownMaterial: null })] })).paths;
+    expect(bare.at(-1)).toMatchObject({ level: 1, line: "Is a pier the right tool at all?", under: "QUESTION" });
+  });
+
+  it("an investigation with no dig on the question stores no mark, and the AIs' material never reads one", () => {
+    expect(built().paths.filter((path) => "under" in path)).toEqual([]);
+    const marked = built(investigationInput({ digs: [readyDig(), onQuestion()] }));
+    expect(JSON.stringify(dossierFieldsOf(marked))).not.toContain("QUESTION");
+  });
+
+  it("the closing's fallback keeps the mark when a runaway detail costs the rest of the row", async () => {
+    const runaway = onQuestion({ ownMaterial: { answer: [], sources: [], paths: [{ positionRef: BRIDGE, statement: "A bridge would cost less.", extracts: [],
+      points: [{ id: "66666666-0000-4000-8000-0000000000f1", text: "x".repeat(9_000), onId: null, side: "for", trust: null, disputed: false }] }] } });
+    const store = memoryReports();
+    expect(await closeInvestigation(settingsOver({ store, vendors: team(), dossier: investigationInput({ digs: [readyDig(), runaway] }) }), closingOf()))
+      .toBe("RECORDED");
+    const content = store.contents.get(store.records[0]!.reportId) as InvestigationReportContent;
+    const bridge = content.paths!.find((path) => path.line === "A bridge would cost less.")!;
+    expect(bridge.points).toBeUndefined();
+    expect(bridge).toEqual({ line: "A bridge would cost less.", summary: null, fate: null, level: 1, under: "QUESTION" });
+  });
+});

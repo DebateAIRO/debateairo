@@ -753,7 +753,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.report.waits.PERSON_DAY",
   "v4.report.waits.PERSON_WEEK",
   "v4.report.waits.PERSON_MONTH",
-  "v4.money.startsWait.PERSON_MONTH_NO_REPORT"
+  "v4.money.startsWait.PERSON_MONTH_NO_REPORT",
+  // V4 start step, Task 55f (the coordinator's ruling on Task 55c's open point 3): the report page's own fold for the digs on the main
+  // question, after the paths (draft wording), shown at the click-test.
+  "v4.investigation.updatedByQuestionDig"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

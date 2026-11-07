@@ -208,11 +208,12 @@ export type DossierReportDig = Readonly<{
 }>;
 /**
  * One path in the stored version: level 0 is the first debate's, level k the paths of a dig at level k. V4 start step, Task 55b: a path
- * debate's first-level path also keeps, last, its path id, its trust word and the person's own words with the verdict on them.
+ * debate's first-level path also keeps, last, its path id, its trust word and the person's own words with the verdict on them. Task 55f:
+ * each path of a dig on the main question, and of the digs dug from it, says so, last.
  */
 export type DossierReportPath = Readonly<{ line: string; summary: string | null; fate: StoryFate | null; level: number;
   points?: readonly DossierReportPoint[]; dig?: DossierReportDig; path_id?: PathId; trust?: TrustWord | null;
-  own?: Readonly<{ own_words: readonly string[]; view: DossierView | null }> }>;
+  own?: Readonly<{ own_words: readonly string[]; view: DossierView | null }>; under?: "QUESTION" }>;
 
 export type Dossier = Readonly<{
   kind: "BUILT";
@@ -684,7 +685,12 @@ function storedOf(path: DossierPath, cards: readonly DossierDig[], firstRunId: s
   };
 }
 
-/** The paths as the stored version lists them, each under the debate it was dug from: the page and the PDF show this tree. */
+/**
+ * The paths as the stored version lists them, each under the debate it was dug from: the page and the PDF show this tree. V4 start step,
+ * Task 55f: a dig on the main question comes after the last path's own digs, so each row it adds (its first path with what was dug, and
+ * its other paths) is marked `under: "QUESTION"`, last, and so is each row of the digs dug from it: a dig the walk did not reach follows
+ * them at any level, and only the mark tells the two apart (review of Task 55f).
+ */
 function reportPathsOf(input: DossierInput, cards: readonly DossierDig[], refs: Refs): readonly DossierReportPath[] {
   const paths: DossierReportPath[] = [];
   const placed = new Set<string>();
@@ -694,24 +700,25 @@ function reportPathsOf(input: DossierInput, cards: readonly DossierDig[], refs: 
       newestOf.set(dig.positionRef, dig.rewrite.after);
     }
   }
-  const under = (parentRunId: string, positionRef: string | null): void => {
+  const under = (parentRunId: string, positionRef: string | null, onQuestion = false): void => {
     for (const dig of cards) {
       if (placed.has(lower(dig.runId)) || lower(dig.parentRunId) !== lower(parentRunId) || dig.positionRef !== positionRef) continue;
       placed.add(lower(dig.runId));
-      visit(dig);
+      visit(dig, onQuestion);
     }
   };
-  const visit = (dig: DossierDig): void => {
+  const visit = (dig: DossierDig, onQuestion = false): void => {
     const about = reportDigOf(dig);
     const own = cardPathsOf(dig);
+    const place = onQuestion ? { under: "QUESTION" as const } : {};
     // A dig with no path of its own still has its row: what was dug and what it changed.
-    if (own.length === 0) paths.push(Object.freeze({ line: dig.picks[0]?.text ?? "-", summary: null, fate: null, level: dig.level, dig: about }));
+    if (own.length === 0) paths.push(Object.freeze({ line: dig.picks[0]?.text ?? "-", summary: null, fate: null, level: dig.level, dig: about, ...place }));
     own.forEach((path, at) => {
       paths.push(Object.freeze({ line: path.line, summary: null, fate: path.fate, level: dig.level,
-        points: reportPointsOf(path.points, dig.ownMaterial?.sources ?? [], refs, input.trustWords), ...(at === 0 ? { dig: about } : {}) }));
-      under(dig.runId, path.positionRef);
+        points: reportPointsOf(path.points, dig.ownMaterial?.sources ?? [], refs, input.trustWords), ...(at === 0 ? { dig: about } : {}), ...place }));
+      under(dig.runId, path.positionRef, onQuestion);
     });
-    under(dig.runId, null);
+    under(dig.runId, null, onQuestion);
   };
   for (const path of input.first.paths) {
     const current = path.current ?? newestOf.get(path.ref) ?? { line: path.storyLine, summary: null, fate: path.storyFate };
@@ -719,7 +726,7 @@ function reportPathsOf(input: DossierInput, cards: readonly DossierDig[], refs: 
       ...storedOf(path, cards, input.first.runId) }));
     under(input.first.runId, path.ref);
   }
-  under(input.first.runId, null);
+  under(input.first.runId, null, true);
   // A dig the walk did not reach (its parent erased, or on a path no longer named) still counts.
   for (const dig of cards) {
     if (placed.has(lower(dig.runId))) continue;

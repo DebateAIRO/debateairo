@@ -120,6 +120,35 @@ describe("what the report's PDF prints", () => {
     for (const tag of ["Held up", "Partly held", "Set aside", "Fell"]) expect(printed, tag).not.toContain(tag);
   });
 
+  it("V4 start step, Task 55f: a dig on the main question prints after the paths, under the question itself, never under the last path", async () => {
+    const base = versionWith(words);
+    const onQuestion = { line: "A made-up dig on the question.", summary: null, fate: null, level: 1,
+      dig: { picks: ["Is a pier worth it at all?"], own_words: [], view: null, changed: [] }, under: "QUESTION" };
+    const dugFromIt = { line: "A made-up path dug from it.", summary: null, fate: null, level: 2, under: "QUESTION" };
+    // Review of Task 55f: a dig the walk did not reach (its parent erased), deeper than the dig on the question, keeps its place in the tree.
+    const lost = { line: "A made-up lost dig.", summary: null, fate: null, level: 3 };
+    const version = InvestigationReportVersionSchema.parse({ ...base, paths: [...base.paths!, onQuestion, dugFromIt, lost] }) as FinishedInvestigationReport;
+    const question = "Should the city build a pier?";
+    const items = buildInvestigationReportPdfModel({ question, version, catalogs: english }).paths!.items;
+    expect(items.map((item) => [item.level, item.line])).toEqual([
+      [0, words.path], [1, words.note], [2, words.answer], [3, words.path], [3, "A made-up lost dig."],
+      // The question itself is the row the digs on it sit under, so they are indented under it as every follow-up is.
+      [0, question], [1, "A made-up dig on the question."], [2, "A made-up path dug from it."]
+    ]);
+    expect(items[5]).toEqual({ level: 0, trustWords: null, line: question, summary: null, points: [], dig: null });
+    expect(items[6]!.dig).toMatchObject({ title: "Follow-up debate", picks: ["Is a pier worth it at all?"] });
+    // A version written before the mark prints as it always did: the stored order, nothing added.
+    const unmarked = [onQuestion, dugFromIt].map(({ under: _under, ...rest }) => rest);
+    const older = InvestigationReportVersionSchema.parse({ ...base, paths: [...base.paths!, ...unmarked, lost] }) as FinishedInvestigationReport;
+    expect(buildInvestigationReportPdfModel({ question, version: older, catalogs: english }).paths!.items.map((item) => [item.level, item.line])).toEqual([
+      [0, words.path], [1, words.note], [2, words.answer], [3, words.path], [1, "A made-up dig on the question."], [2, "A made-up path dug from it."],
+      [3, "A made-up lost dig."]
+    ]);
+    // And it draws.
+    const pdf = await renderInvestigationReportPdf({ question, version, catalogs: english });
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  }, 120_000);
+
   it("r2-13: a Free debate's PDF says it was not checked on the web, in the question's language", async () => {
     expect(buildInvestigationReportPdfModel({ question: "Q?", version: versionWith(words), catalogs: english, free: true }).webNote)
       .toBe("Not checked on the web.");
