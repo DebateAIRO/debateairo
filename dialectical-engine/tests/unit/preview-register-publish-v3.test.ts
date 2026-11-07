@@ -62,6 +62,8 @@ describe('publish kit v3: the hosted source', () => {
     expect([oldCost.admission_close_basis_points, oldCost.finish_up_to_basis_points, oldCost.waiting_line_per_person]).toEqual([9500, 11500, 1]);
     const admission = value(rows, 'admissionPolicy'), oldAdmission = value(f.v2, 'admissionPolicy');
     expect(oldAdmission.ask_room_reads).toBeUndefined();
+    // Owner ruling 2026-11-07: the team pages' budget comes with the code-owned row, so the test site's next publish carries it.
+    expect(oldAdmission.staff_requests).toEqual({ key: 'owner', limit: 120, window_ms: 60_000, capacity: 65_536 });
     expect(admission).toEqual({ ...oldAdmission, ask_room_reads: { key: 'owner', limit: 60, window_ms: 60_000, capacity: 65_536 } });
     const billing = value(rows, 'billingPolicy');
     expect(billing).toEqual({ ...value(f.v2, 'billingPolicy'), enabled: true, withdrawal_countries: [...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries, 'US'] });
