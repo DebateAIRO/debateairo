@@ -228,11 +228,17 @@ export function shelfPlaceOf(row: ShelfRow, links: ReadonlyMap<string, string | 
  * words), from the server's `dig_pick`, with "and more" when the dig's own question line names more than one pick (as a
  * dig under a question says it). The fifth round (7 Nov): a dig of a whole path, which has no pick, reads "Dig: a closer
  * look at a path" (the map's own button is "A closer look at this path").
+ *
+ * A public dig is always on a path, and its question line names the path's line first (askText digItems). Written in
+ * English, the line says which item is the path; written off English, nothing does, so the first item is taken as the
+ * path's line, and only the server's `dig_pick` names the pick: the card never shows the path's line with its outcome
+ * words (dig-f30, map-f25).
  */
 export function publicDigCardText(row: Pick<ShelfRow, "questionLine" | "publicPick">, catalog: MessageCatalog): string {
   const detail = parseDigDetail(row.questionLine, catalog);
-  const linePicks = detail === null ? [] : detail.items.filter((_, at) => detail.kinds[at] !== "PATH");
-  const pick = row.publicPick ?? linePicks[0] ?? null;
+  const linePicks = detail === null ? []
+    : detail.english ? detail.items.filter((_, at) => detail.kinds[at] !== "PATH") : detail.items.slice(1);
+  const pick = row.publicPick ?? (detail?.english === true ? linePicks[0] : undefined) ?? null;
   if (pick === null) return t(catalog, "v4.maps.digWholePath");
   return t(catalog, linePicks.length > 1 ? "v4.maps.digMore" : "v4.maps.dig", { pick });
 }

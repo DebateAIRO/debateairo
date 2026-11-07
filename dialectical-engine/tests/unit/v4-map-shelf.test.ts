@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { AnswerIndex, DigLinks } from "@debateai/contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { digPicksOf, digQuestion } from "../../apps/ui/lib/v4/askText.js";
+import { digPicksOf, digQuestion, parseDigDetail } from "../../apps/ui/lib/v4/askText.js";
 import { mergeShelfRows, readMapShelf, shelfExtrasOf, shelfPicksOf, type ShelfClient } from "../../apps/ui/lib/v4/mapShelf.js";
 import type { DigTarget, V4Path } from "../../apps/ui/lib/v4/types.js";
 import { usedUpLine } from "../../apps/ui/lib/v4/money.js";
@@ -270,6 +270,32 @@ describe("question 33 A: a dig made on someone else's public page is a card of i
     const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({ [id(2)]: elsewhere })) });
     expect(shelf.maps.map((map) => [map.kind, map.question])).toEqual([["PUBLIC_DIG", "Dig: a closer look at a path"]]);
     expect(CATALOG["v4.maps.digWholePath"]).toBe("Dig: a closer look at a path");
+  });
+
+  it("written off English, the path's line (first) is never taken for a pick: 'and more' counts only the picks after it", async () => {
+    const offEnglish = (target: DigTarget) => digQuestion(target, publicQuestion, CATALOG, "ro");
+    const one = offEnglish({ kind: "picks", path, picks: [own(1, "Cars pollute city air")] } as DigTarget);
+    const two = offEnglish({ kind: "picks", path, picks: [own(1, "Cars pollute city air"), own(2, "Fares pay the drivers")] } as DigTarget);
+    const whole = offEnglish({ kind: "path", path } as DigTarget);
+    expect(parseDigDetail(one, CATALOG)?.english).toBe(false);
+    const readAnswerIndex = answerList([
+      { run: id(5), seq: 50, line: one, extra: onPublic("Cars pollute city air") },
+      { run: id(4), seq: 40, line: two, extra: onPublic("Cars pollute city air") },
+      // No pick from the server: the line's own words are not trusted off English.
+      { run: id(3), seq: 30, line: one, extra: onPublic() },
+      { run: id(2), seq: 20, line: whole, extra: onPublic() },
+      // A line no dig parse reads: the server's pick alone.
+      { run: id(1), seq: 10, line: "Cars and cities", extra: onPublic("Cars pollute city air") }
+    ]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({})) });
+    expect(shelf.maps.map((map) => map.question)).toEqual([
+      "Dig: Cars pollute city air",
+      "Dig: Cars pollute city air and more",
+      "Dig: a closer look at a path",
+      "Dig: a closer look at a path",
+      "Dig: Cars pollute city air"
+    ]);
+    expect(shelf.maps.every((map) => !map.question.includes("did not hold"))).toBe(true);
   });
 
   it("before the server marks such a row, the dig still hangs nowhere (today's behaviour, never a guess)", async () => {

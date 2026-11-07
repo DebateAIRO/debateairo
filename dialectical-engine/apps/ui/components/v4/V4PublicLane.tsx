@@ -30,7 +30,7 @@ import { publicReportWriting, reportShown } from "@/lib/v4/publicReport";
 import { focusInPlace, useFocusHandOff, type FocusHandOff } from "@/lib/v4/useFocusHandOff";
 import { useWaitPolling } from "@/lib/v4/useWaitPolling";
 import { contractClient } from "@/lib/api";
-import { publicDebateLevel } from "@/lib/v4/debateLevel";
+import { publicDebateLevel, readingLevelOf } from "@/lib/v4/debateLevel";
 import { levelHref } from "@/lib/v4/storage";
 import { picksMax } from "@/lib/v4/suggestions";
 import type { DigMode, PendingDig, ReadingLevel } from "@/lib/v4/types";
@@ -100,7 +100,7 @@ type LaneActions = Readonly<{
   planTier: "free" | "premium";
   busy: boolean;
   publicRef: string;
-  /** The debate's own reading level, for the links to a dig's own page (null while nobody is signed in: no link). */
+  /** The level the debate names itself, for the links to a dig's own page (null: it names none, or nobody is signed in). */
   level: ReadingLevel | null;
   /** public-f11: the dig's share before the press, when the room read says one for a dig (not yet on a public page). */
   share: number | null;
@@ -127,9 +127,11 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   const { catalog, locale } = lane;
   // The owner's level ruling (5 Nov, question 15 and the second round: a public page shows each debate at the level it was
   // asked at): a dig asked here is asked, and its share read, at the debate's own level (its `reading_level`; none reads as
-  // Plain words, lib/v4/debateLevel.ts), never the visitor's own, so "up to N%" agrees with what the dig is charged. Its
-  // card's link to the dig's own page carries the same level (V4PublicPage draws the points at it too).
+  // Plain words, lib/v4/debateLevel.ts), never the visitor's own, so "up to N%" agrees with what the dig is charged.
+  // V4PublicPage draws the points at it too. A link to the dig's own page carries only a level the debate names itself
+  // (`linkLevel`): with none, no level rides it, and the dig's map shows the level the dig was kept at.
   const level = publicDebateLevel(debate);
+  const linkLevel = readingLevelOf(debate);
   const ask = useV4Ask({
     catalog,
     homeCatalog: lane.homeCatalog ?? {},
@@ -227,8 +229,8 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   const writeReport = useCallback(() => pressPublicReport(debate.public_ref, { catalog, room, locale }), [debate.public_ref, catalog, room, locale]);
   const suggestionsFor = useCallback((path: PublicPathView) => publicSuggestionsFor(debate, path), [debate]);
   const actions = useMemo<LaneActions>(() => ({
-    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level, share, periodLine, suggestionsFor, startDig, writeReport
-  }), [returnPath, planTier, submitting, publicRef, level, share, periodLine, suggestionsFor, startDig, writeReport]);
+    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: linkLevel, share, periodLine, suggestionsFor, startDig, writeReport
+  }), [returnPath, planTier, submitting, publicRef, linkLevel, share, periodLine, suggestionsFor, startDig, writeReport]);
   return (
     <LaneContext.Provider value={actions}>
       {children}
