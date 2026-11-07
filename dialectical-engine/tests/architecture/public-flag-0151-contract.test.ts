@@ -87,7 +87,7 @@ describe("0151: the Report button and the sealed originals' six months", () => {
     for (const table of TABLES) expect(loader, table).toContain(`"${table}"`);
     for (const signature of [...GRANTED, ...PRIVATE]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-7)!;
+    const step = plan.forwardChain.at(-8)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -107,7 +107,7 @@ describe("0151: the Report button and the sealed originals' six months", () => {
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-7)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(plan.forwardChain.at(-8)!.amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`", () => {

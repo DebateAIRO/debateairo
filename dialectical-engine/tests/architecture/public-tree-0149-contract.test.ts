@@ -67,7 +67,7 @@ describe("0149: a funded person's public report, a settled dig, the page's refer
     for (const table of TABLES) expect(loader, table).toContain(`"${table}"`);
     for (const signature of [...GRANTED, ...PRIVATE, ...REDEFINED]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-9)!;
+    const step = plan.forwardChain.at(-10)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -87,7 +87,7 @@ describe("0149: a funded person's public report, a settled dig, the page's refer
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-9)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(plan.forwardChain.at(-10)!.amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`", () => {
