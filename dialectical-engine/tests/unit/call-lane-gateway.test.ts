@@ -669,7 +669,8 @@ describe("the runner's wiring (source pins)", () => {
     // gateway, the innermost wrapper — it lanes nothing; a recorded call it answers still took its slot above it, and
     // asks the debate's keep-alive first, as a real call does.
     expect(code).toContain("const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));");
-    expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay);\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
+    // V4 start step, Task 57f: the replay gateway also hands the site a call an earlier copy paid for and this copy buys again (waiveCalls).
+    expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay, waiveCalls);\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
     // Refused-repair salvage (Task 6 review): the replay reads A1 and B calls only on a run whose structure-repair route is
     // wired (the runner composition's `structureRepairCeiling`); hosted and local replay as today.
     expect(code).toContain("const structureReplay = (settings.structureRepairCeiling ?? null) !== null;");
