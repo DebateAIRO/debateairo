@@ -555,7 +555,10 @@ block holds:
 - `asked`: the three settings as given;
 - `storedDepthParams`: what the ask path stored for the run;
 - `sizes`: the sizes frozen on the run's money receipt (plan, map AIs, answers, graders, close-call extra graders,
-  points per answer, deeper points, gap rounds, the three settings, the opening);
+  points per answer, deeper points, gap rounds, the three settings, the opening). A debate with paths (`--start-step`,
+  receipt version 2) has no map, so its `sizes` carry `version: 2` and the paths instead: how many and where they came
+  from (`pathsSource`: MENU, RUN_BUILT or DIG_PICKS), the run's own list writers (RUN_BUILT only), points per path, and no
+  opening;
 - `opening`: the opening the debate used. It is `TODAYS_OPENING` when the map was unavailable, or gave fewer than two
   answers to argue, and each AI argued its own position, as today;
 - `mapCallsByStep`: the map's calls by step (angles, list, merge, gap, gap-paths, choose, check; gap-paths is the gap round after Start on a path debate), every try as the ledger recorded it;
@@ -595,7 +598,13 @@ A debate asked for the new shape that did not run it is NOT_PROVEN (exit 30), wi
 - `MAP_ANSWERS_NOT_ARGUED`: the map gave fewer than two answers to argue, so each AI argued its own opening, as today;
 - `NO_MAP_STORED`: the run kept no map at all (it stopped before the map);
 - `NO_SHAPE_ON_RECEIPT`: the run was admitted without the shape;
+- `NO_PATHS_STORED` (a debate with paths): the run kept no chosen paths at all;
+- `MENU_UNAVAILABLE_QUESTION_ITSELF` (a debate with paths that builds its own list): no list came back, so it argued one
+  path, the question itself;
 - `FACTS_UNREADABLE:<code>`: what the run did could not be read.
+
+The map's three reasons above apply only to a debate without paths. A start-step practice (`--start-step`) also counts
+only the AIs its plan seats: a Free start never names a premium-only AI as not exercised.
 
 Without `--shape-policy`, on a register without the row, nothing changes: today's shape, and no `shape` block.
 

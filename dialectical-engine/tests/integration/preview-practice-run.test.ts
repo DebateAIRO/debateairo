@@ -1648,7 +1648,8 @@ describe("preview practice: debate mode, the start step on the stand-ins (V4 Tas
   const SHAPE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/shape-policy-start.json", import.meta.url));
   const LENGTH_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/length-policy-start.json", import.meta.url));
   const ENGINE_POLICY_START = fileURLToPath(new URL("../../tools/preview-practice/engine-policy-start.json", import.meta.url));
-  type StartReport = { verdict: string; reasons: string[]; ask: { engine?: { engine: number } }; failures: unknown[];
+  type StartReport = { verdict: string; exitCode: number; reasons: string[]; ask: { engine?: { engine: number } }; failures: unknown[];
+    shape?: { sizes: Record<string, unknown> | null; opening: string | null; notExercised: string | null };
     run: { runId: string; workItemOutcome: string; answer: { served: boolean } | null; story: { outcome: string | null } | null };
     web?: { totals: { searches: number; searchFeeMicros: number } } };
   type MonthLine = { kind: string; phase?: string; runId?: string | null; calls?: number; costNanoUsd?: string; plan?: string; paths?: number;
@@ -1680,11 +1681,15 @@ describe("preview practice: debate mode, the start step on the stand-ins (V4 Tas
       if (line.startsWith("dig 1: run ")) at.dig = stubs.requests.length;
     } });
     const report = outcome.report as unknown as StartReport;
-    // Nothing refused, failed or stopped, and no reply refused. PASS itself is not asserted: today the report adds NOT_PROVEN reasons
-    // of its own to a Free start (the premium AIs a Free panel never seats; a v2 receipt's sizes, which the shape block does not read).
-    expect(report.reasons.filter((reason) => /^(HARNESS_|ADMISSION_|FORMAT_|CALL_FAILED|GATE_|UNBILLED_|MODEL_BUSY|PRACTICE_)/u.test(reason)))
-      .toEqual([]);
+    // Task 91e: a start-step run that went right proves PASS, with no reason at all and no reply refused. Only the plan's own roster is
+    // seated (Free: GLM and DeepSeek; the premium-only AIs are never "not exercised"), and the shape block reads the v2 receipt's sizes:
+    // 3 paths from the menu, argued as stored.
+    expect(report).toMatchObject({ verdict: "PASS", exitCode: 0 });
+    expect(outcome.exitCode).toBe(0);
+    expect(report.reasons).toEqual([]);
     expect(report.failures).toEqual([]);
+    expect(report.shape).toMatchObject({ sizes: { version: 2, plan: "free", paths: 3, pathsSource: "MENU", runListWriters: 0, gapRounds: 0 },
+      opening: null, notExercised: null });
 
     // The step before Start: the lists by the cut, one merge, the combine written; Start with the menu's top 3 paths, chosen by the AIs.
     const listsByCut = Number(/^start step: ([1-9][0-9]*) list\(s\) by the cut, 0 after it, 1 merge\(s\), a menu of [4-9][0-9]* path\(s\); the combine written$/u

@@ -11,13 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startMoreOf, type Answer, type StartMenu } from "@debateai/contract";
 import { PREVIEW_PROVIDER_REF_MODELS, parsePreviewEnvironmentConfig } from "@debateai/providers";
 import {
-  debateShapePolicyStartValues, debateShapeStartStepOf, debateShapeStartStepStartValues, engineVersionPolicyStartValues,
-  parseDebateShapePolicy, type DebateShapePolicy
+  computeStructuralCeilingBasis, debateShapePolicyStartValues, debateShapeStartStepOf, debateShapeStartStepStartValues,
+  engineVersionPolicyStartValues, parseDebateShapePolicy, resolveDebateShapeV2, type DebateShapePolicy
 } from "@debateai/register";
 import { newStartStepKey, signStartCheck, signStartList, signStartMenu } from "../../apps/api/src/start-step/signing.js";
 import type { StartStepPort } from "../../apps/api/src/start-step/step.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
+import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
+import { debateReport } from "../../tools/preview-practice/practice-report.js";
 import { practiceShapeOverrideFromArgs } from "../../tools/preview-practice/practice-shape.js";
 import { parsePracticeRegisterExport, type PracticeRegisterImportReceipt } from "../../tools/preview-practice/practice-register-import.js";
 import type { PracticeSettings, PracticeSockets } from "../../tools/preview-practice/practice-settings.js";
@@ -49,7 +51,13 @@ const seen = vi.hoisted(() => ({
   writes: [] as ((runId: string) => readonly LedgerRow[])[],
   ran: 0,
   digJoins: [] as unknown[],
-  digPicks: [] as unknown[]
+  digPicks: [] as unknown[],
+  /** Task 91e: the debate's admitted panel (core.run.discovered_panel), its receipt, its stored set (codes), its answer and story. */
+  panel: [] as unknown[],
+  basis: null as unknown,
+  pathSet: [] as { source: string; author: string }[],
+  projection: null as unknown,
+  story: null as unknown
 }));
 
 vi.mock("@debateai/db", async (importOriginal) => ({
@@ -73,11 +81,17 @@ vi.mock("@debateai/register", async (importOriginal) => ({
 }));
 vi.mock("@debateai/serve", async (importOriginal) => ({
   ...await importOriginal<typeof import("@debateai/serve")>(),
-  ServeRepository: class { async readAnswerProjection() { return null; } }
+  ServeRepository: class { async readAnswerProjection() { return seen.projection; } }
 }));
 vi.mock("@debateai/story", async (importOriginal) => ({
   ...await importOriginal<typeof import("@debateai/story")>(),
-  StoryRepository: class { async readForAnswer() { return null; } }
+  StoryRepository: class { async readForAnswer() { return seen.story; } }
+}));
+// Task 91e: the map's readers (a content lease over a real pool) on the stand-in database: a path debate stores no map.
+vi.mock("@debateai/map", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@debateai/map")>(),
+  readMapChoiceForRun: vi.fn(async () => null),
+  readMapItemsForRun: vi.fn(async () => [])
 }));
 vi.mock("../../tools/preview-practice/practice-throwaway-db.js", () => ({
   startPracticeDatabase: vi.fn(async () => {
@@ -94,6 +108,12 @@ vi.mock("../../tools/preview-practice/practice-throwaway-db.js", () => ({
             outcome: "OK", started_at: new Date(row.finishedAt.getTime() - 1_000), finished_at: row.finishedAt, raw_artifact_ref: null,
             metadata_json: row.metadata, raw_text: null, content_ciphertext: null })) };
         }
+        // Task 91e: the debate's panel, its receipt and its stored set, as the practice reads them after the debate.
+        if (text.includes("SELECT discovered_panel FROM core.run")) return { rows: [{ discovered_panel: seen.panel }] };
+        if (text.includes("SELECT depth_params, envelope_basis FROM core.run")) {
+          return { rows: seen.basis === null ? [] : [{ depth_params: { depth: 1 }, envelope_basis: seen.basis }] };
+        }
+        if (text.includes("core.start_path_set")) return { rows: seen.pathSet };
         return { rows: [] };
       }
     };
@@ -214,7 +234,10 @@ beforeEach(() => {
   seen.composed = null;
   seen.ran = 0;
   seen.workItems.clear();
-  for (const list of [seen.submits, seen.preStart, seen.ledger, seen.writes, seen.digJoins, seen.digPicks]) list.length = 0;
+  for (const list of [seen.submits, seen.preStart, seen.ledger, seen.writes, seen.digJoins, seen.digPicks, seen.panel, seen.pathSet]) list.length = 0;
+  seen.basis = null;
+  seen.projection = null;
+  seen.story = null;
 });
 
 describe("Task 91b: --start-step and --digs, debate mode only", () => {
@@ -478,5 +501,85 @@ describe("Task 91b: a dry run on fake gates (Free, 3 paths, 1 dig)", () => {
       .rejects.toMatchObject({ code: "PRACTICE_START_STEP_NOT_IN_FORCE" });
     expect(seen.preStart).toEqual([]);
     expect(seen.submits).toEqual([]);
+  });
+
+  /*
+   * Task 91e (the 91d review): every start-step practice ended NOT_PROVEN when nothing was wrong. The sat-out list was the premium
+   * roster less the panel, but a Free start seats only the Free roster; and the shape facts read a v2 receipt's `shape`, which it never
+   * has (`shapeV2`). Rules: a model the plan does not seat is never "not exercised"; one it seats that the panel left out still is; an
+   * R22 practice (no --start-step) keeps today's premium roster. Made-up panels, receipts and answers on the stand-ins above.
+   */
+  describe("Task 91e: a start-step run that went right proves PASS", () => {
+    const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
+    const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+    const QWEN = "Qwen/Qwen3.8-Flash";
+    const TERMS = Object.freeze({ maxDepth: 5, judgeMaxAttempts: 3, organMaxAttempts: 3, finalRetryAttempts: 1, maxRecompose: 1,
+      maxCooldownHoldsPerRun: 2, branchingFactor: 2, compositionSegmentCap: 3, fixedOrgansPerComposition: 5,
+      reviewerCallsPerNode: 1, synthesizerMaxRounds: 3, evaluatorMaxRounds: 3 });
+    const S = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
+    const member = (model: string) => ({ provider_ref: refOf(model), model_id: model, maker: model.split(/[-/]/u)[0]!.toLowerCase() });
+    /** The run as the practice reads it after the debate: its panel, its v2 receipt, its stored set of MENU paths and a served answer. */
+    const debated = (plan: "free" | "premium", paths: number, panel: readonly string[]) => {
+      seen.panel.push(...panel.map(member));
+      // A v2 receipt needs a panel of 2 at least (admission's own rule); a panel the test cuts to one keeps a receipt of two.
+      const makers = Math.max(2, panel.length);
+      seen.basis = JSON.parse(JSON.stringify(computeStructuralCeilingBasis({ ...TERMS, panelSize: makers, depth: 1,
+        shapeV2: resolveDebateShapeV2(STEP_ROW, plan, { ...S, paths, pathsSource: "MENU" }, makers) })));
+      seen.pathSet.push(...Array.from({ length: paths }, () => ({ source: "MENU", author: "AI_SUGGESTION" })));
+      seen.projection = { terminal: "SERVED", serve_state: "SERVED", verdict_state: "SETTLED", condition_mark_records: [] };
+      seen.story = { outcome: "READY", failureCode: null };
+    };
+    const practise = (start: { plan: "free" | "premium"; paths: number; digs: 0 } | undefined) => runPracticeDebate({ settings: SETTINGS,
+      sockets: SOCKETS, register: REGISTER, budgetPorts: {} as never, observer: {} as never, depth: 1, questionId: "en",
+      shape: { policy: STEP_ROW, ask: {} }, ...(start === undefined ? {} : { start, startMonthDirectory: out }),
+      progress: () => undefined } as Parameters<typeof runPracticeDebate>[0]);
+    const reportOf = (result: Awaited<ReturnType<typeof runPracticeDebate>>) =>
+      debateReport({ result, observer: new PracticeGateObserver(), startedAt: new Date(0), finishedAt: new Date(1_000) });
+
+    it("Free (free:3): the Free roster seated, none of the premium-only models named, the shape block from shapeV2: PASS", async () => {
+      compose();
+      debated("free", 3, [GLM, HAIKU]);
+      const result = await practise({ plan: "free", paths: 3, digs: 0 });
+      expect(result.admission.satOut).toEqual([]);
+      expect(result.shape).toMatchObject({ sizes: { version: 2, plan: "free", paths: 3, pathsSource: "MENU", gapRounds: 0 }, notExercised: null });
+      expect(reportOf(result)).toMatchObject({ verdict: "PASS", exitCode: 0, reasons: [] });
+    });
+
+    it("premium:5 the same: the premium roster seated, 5 paths on the receipt: PASS", async () => {
+      compose();
+      debated("premium", 5, [GLM, DEEPSEEK, MIMO, QWEN, HAIKU]);
+      const result = await practise({ plan: "premium", paths: 5, digs: 0 });
+      expect(seen.submits[0]!.request).toMatchObject({ plan_tier: "premium", start_paths: { source: "MENU", width: 5 } });
+      expect(result.admission.satOut).toEqual([]);
+      expect(result.shape).toMatchObject({ sizes: { version: 2, plan: "premium", paths: 5, pathsSource: "MENU" }, notExercised: null });
+      expect(reportOf(result)).toMatchObject({ verdict: "PASS", exitCode: 0, reasons: [] });
+    });
+
+    it("a model the plan seats that the panel left out was never called: still NOT_PROVEN, naming it alone", async () => {
+      compose();
+      debated("free", 3, [GLM]);
+      const free = await practise({ plan: "free", paths: 3, digs: 0 });
+      expect(free.admission.satOut.map((entry) => entry.model)).toEqual([HAIKU]);
+      expect(reportOf(free)).toMatchObject({ verdict: "NOT_PROVEN", exitCode: 30, reasons: [`MODEL_NOT_EXERCISED:${HAIKU}`] });
+    });
+
+    // Task 91e review: the same rule on premium:5 (the sitting's Plus run). Its roster is the premium one, never the Free one: a
+    // premium-only model the panel left out (Qwen here, outside the made-up Free roster) is still named.
+    it("premium:5 the same rule: a premium-roster model the panel left out is still NOT_PROVEN, naming it alone", async () => {
+      compose();
+      debated("premium", 5, [GLM, DEEPSEEK, MIMO, HAIKU]);
+      const plus = await practise({ plan: "premium", paths: 5, digs: 0 });
+      expect(plus.admission.satOut.map((entry) => entry.model)).toEqual([QWEN]);
+      expect(reportOf(plus)).toMatchObject({ verdict: "NOT_PROVEN", exitCode: 30, reasons: [`MODEL_NOT_EXERCISED:${QWEN}`] });
+    });
+
+    it("an R22 practice (no --start-step) asks on premium as today: its sat-out list is the premium roster less the panel", async () => {
+      compose();
+      seen.panel.push(...[GLM, DEEPSEEK, HAIKU].map(member));
+      const result = await practise(undefined);
+      expect(seen.submits[0]!.request).toMatchObject({ plan_tier: "premium" });
+      expect(result.admission.satOut.map((entry) => entry.model)).toEqual([MIMO, QWEN]);
+      expect(reportOf(result).reasons).toEqual(expect.arrayContaining([`MODEL_NOT_EXERCISED:${MIMO}`, `MODEL_NOT_EXERCISED:${QWEN}`]));
+    });
   });
 });

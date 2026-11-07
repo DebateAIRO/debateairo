@@ -726,6 +726,17 @@ export function assertPracticeLineUpPublished(lineUp: PreviewLineUp | null, vers
   }
 }
 
+/**
+ * V4 start step, Task 91e (the 91d review): the roster the practice's ask seats its panel from, the plan's own. A Free start
+ * (`--start-step free:N`) asks on the Free plan, so admission seats the Free roster; every other practice asks on premium, as today.
+ * The sat-out list is this roster less the admitted panel: a model the plan does not seat is never "not exercised", and one it seats
+ * that the panel left out (so the run never called it) still is.
+ */
+export function practiceSeatedRoster(config: Readonly<{ free_model_ids: readonly string[]; premium_model_ids: readonly string[] }>,
+  start: PracticeStartStep | undefined): readonly string[] {
+  return start?.plan === "free" ? config.free_model_ids : config.premium_model_ids;
+}
+
 export async function runPracticeDebate(input: Readonly<{
   settings: PracticeSettings;
   sockets: PracticeSockets;
@@ -1058,7 +1069,8 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const admissionSeconds = (performance.now() - admissionStarted) / 1000;
     const job = dispatched[0];
-    const premium = settings.previewConfig.premium_model_ids;
+    // V4 start step, Task 91e: the plan's own roster (a Free start seats the Free one), never the premium roster for every ask.
+    const seated = practiceSeatedRoster(settings.previewConfig, input.start);
     const probeRows = (await pool.query<{ provider_ref: string; state: string; failure_code: string | null; n: number }>(
       `SELECT provider_ref, state, failure_code, count(*)::int AS n FROM core.provider_probe
         GROUP BY provider_ref, state, failure_code ORDER BY provider_ref, state`)).rows;
@@ -1089,7 +1101,7 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
     const panel = (Array.isArray(runRow?.discovered_panel) ? runRow.discovered_panel : []) as { provider_ref: string; model_id: string; maker: string }[];
-    const satOut = premium.filter((model) => !panel.some((member) => member.model_id === model)).map((model) => {
+    const satOut = seated.filter((model) => !panel.some((member) => member.model_id === model)).map((model) => {
       const refs = Object.entries(PREVIEW_PROVIDER_REF_MODELS).filter(([, id]) => id === model).map(([ref]) => ref);
       const failure = probeRows.find((row) => refs.includes(row.provider_ref) && row.state !== "HEALTHY")?.failure_code ?? null;
       return Object.freeze({ model, providerRefs: Object.freeze(refs), failureCode: failure });

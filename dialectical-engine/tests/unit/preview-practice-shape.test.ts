@@ -6,11 +6,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { mapPromptContractHash } from "@debateai/map";
 import {
   canonicalRegisterJson,
+  computeStructuralCeilingBasis,
   DEBATE_SHAPE_POLICY_ROW_KEY,
   debateShapePolicyRow,
   debateShapePolicyStartValues,
   loadBootstrapRegister,
   parseDebateShapePolicy,
+  resolveDebateShape,
+  resolveDebateShapeV2,
   type RegisterPublicationRow
 } from "@debateai/register";
 import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
@@ -26,6 +29,7 @@ import {
   practiceShapeBlock,
   practiceShapeLines,
   practiceShapeOverrideFromArgs,
+  readPracticeShapeFacts,
   type PracticeShapeFacts
 } from "../../tools/preview-practice/practice-shape.js";
 import { practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
@@ -372,6 +376,113 @@ describe("practice debate shape: what the run did", () => {
     const report = { schema: "preview-practice-report-v1", mode: "debate", verdict: "PASS", exitCode: 0, reasons: [],
       startedAt: "2026-10-12T10:00:00.000Z", finishedAt: "2026-10-12T11:00:00.000Z" } as unknown as PracticeReport;
     expect(reportMarkdown(report)).not.toContain("Debate shape");
+  });
+});
+
+/*
+ * V4 start step, Task 91e (the 91d review): a path debate's receipt (shape receipt v2) parses into `shapeV2`, never `shape`, so the
+ * shape block read no sizes and every start-step practice ended SHAPE_NOT_EXERCISED:NO_SHAPE_ON_RECEIPT. The facts read `shapeV2` on a
+ * v2 receipt and `shape` on a v1 one. A path debate has no map (Task 53): it ran its shape when it argued the paths it stored, never
+ * the run-built fallback of one path, the question itself. Every figure is made up.
+ */
+describe("V4 start step, Task 91e: the shape facts of a path debate (receipt v2) beside R22's (v1)", () => {
+  const TERMS = Object.freeze({ maxDepth: 5, judgeMaxAttempts: 3, organMaxAttempts: 3, finalRetryAttempts: 1, maxRecompose: 1,
+    maxCooldownHoldsPerRun: 2, branchingFactor: 2, compositionSegmentCap: 3, fixedOrgansPerComposition: 5,
+    reviewerCallsPerNode: 1, synthesizerMaxRounds: 3, evaluatorMaxRounds: 3 });
+  const POLICY = debateShapePolicyStartValues();
+  const S = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
+  /** As the database hands the receipt back (jsonb). */
+  const wire = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+  const FREE = resolveDebateShapeV2(POLICY, "free", { ...S, paths: 3, pathsSource: "MENU" }, 2);
+  const PREMIUM = resolveDebateShapeV2(POLICY, "premium", { ...S, paths: 5, pathsSource: "MENU" }, 5);
+  const BUILT = resolveDebateShapeV2(POLICY, "premium", { ...S, paths: 5, pathsSource: "RUN_BUILT" }, 5);
+  const V1 = resolveDebateShape({ policy: POLICY, plan: "premium", makers: 5, settings: S })!;
+  const v2Basis = (shapeV2: typeof FREE, panelSize: number) => wire(computeStructuralCeilingBasis({ ...TERMS, panelSize, depth: 1, shapeV2 }));
+  const V1_BASIS = wire(computeStructuralCeilingBasis({ ...TERMS, panelSize: 5, depth: 1, shape: V1 }));
+  type StoredSet = Readonly<{ source: string; authors: readonly string[] }> | null;
+  /** A made-up throwaway database: the run's receipt, no condition mark, the given map keys, no answer check, the given stored set. */
+  function database(basis: unknown, set: StoredSet, keys: readonly string[] = []) {
+    const asked: string[] = [];
+    const pool = {
+      query: async (text: string) => {
+        asked.push(text);
+        if (text.includes("envelope_basis FROM core.run")) return { rows: [{ depth_params: { depth: 1 }, envelope_basis: basis }] };
+        if (text.includes("FROM ledger.ledger_entry")) return { rows: keys.map((key) => ({ call_site_key: key })) };
+        if (text.includes("core.start_path_set")) return { rows: set === null ? [] : set.authors.map((author) => ({ source: set.source, author })) };
+        return { rows: [] };
+      }
+    } as unknown as Parameters<typeof readPracticeShapeFacts>[0];
+    return { pool, asked };
+  }
+  const NO_MAP = Object.freeze({ choice: async () => null, items: async () => [] });
+  const MAP_OF_TWO = Object.freeze({ choice: async () => ({ opening: "MAP", answers: [{}, {}], alsoRaised: [{}] }), items: async () => [] });
+  const menuOf = (count: number): StoredSet => ({ source: "MENU", authors: Array.from({ length: count }, () => "AI_SUGGESTION") });
+  const pathSizes = (shape: typeof FREE) => ({ version: 2, plan: shape.plan, depthMode: shape.depthMode, scrutiny: shape.scrutiny,
+    answerLength: shape.answerLength, paths: shape.paths, pathsSource: shape.pathsSource, runListWriters: shape.runListWriters,
+    graders: shape.graders, pointsPerPath: shape.pointsPerPath, deeperTopPoints: shape.deeperTopPoints, gapRounds: shape.gapRounds,
+    closeCallExtraGraders: shape.closeCallExtraGraders });
+  const NOT_EXERCISED_BASE: PracticeVerdictInput = { harnessError: null, completed: true, servedAnswer: true, storyOutcome: "READY",
+    formatFailures: 0, failedCalls: 0, gateHalted: false, gateStopped: false, notExercisedModels: [], unbilledRefusals: 0, p90ByModel: {} };
+  const verdictOf = (notExercised: string | null) =>
+    practiceVerdict({ ...NOT_EXERCISED_BASE, shapeNotExercised: notExercised === null ? [] : [notExercised] });
+
+  it("a Free start that went right: the sizes from shapeV2, its 3 stored paths argued, the shape exercised, PASS", async () => {
+    const { pool } = database(v2Basis(FREE, 2), menuOf(3));
+    const facts = await readPracticeShapeFacts(pool, "run-free", "answer-free", NO_MAP);
+    expect(facts.sizes).toEqual(pathSizes(FREE));
+    expect(facts.sizes).toMatchObject({ plan: "free", paths: 3, pathsSource: "MENU", runListWriters: 0, gapRounds: 0 });
+    expect(facts.pathSet).toEqual({ source: "MENU", authors: ["AI_SUGGESTION", "AI_SUGGESTION", "AI_SUGGESTION"] });
+    const block = blockOf(facts);
+    expect(block).toMatchObject({ sizes: pathSizes(FREE), opening: null, chosenAnswers: null, alsoRaised: null, notExercised: null });
+    expect(verdictOf(block.notExercised)).toEqual({ verdict: "PASS", exitCode: 0, reasons: [] });
+  });
+
+  it("a premium:5 start the same: 5 paths, its gap rounds counted under gap-paths, PASS", async () => {
+    const { pool } = database(v2Basis(PREMIUM, 5), menuOf(5), ["MAP:gap-paths:1"]);
+    const block = blockOf(await readPracticeShapeFacts(pool, "run-plus", "answer-plus", NO_MAP));
+    expect(block.sizes).toEqual(pathSizes(PREMIUM));
+    expect(block.sizes).toMatchObject({ plan: "premium", paths: 5, pathsSource: "MENU", gapRounds: POLICY.plans.premium.gapRoundsMax });
+    expect(block.mapCallsByStep).toMatchObject({ list: 0, merge: 0, "gap-paths": 1, choose: 0 });
+    expect(block.notExercised).toBeNull();
+    expect(verdictOf(block.notExercised).verdict).toBe("PASS");
+  });
+
+  it("a path debate that stored no paths, or argued only the run-built fallback (the question itself), did not run its shape: NOT_PROVEN", async () => {
+    const none = blockOf(await readPracticeShapeFacts(database(v2Basis(FREE, 2), null).pool, "run-none", null, NO_MAP));
+    expect(none).toMatchObject({ sizes: pathSizes(FREE), notExercised: "NO_PATHS_STORED" });
+    expect(verdictOf(none.notExercised)).toEqual({ verdict: "NOT_PROVEN", exitCode: 30, reasons: ["SHAPE_NOT_EXERCISED:NO_PATHS_STORED"] });
+    // No list came back, so the run argued one path, the question itself as the person wrote it (paths-run.ts runBuiltStartPathSet).
+    const fellBack = blockOf(await readPracticeShapeFacts(database(v2Basis(BUILT, 5), { source: "RUN_BUILT", authors: ["PERSON_EDITED"] }).pool,
+      "run-built", "answer-built", NO_MAP));
+    expect(fellBack.notExercised).toBe("MENU_UNAVAILABLE_QUESTION_ITSELF");
+    expect(practiceShapeLines(fellBack).join("\n")).toContain("- the new shape was not exercised: MENU_UNAVAILABLE_QUESTION_ITSELF");
+    // The run's own menu: its top paths, each an AI suggestion; a person's own edit on a menu's path is no fallback.
+    expect(blockOf(await readPracticeShapeFacts(database(v2Basis(BUILT, 5), { source: "RUN_BUILT", authors: ["AI_SUGGESTION", "AI_SUGGESTION",
+      "AI_SUGGESTION", "AI_SUGGESTION", "AI_SUGGESTION"] }).pool, "run-built", "answer-built", NO_MAP)).notExercised).toBeNull();
+    expect(blockOf(await readPracticeShapeFacts(database(v2Basis(FREE, 2), { source: "MENU", authors: ["PERSON_EDITED"] }).pool,
+      "run-edited", "answer-edited", NO_MAP)).notExercised).toBeNull();
+  });
+
+  it("an R22 practice (receipt v1) reads as today: the v1 sizes, its map rules, no path set and no question about one", async () => {
+    const { pool, asked } = database(V1_BASIS, menuOf(3), ["MAP:angles", "MAP:list:0", "MAP:merge", "MAP:choose"]);
+    const facts = await readPracticeShapeFacts(pool, "run-r22", "answer-r22", MAP_OF_TWO);
+    expect(facts.sizes).toEqual({ plan: "premium", depthMode: "adaptive", scrutiny: "standard", answerLength: "standard", mapAIs: V1.mapAIs,
+      answers: V1.answers, graders: V1.graders, pointsPerAnswer: V1.pointsPerAnswer, deeperTopPoints: V1.deeperTopPoints,
+      gapRounds: V1.gapRounds, closeCallExtraGraders: V1.closeCallExtraGraders, opening: V1.opening });
+    expect("pathSet" in facts).toBe(false);
+    expect(asked.some((text) => text.includes("start_path"))).toBe(false);
+    expect(blockOf(facts)).toMatchObject({ opening: V1.opening, chosenAnswers: 2, alsoRaised: 1, notExercised: null });
+    // Its map rules stand: no map stored is NO_MAP_STORED, never read as a path debate.
+    expect(blockOf(await readPracticeShapeFacts(pool, "run-r22", "answer-r22", NO_MAP)).notExercised).toBe("NO_MAP_STORED");
+  });
+
+  it("report.md gives a path debate's sizes in its own words: paths, where they came from, points per path", async () => {
+    const lines = practiceShapeLines(blockOf(await readPracticeShapeFacts(database(v2Basis(FREE, 2), menuOf(3)).pool, "run-free", "answer-free",
+      NO_MAP))).join("\n");
+    expect(lines).toContain(`- sizes on the run's receipt: plan free, 3 paths (MENU), 0 list writers of the run's own, ${String(FREE.graders)} `
+      + `graders (+${String(FREE.closeCallExtraGraders)} on a close call), ${String(FREE.pointsPerPath)} points per path, 0 gap rounds, `
+      + "adaptive, scrutiny standard, answer length standard");
+    expect(lines).not.toContain("the new shape was not exercised");
   });
 });
 
