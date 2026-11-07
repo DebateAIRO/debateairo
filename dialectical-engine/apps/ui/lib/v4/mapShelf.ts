@@ -87,8 +87,14 @@ export type ShelfRead = Readonly<{
   anyRows: boolean;
 }>;
 
-/** A run id → the run it was dug from (null: not a dig), or FAILED when its dig links could not be read. */
-export type DigLinkCache = Map<string, string | null | "FAILED">;
+/**
+ * What the account's dig link says of one run: the run it was dug from (null: no link, not a dig by its link), and whether
+ * the dig's question names a path's line first (its first recorded place is that path, "path:<id>": a dig of a path, or of
+ * picks on one, lib/v4/suggestions.ts placesOf); null when no place was recorded.
+ */
+export type DigLinkRead = Readonly<{ parent: string | null; pathFirst: boolean | null }>;
+/** A run id → what its dig link says, or FAILED when its dig links could not be read. */
+export type DigLinkCache = Map<string, DigLinkRead | "FAILED">;
 export type ShelfClient = Pick<ContractClient, "readAnswerIndex" | "readDigLinks"> & Partial<Pick<ContractClient, "readRun">>;
 
 /** Rows per page of GET /v1/answers (1..128). */
@@ -176,9 +182,9 @@ export function mergeShelfRows(known: readonly ShelfRow[], page: Pick<AnswerInde
 
 /**
  * Where a row goes: a card of its own (a question, or a dig made on someone else's public page), or under the run it was
- * dug from (null: no known parent).
+ * dug from (null: no known parent). A dig keeps what its link says of its first line (DigLinkRead.pathFirst; null: not known).
  */
-export type ShelfPlace = Readonly<{ kind: ShelfCardKind }> | Readonly<{ kind: "DIG"; parent: string | null }>;
+export type ShelfPlace = Readonly<{ kind: ShelfCardKind }> | Readonly<{ kind: "DIG"; parent: string | null; pathFirst: boolean | null }>;
 
 /** Whether a place is a card of the list. */
 function isCard(place: ShelfPlace | undefined): boolean {
@@ -189,13 +195,22 @@ function isCard(place: ShelfPlace | undefined): boolean {
  * dig-f30: what a dig looked into, as its shelf line names it. A dig of picks on a path also names the path's line first
  * (W3-4); that line is the path, not a pick, so it is left out. A dig of a whole path is named by the path's short label
  * (map-f25, r2-20 A), never by its whole line with its outcome words ("Nuclear first: did not hold. …").
+ *
+ * Written in English, each line says its kind. Written off English, none does, so `pathFirst` (the dig link's first place,
+ * DigLinkRead) says whether the first line is the path's: the owner, 7 Nov 2026 (sixth round), a dig is named by its pick in
+ * every language. Not known (no place recorded, a dig found by its text): every line is read as a pick, as before.
+ * Two known limits, off English only: picks of a path that left the map before the dig was sent (lib/v4/suggestions.ts
+ * draftTarget finds no path, but the picks' places still name it first) lose their first pick to the path's place, so the
+ * shelf shows the next pick or the one pick's short label; and a row that names its link itself (`dug_from`, in no contract
+ * yet) is never read, so its first line is not known until the server says that too.
  */
-export function shelfPicksOf(questionLine: string, catalog: MessageCatalog): readonly string[] {
+export function shelfPicksOf(questionLine: string, catalog: MessageCatalog, pathFirst: boolean | null = null): readonly string[] {
   const detail = parseDigDetail(questionLine, catalog);
   if (detail !== null) {
-    const picks = detail.items.filter((_, at) => detail.kinds[at] !== "PATH");
+    const isPath = (at: number) => (detail.english ? detail.kinds[at] === "PATH" : pathFirst === true && at === 0);
+    const picks = detail.items.filter((_, at) => !isPath(at));
     if (picks.length > 0) return picks;
-    const path = detail.items.find((_, at) => detail.kinds[at] === "PATH");
+    const path = detail.items.find((_, at) => isPath(at));
     if (path !== undefined && cardLabel(path).length > 0) return Object.freeze([cardLabel(path)]);
   }
   return digPicksOf(questionLine, catalog);
@@ -212,13 +227,15 @@ function entryOf(row: ShelfRow): IndexEntry {
  * recorded, or the read failed), a dig made before the links existed is still known by the context line its text
  * carries, and placed under its one parent as the map page finds it (digIndex.digParentOf).
  */
-export function shelfPlaceOf(row: ShelfRow, links: ReadonlyMap<string, string | null | "FAILED">, entries: readonly IndexEntry[], catalog: MessageCatalog): ShelfPlace {
+export function shelfPlaceOf(row: ShelfRow, links: ReadonlyMap<string, DigLinkRead | "FAILED">, entries: readonly IndexEntry[], catalog: MessageCatalog): ShelfPlace {
   if (row.publicDig) return Object.freeze({ kind: "PUBLIC_DIG" });
   const read = links.get(row.runId);
-  const linked = row.dugFrom !== undefined ? row.dugFrom : read === undefined || read === "FAILED" ? undefined : read;
-  if (typeof linked === "string") return Object.freeze({ kind: "DIG", parent: linked });
+  const known = read === undefined || read === "FAILED" ? undefined : read;
+  const linked = row.dugFrom !== undefined ? row.dugFrom : known?.parent;
+  const pathFirst = known?.pathFirst ?? null;
+  if (typeof linked === "string") return Object.freeze({ kind: "DIG", parent: linked, pathFirst });
   if (parseDigDetail(row.questionLine, catalog) !== null) {
-    return Object.freeze({ kind: "DIG", parent: digParentOf(row.runId, row.questionLine, entries, catalog)?.runId ?? null });
+    return Object.freeze({ kind: "DIG", parent: digParentOf(row.runId, row.questionLine, entries, catalog)?.runId ?? null, pathFirst });
   }
   return Object.freeze({ kind: "QUESTION" });
 }
@@ -279,10 +296,11 @@ export function buildShelf(
   };
   const digsOf = new Map<string, ShelfDig[]>();
   for (const row of rows) {
-    if (places.get(row.runId)?.kind !== "DIG") continue;
+    const place = places.get(row.runId);
+    if (place?.kind !== "DIG") continue;
     const root = rootOf(row.runId);
     if (root === null) continue;
-    const picks = shelfPicksOf(row.questionLine, catalog);
+    const picks = shelfPicksOf(row.questionLine, catalog, place.pathFirst);
     const list = digsOf.get(root) ?? [];
     list.push(Object.freeze({ runId: row.runId, pick: picks[0]!, more: picks.length > 1, ...stateOf(row) }));
     digsOf.set(root, list);
@@ -314,10 +332,11 @@ async function readPause(runId: string, client: ShelfClient): Promise<ShelfPause
   }
 }
 
-async function readLink(runId: string, client: ShelfClient): Promise<string | null | "FAILED"> {
+async function readLink(runId: string, client: ShelfClient): Promise<DigLinkRead | "FAILED"> {
   try {
     const links = await Promise.resolve().then(() => client.readDigLinks(runId));
-    return links.parent?.parent_run_id ?? null;
+    const first = links.parent?.places[0];
+    return Object.freeze({ parent: links.parent?.parent_run_id ?? null, pathFirst: first === undefined ? null : first.startsWith("path:") });
   } catch {
     return "FAILED";
   }
