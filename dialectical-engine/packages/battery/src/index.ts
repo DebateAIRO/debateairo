@@ -287,6 +287,22 @@ export type WorkItemFence = Readonly<{ releaseKey: string; workerId?: string }>;
 export const WORK_ITEM_RETRY = Object.freeze({ delaySeconds: 180 });
 
 /**
+ * V4 start step, Tasks 57e and 57f — THE STOPS THAT ARE NOT OURS: the person's own act (a debate or account they erased while it ran), a limit
+ * the debate reached (its own ceiling, a step's tries used up) and every spending wall (the person's quota, the site's day, the debate's money
+ * ceiling, a team grant that is gone). The runner never gives one its automatic retry (apps/runner runFailureRetriesOnce), and Continue never
+ * continues a debate that stopped on one (apps/api/src/run-continue.ts stopIsOurs): one list for both, so the two never disagree.
+ */
+export const RUN_STOPS_NOT_OURS: ReadonlySet<string> = new Set([
+  "PRIVATE_CONTENT_ERASED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
+  "CALL_BUDGET_EXHAUSTED",
+  "PERSON_ALLOWANCE_REACHED",
+  "DAILY_COST_ENVELOPE_REACHED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "INTERNAL_FUNDING_UNAVAILABLE"
+]);
+
+/**
  * What a park for the one retry did: PARKED (this copy's claim kept until the delay, the retry recorded), RETRIED (the work item had its
  * one retry already: nothing written), NOT_HELD (not this copy's claim of this release's open item: nothing written).
  */

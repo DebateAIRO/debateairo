@@ -3354,6 +3354,29 @@
       "grants": [
         "EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0164_pre_start_release.sql",
+      "grants": [
+        "SELECT ON ledger.model_spend_call_waiver"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0164_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.read_run_continue(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.continue_failed_run(uuid,uuid,text,bigint)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0164_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
+        "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

@@ -451,6 +451,26 @@ describe("what Pick up can meet (spec §3.5, §3.10)", () => {
     noAiCall();
   });
 
+  // Review (wave 16, Task 76e's open point 4): the restore's fresh room read failing must not take the card away. Before the
+  // fix, useAskRoom's failed read blanked the room, the start card went, and Start sent the line alone (no paths, no id).
+  it("a fresh room read that fails at Pick up keeps the card: the rows stay, and Start sends the kept paths and the id", async () => {
+    keep();
+    await mount();
+    const reads = server.roomReads;
+    server.roomAnswer = () => Promise.reject(new Error("SERVER_FAILURE"));
+    await click(pickUp());
+    expect(server.roomReads).toBeGreaterThan(reads);
+    expect(onStepTwo()).toBe(true);
+    expect(rows()).toHaveLength(5);
+    expect(startButton().disabled).toBe(false);
+    await press(startButton());
+    expect(server.createDebate).toHaveBeenCalledTimes(1);
+    const sent = lane()!;
+    expect((sent.startPaths as { paths: unknown[] }).paths).toHaveLength(5);
+    expect(sent.savedQuestionId).toBe(PICKED);
+    noAiCall();
+  });
+
   it("crisis words in a saved own path open the help screen instead of step 2", async () => {
     keep(keptOf(shapedPlan(CRISIS)));
     await pickedUp();

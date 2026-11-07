@@ -54,7 +54,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // browser.
       "digDock.ts", "useDigQueue.tsx",
       // The wave-2 review fixes (4 Nov): the one click-time check a map dig and a public page's dig share keeps nothing either.
-      "useDigClickCheck.ts"]) {
+      "useDigClickCheck.ts",
+      // V4 start step, Task 79: a dig's path plan (its picks as paths) keeps nothing in the browser.
+      "digPathPlan.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }
@@ -72,7 +74,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // by the site's own LanguageSwitcher and ModeToggle) and the one step marker.
       "V4AccountMenu.tsx", "V4Steps.tsx",
       // Wave 2 (dig-f4): the docked tray and the phone's list of picks.
-      "V4DigTray.tsx"]) {
+      "V4DigTray.tsx",
+      // V4 start step, Task 79: a dig's path rows and their combine calls.
+      "V4DigPaths.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }

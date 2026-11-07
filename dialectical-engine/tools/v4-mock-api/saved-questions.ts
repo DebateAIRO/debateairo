@@ -212,8 +212,18 @@ export function savedQuestionsScene(): MockSavedScene {
 type Schema = { safeParse(value: unknown): { success: boolean } };
 type Refused = Readonly<{ status: 400 | 404 | 409 | 413 | 422; error: string; extra?: Readonly<Record<string, unknown>> }>;
 
+/**
+ * Whether each request is logged. server.ts turns it on unless MOCK_QUIET=1 (only server.ts and check.ts read the environment, the source
+ * law's two named local readers, tools/orphan-audit); a test that imports this module alone logs nothing.
+ */
+let logging = false;
+
+export function setSavedQuestionsLogging(on: boolean): void {
+  logging = on;
+}
+
 function logRequest(method: string, path: string, status: number): void {
-  if (process.env.MOCK_QUIET === "1") return;
+  if (!logging) return;
   process.stderr.write(`[mock] ${method} ${path} ${String(status)}\n`);
 }
 

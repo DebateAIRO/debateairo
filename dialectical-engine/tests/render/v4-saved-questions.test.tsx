@@ -309,7 +309,8 @@ const notStarted = (): HTMLElement | null => host!.querySelector<HTMLElement>(".
 const listed = (): string[] => [...(notStarted()?.querySelectorAll(".v4NotStartedQuestion") ?? [])].map((one) => one.textContent ?? "");
 const lineOf = (question: string): HTMLElement =>
   [...notStarted()!.querySelectorAll<HTMLElement>(".v4NotStartedItem")].find((one) => one.textContent?.includes(question))!;
-const dayOf = (iso: string): string => new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(new Date(iso));
+// Review (wave 16): the owner's answer Q5 B (5 Nov): every English page writes the day first ("20 Oct"), whichever English.
+const dayOf = (iso: string): string => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(iso));
 
 /** Whether the browser would ask "Leave site?" now. */
 function asksBeforeLeaving(): boolean {
@@ -528,6 +529,30 @@ describe("Start names the saved question and removes it (spec §3.7)", () => {
     expect(deletes()).toEqual([]);
   });
 
+  // Review (wave 16; spec §3.7: '"Just answer it" starts a debate too, so it removes the saved copy the same way'): after Back,
+  // step 1's "Just answer it" for the same words starts the question the account keeps; with other words it starts another one.
+  it("step 1's 'Just answer it' after Back with the same words names the saved question, and one DELETE follows STARTED", async () => {
+    await toSaved();
+    await browserBack();
+    expect(onStepTwo()).toBe(false);
+    expect(stepOneBox().value).toBe(Q);
+    await press(host!.querySelector(".v4AskActions .v4AskJust")!);
+    expect(server.createDebate).toHaveBeenCalledTimes(1);
+    expect(lane()?.savedQuestionId).toBe(ID);
+    expect(deletes()).toHaveLength(1);
+    expect(deletes()[0]!.path).toBe(`${SAVED}/${ID}`);
+  });
+
+  it("step 1's 'Just answer it' after Back with other words names no saved question and deletes nothing", async () => {
+    await toSaved();
+    await browserBack();
+    await type(stepOneBox(), "Should Romania plant more forests by 2040?");
+    await press(host!.querySelector(".v4AskActions .v4AskJust")!);
+    expect(server.createDebate).toHaveBeenCalledTimes(1);
+    expect(lane()?.savedQuestionId).toBeUndefined();
+    expect(deletes()).toEqual([]);
+  });
+
   it("Back, new words, Next: the new reading goes by PUT to the same id, never a second POST", async () => {
     await toSaved();
     await browserBack();
@@ -562,6 +587,8 @@ describe("'Not started yet' on step 1 (owner card 'Where shown'; answer S3 A)", 
       expect(buttonNamed("Delete", line)).toBeDefined();
       expect(line.textContent).toContain(dayOf(one.saved_at));
     }
+    expect(lineOf(B.question).textContent).toContain("20 Oct");
+    expect(lineOf(B.question).textContent).not.toContain("Oct 20");
     await unmount();
     window.history.replaceState({ __NA: true, v4ask: { step: "ask", words: Q } }, "", "/v4");
     await mount();

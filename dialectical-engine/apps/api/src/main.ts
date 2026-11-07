@@ -43,6 +43,8 @@ import { PostgresStartPathsStore } from "@debateai/db";
 import { PostgresOwnClosingsReader } from "@debateai/db";
 import { createStartTransport } from "./start-step/transport.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
+// V4 start step, Task 57f: Continue on a failed debate, and the room for the rest.
+import { continueRoomOf } from "./run-continue.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -1943,6 +1945,21 @@ const api = buildApi({
     resumeInRelease: (ownerRef, runId, releaseKey, registerVersion) =>
       new PostgresDigModelRepository(pool).resumeInRelease(ownerRef, runId, releaseKey, registerVersion)
   }),
+  // V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate, through 0164's read and re-open on
+  // this pool (the API's role); hosted, only while the person's pool (the ask room's) and the site's day have room for the rest. The wake and the
+  // hand-over are the two above.
+  failedRunContinue: {
+    store: {
+      readContinue: (ownerRef, runId) => new PostgresDigModelRepository(pool).readRunContinue(ownerRef, runId),
+      reopen: (ownerRef, runId, destination) => new PostgresDigModelRepository(pool)
+        .continueFailedRun(ownerRef, runId, destination?.releaseKey ?? null, destination?.registerVersion ?? null)
+    },
+    ...(askRoom === undefined || askRoomComposition === undefined || askRoomReadiness === undefined ? {} : { room: continueRoomOf({
+      personPool: (ownerRef, now) => askRoom.readPersonPool(ownerRef, now),
+      daySpentMicros: (day) => askRoomComposition.spend.readDaySpentMicros(day),
+      dailyCeilingMicros: askRoomReadiness.runPolicy.dailyCeilingMicros
+    }) })
+  },
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape

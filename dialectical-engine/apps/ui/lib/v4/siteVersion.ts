@@ -24,11 +24,14 @@ export function reloadPage(): void {
  * `updated`: a room read answered a `settings_version` other than the first one this page load saw (either way); it stays true
  * for the page's life, since the page cannot tell the site went back to the very code it loaded. `latestRoom`: the room as last
  * read, handed to the start step so the new widths reach it; a read of this hook's own that fails keeps the room before it there
- * (the page's other reads are as they were), so a passing fault never takes step 2's card away.
+ * (the page's other reads are as they were), so a passing fault never takes step 2's card away. `readAgain`: one such read now,
+ * for the page's restore (review, wave 16: the restore's fresh room read that failed took the card away, and Start then sent
+ * the line without the kept paths).
  */
 export function useSiteVersion(input: Readonly<{ room: AskRoom | null; refresh: () => Promise<AskRoom | null> }>): Readonly<{
   updated: boolean;
   latestRoom: AskRoom | null;
+  readAgain(): void;
 }> {
   const { room } = input;
   const refresh = useRef(input.refresh);
@@ -53,31 +56,35 @@ export function useSiteVersion(input: Readonly<{ room: AskRoom | null; refresh: 
     if (room !== null) setKept(null);
   }, [room, see]);
 
+  const alive = useRef(true);
   useEffect(() => {
-    let alive = true;
-    const read = (): void => {
-      const before = lastRead.current;
-      void refresh.current().then((value) => {
-        if (!alive) return;
-        if (value === null) setKept(before);
-        else see(value);
-      }, () => {
-        if (alive) setKept(before);
-      });
-    };
-    const onVisible = (): void => {
-      if (document.visibilityState === "visible") read();
-    };
-    const timer = setInterval(read, SITE_VERSION_POLL_MS);
-    window.addEventListener("focus", read);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-      window.removeEventListener("focus", read);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  const readAgain = useCallback((): void => {
+    const before = lastRead.current;
+    void refresh.current().then((value) => {
+      if (!alive.current) return;
+      if (value === null) setKept(before);
+      else see(value);
+    }, () => {
+      if (alive.current) setKept(before);
+    });
   }, [see]);
 
-  return { updated, latestRoom: room ?? kept };
+  useEffect(() => {
+    const onVisible = (): void => {
+      if (document.visibilityState === "visible") readAgain();
+    };
+    const timer = setInterval(readAgain, SITE_VERSION_POLL_MS);
+    window.addEventListener("focus", readAgain);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", readAgain);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [readAgain]);
+
+  return { updated, latestRoom: room ?? kept, readAgain };
 }

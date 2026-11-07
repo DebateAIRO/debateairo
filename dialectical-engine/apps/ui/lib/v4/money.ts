@@ -1,4 +1,6 @@
 import {
+  RUN_CONTINUE_NO_ROOM,
+  RUN_NOT_CONTINUABLE,
   RUN_PAUSED_UNTIL_RESET,
   type ContractClient,
   type MonthPause,
@@ -284,10 +286,32 @@ export type ContinueOutcome =
  * with its reset (`until`), answered as data. True resume: finished work is never paid for again. Never throws.
  */
 export async function continueRun(runId: string, client: Pick<ContractClient, "continueRun"> = contractClient): Promise<ContinueOutcome> {
+  const outcome = await sendContinue(runId, client);
+  // Task 57g: a failed debate's own two refusals never answer a month-paused one; if they did, they would read as before (FAILED).
+  return outcome.kind === "NOT_CONTINUABLE" || outcome.kind === "NO_ROOM" ? { kind: "FAILED" } : outcome;
+}
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers: "continue where it broke, and not charge the customer again"): the same Continue on
+ * the person's own FAILED debate, "Continue where it stopped". Besides the month pause's answers, the API refuses a failed debate it cannot
+ * continue (NOT_CONTINUABLE: the page reads the debate again and the button goes) and one with no room left for the rest (NO_ROOM: the
+ * usual quota words). Nothing changed either way. Anything else it cannot use (an upload switching, 503 RUN_CONTINUE_TRY_AGAIN; a lost
+ * connection) is FAILED: the person may press again. Never throws.
+ */
+export type StoppedContinueOutcome = ContinueOutcome | Readonly<{ kind: "NOT_CONTINUABLE" }> | Readonly<{ kind: "NO_ROOM" }>;
+
+export function continueStopped(runId: string, client: Pick<ContractClient, "continueRun"> = contractClient): Promise<StoppedContinueOutcome> {
+  return sendContinue(runId, client);
+}
+
+/** POST /v1/runs/{id}/continue once, through the typed client (its 409 bodies come back as data); every answer named. Never throws. */
+async function sendContinue(runId: string, client: Pick<ContractClient, "continueRun">): Promise<StoppedContinueOutcome> {
   try {
     const answer = await Promise.resolve().then(() => client.continueRun(runId));
     if ("state" in answer && answer.state === "CONTINUING") return { kind: "CONTINUING" };
     if ("error" in answer && answer.error === RUN_PAUSED_UNTIL_RESET) return { kind: "TOO_EARLY", until: answer.until };
+    if ("error" in answer && answer.error === RUN_NOT_CONTINUABLE) return { kind: "NOT_CONTINUABLE" };
+    if ("error" in answer && answer.error === RUN_CONTINUE_NO_ROOM) return { kind: "NO_ROOM" };
     return { kind: "FAILED" };
   } catch {
     return { kind: "FAILED" };

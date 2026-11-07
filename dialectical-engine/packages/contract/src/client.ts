@@ -1,5 +1,7 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
+// V4 start step, Task 57f: Continue on a failed debate: its two refusals, answered as data.
+import { RunNotContinuedSchema, type RunNotContinued } from "./web.js";
 import { InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
@@ -601,9 +603,11 @@ export interface ContractClient {
   recordDigLink(parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkRecorded>;
   /**
    * R22 W3-8 (the money rule): Continue on a debate paused at the month wall. Pressed before the month reset it is
-   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`.
+   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`. V4 start step, Task 57f: the
+   * same route continues the person's own FAILED debate where it stopped; a failed debate it cannot continue (409 RUN_NOT_CONTINUABLE) and
+   * one with no room left for the rest (409 RUN_CONTINUE_NO_ROOM) are answered as data too, nothing changed.
    */
-  continueRun(runId: string): Promise<RunContinued | RunContinueRefused>;
+  continueRun(runId: string): Promise<RunContinued | RunContinueRefused | RunNotContinued>;
   /** R22 W5-1: the investigation the debate is in and its report versions, oldest first. */
   readInvestigation(runId: string): Promise<InvestigationReports>;
   /**
@@ -1133,13 +1137,15 @@ export function createContractClient(
     readDigLinks: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/dig-links`, DigLinksSchema),
     recordDigLink: (parentRunId: string, link: DigLinkRecordRequest) => request(`/v1/runs/${encodeURIComponent(parentRunId)}/dig-links`, DigLinkRecordedSchema,
       { method: "POST", body: JSON.stringify(DigLinkRecordRequestSchema.parse(link)) }),
-    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused>(
+    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused | RunNotContinued>(
       root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/continue`, RunContinuedSchema,
       { method: "POST", body: JSON.stringify(RunContinueRequestSchema.parse({})) }, auth, undefined,
       (status, body) => {
         if (status !== 409) return null;
         const refused = RunContinueRefusedSchema.safeParse(body);
-        return refused.success ? refused.data : null;
+        if (refused.success) return refused.data;
+        const notContinued = RunNotContinuedSchema.safeParse(body);
+        return notContinued.success ? notContinued.data : null;
       }
     ),
     readInvestigation: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/investigation`, InvestigationReportsSchema),

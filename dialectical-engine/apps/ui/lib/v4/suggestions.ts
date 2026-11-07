@@ -5,6 +5,7 @@ import {
   DIG_PLACE_PATTERN,
   DIG_SUGGESTION_KINDS,
   FREE_DIG_PICKS_MAX,
+  START_STEP_LIMITS,
   WEB_CONTRACT_LIMITS,
   type Answer,
   type AskParent,
@@ -94,9 +95,11 @@ export function picksMax(planTier: V4PlanTier): number {
 
 /**
  * Why a pick cannot join the draft: OTHER_PATH (owner Q-D1: the draft holds picks of another path), FULL (the plan's cap
- * is reached; on Free, 3), EMPTY (a text with nothing in it), TOO_LONG (past the contract's 2,000 characters).
+ * is reached; on Free, 3), EMPTY (a text with nothing in it), TOO_LONG (past the contract's 2,000 characters). V4 start step,
+ * Task 79 (spec 2026-11-03 §4.4): on a path debate's dig each pick is a path, so its words are a path's question (TOO_LONG past
+ * 1,000), and one more path than a dig may look into is PATHS_FULL (lib/v4/digPathPlan.ts says when).
  */
-export type PickRefusal = "OTHER_PATH" | "FULL" | "EMPTY" | "TOO_LONG";
+export type PickRefusal = "OTHER_PATH" | "FULL" | "EMPTY" | "TOO_LONG" | "PATHS_FULL";
 
 /** Whether a new pick of `group` may join `draft` (null: it may). An empty draft takes a pick of any group. */
 export function pickRefusal(draft: V4DigDraft, group: string | null, planTier: V4PlanTier): PickRefusal | null {
@@ -105,10 +108,15 @@ export function pickRefusal(draft: V4DigDraft, group: string | null, planTier: V
   return null;
 }
 
-function textRefusal(text: string): PickRefusal | null {
+/**
+ * `pathsParent` (Task 79): a path debate's dig, where the words become a path's question, so they stay within its 1,000 UTF-16
+ * code units (the start step's lengths), well inside the pick's own 2,000 characters.
+ */
+function textRefusal(text: string, pathsParent: boolean): PickRefusal | null {
   const clean = text.trim();
   if (clean.length === 0) return "EMPTY";
   if (Array.from(clean).length > WEB_CONTRACT_LIMITS.pickTextMaxChars) return "TOO_LONG";
+  if (pathsParent && clean.length > START_STEP_LIMITS.pathQuestionMaxChars) return "TOO_LONG";
   return null;
 }
 
@@ -126,12 +134,15 @@ function withPicks(group: string | null, picks: readonly V4DigPick[]): V4DigDraf
   return picks.length === 0 ? EMPTY_DRAFT : Object.freeze({ group, picks: Object.freeze([...picks]) });
 }
 
-/** Adds `pick` (refused, the draft unchanged, when pickRefusal or its text says no). The same key twice is one pick. */
-export function addPick(draft: V4DigDraft, pick: V4DigPick, planTier: V4PlanTier): DraftChange {
+/**
+ * Adds `pick` (refused, the draft unchanged, when pickRefusal or its text says no). The same key twice is one pick. Task 79:
+ * `pathsParent`, a path debate's dig (its words are a path's question).
+ */
+export function addPick(draft: V4DigDraft, pick: V4DigPick, planTier: V4PlanTier, pathsParent = false): DraftChange {
   if (draft.picks.some((known) => known.key === pick.key)) return changed(draft);
   // V4 start step, Task 60: a "+ N more" item (MORE) keeps the AIs' words, as an open question does.
   const refused = pickRefusal(draft, pick.group, planTier)
-    ?? (pick.kind === "OPEN" || pick.kind === "MORE" ? null : textRefusal(pick.text));
+    ?? (pick.kind === "OPEN" || pick.kind === "MORE" ? null : textRefusal(pick.text, pathsParent));
   if (refused !== null) return refusedWith(draft, refused);
   const kept: V4DigPick = pick.kind === "OPEN" || pick.kind === "MORE" ? pick : Object.freeze({ ...pick, text: pick.text.trim() });
   return changed(withPicks(pick.group, [...draft.picks, kept]));
@@ -141,18 +152,21 @@ export function removePick(draft: V4DigDraft, key: string): V4DigDraft {
   return withPicks(draft.group, draft.picks.filter((pick) => pick.key !== key));
 }
 
-/** Adds the pick, or takes it out when it is already there (a pick box). */
-export function togglePick(draft: V4DigDraft, pick: V4DigPick, planTier: V4PlanTier): DraftChange {
-  return draft.picks.some((known) => known.key === pick.key) ? changed(removePick(draft, pick.key)) : addPick(draft, pick, planTier);
+/** Adds the pick, or takes it out when it is already there (a pick box). Task 79: `pathsParent` as addPick's. */
+export function togglePick(draft: V4DigDraft, pick: V4DigPick, planTier: V4PlanTier, pathsParent = false): DraftChange {
+  return draft.picks.some((known) => known.key === pick.key) ? changed(removePick(draft, pick.key)) : addPick(draft, pick, planTier, pathsParent);
 }
 
-/** A suggestion or own view's new text (an open question's text is never edited). Refused when empty or too long. */
-export function editPick(draft: V4DigDraft, key: string, text: string): DraftChange {
+/**
+ * A suggestion or own view's new text (an open question's text is never edited). Refused when empty or too long (Task 79:
+ * `pathsParent` as addPick's).
+ */
+export function editPick(draft: V4DigDraft, key: string, text: string, pathsParent = false): DraftChange {
   const at = draft.picks.findIndex((pick) => pick.key === key);
   const pick = draft.picks[at];
   // V4 start step, Task 62: a "+ N more" item (MORE) keeps the AIs' words, as an open question does.
   if (pick === undefined || pick.kind === "OPEN" || pick.kind === "MORE") return changed(draft);
-  const refused = textRefusal(text);
+  const refused = textRefusal(text, pathsParent);
   if (refused !== null) return refusedWith(draft, refused);
   const picks = [...draft.picks];
   picks[at] = Object.freeze({ ...pick, text: text.trim() });

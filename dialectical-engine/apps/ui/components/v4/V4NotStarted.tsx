@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { SAVED_QUESTION_LIMITS, type SavedQuestionSummary } from "@debateai/contract";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /*
  * V4 start step, Task 76f (owner cards "Where shown" and "How long"; answer S3 A; saved-questions spec 2026-11-04 §3.4): "Not
@@ -11,15 +11,14 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
  * "Show all (n)" shows the rest in the same place. Nothing shows without an item.
  */
 
-/** The day a question was last saved, in the page's language ("22 Oct"); nothing for a date the page cannot read. */
+/**
+ * The day a question was last saved, in the page's language ("22 Oct"); nothing for a date the page cannot read. Review (wave
+ * 16): through translate.ts's formatDate, so every English page writes the day first (the owner's answer Q5 B, 5 Nov).
+ */
 function dayOf(iso: string, locale: string): string {
   const when = new Date(iso);
   if (Number.isNaN(when.valueOf())) return "";
-  try {
-    return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(when);
-  } catch {
-    return new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(when);
-  }
+  return formatDate(locale, when, { day: "numeric", month: "short" });
 }
 
 export function V4NotStarted(props: Readonly<{

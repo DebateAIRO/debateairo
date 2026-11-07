@@ -105,14 +105,41 @@ export function askAgainQuestion(run: Pick<RunProjection, "question_line">, cata
 }
 
 /**
- * V4 start step, Task 57e (the owner's 6 Nov rule: "re-use what we already paid for"): what "Ask this again" re-uses. When the FAILED run
- * read says `reusable` (the person's own failed question kept its clarifying answers and the paths chosen from the list), the link the ask
- * sends as `again_of`: the failed debate's id and its whole line as the server sent it (the clarifying answers in it), which the ask must
- * send unchanged for the server to start it again on what it kept, at no new charge. Null otherwise (nothing kept, not FAILED, a dig).
+ * V4 start step, Task 57g (the owner's 7 Nov answers, replacing Task 57e's re-use link: "if it stays the same, we need to use whatever was
+ * already generated and paid for ... if they change the question, then it's a new question"): whether the person's own FAILED question can
+ * continue where it stopped, as its run read says (`continuable`, Task 57f: exactly when POST /v1/runs/{id}/continue would continue it).
+ * Never a dig (its question is the site's text for the AIs), nor a run with no words to fill in.
  */
-export type AskAgainReuse = Readonly<{ runId: string; questionLine: string }>;
+export function askAgainContinuable(run: Pick<RunProjection, "question_line" | "state" | "continuable">, catalog: MessageCatalog): boolean {
+  return run.state === "FAILED" && run.continuable === true && askAgainQuestion(run, catalog) !== null;
+}
 
-export function askAgainReuseOf(run: Pick<RunProjection, "run_ref" | "question_line" | "state" | "reusable">, catalog: MessageCatalog): AskAgainReuse | null {
-  if (run.state !== "FAILED" || run.reusable !== true || parseDigQuestion(run.question_line, catalog) !== null) return null;
-  return Object.freeze({ runId: run.run_ref, questionLine: run.question_line });
+/** Task 57g: the words on the ask page are the stopped question's own once both are trimmed (any other change is a new question). */
+export function sameStoppedWords(typed: string, stopped: string | null): boolean {
+  return stopped !== null && typed.trim() === stopped.trim();
+}
+
+/*
+ * Task 57g: "Change the question" with the words left as they were goes back to the stopped debate's map, which starts the same Continue
+ * there, with its 10-second Undo. The ask page hands that over in one module variable, as Start's hand-off (startHandOff.ts): it lives
+ * while this tab's scripts run, so the client-side move to the map finds it; a reload or another tab does not. Never in the browser's
+ * storage, never in the address. Used once, and never after CONTINUE_HAND_OFF_MS.
+ */
+
+/** How long the map may take the hand-off after the ask page made it. */
+export const CONTINUE_HAND_OFF_MS = 60_000;
+
+let continueHeld: Readonly<{ runId: string; at: number }> | null = null;
+
+/** The ask page: the map of `runId` starts its Continue on arrival (replacing any earlier hand-off). */
+export function handOffContinue(runId: string, now: number): void {
+  continueHeld = Object.freeze({ runId, at: now });
+}
+
+/** The map page, once its first read answered: true once for a fresh hand-off of this run (it is used up either way); never another run's. */
+export function takeContinueHandOff(runId: string, now: number): boolean {
+  if (continueHeld === null || continueHeld.runId !== runId) return false;
+  const fresh = now - continueHeld.at < CONTINUE_HAND_OFF_MS;
+  continueHeld = null;
+  return fresh;
 }

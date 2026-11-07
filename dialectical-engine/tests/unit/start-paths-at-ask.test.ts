@@ -14,9 +14,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  AskRequestSchema, StartListSchema, StartMenuSchema, type AskRequest, type DigPick, type SignedStartList, type SignedStartMenu, type StartList,
-  type StartMenu, type StartPathChoice, type StartPaths
+  AskRequestSchema, StartListSchema, StartMenuSchema, type AskRequest, type DigPick, type DigSuggestion, type SignedStartList, type SignedStartMenu,
+  type StartList, type StartMenu, type StartPathChoice, type StartPaths
 } from "@debateai/contract";
+import { digPathPlanOf, digStartPaths } from "../../apps/ui/lib/v4/digPathPlan.js";
+import { suggestionPick } from "../../apps/ui/lib/v4/suggestions.js";
 import { TypedDomainError, joinedPathWords } from "@debateai/kernel";
 import type { DebateShapePlanKey, DebateShapeWidths } from "@debateai/register";
 import { pathPlanFromMenu, pathPlanReduce, pathPlanToStartPaths, type PathPlan, type PathPlanAction } from "../../apps/ui/lib/v4/pathPlan.js";
@@ -482,6 +484,47 @@ describe("verifyStartPathsAtAsk: the paths signed at Next, read back at Start (s
       const edited = verify(digAsk({ start_paths: { source: "DIG_PICKS", paths: [{ ...P_PICK1, question: "Who pays for delays?" }], width: 1,
         chosen_by: "PERSON" } }), { dig });
       expect(edited.paths[0]!.author).toBe("PERSON_EDITED");
+    });
+
+    /*
+     * Independent review of Task 79 (wave 16; Task 33b's deferred note): the dig's rows join two AI-suggested picks the same way
+     * when no AI wrote one question for them (the combine failed, or the dig was pressed while it was being written): each pick
+     * by its text, with no title, so its title is its text cut to a path title's length. The server joins the picks as sent the
+     * same way: the same words are the AIs' (AI_COMBINED); a pick the person wrote or reworded in the join, or a word changed,
+     * stays the person's.
+     */
+    it("DIG_PICKS: AI-suggested picks under the dig rows' own joined words, no combine_ref, are AI_COMBINED", () => {
+      const suggestions: DigSuggestion[] = [
+        { suggestion_id: "sg-1", kind: "UNDOCUMENTED", side: null, text: "Who pays if building runs years late?", places: ["path:b2"] },
+        { suggestion_id: "sg-3", kind: "UNDOCUMENTED", side: null, text: "Can the grid carry the new plants' power by 2035?", places: ["path:b2"] }
+      ];
+      let plan = digPathPlanOf(suggestions.map((suggestion) => suggestionPick("b2", suggestion)), false);
+      for (const action of [{ type: "SELECT", key: plan.paths[0]!.key }, { type: "SELECT", key: plan.paths[1]!.key }, { type: "COMBINE_SELECTED" }] as const) {
+        plan = pathPlanReduce(plan, action).plan;
+      }
+      const writing = digStartPaths(plan);
+      const fallback = digStartPaths(pathPlanReduce(plan, { type: "COMBINE_FAILED", key: plan.paths[0]!.key }).plan);
+      const sentPicks: DigPick[] = suggestions.map((suggestion) =>
+        ({ kind: suggestion.kind, suggestion_id: suggestion.suggestion_id, place: "path:b2", text: suggestion.text }));
+      const aiDig = Object.freeze({ parentRunId: PARENT_RUN_ID, picks: Object.freeze(sentPicks),
+        pickAuthors: Object.freeze(["AI_SUGGESTION", "AI_SUGGESTION"] as DigPickAuthor[]) });
+      const request = (startPaths: StartPaths): AskRequest =>
+        baseAsk({ parent: { parent_run_id: PARENT_RUN_ID, places: ["path:b2"], mode: "quick", picks: sentPicks }, start_paths: startPaths });
+      for (const sent of [writing, fallback]) {
+        expect(sent.paths).toHaveLength(1);
+        expect(sent.paths[0]!.combine_ref).toBeUndefined();
+        const v = verify(request(sent), { dig: aiDig });
+        expect(v.paths[0]).toMatchObject({ author: "AI_COMBINED", ownWords: [] });
+        expect(v.ownWords).toEqual([]);
+      }
+      // A pick the person reworded in the join: the words are theirs.
+      expect(verify(request(writing), { dig: { ...aiDig, pickAuthors: ["AI_SUGGESTION", "PERSON_EDITED"] } }).paths[0]!.author).toBe("PERSON_EDITED");
+      // A word changed: the person's.
+      expect(verify(request({ ...writing, paths: [{ ...writing.paths[0]!, title: "My own title" }] }), { dig: aiDig }).paths[0]!.author)
+        .toBe("PERSON_EDITED");
+      // One pick alone is never a join (its own words are the pick's author, as before).
+      expect(verify(request({ source: "DIG_PICKS", paths: [P_PICK1], width: 1, chosen_by: "PERSON" }), { dig: aiDig }).paths[0]!.author)
+        .toBe("AI_SUGGESTION");
     });
 
     it("DIG_PICKS: the width is the number of paths, at most the widest option", () => {

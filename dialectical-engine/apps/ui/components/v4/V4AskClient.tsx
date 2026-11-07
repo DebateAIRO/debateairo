@@ -61,6 +61,7 @@ import {
   type V4StartHandOver
 } from "@/lib/v4/types";
 import { useAskAgain } from "@/lib/v4/useAskAgain";
+import { handOffContinue, sameStoppedWords } from "@/lib/v4/failedRun";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
 import { useSavedQuestion } from "@/lib/v4/useSavedQuestion";
@@ -1059,6 +1060,13 @@ function V4AskForm({
       } else if (sending.press !== "quick") {
         // Step 2 with no start step: the line alone, as the card's hook hands it over then.
         handOver = { questionLine: sending.line, ownWords: [] };
+      } else if (savedIdRef.current !== null && sending.basis === readLine) {
+        // Review (wave 16; saved-questions spec §3.7, '"Just answer it" starts a debate too, so it removes the saved copy'): step
+        // 1's press for the words whose step 2 the account keeps (after Back, unchanged) starts that question, so the ask names
+        // it, as Start does; other words start another question and name none.
+        await save.flush();
+        const kept = savedIdRef.current;
+        if (kept !== null) handOver = { questionLine: sending.line, ownWords: [], savedQuestionId: kept };
       }
       const outcome = await ask.submit(handOver?.questionLine ?? sending.line, sending.mode, "ask", null, sending.purposeLines, undefined, handOver);
       switch (outcome.kind) {
@@ -1169,7 +1177,21 @@ function V4AskForm({
     if (nextPressRef.current !== "IDLE") return;
     if (helpFirstAt(trimmed)) return;
     if (!longEnough || busy || quickTooLong || sessionUnknown || stepOneHeld) return;
+    if (continuesStopped()) return;
     void pressQuick();
+  }
+
+  /**
+   * V4 start step, Task 57g (the owner's 7 Nov answers: "if it stays the same, we need to use whatever was already generated and paid
+   * for"): opened from the stopped page's "Change the question", the words left as they were (trimmed) continue that debate itself when
+   * the server can: no consent, no reading, no charge here; its map starts the same Continue, with its 10-second Undo. Next and step 1's
+   * "Just answer it" alike (either would otherwise charge the same question twice). True: the page is on its way to the map.
+   */
+  function continuesStopped(): boolean {
+    if (againRunId === null || again?.continuable !== true || !sameStoppedWords(trimmed, againQuestion)) return false;
+    handOffContinue(againRunId, Date.now());
+    router.push(`/v4/debate/${encodeURIComponent(againRunId)}`);
+    return true;
   }
 
   async function pressQuick(): Promise<void> {
@@ -1203,6 +1225,7 @@ function V4AskForm({
     if (nextPressRef.current !== "IDLE" || startFlight.current) return;
     if (helpFirstAt(trimmed)) return;
     if (!longEnough || busy || sessionUnknown || stepOneHeld) return;
+    if (continuesStopped()) return;
     setRefusal(null);
     setRefusalStart(null);
     setNextPress("CONSENT");
@@ -1468,7 +1491,8 @@ function V4AskForm({
     setDeclinedAtNext(false);
     setStartedRun(null);
     setStep("read");
-    void ask.refreshRoom().catch(() => null);
+    // Review (wave 16): read through the update check, so a read that fails keeps the room before it (and the card with it).
+    site.readAgain();
     return true;
   }
   // Task 76e: a kept step 2 handed to the page opens at once, before the browser paints.

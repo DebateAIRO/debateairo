@@ -750,6 +750,18 @@ export const RunContinueRefusedSchema = z.object({
   until: z.iso.datetime()
 }).strict();
 export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
+/**
+ * V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate. A failed debate it cannot continue
+ * (erased, a stop the person caused, a spending wall, set aside by an upload, a step's tries used up) is refused with RUN_NOT_CONTINUABLE; a
+ * continuable one with no room left for the rest (the person's quota or the site's day) with RUN_CONTINUE_NO_ROOM. Nothing changed either way.
+ */
+export const RUN_NOT_CONTINUABLE = "RUN_NOT_CONTINUABLE" as const;
+export const RUN_CONTINUE_NO_ROOM = "RUN_CONTINUE_NO_ROOM" as const;
+export const RunNotContinuedSchema = z.object({
+  error: z.enum([RUN_NOT_CONTINUABLE, RUN_CONTINUE_NO_ROOM]),
+  message: z.enum([RUN_NOT_CONTINUABLE, RUN_CONTINUE_NO_ROOM])
+}).strict().refine((refused) => refused.error === refused.message, { message: "the message names the refusal" });
+export type RunNotContinued = z.infer<typeof RunNotContinuedSchema>;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // The owner's changes of 31 Oct 2026 (plan 2026-10-31-r22-owner-changes.md): the shapes the lanes fill. Every member that rides an ask,

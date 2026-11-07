@@ -35,6 +35,15 @@ const NOT_KEPT = "AND NOT core.run_pre_start_kept(t.run_id)";
 const KEPT = "core.run_pre_start_kept(uuid)";
 const RETRY_TABLE = "core.work_item_retry";
 const RETRY = "core.record_work_item_retry(uuid,uuid,timestamptz)";
+/** Task 57f: a failed debate continues where it stopped, and a call bought again is the site's. */
+const REOPEN_TABLE = "core.work_item_reopen";
+const CALL_WAIVER_TABLE = "ledger.model_spend_call_waiver";
+const READ_CONTINUE = "core.read_run_continue(uuid,uuid)";
+const CONTINUE = "core.continue_failed_run(uuid,uuid,text,bigint)";
+const RECORD_CALL_WAIVER = "ledger.record_call_waiver(uuid,uuid[])";
+const CALL_WAIVED = "ledger.call_waived_attempts(uuid)";
+/** What leaves a call the site paid for out of the person's spend, in every reader that counts it. */
+const NOT_CALL_WAIVED = "NOT EXISTS (SELECT 1 FROM ledger.model_spend_call_waiver cw WHERE cw.attempt_id = s.attempt_id)";
 const nameOf = (signature: string): string => signature.slice(0, signature.indexOf("(")).toLowerCase();
 const bodyOf = (sql: string, head: string): string => {
   const at = sql.indexOf(head);
@@ -53,7 +62,7 @@ describe("0164: a failed question gives back its path-list charge", () => {
     expect(plan.forwardChain.find((step) => step.name === NAME)!.amendsPostconditionsOf).toEqual(AMENDS);
     const loader = read("packages/db/src/migration-forward0164.ts");
     for (const name of [TABLE, "identity.record_pre_start_try_charge(", "identity.link_pre_start_try(", "identity.read_run_quota_used(", SPENT, ...READERS,
-      RETRY_TABLE, KEPT, RETRY]) {
+      RETRY_TABLE, KEPT, RETRY, REOPEN_TABLE, CALL_WAIVER_TABLE, READ_CONTINUE, CONTINUE, RECORD_CALL_WAIVER, CALL_WAIVED]) {
       expect(loader, name).toContain(name);
     }
   });
@@ -87,9 +96,9 @@ describe("0164: a failed question gives back its path-list charge", () => {
     expect(auditMigrationReplaySafety(SQL_PATH, sql, {
       plan, migrateSource: read("packages/db/src/index.ts"), transactionSource: read("packages/db/src/migration-transaction.ts")
     })).toEqual([]);
-    expect([...definedRelationNames(sql)]).toEqual([TABLE, RETRY_TABLE]);
+    expect([...definedRelationNames(sql)]).toEqual([TABLE, CALL_WAIVER_TABLE, RETRY_TABLE, REOPEN_TABLE]);
     const earlier = readdirSync(new URL("migrations/", ROOT)).filter((entry) => /^\d{4}_.*\.sql$/u.test(entry) && entry < NAME);
-    for (const table of [TABLE, RETRY_TABLE]) expect(earlier.some((name) => definedRelationNames(read(`migrations/${name}`)).includes(table)), table).toBe(false);
+    for (const table of [TABLE, CALL_WAIVER_TABLE, RETRY_TABLE, REOPEN_TABLE]) expect(earlier.some((name) => definedRelationNames(read(`migrations/${name}`)).includes(table)), table).toBe(false);
   });
 
   it("C-O stores the charge, its person, its try and (from Start) its debate: no text; no request role reads it; append-only but for the link", () => {
@@ -140,7 +149,7 @@ describe("0164: a failed question gives back its path-list charge", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0164.ts");
     const readme = read("migrations/lineage/README.md").replace(/\s+/gu, " ");
     for (const needle of ["(0164, below) the fifty-fourth", "## A failed question gives back its path-list charge (0164)", "`loadForward0164`",
-      "MIGRATION_FORWARD0164_", "`core.run_pre_start_kept`", "`core.work_item_retry`"]) {
+      "MIGRATION_FORWARD0164_", "`core.run_pre_start_kept`", "`core.work_item_retry`", "`core.continue_failed_run`", "`ledger.model_spend_call_waiver`"]) {
       expect(readme, needle).toContain(needle);
     }
     expect(read("deploy/preview-auth-dev/v1/README.md")).toContain("`migrations/0164_pre_start_release.sql` (after `0163_main_answer_path_added.sql`, `n1: drained`)");
@@ -170,6 +179,9 @@ describe("0164: a failed question gives back its path-list charge", () => {
     expect(kept).toContain("FROM core.start_path_set AS path_set WHERE path_set.run_id = p_run_id AND path_set.source = 'MENU'");
     // A debate an upload set aside used none of the person's quota (0123's waiver, its own sentence): its charges are given back as before.
     expect(kept).toContain("AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = p_run_id)");
+    // Task 57f: the paths are re-used by continuing the debate; one never queued as a debate (RUN_SETUP_FAILED) can never continue: given back.
+    expect(kept).toContain("item.state = 'FAILED'");
+    expect(kept).toContain("item.terminal_reason LIKE 'RUN_SETUP_FAILED:%'");
     expect(sql).toContain(`REVOKE ALL ON FUNCTION ${KEPT} FROM PUBLIC,`);
     expect([...sql.matchAll(/^GRANT EXECUTE ON FUNCTION core\.run_pre_start_kept\(uuid\) TO ([a-z_]+);$/gmu)].map((match) => match[1]))
       .toEqual(["debateai_staff_security_owner"]);
@@ -197,5 +209,76 @@ describe("0164: a failed question gives back its path-list charge", () => {
       .toEqual(["debateai_runtime"]);
     const header = read(SQL_PATH).split("\n").filter((line) => line.startsWith("--")).join(" ");
     expect(header).toContain("Task 57e");
+  });
+  // Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again ... Only if we can't re-use, then we
+  // need to pay for this ourselves"; edited in place, never pushed or applied): the person's own failed debate is re-opened by one owner-checked
+  // definer for the API's role alone, each re-open recorded (ids and times only); and a call an earlier copy paid for and could not hand back
+  // is the site's once it is bought again (the waiver, call by call), left out by every reader of the person's spend.
+  it("C-C continue: one owner-checked re-open of the newest FAILED work item, recorded once per press that re-opens; read and re-open for the API's role alone", () => {
+    const sql = code(read(SQL_PATH));
+    const at = sql.indexOf(`CREATE TABLE IF NOT EXISTS ${REOPEN_TABLE} (`);
+    const columns = sql.slice(at, sql.indexOf("\n);", at));
+    expect([...columns.matchAll(/^ {2}([a-z_]+) (?:uuid|text|bigint|integer|timestamptz|jsonb|bytea)/gmu)].map((match) => match[1]))
+      .toEqual(["work_item_id", "reopen_no", "run_id", "reopened_at"]);
+    expect(columns).not.toMatch(/question|answer|ciphertext|content|reason|words|owner/u);
+    expect(sql).toContain(`SELECT core.install_truncate_guard('${REOPEN_TABLE}');`);
+    expect(sql).toContain(`CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON ${REOPEN_TABLE}`);
+    const reopen = bodyOf(sql, "CREATE OR REPLACE FUNCTION core.continue_failed_run(");
+    expect(reopen).toContain("SECURITY DEFINER");
+    expect(reopen).toContain("SET search_path=pg_catalog");
+    // The same lock as 0134's resume and 0143's hand-over: one press at a time per debate, and never beside the month's Continue.
+    expect(reopen).toContain("pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:dig-model:' || p_run_id::text, 0))");
+    expect(reopen).toContain("core.run_ownership_event");
+    expect(reopen).toContain("RETURN 'NOT_OWNED'");
+    expect(reopen).toContain("RETURN 'CONTINUING'");
+    expect(reopen).toContain("RETURN 'NOT_CONTINUABLE'");
+    // Claimable at once, as a copy that let go of it leaves it: the wake hands it on, and the runner's re-send of lapsed claims does if the wake fails.
+    expect(reopen).toContain("SET state = 'CLAIMED', terminal_reason = NULL, claimed_by = 'continue', claim_deadline = pg_catalog.clock_timestamp()");
+    expect(reopen).toContain(`INSERT INTO ${REOPEN_TABLE}`);
+    // Never a debate set aside by an upload (0123's waiver: it used none of the person's quota), one never queued, a settled one, an erased one.
+    for (const needle of ["ledger.model_spend_waiver", "'RUN_SET_ASIDE:%'", "'RUN_SETUP_FAILED:%'", "settled_attempt_id IS NOT NULL",
+      "core.run_private_content_is_live(p_run_id)", "identity.run_handover", "register.settings_version_passed"]) expect(reopen, needle).toContain(needle);
+    const facts = bodyOf(sql, "CREATE OR REPLACE FUNCTION core.read_run_continue(");
+    expect(facts).toContain("core.run_ownership_event");
+    expect(facts).toContain(REOPEN_TABLE);
+    for (const signature of [READ_CONTINUE, CONTINUE]) {
+      expect(sql).toContain(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC,`);
+      const name = signature.slice(0, signature.indexOf("(")).replace(".", "\\.");
+      expect([...sql.matchAll(new RegExp(`^GRANT EXECUTE ON FUNCTION ${name}\\([^)]*\\) TO ([a-z_]+);$`, "gmu"))].map((match) => match[1]), signature)
+        .toEqual(["debateai_billing_runtime"]);
+    }
+    expect(sql).toMatch(/^REVOKE ALL ON core\.work_item_reopen FROM PUBLIC,/mu);
+    expect([...sql.matchAll(/^GRANT [^\n]* ON core\.work_item_reopen TO ([a-z_]+);$/gmu)]).toEqual([]);
+    const header = read(SQL_PATH).split("\n").filter((line) => line.startsWith("--")).join(" ");
+    expect(header).toContain("Task 57f");
+  });
+
+  it("C-W the waiver, call by call: ids and times only, insert-only, written for the runner's role; every reader of the person's spend leaves it out", () => {
+    const sql = code(read(SQL_PATH));
+    const at = sql.indexOf(`CREATE TABLE IF NOT EXISTS ${CALL_WAIVER_TABLE} (`);
+    const columns = sql.slice(at, sql.indexOf("\n);", at));
+    expect([...columns.matchAll(/^ {2}([a-z_]+) (?:uuid|text|bigint|integer|timestamptz|jsonb|bytea)/gmu)].map((match) => match[1]))
+      .toEqual(["attempt_id", "run_id", "recorded_at"]);
+    expect(columns).toContain("attempt_id uuid PRIMARY KEY");
+    expect(columns).not.toMatch(/question|answer|ciphertext|content|words|owner/u);
+    expect(sql).toContain(`SELECT core.install_truncate_guard('${CALL_WAIVER_TABLE}');`);
+    expect(sql).toContain(`CREATE TRIGGER reject_mutation BEFORE UPDATE OR DELETE ON ${CALL_WAIVER_TABLE}`);
+    // It waives only a charge recorded on that same debate, once.
+    const writer = bodyOf(sql, "CREATE OR REPLACE FUNCTION ledger.record_call_waiver(");
+    expect(writer).toContain("FROM ledger.model_spend AS spend");
+    expect(writer).toContain("spend.run_id = p_run_id");
+    expect(writer).toContain("ON CONFLICT DO NOTHING");
+    for (const head of ["CREATE OR REPLACE FUNCTION billing.read_internal_grant_spent(", "CREATE OR REPLACE FUNCTION staff.read_team_internal_spent(",
+      "CREATE OR REPLACE FUNCTION identity.read_run_quota_used("]) {
+      expect(bodyOf(sql, head), head).toContain(NOT_CALL_WAIVED);
+    }
+    expect(bodyOf(sql, "CREATE OR REPLACE FUNCTION ledger.call_waived_attempts(")).toContain("billing.run_charge_scope");
+    // The subscription reader (packages/budget) reads it through the one definer, never the table.
+    expect(read("packages/budget/src/model-spend.ts")).toContain("unnest(ledger.call_waived_attempts($1::uuid))");
+    expect(sql).toMatch(/^REVOKE ALL ON ledger\.model_spend_call_waiver FROM PUBLIC,/mu);
+    expect([...sql.matchAll(/^GRANT ([^\n]*) ON ledger\.model_spend_call_waiver TO ([a-z_]+);$/gmu)].map((match) => `${match[2]}: ${match[1]}`))
+      .toEqual(["debateai_staff_security_owner: SELECT"]);
+    expect([...sql.matchAll(/^GRANT EXECUTE ON FUNCTION (ledger\.[a-z_]+)\([^)]*\) TO ([a-z_]+);$/gmu)].map((match) => `${match[1]} ${match[2]}`))
+      .toEqual(["ledger.record_call_waiver debateai_runtime", "ledger.call_waived_attempts debateai_runtime"]);
   });
 });

@@ -43,15 +43,15 @@ import {
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
-import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "./failed-seed.js";
+import { FAILED_DIGS, FAILED_DIGS_PARENT, mockContinueStep, RUN_FAILED_SOME } from "./failed-seed.js";
 import { windowsForPlan } from "./plan-windows.js";
 import {
-  routeStartStep, setStartRoomScene, startAskRefusal, startRoomReadOutcome, startRoomScene, startSettingsVersion, startStepCounters, startStepRoomPart,
-  startStepSelfCheck, startStepUsedPercent, START_ROOM_SCENES
+  routeStartStep, setStartRoomScene, setStartStepLogging, startAskRefusal, startRoomReadOutcome, startRoomScene, startSettingsVersion, startStepCounters,
+  startStepRoomPart, startStepSelfCheck, startStepUsedPercent, START_ROOM_SCENES
 } from "./start-step.js";
 import {
   MOCK_SAVED_SWITCH, removeSavedQuestionAtStart, routeSavedQuestions, savedQuestionCounters, savedQuestionSamples, savedQuestionsKept,
-  savedQuestionsScene, setSavedQuestionsScene
+  savedQuestionsScene, setSavedQuestionsLogging, setSavedQuestionsScene
 } from "./saved-questions.js";
 import {
   mockAnswerCarryOn, mockAnswerPathsPart, mockFirstClosingLeft, mockPathRunMs, mockPathRunOf, mockPathRunSamples, mockPathRunSelfCheck,
@@ -152,6 +152,9 @@ const POSTED_STORY_SECONDS = seconds("MOCK_POSTED_STORY_SECONDS", 10);
 /** dig-f1 (V4 screen review, 3 Nov 2026): how long the first debate's main answer is still being rewritten after the mock starts. */
 const MAIN_ANSWER_SECONDS = seconds("MOCK_MAIN_ANSWER_SECONDS", 45);
 const QUIET = process.env.MOCK_QUIET === "1";
+// The step before Start and the saved questions log their requests as this file does (they never read the environment themselves).
+setStartStepLogging(!QUIET);
+setSavedQuestionsLogging(!QUIET);
 let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, "FITS");
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
@@ -240,12 +243,12 @@ const REPORT_WRITING_MS = seconds("MOCK_REPORT_SECONDS", 8) * 1000;
 /**
  * V4 start step, Task 80 (owner answer Q8, read-f3; start-step.ts): the room scene. SITEUPDATED names the next settings version 30 s
  * after the first room read; PLANFAILS fails the first two room reads; PLANFAILSALL every one. A room read comes before any question
- * is typed, so these are a switch (`roomscene=`), not words in the question.
+ * is typed, so these are a switch, `roomscene=`, not words in the question.
  */
 setStartRoomScene(choice("MOCK_ROOM_SCENE", process.env.MOCK_ROOM_SCENE, START_ROOM_SCENES, "NONE"));
 /**
  * V4 start step, Task 80b (saved-questions.ts): the questions not started yet. PICKUP seeds the #pickup scene's two; NONE keeps none.
- * The list is read on step 1, before any question is typed, so this is a switch (`saved=`), not words in the question.
+ * The list is read on step 1, before any question is typed, so this is a switch, `saved=`, not words in the question.
  */
 setSavedQuestionsScene(choice("MOCK_SAVED", process.env.MOCK_SAVED, MOCK_SAVED_SWITCH, "NONE"));
 
@@ -314,8 +317,10 @@ type MockRun = {
   failsAt?: number;
   /** Owner review 3 Nov: what a FAILED run took from the person's quota (the contract's `quota_used` since Task 57c, so both views send it). */
   quotaUsed?: "NONE" | "SOME";
-  /** V4 start step, Task 57e: a FAILED run whose clarifying answers and paths are kept for "Ask this again" (the contract's `reusable`). */
-  reusable?: true;
+  /** V4 start step, Task 57g: a FAILED run that Continue would continue where it stopped (the contract's `continuable`, Task 57e's `reusable`). */
+  continuable?: true;
+  /** Task 57g: a failed run Continue continued; while it runs again a second press is CONTINUING too, as on the API. */
+  continued?: boolean;
   /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
   settlesAfterContinue?: boolean;
   /** dig-f1: its main answer is still being rewritten until this moment, then has its newest version (rewrite-seed.ts mainAnswerAt). */
@@ -409,12 +414,23 @@ settledRun({
 }).mainAnswerReadyAt = T0 + MAIN_ANSWER_SECONDS * 1000;
 addRun({ runRef: RUN_RUNNING, seq: 5, startedAt: T0 - 4 * 60_000, question: "Is a four-day work week good for productivity and for workers?" });
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
-addRun({
-  runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
-  // Owner review 3 Nov (draft): the models were gone when it was claimed, so it never began and nothing was taken.
-  quotaUsed: "NONE",
-  question: "Will AI tutors replace homework help from teachers within five years?"
-});
+/**
+ * The first failed question, as seeded. V4 start step, independent review of Task 57g: its stop is ours (the API's rule,
+ * apps/api/src/run-continue.ts stopIsOurs), so its read says `continuable` and its Continue continues it, as the API's do; it is the
+ * click-test's "continuable, nothing used" page. The switch `failed=RESET` seeds it again.
+ */
+function seedFailed(): void {
+  const before = runs.get(RUN_FAILED);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({
+    runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
+    // Owner review 3 Nov (draft): the models were gone when it was claimed, so it never began and nothing was taken.
+    quotaUsed: "NONE",
+    question: "Will AI tutors replace homework help from teachers within five years?",
+    continuable: true
+  });
+}
+seedFailed();
 settledRun({
   runRef: RUN_STORY_WRITING, answerId: ANSWER_STORY_WRITING, seq: 4,
   question: "Should Romania build two new reactors at Cernavodă, or spend the money on wind, solar and batteries?",
@@ -465,8 +481,31 @@ settledRun({
 for (const dig of FAILED_DIGS) {
   addRun({ runRef: dig.runRef, seq: dig.seq, question: dig.question, failedReason: dig.reason, quotaUsed: dig.quotaUsed });
 }
-addRun({ runRef: RUN_FAILED_SOME.runRef, seq: RUN_FAILED_SOME.seq, question: RUN_FAILED_SOME.question, failedReason: RUN_FAILED_SOME.reason,
-  quotaUsed: RUN_FAILED_SOME.quotaUsed, reusable: RUN_FAILED_SOME.reusable });
+/**
+ * The failed question that used some of the quota and can continue (failed-seed.ts RUN_FAILED_SOME), as seeded. V4 start step, Task 57g:
+ * its Continue replaces it with a run that runs again and finishes (continueStoppedRun); the switch `failed=RESET` seeds it again.
+ */
+function seedFailedSome(): void {
+  const before = runs.get(RUN_FAILED_SOME.runRef);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({ runRef: RUN_FAILED_SOME.runRef, seq: RUN_FAILED_SOME.seq, question: RUN_FAILED_SOME.question, failedReason: RUN_FAILED_SOME.reason,
+    quotaUsed: RUN_FAILED_SOME.quotaUsed, continuable: RUN_FAILED_SOME.continuable });
+}
+seedFailedSome();
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers): Continue on a failed question that can continue. It runs again for the stand-in's run
+ * time (the API runs only what never ran) and finishes with today's answer, its report's investigation opened as a new question's is; while
+ * it runs, a second press is CONTINUING too (failed-seed.ts mockContinueStep).
+ */
+function continueStoppedRun(run: MockRun, now = Date.now()): void {
+  const settleAt = now + RUN_SECONDS * 1000;
+  settledRun({
+    runRef: run.runRef, answerId: randomUUID(), question: run.question, seq: run.seq, askedAt: now, settleAt,
+    storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web: "PAID"
+  }).continued = true;
+  if (investigationOf(run.runRef) === undefined) openInvestigation(run.runRef);
+}
 
 // Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -668,8 +707,8 @@ function runProjection(run: MockRun, now = Date.now()) {
       elapsedMs: now - (run.startedAt ?? now), sinceAnswerMs: now - (run.settleAt ?? now) })),
     // Owner review 3 Nov; V4 start step, Task 57c (the contract's RunProjectionSchema.quota_used, last): what a failed run took from the quota.
     ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {}),
-    // V4 start step, Task 57e (the contract's RunProjectionSchema.reusable, last): what ran is kept for the next try.
-    ...(state === "FAILED" && run.reusable === true ? { reusable: true } : {})
+    // V4 start step, Task 57g (the contract's RunProjectionSchema.continuable, last; Task 57e's `reusable`): Continue would continue it.
+    ...(state === "FAILED" && run.continuable === true ? { continuable: true } : {})
   };
 }
 
@@ -1756,6 +1795,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
         // The withdrawal can be clicked again: subscription=RESET puts the Plus subscription back inside its 14 days.
         if (url.searchParams.get("subscription") === "RESET") withdrawnAt = null;
+        // V4 start step, Task 57g: Continue can be clicked again: failed=RESET puts the failed questions 4444 and 4500…45 back as seeded (failed, continuable).
+        const failedSetting = url.searchParams.get("failed");
+        if (failedSetting !== null && choice("failed", failedSetting, ["RESET"] as const, "RESET") === "RESET") {
+          seedFailed();
+          seedFailedSome();
+        }
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
         if (publicStateSetting !== null) publicState = choice("publicstate", publicStateSetting, PUBLIC_STATES, publicState);
         const publicDigShareSetting = url.searchParams.get("publicdigshare");
@@ -1772,7 +1817,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate, publicdigshare, roomscene, saved or session; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate, publicdigshare, roomscene, saved, failed or session; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1782,7 +1827,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&publicdigshare=&live=&climb=&roomscene=&saved=&session=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&publicdigshare=&live=&climb=&roomscene=&saved=&session=&failed=RESET&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -2006,6 +2051,18 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       return sendJson(req, res, 200, { seen_at: seenAt }, C.LastVisitRecordedSchema);
     }
     if (parts[3] === "continue") {
+      // V4 start step, Task 57g (the owner's 7 Nov answers; failed-seed.ts mockContinueStep): first the person's own FAILED question, as the
+      // API's route tries it first; everything else falls through to the month pause's Continue below, unchanged.
+      const stoppedStep = mockContinueStep({ failed: stateOf(run) === "FAILED", running: stateOf(run) === "RUNNING",
+        continuable: run.continuable === true, continued: run.continued === true });
+      if (stoppedStep !== "MONTH") {
+        if (!DraftRunContinueRequestSchema.safeParse(body ?? {}).success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+        if (stoppedStep === "NOT_CONTINUABLE") {
+          return sendJson(req, res, 409, { error: "RUN_NOT_CONTINUABLE", message: "RUN_NOT_CONTINUABLE" }, C.RunNotContinuedSchema);
+        }
+        if (stoppedStep === "CONTINUE") continueStoppedRun(run);
+        return sendJson(req, res, 200, { state: "CONTINUING" }, DraftRunContinuedSchema);
+      }
       // Draft route (W2-7, money rule): Continue on a debate paused at the month wall, once the new month has started.
       if (run.monthPaused !== true || stateOf(run) !== "RUNNING") return sendJson(req, res, 409, { error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
       if (!DraftRunContinueRequestSchema.safeParse(body ?? {}).success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });

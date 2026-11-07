@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import type { StartPaths } from "@debateai/contract";
 import type { AskRoom } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { recordDig } from "./accountMemory.js";
@@ -83,12 +84,17 @@ export function useDigQueue(input: Readonly<{
   aboutOf: (target: DigTarget) => ReactNode;
   /** report-d2: the report waits for digs or is written, so digging rests (its buttons say why); nothing starts. */
   digsRest: boolean;
+  /**
+   * Task 79 review: at the send, a path debate's dig's paths as they go (components/v4/V4DigPaths.tsx settledPaths: the AI's
+   * words for a row still being written at the press, when they came meanwhile). Absent: as pressed.
+   */
+  settlePaths?: (paths: StartPaths) => StartPaths;
   catalog: MessageCatalog;
   locale: string;
 }>): DigQueue {
   const {
     map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
-    setVisitLinks, ask, onCounting, aboutOf, digsRest, catalog, locale
+    setVisitLinks, ask, onCounting, aboutOf, digsRest, settlePaths, catalog, locale
   } = input;
   const restRef = useRef(digsRest);
   useEffect(() => {
@@ -105,13 +111,20 @@ export function useDigQueue(input: Readonly<{
 
   const send = async (dig: PendingDig, parentRunId: string, parentQuestionLine: string): Promise<DigUndoResult> => {
     let outcome: V4AskOutcome;
+    // Task 79 review: the paths as they go now (a combined question written during the 10 seconds goes with them).
+    const paths = dig.paths === undefined ? undefined : settlePaths?.(dig.paths) ?? dig.paths;
     try {
       // ASK-4: a dig carries AI-written text, so it is sent as a dig (no client crisis pop-up on AI words). W3-4: with its
       // parent (the debate it digs, the places, the mode and the picks as sent).
       // dig-f9: the question check's screen can only come with the server's answer, 10 seconds after the click, so it
       // names the dig it is about.
-      outcome = await ask.submit(digQuestion(dig.target, parentQuestionLine, catalog, locale), dig.mode, "dig",
-        askParentOf(parentRunId, dig.target, dig.mode), undefined, aboutOf(dig.target));
+      // V4 start step, Task 79 (dig-f35): a path debate's dig of picks goes with its paths as the person shaped them (DIG_PICKS);
+      // the words written on its rows had their crisis check at the press (V4DebateClient).
+      const question = digQuestion(dig.target, parentQuestionLine, catalog, locale);
+      const parent = askParentOf(parentRunId, dig.target, dig.mode);
+      outcome = await (paths === undefined
+        ? ask.submit(question, dig.mode, "dig", parent, undefined, aboutOf(dig.target))
+        : ask.submit(question, dig.mode, "dig", parent, undefined, aboutOf(dig.target), { questionLine: question, startPaths: paths, ownWords: [] }));
     } catch {
       outcome = { kind: "REFUSED", message: t(catalog, "v4.dig.failed") };
     }
@@ -130,8 +143,9 @@ export function useDigQueue(input: Readonly<{
       // Kept for this visit even when the page has gone meanwhile (Decision A: memory only), and in the account (N11:
       // which debate it came from, where on the map, its mode). Best-effort: without the record it is found by text.
       startedThisVisit.set(link.childRunId, { link, parentQuestion: ownWords(parentQuestionLine) });
-      // dig-f12: "Try this dig again" digs exactly what was sent (memory only, lib/v4/useSentDigs.ts).
-      rememberSentDig(link.childRunId, { target: dig.target, mode: dig.mode });
+      // dig-f12: "Try this dig again" digs exactly what was sent (memory only, lib/v4/useSentDigs.ts). Task 79 review: a path
+      // debate's dig with the paths it went with, so it is tried again with them, never one path per pick.
+      rememberSentDig(link.childRunId, { target: dig.target, mode: dig.mode, ...(paths === undefined ? {} : { paths }) });
       void recordDig(link);
       const started: DigUndoResult = { kind: "STARTED", childRunId: link.childRunId, startedAt };
       if (!mounted.current) return started;

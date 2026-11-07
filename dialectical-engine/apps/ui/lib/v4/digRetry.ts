@@ -1,3 +1,4 @@
+import type { StartPaths } from "@debateai/contract";
 import { sameItemText } from "./askText.js";
 import { findOpenQuestion } from "./mapModel.js";
 import { openPick, suggestionPick } from "./suggestions.js";
@@ -18,8 +19,11 @@ import type { DigLink, DigMode, DigTarget, DigView, PendingDig, V4DigPick, V4Map
 
 /** What a failed dig's panel offers. */
 export type DigRetry =
-  /** "Try this dig again": this target, with this mode (null: unknown, the page's own choice then). */
-  | Readonly<{ kind: "OFFER"; target: DigTarget; mode: DigMode | null }>
+  /**
+   * "Try this dig again": this target, with this mode (null: unknown, the page's own choice then). V4 start step, Task 79
+   * review: `paths`, the paths a path debate's dig went with (DIG_PICKS), sent again with it; absent, none were sent or known.
+   */
+  | Readonly<{ kind: "OFFER"; target: DigTarget; mode: DigMode | null; paths?: StartPaths }>
   /** The same dig failed twice: "This keeps failing. Write your report…". */
   | Readonly<{ kind: "KEEPS_FAILING" }>
   /** A later try of the same dig is running or done: nothing more is offered here. */
@@ -31,8 +35,8 @@ const NONE: DigRetry = Object.freeze({ kind: "NONE" });
 const RETRIED: DigRetry = Object.freeze({ kind: "RETRIED" });
 const KEEPS_FAILING: DigRetry = Object.freeze({ kind: "KEEPS_FAILING" });
 
-/** A dig as sent, remembered for this visit. */
-export type SentDig = Readonly<{ target: DigTarget; mode: DigMode }>;
+/** A dig as sent, remembered for this visit (Task 79 review: with the paths it went with, when it sent any). */
+export type SentDig = Readonly<{ target: DigTarget; mode: DigMode; paths?: StartPaths }>;
 
 function oneLine(text: string): string {
   return text.replace(/\s+/gu, " ").trim();
@@ -96,13 +100,15 @@ export function digRetryOf(dig: DigView, digs: readonly DigView[], map: V4Map, s
   const later = at === -1 ? [] : digs.slice(at + 1).filter((other) => sameDig(other.link, dig.link));
   if (later.some((other) => other.state !== "FAILED")) return RETRIED;
   if (same.filter((other) => other.state === "FAILED").length >= 2) return KEEPS_FAILING;
-  if (sent !== null) return Object.freeze({ kind: "OFFER", target: sent.target, mode: sent.mode });
+  if (sent !== null) {
+    return Object.freeze({ kind: "OFFER", target: sent.target, mode: sent.mode, ...(sent.paths === undefined ? {} : { paths: sent.paths }) });
+  }
   const target = rebuildDigTarget(dig.link, map);
   if (target === null || !asksTheSame(target)) return NONE;
   return Object.freeze({ kind: "OFFER", target, mode: dig.link.mode });
 }
 
-/** The pending dig a retry makes: the same target and mode, through the usual Undo window. */
+/** The pending dig a retry makes: the same target, mode and paths (Task 79 review), through the usual Undo window. */
 export function retryPending(offer: Extract<DigRetry, { kind: "OFFER" }>, mode: DigMode, now: number, undoMs: number): PendingDig {
-  return Object.freeze({ target: offer.target, mode, sendsAt: now + undoMs });
+  return Object.freeze({ target: offer.target, mode, sendsAt: now + undoMs, ...(offer.paths === undefined ? {} : { paths: offer.paths }) });
 }

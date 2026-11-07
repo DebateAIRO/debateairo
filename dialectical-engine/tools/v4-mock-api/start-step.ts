@@ -478,8 +478,18 @@ export function startStepUsedPercent(): number {
 
 type Schema = { safeParse(value: unknown): { success: boolean; error?: unknown } };
 
+/**
+ * Whether each request is logged. server.ts turns it on unless MOCK_QUIET=1 (only server.ts and check.ts read the environment, the source
+ * law's two named local readers, tools/orphan-audit); a test that imports this module alone logs nothing.
+ */
+let logging = false;
+
+export function setStartStepLogging(on: boolean): void {
+  logging = on;
+}
+
 function logRequest(path: string, status: number, note = ""): void {
-  if (process.env.MOCK_QUIET === "1") return;
+  if (!logging) return;
   process.stderr.write(`[mock] POST ${path} ${String(status)}${note === "" ? "" : ` ${note}`}\n`);
 }
 

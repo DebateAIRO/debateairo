@@ -253,6 +253,23 @@ function keptReading(kept: V4StartKept, line: string, level: ReadingLevel): Read
 }
 
 /**
+ * Review (wave 16; saved-questions spec §3.2, "the combined questions already written, so that Undo and combine again stays
+ * free"): the AI's combined words a kept plan holds, on the list, under "+ N more" and in every Undo step, by their members, so
+ * the restored reading knows them as the reading that wrote them did: combining the same paths again after Undo takes them at
+ * once, with no call. The plan's own paths win over its Undo steps.
+ */
+function keptWritten(plan: PathPlan): ReadonlyMap<string, Written> {
+  const written = new Map<string, Written>();
+  for (const step of [...plan.undo, plan]) {
+    for (const path of [...step.paths, ...step.more]) {
+      if (path.wording !== "COMBINED" || path.combineRef === null) continue;
+      written.set(combineMembersKey(pathPlanCombineMembers(path)), { title: path.title, question: path.question, combineRef: path.combineRef });
+    }
+  }
+  return written;
+}
+
+/**
  * Task 76e: how a reading ended, as saved: READY with a list (a stale reading keeps its paths, so it counts as READY when it
  * holds a menu); NONE with no list; LEFT_EARLY while the AIs were still reading, or a kept step 2 left before its list.
  */
@@ -666,6 +683,7 @@ export function useStartPaths(input: V4StartPathsInput): V4StartCardState {
     opened.current = kept;
     stop();
     const run = freshRun();
+    for (const [members, words] of keptWritten(kept.plan)) run.written.set(members, words);
     runRef.current = run;
     const restored = keptReading(kept, questionLine, latest.current.readingLevel);
     readingRef.current = restored;

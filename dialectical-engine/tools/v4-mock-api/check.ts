@@ -614,11 +614,37 @@ await step("a failed dig per reason group, and a failed question that used some 
   must(new Set(links.children.map((link: Loose) => [...link.places].sort().join(" "))).size === links.children.length, "each failed dig digs its own place");
   const some: Loose = await mock(`/__mock/draft/v1/runs/${RUNS.failedSome}`);
   must(some.state === "FAILED" && some.quota_used === "SOME", "the second failed question's draft view says it used some");
-  // V4 start step, Task 57e: the contract's run read says it kept what ran for the next try; the first failed question kept nothing.
+  // V4 start step, Task 57g (Task 57e's `reusable`, renamed): the contract's run read says it can continue; so does the first failed
+  // question's (its models gone at claim is a stop of ours, which the API continues: review of 57g), with nothing used.
   const someRead: Loose = await client.readRun(RUNS.failedSome);
-  must(someRead.reusable === true, "the second failed question's run read says what ran is kept for the next try");
-  must((await client.readRun(RUNS.failed) as Loose).reusable === undefined, "the first failed question kept nothing for the next try");
-  return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}, reusable ${String(someRead.reusable)}`;
+  must(someRead.continuable === true, "the second failed question's run read says it can continue where it stopped");
+  const firstRead: Loose = await client.readRun(RUNS.failed);
+  must(firstRead.continuable === true && firstRead.quota_used === "NONE", "the first failed question can continue too, with nothing used");
+  return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}, continuable ${String(someRead.continuable)}`;
+}, (value: string) => value);
+// V4 start step, Task 57g (the owner's 7 Nov answers): "Continue where it stopped". A failed run the API refuses too (the dig an update set
+// aside) is refused; the second failed question runs again (a second press while it runs is CONTINUING too), then finishes; failed=RESET
+// puts it back as seeded, for the click-test.
+await step("a failed question continues where it stopped, then finishes (Task 57g; failed=RESET)", async () => {
+  const press = (id: string) => fetch(`${MOCK}/v1/runs/${id}/continue`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const refused = await press(FAILED_DIGS.find((dig) => dig.kind === "SET_ASIDE")!.runRef);
+  must(refused.status === 409 && (await refused.json()).error === "RUN_NOT_CONTINUABLE", "a debate an update set aside cannot continue");
+  const first = await press(RUNS.failedSome);
+  must(first.status === 200 && (await first.json()).state === "CONTINUING", "Continue continues the second one");
+  const running: Loose = await client.readRun(RUNS.failedSome);
+  must(running.state === "RUNNING" && running.continuable === undefined && running.quota_used === undefined, "it runs again");
+  const again = await press(RUNS.failedSome);
+  must(again.status === 200 && (await again.json()).state === "CONTINUING", "a second press while it runs is CONTINUING");
+  let state: string = running.state;
+  for (let waited = 0; state !== "SETTLED" && waited < 90; waited += 1) {
+    await sleep(1_000);
+    state = (await client.readRun(RUNS.failedSome) as Loose).state;
+  }
+  must(state === "SETTLED", "then it finishes");
+  await mock("/__mock/set?failed=RESET");
+  const reset: Loose = await client.readRun(RUNS.failedSome);
+  must(reset.state === "FAILED" && reset.continuable === true, "failed=RESET puts it back as seeded");
+  return `refused the set-aside dig, continued 4500…45 to ${state}, reset to ${String(reset.state)}`;
 }, (value: string) => value);
 
 // Owner's screen review, 3 Nov 2026 (journey-d2, journey-f16, wait-f7): when a question started, for "Started 14:31" on any

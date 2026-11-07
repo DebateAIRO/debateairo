@@ -731,7 +731,19 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // shown at the click-test.
   "v4.start.drop.add",
   "v4.start.drop.combine",
-  "v4.start.drop.ownPath"
+  "v4.start.drop.ownPath",
+  // V4 start step, Task 79 (spec 2026-11-03 §4.4; dig-f35, owner answer Q18 A): a dig's overlap suggestion (row D's tested
+  // words), its two buttons, the 7-path line and the path-length line (draft wording), shown at the click-test.
+  "v4.digPaths.overlap",
+  "v4.digPaths.overlapCombine",
+  "v4.digPaths.keepApart",
+  "v4.digPaths.full",
+  "v4.digPaths.ownTooLong",
+  // V4 start step, Task 57g (the owner's 7 Nov answers, his card "Button on the stopped page"): the stopped page's "Continue where it
+  // stopped", its line when some quota was used, and "Ask this again" as "Change the question" (draft wording), shown at the click-test.
+  "v4.failed.continue",
+  "v4.failed.continueLine",
+  "v4.failed.changeQuestion"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {

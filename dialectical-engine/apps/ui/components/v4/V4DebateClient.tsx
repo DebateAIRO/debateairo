@@ -18,6 +18,7 @@ import { V4BottomStack, type V4BarJob } from "@/components/v4/V4BottomStack";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import type { V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigTray, V4PicksList } from "@/components/v4/V4DigTray";
+import { useDigPaths } from "@/components/v4/V4DigPaths";
 import { V4DigNotes, V4DigStartingLine } from "@/components/v4/V4DigUndo";
 import { V4FailedScreen } from "@/components/v4/V4FailedScreen";
 import { V4Header } from "@/components/v4/V4Header";
@@ -45,6 +46,7 @@ import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard"
 import { V4PathList, V4SkipToAnswer, V4WhereBar } from "@/components/v4/V4MapPlace";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { useMapView } from "@/components/v4/useMapView";
+import { useStoppedContinue } from "@/components/v4/useStoppedContinue";
 import { V4Steps } from "@/components/v4/V4Steps";
 import { useV4Ready } from "@/components/v4/useV4Ready";
 import { useMapReport } from "@/components/v4/useMapReport";
@@ -63,7 +65,8 @@ import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { panelDigsPicks, trayShows } from "@/lib/v4/digDock";
 import { askAgainHref } from "@/lib/v4/failedRun";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
-import { useClaimDigNotes, waitingDigFor } from "@/lib/v4/digUndo";
+import { DIG_UNDO_MS, useClaimDigNotes, waitingDigFor } from "@/lib/v4/digUndo";
+import { isPathsParent } from "@/lib/v4/digPathPlan";
 import { startedThisVisit, useDigQueue } from "@/lib/v4/useDigQueue";
 import { useFailedDigs } from "@/lib/v4/useFailedDigs";
 import { useParentDigRetry, type ParentDigRetryReads } from "@/lib/v4/useParentDigRetry";
@@ -835,8 +838,16 @@ function V4Debate({
   // Independent review (Task 79b): an open question picked stays a place in the dig's question, never a path (spec 2026-11-03 §4.4;
   // the ask sends it in `places`, not in `picks`, so the server makes no path of it), so it is not counted; a dig of open questions
   // alone sends no picks and is today's dig, with today's single share.
-  const digPathPicks = draft.picks.filter((pick) => pick.kind !== "OPEN").length;
-  const digPaths = served?.answer.branches !== undefined && digPathPicks > 0 ? digPathPicks : undefined;
+  // V4 start step, Task 79 (spec §4.4, dig-f35; answer Q19): the count is the dig plan's paths (components/v4/V4DigPaths.tsx
+  // useDigPaths: the picks that are not open questions, as the person combined and split them), which travels with the draft.
+  // Coordinator ruling (7 Nov, the wave-16 review of Task 79): where the start step runs, the server argues EVERY dig of picks as paths,
+  // an R22 debate's too (apps/api/src/index.ts digRuns), and its room read then names a share per path count; so the page follows it.
+  const digPathsParent = served !== null && (isPathsParent(served.answer) || digRoomRead?.dig_share_by_paths !== undefined);
+  const digPathPlan = useDigPaths({
+    pathsParent: digPathsParent, parentRunId: servedRunId === null || !canDig ? null : servedRunId,
+    freePlan: ask.planTier === "free", planTier: ask.planTier, readingLevel, draft, draftRef, commitDraft, holding: picksUndo.offered
+  });
+  const digPaths = digPathPlan.pathCount;
   const digQuota = useMemo((): Readonly<{ quota: V4DigQuota; room: typeof digRoomRead }> => {
     const line = digPaths === undefined || digRoomRead?.dig_share_by_paths === undefined ? null : digShareLine(digRoomRead, digPaths);
     const percent = typeof line?.values.percent === "number" ? line.values.percent : null;
@@ -1197,37 +1208,46 @@ function V4Debate({
   const mainQuestionPicks = useMemo(() => (served === null ? [] : digSuggestionsWithMore(served.answer, [])), [served]);
   const choice = useMemo<V4DigChoice | undefined>(() => {
     if (map === null) return undefined;
+    // Task 79 (spec §4.4): on a path debate one more pick that makes a path than the dig may look into is refused (PATHS_FULL).
+    const pathPicks = (picks: readonly V4DigPick[]): number => picks.filter((pick) => pick.kind !== "OPEN").length;
     const keep = (change: Readonly<{ draft: V4DigDraft; refused: ReturnType<typeof pickRefusal> }>) => {
-      if (change.refused === null) commitDraft(change.draft);
-      return change.refused;
+      if (change.refused !== null) return change.refused;
+      if (digPathPlan.newPickRefusal !== null && pathPicks(change.draft.picks) > pathPicks(draftRef.current.picks)) return digPathPlan.newPickRefusal;
+      commitDraft(change.draft);
+      return null;
     };
     return {
       draft,
       planTier,
       canDig,
       digHereToo: (pathId: string) => canDig && (isDigMap || digsUnder(map, digs, pathId).length > 0),
-      refusalFor: (group: string | null) => pickRefusal(draft, group, planTier),
+      refusalFor: (group: string | null, makesPath?: boolean) =>
+        pickRefusal(draft, group, planTier) ?? (makesPath === true ? digPathPlan.newPickRefusal : null),
       onToggleSuggestion: (pathId: string, suggestion: DigSuggestion) => {
-        if (canDig) keep(toggleDraftPick(draftRef.current, suggestionPick(pathId, suggestion), planTier));
+        if (canDig) keep(toggleDraftPick(draftRef.current, suggestionPick(pathId, suggestion), planTier, digPathsParent));
       },
-      onEditPick: (key: string, text: string) => keep(editPick(draftRef.current, key, text)),
+      onEditPick: (key: string, text: string) => keep(editPick(draftRef.current, key, text, digPathsParent)),
       onAddOwnView: (pathId: string, text: string) => {
         ownViewSerial.current += 1;
-        return keep(addPick(draftRef.current, ownViewPick(pathId, text, ownViewSerial.current), planTier));
+        return keep(addPick(draftRef.current, ownViewPick(pathId, text, ownViewSerial.current), planTier, digPathsParent));
       },
       onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
       onClear: clearPicks,
       mainQuestionPicks,
       onToggleMainPick: (pick: V4DigPick) => {
-        if (canDig) keep(toggleDraftPick(draftRef.current, pick, planTier));
+        if (canDig) keep(toggleDraftPick(draftRef.current, pick, planTier, digPathsParent));
       },
       typed,
       // dig-f5: where the picks wait, by name, with [Go to them] (the path, or the main question for its own open questions).
       ...(picksPlaceOf(map, draft, catalog, select) ?? {}),
       // journey-f20 / dig-f26 / public-f26: the own-view box's one grey line when what is typed there will be public.
-      ...(publicLine === null ? {} : { publicLine })
+      ...(publicLine === null ? {} : { publicLine }),
+      // Task 79 (dig-f35): a path debate's dig, and its path rows under the picks.
+      pathsParent: digPathsParent,
+      ...(digPathPlan.rows === null ? {} : { digPaths: { ...digPathPlan.rows, locale } })
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, publicLine, mainQuestionPicks]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, publicLine, mainQuestionPicks, digPathsParent,
+    digPathPlan.newPickRefusal, digPathPlan.rows, locale]);
   // ── The dig flow (dig-d3 B, owner pick 3 Nov): lib/v4/useDigQueue.tsx ──────────────────────────────────────────
   // A dig waiting out its 10 seconds belongs to the whole V4 site, not to this page (lib/v4/digUndo.ts, memory only): it
   // keeps its own Undo when the person digs again or opens another page, and the other dig buttons stay active. Its
@@ -1240,9 +1260,26 @@ function V4Debate({
   const digQueue = useDigQueue({
     map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
     setVisitLinks, ask, onCounting: dismissPicksUndo, aboutOf: (target) => digAboutLine(target, catalog),
-    digsRest: report.digsRest, catalog, locale
+    // Task 79 review: a combined question written during the dig's 10 seconds goes with it.
+    digsRest: report.digsRest, settlePaths: digPathPlan.settledPaths, catalog, locale
   });
-  const { waitingDigs, queueDig, startDig, undoDig } = digQueue;
+  const { waitingDigs, queueDig, undoDig } = digQueue;
+  // V4 start step, Task 79 (dig-f35, r2-22): a dig of the draft's picks on a path debate goes with its path plan (DIG_PICKS) through
+  // the shared 10-second Undo, unchanged; the words the person wrote on its rows get the crisis check at the press, as their own
+  // views do (V, 2026-09-30). Every other dig is today's.
+  const { startPathsFor, ownWords: digRowWords } = digPathPlan;
+  const startPicksDig = digQueue.startDig;
+  const offerCrisisHelp = ask.offerCrisisHelp;
+  const startDig = useCallback((target: DigTarget): void => {
+    const paths = startPathsFor(target);
+    if (paths === undefined) {
+      startPicksDig(target);
+      return;
+    }
+    const written = digRowWords();
+    if (written.length > 0 && offerCrisisHelp(written)) return;
+    queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + DIG_UNDO_MS, paths });
+  }, [startPathsFor, digRowWords, startPicksDig, offerCrisisHelp, queueDig, sentDigMode]);
   // Task 62 (journey-f13, r2-22): a chosen path's one dig button digs deeper into it, and a "+ N more" item is dug as a MORE
   // pick of the main question; both through the shared Undo note (nothing is sent for 10 seconds), once the answer is served.
   const digDeeper = useMemo(() => (map === null || !canDig ? undefined : (pathId: string): void => {
@@ -1419,6 +1456,12 @@ function V4Debate({
     runId, failed: load?.kind === "RUN" && load.run.state === "FAILED" && (isDigPage || recordParent !== null),
     parentRunId: parent?.runId ?? null, index, indexSettled, visit: visitAll, catalog, locale, reads: PARENT_RETRY_READS
   });
+  // V4 start step, Task 57g (the owner's 7 Nov answers): "Continue where it stopped" on a question that did not finish, when its read says
+  // `continuable`: the 10-second Undo, then the same debate continues on this page (components/v4/useStoppedContinue.tsx).
+  const stoppedContinue = useStoppedContinue({
+    runId, run: load?.kind === "RUN" ? load.run : null, loaded: load !== null, dig: isDigPage || recordParent !== null, room: ask.room,
+    reread: () => setLoadAttempt((count) => count + 1), catalog, locale
+  });
 
   // ── The map as shown (V4 screen review, 3 Nov): components/v4/useMapView.ts ─────────────────────────────────────
   // The star moved off what is dug (map-f5), the cards that turn over (dig-d4 B), the answer card's fold (map-d1), the
@@ -1521,6 +1564,8 @@ function V4Debate({
                 ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, debateLevel) }
                 : null}
               {...(parentRetry === undefined ? {} : { digRetry: parentRetry })}
+              // Task 57g: "Continue where it stopped" only when the read says `continuable` ("Ask this again" then says "Change the question").
+              {...(stoppedContinue.offered ? { onContinue: stoppedContinue.press, continueNote: stoppedContinue.note } : {})}
               catalog={catalog}
               homeCatalog={homeCatalog}
             />

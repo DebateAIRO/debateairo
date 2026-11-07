@@ -553,6 +553,30 @@ describe("useStartPaths: the reading Task 76f saves, and a kept step 2", () => {
     expect(server.merges).toEqual([]);
   });
 
+  // Review (wave 16; saved-questions spec §3.2: "the combined questions already written, so that Undo and combine again stays
+  // free"): a kept combined path's AI words are known to the reading again, so combining the same paths after Undo asks no AI.
+  it("kept: Undo, then combining the same paths again takes the kept AI words at once, with no combine call", async () => {
+    await probe({ ...BASE, kept: keptOf() });
+    expect(card!.plan!.paths.filter((path) => path.wording === "COMBINED")).toHaveLength(1);
+    const steps = card!.plan!.undo.length;
+    expect(steps).toBeGreaterThan(0);
+    await act(async () => { for (let step = 0; step < steps; step += 1) card!.dispatch({ type: "UNDO" }); });
+    await settle();
+    expect(card!.plan!.undo).toEqual([]);
+    expect(card!.plan!.paths.filter((path) => path.wording === "COMBINED")).toEqual([]);
+    await act(async () => {
+      card!.dispatch({ type: "SELECT", key: "kp01" });
+      card!.dispatch({ type: "SELECT", key: "kp02" });
+      card!.dispatch({ type: "COMBINE_SELECTED" });
+    });
+    await settle();
+    const again = card!.plan!.paths.filter((path) => path.wording !== "AI");
+    expect(again).toHaveLength(1);
+    expect(again[0]).toMatchObject({ wording: "COMBINED", title: "Hard weeks and using less",
+      question: "How would Romania get through its hardest weeks?", combineRef: "cmb.sig" });
+    expect(server.combines).toEqual([]);
+  });
+
   it("kept: NONE and LEFT_EARLY open with no list, Start works, and nothing is posted", async () => {
     await probe({ ...BASE, kept: keptOf(shapedPlan(), { menu: null, end: "NONE", noneReason: "DEADLINE", lateLists: [] }) });
     expect(card!.phase).toBe("NONE");

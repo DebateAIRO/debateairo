@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { RunProjection } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { ownWords } from "@/lib/v4/askText";
 import type { DigRetry } from "@/lib/v4/digRetry";
-import { digFailureMessage, failedQuotaKey } from "@/lib/v4/failedRun";
+import { digFailureMessage, failedQuotaKey, quotaSomeUsed } from "@/lib/v4/failedRun";
 
 /*
  * Owner review 3 Nov 2026 (wait-f11, map-f30): the page of a debate that did not finish. Its plain reason sentence (one of
@@ -31,9 +32,16 @@ import { digFailureMessage, failedQuotaKey } from "@/lib/v4/failedRun";
  * it again in a while." here too, as in its panel. The page says what the parent map offers (`digRetry`, worked out by the
  * page from the map's digs: the start-step session's wiring): "You can try this dig again from the map." only when the map
  * offers that try; absent, the page is as it was.
+ * V4 start step, Task 57g (the owner's 7 Nov answers; agreed with the review session, which owns this screen's words): two optional props.
+ * Given `onContinue` (the page gives it only when the run read says `continuable`), a question's page draws the primary button "Continue
+ * where it stopped" and "Ask this again" says "Change the question" (the same link, the plain button beside it). The line under the button
+ * ("What already ran is kept. Continuing pays only for what has not run yet.") shows only when the server says some quota was used; with
+ * none, the screen keeps only "Nothing was taken for the failed try." (never both lines). Without `onContinue` the screen is as before.
  */
 
-export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, picksKept = false, digRetry, catalog, homeCatalog }: Readonly<{
+export function V4FailedScreen({
+  run, askAgainHref, askHref, classicHref, dig, picksKept = false, digRetry, onContinue, continueNote, catalog, homeCatalog
+}: Readonly<{
   run: RunProjection;
   /**
    * The ask step, filled from this debate (lib/v4/failedRun.ts askAgainHref). Task 75d: its words and its reading level are read
@@ -63,10 +71,18 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
    * Ignored for a first question.
    */
   digRetry?: DigRetry["kind"];
+  /**
+   * Task 57g: "Continue where it stopped", pressed (the page's 10-second Undo comes first, then POST /v1/runs/{id}/continue). Absent:
+   * no button, no line, and "Ask this again" as before. Ignored for a dig.
+   */
+  onContinue?: () => void;
+  /** Task 57g: what a press of it shows right under the button (the shared Undo note, then its outcome). Only with `onContinue`. */
+  continueNote?: ReactNode;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
 }>) {
   const quotaKey = failedQuotaKey(run, dig !== null);
+  const continuing = onContinue !== undefined;
   const keepsFailing = digRetry === "KEEPS_FAILING";
   const mapOffersTry = digRetry === undefined || digRetry === "OFFER";
   return (
@@ -93,7 +109,16 @@ export function V4FailedScreen({ run, askAgainHref, askHref, classicHref, dig, p
       )}
       {dig === null ? (
         <div className="v4DebFailedAgain">
-          <Link className="v4Btn v4BtnPrimary" href={askAgainHref}>{t(catalog, "v4.debate.askAgain")}</Link>
+          {continuing ? (
+            <>
+              <button type="button" className="v4Btn v4BtnPrimary v4DebFailedContinue" onClick={onContinue}>{t(catalog, "v4.failed.continue")}</button>
+              {continueNote}
+              {quotaSomeUsed(run) ? <p className="v4Muted v4DebFailedNote">{t(catalog, "v4.failed.continueLine")}</p> : null}
+            </>
+          ) : null}
+          <Link className={continuing ? "v4Btn" : "v4Btn v4BtnPrimary"} href={askAgainHref}>
+            {t(catalog, continuing ? "v4.failed.changeQuestion" : "v4.debate.askAgain")}
+          </Link>
           <p className="v4Muted v4DebFailedNote">
             {t(catalog, picksKept ? "v4.debate.askAgainNote" : "v4.debate.askAgainNoteQuestion")}
           </p>

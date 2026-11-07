@@ -87,6 +87,13 @@ export type RunPauseRead = Readonly<{
   planned_calls: number | null; planned_searches: number | null; planned_micros: number | null; paused_at: string | null;
 }>;
 export type DigLevelRead = Readonly<{ run_id: string; parent_run_id: string | null; dig_level: number }>;
+/** V4 start step, Task 57f (0164): a debate as Continue sees it (core.read_run_continue). */
+export type RunContinueRead = Readonly<{
+  state: "NONE" | "OPEN" | "DONE" | "FAILED"; terminal_reason: string | null; content_live: boolean; waived: boolean; settled: boolean;
+  paused: boolean; reopened: boolean;
+}>;
+/** Task 57f (0164): what core.continue_failed_run did. */
+export type RunReopenRead = "RECORDED" | "CONTINUING" | "NOT_FAILED" | "NOT_CONTINUABLE" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED";
 
 export class PostgresDigModelRepository {
   constructor(private readonly pool: Executor) {}
@@ -123,6 +130,25 @@ export class PostgresDigModelRepository {
     : Promise<"RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED" }>(
       "SELECT identity.continue_paused_run_in_release($1,$2,$3,$4) AS outcome", [ownerRef, runId, toReleaseKey, toRegisterVersion])).rows[0]!.outcome;
+  }
+
+  /**
+   * V4 start step, Task 57f (0164's core.read_run_continue): the person's own debate as Continue and its FAILED read see it, codes and flags
+   * only (its newest work item's state and terminal reason, live, set aside, settled, paused, re-opened); null when it is not this account's.
+   */
+  async readRunContinue(ownerRef: string, runId: string): Promise<RunContinueRead | null> {
+    return (await this.pool.query<{ facts: RunContinueRead | null }>("SELECT core.read_run_continue($1,$2) AS facts", [ownerRef, runId]))
+      .rows[0]?.facts ?? null;
+  }
+
+  /**
+   * Task 57f (0164's core.continue_failed_run): the person's Continue on their own FAILED debate: its work item goes back to be claimed and
+   * the re-open is recorded; a debate of an older release moves to `toReleaseKey` (a version this release has passed) in the same transaction.
+   * Whether its stop was ours is the API's rule, asked before this. The room code has already found room.
+   */
+  async continueFailedRun(ownerRef: string, runId: string, toReleaseKey: string | null, toRegisterVersion: number | null): Promise<RunReopenRead> {
+    return (await this.pool.query<{ outcome: RunReopenRead }>("SELECT core.continue_failed_run($1,$2,$3,$4) AS outcome",
+      [ownerRef, runId, toReleaseKey, toRegisterVersion])).rows[0]!.outcome;
   }
 
   /** The release and settings version that own the debate now (0143), for the API's hand-over decision. */

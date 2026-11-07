@@ -212,10 +212,10 @@ export function stripRoom<T extends Json>(room: T): T {
 /**
  * W2-7: without its month pause, a paused debate reads as today's RUNNING; the draft start time (journey-d2) goes too; without
  * `quota_used`, a failed run says nothing of the quota; without `question_share` (map-f9), the map shows no "This question". V4 start step,
- * Task 57e: without `reusable`, a failed run says nothing of what is kept for the next try.
+ * Task 57g: without `continuable` (Task 57e's `reusable`), a failed run offers no "Continue where it stopped".
  */
 export function stripRun<T extends Json>(run: T): T {
-  const { month_pause: _pause, started_at: _started, quota_used: _quota, question_share: _share, reusable: _reusable, ...rest } = run;
+  const { month_pause: _pause, started_at: _started, quota_used: _quota, question_share: _share, continuable: _continuable, ...rest } = run;
   return rest as unknown as T;
 }
 

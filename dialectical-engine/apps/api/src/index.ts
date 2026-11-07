@@ -10,6 +10,8 @@ import {
 } from "./dig-admission.js";
 import { addToResearched } from "./web-researched.js";
 import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader, type RunHandoverPort } from "./month-pause.js";
+// V4 start step, Task 57f: Continue also continues the person's own failed debate where it stopped.
+import { continueFailedRun, failedRunContinuable, type FailedRunContinueOptions } from "./run-continue.js";
 import {
   readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
 } from "./investigation-report.js";
@@ -166,6 +168,8 @@ import {
   INVESTIGATION_REPORT_WRITING,
   RunContinueRefusedSchema,
   RUN_PAUSED_UNTIL_RESET,
+  // V4 start step, Task 57f: Continue's refusals of a failed debate.
+  RunNotContinuedSchema, RUN_CONTINUE_NO_ROOM, RUN_NOT_CONTINUABLE,
   type AskParent,
   // V4 start step, Task 30: the four calls before Start.
   START_PATHS_EXPIRED, START_PATHS_INVALID, START_PATHS_STALE, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema,
@@ -371,8 +375,6 @@ import {
   freeNoticeMissing, startHandOverOf, startQuestionCheckText, startStepOnInView, startTextsOfBody, startWidthsOfView, type StartDig,
   type StartHandOverAtAsk
 } from "./start-paths-at-ask.js";
-// V4 start step, Task 57e: "Ask this again" re-uses what the failed question kept.
-import { askAgainHandOverOf, askAgainOf, readAskAgainSource, type AskAgain, type AskAgainSource } from "./ask-again.js";
 // V4 start step, Task 30: the step behind the four calls before Start, its key and its stream writer.
 import { START_STEP_TIMING, type StartStepTiming } from "@debateai/map";
 import { detectArgumentLanguage } from "@debateai/kernel";
@@ -1882,13 +1884,6 @@ export interface AskApplication {
    * debate (0164); how many. Absent: nothing is given.
    */
   linkPreStartTry?(ownerRef: string, tryRef: string, runId: string): Promise<number>;
-  /**
-   * V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): what one of the person's FAILED first questions kept
-   * for "Ask this again" (./ask-again.ts AskAgainSource: its line with the clarifying answers, its purpose lines, depth and the paths chosen
-   * from the list), read only after that debate's owner-gated read said FAILED; null when it keeps nothing to re-use or cannot be read.
-   * Absent: Ask again is today's ask, and the FAILED read never says `reusable`.
-   */
-  readAskAgain?(ownerRef: string, runId: string): Promise<AskAgainSource | null>;
 }
 
 /** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
@@ -2088,6 +2083,11 @@ export interface ApiOptions {
   readonly continuedRunWake?: ContinuedRunWake;
   /** Decision 12 (./month-pause.ts): where Continue hands a debate of another release; absent: Continue resumes it where it is. */
   readonly runHandover?: RunHandoverPort;
+  /**
+   * V4 start step, Task 57f (./run-continue.ts): Continue on the person's own FAILED debate (0164's read and re-open, and the room for the
+   * rest), and the FAILED read's `continuable`. Absent: Continue is the month wall's alone, and no read says `continuable`.
+   */
+  readonly failedRunContinue?: FailedRunContinueOptions;
   /**
    * R22 W5-1: the final report over an investigation (./investigation-report.ts): 0136's reports read, 0133's open, close
    * and reopen, the ownership check and the opener of what the runner sealed under the ROOT's run key. Absent: the three
@@ -4469,33 +4469,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // V4 start step
     // Task 39e (saved questions spec 2026-11-04 §3.7): the question not started yet this ask starts from is read only by the removal
     // once the ask is accepted (below); it is never handed to `submit`, so never stored with the run, sealed, logged or passed to the runner.
-    // Task 57e: the "Ask this again" link is read the same way: by the route alone, never handed to `submit` with the ask.
-    const { saved_question_id: savedQuestionId, again_of: againOf, ...ask } = parseRequest(AskRequestSchema, request.body);
+    const { saved_question_id: savedQuestionId, ...ask } = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
     // V4 start step, Task 56: everything after the body's checks is the person's own question and dig step (askAsOwner, below,
     // shared with the carry-on); the route sends what it answers.
-    const answered = await askAsOwner(asker, ask, { ...(savedQuestionId === undefined ? {} : { savedQuestionId }),
-      ...(againOf === undefined ? {} : { againOf }) });
+    const answered = await askAsOwner(asker, ask, savedQuestionId === undefined ? {} : { savedQuestionId });
     return reply.status(answered.status).send(answered.body);
   });
-  /**
-   * V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): what the person's own FAILED first question `runId`
-   * kept for "Ask this again" (its owner-gated read first, then the application's read), or null: not theirs, not FAILED, erased, nothing kept,
-   * or anything that cannot be read. Never throws: a link that cannot be honoured is today's ask.
-   */
-  const askAgainSourceOf = async (request: AskerOfRequest, runId: string): Promise<AskAgainSource | null> => {
-    const ownerRef = request.authenticatedSession?.ownerRef;
-    if (ownerRef === undefined || options.application.readAskAgain === undefined) return null;
-    try {
-      const run = await readOwnerRun(options, runId, request.session, ownershipFor(request));
-      if (run?.state !== "FAILED") return null;
-      return await options.application.readAskAgain(ownerRef, runId);
-    } catch {
-      return null;
-    }
-  };
   /**
    * V4 start step, Task 56: POST /v1/asks after the body's checks, as one step the route and the carry-on share: the Free notice
    * lock, Decision 13's public branch, the dig's admission, Task 36's hand-over, the question check, `submit`, the dig's join and
@@ -4503,7 +4485,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * `public_dig_not_joined` included) or REFUSED (the route's refusal; `body.error` is its code). `extras.principal` is set only by
    * the carry-on ports (a server principal's carry-on dig); `extras.savedQuestionId` only by the route.
    */
-  const askAsOwner = async (asker: AskAsker, ask: AskRequest, extras: Readonly<{ savedQuestionId?: string; againOf?: string;
+  const askAsOwner = async (asker: AskAsker, ask: AskRequest, extras: Readonly<{ savedQuestionId?: string;
     principal?: Pick<Extract<AskPrincipal, { kind: "server" }>, "carryOn"> }> = {}): Promise<AskAsOwnerOutcome> => {
     const owner = asker.owner;
     const request: AskerOfRequest = owner === null ? Object.freeze({ session: asker.session }) : Object.freeze({ session: asker.session, authenticatedSession: owner });
@@ -4581,13 +4563,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const digOfStart = digParent !== undefined ? { parentRunId: digParent.parent_run_id, picks: digParent.picks ?? [], own: true }
       : publicAdmission === null ? null : { parentRunId: publicAdmission.parentRunId, picks: publicAdmission.picks, own: false };
     let start: StartHandOverAtAsk | null = null;
-    // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): "Ask this again" on the person's own FAILED first
-    // question that kept the paths chosen from the list, with its line unchanged: the question starts again on what that debate stored (its
-    // clarifying answers, purpose lines, depth and paths), handed over as a Start's verified paths are, with no call before Start, no charge
-    // and no try linked. Anything else ignores the link (today's ask, `ask` as sent).
-    const again: AskAgain | null = extras.againOf === undefined || owner === null || !newQuestion ? null
-      : askAgainOf(ask, await askAgainSourceOf(request, extras.againOf));
-    if (owner !== null && (again !== null || ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
+    if (owner !== null && (ask.start_check !== undefined || ask.start_paths !== undefined || (digOfStart?.picks.length ?? 0) > 0)) {
       const view = await viewOnce();
       // Where the switch is off nothing runs, so no plan is read for a binding (null: a menu is STALE, the rest is today's ask).
       const binding = !startStepOnInView(view) ? null
@@ -4597,16 +4573,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         pickAuthors: Object.freeze(await Promise.all(digOfStart.picks.map(async (pick) => digPickAuthorOf(pick,
           pick.suggestion_id === null || !digOfStart.own ? null : await digSuggestionText(owner.ownerRef, digOfStart.parentRunId, pick.suggestion_id))))) });
       try {
-        if (again !== null) {
-          // Task 57e: the kept paths under the binding Next would derive now; where the step does not run any more, today's ask.
-          const reused = askAgainHandOverOf({ again, binding, view });
-          if (reused !== null) {
-            ask = again.ask;
-            start = Object.freeze({ ...reused, questionEdited: false });
-          }
-        } else {
-          start = startHandOverOf({ key: options.startStepKey, ownerRef: owner.ownerRef, ask, binding, view, dig, now: new Date() });
-        }
+        start = startHandOverOf({ key: options.startStepKey, ownerRef: owner.ownerRef, ask, binding, view, dig, now: new Date() });
       } catch (error) {
         if (error instanceof TypedDomainError && START_PATHS_REFUSAL_STATUS.has(error.code)) {
           return refusedWith({ status: askRefusalStatus(error.code), body: { error: error.code, message: error.code } });
@@ -5382,14 +5349,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A): a failed debate says whether any of the person's quota was used (0164),
       // after its owner-gated read above; nothing is said where the server cannot say. A debate that did not fail reads as before.
       const quotaUsed = await options.application.readRunQuotaUsed?.(runId, ownershipFor(request)) ?? null;
-      // Task 57e (the owner's 6 Nov rule: re-use what was already paid for): it says `reusable` when what already ran is kept for the
-      // person's next try ("Ask this again" would re-use its clarifying answers and paths); nothing when it keeps nothing or cannot be read.
-      const againOwner = request.authenticatedSession?.ownerRef;
-      const readAskAgain = options.application.readAskAgain?.bind(options.application);
-      const reusable = againOwner !== undefined && readAskAgain !== undefined
-        && await Promise.resolve().then(() => readAskAgain(againOwner, runId)).then((source) => source !== null, () => false);
-      const failed = quotaUsed === null && !reusable ? run
-        : RunProjectionSchema.parse({ ...run, ...(quotaUsed === null ? {} : { quota_used: quotaUsed }), ...(reusable ? { reusable: true } : {}) });
+      // Task 57f (the owner's 7 Nov answers: continue where it stopped; 57e's `reusable`, renamed): it says `continuable` exactly when Continue
+      // would continue it (./run-continue.ts, the rule the route shares), as far as the read can know; nothing when it cannot be read.
+      const continueOwner = request.authenticatedSession?.ownerRef;
+      const continueStore = options.failedRunContinue?.store;
+      const continuable = continueOwner !== undefined && continueStore !== undefined
+        && await Promise.resolve().then(() => continueStore.readContinue(continueOwner, runId)).then(failedRunContinuable, () => false);
+      const failed = quotaUsed === null && !continuable ? run
+        : RunProjectionSchema.parse({ ...run, ...(quotaUsed === null ? {} : { quota_used: quotaUsed }), ...(continuable ? { continuable: true } : {}) });
       // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
       if (failed.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
         const found = await options.application.readRunFound(runId);
@@ -5653,6 +5620,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (target === null || options.digModel === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     if (!RunContinueRequestSchema.safeParse(request.body ?? {}).success) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    // V4 start step, Task 57f (./run-continue.ts): the person's own FAILED debate continues where it stopped (re-opened once, then woken), and a
+    // second press while it runs is CONTINUING. A debate neither failed nor re-opened goes on to the month wall's Continue below, unchanged.
+    if (options.failedRunContinue !== undefined) {
+      const failed = await continueFailedRun({ ...target, now: new Date() }, { ...options.failedRunContinue,
+        ...(options.continuedRunWake === undefined ? {} : { wake: options.continuedRunWake }),
+        ...(options.runHandover === undefined ? {} : { handover: options.runHandover }) });
+      switch (failed.kind) {
+        case "NOT_FAILED": break;
+        case "CONTINUING": return reply.send(RunContinuedSchema.parse({ state: "CONTINUING" }));
+        case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+        case "NOT_CONTINUABLE": return reply.status(409).send(RunNotContinuedSchema.parse({ error: RUN_NOT_CONTINUABLE, message: RUN_NOT_CONTINUABLE }));
+        case "NO_ROOM": return reply.status(409).send(RunNotContinuedSchema.parse({ error: RUN_CONTINUE_NO_ROOM, message: RUN_CONTINUE_NO_ROOM }));
+        case "TRY_AGAIN": return reply.status(503).send({ error: "RUN_CONTINUE_TRY_AGAIN", message: "RUN_CONTINUE_TRY_AGAIN" });
+        default: return exhaustive(failed);
+      }
     }
     const room = options.monthRoom ?? Object.freeze({ monthHasRoom: async () => false });
     const outcome = await continuePausedRun({ ...target, now: new Date() }, options.digModel, room, options.continuedRunWake,
@@ -7033,15 +7016,6 @@ export class PostgresAskApplication implements AskApplication {
   /** V4 start step, Task 56: the carry-on's read of a debate's stored ask (its own lease; null: no such run). */
   readStoredAsk(runId: string): Promise<StoredAsk | null> {
     return this.#runs.readStoredAsk(runId);
-  }
-
-  /**
-   * V4 start step, Task 57e: what a FAILED first question of the person kept for "Ask this again" (./ask-again.ts), read only after the
-   * route's owner-gated read: its kept paths (the start paths store, null once erased), its stored ask and its purpose lines. Never throws.
-   */
-  readAskAgain(ownerRef: string, runId: string): Promise<AskAgainSource | null> {
-    return readAskAgainSource({ pool: this.pool, ownerRef, runId, readStoredAsk: (id) => this.#runs.readStoredAsk(id),
-      startPaths: this.settings.startPaths });
   }
 
   async submit(

@@ -1480,6 +1480,29 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_staff_security_owner",
   "source": "migrations/0164_pre_start_release.sql",
   "grants": ["EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"]
+},
+// Task 57f: a failed debate continues where it stopped. The waiver, call by call, for the readers' owner (its readers read it); the facts and
+// the re-open for the API's role alone; the waiver's writer (the runner) and its reader (the subscription reader) for the shared runtime role.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0164_pre_start_release.sql",
+  "grants": ["SELECT ON ledger.model_spend_call_waiver"]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0164_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.read_run_continue(uuid,uuid)",
+    "EXECUTE ON FUNCTION core.continue_failed_run(uuid,uuid,text,bigint)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0164_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
+    "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

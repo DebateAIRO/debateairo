@@ -334,3 +334,24 @@ describe("questions 4 A and 5 B: the dates under a point are long, with the year
     expect(time.textContent).toBe("28 October 2026");
   });
 });
+
+// Independent review (Task 79, wave 16): on a path debate a "+ N more" pick would be one more path of the dig, so a dig already
+// at its most paths closes those boxes (V4MorePickRows asks with makesPath). The visible line above them (dig-f22) says the same
+// reason, the dig's own ("A dig looks into up to 7 paths. …"), never nothing while the boxes are greyed.
+describe("Task 79: the '+ N more' rows of a dig at its most paths say why they are closed", () => {
+  const MORE = (id: string): V4DigPick => ({
+    kind: "MORE", key: `more-${id}`, group: null, more: { id, title: `Made-up left-out path ${id}`, question: `Made-up question ${id}?`, isNew: false }
+  });
+  it("the reason line above the greyed '+ N more' boxes is the dig's PATHS_FULL line", async () => {
+    const map: V4Map = { ...mapWith([]), open: [], paths: [path("b1"), path("b2")] };
+    const draft: V4DigDraft = { group: null, picks: [MORE("kp06")] };
+    const host = await mountPanel(map, "root", "plain", choiceFor(draft, {
+      refusalFor: (group, makesPath) => pickRefusal(draft, group, "premium") ?? (makesPath === true ? "PATHS_FULL" : null),
+      mainQuestionPicks: [MORE("kp06"), MORE("kp07")], onToggleMainPick: noop, pathsParent: true
+    }));
+    const greyed = [...host.querySelectorAll<HTMLInputElement>(".v4MorePick input[type=checkbox]")].filter((box) => box.disabled);
+    expect(greyed).toHaveLength(1);
+    const lines = [...host.querySelectorAll<HTMLElement>(".v4PanelReasonRow .v4PickReason")].map((line) => line.textContent);
+    expect(lines).toEqual([t(catalog, "v4.digPaths.full")]);
+  });
+});

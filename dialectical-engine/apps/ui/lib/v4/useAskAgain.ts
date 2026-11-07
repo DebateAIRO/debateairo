@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { contractClient } from "@/lib/api";
 import type { MessageCatalog } from "@/lib/i18n/translate";
-import { askAgainQuestion, askAgainReuseOf, type AskAgainReuse } from "./failedRun.js";
+import { askAgainContinuable, askAgainQuestion } from "./failedRun.js";
 import type { ReadingLevel } from "./types.js";
 
 /*
@@ -14,9 +14,10 @@ import type { ReadingLevel } from "./types.js";
  * V4 start step, Task 75d (owner, 5 Nov): it also carries the failed debate's own reading level, read back with its words (the
  * run read's `reading_level`); a debate asked without one gives none, so the ask step stays on Plain words. Never from the address.
  *
- * V4 start step, Task 57e (the owner's 6 Nov rule: "re-use what we already paid for"): when the failed debate's read says `reusable`, the
- * re-use link too (`reuse`, failedRun.ts askAgainReuseOf): the ask that sends it as `again_of`, with that line unchanged, starts the question
- * again on its kept clarifying answers and paths, with no call before Start and no new charge. Null: today's "Ask this again".
+ * V4 start step, Task 57g (the owner's 7 Nov answers, replacing Task 57e's re-use link and its `again_of`): whether the stopped debate can
+ * continue where it stopped (`continuable`, failedRun.ts askAgainContinuable). Opened from the stopped page's "Change the question", the
+ * words left as they were then continue that debate on its map, with no reading and no new charge (V4AskClient); changed words are a new
+ * question. False: today's "Ask this again".
  */
 
 /** What "Ask this again" fills in from the earlier debate. */
@@ -25,8 +26,8 @@ export type AskAgain = Readonly<{
   question: string | null;
   /** The level it was asked at (null: asked without one). */
   level: ReadingLevel | null;
-  /** Task 57e: what the failed question kept for the next try (null: nothing; the ask is today's). */
-  reuse: AskAgainReuse | null;
+  /** Task 57g: the server would continue the stopped debate itself (false: the same words are a new question, as before). */
+  continuable: boolean;
 }>;
 
 /** What to fill in from run `runId` (null: none named, not read yet, or unreadable). Never throws. */
@@ -37,7 +38,7 @@ export function useAskAgain(runId: string | null, catalog: MessageCatalog): AskA
     let active = true;
     Promise.resolve().then(() => contractClient.readRun(runId)).then(
       (run) => {
-        if (active) setAgain(Object.freeze({ question: askAgainQuestion(run, catalog), level: run.reading_level ?? null, reuse: askAgainReuseOf(run, catalog) }));
+        if (active) setAgain(Object.freeze({ question: askAgainQuestion(run, catalog), level: run.reading_level ?? null, continuable: askAgainContinuable(run, catalog) }));
       },
       () => { /* quiet: the ask step stays as it is */ }
     );

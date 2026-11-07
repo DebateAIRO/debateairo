@@ -212,6 +212,9 @@
   "v4.debate.failedNothingTaken": "Nothing was taken for the failed try.",
   "v4.debate.failedSomeTaken": "The part that ran used some of your quota.",
   "v4.debate.digFailedBackNote": "You can try this dig again from the map.",
+  "v4.failed.continue": "Continue where it stopped",
+  "v4.failed.continueLine": "What already ran is kept. Continuing pays only for what has not run yet.",
+  "v4.failed.changeQuestion": "Change the question",
   "v4.debate.notFoundTitle": "We couldn't find this question",
   "v4.debate.notFoundBody": "The link may be wrong, or the question may belong to another account.",
   "v4.debate.loadFailedTitle": "We couldn't load this question just now",
@@ -1005,5 +1008,10 @@
   "v4.start.suggest.keepApart": "Keep apart",
   "v4.start.suggest.fits": "“{title}” fits path {n}. Add it there, no extra path.",
   "v4.start.suggest.addTo": "Add to path {n}",
-  "v4.start.suggest.notNow": "Not now"
+  "v4.start.suggest.notNow": "Not now",
+  "v4.digPaths.overlap": "“{a}” and “{b}” overlap. Dig them as one?",
+  "v4.digPaths.overlapCombine": "Combine",
+  "v4.digPaths.keepApart": "Keep apart",
+  "v4.digPaths.full": "A dig looks into up to 7 paths. Combine two of your picks, or remove one.",
+  "v4.digPaths.ownTooLong": "Your view is too long for a path. Keep it under 1,000 characters."
 }

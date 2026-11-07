@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0164_pre_start_release.sql",
-    "sha256": "090f2e378f649a83bc511ae6df47060d3561f9f9bf118001d8d6ee1a7d86c836"
+    "sha256": "dd604ae61ec1584473421ed9506636f2f5c8d37c4d16bb8a38e25e5e08faefd2"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

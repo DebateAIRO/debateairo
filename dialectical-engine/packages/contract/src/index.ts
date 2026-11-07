@@ -55,7 +55,7 @@ import { PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequ
   ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
-  RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
+  RunContinuedSchema, RunNotContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
 export * from "./web.js";
 import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, PublicReportVersionSchema } from "./investigation-report.js";
@@ -323,12 +323,9 @@ export const AskRequestSchema = z.object({
   carry_on_to_report: z.literal(true).optional(),
   // V4 start step, Task 39c (saved questions spec 2026-11-04 §3.7), last: the question not started yet this ask starts from,
   // removed once the debate is accepted. Read only by that removal: never stored with the run, sealed, logged or passed to the runner.
-  saved_question_id: SavedQuestionIdSchema.optional(),
-  // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for), last: "Ask this again" on one of the person's own
-  // FAILED first questions whose read says `reusable`. With the same line, the question starts again on what that debate stored (its
-  // clarifying answers and its paths chosen from the list) with no call before Start; otherwise the link is ignored (today's ask). Read only
-  // by the asks route: never stored with the run, sealed, logged or passed to the runner.
-  again_of: z.uuid().optional()
+  saved_question_id: SavedQuestionIdSchema.optional()
+  // V4 start step, Task 57f (the owner's 7 Nov answers): Task 57e's `again_of` (a new debate on what a failed question kept) is gone; the
+  // same failed debate continues instead (POST /v1/runs/{id}/continue), and changed words are a new question, charged as new.
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -1050,10 +1047,11 @@ export const RunProjectionSchema = z.object({
   // quota. NONE: nothing was taken (its path-list charge was given back, 0164, and nothing else ran); SOME: some was. Absent on every
   // other run, and where the server cannot say, so an older reader still parses.
   quota_used: z.enum(["NONE", "SOME"]).optional(),
-  // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for), last: true when what already ran is kept for the
-  // person's next try: this FAILED first question is theirs, not erased, and keeps the paths chosen from the list, so "Ask this again"
-  // (`again_of`) starts it again on its clarifying answers and those paths at no new charge. Absent otherwise.
-  reusable: z.literal(true).optional()
+  // V4 start step, Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again"; Task 57e's
+  // `reusable`, renamed), last: true when POST /v1/runs/{id}/continue would continue this FAILED debate, as far as the read can know: it is
+  // the person's own, a first question or a dig, its content live, its stop ours (never their own act, a spending wall or a step's tries
+  // used up), not set aside by an upload, and not re-opened since it failed. Absent otherwise (the press is then 409 RUN_NOT_CONTINUABLE).
+  continuable: z.literal(true).optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
@@ -1061,8 +1059,8 @@ export const RunProjectionSchema = z.object({
   if (run.quota_used !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", path: ["quota_used"], message: "only a failed debate says whether any quota was used" });
   }
-  if (run.reusable !== undefined && run.state !== "FAILED") {
-    context.addIssue({ code: "custom", path: ["reusable"], message: "only a failed debate keeps what ran for the next try" });
+  if (run.continuable !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["continuable"], message: "only a failed debate continues where it stopped" });
   }
   if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
     context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
@@ -2232,6 +2230,8 @@ export const contractInventory = Object.freeze({
     StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
     // V4 start step, Task 39e: the saved-question routes' requests (the first and later saves) and answers (the list, Pick up, a save).
     SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema,
+    // V4 start step, Task 57f: Continue's refusals of a failed debate it cannot continue, or with no room left for the rest.
+    RunNotContinuedSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

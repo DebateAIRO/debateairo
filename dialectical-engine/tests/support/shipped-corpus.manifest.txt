@@ -19,7 +19,6 @@ apps/api/src/active-settings-version.ts
 apps/api/src/admission-alarm.ts
 apps/api/src/admission-settings.ts
 apps/api/src/admission.ts
-apps/api/src/ask-again.ts
 apps/api/src/ask-billing.ts
 apps/api/src/ask-clarify.ts
 apps/api/src/ask-model-picker.ts
@@ -188,6 +187,7 @@ apps/api/src/release-loops.ts
 apps/api/src/release-state.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
+apps/api/src/run-continue.ts
 apps/api/src/run-event-tail.ts
 apps/api/src/saved-questions/routes.ts
 apps/api/src/saved-questions/service.ts
@@ -723,6 +723,7 @@ apps/ui/components/v4/V4ChoiceChips.tsx
 apps/ui/components/v4/V4ContributionNote.tsx
 apps/ui/components/v4/V4DebateClient.tsx
 apps/ui/components/v4/V4DigFailed.tsx
+apps/ui/components/v4/V4DigPaths.tsx
 apps/ui/components/v4/V4DigRunning.tsx
 apps/ui/components/v4/V4DigSeed.tsx
 apps/ui/components/v4/V4DigSuggest.tsx
@@ -778,6 +779,7 @@ apps/ui/components/v4/digAbout.tsx
 apps/ui/components/v4/mapDigHelpers.ts
 apps/ui/components/v4/useMapReport.tsx
 apps/ui/components/v4/useMapView.ts
+apps/ui/components/v4/useStoppedContinue.tsx
 apps/ui/components/v4/useV4Ready.tsx
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
@@ -1010,6 +1012,7 @@ apps/ui/lib/v4/clarifyWait.ts
 apps/ui/lib/v4/clock.ts
 apps/ui/lib/v4/digDock.ts
 apps/ui/lib/v4/digIndex.ts
+apps/ui/lib/v4/digPathPlan.ts
 apps/ui/lib/v4/digProgress.ts
 apps/ui/lib/v4/digQuota.ts
 apps/ui/lib/v4/digRetry.ts

@@ -1652,7 +1652,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * Paid-plans spec §2.4.2 (B6), with the money rule's PATH_REWRITE (W3-2): the FROM and WHERE of one person's
    * subscription spend in [$2, $3): the RUN, STORY and PATH_REWRITE charges of the runs `billing.run_charge_scope` pins to
    * owner $1 on a subscription, admitted before $3, a premium run removed by its synthesis check excepted, no waiver
-   * (side-by-side C10). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
+   * (side-by-side C10), nor a call the site took over (V4 start step, Task 57f: an earlier copy's charge for a call a continued debate had to
+   * buy again, 0164's call waiver, read through its one definer). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
    * `billing.read_internal_grant_spent` (the internal branch) counts the same kinds since the drained step 0140.
    */
   static readonly #ownerSpendFrom = `FROM billing.run_charge_scope AS scope
@@ -1669,7 +1670,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          AND scope.admitted_at < $3
          AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3
-         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`;
+         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)
+         AND NOT EXISTS (SELECT 1 FROM unnest(ledger.call_waived_attempts($1::uuid)) AS waived(attempt_id) WHERE waived.attempt_id = spend.attempt_id)`;
 
   /**
    * The money rule (owner, 31 Oct): the person's spend in each of several windows of one month, in ONE query, for the

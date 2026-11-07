@@ -25,6 +25,7 @@ import {
   type StoredStartPathSet
 } from "@debateai/db";
 import {
+  RUN_STOPS_NOT_OURS,
   WorkItemRepository,
   assertClaimCoversCall,
   type TerminalCompletionDeclaration
@@ -334,7 +335,7 @@ import {
 import { purposeLinesOf } from "./path-rewrite-sources.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
-import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, RUN_HANDOVER_IMPOSSIBLE, type ReplayBook } from "./run-replay.js";
+import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, RUN_HANDOVER_IMPOSSIBLE, waiveRedoneCalls, type ReplayBook } from "./run-replay.js";
 import { holdRunPassages, passageRecordedRequest, releaseRunPassages } from "./passage-record.js";
 import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
@@ -6252,9 +6253,12 @@ export class WalkingSkeletonRunner {
       workItemId: claimed.workItemId, workerId: settings.workerId,
       heldUntil: keepAlive.heldUntil(), claimMs: settings.claimMs
     });
+    // V4 start step, Task 57f (the owner's 7 Nov answers: "Only if we can't re-use, then we need to pay for this ourselves"): a call an earlier
+    // copy paid for that this copy must buy again (no answer, or one that no longer answers it) is the site's: its earlier charge is waived.
+    const waiveCalls = (runId: string, attemptIds: readonly string[]) => waiveRedoneCalls(this.pool, runId, attemptIds).then(() => undefined);
     const replayedMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
-      if (replayBook.pending === 0) return maker;
-      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay);
+      if (replayBook.pending === 0 && (replayBook.redoCredits ?? 0) === 0) return maker;
+      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay, waiveCalls);
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));
@@ -14390,16 +14394,9 @@ const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
  * step's tries used up), and every spending wall (the person's quota, the site's day, the debate's money ceiling, a team grant that is gone).
  * A crisis stop and a refused question never reach a runner (the asks route answers them before any debate exists); the month wall's planned
  * stop and the other stops that leave the work item alone are never recorded at all (LEAVES_WORK_ITEM_ALONE).
+ * Task 57f: the list is the work package's RUN_STOPS_NOT_OURS, which Continue reads too (a failed debate continues only on a stop of ours).
  */
-const NEVER_RETRIED: ReadonlySet<string> = new Set([
-  "PRIVATE_CONTENT_ERASED",
-  "RUN_CEILING_BELOW_FIRST_CALL",
-  "CALL_BUDGET_EXHAUSTED",
-  "PERSON_ALLOWANCE_REACHED",
-  "DAILY_COST_ENVELOPE_REACHED",
-  "RUN_COST_ENVELOPE_MONEY_REACHED",
-  "INTERNAL_FUNDING_UNAVAILABLE"
-]);
+const NEVER_RETRIED: ReadonlySet<string> = RUN_STOPS_NOT_OURS;
 
 /**
  * V4 start step, Task 57e: whether a debate's stop is ours and earns its one automatic retry: a provider out (PROVIDER_CALL_FAILED), an AI's

@@ -405,11 +405,12 @@ function WhereToDig(props: Readonly<{
   // dig-f22: the visible reason sits right above the first box greyed for it (each question is its own group here, since
   // the main question's list can hold the starred question of a path beside its own). Independent review (Task 76k): on a
   // path debate the "+ N more" rows come first, so when they are greyed the line (with question 26 A's buttons) sits above
-  // them, once, and not again above an open question greyed for the same reason.
+  // them, once, and not again above an open question greyed for the same reason. Task 79 review: each of those rows would be
+  // a path of the dig, so the line asks as V4MorePickRows does (makesPath: a dig at its most paths says the dig's own reason).
   const morePicked = new Set((choice?.draft.picks ?? []).map((pick) => pick.key));
   const moreReason = hasMore && choice !== undefined && choice.draft.picks.length > 0
     && (props.more ?? []).some((pick) => pick.kind === "MORE" && !morePicked.has(pick.key))
-    ? choice.refusalFor(null)
+    ? choice.refusalFor(null, true)
     : null;
   const reasons = new Map([...pickReasonPlaces(
     props.open.map((question) => ({ key: question.id, path: null, open: [question], suggestions: false })), panel.picked, panel.choice

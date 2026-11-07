@@ -107,10 +107,25 @@ export const FAILED_DIGS: readonly FailedDigSeed[] = Object.freeze([
 export const RUN_FAILED_SOME = Object.freeze({
   runRef: "45000000-0000-4000-8000-000000000045",
   seq: 24,
-  reason: "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED",
+  // V4 start step, Task 57g: a stop of ours (a provider call failed), the kind the API continues; the page reads it "stopped partway", as
+  // before. A step's tries used up (CALL_BUDGET_EXHAUSTED, this seed's code until 57g) is never continued (packages/battery RUN_STOPS_NOT_OURS).
+  reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED",
   quotaUsed: "SOME" as const,
   question: "Should my city make its buses free for everyone, or only for people on low incomes?",
-  // V4 start step, Task 57e (the owner's 6 Nov rule: re-use what was already paid for): it kept its clarifying answers and the paths chosen
-  // from the list, so its read says `reusable` ("What already ran is kept for your next try, ..."). The first failed question kept nothing.
-  reusable: true as const
+  // V4 start step, Task 57g (the owner's 7 Nov answers; Task 57e's `reusable`, renamed by Task 57f): its read says `continuable`, so its
+  // page offers "Continue where it stopped" (server.ts: Continue runs it again, then it finishes). The first failed question cannot continue.
+  continuable: true as const
 });
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers; the API's route, apps/api/src/run-continue.ts): what the stand-in's Continue
+ * (POST /v1/runs/{id}/continue) does with a run. A FAILED question whose read says `continuable` continues (CONTINUE: it runs again,
+ * then finishes); a second press while it runs answers CONTINUING again (AGAIN), as the API's re-open does; any other FAILED run is
+ * refused (NOT_CONTINUABLE: 409 RUN_NOT_CONTINUABLE). Everything else is the month pause's Continue, unchanged (MONTH).
+ */
+export type MockContinueStep = "CONTINUE" | "AGAIN" | "NOT_CONTINUABLE" | "MONTH";
+
+export function mockContinueStep(run: Readonly<{ failed: boolean; running: boolean; continuable: boolean; continued: boolean }>): MockContinueStep {
+  if (run.failed) return run.continuable ? "CONTINUE" : "NOT_CONTINUABLE";
+  return run.continued && run.running ? "AGAIN" : "MONTH";
+}
