@@ -8,13 +8,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
-import { PublicDebateSchema, StoryBodySchema, type Answer, type PublicDebate } from "@debateai/contract";
+import { PublicDebateSchema, StoryBodySchema, type Answer, type PathId, type PublicDebate } from "@debateai/contract";
 import {
-  ContentCipher, encrypt, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, generateVerificationToken, hashToken, loadKek
+  ContentCipher, encrypt, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, generateVerificationToken, hashToken, loadKek, type RunContentKeyStore
 } from "../../packages/crypto/src/index.js";
 import {
-  MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
-  PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
+  MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, RUN_PURPOSE_LINES_CARRIER, PostgresTreeUpdateRunnerRepository, encryptAttestedContentForRun, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository,
+  PostgresInvestigationRepository, PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresPublicTreeRunnerRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresTreeUpdateRepository, configureContentEncryption, contentCipherFor, createPool,
   decryptContentForRun, migrate, PostgresModerationNoticeRepository, withRunContentLease, type Pool, type PublicFlagLimits
 } from "@debateai/db";
 import { renderMail } from "@debateai/mail-templates";
@@ -27,7 +27,7 @@ import { buildApi, type ApiOptions } from "../../apps/api/src/index.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentCheck } from "../../apps/api/src/publication-check/check.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
-import { joinPublicDigAtStart, pressPublicReport, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
+import { admitPublicDig, joinPublicDigAtStart, pressPublicReport, sweepPublicPage, type PublicDigAdmission } from "../../apps/api/src/public-tree.js";
 import { postgresInvestigationCloseSources } from "../../apps/runner/src/investigation-close-sources.js";
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import { pathUpdateIdOf } from "../../apps/runner/src/path-climb.js";
@@ -51,6 +51,8 @@ let runner: Pool;
 let erasure: Pool;
 let secretRoot: string;
 let runKeys: FileRunContentKeyStore;
+/** Task 56f: every run whose key the content cipher loaded, lower-case, in order (a test empties it before what it watches). */
+const keyLoads: string[] = [];
 const users = new Map<string, string>();
 let userDeks: FileUserDekStore;
 const publicationCipher = new PublicationCipher(new MemoryPublicationKeyStore(loadKek(generateDek())));
@@ -231,7 +233,13 @@ beforeAll(async () => {
     if (userId === undefined) throw new Error("OWNER_REF_UNRESOLVED");
     return userId;
   });
-  const cipher = new ContentCipher(runKeys);
+  const keys = runKeys;
+  const watched: RunContentKeyStore = {
+    store: (runId, identity, contentKey) => keys.store(runId, identity, contentKey),
+    load: (runId) => { keyLoads.push(runId.toLowerCase()); return keys.load(runId); },
+    exists: (runId) => keys.exists(runId), ownerRef: (runId) => keys.ownerRef(runId), listByOwner: (ownerRef) => keys.listByOwner(ownerRef), destroy: (runId) => keys.destroy(runId)
+  };
+  const cipher = new ContentCipher(watched);
   configureContentEncryption(database.pool, cipher);
   logins = await provisionRlsLogins(database);
   api = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
@@ -505,6 +513,217 @@ describe("digs after the author leaves (decision 22)", () => {
     await dig(eve, debate, world);
     await settleAll(world);
     expect((await page(debate.ref)).contributions).toHaveLength(1);
+  });
+});
+
+describe("a public debate whose owner leaves stays open to everyone's digs and report (Task 56f)", () => {
+  // The owner's 7 Nov answer: "of course if the owner leaves/suspended then it's not finished, but that doesn't mean someone else couldn't continue
+  // this debate. the site never does anything for this situation". The carry-on stops as Task 56e built it; nothing runs on the site's behalf; the page
+  // stays readable, and anyone with credit digs it and writes its report on their own credit, as the publish warning promises.
+  const carryOn = () => new PostgresStartPathsStore(runner);
+  const markOf = async (runId: string): Promise<string> =>
+    (await database.pool.query<{ mark: string }>("SELECT core.read_carry_on_mark($1) AS mark", [runId])).rows[0]!.mark;
+  /** "Let the AIs carry on to the report" ticked at Start, and the first debate settled: DUE. */
+  async function carryOnAsked(runId: string): Promise<void> {
+    expect(await carryOn().recordStartPaths({ runId, source: "RUN_BUILT", width: 1, chosenBy: "AIS", carryOnToReport: true, menu: null,
+      paths: [{ pathId: "b1" as PathId, pathNo: 1, author: "PERSON_EDITED", title: "The question", question: QUESTION, viewpoints: [], ownWords: [] }] })).toBe("RECORDED");
+    expect(await carryOn().recordCarryOnDue(runId)).toBe("RECORDED");
+  }
+  /** The owner's private purpose lines, kept with the debate under its key. */
+  async function purposeKept(who: StoryEncryptedOwner, root: string): Promise<void> {
+    const sealed = await withRunContentLease(api, [root], () => encryptAttestedContentForRun(api, root, RUN_PURPOSE_LINES_CARRIER, root, { purpose: AUTHOR_PRIVATE }));
+    expect(await new PostgresTreeUpdateRepository(api).recordPurposeLines(who.ownerRef, root, sealed!)).toBe("RECORDED");
+  }
+  /** Every row naming the account, counted per column: each uuid or text column called *owner_ref or writer_ref, in every table. */
+  async function rowsNaming(ownerRef: string): Promise<Readonly<Record<string, number>>> {
+    const columns = (await database.pool.query<{ table_schema: string; table_name: string; column_name: string }>(`SELECT c.table_schema, c.table_name, c.column_name
+      FROM information_schema.columns AS c JOIN information_schema.tables AS t ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+      WHERE c.table_schema NOT IN ('pg_catalog','information_schema') AND c.data_type IN ('uuid','text') AND (c.column_name LIKE '%owner_ref' OR c.column_name = 'writer_ref')
+      ORDER BY 1, 2, 3`)).rows;
+    const quoted = (name: string): string => `"${name.replaceAll('"', '""')}"`;
+    const counts: Record<string, number> = {};
+    for (const column of columns) {
+      counts[`${column.table_schema}.${column.table_name}.${column.column_name}`] = (await database.pool.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM ${quoted(column.table_schema)}.${quoted(column.table_name)} WHERE ${quoted(column.column_name)}::text = $1`, [ownerRef])).rows[0]!.n;
+    }
+    return counts;
+  }
+  /** A visitor's site: POST /v1/asks starts their dig (each start answers the next of `runs`), POST .../report presses, GET reads the page. */
+  function visitorSite(who: StoryEncryptedOwner, runs: string[] = []) {
+    const base = testHttpIdentity(randomUUID());
+    const identity = { ...base, authenticated: { ...base.authenticated, userId: who.userId, ownerRef: who.ownerRef,
+      session: { ...base.authenticated.session, session_id: who.sessionId, asker_id: `owner:${who.ownerRef}` } } };
+    const app = { submit: async () => ({ run_ref: runs.shift()!, status: "QUEUED" }), withContentLease: <T>(_id: string, use: () => Promise<T>) => use() } as unknown as ApiOptions["application"];
+    const http = buildApi({ application: app, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN, publications: application() as never,
+      questionCheck: { check: async () => ({ outcome: "PASS" }) } as never,
+      publicTree: { pool: api, tree: new PostgresPublicTreeRepository(api), contributions: new PostgresPublicDebateRepository(api), readPublicDebate: (ref) => application().readPublicDebate(ref) } });
+    return { http, identity };
+  }
+  /** A visitor's dig as the asks route admits it and joins it to the public tree, then run and settled as `dig` runs one. */
+  async function visitorDig(digger: StoryEncryptedOwner, debate: Readonly<{ ref: string; root: string; position: string }>, world: ReturnType<typeof vendors>): Promise<string> {
+    const run = await createEncryptedStoryRun(database.pool, digger, "Would winter ridership fill it?");
+    const { http, identity } = visitorSite(digger, [run]);
+    try {
+      const asked = await http.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true), payload: { question_line: "Would winter ridership fill it?", risk_tier: "standard",
+        tier_source: "MACHINE_DEFAULT", tier_provenance_ref: "machine:deployment-floor", composition_budget_tier: "low", depth_params: { depth: 1 }, decision_scope: "test-layer scope",
+        as_of: "2026-08-07T00:00:00.000Z", steering_presets: [], plan_tier: "free", steering_annotations: [],
+        public_parent: { public_ref: debate.ref, places: [`path:${debate.position}`], mode: "quick",
+          picks: [{ kind: "OWN_VIEW", suggestion_id: null, place: `path:${debate.position}`, text: "My own view: tourists keep it full." }] } } });
+      expect(asked.statusCode).toBe(202);
+      expect(asked.json()).toMatchObject({ run_ref: run });
+      expect(asked.json().public_dig_not_joined).toBeUndefined();
+    } finally {
+      await http.close();
+    }
+    // Joined on the page, under the debate, the visitor's own.
+    expect((await database.pool.query("SELECT owner_ref, root_run_id, parent_run_id FROM identity.public_contribution WHERE dig_run_id=$1", [run])).rows)
+      .toEqual([{ owner_ref: digger.ownerRef, root_run_id: debate.root, parent_run_id: debate.root }]);
+    const { workItemId } = await persistTerminalRun({ pool: database.pool, runId: run, fixtureKey: randomUUID(), factBundle: FACTS });
+    const snapshot = ownNodes(digSnapshot(run, { resolve: (ref: string) => { const member = world.members.find((entry) => entry.providerRef === ref);
+      return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef }; }, backups: world.members }, { workItemId }), run);
+    expect(await runDigPathRewrite(world.composed.settings, snapshot)).toBe(true);
+    return run;
+  }
+  async function visitorPress(writer: StoryEncryptedOwner, ref: string) {
+    const { http, identity } = visitorSite(writer);
+    try {
+      return await http.inject({ method: "POST", url: `/v1/public/debates/${ref}/report`, headers: testSessionHeaders(identity, true), payload: {} });
+    } finally {
+      await http.close();
+    }
+  }
+  async function strangerRead(ref: string) {
+    const { http } = visitorSite(await account());
+    try {
+      return await http.inject({ method: "GET", url: `/v1/public/debates/${ref}` });
+    } finally {
+      await http.close();
+    }
+  }
+  /**
+   * After the owner left: a visitor digs and another writes the report, each over the site's own routes. Then case 3 of the brief: nothing is charged
+   * to the owner (the digger and the writer pay), and no part of it reads or writes the owner's data: no key of her debate is loaded, no row naming
+   * her is added or removed, and no prompt holds her private purpose lines.
+   */
+  async function continuedByVisitors(ana: StoryEncryptedOwner, debate: Readonly<{ ref: string; root: string; position: string }>): Promise<string> {
+    const [eve, fay] = [await account(), await account()];
+    const before = await rowsNaming(ana.ownerRef);
+    expect(Object.keys(before)).toEqual(expect.arrayContaining(["identity.public_contribution.owner_ref", "identity.public_report.writer_ref", "identity.main_answer_update.owner_ref"]));
+    keyLoads.length = 0;
+    const world = vendors();
+    const run = await visitorDig(eve, debate, world);
+    await settleAll(world);
+    expect(await new PostgresPublicDebateRunnerRepository(runner).readContribution(run)).toMatchObject({ outcome: "ALLOWED" });
+    const dug = await page(debate.ref);
+    expect(dug.contributions).toEqual([expect.objectContaining({ position_ref: debate.position, contributor: pseudonymOf(eve), own_rewrite: true })]);
+    expect(dug.main_answer_update?.segments[0]?.text).toContain("The whole debate now points to");
+    // Another visitor writes its report; the visitor's dig carries it, since the owner's debate may not.
+    const pressed = await visitorPress(fay, debate.ref);
+    expect(pressed.statusCode).toBe(202);
+    expect(pressed.json()).toEqual({ state: "WRITING", report_version: 1 });
+    await sweepPublicTree({ ...world.composed.publicTree, reports: world.reports, staleMs: 0 });
+    await pageSweep();
+    expect((await page(debate.ref)).reports).toEqual([expect.objectContaining({ report_version: 1, writer: pseudonymOf(fay) })]);
+    expect((await database.pool.query("SELECT carrier_run_id, writer_ref FROM identity.public_report WHERE publication_ref=$1", [debate.ref])).rows)
+      .toEqual([{ carrier_run_id: run, writer_ref: fay.ownerRef }]);
+    // Nothing charged to the owner: her debate's run is charged nothing, her window counts nothing; the digger and the writer pay.
+    const store = new PostgresModelSpendStore(runner);
+    const [from, to] = [new Date(Date.now() - 3_600_000), new Date(Date.now() + 3_600_000)];
+    expect(await countOf(debate.root)).toBe(0);
+    expect(await store.readOwnerSpentMicros(ana.ownerRef, from, to)).toBe(0);
+    // The digger's: on her dig's own run (billing pins that run to her at admission; this file admits no run through billing).
+    expect(await spentOf(run, "CONTRIBUTION_CHECK")).toBeGreaterThan(0);
+    expect(await spentOf(run, "PATH_CLIMB")).toBeGreaterThan(0);
+    expect(await spentOf(run, "ANSWER_UPDATE")).toBeGreaterThan(0);
+    // The writer's: on the carrier, attributed to the writer.
+    expect(await spentOf(run, "PUBLIC_REPORT")).toBeGreaterThan(0);
+    expect(await store.readOwnerSpentMicros(fay.ownerRef, from, to)).toBe(await spentOf(run, "PUBLIC_REPORT"));
+    // Nothing of hers read or written: the watch saw the digger's key, never her debate's.
+    expect(keyLoads).toContain(run.toLowerCase());
+    expect(keyLoads).not.toContain(debate.root.toLowerCase());
+    expect(await rowsNaming(ana.ownerRef)).toEqual(before);
+    expect(everyPromptText(world.sent)).toContain(QUESTION);
+    expect(everyPromptText(world.sent)).not.toContain("AUTHOR-PRIVATE-PURPOSE");
+    return run;
+  }
+
+  it("its owner suspended: the page reads; a visitor's dig is admitted, runs and joins; a visitor writes the report; they pay; the carry-on starts no dig", async () => {
+    const ana = await account();
+    const debate = await publishedDebate(ana);
+    await purposeKept(ana, debate.root);
+    await carryOnAsked(debate.root);
+    await seeded([[`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [ana.userId]]]);
+    // Task 56e: her carry-on starts no dig: claimed BEGUN and handed to no dig pass, nor to a press while she is suspended.
+    expect(await carryOn().claimCarryOnDue(10)).toEqual([]);
+    expect(await markOf(debate.root)).toBe("BEGUN");
+    expect(await carryOn().readCarryOnBegun(10)).toEqual([]);
+    // The page still reads, over HTTP too.
+    expect((await page(debate.ref)).question).toBe(QUESTION);
+    const read = await strangerRead(debate.ref);
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({ public_ref: debate.ref, question: QUESTION });
+    // Before anyone digs, a report has nothing to carry it but her debate, which it may not use: as when the owner is erased ("Dig into a path first").
+    const early = await visitorPress(await account(), debate.ref);
+    expect(early.statusCode).toBe(409);
+    expect(early.json().error).toBe("PUBLIC_DEBATE_NO_CARRIER");
+    await continuedByVisitors(ana, debate);
+    // The carry-on ran nothing meanwhile: still BEGUN, waiting for her account (Task 56e).
+    expect(await carryOn().claimCarryOnDue(10)).toEqual([]);
+    expect(await markOf(debate.root)).toBe("BEGUN");
+  });
+
+  it("its owner erased: the page reads without her name; a visitor's dig is admitted and runs; a visitor writes the report; they pay; the carry-on is closed", async () => {
+    const ana = await account();
+    const debate = await publishedDebate(ana);
+    await purposeKept(ana, debate.root);
+    await carryOnAsked(debate.root);
+    await authorLeaves(ana, debate.root);
+    // Task 56e: an erased debate's carry-on is closed at once: DONE, no dig, no report.
+    expect(await carryOn().claimCarryOnDue(10)).toEqual([]);
+    expect(await markOf(debate.root)).toBe("DONE");
+    // The page still reads, without her name, over HTTP too.
+    expect(await page(debate.ref)).toMatchObject({ question: QUESTION, author_pseudonym: "a contributor", author_name_gone: true });
+    const read = await strangerRead(debate.ref);
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({ public_ref: debate.ref, question: QUESTION, author_pseudonym: "a contributor" });
+    expect(read.body).not.toContain(pseudonymOf(ana));
+    const early = await visitorPress(await account(), debate.ref);
+    expect(early.statusCode).toBe(409);
+    expect(early.json().error).toBe("PUBLIC_DEBATE_NO_CARRIER");
+    await continuedByVisitors(ana, debate);
+    expect(await markOf(debate.root)).toBe("DONE");
+  });
+
+  it("its owner back after a suspension: the next main-answer version builds on the one a visitor's dig wrote meanwhile, not on the one before", async () => {
+    const [ana, dan, eve, fay] = [await account(), await account(), await account(), await account()];
+    const debate = await publishedDebate(ana);
+    // 0138 names the root `run_id`; 0147 names it `root_run_id` (its `run_id` is the dig's).
+    const versions = async (table: "main_answer_update" | "public_answer_update"): Promise<number> => Number((await database.pool.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM identity.${table} WHERE ${table === "main_answer_update" ? "run_id" : "root_run_id"}=$1 AND outcome <> 'FAILED'`, [debate.root])).rows[0]!.n);
+    // Before: Dan's dig moves the main answer, kept under the root's key (0138).
+    const first = vendors();
+    await dig(dan, debate, first);
+    await settleAll(first);
+    const before = (await page(debate.ref)).main_answer_update!.segments[0]!.text;
+    expect([await versions("main_answer_update"), await versions("public_answer_update")]).toEqual([1, 0]);
+    // Suspended: Eve's dig moves it again, kept under her dig's key (0147), since the root's key may not be used.
+    await seeded([[`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [ana.userId]]]);
+    const meanwhile = vendors();
+    await dig(eve, debate, meanwhile);
+    await settleAll(meanwhile);
+    const during = (await page(debate.ref)).main_answer_update!.segments[0]!.text;
+    expect(during).not.toBe(before);
+    expect([await versions("main_answer_update"), await versions("public_answer_update")]).toEqual([1, 1]);
+    // Back: Fay's dig writes the next version under the root's key again; its writer revises the newest version, the one the page shows.
+    await seeded([[`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [ana.userId]]]);
+    const after = vendors();
+    await dig(fay, debate, after);
+    await settleAll(after);
+    expect([await versions("main_answer_update"), await versions("public_answer_update")]).toEqual([2, 1]);
+    const revising = everyPromptText(after.sent.filter((packet) => contractOf(packet).startsWith("report.answer.later")));
+    expect(revising).toContain(during);
+    expect(revising).not.toContain(before);
+    expect((await page(debate.ref)).main_answer_update!.segments[0]!.text).not.toBe(during);
   });
 });
 
@@ -1078,6 +1297,28 @@ async function delegate(): Promise<Actor> {
     expect(after.changed_after_review).toBeUndefined();
     expect(await tree.readDigParent(debate.ref, null)).not.toBeNull();
     expect(await pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toEqual({ kind: "WRITING", reportVersion: expect.any(Number) });
+  }, 180_000);
+
+  it("Task 56f: taken off by review, a debate whose owner left gets nothing, as today: no page, no dig, no report", async () => {
+    const [ana, eve] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const tree = new PostgresPublicTreeRepository(api);
+    const readPublicDebate = (ref: string) => application().readPublicDebate(ref);
+    const pick = { kind: "OWN_VIEW" as const, suggestion_id: null, place: `path:${debate.position}`, text: "My view." };
+    const nothing = async (): Promise<void> => {
+      expect(await readPublicDebate(debate.ref)).toBeNull();
+      expect(await admitPublicDig({ parent: { public_ref: debate.ref, places: [pick.place], mode: "quick", picks: [pick] }, free: false }, { tree, readPublicDebate })).toEqual({ kind: "NOT_FOUND" });
+      const late = await createEncryptedStoryRun(database.pool, eve, "Too late?");
+      expect((await tree.join({ ownerRef: eve.ownerRef, publicationRef: debate.ref, parentRunId: debate.root, childRunId: late, positionRef: debate.position })).outcome).toBe("NOT_PUBLIC");
+      expect(await pressPublicReport({ ownerRef: eve.ownerRef, publicationRef: debate.ref, reportId: randomUUID(), free: false, now: new Date(), pool: api, tree, readPublicDebate })).toEqual({ kind: "NOT_FOUND" });
+    };
+    // Suspended, then taken off; then erased while off.
+    await seeded([[`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [ana.userId]]]);
+    await act(owner, debate, "HIDE");
+    await nothing();
+    await authorLeaves(ana, debate.root);
+    await nothing();
+    expect((await database.pool.query("SELECT 1 FROM identity.public_contribution WHERE publication_ref=$1", [debate.ref])).rowCount).toBe(0);
   }, 180_000);
 
   it("taking a dig out: its text leaves the page; what came after it is shown as affected and off the page until put back; no later prompt, report or owner's read holds it; the digger's own view says so", async () => {
