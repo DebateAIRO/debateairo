@@ -1079,6 +1079,28 @@ const PUBLIC_DIG_CARD_ANSWER_LINES: Readonly<Record<string, string>> = Object.fr
   "v4.maps.digWholePath": "Dig: a closer look at a path"
 });
 
+/**
+ * Owner 7 Nov, question 41 A ("say both ways"; OPEN-OWNER-QUESTIONS-2026-11-04.md, sixth round), word for word: when the stopped page
+ * offers "Continue where it stopped", the grey line under "Change the question" says what each way does, for the question alone and
+ * with the picks kept. Without Continue the page keeps v4.debate.askAgainNote and v4.debate.askAgainNoteQuestion as they are.
+ */
+const SIXTH_ROUND_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.failed.changeQuestionNote":
+    "Your question is kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped.",
+  "v4.failed.changeQuestionNotePicks":
+    "Your question and your picks are kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped."
+});
+
+describe("the owner's sixth round (7 Nov, question 41 A): the grey line under \"Change the question\" says both ways", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(SIXTH_ROUND_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(SIXTH_ROUND_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in SIXTH_ROUND_ANSWER_LINES)).toEqual([]);
+    // The lines without Continue stay as they were.
+    expect(catalog["v4.debate.askAgainNoteQuestion"]).toBe("Your question is kept. The list of paths is made again, which uses a little of your quota, like any new question.");
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.askAgainNoteQuestion");
+  });
+});
+
 describe("the owner's answer to question 33 and the fifth round (7 Nov): the public dig's card on \"My questions\"", () => {
   it("is the owner's words, pinned here, and waits on no drafted list", () => {
     expect(Object.fromEntries(Object.keys(PUBLIC_DIG_CARD_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PUBLIC_DIG_CARD_ANSWER_LINES);

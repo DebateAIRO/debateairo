@@ -244,6 +244,16 @@ describe("report-f4: the paths dug later, folded under theirs, and what each dig
     expect(node.querySelectorAll(".v4RepView")).toHaveLength(1);
   });
 
+  it("a fold opened on one version is closed again on the next version pressed (the review's key reset)", async () => {
+    const node = await mountReport([finished(1, "2026-11-04T10:00:00.000Z", R22_PATHS), finished(2, "2026-11-05T10:00:00.000Z", R22_PATHS)]);
+    const foldNow = () => groupOf(node, "A made-up first R22 path.").querySelector<HTMLDetailsElement>(":scope > details")!;
+    await openFold(foldNow());
+    expect(foldNow().open).toBe(true);
+    await press([...node.querySelectorAll<HTMLButtonElement>(".v4RepVersion")][1]!);
+    expect(flat(node.querySelector(".v4RepVersionLine"))).toContain("Version 1");
+    expect(foldNow().open).toBe(false);
+  });
+
   it("a version written before R22 keeps only its written answer", async () => {
     const node = await mountReport([finished(1, "2026-10-28T10:00:00.000Z"), finished(2, "2026-11-05T10:00:00.000Z", R22_PATHS)]);
     await press([...node.querySelectorAll<HTMLButtonElement>(".v4RepVersion")][1]!);

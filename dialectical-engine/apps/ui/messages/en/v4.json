@@ -216,6 +216,8 @@
   "v4.failed.continue": "Continue where it stopped",
   "v4.failed.continueLine": "What already ran is kept. Continuing pays only for what has not run yet.",
   "v4.failed.changeQuestion": "Change the question",
+  "v4.failed.changeQuestionNote": "Your question is kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped.",
+  "v4.failed.changeQuestionNotePicks": "Your question and your picks are kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped.",
   "v4.debate.notFoundTitle": "We couldn't find this question",
   "v4.debate.notFoundBody": "The link may be wrong, or the question may belong to another account.",
   "v4.debate.loadFailedTitle": "We couldn't load this question just now",

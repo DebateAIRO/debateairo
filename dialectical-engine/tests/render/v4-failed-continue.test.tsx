@@ -136,6 +136,49 @@ describe("the stopped page's words (Task 57g)", () => {
   });
 });
 
+/*
+ * Owner 7 Nov, question 41 A ("say both ways"; OPEN-OWNER-QUESTIONS-2026-11-04.md, sixth round), word for word: when "Continue where it
+ * stopped" is offered, the grey line under "Change the question" says what each way does. Without Continue it is as before.
+ */
+const BOTH_WAYS =
+  "Your question is kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped.";
+const BOTH_WAYS_PICKS =
+  "Your question and your picks are kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped.";
+
+describe("the owner's question 41 A (7 Nov): the grey line under 'Change the question' says both ways", () => {
+  it("a debate that can continue: the question's line right under 'Change the question', never the old one", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME", continuable: true });
+    await mountMap(1600, runId);
+    const change = [...page().querySelectorAll("a")].find((link) => link.textContent?.trim() === CHANGE)!;
+    expect(change.nextElementSibling?.textContent).toBe(BOTH_WAYS);
+    expect(text()).not.toContain(CATALOG["v4.debate.askAgainNoteQuestion"]);
+    expect(text()).not.toContain(CATALOG["v4.debate.askAgainNote"]);
+  });
+
+  it("with Continue and the picks kept: the picks' line", async () => {
+    const run = failedRun("7b000000-0000-4000-8000-000000000002", { quota_used: "SOME", continuable: true });
+    const base = { run, askAgainHref: "/v4?again=7b000000-0000-4000-8000-000000000002", askHref: "/v4", dig: null, catalog: CATALOG, homeCatalog: HOME };
+    const withPicks = await draw(<V4FailedScreen {...base} onContinue={() => undefined} picksKept />);
+    expect(withPicks).toContain(BOTH_WAYS_PICKS);
+    expect(withPicks).not.toContain(CATALOG["v4.debate.askAgainNote"]);
+    const questionOnly = await draw(<V4FailedScreen {...base} onContinue={() => undefined} />);
+    expect(questionOnly).toContain(BOTH_WAYS);
+    expect(questionOnly).not.toContain(BOTH_WAYS_PICKS);
+  });
+
+  it("without Continue: both old lines as they were", async () => {
+    const run = failedRun("7b000000-0000-4000-8000-000000000003", { quota_used: "SOME" });
+    const base = { run, askAgainHref: "/v4?again=7b000000-0000-4000-8000-000000000003", askHref: "/v4", dig: null, catalog: CATALOG, homeCatalog: HOME };
+    const withPicks = await draw(<V4FailedScreen {...base} picksKept />);
+    expect(withPicks).toContain(CATALOG["v4.debate.askAgainNote"]);
+    expect(withPicks).not.toContain(BOTH_WAYS_PICKS);
+    const questionOnly = await draw(<V4FailedScreen {...base} />);
+    expect(questionOnly).toContain(CATALOG["v4.debate.askAgainNoteQuestion"]);
+    expect(questionOnly).not.toContain(BOTH_WAYS);
+  });
+});
+
 describe("the press: the shared 10-second Undo, then one Continue (Task 57g)", () => {
   it("shows Start's Undo note and sends nothing for 10 seconds; Undo sends nothing, ever", async () => {
     const runId = crypto.randomUUID();

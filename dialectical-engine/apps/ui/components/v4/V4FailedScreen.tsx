@@ -37,6 +37,9 @@ import { digFailureMessage, failedQuotaKey, quotaSomeUsed } from "@/lib/v4/faile
  * where it stopped" and "Ask this again" says "Change the question" (the same link, the plain button beside it). The line under the button
  * ("What already ran is kept. Continuing pays only for what has not run yet.") shows only when the server says some quota was used; with
  * none, the screen keeps only "Nothing was taken for the failed try." (never both lines). Without `onContinue` the screen is as before.
+ * Owner 7 Nov, question 41 A ("say both ways"; OPEN-OWNER-QUESTIONS-2026-11-04.md, sixth round): with `onContinue`, the grey line under
+ * "Change the question" says what each way does (v4.failed.changeQuestionNote, or …NotePicks with the picks kept): changed, it is a new
+ * question; left as it is, this debate continues where it stopped. Without `onContinue` the grey line is the one above, as before.
  */
 
 export function V4FailedScreen({
@@ -120,7 +123,9 @@ export function V4FailedScreen({
             {t(catalog, continuing ? "v4.failed.changeQuestion" : "v4.debate.askAgain")}
           </Link>
           <p className="v4Muted v4DebFailedNote">
-            {t(catalog, picksKept ? "v4.debate.askAgainNote" : "v4.debate.askAgainNoteQuestion")}
+            {t(catalog, continuing
+              ? (picksKept ? "v4.failed.changeQuestionNotePicks" : "v4.failed.changeQuestionNote")
+              : (picksKept ? "v4.debate.askAgainNote" : "v4.debate.askAgainNoteQuestion"))}
           </p>
         </div>
       ) : dig.backHref !== null ? (

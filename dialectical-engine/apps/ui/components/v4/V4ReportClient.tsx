@@ -1495,7 +1495,8 @@ function ReportVersion({ version, isCurrent, webNote, locale, language, catalog 
         state={version.state}
         catalog={catalog}
         language={language}
-        pathsPart={<VersionPaths paths={version.paths} isCurrent={isCurrent} language={language} catalog={catalog} />}
+        // Keyed by the version (the review session's ruling): a fold opened on one version is closed again on the next one pressed.
+        pathsPart={<VersionPaths key={version.report_version} paths={version.paths} isCurrent={isCurrent} language={language} catalog={catalog} />}
       />
     </div>
   );
