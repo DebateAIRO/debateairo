@@ -1,4 +1,5 @@
 import { mailAlternatives } from "../support/accountMail.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -62,7 +63,7 @@ describe("DEV-06 local sendmail-compatible capture", { concurrent: false }, () =
     const spool = join(root, "mail");
     process.env[captureEnvironmentKey] = spool;
     try {
-      const sender = new SendmailMailSender({
+      const sender = new SendmailMailSender({ gate: testOutboundMailGate(),
         executable,
         from: "noreply@localhost.test",
         publicAppUrl: "https://localhost:3000",

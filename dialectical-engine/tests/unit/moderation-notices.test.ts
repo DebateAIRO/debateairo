@@ -8,6 +8,7 @@ import type { ModerationStatementClaim, ModerationStatementGround, ModerationSta
 import { renderMail } from "@debateai/mail-templates";
 import { MemoryTemplatedMailSender, TemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
 import { ModerationStatementReconciler, statementMailParams } from "../../apps/api/src/moderation-statements.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 /*
  * 0157 (changed on purpose from 0156's sender test): the API no longer sends 0156's no-reason notice. Its statement of reasons (DSA Art 17; the owner's D1
@@ -102,7 +103,7 @@ describe("0157: the statement of reasons sender", () => {
     const previous = process.env.DEBATEAI_DEV_MAIL_CAPTURE_DIR;
     process.env.DEBATEAI_DEV_MAIL_CAPTURE_DIR = join(root, "mail");
     try {
-      const sendmail = new TemplatedMailSender({ executable: resolve("deploy/dev-auth/sendmail-capture.mjs"), from: "noreply@localhost.test", timeoutMs: 10_000 });
+      const sendmail = new TemplatedMailSender({ gate: testOutboundMailGate(), executable: resolve("deploy/dev-auth/sendmail-capture.mjs"), from: "noreply@localhost.test", timeoutMs: 10_000 });
       const { reconciler, claims, completed } = world([statement("DEBATE_HIDDEN", { mailLocale: "ro" })], sendmail);
       await reconciler.reconcile();
       expect(completed).toEqual([[claims[0]!.statementId, "SENT"]]);

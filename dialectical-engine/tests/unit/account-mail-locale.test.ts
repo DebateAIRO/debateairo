@@ -135,7 +135,7 @@ describe("C12.9 plain text carries no bidi control (R-33)", () => {
 // C12.4 / C12.5 / C12.6: every account sender sends the display locale's copy, with lang and Content-Language, through the
 // real `sendmail -t` path; the dev sink (deploy/dev-auth/sendmail-capture.mjs) keeps each message as one .eml file.
 const capture = fileURLToPath(new URL("../../deploy/dev-auth/sendmail-capture.mjs", import.meta.url));
-const sendOptions = { executable: capture, from: "noreply@debate.test", publicAppUrl: "https://debate.test", timeoutMs: 10_000 };
+const sendOptions = { executable: capture, from: "noreply@debate.test", publicAppUrl: "https://debate.test", timeoutMs: 10_000, gate: { authorize: async () => true } };
 const token = "A".repeat(21) + "_" + "b".repeat(20) + "-";
 const person = "person@example.test";
 const messageId = "11111111-1111-4111-8111-111111111111";

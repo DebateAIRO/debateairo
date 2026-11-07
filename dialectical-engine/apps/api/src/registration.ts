@@ -165,7 +165,9 @@ export class AuthFlowError extends Error {
     | "MFA_RATE_LIMITED"
     | "LEGAL_DOCUMENT_STALE"
     /** Open sign-up mail (2026-10-09): the one address rule, or a domain that takes no mail. Same code as email change. */
-    | "EMAIL_INVALID",
+    | "EMAIL_INVALID"
+    /** The daily outbound mail limit (owner's rulings of 2026-11-01): today's sign-up mail is spent; "try later". */
+    | "MAIL_DAILY_LIMIT",
     options?: ErrorOptions
   ) {
     super(code, options);
@@ -179,7 +181,7 @@ export class AuthFlowError extends Error {
       : this.code === "MFA_FIRST_STEP_UNAVAILABLE" || this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
         || this.code === "LEGAL_DOCUMENT_STALE" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
-        || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
+        || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" || this.code === "MAIL_DAILY_LIMIT" ? 503 : 400;
   }
 }
 
@@ -831,6 +833,17 @@ export class RegistrationService implements RegistrationApplication {
      * through (fail open). Absent, no DNS question is asked (tests, and compositions that predate it).
      */
     readonly mailDomainCheck?: MailDomainCheck;
+    /**
+     * The daily outbound mail limit (owner's rulings of 2026-11-01): is there room today for one more sign-up mail? Asked
+     * after the limiter and before any account work, for password sign-up and resend; a no refuses with
+     * MAIL_DAILY_LIMIT. It depends on the day's count alone, never on whether an account exists. The send itself is
+     * still gated in the sender. Absent, nothing is asked.
+     */
+    readonly outboundMail?: Readonly<{
+      hasStandardRoom(): Promise<boolean>;
+      /** The gate's database work without a send, run by a sign-up that sends nothing so both paths load it alike. */
+      balanceWithoutSend?(): Promise<void>;
+    }>;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -1430,7 +1443,9 @@ export class RegistrationService implements RegistrationApplication {
           ? this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs)
           : Promise.resolve();
         if (duplicate !== undefined) {
-          await equalWork;
+          // The new account's send asks the outbound mail gate (a suppression lookup and the day's count) inside the
+          // same window; the duplicate asks the same questions without a send, so the database sees one load either way.
+          await Promise.all([equalWork, this.dependencies.outboundMail?.balanceWithoutSend?.().catch(() => undefined)]);
           await releaseReservation();
           await this.dependencies.repository.recordDuplicateRegistrationPostwork({
             userId: duplicate.userId,
@@ -1632,6 +1647,18 @@ export class RegistrationService implements RegistrationApplication {
     throw new Error("PSEUDONYM_ALLOCATION_EXHAUSTED");
   }
 
+  /**
+   * At the day's limit for sign-up mail, refuse before any account work. A count that cannot be read is a retryable
+   * refusal, not a pass: the send itself would refuse too, after the account was made.
+   */
+  private async assertMailRoom(): Promise<void> {
+    const gate = this.dependencies.outboundMail;
+    if (gate === undefined) return;
+    let room: boolean;
+    try { room = await gate.hasStandardRoom(); } catch (error) { throw new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: error }); }
+    if (!room) throw new AuthFlowError("MAIL_DAILY_LIMIT");
+  }
+
   private async attemptVerificationDelivery(
     input: VerificationDelivery
   ): Promise<VerificationDeliveryRecord> {
@@ -1745,6 +1772,7 @@ export class RegistrationService implements RegistrationApplication {
           for (const address of recoveryEmail === null ? [email] : [email, recoveryEmail]) {
             if (await mailDomainRefused(this.dependencies.mailDomainCheck, address)) throw new AuthFlowError("EMAIL_INVALID");
           }
+          await this.assertMailRoom();
         }
 
         let passwordHash: string | null = null;
@@ -1954,6 +1982,7 @@ export class RegistrationService implements RegistrationApplication {
           persistAfter: floorResponse()
         });
       }
+      await this.assertMailRoom();
       releaseMailDispatch = await this.reserveMailDispatch(correlationId);
       const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
       const expiresAt = new Date(now.getTime() + this.dependencies.policy.verification.tokenTtlMs);
