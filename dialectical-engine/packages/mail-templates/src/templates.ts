@@ -16,7 +16,8 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED",
   "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "MODERATION_STATEMENT_REPORT_REMOVED",
   "MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED",
-  "PUBLIC_FLAG_ANSWER_RECEIPT", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED"
+  "PUBLIC_FLAG_ANSWER_RECEIPT", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED",
+  "OUTBOUND_MAIL_SHARE", "OUTBOUND_MAIL_SIGN_UP_STOPPED", "OUTBOUND_MAIL_ALL_STOPPED"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -472,5 +473,21 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   TEAM_ALLOWANCE_YOURS: define({
     catalogue: "owner", subject: "owner.teamAllowance.yoursSubject",
     paragraphs: ["owner.teamAllowance.yours", "owner.teamAllowance.yoursNext"], params: {}
+  }),
+  // The daily outbound mail limit (owner's rulings of 2026-11-01): counts and the UTC day only, never an address.
+  OUTBOUND_MAIL_SHARE: define({
+    catalogue: "owner", subject: "owner.outboundMail.share.subject",
+    paragraphs: ["owner.outboundMail.share.body", "owner.outboundMail.count"],
+    params: { day: "text", total: "text", limit: "text" }
+  }),
+  OUTBOUND_MAIL_SIGN_UP_STOPPED: define({
+    catalogue: "owner", subject: "owner.outboundMail.signUpStopped.subject",
+    paragraphs: ["owner.outboundMail.signUpStopped.body", "owner.outboundMail.count", "owner.outboundMail.resets"],
+    params: { day: "text", total: "text", limit: "text" }
+  }),
+  OUTBOUND_MAIL_ALL_STOPPED: define({
+    catalogue: "owner", subject: "owner.outboundMail.allStopped.subject",
+    paragraphs: ["owner.outboundMail.allStopped.body", "owner.outboundMail.count", "owner.outboundMail.resets"],
+    params: { day: "text", total: "text", limit: "text" }
   })
 });

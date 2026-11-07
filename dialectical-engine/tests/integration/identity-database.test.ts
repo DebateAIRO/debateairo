@@ -85,6 +85,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "main_answer_update", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
+      // 0170 the daily outbound mail limit.
+      "outbound_mail_daily_count", "outbound_mail_suppression",
       "page_reading_level",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",

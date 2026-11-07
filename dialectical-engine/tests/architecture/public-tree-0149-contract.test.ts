@@ -55,7 +55,7 @@ describe("0149: a funded person's public report, a settled dig, the page's refer
   it("follows 0148 in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0149 } from './migration-forward0149.js';");
-    expect(chain).toContain("loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157]");
+    expect(chain).toContain("loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0170]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "public-report-team-month-forward0149-v1";');

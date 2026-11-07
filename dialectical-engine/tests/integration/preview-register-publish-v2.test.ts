@@ -24,13 +24,13 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       // A historical base with v8's key set: the source without v1's three additions (consumerRecoveryPolicy,
       // publicationCheckPolicy, taxAuthorities) and the role rotation row (answerRoleRotationPolicy; the live v9 lacks only
       // the rotation row), plus the two base-owned rows. Synthetic fixture setup only; the operator never imports history.
-      const base = [...source.filter(row => !['consumerRecoveryPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities', 'answerRoleRotationPolicy'].includes(row.rowKey)), ...owned];
+      const base = [...source.filter(row => !['consumerRecoveryPolicy', 'outboundMailPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities', 'answerRoleRotationPolicy'].includes(row.rowKey)), ...owned];
       await createPostgresRegisterPublicationPort(pool).importHistorical({ registerVersion: parseRegisterVersionText('4'), rows: base });
       const v4 = await readSealedSnapshot(pool, '4');
 
       // 1. Four keys added (three from v1, and the role rotation row).
       const first = composePreviewSnapshotV2({ sourceRows: source, baseRows: v4.rows, baseRegisterVersion: '4', baseSnapshotSha256: v4.snapshotSha256 });
-      expect(first.addedKeys).toEqual(['answerRoleRotationPolicy', 'consumerRecoveryPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities']);
+      expect(first.addedKeys).toEqual(['answerRoleRotationPolicy', 'consumerRecoveryPolicy', 'outboundMailPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities']);
       const firstInput = { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: first, approval: approvalOf(first) };
       const v5 = await publishPreviewRegisterV2(pool, firstInput);
       expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: 73, snapshotSha256: first.snapshotSha256 });

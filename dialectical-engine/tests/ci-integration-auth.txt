@@ -112,3 +112,5 @@ tests/integration/public-review-http.test.ts
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).
 # The hand-over (0143): a paused debate moves to the current release once, under the pause's own lock.
 tests/integration/run-handover-database.test.ts
+# The daily outbound mail limit (0170): the shared count, its atomicity and the API logins' rights on a real database.
+tests/integration/outbound-mail-limit.test.ts

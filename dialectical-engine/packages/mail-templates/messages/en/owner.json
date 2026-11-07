@@ -64,5 +64,13 @@
   "owner.publicReview.changed": "Someone with access to the team page took a step on a public debate under review. Sign in to see the log.",
   "owner.teamAllowance.yoursSubject": "Your quota from the team changed",
   "owner.teamAllowance.yours": "The quota the Owner gave you for your debates has changed.",
-  "owner.teamAllowance.yoursNext": "Sign in to see what you can use now. If you did not expect this, tell the Owner."
+  "owner.teamAllowance.yoursNext": "Sign in to see what you can use now. If you did not expect this, tell the Owner.",
+  "owner.outboundMail.share.subject": "Half of today's mail limit is used",
+  "owner.outboundMail.share.body": "The site has sent half of the mail it may send today. Nothing has stopped: this is only a warning.",
+  "owner.outboundMail.signUpStopped.subject": "Sign-up mail has stopped for today",
+  "owner.outboundMail.signUpStopped.body": "The site reached the part of today's mail limit open to ordinary mail. New sign-ups and resends are told to try later, and other ordinary mail waits. Security mail still goes out.",
+  "owner.outboundMail.allStopped.subject": "All mail has stopped for today",
+  "owner.outboundMail.allStopped.body": "The site reached today's whole mail limit, so security mail has stopped too. Password resets and security notices wait until the count starts again.",
+  "owner.outboundMail.count": "Day (UTC): {day}. Mails sent: {total}. Daily limit: {limit}.",
+  "owner.outboundMail.resets": "The count starts again at midnight UTC."
 }

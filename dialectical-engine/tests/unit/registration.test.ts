@@ -1,4 +1,5 @@
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { canonicalSignup, canonicalResend, passedTurnstile } from "../support/turnstileFixtures.js";
 import { createHmac, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -1370,7 +1371,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     const executable = join(root, "slow-sendmail");
     await writeFile(executable, "#!/bin/sh\nsleep 1\nexit 0\n", "utf8");
     await chmod(executable, 0o700);
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
@@ -1393,7 +1394,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
   });
 
   it("rejects malformed and CRLF recipients before invoking sendmail", async () => {
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable: "/definitely/not/a/sendmail-binary",
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
@@ -1430,7 +1431,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       "utf8"
     );
     await chmod(executable, 0o700);
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
@@ -1793,6 +1794,7 @@ function rework7Harness(options: {
   readonly deferHash?: boolean;
   readonly legalAcceptance?: boolean;
   readonly mailDomainCheck?: MailDomainCheck;
+  readonly outboundMail?: Readonly<{ hasStandardRoom(): Promise<boolean> }>;
 } = {}): Rework7Harness {
   const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const policy = Object.freeze({
@@ -1949,7 +1951,8 @@ function rework7Harness(options: {
       return "r7".padEnd(43, "T");
     },
     ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {}),
-    ...(options.mailDomainCheck === undefined ? {} : { mailDomainCheck: options.mailDomainCheck })
+    ...(options.mailDomainCheck === undefined ? {} : { mailDomainCheck: options.mailDomainCheck }),
+    ...(options.outboundMail === undefined ? {} : { outboundMail: options.outboundMail })
   });
 
   interface Rework7Inspected {
@@ -3023,5 +3026,56 @@ describe("Task5 versioned verification delivery policy", () => {
   ])("rejects malformed or reinterpreted enforcement%j", (enforcement) => {
     const rows = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map(row => row.rowKey === "verificationPolicy" ? { ...row, value: { ...row.value, outbound_send_enforcement: enforcement } } : row);
     expect(() => authPolicyFromRegisterRows(rows)).toThrow();
+  });
+});
+
+describe("the daily outbound mail limit at sign-up and resend (owner's rulings of 2026-11-01)", () => {
+  const input = { phone: "+40722123456", email: "budget@example.test", recoveryEmail: null, password: REWORK7_PASSWORD, adultAffirmed: true };
+  const source = (requestId: string) => ({ ip: "81.196.1.10", userAgent: "test/1", requestId });
+  const room = (answer: boolean) => ({ hasStandardRoom: async () => answer });
+
+  it("sign-up at the limit answers MAIL_DAILY_LIMIT (503) after the limiter, before any hash or account", async () => {
+    const harness = rework7Harness({ outboundMail: room(false) });
+    try {
+      const refusal = await harness.service.register(input, source("limit-full")).then(() => null, (error: unknown) => error);
+      expect(refusal).toBeInstanceOf(AuthFlowError);
+      expect(refusal).toMatchObject({ code: "MAIL_DAILY_LIMIT", statusCode: 503 });
+      expect(harness.counters.limiterConsume).toBe(1);
+      expect(harness.counters.passwordHash).toBe(0);
+      expect(harness.counters.mailReservation).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+
+  it("resend at the limit answers MAIL_DAILY_LIMIT before any mail reservation, whether or not the account exists", async () => {
+    const harness = rework7Harness({ outboundMail: room(false) });
+    try {
+      await expect(harness.resend(0)).rejects.toMatchObject({ code: "MAIL_DAILY_LIMIT" });
+      expect(harness.counters.mailReservation).toBe(0);
+      expect(harness.counters.tokenMint).toBe(0);
+    } finally { harness.restore(); }
+    const known = rework7Harness({ outboundMail: room(false), existingAddress: true });
+    try {
+      await expect(known.resend(0)).rejects.toMatchObject({ code: "MAIL_DAILY_LIMIT" });
+      expect(known.counters.mailReservation).toBe(0);
+    } finally { known.restore(); }
+  });
+
+  it("with room left, sign-up and resend go on as before", async () => {
+    const harness = rework7Harness({ outboundMail: room(true) });
+    try {
+      await harness.service.register(input, source("limit-room"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.resend(1);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+
+  it("a count that cannot be read answers the retryable refusal, before any account is made", async () => {
+    const harness = rework7Harness({ outboundMail: { hasStandardRoom: async () => { throw new Error("COUNT_DOWN"); } } });
+    try {
+      await expect(harness.service.register(input, source("limit-broken"))).rejects.toMatchObject({ code: "AUTH_TEMPORARILY_UNAVAILABLE", statusCode: 503 });
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
   });
 });
