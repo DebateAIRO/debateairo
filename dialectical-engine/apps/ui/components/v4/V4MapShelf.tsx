@@ -21,6 +21,9 @@ import type { ReadingLevel } from "@/lib/v4/types";
  * shows and digs at the account's level, which it reads itself: the same level these links carried before (the ask page
  * and All my maps held only the account's level). A debate's own links (its map and report, its digs) keep `?level=` until
  * that field lands (the report page's rule on its sibling branch), so a round trip never leans on the account.
+ * The owner's answer to question 33 (5 Nov, A) and the fifth round (7 Nov): a dig the person made on someone else's public
+ * page is a card of its own among the questions, "Dig: {its pick}" ("Dig: a closer look at a path" for a whole path),
+ * opening the dig's own map (lib/v4/mapShelf.ts publicDigCardText).
  */
 
 /** The ask page's shelf: this many questions. */
@@ -126,7 +129,7 @@ function MapCard({ map, catalog, locale, digsMax }: Readonly<{
 }>) {
   return (
     <li className="v4ShelfItem">
-      <Link className="v4ShelfCard" href={mapHref(map.runId)}>
+      <Link className="v4ShelfCard" href={mapHref(map.runId)} {...(map.kind === "PUBLIC_DIG" ? { "data-shelf-public-dig": "" } : {})}>
         <span className="v4ShelfQuestion" dir="auto" data-ai-generated="true">{map.question}</span>
         {map.bar === null ? null : <V4TrustBar counts={map.bar} catalog={catalog} />}
         <span className="v4ShelfMeta">

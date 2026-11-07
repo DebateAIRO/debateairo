@@ -6,6 +6,7 @@ import { AlsoRaisedList } from "@/components/AlsoRaisedList";
 import { FloorAnswer } from "@/components/FloorAnswer";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
+import { publicDebateLevel } from "@/lib/v4/debateLevel";
 import { cardLabel } from "@/lib/v4/mapLooks";
 import { publicHasWords, publicMapOf, publicSidesOf, type PublicSide } from "@/lib/v4/publicMap";
 import type { PublicPathView } from "@/lib/v4/publicPage";
@@ -264,7 +265,7 @@ function PathRow({ path, view, open, onToggle, words, props }: Readonly<{
             {checked ? (
               <div className="v4PubFound">
                 <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} size="large" showCounts />
-                <PointGroups points={path.points} level="plain" catalog={catalog} locale={locale} />
+                <PointGroups points={path.points} level={publicDebateLevel(props.debate)} catalog={catalog} locale={locale} />
               </div>
             ) : null}
             {path.open.length > 0 ? (

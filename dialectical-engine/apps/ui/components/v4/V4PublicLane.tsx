@@ -30,7 +30,8 @@ import { publicReportWriting, reportShown } from "@/lib/v4/publicReport";
 import { focusInPlace, useFocusHandOff, type FocusHandOff } from "@/lib/v4/useFocusHandOff";
 import { useWaitPolling } from "@/lib/v4/useWaitPolling";
 import { contractClient } from "@/lib/api";
-import { levelHref, useReadingLevel } from "@/lib/v4/storage";
+import { publicDebateLevel, readingLevelOf } from "@/lib/v4/debateLevel";
+import { levelHref } from "@/lib/v4/storage";
 import { picksMax } from "@/lib/v4/suggestions";
 import type { DigMode, PendingDig, ReadingLevel } from "@/lib/v4/types";
 import { useDigClickCheck } from "@/lib/v4/useDigClickCheck";
@@ -99,7 +100,7 @@ type LaneActions = Readonly<{
   planTier: "free" | "premium";
   busy: boolean;
   publicRef: string;
-  /** The reading level the person chose, for the links to a dig's own page. */
+  /** The level the debate names itself, for the links to a dig's own page (null: it names none, or nobody is signed in). */
   level: ReadingLevel | null;
   /** public-f11: the dig's share before the press, when the room read says one for a dig (not yet on a public page). */
   share: number | null;
@@ -124,11 +125,13 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   debate: PublicDebate; lane: V4PublicLaneConfig; returnPath: LaneActions["returnPath"]; children: ReactNode;
 }>) {
   const { catalog, locale } = lane;
-  // STILL DUE (the owner's second round, 5 Nov: a public page shows each debate at the level it was asked at; the start-step
-  // plan leaves the public page's own use of reading_level to this review): a dig asked here should take the debate's own
-  // level once the server sends reading_level with the public debate. Until then it takes the visitor's saved level, or
-  // Plain words (and V4PublicPage draws the points at Plain words).
-  const [savedLevel] = useReadingLevel(null);
+  // The owner's level ruling (5 Nov, question 15 and the second round: a public page shows each debate at the level it was
+  // asked at): a dig asked here is asked, and its share read, at the debate's own level (its `reading_level`; none reads as
+  // Plain words, lib/v4/debateLevel.ts), never the visitor's own, so "up to N%" agrees with what the dig is charged.
+  // V4PublicPage draws the points at it too. A link to the dig's own page carries only a level the debate names itself
+  // (`linkLevel`): with none, no level rides it, and the dig's map shows the level the dig was kept at.
+  const level = publicDebateLevel(debate);
+  const linkLevel = readingLevelOf(debate);
   const ask = useV4Ask({
     catalog,
     homeCatalog: lane.homeCatalog ?? {},
@@ -136,7 +139,7 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
     locale,
     crisisCountryHint: lane.crisisCountryHint,
     mode: "quick",
-    readingLevel: savedLevel ?? "plain"
+    readingLevel: level
   });
   const { submit, room, planTier, submitting, dialogs } = ask;
   // The send runs after the 10 seconds, perhaps once the person has left this page: it uses the hook's last submit, which
@@ -226,8 +229,8 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   const writeReport = useCallback(() => pressPublicReport(debate.public_ref, { catalog, room, locale }), [debate.public_ref, catalog, room, locale]);
   const suggestionsFor = useCallback((path: PublicPathView) => publicSuggestionsFor(debate, path), [debate]);
   const actions = useMemo<LaneActions>(() => ({
-    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: savedLevel, share, periodLine, suggestionsFor, startDig, writeReport
-  }), [returnPath, planTier, submitting, publicRef, savedLevel, share, periodLine, suggestionsFor, startDig, writeReport]);
+    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: linkLevel, share, periodLine, suggestionsFor, startDig, writeReport
+  }), [returnPath, planTier, submitting, publicRef, linkLevel, share, periodLine, suggestionsFor, startDig, writeReport]);
   return (
     <LaneContext.Provider value={actions}>
       {children}
