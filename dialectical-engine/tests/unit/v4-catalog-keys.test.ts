@@ -764,6 +764,25 @@ const YOUR_QUESTION_RECORD_LINES: Readonly<Record<string, string>> = Object.free
   "v4.nest.trailRoot": "Your question"
 });
 
+/**
+ * The owner's answer to question 33 (5 Nov 2026, A) and the fifth round (7 Nov), word for word: a dig made on someone else's
+ * public page shows on "My questions" as a card of its own, "Dig: {its pick}" (dig-f30's words, which question 33 quotes),
+ * and one that dug a whole path, with no pick, as "Dig: a closer look at a path".
+ */
+const PUBLIC_DIG_CARD_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.dig": "Dig: {pick}",
+  "v4.maps.digWholePath": "Dig: a closer look at a path"
+});
+
+describe("the owner's answer to question 33 and the fifth round (7 Nov): the public dig's card on \"My questions\"", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(PUBLIC_DIG_CARD_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PUBLIC_DIG_CARD_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in PUBLIC_DIG_CARD_ANSWER_LINES)).toEqual([]);
+    // It echoes the map's own button for a whole path.
+    expect(catalog["v4.map.digWholePath"]).toBe("A closer look at this path");
+  });
+});
+
 describe("the owner's fourth round (6 Nov): the tab, the 'older than the map' box and two failed-dig lines", () => {
   it("are the owner's words, pinned here, and wait on no drafted list", () => {
     expect(Object.fromEntries(Object.keys(FOURTH_ROUND_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(FOURTH_ROUND_ANSWER_LINES);

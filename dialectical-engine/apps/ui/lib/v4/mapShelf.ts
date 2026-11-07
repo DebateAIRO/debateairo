@@ -1,6 +1,6 @@
 import { DIG_LEVEL_MAX, type AnswerIndex, type ContractClient } from "@debateai/contract";
 import { contractClient } from "../api.js";
-import type { MessageCatalog } from "../i18n/translate.js";
+import { t, type MessageCatalog } from "../i18n/translate.js";
 import { digPicksOf, ownWords, parseDigDetail } from "./askText.js";
 import { digParentOf, type IndexEntry } from "./digIndex.js";
 import { cardLabel } from "./mapLooks.js";
@@ -23,7 +23,9 @@ import { TRUST_WORDS, type TrustCounts, type TrustWord } from "./types.js";
  *  - `started_at` (an open run): "Being looked into, started 14:00"; without it, "Being looked into";
  *  - `map_bar` ({ sure, sure_for_case, still_argued, didnt_hold }, whole numbers): the map's four-shade bar; without it, none;
  *  - `changed_since_visit` (true): the "New" dot (the map changed since the person last opened it); without it, none;
- *  - `dug_from` (a run id, or null for a first question): the dig link, so no per-row read is needed; without it, read.
+ *  - `dug_from` (a run id, or null for a first question): the dig link, so no per-row read is needed; without it, read;
+ *  - `dug_on_public` (true) with `dig_pick` (its first pick's words as the person sent them): a dig the person made on
+ *    someone else's public page (the start-step session's Task 79c), a card of its own (question 33 A, below).
  * The contract's answer-list rows are strict today, so these arrive only once the contract names them.
  *
  * journey-f22 / public-f17: the answer list says "running" for a question paused at the month wall too, so each map or dig
@@ -51,13 +53,21 @@ export type ShelfRow = Readonly<{
   changed: boolean;
   /** The run this one was dug from as the server says it (null: a first question); undefined when the row does not say. */
   dugFrom: string | null | undefined;
+  /** The server says this is a dig the person made on someone else's public page (`dug_on_public`). */
+  publicDig: boolean;
+  /** That dig's first pick in the person's words (`dig_pick`); null when it had none (a whole path) or it is not such a dig. */
+  publicPick: string | null;
 }>;
 
 export type ShelfDig = Readonly<{ runId: string; pick: string; more: boolean; state: ShelfState; pause: ShelfPause | null }>;
 
+/** A card of the list: one of the person's questions, or a dig they made on someone else's public page (question 33 A). */
+export type ShelfCardKind = "QUESTION" | "PUBLIC_DIG";
+
 export type ShelfMap = Readonly<{
   runId: string;
-  /** The person's own words (askText.ownWords). */
+  kind: ShelfCardKind;
+  /** The card's words: the person's own question (askText.ownWords), or a public dig's "Dig: …" (publicDigCardText). */
   question: string;
   state: ShelfState;
   /** Set when state is PAUSED. */
@@ -108,15 +118,19 @@ function barOf(value: unknown): TrustCounts | null {
 }
 
 /** The optional fields of one answer-list row (see the header). */
-export function shelfExtrasOf(row: object): Pick<ShelfRow, "startedAt" | "bar" | "changed" | "dugFrom"> {
+export function shelfExtrasOf(row: object): Pick<ShelfRow, "startedAt" | "bar" | "changed" | "dugFrom" | "publicDig" | "publicPick"> {
   const loose = row as Readonly<Record<string, unknown>>;
   const started = loose.started_at;
   const dug = loose.dug_from;
+  const publicDig = loose.dug_on_public === true;
+  const pick = publicDig && typeof loose.dig_pick === "string" ? loose.dig_pick.trim() : "";
   return {
     startedAt: typeof started === "string" && ISO_TIME.test(started) && Number.isFinite(Date.parse(started)) ? started : null,
     bar: barOf(loose.map_bar),
     changed: loose.changed_since_visit === true,
-    dugFrom: dug === null ? null : typeof dug === "string" && dug.length > 0 ? dug : undefined
+    dugFrom: dug === null ? null : typeof dug === "string" && dug.length > 0 ? dug : undefined,
+    publicDig,
+    publicPick: pick.length > 0 ? pick : null
   };
 }
 
@@ -133,7 +147,9 @@ function joined(known: ShelfRow | undefined, row: ShelfRow): ShelfRow {
     startedAt: lead.startedAt ?? other.startedAt,
     bar: lead.bar ?? other.bar,
     changed: lead.changed || other.changed,
-    dugFrom: lead.dugFrom !== undefined ? lead.dugFrom : other.dugFrom
+    dugFrom: lead.dugFrom !== undefined ? lead.dugFrom : other.dugFrom,
+    publicDig: lead.publicDig || other.publicDig,
+    publicPick: lead.publicPick ?? other.publicPick
   });
 }
 
@@ -158,8 +174,16 @@ export function mergeShelfRows(known: readonly ShelfRow[], page: Pick<AnswerInde
   return Object.freeze([...byRun.values()].sort(newestFirst));
 }
 
-/** Where a row goes: a card of its own, or under the run it was dug from (null: no known parent). */
-export type ShelfPlace = Readonly<{ kind: "QUESTION" }> | Readonly<{ kind: "DIG"; parent: string | null }>;
+/**
+ * Where a row goes: a card of its own (a question, or a dig made on someone else's public page), or under the run it was
+ * dug from (null: no known parent).
+ */
+export type ShelfPlace = Readonly<{ kind: ShelfCardKind }> | Readonly<{ kind: "DIG"; parent: string | null }>;
+
+/** Whether a place is a card of the list. */
+function isCard(place: ShelfPlace | undefined): boolean {
+  return place !== undefined && place.kind !== "DIG";
+}
 
 /**
  * dig-f30: what a dig looked into, as its shelf line names it. A dig of picks on a path also names the path's line first
@@ -182,11 +206,14 @@ function entryOf(row: ShelfRow): IndexEntry {
 }
 
 /**
- * A row's place. The dig link decides: the server's `dug_from` when the row carries it, else the account's dig-link read.
- * With no link (none recorded, or the read failed), a dig made before the links existed is still known by the context
- * line its text carries, and placed under its one parent as the map page finds it (digIndex.digParentOf).
+ * A row's place. A dig the server marks as made on someone else's public page is a card of its own (question 33 A): the
+ * debate it was dug from is not the person's, so it has no question of theirs to hang under. Otherwise the dig link
+ * decides: the server's `dug_from` when the row carries it, else the account's dig-link read. With no link (none
+ * recorded, or the read failed), a dig made before the links existed is still known by the context line its text
+ * carries, and placed under its one parent as the map page finds it (digIndex.digParentOf).
  */
 export function shelfPlaceOf(row: ShelfRow, links: ReadonlyMap<string, string | null | "FAILED">, entries: readonly IndexEntry[], catalog: MessageCatalog): ShelfPlace {
+  if (row.publicDig) return Object.freeze({ kind: "PUBLIC_DIG" });
   const read = links.get(row.runId);
   const linked = row.dugFrom !== undefined ? row.dugFrom : read === undefined || read === "FAILED" ? undefined : read;
   if (typeof linked === "string") return Object.freeze({ kind: "DIG", parent: linked });
@@ -197,14 +224,25 @@ export function shelfPlaceOf(row: ShelfRow, links: ReadonlyMap<string, string | 
 }
 
 /**
- * The cards: the first `want` question rows (newest first, rows with no words of their own left out), each with the digs
+ * The words of a public dig's card. The owner's answer to question 33 (5 Nov 2026, A): "Dig: {its pick}" (dig-f30's
+ * words), from the server's `dig_pick`, with "and more" when the dig's own question line names more than one pick (as a
+ * dig under a question says it). The fifth round (7 Nov): a dig of a whole path, which has no pick, reads "Dig: a closer
+ * look at a path" (the map's own button is "A closer look at this path").
+ */
+export function publicDigCardText(row: Pick<ShelfRow, "questionLine" | "publicPick">, catalog: MessageCatalog): string {
+  const detail = parseDigDetail(row.questionLine, catalog);
+  const linePicks = detail === null ? [] : detail.items.filter((_, at) => detail.kinds[at] !== "PATH");
+  const pick = row.publicPick ?? linePicks[0] ?? null;
+  if (pick === null) return t(catalog, "v4.maps.digWholePath");
+  return t(catalog, linePicks.length > 1 ? "v4.maps.digMore" : "v4.maps.dig", { pick });
+}
+
+/**
+ * The cards: the first `want` card rows (newest first, questions with no words of their own left out), each with the digs
  * whose chain of parents leads to it, newest first. A dig whose question is not among the rows read hangs nowhere here.
- *
- * STILL DUE (the owner's answer to question 33, 5 Nov, A): a dig made on someone else's public page shows as its own card,
- * "Dig: {its pick}" (dig-f30's words), the one case of a dig card of its own. It waits on the server: the answer list's
- * rows must say the dig was made on a public page and carry its pick (`dug_on_public`, `dig_pick`: the start-step plan's
- * Task 79c gives the data; the page part is this review's). Until then such a dig hangs nowhere and the list leaves it
- * out, so the public dig box's "“My questions” will show it if it did." (v4.public.dig.unconfirmed) is not yet true for it.
+ * A dig the person made on someone else's public page is a card of its own, "Dig: …" (question 33 A, publicDigCardText),
+ * the one case of a dig card of its own; the public dig box's "“My questions” will show it if it did." relies on it.
+ * Until the server marks such a row (`dug_on_public`), the dig still hangs nowhere and the list leaves it out.
  */
 export function buildShelf(
   rows: readonly ShelfRow[],
@@ -227,7 +265,7 @@ export function buildShelf(
       seen.add(at);
       const place = places.get(at);
       if (place === undefined) return null;
-      if (place.kind === "QUESTION") return at;
+      if (place.kind !== "DIG") return at;
       if (place.parent === null) return null;
       at = place.parent;
     }
@@ -246,11 +284,12 @@ export function buildShelf(
   const maps: ShelfMap[] = [];
   for (const row of rows) {
     if (maps.length >= want) break;
-    if (places.get(row.runId)?.kind !== "QUESTION") continue;
-    const question = ownWords(row.questionLine);
+    const kind = places.get(row.runId)?.kind;
+    if (kind !== "QUESTION" && kind !== "PUBLIC_DIG") continue;
+    const question = kind === "PUBLIC_DIG" ? publicDigCardText(row, catalog) : ownWords(row.questionLine);
     if (question.length === 0) continue;
     maps.push(Object.freeze({
-      runId: row.runId, question, ...stateOf(row), startedAt: row.startedAt, bar: row.bar, changed: row.changed,
+      runId: row.runId, kind, question, ...stateOf(row), startedAt: row.startedAt, bar: row.bar, changed: row.changed,
       digs: Object.freeze(digsOf.get(row.runId) ?? [])
     }));
   }
@@ -303,7 +342,7 @@ export async function readMapShelf(want: number, catalog: MessageCatalog, option
   /** The oldest answer read so far: a question older than it may still have unread answers before it. */
   let frontier = Number.POSITIVE_INFINITY;
   const settled = (row: ShelfRow) => ended || row.sequence >= frontier;
-  const settledQuestions = () => rows.filter((row) => places.get(row.runId)?.kind === "QUESTION" && settled(row)).length;
+  const settledQuestions = () => rows.filter((row) => isCard(places.get(row.runId)) && settled(row)).length;
   for (;;) {
     const page = await client.readAnswerIndex(SHELF_PAGE, offset);
     pages += 1;
@@ -318,14 +357,14 @@ export async function readMapShelf(want: number, catalog: MessageCatalog, option
       const next = rows.filter((row) => !places.has(row.runId)).slice(0, LINK_READS_AT_ONCE);
       if (next.length === 0) break;
       await Promise.all(next
-        .filter((row) => row.dugFrom === undefined && !cache.has(row.runId))
+        .filter((row) => row.dugFrom === undefined && !row.publicDig && !cache.has(row.runId))
         .map(async (row) => { cache.set(row.runId, await readLink(row.runId, client)); }));
       const entries = rows.map(entryOf);
       for (const row of next) places.set(row.runId, shelfPlaceOf(row, cache, entries, catalog));
     }
     if (settledQuestions() > want || ended || pages >= maxPages) break;
   }
-  const placedQuestions = rows.filter((row) => places.get(row.runId)?.kind === "QUESTION").length;
+  const placedQuestions = rows.filter((row) => isCard(places.get(row.runId))).length;
   const unplaced = rows.some((row) => !places.has(row.runId));
   const shown = buildShelf(rows, places, catalog, want);
   // journey-f22: read again only what the shelf shows as being looked into (a few open runs at most).

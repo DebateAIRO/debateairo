@@ -112,6 +112,7 @@
   "v4.maps.new": "New",
   "v4.maps.dig": "Dig: {pick}",
   "v4.maps.digMore": "Dig: {pick} and more",
+  "v4.maps.digWholePath": "Dig: a closer look at a path",
   "v4.maps.empty": "You haven't asked a question yet.",
   "v4.maps.ask": "Ask a question",
   "v4.maps.failed": "We couldn't load your questions just now.",
