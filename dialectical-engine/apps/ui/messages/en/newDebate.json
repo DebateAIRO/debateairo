@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Unable to create debate",
   "newDebate.sessionReadFailed": "Session read failed",
   "newDebate.planRosterFailed": "Plan tier roster read failed",
-  "newDebate.checkingSession": "Checking session…",
+  "newDebate.checkingSession": "One moment…",
   "newDebate.redirectingToSignIn": "Taking you to sign in…",
   "newDebate.continueToSignIn": "Continue to sign in",
   "newDebate.defaultUnavailable": "The deployment has no valid riskTier row; Risk tier awaits input.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "You've reached today's limit for your plan. You can still ask: your debate will start by itself at {time}.",
   "newDebate.room.personWeekFullTopPlan": "You've reached this week's limit for your plan. You can still ask: your debate will start by itself on {time}.",
   "newDebate.room.personMonthFullTopPlan": "You've reached this month's limit for your plan. You can still ask: your debate will start by itself on {time}.",
-  "newDebate.room.freeMonthFull": "You've used this month's free debate allowance. Your next debate can start on {time}, or choose a plan to continue now.",
+  "newDebate.room.freeMonthFull": "You've used this month's free quota. Your next debate can start on {time}, or choose a plan to continue now.",
   "newDebate.room.personClose": "You're close to your plan's limit. This debate will still run in full.",
   "newDebate.room.ownDebatesFull": "Your other debates are using the rest of your limit for now. This one starts by itself as soon as one of them finishes.",
   "newDebate.room.upgradeLink": "See plans",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Your plan: Free",
   "newDebate.plan.current.PLUS": "Your plan: Plus",
   "newDebate.plan.current.PRO": "Your plan: Pro",
-  "newDebate.plan.current.MAX": "Your plan: Max"
+  "newDebate.plan.current.MAX": "Your plan: Max",
+  "newDebate.askText.otherAnswer": "Other…",
+  "newDebate.askText.otherLabel": "Your own extra clarification",
+  "newDebate.askText.matters": "If the answers pull in different directions, what matters most to me: {matters}",
+  "newDebate.askText.angles": "Please also look at: {list}.",
+  "newDebate.freePublicNotice": "On the Free plan your question and its debate are public. Don't include personal details."
 }

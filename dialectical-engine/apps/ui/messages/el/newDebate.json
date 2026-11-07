@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Δεν ήταν δυνατή η δημιουργία αντιπαράθεσης",
   "newDebate.sessionReadFailed": "Η ανάγνωση της συνεδρίας απέτυχε",
   "newDebate.planRosterFailed": "Η ανάγνωση καταλόγου βαθμίδων προγράμματος απέτυχε",
-  "newDebate.checkingSession": "Έλεγχος συνεδρίας…",
+  "newDebate.checkingSession": "Μια στιγμή…",
   "newDebate.redirectingToSignIn": "Μετάβαση στη σύνδεση…",
   "newDebate.continueToSignIn": "Συνέχεια στη σύνδεση",
   "newDebate.defaultUnavailable": "Η εγκατάσταση δεν διαθέτει έγκυρη γραμμή riskTier· η βαθμίδα κινδύνου αναμένει εισαγωγή.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Φτάσατε το σημερινό όριο του προγράμματός σας. Μπορείτε ακόμη να ρωτήσετε: η αντιπαράθεσή σας θα ξεκινήσει μόνη της στις {time}.",
   "newDebate.room.personWeekFullTopPlan": "Φτάσατε το όριο αυτής της εβδομάδας για το πρόγραμμά σας. Μπορείτε ακόμη να ρωτήσετε: η αντιπαράθεσή σας θα ξεκινήσει μόνη της στις {time}.",
   "newDebate.room.personMonthFullTopPlan": "Φτάσατε το όριο αυτού του μήνα για το πρόγραμμά σας. Μπορείτε ακόμη να ρωτήσετε: η αντιπαράθεσή σας θα ξεκινήσει μόνη της στις {time}.",
-  "newDebate.room.freeMonthFull": "Χρησιμοποιήσατε τις δωρεάν αντιπαραθέσεις αυτού του μήνα. Η επόμενη αντιπαράθεσή σας μπορεί να ξεκινήσει στις {time} ή επιλέξτε ένα πρόγραμμα για να συνεχίσετε τώρα.",
+  "newDebate.room.freeMonthFull": "Χρησιμοποιήσατε τη δωρεάν ποσόστωση αυτού του μήνα. Η επόμενη αντιπαράθεσή σας μπορεί να ξεκινήσει στις {time} ή επιλέξτε ένα πρόγραμμα για να συνεχίσετε τώρα.",
   "newDebate.room.personClose": "Πλησιάζετε το όριο του προγράμματός σας. Αυτή η αντιπαράθεση θα ολοκληρωθεί κανονικά.",
   "newDebate.room.ownDebatesFull": "Οι άλλες αντιπαραθέσεις σας χρησιμοποιούν προς το παρόν ό,τι απομένει από το όριό σας. Αυτή η αντιπαράθεση θα ξεκινήσει μόνη της μόλις ολοκληρωθεί μία από αυτές.",
   "newDebate.room.upgradeLink": "Δείτε τα προγράμματα",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Το πρόγραμμά σας: Δωρεάν",
   "newDebate.plan.current.PLUS": "Το πρόγραμμά σας: Plus",
   "newDebate.plan.current.PRO": "Το πρόγραμμά σας: Pro",
-  "newDebate.plan.current.MAX": "Το πρόγραμμά σας: Max"
+  "newDebate.plan.current.MAX": "Το πρόγραμμά σας: Max",
+  "newDebate.askText.otherAnswer": "Άλλη απάντηση…",
+  "newDebate.askText.otherLabel": "Η δική σας επιπλέον διευκρίνιση",
+  "newDebate.askText.matters": "Αν οι απαντήσεις οδηγούν σε διαφορετικές κατευθύνσεις, για μένα το πιο σημαντικό είναι: {matters}",
+  "newDebate.askText.angles": "Παρακαλώ, δείτε επίσης: {list}.",
+  "newDebate.freePublicNotice": "Στο δωρεάν πρόγραμμα, η ερώτησή σας και η αντιπαράθεσή της είναι δημόσιες. Μην συμπεριλαμβάνετε προσωπικά στοιχεία."
 }

@@ -45,7 +45,8 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `countryPolicy` | optional, and NOT in the example: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; `us_states` (optional) overrides the United States for a state a person declares at sign-up (never `blocked`; today Tennessee is closed); `regions` (optional) closes payment, never sign-up, in a part of an open country, found from the buyer's billing address: each entry is a region id (`US-MD`, `CA-SK`, `ES-CN`, ...; the code's closed list) with `pay`, the reason, and `"buyers": "business"` when only business buyers are refused (left out: every buyer), never `signup` or `blocked` (see "Closing payment in a region" below); unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); the member turns the gate on, and is added only as "The country gate's switches" below says | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out; in `regions`, an id the code does not know, a rule with `signup` or `blocked`, and `buyers` other than `"business"`) |
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
-| `billingPlans` | optional: the paid plans: each plan's net price in USD, EUR and RON (whole cents or bani), the monthly credit (always USD), day and week shares, the finish edge, Free's fixed gauges, and `currency_by_country` (which currency each tax country pays in; any other country pays the `default`), as the register row stores them. Left out, the engine's own row is sealed, whose EUR and RON prices are placeholders | the register's own parser — `BILLING_PLANS_INVALID` |
+| `billingPlans` | **required** (R22 decision 18; `HOSTED_REGISTER_ROW_MISSING:billingPlans` without it): the plans with their real limits, which the repository never holds: each plan's net price in USD, EUR and RON (whole cents or bani), the monthly credit (always USD), day and week shares, the finish edge (`finish_bp`; since billingPlans v4 `10000` with a fixed `finish_overflow_micros` past each day, week and month limit), the one closing reserve (`reserve_micros`) and where it is kept (`reserve_held`: `INSIDE_LIMITS` on every paid plan, `ON_TOP_OF_CREDIT` on Free), Free's fixed gauges, and `currency_by_country`. The example's limits are made up, and with `billingPolicy.enabled` a credit of the code's made-up row refuses (`HOSTED_REGISTER_BILLING_PLANS_MADE_UP`). | the register's own parser (`BILLING_PLANS_INVALID`) |
+| `abuseLimits` | **required** (R22 decision 18; `HOSTED_REGISTER_ROW_MISSING:abuseLimits` without it, `ABUSE_LIMITS_INVALID` when malformed, and an API on a version without the row refuses to start, `ABUSE_LIMITS_UNRESOLVED`): clarifying-question calls per person per hour and per day, Report-button uses per person per hour, per debate and per site per day, cancel links per account per day, and mail-domain lookups per minute. The example's values are made up. | the register's own parser (`ABUSE_LIMITS_INVALID`) |
 | `billingPolicy` | optional: the billing switch (`enabled`) and its rules. Left out, the engine's own row is sealed: billing OFF | the register's own parser — `BILLING_POLICY_INVALID`; switched on without the budget members, `BILLING_REQUIRES_ENVELOPE_MEMBERS`; switched on in a version without `countryPolicy`, `BILLING_CONFIGURATION_INCOMPLETE` (the publish's boot check) |
 | `taxAuthorities` | optional: where and when each tax is paid, in plain words, for the quarterly tax summary. Left out, the code-owned `taxAuthorities` row is published unchanged; include the member to correct the text. The example carries the member, equal to the code-owned text, so a file copied from it seals that copy under your own `sourceRef`: the code-owned "research of 29 September 2026, for the accountant to confirm" provenance is dropped, and a later correction of the code-owned row never reaches your versions while your file keeps the member. Delete the member from your copy unless you are correcting the text | the register's own parser — `TAX_AUTHORITIES_INVALID` (a `null` member is refused too) |
 | `publicationCheckPolicy` | optional, and NOT in the example: the deadline of the safety check that runs before a debate is published, as `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": 60000}`, in whole milliseconds from 1000 to 60000 (60 seconds is the spec's cap, and the website waits 85 seconds for a publish). Left out, the code-owned `publicationCheckPolicy` row is published unchanged (60000); include the member only to change the deadline. A check that runs out of time refuses the publish, so a shorter deadline can only refuse more publishes, never skip the check | the register's own parser — `PUBLICATION_CHECK_POLICY_INVALID` (a `null` member is refused too) |
@@ -80,26 +81,34 @@ switch later is a new version, never an edit of a sealed one.
 
 ## Closing payment in a region
 
-Some places inside an open country need their own tax registration before the site may sell there. The
-`regions` member of `countryPolicy` closes payment in them. People there can still sign up and use the
-Free plan; only paying is refused. The site finds the region from the billing address the buyer types (the
-postal code, or the state or province), not from the internet address.
+Some places inside an open country need their own tax registration before the site may sell there, and the Terms
+exclude one, Tennessee. The `regions` member of `countryPolicy` closes payment in them. People in a tax region can
+still sign up and use the Free plan; only paying is refused. The site finds the region from the billing address the
+buyer types (the postal code, or the state or province), not from the internet address.
 
 `country-policy.example.json` carries the owner's launch list of 20 October 2026 (the research is in the payment
-region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`):
+region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`), and Tennessee:
 
 - Canada: Saskatchewan (`CA-SK`), Manitoba (`CA-MB`);
-- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, `US-NJ`, and Ohio (`US-OH`) for
-  business buyers only;
+- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, and Ohio (`US-OH`) for business buyers
+  only. New Jersey (`US-NJ`) was on the list too until the owner opened it on 4 November 2026;
 - the EU places outside the EU VAT area: `ES-CN` (Canary Islands), `ES-CE` (Ceuta), `ES-ML` (Melilla),
   `FR-971` (Guadeloupe, with Saint-Martin and Saint-Barthélemy), `FR-972` (Martinique), `FR-973` (French
   Guiana), `FR-974` (Réunion), `FR-976` (Mayotte), `FI-01` (Åland), `GR-69` (Mount Athos), `IT-LIVIGNO`,
-  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen).
+  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen);
+- Tennessee (`US-TN`), for every buyer, because the Terms exclude it (section 2 and Annex A.2, the owner's
+  amendment of 8 October 2026). Sign-up already refuses a person who declares Tennessee (`us_states`); this entry
+  refuses a Tennessee billing address too, so someone who declared another state still cannot pay from there.
+  Its refusal has its own code, `REGION_TERMS_EXCLUDED`, read from the reason, and its own sentence ("We don't
+  offer Dialectical Engine in Tennessee, so we can't take payment for this address."); a region closed for tax
+  answers `REGION_PAYMENT_UNAVAILABLE`.
 
-Each entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
+Each tax entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
 region once the company is registered there, delete its entry from the hosted file and publish: that new
-version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). A file whose
-`countryPolicy` has no `regions` member closes no region.
+version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). Tennessee's entry reads
+`{ "pay": false, "reason": "TERMS_EXCLUDED" }`. Keep it while the Terms exclude Tennessee, and delete it only
+together with the `us_states` entry, once the Terms serve Tennessee again. A file whose `countryPolicy` has no
+`regions` member closes no region.
 
 ## The room read's budget
 
@@ -219,7 +228,8 @@ Your `sourceRef` is sealed in these places, and only there:
 
 - the publication's own source reference (why this version exists);
 - the `costEnvelopePolicy` row's source reference, verbatim;
-- the `billingPlans` and `billingPolicy` rows' source reference, verbatim, when the file supplies them;
+- the `billingPlans` and `abuseLimits` rows' source reference, verbatim, always;
+- the `billingPolicy` row's source reference, verbatim, when the file supplies it;
 - the `countryPolicy` row's source reference, verbatim, when the file carries the member;
 - the `taxAuthorities` row's source reference, verbatim, when the file carries the member (left
   out, that row keeps the code-owned source reference);
@@ -261,10 +271,9 @@ The values are the engine's own; only the provenance labels say "development". T
 on its `provenance=development-source-refs (known limitation)` line. Renaming that provenance is a
 separate change to the runner's reader and needs its own ruling.
 
-The ceilings in the example are the PROVISIONAL first-run values the owner accepted: 0.25 USD per
-run (`250000`) and 2.00 USD per day (`2000000`), with `provisional: true`. The real values come
-after the first measured paid run, as a NEW version published from an edited copy of this file —
-never as an edit of the sealed one.
+Every limit in the example is MADE UP, with `provisional: true` on its ceilings. The real values live
+only in the operator's copy of this file on the server, and a change is a NEW version published from an
+edited copy — never an edit of the sealed one.
 
 The file is read under the same custody rule as the key files: mode `0600`, owned by the user who
 runs the command, inside a `0700` directory owned by that same user, not a symlink

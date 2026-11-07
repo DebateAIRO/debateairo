@@ -59,6 +59,7 @@ import {
 } from "../../packages/register/src/index.js";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 const EXAMPLE_PATH = new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url);
 const INLINE_SECRET = "Bearer hosted-register-test-inline-credential-must-never-print";
@@ -115,7 +116,9 @@ function validFile(): Record<string, unknown> {
         input_price_micros_per_million: 1_000_000,
         output_price_micros_per_million: 4_000_000
       }
-    ]
+    ],
+    // R22 decision 18: required members; the code holds only made-up values, and these stand in for the operator's.
+    ...structuredClone(TEST_OWNER_LIMIT_ROWS)
   };
 }
 
@@ -199,8 +202,8 @@ describe("Task 14b · the operator's hosted register file", () => {
     const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
     expect(plan.costEnvelope).toMatchObject({
-      perRunCeilingMicros: 250_000,
-      dailyCeilingMicros: 2_000_000,
+      perRunCeilingMicros: 440_000,
+      dailyCeilingMicros: 5_500_000,
       provisional: true
     });
     expect(plan.vendorRefs.length).toBeGreaterThanOrEqual(2);
@@ -227,20 +230,20 @@ describe("Task 14b · the operator's hosted register file", () => {
    * deployment only through this file. The format string stays v1: every v1
    * file already published stays valid and keeps its meaning (missing = 0).
    */
-  it("ships an example carrying the answer's reserve (3000) and overrun (2000), and the plan prints them", async () => {
+  it("ships an example carrying a made-up answer's reserve (3300) and overrun (2200), and the plan prints them", async () => {
     const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
     expect(example.format).toBe("debateai.hosted-register.v1");
     expect(example.costEnvelopePolicy).toMatchObject({
-      serve_reserve_basis_points: 3_000,
-      serve_overrun_basis_points: 2_000
+      serve_reserve_basis_points: 3_300,
+      serve_overrun_basis_points: 2_200
     });
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
-    expect(plan.costEnvelope).toMatchObject({ serveReserveBasisPoints: 3_000, serveOverrunBasisPoints: 2_000 });
+    expect(plan.costEnvelope).toMatchObject({ serveReserveBasisPoints: 3_300, serveOverrunBasisPoints: 2_200 });
     expect(renderHostedRegisterPlan(plan))
-      .toMatch(/^cost_envelope .* serve_reserve_basis_points=3000 serve_overrun_basis_points=2000$/mu);
+      .toMatch(/^cost_envelope .* serve_reserve_basis_points=3300 serve_overrun_basis_points=2200$/mu);
     const envelope = plan.rows.find((row) => row.rowKey === COST_ENVELOPE_POLICY_ROW_KEY);
     expect(JSON.parse(envelope!.valueJsonText)).toMatchObject({
-      serve_reserve_basis_points: 3_000, serve_overrun_basis_points: 2_000
+      serve_reserve_basis_points: 3_300, serve_overrun_basis_points: 2_200
     });
   });
 
@@ -804,25 +807,25 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
   it("ships an example with the three budget members and both billing rows, billing off", async () => {
     const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
     expect(example.costEnvelopePolicy).toMatchObject({
-      admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+      admission_close_basis_points: 8_800, finish_up_to_basis_points: 11_000, waiting_line_per_person: 1
     });
     expect(example.billingPlans).toEqual(JSON.parse(JSON.stringify(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value)));
     expect(example.billingPolicy).toEqual(JSON.parse(JSON.stringify(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)));
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
     const rendered = renderHostedRegisterPlan(plan);
     expect(rendered).toContain(
-      "cost_envelope_band admission_close_basis_points=9500 finish_up_to_basis_points=11500 waiting_line_per_person=1\n"
+      "cost_envelope_band admission_close_basis_points=8800 finish_up_to_basis_points=11000 waiting_line_per_person=1\n"
     );
     expect(rendered).toContain("billing_policy enabled=false\n");
     expect(rendered).toContain("billing_plans plan_ids=FREE,PLUS,PRO,MAX\n");
-    // §2.5.1: Free's whole month (0.20 USD) is below 0.25 USD per debate. A warning, never a refusal.
+    // §2.5.1: the example's made-up Free month is below its made-up per-debate ceiling. A warning, never a refusal.
     expect(rendered).toContain("warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:FREE\n");
     expect(rendered).not.toContain("BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:PLUS");
     // The existing cost_envelope line keeps its shape (the M1 regex above still matches it).
-    expect(rendered).toMatch(/^cost_envelope .* serve_overrun_basis_points=2000$/mu);
+    expect(rendered).toMatch(/^cost_envelope .* serve_overrun_basis_points=2200$/mu);
   });
 
-  it("seals the engine's own billing rows, billing off, when a v1 file names neither", async () => {
+  it("seals the engine's own billing switch, off, when a file does not name one, and the file's own plans", async () => {
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
     const policy = plan.rows.find((row) => row.rowKey === "billingPolicy");
     expect(policy?.sourceRef).toBe(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef);
@@ -859,8 +862,41 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
     expect(renderHostedRegisterPlan(plan)).toContain("billing_policy enabled=true\n");
   });
 
+  // R22 decision 18: the code holds only made-up plans and abuse limits, so a hosted file must bring its own.
+  it.each([["billingPlans"], ["abuseLimits"]])("refuses a file without %s, by name, before any plan", (member) => {
+    const file = validFile();
+    delete file[member];
+    expect(codeOf(() => parseHostedRegisterFile(bytesOf(file)))).toBe(`HOSTED_REGISTER_ROW_MISSING:${member}`);
+  });
+
+  it("seals the operator's plans and abuse limits verbatim, under the file's sourceRef", async () => {
+    const file = validFile();
+    (file.abuseLimits as Record<string, unknown>) = { ...(file.abuseLimits as Record<string, unknown>), clarify_per_hour: 3 };
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
+    for (const key of ["billingPlans", "abuseLimits"]) {
+      const row = plan.rows.find((entry) => entry.rowKey === key)!;
+      expect(JSON.parse(row.valueJsonText), key).toEqual(JSON.parse(JSON.stringify(file[key])));
+      expect(row.sourceRef, key).toBe(file.sourceRef);
+    }
+  });
+
+  it("refuses the code's made-up plans with billing on (HOSTED_REGISTER_BILLING_PLANS_MADE_UP), and allows them with billing off", async () => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+    });
+    file.askRoomReads = ROOM_READS_FIXTURE;
+    file.billingPlans = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value;
+    expect(await planCode(file)).toBe("NO_REFUSAL");
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
+    expect(await planCode(file)).toBe("HOSTED_REGISTER_BILLING_PLANS_MADE_UP");
+    file.billingPlans = structuredClone(TEST_OWNER_LIMIT_ROWS.billingPlans);
+    expect(await planCode(file)).toBe("NO_REFUSAL");
+  });
+
   it.each([
     ["a malformed plans row", "billingPlans", { kind: "BILLING_PLANS" }, "BILLING_PLANS_INVALID"],
+    ["a malformed abuse limits row", "abuseLimits", { kind: "ABUSE_LIMITS" }, "ABUSE_LIMITS_INVALID"],
     ["a policy naming a payment environment (A22: the environment follows the API's base URL, never the policy)", "billingPolicy",
       { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, payment_environment: "sandbox" }, "BILLING_POLICY_INVALID"]
   ])("refuses %s by the register's own code", async (_name, key, value, code) => {
@@ -1693,9 +1729,9 @@ describe("Paid plans P4-G · the room read's admission budget (ruling C7)", () =
 
   it("ships an example that seals the band with an example room-read budget", async () => {
     const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
-    expect(example.askRoomReads).toEqual({ key: "owner", limit: 60, window_ms: 60_000, capacity: 65_536 });
+    expect(example.askRoomReads).toEqual({ key: "owner", limit: 66, window_ms: 60_000, capacity: 65_536 });
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
-    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads key=owner limit=60 window_ms=60000 capacity=65536\n");
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads key=owner limit=66 window_ms=60000 capacity=65536\n");
     // Without the member the example itself is refused: the band is sealed.
     delete example.askRoomReads;
     expect(await planCode(example)).toBe("ASK_ROOM_ADMISSION_UNSEALED");

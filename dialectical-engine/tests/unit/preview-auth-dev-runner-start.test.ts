@@ -288,8 +288,9 @@ describe('the real readiness seam', () => {
       retire = source.indexOf('startRunnerRetirement({'), ended = source.indexOf('await started;');
     expect(announce).toBeGreaterThan(0);
     expect(announce).toBeLessThan(resend); expect(resend).toBeLessThan(retire); expect(retire).toBeLessThan(ended);
-    expect(source.slice(ended)).toContain('lapsedResend.stop();\nretirement.stop();');
-    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    await worker.stop();\n');
+    // R22 W3-7: the path rewrite sweep stops beside the re-send pass, both when the worker is told to stop and after it ended.
+    expect(source.slice(ended)).toContain('lapsedResend.stop();\npathRewriteSweep?.stop();\ntreeSweep?.stop();\npublicTreeSweep?.stop();\ninvestigationCloseSweep?.stop();\npassageSweep?.stop();\nwebResearchedSweep?.stop();\nretirement.stop();');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    pathRewriteSweep?.stop();\n    treeSweep?.stop();\n    publicTreeSweep?.stop();\n    investigationCloseSweep?.stop();\n    passageSweep?.stop();\n    webResearchedSweep?.stop();\n    await worker.stop();\n');
   });
 
   // R4 (final review): a retired runner's process ends by itself (the public server has no launcher to exit it). The
@@ -297,7 +298,7 @@ describe('the real readiness seam', () => {
   // which Hatchet resolves before its running tasks finish (and a planned stop leaves the exit to Hatchet itself).
   it('runner main ends both pools once the retired worker has stopped, and never at its tail', async () => {
     const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
-    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    pathRewriteSweep?.stop();\n    treeSweep?.stop();\n    publicTreeSweep?.stop();\n    investigationCloseSweep?.stop();\n    passageSweep?.stop();\n    webResearchedSweep?.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
     expect(source.match(/\.end\(\)/g)).toHaveLength(2);
     expect(source.slice(source.indexOf('await started;'))).not.toContain('.end()');
   });
@@ -359,6 +360,25 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     // Side-by-side spec §1: prepare-only checks the release key right after the narrowed environment, as the start does.
     const narrowed = prepare.indexOf("narrowEnvironment('runner',configured,runtime,plan.publication,plan)"), keyed = prepare.indexOf('assertRunnerReleaseKey(configured,plan,source)');
     expect(narrowed).toBeGreaterThan(0); expect(keyed).toBeGreaterThan(narrowed);
+  });
+
+  // R22 (2026-11-02): the runner login's role set (0130's debateai_rls_all_accounts) refused only at --start, with the
+  // site down. Prepare-only runs the start's own connection check, in the start's order, before it reports anything.
+  it('prepare-only runs the selected runner connection check, as the start does, between the narrowed environment and the release key', async () => {
+    const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
+    const prepare = code.slice(code.indexOf('export async function prepareRunner'), code.indexOf('export async function launchRunner'));
+    const steps = ["narrowEnvironment('runner',configured,runtime,plan.publication,plan)", "tsImport('./verify-native.ts',import.meta.url)",
+      'await verify.assertSelectedRunnerConnection(configured,plan.publication)', 'assertRunnerReleaseKey(configured,plan,source)', 'return {'];
+    const at = steps.map(step => prepare.indexOf(step));
+    expect(at.every(index => index > 0), JSON.stringify(at)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(prepare.match(/assertSelectedRunnerConnection\(/g)).toHaveLength(1);
+    // Its line now says the connection was checked.
+    expect(prepare).toContain('runtimeSelectionVerified:true');
+    expect(prepare).not.toContain('runtimeSelectionVerified:false');
+    // The same check, by name, that the start runs (verify-native.ts: the exact role set the principals manifest's runner row pins).
+    const start = code.slice(code.indexOf('export async function launchRunner'));
+    expect(start).toContain('await verify.assertSelectedRunnerConnection(configured,plan.publication)');
   });
 
   // Side-by-side spec §1: the preview launcher ties RELEASE_KEY to the plan's register pin and source revision.
@@ -618,5 +638,29 @@ describe('debateai-preview-runner@.service template', () => {
     const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
     const readable = unit['[Service]ReadOnlyPaths']!.join(' ').split(' ');
     expect(readable.filter(path => path.includes('.env'))).toEqual(['/etc/debateai-v3-preview/auth-dev-v1/runner-%i.env']);
+  });
+});
+
+// R22, 2026-11-02: the runner's first start under 0130's row security refused, because this check still pinned the
+// membership set measured before 0130. The set it pins is the production principals manifest's runner-runtime row.
+describe('the runner connection check and the principals manifest', () => {
+  it("pins exactly the manifest's runner-runtime memberships, and the cross-account marker must be usable without SET ROLE", async () => {
+    const code = await readFile(resolve(OPERATOR, 'verify-native.ts'), 'utf8');
+    const body = code.slice(code.indexOf('export async function assertSelectedRunnerConnection'));
+    const pinned = /pg_has_role\(current_user,g\.oid,'MEMBER'\)\)=ARRAY\[([^\]]*)\]::text\[\]/.exec(body)?.[1];
+    const manifest: unknown = JSON.parse(await readFile(resolve(import.meta.dirname, '../../docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json'), 'utf8'));
+    const find = (node: unknown): { directMemberships: string[] } | undefined => {
+      if (Array.isArray(node)) { for (const item of node) { const hit = find(item); if (hit) return hit; } return undefined; }
+      if (node && typeof node === 'object') {
+        if ((node as { id?: unknown }).id === 'runner-runtime') return node as { directMemberships: string[] };
+        for (const value of Object.values(node)) { const hit = find(value); if (hit) return hit; }
+      }
+      return undefined;
+    };
+    const runner = find(manifest);
+    expect(runner?.directMemberships).toContain('debateai_rls_all_accounts');
+    // array_agg orders by name (C collation): the manifest's names sorted the same way.
+    expect(pinned?.split(',').map(name => name.trim().replace(/^'|'$/g, ''))).toEqual([...runner!.directMemberships].sort());
+    expect(body).toContain("AND pg_has_role(current_user,'debateai_rls_all_accounts','USAGE')");
   });
 });

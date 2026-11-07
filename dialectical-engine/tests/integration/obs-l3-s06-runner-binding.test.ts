@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient } from "pg";
@@ -494,23 +496,21 @@ console.log(JSON.stringify({
     // nothing, so the property is keyed on it plus the exit sink — both
     // observed BEFORE @debateai/db evaluates, not by reading source text.
     //
-    // The database connection budget (#129) added `RUNNER_CAPACITY` and
-    // `RUNNER_DATABASE_POOLS` to main.ts's @debateai/db line; this stand-in
-    // missed them and the case went RED at link time. Their values copy the
-    // shape of packages/db/src/pool-budget.ts, although the throw below fires
-    // before anything reads them (parallel AI calls, 2026-10-12: runtime 32 and
-    // the claim renewals' own keepAlive pool of 2).
+    // That rot came back every time main.ts gained a name (#129, V-28, INT3, Task 7, B9b, B9d, parallel calls, debate shape,
+    // side-by-side, then PostgresDigModelRunnerRepository and closingReservesOf), and each time the case measured nothing
+    // until a person added the name. So the stand-ins are now written from main.ts's own import lines: every name it imports
+    // from a stubbed module exists, whatever it adds next. No value is ever read: the DB stand-in throws below while the
+    // graph evaluates, before main.ts's own body runs, so an empty binding is enough.
+    const mainSource = readFileSync(join(ROOT, "apps/runner/src/main.ts"), "utf8");
+    const standInFor = (specifier: string): string => [...mainSource.matchAll(/^import\s*\{([^}]*)\}\s*from\s*"([^"]+)"/gmu)]
+      .filter((line) => line[2] === specifier)
+      .flatMap((line) => line[1]!.split(",").map((name) => name.trim()).filter((name) => name !== "" && !name.startsWith("type ")))
+      .map((name) => `export const ${name.split(/\s+as\s+/u)[0]!} = undefined;`).join(" ");
+    // Control: the reading above found the lines this case depends on (an empty stand-in would fail at link time anyway).
+    expect(standInFor("@debateai/db")).toContain("export const RunRepository = undefined;");
+    expect(standInFor("@debateai/register")).toContain("export const loadRunnerEnvironment = undefined;");
     const throwingDb = `data:text/javascript,${encodeURIComponent(`
-export function createPool() {}
-export function configureContentEncryption() {}
-export class RunRepository {}
-export class EntitlementRepository {}
-export class PostgresInternalAllowanceRepository {}
-export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
-export const RUNNER_DATABASE_POOLS = Object.freeze({
-  runtime: Object.freeze({ name: "runner:runtime", max: 32, connectionTimeoutMillis: 5000 }),
-  keepAlive: Object.freeze({ name: "runner:keep-alive", max: 2, connectionTimeoutMillis: 5000 })
-});
+${standInFor("@debateai/db")}
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
 const exitSink = process.listenerCount("exit");
 if (uncaught < 1 || exitSink < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
@@ -521,38 +521,8 @@ export async function resolve(specifier, context, nextResolve) {
     if (specifier === "@debateai/db") {
       return { url: ${JSON.stringify(throwingDb.trim())}, shortCircuit: true };
     }
-    const stubs = {
-      "@hatchet-dev/typescript-sdk": "export class Hatchet {}",
-      "../../../packages/crypto/src/index.js": "export function loadKek() {}",
-      "@debateai/battery": "export class WorkItemRepository {} export function createTerminalActivationEvaluator() {}",
-      // INT2: every NAMED import of a stubbed module must exist, because ESM
-      // links the whole graph before any body evaluates — so a stub that falls
-      // behind main.ts fails at LINK time and this case stops measuring the
-      // install-first ordering it exists for. V-28's
-      // \`assertHostedCostEnvelopesSealed\` joined this import line and was
-      // missing here. INT3 (the Task 11 merge) brought \`readCostEnvelopePolicy\`
-      // onto the same line — the hosted start-up's fail-closed read of the
-      // sealed money ceilings — and this case went RED at link time again
-      // until the stub caught up. The verdict story (Task 7) added
-      // \`readStoryPolicyFromRegister\`, the optional story rows' boot read.
-      // Paid plans B9b added \`EntitlementRepository\` (@debateai/db, above),
-      // \`costEnvelopeBand\` and \`readBillingPlans\`; B9d added \`costEnvelopeCeilings\`.
-      // Parallel AI calls (2026-10-12, Task 9) added \`readCallConcurrencyPolicy\` and
-      // \`effectiveCallConcurrency\`, the call scheduler's boot read of the optional row.
-      // Debate shape (2026-10-12, Phase 2a Task 9) added \`readDebateShapePolicy\` and the runner's boot guard on the optional row;
-      // Phase 2b replaced the guard with \`readMapContractHash\` (the boot resolves the shape settings, apps/runner/src/debate-shape-boot.ts).
-      // Side-by-side spec §13 moved every per-version read (the story rows, the scorecard and engine version, the run
-      // ceiling's \`costEnvelopeCeilings\`, the shape) into apps/runner/src/run-settings.ts, stubbed below; and S14 moved
-      // the site reads (the site's money row, its band, billingPlans) there too, so this stub carries exactly the four
-      // names main.ts still imports from @debateai/register.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {}",
-      // main.ts's ./index.js line (the money rule's price map and its two content-free log lines included).
-      "./index.js": "export function buildProviderPriceMap() {} export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export function logBodyCostFallback() {} export function logServeDisclosure() {} export class WalkingSkeletonRunner {}",
-      // Side-by-side spec §13 moved the per-version reads (policy, story, shape, engine, scorecard) behind the one
-      // settings loader: main.ts imports these three from it, and (S6) the run → version map and each run's own
-      // version's money guard; S8 the boot preload and its line; SA5 the per-run thinking table; S14 the site reads.
-      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {} export function createRunSettingsVersions() {} export function runCostEnvelopeGuardOf() {} export function preloadRunnerSettings() {} export function runnerSettingsLine() {} export function runPreviewThinkingLevelsOf() {} export function readRunnerSiteContext() {}",
-    };
+    const stubs = ${JSON.stringify(Object.fromEntries(["@hatchet-dev/typescript-sdk", "@debateai/battery", "@debateai/register", "./index.js", "./run-settings.js"]
+    .map((specifier) => [specifier, standInFor(specifier)])))};
     if (Object.hasOwn(stubs, specifier)) {
       return { url: "data:text/javascript," + encodeURIComponent(stubs[specifier]), shortCircuit: true };
     }

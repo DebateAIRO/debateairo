@@ -1,6 +1,17 @@
-import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
+import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
+import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
+import {
+  digSuggestionTextFromAnswer,
+  admitDig, digPathIndexOf, joinAtStart, recordDigPicksAtStart, type DigAdmissionPorts, type DigJoinPort, type DigPathIndex,
+  type DigPicksPort, type DigSuggestionTextReader
+} from "./dig-admission.js";
+import { addToResearched } from "./web-researched.js";
+import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader, type RunHandoverPort } from "./month-pause.js";
+import {
+  readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
+} from "./investigation-report.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
@@ -17,14 +28,19 @@ import type { AuthSourceAdmission } from "./registration.js";
 import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
-import type { ProfileSession } from "@debateai/db";
+import { moderationStatementsOf, type ModerationStatementPorts } from "./moderation-statements.js";
+import { pressPublicFlag, type PublicFlagPorts } from "./public-flag.js";
+import type { PostgresPublicDebateRepository, PostgresPublicTreeRepository, ProfileSession, PublicContributionRead } from "@debateai/db";
 import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
+import { questionWithPurposeLines, recordPurposeLinesAtAsk, type PurposeLinesPort } from "./purpose-lines.js";
+import { admitPublicDig, joinPublicDigAtStart, pressPublicReport, type PublicDigAdmission, ownDigRewriteOf } from "./public-tree.js";
+import type { AskClarifyPort } from "./ask-clarify.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { AsyncResource } from "node:async_hooks";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -47,6 +63,8 @@ import {
   AskAlreadyWaitingSchema,
   AskRequestSchema,
   askQuestionMaxBytes,
+  AskClarifyRequestSchema,
+  AskClarifyResponseSchema,
   DeploymentSchema,
   EventTypeSchema,
   InvestigationAcceptedSchema,
@@ -62,15 +80,22 @@ import {
   PublicationTransitionSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
+  PublicDebateRefusedSchema,
+  PublicReportAcceptedSchema,
+  PublicFlagAnswerSchema,
+  PublicFlagRequestSchema,
+  PublicReportRequestSchema,
+  type PublicDebate,
+  type PublicDigParent,
   PublishDebateRequestSchema,
   RunEventSchema,
   RunProjectionSchema,
+  type RunFoundPage,
   SessionSchema,
   AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
   RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
   StepUpAuthorizationRequestSchema,
   AuthenticationResponseSchema, PasskeyEnrollmentResponseSchema, BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
-  UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
   type ArgumentLanguage,
@@ -110,7 +135,35 @@ import {
   QuestionLanguageChoiceNeededSchema,
   PUBLICATION_APPROVAL_REQUIRED,
   DEBATE_REMOVED_BY_CHECK,
-  RemovalNoticeTakeSchema
+  RemovalNoticeTakeSchema,
+  ReadingLevelStateSchema,
+  ReadingLevelSaveRequestSchema,
+  LastVisitSchema,
+  LastVisitRecordRequestSchema,
+  LastVisitRecordedSchema,
+  DigLinksSchema,
+  DigLinkRecordRequestSchema,
+  DigLinkRecordedSchema,
+  ACCOUNT_MEMORY_LIMITS,
+  DIG_LEVEL_MAX,
+  DIG_TOO_DEEP,
+  DigTooDeepSchema,
+  DIG_PICKS_ONE_PATH,
+  DigPicksOnePathSchema,
+  DIG_FREE_PICKS_MAX,
+  DigFreePicksMaxSchema,
+  FREE_DIG_PICKS_MAX,
+  RunContinueRequestSchema,
+  RunContinuedSchema,
+  InvestigationCloseRequestSchema,
+  InvestigationReopenRequestSchema,
+  InvestigationReopenedSchema,
+  InvestigationReportAcceptedSchema,
+  InvestigationReportWritingSchema,
+  INVESTIGATION_REPORT_WRITING,
+  RunContinueRefusedSchema,
+  RUN_PAUSED_UNTIL_RESET,
+  type AskParent
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -277,7 +330,8 @@ import {
 } from "@debateai/register";
 import type { AdmissionRunMembers } from "./admission-settings.js";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
-import { engineForAsk } from "./engine-ask.js";
+import { engineForAsk, webSitesForAsk } from "./engine-ask.js";
+import type { WebSites } from "@debateai/register";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
@@ -807,9 +861,11 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
   "RUN_ENVELOPE_BASIS_INVALID",
   "RUN_FROZEN_HEAD_READ_FAILED",
+  "RUN_HANDOVER_IMPOSSIBLE",
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
   "RUN_MAKER_COUNT_INVALID",
+  "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",
   "RUN_OWNER_INVALID",
   "RUN_OWNER_RAW_ID_FORBIDDEN",
@@ -1442,7 +1498,11 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
+  // V4 account memory (N7, migration 0131): the account's reading level. A write carries the CSRF pair like any user route.
+  { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
+  { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "GET /v1/account/moderation-statements", auth: "user", resource: "identity", action: "read-moderation-statements" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
@@ -1465,12 +1525,16 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   // Addition D24 (owner 2026-10-22): the companies the declared provider targets reach, for the "AI providers" page.
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
+  // Decision 13: a report on a public debate, by a signed-in person with credit.
+  { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
+  { route: "POST /v1/public/debates/{id}/flag", auth: "user", resource: "public-debate", action: "flag" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // Anonymous support writes require the exact first-party Origin.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
+  { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   // Side-by-side spec §6 (plan C5): the process probes. Public and session-free (the website's /readyz and Caddy poll
@@ -1494,9 +1558,20 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
-  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
+  // V4 account memory (N7, N11, migration 0131): a debate's last visit and its dig links, owner-scoped in the database.
+  { route: "GET /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "read-last-visit" },
+  { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
+  { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
+  { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
+  // R22 W3-8 (the money rule): Continue on a month-paused debate, owner-scoped in the database (0134's resume_paused_run).
+  { route: "POST /v1/runs/{id}/continue", auth: "user", resource: "run-owner", action: "continue-run" },
+  // R22 W5-1: the final report over an investigation (0133's closings, 0136's report versions), owner-scoped in the database.
+  { route: "GET /v1/runs/{id}/investigation", auth: "user", resource: "run-owner", action: "read-investigation" },
+  { route: "POST /v1/runs/{id}/report", auth: "user", resource: "run-owner", action: "write-report" },
+  { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
+  { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1679,6 +1754,8 @@ export interface AskApplication {
   submit(ask: AskRequest, session: Session, principal: AskPrincipal): Promise<AskAccepted>;
   readAnswer(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null>;
   readRunAnswer(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<Answer | null>;
+  /** Decision 12: what the AIs found on a debate set aside; asked only after that debate's owner-gated read. */
+  readRunFound?(runId: string): Promise<readonly RunFoundPage[]>;
   readRun(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null>;
   readAnswerIndex(session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex>;
   readSynthesisChecks?(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<readonly {
@@ -1749,6 +1826,14 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
   LINK_EXPIRED: 410,
   ADDRESS_UNAVAILABLE: 409
 });
+
+/** Decision 13: what the public routes need (composed in main.ts on the API's own pool, which carries the content cipher). */
+export type PublicTreeOptions = Readonly<{
+  pool: Pool;
+  tree: PostgresPublicTreeRepository;
+  contributions: PostgresPublicDebateRepository;
+  readPublicDebate: (publicationRef: string) => Promise<PublicDebate | null>;
+}>;
 
 export interface ApiOptions {
   readonly questionCheck?: AskQuestionCheck;
@@ -1825,6 +1910,50 @@ export interface ApiOptions {
    * view. Optional like `disclosures`; without it the route answers its closed 404.
    */
   readonly mapViews?: AnswerMapViewApplication;
+  /**
+   * V4 account memory (owner rulings N7 and N11, migration 0131): the reading level, each debate's last visit and each
+   * dig's link, kept in the account. Its six routes are always mounted; without it they answer 503
+   * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory.
+   */
+  readonly accountMemory?: AccountMemoryStore;
+  /**
+   * Plan 2026-10-30 dig-model revision W3-2 (0134): each debate's dig level and its month pause, on the API's own pool
+   * (`PostgresDigModelRepository`). Absent: an ask's `parent` is not read (as before W3-2: the page's after-start dig
+   * link is the only one) and no run read carries `month_pause`.
+   */
+  readonly digModel?: Pick<DigAdmissionPorts, "readDigLevel"> & MonthPausePort;
+  /** W3-2 (0133, 0134): at start, a dig joins its parent's investigation (`PostgresInvestigationRepository.join`). */
+  readonly investigations?: DigJoinPort;
+  /** W3-7 (0135): once a dig joined, what it was made of is kept for its path rewrite (`PostgresDigPicksRepository`). */
+  readonly digPicks?: DigPicksPort;
+  /** Decision 13: digs and reports on a public debate, by anyone with credit (./public-tree.ts); absent: only the first snapshot is readable. */
+  readonly publicTree?: PublicTreeOptions;
+  readonly publicFlags?: PublicFlagPorts;
+  /** 0157 (D1): the signed-in person's own statements of reasons, their facts opened under each debate's key. */
+  readonly moderationStatements?: ModerationStatementPorts;
+  /** Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key at the ask. */
+  readonly purposeLines?: PurposeLinesPort;
+  /** Decision 29: dynamic step 2's small call. Absent: every page gets the generic purpose options. */
+  readonly askClarify?: AskClarifyPort;
+  /** W3-7: a parent's stored dig suggestion, to tell an AI suggestion from the person's edit (W4-3's store; absent: none). */
+  readonly digSuggestionText?: DigSuggestionTextReader;
+  /** W3-2: whether a person's month has room again after a month pause (the ask room's `monthHasRoom`). */
+  readonly monthRoom?: MonthRoomReader;
+  /** R22 W3-8: after Continue, the paused debate's work item is handed to its runner again (./month-pause.ts). */
+  readonly continuedRunWake?: ContinuedRunWake;
+  /** Decision 12 (./month-pause.ts): where Continue hands a debate of another release; absent: Continue resumes it where it is. */
+  readonly runHandover?: RunHandoverPort;
+  /**
+   * R22 W5-1: the final report over an investigation (./investigation-report.ts): 0136's reports read, 0133's open, close
+   * and reopen, the ownership check and the opener of what the runner sealed under the ROOT's run key. Absent: the three
+   * routes answer the closed 404, as Continue does without `digModel`.
+   */
+  readonly investigationReports?: InvestigationReportPorts;
+  /** W4-4: "Add to researched" (./web-researched.ts): 0132's writer and 0133's clock. Absent: the route answers the closed 404. */
+  readonly webResearched?: Readonly<{
+    record(ownerRef: string, runId: string, pageId: string): Promise<"RECORDED" | "ALREADY" | "NOT_OWNED" | "NOT_OTHER_PAGE">;
+    markActivity(ownerRef: string, runId: string): Promise<void>;
+  }>;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -3222,7 +3351,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // C11.1 (R-16): the schedule request's source carries its mail language into the SCHEDULED row.
     const scheduled=await options.accountErasure.schedule({
       authenticated,grantToken:input.step_up_grant,
-      ...(input.delete_public_debates === true ? { deletePublicDebates:true } : {}),
       source:sourceFor(request)
     });
     if (scheduled==="NOTIFICATION_CHANNEL_REQUIRED") {
@@ -3241,8 +3369,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(202).send(AccountErasureStatusSchema.parse({
       status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
-      cancellation_ref:scheduled.cancellationRef,
-      delete_public_debates:scheduled.deletePublicDebates === true
+      cancellation_ref:scheduled.cancellationRef
     }));
   });
   api.get("/v1/account/erasure",routePolicy("GET /v1/account/erasure"),async (request,reply)=>{
@@ -3257,8 +3384,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(AccountErasureStatusSchema.parse(current.status==="NONE"
       ? { status:"NONE" }
       : { status:current.status,execute_at:current.executeAt!.toISOString(),
-          cancellation_ref:current.cancellationRef!,
-          delete_public_debates:current.deletePublicDebates === true }
+          cancellation_ref:current.cancellationRef! }
     ));
   });
   api.post(
@@ -3338,6 +3464,125 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(RemovalNoticeTakeSchema.parse({
       notice: ownerRef === null ? false : await access.takeRemovalNotice(ownerRef)
     }));
+  });
+  // V4 account memory (owner rulings N7 and N11, migration 0131). The account is the signed-in one (the cookie session:
+  // `auth: "user"` admits nothing else), so a write can only ever touch the caller's own rows; the run routes below are
+  // owner-scoped in the database too. No admission scope, as every account self route: storage is one row per account
+  // (the level) or per owned debate (a visit, a dig), so it cannot grow past what the account owns.
+  // Plan 2026-10-30 dig-model revision W3-2 (owner Q-D1): where the parent map's places hang, read from the parent's
+  // story the way the map reads it; null when the parent has no story yet (every point then hangs under the question).
+  const digPathIndexFor = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
+    parentRunId: string): Promise<DigPathIndex | null> => {
+    if (options.stories === undefined) return null;
+    const ownership = ownershipFor(request);
+    const answer = await readOwnerRunAnswer(options, parentRunId, request.session, ownership);
+    if (answer === null) return null;
+    const story = await options.stories.readStory({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownership });
+    const paths = story?.body?.short.paths;
+    return paths === undefined ? null : digPathIndexOf(paths);
+  };
+  // W3-2: a dig's admission (./dig-admission.ts) before anything is charged; the path its places share when the ask may go
+  // on (W3-7: its picks are kept on it), else the refusal sent. Another
+  // account's parent is the closed 404; a parent at the deepest level 409 DIG_TOO_DEEP; picks the page never sends
+  // (more than Free combines, or from more than one path) a 400 with its own code (W3-8: DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH).
+  const digRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>,
+    reply: FastifyReply, parent: AskParent, settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
+  ): Promise<Readonly<{ refused: FastifyReply }> | Readonly<{ positionRef: string | null }>> => {
+    const digModel = options.digModel;
+    if (digModel === undefined) return { positionRef: null };
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (ownerRef === undefined) return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+    const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
+    const admission = await admitDig({ ownerRef, parent, free: decided.settings.plan_tier === "free" }, {
+      readDigLevel: (owner, runId) => digModel.readDigLevel(owner, runId),
+      readPathIndex: (_owner, runId) => digPathIndexFor(request, runId)
+    });
+    switch (admission.kind) {
+      case "ADMIT": return { positionRef: admission.positionRef };
+      case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+      case "TOO_DEEP":
+        return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
+      // W3-8: each of the two refusals the page never sends has its own code, so the page can say which one it was.
+      case "MALFORMED": return { refused: admission.reason === "FREE_PICKS_OVER"
+        ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
+        : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })) };
+      default: return exhaustive(admission);
+    }
+  };
+  // The person's plan and whether new starts wait for a reset, as a quick look on their own plan (W4-4's read, shared with a public report's press).
+  const roomOfPerson = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>, ownerRef: string): Promise<Readonly<{ planId: string | null; waitsForReset: boolean }>> => {
+    if (options.askRoom === undefined) return { planId: null, waitsForReset: false };
+    const view = await admissionView();
+    const decided = await decideRoomSettingsAndPlan({ plan_tier: "premium", composition_budget_tier: "low",
+      depth_params: roomDepthParams(AskRoomQuerySchema.parse({ plan_tier: "premium", composition_budget_tier: "low", depth: "1" })) }, ownerRef, options.askBilling);
+    const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
+    const room = await options.askRoom.readRoom({ access: ownershipFor(request), ...(view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion }),
+      settingsClass: runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
+        view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan) });
+    return { planId: room.planId, waitsForReset: room.newStarts === "BLOCKED_UNTIL_RESET" };
+  };
+  // Decision 13: the page a dig names. `public_parent` is a stranger's (the page is all they know); a `parent` the person owns goes public-side once that debate is public, or is an allowed contribution.
+  const publicParentOf = async (ask: AskRequest): Promise<PublicDigParent | null> => {
+    if (options.publicTree === undefined) return null;
+    if (ask.public_parent !== undefined) return ask.public_parent;
+    if (ask.parent === undefined) return null;
+    const tree = await options.publicTree.tree.readTreeOfRun(ask.parent.parent_run_id);
+    if (tree === null) return null;
+    return { public_ref: tree.publication_ref, ...(tree.dig_update_id === null ? {} : { dig_ref: tree.dig_update_id }), places: ask.parent.places, mode: ask.parent.mode,
+      ...(ask.parent.picks === undefined ? {} : { picks: ask.parent.picks }) };
+  };
+  const publicDigRefusal = async (request: Readonly<{ session: Session; authenticatedSession?: AuthenticatedSession }>, reply: FastifyReply, parent: PublicDigParent,
+    settings: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
+  ): Promise<Readonly<{ refused: FastifyReply }> | Readonly<{ admission: Extract<PublicDigAdmission, { kind: "ADMIT" }> }>> => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    const store = options.publicTree;
+    if (ownerRef === undefined || store === undefined) return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+    const decided = await decideRoomSettingsAndPlan(settings, ownerRef, options.askBilling);
+    const admission = await admitPublicDig({ parent, free: decided.settings.plan_tier === "free" }, { tree: store.tree, readPublicDebate: store.readPublicDebate });
+    switch (admission.kind) {
+      case "ADMIT": {
+        // A spent pool starts no dig on someone else's debate: nothing joins and nothing waits in line on their page.
+        if ((await roomOfPerson(request, ownerRef)).waitsForReset) {
+          return { refused: reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" })) };
+        }
+        return { admission };
+      }
+      case "NOT_FOUND": return { refused: reply.status(404).send({ error: "RUN_NOT_FOUND" }) };
+      case "TOO_DEEP": return { refused: reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX })) };
+      case "NEEDS_A_PATH": return { refused: reply.status(400).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DIG_NEEDS_A_PATH", message: "PUBLIC_DIG_NEEDS_A_PATH" })) };
+      case "MALFORMED": return { refused: admission.reason === "FREE_PICKS_OVER"
+        ? reply.status(400).send(DigFreePicksMaxSchema.parse({ error: DIG_FREE_PICKS_MAX, message: DIG_FREE_PICKS_MAX, picks_max: FREE_DIG_PICKS_MAX }))
+        : reply.status(400).send(DigPicksOnePathSchema.parse({ error: DIG_PICKS_ONE_PATH, message: DIG_PICKS_ONE_PATH })) };
+      default: return exhaustive(admission);
+    }
+  };
+  const accountMemoryOrRefuse = (reply: FastifyReply): AccountMemoryStore | null => {
+    if (options.accountMemory !== undefined) return options.accountMemory;
+    void reply.status(503).send({ error: "ACCOUNT_MEMORY_UNAVAILABLE", message: "ACCOUNT_MEMORY_UNAVAILABLE" });
+    return null;
+  };
+  const accountMemoryMalformed = (reply: FastifyReply) =>
+    reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+  api.get("/v1/account/reading-level", routePolicy("GET /v1/account/reading-level"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    if (ownerRef === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    return reply.send(ReadingLevelStateSchema.parse({ reading_level: await memory.readReadingLevel(ownerRef) }));
+  });
+  api.post("/v1/account/reading-level", credentialRoutePolicy("POST /v1/account/reading-level"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    if (ownerRef === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const body = ReadingLevelSaveRequestSchema.safeParse(request.body);
+    if (!body.success) return accountMemoryMalformed(reply);
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    try {
+      return reply.send(ReadingLevelStateSchema.parse({ reading_level: await memory.saveReadingLevel(ownerRef, body.data.reading_level) }));
+    } catch (error) {
+      if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+      throw error;
+    }
   });
   api.post(
     "/v1/account/legacy-runs/claim",
@@ -3615,11 +3860,55 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
       }
       const debate = await options.publications.readPublicDebate(publicationRef.data);
-      return debate === null
-        ? reply.status(404).send({ error: "DEBATE_NOT_FOUND" })
-        : reply.send(PublicDebateSchema.parse(debate));
+      if (debate !== null) return reply.send(PublicDebateSchema.parse(debate));
+      // Decision 33: hidden under review. Gone for now, no-store, and nothing of it: the page says one plain line.
+      if (await options.publications.isUnderReview?.(publicationRef.data).catch(() => false)) {
+        return reply.status(410).header("Cache-Control", "no-store").send({ error: "DEBATE_UNDER_REVIEW" });
+      }
+      return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
     }
   );
+  // 0157 (DSA Art 17; D1): the person's own statements of reasons, with the facts the mail leaves out. Theirs only; no-store.
+  api.get("/v1/account/moderation-statements", routePolicy("GET /v1/account/moderation-statements"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (options.moderationStatements === undefined) return reply.status(503).send({ error: "MODERATION_STATEMENTS_UNAVAILABLE" });
+    reply.header("Cache-Control", "no-store");
+    return reply.send(await moderationStatementsOf(authenticated.ownerRef, options.moderationStatements));
+  });
+  // Decision 35: Report on a public debate, signed in. One answer shape; every refusal reads the same, so nothing about the check, the limits or the debate leaks.
+  api.post<{ Params: { id: string } }>("/v1/public/debates/:id/flag", credentialRoutePolicy("POST /v1/public/debates/{id}/flag"), async (request, reply) => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    const body = PublicFlagRequestSchema.safeParse(request.body ?? {});
+    if (ownerRef === undefined || options.publicFlags === undefined) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    if (!body.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    if (!admitOrRefuse(reply, "asks", "POST /v1/public/debates/{id}/flag", ownerRef)) return reply;
+    reply.header("Cache-Control", "no-store");
+    const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+    if (!publicationRef.success) return reply.send(PublicFlagAnswerSchema.parse({ state: "NOT_FOUND" }));
+    const state = await pressPublicFlag({ ownerRef, publicationRef: publicationRef.data, flagId: randomUUID(), where: body.data.where, claim: body.data.claim }, options.publicFlags);
+    return reply.send(PublicFlagAnswerSchema.parse({ state }));
+  });
+  // Decisions 13 and 16: a report on a public debate, by anyone with credit, while nothing is ongoing. The asks' budget: a stranger can press it. Their username is only a reference, and they pay.
+  api.post<{ Params: { id: string } }>("/v1/public/debates/:id/report", credentialRoutePolicy("POST /v1/public/debates/{id}/report"), async (request, reply) => {
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    const publicationRef = ResourceIdSchema.safeParse(request.params.id);
+    const store = options.publicTree;
+    if (ownerRef === undefined || !publicationRef.success || store === undefined) return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+    if (!PublicReportRequestSchema.safeParse(request.body ?? {}).success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    if (!admitOrRefuse(reply, "asks", "POST /v1/public/debates/{id}/report", ownerRef)) return reply;
+    const room = await roomOfPerson(request, ownerRef);
+    if (room.waitsForReset) return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+    const press = await pressPublicReport({ ownerRef, publicationRef: publicationRef.data, reportId: randomUUID(), free: room.planId === "FREE", now: new Date(), pool: store.pool, tree: store.tree,
+      readPublicDebate: store.readPublicDebate });
+    switch (press.kind) {
+      case "WRITING": return reply.status(202).send(PublicReportAcceptedSchema.parse({ state: "WRITING", report_version: press.reportVersion }));
+      case "ONGOING": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_ONGOING", message: "PUBLIC_DEBATE_ONGOING" }));
+      case "NO_CARRIER": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_NO_CARRIER", message: "PUBLIC_DEBATE_NO_CARRIER" }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "DEBATE_NOT_FOUND" });
+      default: return exhaustive(press);
+    }
+  });
   // Addition D24: the same answer for every caller (company keys only, no model, URL or price), charged to the
   // per-source public-read budget by the caller's network (DL5-F3: an IPv6 address is its /64), as GET /v1/billing/plans.
   api.get("/v1/public/ai-providers", routePolicy("GET /v1/public/ai-providers"), async (request, reply) => {
@@ -3893,10 +4182,31 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    // Plan 2026-10-30 dig-model revision W3-2: a dig's own checks come before the question check (a paid site call) and
+    // before the room, so a refused dig is charged nothing. Without the dig model the parent is not read (as before).
+    // Decision 13: a dig on a public debate: named by the page it was started from, or by the author's own map once the debate is public. Every dig on a public debate is a contribution, whoever
+    // digs, and joins the public tree on the person's own credit; a debate that is not public is the closed 404, whatever was guessed.
+    const publicParentRef = await publicParentOf(ask);
+    let publicAdmission: Extract<PublicDigAdmission, { kind: "ADMIT" }> | null = null;
+    if (publicParentRef !== null) {
+      const refused = await publicDigRefusal(request, reply, publicParentRef, ask);
+      if ("refused" in refused) return refused.refused;
+      publicAdmission = refused.admission;
+    }
+    const digParent = options.digModel === undefined || publicAdmission !== null ? undefined : ask.parent;
+    let digPositionRef: string | null = null;
+    if (digParent !== undefined) {
+      const admitted = await digRefusal(request, reply, digParent, {
+        plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params
+      });
+      if ("refused" in admitted) return admitted.refused;
+      digPositionRef = admitted.positionRef;
+    }
     if (options.questionCheck === undefined) {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
-    const outcome = await options.questionCheck.check(ask.question_line);
+    // Decision 5 of 31 Oct: place, time and purpose lines the question does not already say are checked with it.
+    const outcome = await options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines));
     const answer = answerForOutcome(outcome, edgeCountry(request.headers));
     if (answer !== null) return reply.status(answer.status).send(answer.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
@@ -3907,7 +4217,67 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
           ownerRef: request.authenticatedSession.ownerRef })
     ));
+    // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
+    // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
+    const digOwner = request.authenticatedSession?.ownerRef;
+    if (digParent !== undefined && digOwner !== undefined && options.investigations !== undefined) {
+      const joined = await joinAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref }, options.investigations);
+      // W3-7: a dig that joined keeps what it was made of (0135), for the rewrite of the path its picks are on.
+      if ((joined === "JOINED" || joined === "ALREADY") && options.digPicks !== undefined) {
+        await recordDigPicksAtStart({ ownerRef: digOwner, parent: digParent, childRunId: accepted.run_ref, positionRef: digPositionRef },
+          options.digPicks, options.digSuggestionText ?? digSuggestionTextFromAnswer((parentRunId) =>
+            options.application.readRunAnswer(parentRunId, request.session, ownershipFor(request))));
+      }
+    }
+    // Decision 13: a public dig's own run joins the public tree, with its copy of the page and its picks.
+    if (publicAdmission !== null && digOwner !== undefined && options.publicTree !== undefined) {
+      const joined = await joinPublicDigAtStart({ ownerRef: digOwner, childRunId: accepted.run_ref, admission: publicAdmission, now: new Date(), pool: options.publicTree.pool, tree: options.publicTree.tree,
+        contributions: options.publicTree.contributions, readPublicDebate: options.publicTree.readPublicDebate });
+      // By the rules a join admitted a moment ago cannot be refused now; a store that failed in between can only be said plainly: the debate runs as the person's own, the page is left alone.
+      if (joined !== "JOINED" && joined !== "ALREADY") return reply.status(202).send({ ...accepted, public_dig_not_joined: true });
+    }
+    // Decision 13: the page showed the Free notice, on the Free plan: this debate goes public when finished, after the AI check. A dig is a contribution instead; a paid plan's flag means nothing.
+    if (ask.free_public_notice === true && ask.parent === undefined && ask.public_parent === undefined && digOwner !== undefined && options.publicTree !== undefined) {
+      const decided = await decideRoomSettingsAndPlan({ plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params }, digOwner, options.askBilling);
+      if (decided.settings.plan_tier === "free") {
+        await options.publicTree.contributions.recordFreeNotice(digOwner, accepted.run_ref).catch(() => undefined);
+      }
+    }
+    // Decision 5 of 31 Oct: a new debate's place, time and purpose lines, stored encrypted at the ask. A dig reads its first debate's.
+    if (ask.purpose_lines !== undefined && ask.parent === undefined && ask.public_parent === undefined
+      && digOwner !== undefined && options.purposeLines !== undefined) {
+      await recordPurposeLinesAtAsk({ ownerRef: digOwner, runId: accepted.run_ref, lines: ask.purpose_lines }, options.purposeLines);
+    }
     return reply.status(202).send(accepted);
+  });
+
+  /**
+   * Decisions 29 and 31: the clarifying questions for step 2, before a debate exists. A signed-in person only. The question reaches the AI only when the
+   * ask itself could send it there: not a question in crisis (their words go to no model, as on POST /v1/asks), never before the sensitive-data
+   * consent, never off the preview's team, never from a blocked country, and never on an empty pool, for the call counts in the person's quota. In each
+   * of those cases, as on any failure, the answer is NONE: the page shows no questions and the person carries on. This route never stands between a
+   * person and Start.
+   */
+  api.post("/v1/asks/clarify", routePolicy("POST /v1/asks/clarify"), async (request, reply) => {
+    const asker = request.authenticatedSession;
+    if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const body = AskClarifyRequestSchema.safeParse(request.body);
+    if (!body.success || Buffer.byteLength(body.data.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const question = body.data.question_line;
+    const none = { source: "NONE" as const };
+    const mayAsk = options.askClarify !== undefined && !detectCrisis(question).crisis
+      && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
+      && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
+      && options.sessions?.readSensitiveDataConsent !== undefined
+      && await options.sessions.readSensitiveDataConsent(asker) === "given";
+    if (!mayAsk) return reply.send(none);
+    // A pool that cannot be read is treated as empty: nothing is spent that cannot be counted, and the person carries on.
+    const pool = options.askRoom?.readPersonPool === undefined ? { empty: false, funding: null }
+      : await options.askRoom.readPersonPool(asker.ownerRef, new Date()).catch(() => ({ empty: true, funding: null }));
+    if (pool.empty) return reply.send(none);
+    return reply.send(AskClarifyResponseSchema.parse(await options.askClarify!.read(asker.ownerRef, question, pool.funding)));
   });
 
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
@@ -3920,6 +4290,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
+    // Plan 2026-10-30 dig-model revision W3-2: a read for a dig names its parent; the parent is checked as the ask will
+    // check it (the person's, below the deepest level), and the answer gives the dig's share of today.
+    const digParent = query.data.dig_parent;
+    let digLevel: number | undefined;
+    if (digParent !== undefined && options.digModel !== undefined) {
+      const level = access.ownerRef === null ? null : await options.digModel.readDigLevel(access.ownerRef, digParent);
+      if (level === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (level >= DIG_LEVEL_MAX) {
+        return reply.status(409).send(DigTooDeepSchema.parse({ error: DIG_TOO_DEEP, message: DIG_TOO_DEEP, level_max: DIG_LEVEL_MAX }));
+      }
+      digLevel = level + 1;
+    }
+    const digMember = digParent === undefined ? {} : {
+      dig: Object.freeze({ parentRunId: digParent, mode: query.data.dig_mode ?? "quick" as const, picks: query.data.dig_picks ?? null,
+        ...(digLevel === undefined ? {} : { level: digLevel }) })
+    };
     // Side-by-side spec §13 (S10): the active version's rows, read once for this request; the room estimates with it.
     const view = await admissionView();
     const versionMember = view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion };
@@ -3932,6 +4318,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       : await options.askRoom.readRoom({
           access,
           ...versionMember,
+          ...digMember,
           settingsClass: await (async () => {
             // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
             // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
@@ -3956,6 +4343,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       plan_id: answer.planId,
       ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
       ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor }),
+      // W3-2 (the money rule): the reserve kept, the estimate as a share of today, and new starts waiting for a reset.
+      ...(answer.reserve === undefined ? {} : { reserve: answer.reserve }),
+      ...(answer.startSharePercent === undefined ? {} : { start_share_percent: answer.startSharePercent }),
+      ...(answer.digSharePercent === undefined ? {} : { dig_share_percent: answer.digSharePercent }),
+      ...(answer.newStarts === undefined ? {} : { new_starts: answer.newStarts }),
       // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
       // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
       // today's byte for byte, and the page offers none of the three settings it would drop.
@@ -4239,7 +4631,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       options.releaseKey,
       { route: "GET /v1/runs/{id}", id: runId }
     );
-    return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
+    if (run === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
+    if (run.state === "FAILED" && run.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
+      const found = await options.application.readRunFound(runId);
+      if (found.length > 0) return reply.send(RunProjectionSchema.parse({ ...run, found }));
+    }
+    // W3-2 (the money rule): a debate paused at the month wall says until when, and whether Continue is offered.
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    if (options.digModel === undefined || ownerRef === undefined
+      || !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) return reply.send(run);
+    const pause = await options.digModel.readPause(ownerRef, runId);
+    if (pause?.state !== "PAUSED") return reply.send(run);
+    const now = new Date();
+    const monthPause = monthPauseOf(pause, now, await options.monthRoom?.monthHasRoom(ownerRef, now) ?? false);
+    return reply.send(monthPause === null ? run : RunProjectionSchema.parse({ ...run, month_pause: monthPause }));
   });
   api.get<{ Params: { id: string } }>(
     "/v1/runs/:id/visibility",
@@ -4271,7 +4677,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       options.releaseKey,
       { route: "GET /v1/runs/{id}/answer", id: runId }
     );
-    return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(answer);
+    if (answer === null) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
+    // Decision 13: on a dig made on a public debate, what became of it, for the digger only.
+    const ownerRef = request.authenticatedSession?.ownerRef;
+    const own = ownerRef === undefined || options.publicTree === undefined ? [] : await options.publicTree.contributions.readOwn(ownerRef, runId).catch((): readonly PublicContributionRead[] => []);
+    const contribution = own.find((entry) => entry.dig_run_id.toLowerCase() === runId.toLowerCase());
+    if (contribution === undefined) return reply.send(answer);
+    const rewrite = await ownDigRewriteOf(options.publicTree!.pool, contribution.dig_run_id, contribution.parent_run_id);
+    return reply.send({ ...answer, contribution: { public_ref: contribution.publication_ref, rewrite,
+      state: contributionStateOf(contribution) } });
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",
@@ -4371,49 +4785,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(201).send(PublicationTransitionSchema.parse(published));
     }
   );
-  api.post<{ Params: { id: string } }>(
-    "/v1/runs/:id/unpublish",
-    credentialRoutePolicy("POST /v1/runs/{id}/unpublish"),
-    async (request, reply) => {
-      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
-      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
-      const authenticated = request.authenticatedSession;
-      if (runId === null || authenticated === undefined) {
-        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      }
-      const input = parseRequest(UnpublishDebateRequestSchema, request.body);
-      if (options.publications === undefined) {
-        return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
-      }
-      if (!await options.publications.preflightGrant({
-        runId,
-        authenticated,
-        grantToken: input.step_up_grant,
-        action: "UNPUBLISH"
-      })) {
-        await options.publications.auditPreflightDenial({
-          authenticated,
-          requestId: request.id
-        });
-        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      }
-      const owned = await options.application.readRun(
-        runId,
-        request.session,
-        ownershipFor(request)
-      );
-      if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-      const unpublished = await options.publications.unpublish({
-        runId,
-        authenticated,
-        grantToken: input.step_up_grant,
-        source: sourceFor(request)
-      });
-      return unpublished === null
-        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
-        : reply.send(PublicationTransitionSchema.parse(unpublished));
-    }
-  );
   const publicationReviewOwner = options.publicationReviews === undefined ? null : createPublicationReviewOwnerRoutes({
     repository: options.publicationReviews.repository,
     publications: options.publications,
@@ -4447,6 +4818,172 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(response.status).send(response.body);
     }
   );
+  // V4 account memory (owner rulings N7 and N11, migration 0131): "not this account's debate" is the closed 404 every
+  // run-owner route answers, decided by 0131's functions (the run's latest ownership event names the caller's account).
+  // The id is the one the page holds, never resolved to a re-admitted run, so a write and its later read meet.
+  const memoryRunOf = (request: Readonly<{ params: { id: string }; session: Session; authenticatedSession?: AuthenticatedSession }>) => {
+    const runId = ResourceIdSchema.safeParse(request.params.id);
+    const ownerRef = ownershipFor(request).ownerRef;
+    return runId.success && ownerRef !== null ? { runId: runId.data, ownerRef } : null;
+  };
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/last-visit", routePolicy("GET /v1/runs/{id}/last-visit"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    const visit = await memory.readLastVisit(target.ownerRef, target.runId);
+    return visit === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(LastVisitSchema.parse(visit));
+  });
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/last-visit",
+    { ...routePolicy("POST /v1/runs/{id}/last-visit"), bodyLimit: ACCOUNT_MEMORY_LIMITS.visitBodyMaxBytes },
+    async (request, reply) => {
+      const target = memoryRunOf(request);
+      if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const body = LastVisitRecordRequestSchema.safeParse(request.body);
+      if (!body.success) return accountMemoryMalformed(reply);
+      const memory = accountMemoryOrRefuse(reply);
+      if (memory === null) return reply;
+      let seenAt: Date | null;
+      try {
+        seenAt = await memory.recordLastVisit(target.ownerRef, target.runId, body.data.items);
+      } catch (error) {
+        if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+        throw error;
+      }
+      return seenAt === null
+        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
+        : reply.send(LastVisitRecordedSchema.parse({ seen_at: seenAt.toISOString() }));
+    }
+  );
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/dig-links", routePolicy("GET /v1/runs/{id}/dig-links"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    const links = await memory.readDigLinks(target.ownerRef, target.runId);
+    return links === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(DigLinksSchema.parse(links));
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/dig-links", credentialRoutePolicy("POST /v1/runs/{id}/dig-links"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const body = DigLinkRecordRequestSchema.safeParse(request.body);
+    if (!body.success || body.data.child_run_id === target.runId) return accountMemoryMalformed(reply);
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    let outcome: Awaited<ReturnType<AccountMemoryStore["recordDigLink"]>>;
+    try {
+      outcome = await memory.recordDigLink(target.ownerRef, target.runId, body.data);
+    } catch (error) {
+      if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+      throw error;
+    }
+    switch (outcome) {
+      case "RECORDED": return reply.send(DigLinkRecordedSchema.parse({ recorded: true }));
+      // Either debate is not the caller's: one closed answer, whichever it was.
+      case "NOT_OWNED": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "CONFLICT": return reply.status(409).send({ error: "DIG_LINK_CONFLICT", message: "DIG_LINK_CONFLICT" });
+      default: return exhaustive(outcome);
+    }
+  });
+  // R22 W3-8 (the money rule): Continue on a debate paused at the month wall (./month-pause.ts): another account's debate
+  // is the closed 404, a press before the reset 409 RUN_PAUSED_UNTIL_RESET (nothing changed), a second press CONTINUING.
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/continue", credentialRoutePolicy("POST /v1/runs/{id}/continue"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.digModel === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!RunContinueRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const room = options.monthRoom ?? Object.freeze({ monthHasRoom: async () => false });
+    const outcome = await continuePausedRun({ ...target, now: new Date() }, options.digModel, room, options.continuedRunWake,
+      undefined, options.runHandover);
+    switch (outcome.kind) {
+      case "CONTINUING": return reply.send(RunContinuedSchema.parse({ state: "CONTINUING" }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "NOT_PAUSED": return reply.status(409).send({ error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
+      // Decision 12: an upload is switching over this moment; nothing changed, the person's next press goes through.
+      case "TRY_AGAIN": return reply.status(503).send({ error: "RUN_CONTINUE_TRY_AGAIN", message: "RUN_CONTINUE_TRY_AGAIN" });
+      case "UNTIL_RESET": return reply.status(409).send(RunContinueRefusedSchema.parse({
+        error: RUN_PAUSED_UNTIL_RESET, message: RUN_PAUSED_UNTIL_RESET, until: outcome.until }));
+      default: return exhaustive(outcome);
+    }
+  });
+  // R22 W5-1: the final report over an investigation (./investigation-report.ts). Another account's debate is the closed
+  // 404 on all three; "Write my report" answers 202 with the version being written (a second press the same version), 409
+  // INVESTIGATION_CLOSED once a finished version stands (the page offers "Keep digging"); a reopen while a version is being
+  // written is 409 INVESTIGATION_REPORT_WRITING, nothing changed.
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/investigation", routePolicy("GET /v1/runs/{id}/investigation"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const read = await readInvestigationReports(target, options.investigationReports);
+    return read === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(read);
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/report", credentialRoutePolicy("POST /v1/runs/{id}/report"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!InvestigationCloseRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    // Decision 13: a public debate never closes: its author's press is the same public report as anyone's, on the public copy.
+    const publicTree = await options.publicTree?.tree.readTreeOfRun(target.runId);
+    if (publicTree !== null && publicTree !== undefined && publicTree.dig_update_id === null && options.publicTree !== undefined) {
+      const room = await roomOfPerson(request, target.ownerRef);
+      if (room.waitsForReset) return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
+      const press = await pressPublicReport({ ownerRef: target.ownerRef, publicationRef: publicTree.publication_ref, reportId: randomUUID(), free: room.planId === "FREE", now: new Date(),
+        pool: options.publicTree.pool, tree: options.publicTree.tree, readPublicDebate: options.publicTree.readPublicDebate });
+      switch (press.kind) {
+        case "WRITING": return reply.status(202).send(InvestigationReportAcceptedSchema.parse({ state: "WRITING", report_version: press.reportVersion, waiting_for_digs: 0 }));
+        case "ONGOING": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_ONGOING", message: "PUBLIC_DEBATE_ONGOING" }));
+        case "NO_CARRIER": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_NO_CARRIER", message: "PUBLIC_DEBATE_NO_CARRIER" }));
+        case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+        default: return exhaustive(press);
+      }
+    }
+    const outcome = await writeInvestigationReport(target, options.investigationReports);
+    switch (outcome.kind) {
+      case "WRITING": return reply.status(202).send(InvestigationReportAcceptedSchema.parse({
+        state: "WRITING", report_version: outcome.reportVersion, waiting_for_digs: outcome.waitingForDigs }));
+      case "CLOSED": return reply.status(409).send({ error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/reopen", credentialRoutePolicy("POST /v1/runs/{id}/reopen"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null || options.investigationReports === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    if (!InvestigationReopenRequestSchema.safeParse(request.body ?? {}).success) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const outcome = await reopenInvestigation(target, options.investigationReports);
+    switch (outcome.kind) {
+      case "OPEN": return reply.send(InvestigationReopenedSchema.parse({ state: "OPEN" }));
+      case "WRITING": return reply.status(409).send(InvestigationReportWritingSchema.parse({
+        error: INVESTIGATION_REPORT_WRITING, message: INVESTIGATION_REPORT_WRITING, report_version: outcome.reportVersion }));
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
+  // W4-4: "Add to researched" (./web-researched.ts). Another account's debate is the closed 404; 202 READING, the same for a page added before;
+  // the refusals are 409, nothing charged. The room is read as a quick look on the person's own plan: it only asks whether new starts wait.
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/researched", credentialRoutePolicy("POST /v1/runs/{id}/researched"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    const store = options.webResearched;
+    if (target === null || store === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const outcome = await addToResearched({ ownerRef: target.ownerRef, runId: target.runId, body: request.body ?? {} }, {
+      readAnswer: (runId) => options.application.readRunAnswer(runId, request.session, ownershipFor(request)),
+      readRunExists: async (runId) => (await options.application.readRun(runId, request.session, ownershipFor(request))) !== null,
+      readRoom: () => roomOfPerson(request, target.ownerRef),
+      record: store.record,
+      markActivity: store.markActivity
+    });
+    switch (outcome.kind) {
+      case "ADDED": return reply.status(202).send(outcome.body);
+      case "REFUSED": return reply.status(409).send(outcome.body);
+      case "MALFORMED": return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      case "NOT_FOUND": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      default: return exhaustive(outcome);
+    }
+  });
   api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" });
@@ -4538,10 +5075,10 @@ export class PostgresRunReleaseLookup implements RunReleaseLookup {
       release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null;
       still_draining: boolean | null; any_current: boolean;
     }>(
-      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested, state.still_draining,
+      `SELECT identity.run_release_now(run.run_id) AS release_key, state.state, state.front_pair_stopped, state.retire_requested, state.still_draining,
               EXISTS (SELECT 1 FROM core.read_current_release()) AS any_current
        FROM core.run AS run
-       LEFT JOIN LATERAL core.read_release_state(run.release_key) AS state ON true
+       LEFT JOIN LATERAL core.read_release_state(identity.run_release_now(run.run_id)) AS state ON true
        WHERE run.run_id = $1`,
       [runId]
     );
@@ -4759,6 +5296,8 @@ export interface RunCreationSettings {
     readonly shape: DebateShapeCeilingInput | null;
     /** Length guidance (spec 2026-10-15 §3.1): the debate's numbers (`lengthGuidanceForAsk`), or null without the row. */
     readonly length: LengthGuidance | null;
+    /** W2-2 (R22): the web part (`webSitesForAsk`), or null where the debate cannot search. */
+    readonly web: WebSites | null;
     /** Engine redesign (INTERFACE §1.4): engine 2's settings for this panel (`engineForAsk`), or null without the row in force. */
     readonly engine: EngineSettings | null;
   }) => Promise<Readonly<Record<string, unknown>>>;
@@ -5083,6 +5622,7 @@ async function admitWithScorecard(input: Readonly<{
       const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, input.shapePlan, makers);
       // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
       const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, input.shapePlan);
+      const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null });
       return await settings.resolveEnvelopeBasis({
         depthParams: ask.depth_params,
         riskTier: risk.effectiveRiskTier,
@@ -5092,7 +5632,8 @@ async function admitWithScorecard(input: Readonly<{
         length,
         // Engine redesign (R1d; INTERFACE §1.4): engine 2's settings for this panel's makers, frozen on the receipt; null
         // without the row in force (engine 1, today's receipt). The answer check is a site only when the map opens the debate.
-        engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })
+        engine,
+        web: webOfAsk(settings, ask, shape, engine)
       });
     } catch (error) {
       return markAskRefusal(error);
@@ -5381,6 +5922,7 @@ export async function evaluateAskAdmission(
     const shape = debateShapeForPanel(settings.debateShapePolicy, ask.depth_params, shapePlan, makers);
     // Length guidance (spec 2026-10-15 §3.1): the plan's numbers at the asked length, frozen on the receipt.
     const length = lengthGuidanceForAsk(settings.lengthGuidancePolicy, ask.depth_params, shapePlan);
+    const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null });
     envelopeBasis = await settings.resolveEnvelopeBasis({
       depthParams: ask.depth_params,
       riskTier: risk.effectiveRiskTier,
@@ -5390,7 +5932,8 @@ export async function evaluateAskAdmission(
       shape,
       length,
       // Engine redesign (R1d; INTERFACE §1.4): as admitWithScorecard's resolveBasis.
-      engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })
+      engine,
+      web: webOfAsk(settings, ask, shape, engine)
     });
   } catch (error) {
     markAskRefusal(error);
@@ -6649,6 +7192,10 @@ export class PostgresAskApplication implements AskApplication {
     return this.#serve.readAnswerProjection(answerId, ownership, version);
   }
 
+  readRunFound(runId: string): Promise<readonly RunFoundPage[]> {
+    return this.#serve.readRunFound(runId);
+  }
+
   readRunAnswer(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<Answer | null> {
     return this.#serve.readRunAnswerProjection(runId, ownership);
   }
@@ -6729,7 +7276,7 @@ export class PostgresAskApplication implements AskApplication {
    */
   async readRunReleaseKey(runId: string): Promise<string | null> {
     const result = await this.pool.query<{ release_key: string }>(
-      "SELECT release_key FROM core.run WHERE run_id = $1::uuid", [runId]
+      "SELECT identity.run_release_now(run_id) AS release_key FROM core.run WHERE run_id = $1::uuid", [runId]
     );
     return result.rows[0]?.release_key ?? null;
   }
@@ -6737,7 +7284,7 @@ export class PostgresAskApplication implements AskApplication {
   /** Side-by-side C14: the release of the run that answered (`serve.answer.run_id`), every version alike. */
   async readAnswerReleaseKey(answerId: string): Promise<string | null> {
     const result = await this.pool.query<{ release_key: string }>(
-      `SELECT run.release_key FROM serve.answer AS answer JOIN core.run AS run ON run.run_id = answer.run_id
+      `SELECT identity.run_release_now(run.run_id) AS release_key FROM serve.answer AS answer JOIN core.run AS run ON run.run_id = answer.run_id
         WHERE answer.answer_id = $1::uuid LIMIT 1`, [answerId]
     );
     return result.rows[0]?.release_key ?? null;
@@ -6951,4 +7498,21 @@ export class PostgresAskApplication implements AskApplication {
       settled: row.settled === true
     });
   }
+}
+
+/** W2-2 (R22): the web part an ask's receipt carries (`webSitesForAsk`): the search gate is this site's own, the rest the ask's. */
+function webOfAsk(settings: Pick<RunCreationSettings, "previewProviderTestConfig">, ask: Pick<AskRequest, "depth_params" | "parent">,
+  shape: Readonly<{ plan: string; answers: number }> | null, engine: unknown): WebSites | null {
+  const config = settings.previewProviderTestConfig;
+  return webSitesForAsk({ searchGate: config !== undefined && previewGateSocket(config, "perplexity") !== undefined, shape, engine,
+    depth: Number(ask.depth_params.depth), parent: ask.parent });
+}
+
+/** Decision 13's line for the digger, true in each case (0157, gap 5): a review that kept it private or holds it off the page says so; its check is not blamed. */
+export function contributionStateOf(contribution: PublicContributionRead): import("@debateai/contract").AnswerContribution["state"] {
+  if (contribution.removed_after_review === true) return "REMOVED_AFTER_REVIEW";
+  if (contribution.kept_private_after_review === true) return "KEPT_PRIVATE_BY_REVIEW";
+  if (contribution.outcome === null) return "CHECKING";
+  if (contribution.outcome !== "ALLOWED") return "KEPT_PRIVATE";
+  return contribution.off_for_review === true ? "OFF_THE_PAGE_FOR_REVIEW" : "ON_THE_PAGE";
 }

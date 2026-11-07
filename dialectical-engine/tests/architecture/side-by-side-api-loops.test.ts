@@ -104,7 +104,8 @@ describe("side-by-side C7 the API's background loops run only on the current rel
       "gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000)",
       "gatedInterval(releaseWatcher,triggerDataExportWork,DATA_EXPORT_TICK_MS)",
       "gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000)",
-      "gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000)"
+      "gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000)",
+      "gatedInterval(releaseWatcher,triggerPublicPage,PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs)"
     ]) {
       expect(mainCode.replace(/\s+/gu, ""), loop).toContain(loop);
     }

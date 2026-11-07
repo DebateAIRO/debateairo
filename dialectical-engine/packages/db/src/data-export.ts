@@ -120,6 +120,37 @@ const WORKER_FUNCTIONS = [
   "identity.renew_data_export_lease(uuid,uuid,integer)",
   "identity.read_data_export_snapshot_v2(uuid,uuid)",
   "identity.read_data_export_threat_reports(uuid,uuid)",
+  // V4 account memory (migration 0131): the reading level, debate visits and dig links.
+  "identity.read_data_export_page_memory(uuid,uuid)",
+  // The Perplexity plan's stores (0132, 0133): a debate's web evidence, the investigations and the reserve events
+  // (debates.json web_sources; account.json investigations and reserve_events).
+  "identity.read_data_export_web_evidence(uuid,uuid)",
+  "identity.read_data_export_investigations(uuid,uuid)",
+  // The new dig model and the month pause (0134): the dig levels, the path rewrites (sealed under each dig's run key)
+  // and the pauses. Its archive section is not wired yet (apps/api/src/data-export); the boot check already pins that
+  // the worker reaches it.
+  "identity.read_data_export_dig_model(uuid,uuid)",
+  // A dig's picks and its path rewrite's material (0135), sealed under each dig's run key. Its archive section is not
+  // wired yet either; the boot check pins that the worker reaches it.
+  "identity.read_data_export_dig_picks(uuid,uuid)",
+  // The final reports over the account's investigations (0136), codes only. Its archive section is not wired yet either;
+  // the boot check pins that the worker reaches it.
+  "identity.read_data_export_investigation_reports(uuid,uuid)",
+  // The owner's changes of 31 Oct (0137 to 0139): contributions and Free asks, tree and answer updates, shown quotes and wipes. Their archive
+  // sections are not wired yet either; the boot check pins that the worker reaches them.
+  "identity.read_data_export_public_debates(uuid,uuid)",
+  "identity.read_data_export_public_tree(uuid,uuid)",
+  "identity.read_data_export_tree_updates(uuid,uuid)",
+  "identity.read_data_export_passage_retention(uuid,uuid)",
+  // A path's suggestions (0141), sealed under each set's run key. Its archive section is not wired yet either; the boot check pins
+  // that the worker reaches it.
+  "identity.read_data_export_path_suggestions(uuid,uuid)",
+  // When step 2's small AI read the person's question (0144): wired, into account.json.
+  "identity.read_data_export_ask_clarify(uuid,uuid)",
+  // The reports the person made with the Report button (0152): wired, into account.json. The words stay under the debate's publication key.
+  "identity.read_data_export_public_flags(uuid,uuid)",
+  // The statements of reasons, 0156's earlier notices and the answers to the person's reports (0157): wired, into account.json.
+  "identity.read_data_export_moderation(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -146,7 +177,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 9
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 23
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }
@@ -155,13 +186,44 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
   }
 }
 
+/**
+ * R22 decision 7: the short quote outlives the passage, so an export after the wipe still holds it. Each quote whose extract
+ * is gone joins its debate's extracts, naming the carrier it is sealed under.
+ */
+function withShownQuotes(webEvidence: unknown, shownQuotes: unknown): unknown {
+  if (!Array.isArray(webEvidence) || !Array.isArray(shownQuotes)) return webEvidence;
+  return webEvidence.map((item: { run_id?: unknown; web?: { extracts?: Array<{ extract_id?: unknown }> } }) => {
+    const here = item.web?.extracts ?? [];
+    const gone = shownQuotes.filter((quote: { run_id?: unknown; extract_id?: unknown }) => quote.run_id === item.run_id
+      && !here.some((extract) => extract.extract_id === quote.extract_id));
+    return gone.length === 0 ? item : { ...item, web: { ...item.web, extracts: [...here,
+      ...gone.map((quote: object) => ({ ...quote, found_by: [], sealed_as: "identity.web_shown_quote" }))] } };
+  });
+}
+
 export class PostgresDataExportSource implements DataExportSourcePort {
   constructor(private readonly pool: Pool) {}
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
-    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown }>(
-      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports",
+    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null;
+      web_evidence: unknown; investigations: Record<string, unknown> | null; passage_retention: Readonly<{ web_shown_quotes?: unknown }> | null; ask_clarify_calls: unknown; public_flags: unknown; moderation: unknown }>(
+      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
+        + "identity.read_data_export_page_memory($1,$2) page_memory, identity.read_data_export_web_evidence($1,$2) web_evidence, "
+        + "identity.read_data_export_investigations($1,$2) investigations, identity.read_data_export_passage_retention($1,$2) passage_retention, identity.read_data_export_ask_clarify($1,$2) ask_clarify_calls, identity.read_data_export_public_flags($1,$2) public_flags, identity.read_data_export_moderation($1,$2) moderation",
       [exportId, workerId])).rows[0]!;
-    return { ...row.snapshot, threat_reports: row.threat_reports };
+    // 0131's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
+    // snapshot's exact-section check refuses the export rather than leaving the records out.
+    // 0132's reader answers [{run_id, web}] per debate; 0133's {investigations, reserve_events}, read the same way.
+    const memory = row.page_memory ?? {};
+    const investigations = row.investigations ?? {};
+    return {
+      ...row.snapshot, threat_reports: row.threat_reports, ask_clarify_calls: row.ask_clarify_calls, public_flags: row.public_flags, moderation: row.moderation,
+      ...("page_reading_level" in memory ? { page_reading_level: memory.page_reading_level } : {}),
+      ...("debate_visits" in memory ? { debate_visits: memory.debate_visits } : {}),
+      ...("dig_links" in memory ? { dig_links: memory.dig_links } : {}),
+      web_evidence: withShownQuotes(row.web_evidence, row.passage_retention?.web_shown_quotes),
+      ...("investigations" in investigations ? { investigations: investigations.investigations } : {}),
+      ...("reserve_events" in investigations ? { reserve_events: investigations.reserve_events } : {})
+    } as RawExportRows;
   }
 }

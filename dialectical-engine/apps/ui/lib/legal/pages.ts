@@ -97,11 +97,11 @@ export const COMPANY: Company = Object.freeze({
 export const isUnverified = (value: string): boolean => value.includes("[");
 
 /**
- * The alternative dispute resolution route Terms section 18 and Annex A.1 name (owner's worksheet,
- * 9 October 2026). The EU online dispute resolution platform closed on 20 July 2025 and is
- * deliberately not linked.
+ * The alternative dispute resolution route Terms section 18 and Annex A.1 name: ANPC's SAL, the
+ * consumer-protection body (Terms 2.14), the same link as the footer's SAL badge. The EU online
+ * dispute resolution platform closed on 20 July 2025 and is deliberately not linked.
  */
-export const ADR_URL = "https://www.onoratainstanta.ro";
+export const ADR_URL = "https://reclamatiisal.anpc.ro/";
 
 /**
  * One stored item /cookies and the storage card list: its name as the code writes it, and the
@@ -169,9 +169,9 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
 }
 
 /** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "reportCheck" | "support";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "support"]);
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "reportCheck", "support"]);
 
 /** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
 export type ContractFlag = "yes" | "no" | "unconfirmed";
@@ -349,7 +349,7 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
   // It is also the model of the end-of-debate check of each synthesis (synthesis-flag S01-R9; PP §5)
   // and of the question check before a debate starts (synthesis-flag S04-R5; PP §5).
-  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "questionCheck"]),
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "questionCheck", "reportCheck"]),
   purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",
@@ -463,7 +463,7 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   // so the Register still names their recipient (REV-S03-p1 privacy N2).
   const support = reviewed.includes(ANTHROPIC_PREVIEW_PROVIDER)
     ? SUPPORT_PROVIDER
-    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "support"]) });
+    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "reportCheck", "support"]) });
   return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, support]);
 }
 
@@ -480,7 +480,23 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.9", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.17", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.16", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70" },
+  { version: "2.15", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/765a7826b1045fabe77783e3a9bbe95a8f6dec9a48ff071e9c4a844a8317d925" },
+  { version: "2.14", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/94474fdb20bed511a590b6bc1c07750ed4e67b1c3dfb328d31638daaf233f6a7" },
+  { version: "2.13", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/9cad1a62f77eee42c46facba8a3c2e04c44afba940688ae5e06d3bf586808cfc" },
+  { version: "2.12", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b" },
+  { version: "2.11", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/58ae2f6196b823ec4e1316e1289861fe54b6c3663913fd9617aa0cfdde4b5bdd" },
+  { version: "2.10", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/bf864a74b185aadeabf37e7a4593830d66cab343388f64b88a01a38348dcd339" },
+  { version: "2.9", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/de0b1e1adaff7690436ef4fe09132b0998d33d2f206ec29be9127142c935e56f" },
   { version: "2.8", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/160400ea25aee99085d012f1008af3ca2841148ae3349401a2ac5152278f6fb4" },
   { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,

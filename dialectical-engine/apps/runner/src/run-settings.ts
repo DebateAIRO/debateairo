@@ -5,6 +5,7 @@ import {
   composeDebateCostEnvelope,
   costEnvelopeBand,
   costEnvelopeCeilings,
+  closingReservesOf,
   debateCallLaneLimits,
   readBillingPlans,
   readCallConcurrencyPolicy,
@@ -20,8 +21,10 @@ import {
   type CostEnvelopePolicy,
   type DeploymentMode,
   type ModelScorecardReadResult,
+  type PlanId,
   type StoryPolicy
 } from "@debateai/register";
+import { TEAM_FEATURE_PLAN_ID } from "@debateai/register";
 import {
   CostEnvelopeGuard,
   PostgresModelSpendStore,
@@ -41,7 +44,9 @@ import {
   assertPreviewRostersServed,
   assertPreviewTargetSet,
   assertPricedProviderTargets,
+  createPerplexitySearchPort,
   parseProviderDiscoveryTargets,
+  previewGateSocket,
   previewPlanTierRosters,
   previewRunnerPolicy,
   resolvePreviewLineUp,
@@ -59,6 +64,10 @@ import { runnerSettingsOfVersion } from "./run-debate-members.js";
 import { readDebateShapeRunnerSettings, type DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import { readEngineRunnerSettings, type EngineRunnerSettings } from "./engine-boot.js";
 import { readDevelopmentRunnerPolicy, type DevelopmentRunnerPolicy } from "./dev-runner-policy.js";
+import { selectPathPages } from "@debateai/evidence";
+import { searchCallSubject } from "./call-lane-gateway.js";
+import type { WebStepRunnerSettings } from "./web-step.js";
+import { withMonthPauseSearch, type MonthPause } from "./month-pause.js";
 
 /**
  * Side-by-side spec §13 (settings changes without an upload), runner points 1, 2 and 7: the runner's ONE per-version
@@ -521,13 +530,15 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
    * refusal refuses the boot, as before; another version's makes it unsupported).
    */
   const money = site.money;
+  const closingReserves = money === null ? null : closingReservesOf(await readBillingPlans(pool, version));
   const costEnvelope = money === null || debateEnvelope === null
     ? null
     : Object.freeze({
         policy: debateEnvelope,
         guard: new CostEnvelopeGuard({
           store: money.store,
-          policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy),
+          // R22 decision 18: the closing's safety net is this version's plans' reserve, never a constant.
+          policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy, closingReserves?.ceilingMicros),
           ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }),
           ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }),
           inFlight: money.inFlight
@@ -821,4 +832,58 @@ export function runPreviewThinkingLevelsOf(
     }
     return settings.previewConfig?.thinking_levels;
   };
+}
+
+/**
+ * Perplexity plan 2026-10-30, task W3-1 — THE RUNNER'S WEB SETTINGS (web-step.ts `runRunnerWebStep`).
+ *
+ * - The search port: the preview's guarded fetch routes the search URL to the search gate's own socket and carries no
+ *   key, so web search runs only where the configuration names that socket. Elsewhere (hosted production, local) there is
+ *   no port yet, and every debate's paths are SWITCHED_OFF: no call, nothing charged.
+ * - The web setting (owner Q16, "a settings switch"): until the register's `webSearchPolicy` row exists (plan §4.2), the
+ *   switch is whether this server has a search gate, as above; the row replaces it without touching the step.
+ * - The money: each search is charged through its run's own version's guard (`searchSeam`, W2-2), hosted only; local
+ *   mode charges nothing, as for every call. The month pause (W3-8's money rule, wired for searches in W4-2): with
+ *   `pause`, every search's admission goes through it (`withMonthPauseSearch`), so at the month wall the debate's
+ *   planned searches pause as its AI calls do (the pause recorded, with the run's body room left as the planned work's
+ *   estimate, this copy stopped, resumed on Continue), for first debates and digs alike.
+ * - The run's plan: billing pinned it at admission (`billing.run_charge_scope`, 0084, which the runner's role reads).
+ *   No row (local mode) or no plan (a team grant) is no plan: no search.
+ * - The planner's per-path decision is kept by the step itself in 0134's store (web-step.ts `postgresWebPlanStatusRecorder`,
+ *   W3-6), on the runner's pool and under the step's own lease: nothing to set here.
+ * A search waits in the debate's lane under the search row's limits (`searchCallSubject`).
+ */
+export function runnerWebSearchSettings(input: Readonly<{
+  pool: Pick<Pool, "query">;
+  previewGate: PreviewGateSettings | undefined;
+  fetch: typeof fetch;
+  /** The run's own version's money guard (`runCostEnvelopeGuardOf`), or null in local mode. */
+  guardOf: ((runId: string) => CostEnvelopeGuard) | null;
+  /** The process's month pause (main.ts `monthPause`); absent: a search at the month wall is only refused. */
+  pause?: MonthPause;
+}>): WebStepRunnerSettings {
+  const gated = input.previewGate !== undefined && previewGateSocket(input.previewGate, "perplexity") !== undefined;
+  const search = gated
+    ? createPerplexitySearchPort({ fetch: input.fetch, selectPages: (pages) => selectPathPages(pages, new Set<string>()) })
+    : null;
+  const guardOf = input.guardOf;
+  const pause = input.pause;
+  return Object.freeze({
+    switchedOn: search !== null,
+    search,
+    searchSubject: searchCallSubject(input.previewGate),
+    searchSeamOf: guardOf === null ? null : (runId: string) => pause === undefined ? guardOf(runId).searchSeam({ runId })
+      : withMonthPauseSearch(guardOf(runId).searchSeam({ runId }), runId, pause, () => guardOf(runId).bodyMicrosLeft(runId)),
+    readRunPlan: (runId: string) => readWebRunPlan(input.pool, runId)
+  });
+}
+
+/**
+ * The plan a run's web step goes by. Decision 14: a funded debate names no plan and counts as the top plan's features, web search among
+ * them; without this it would read as "no plan" and search nothing.
+ */
+export async function readWebRunPlan(pool: Pick<Pool, "query">, runId: string): Promise<PlanId | null> {
+  const row = (await pool.query<{ plan_id: PlanId | null; funding_kind: string }>(
+    "SELECT plan_id, funding_kind FROM billing.run_charge_scope WHERE run_id = $1::uuid", [runId])).rows[0];
+  return row?.funding_kind === "INTERNAL" ? TEAM_FEATURE_PLAN_ID : row?.plan_id ?? null;
 }

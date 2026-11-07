@@ -53,7 +53,7 @@ beforeEach(() => {
     getBillingInvoices: vi.fn(async () => INVOICES),
     quoteSubscriptionUpgrade: vi.fn(), upgradeSubscription: vi.fn(), downgradeSubscription: vi.fn(async () => undefined),
     cancelSubscription: vi.fn(async () => undefined), revokeSubscriptionCancel: vi.fn(async () => undefined),
-    withdrawSubscription: vi.fn(), stepUp: vi.fn(), getBillingCharge: vi.fn(),
+    withdrawSubscription: vi.fn(), getBillingCharge: vi.fn(),
     getBillingPlans: vi.fn(async () => PLANS)
   };
 });
@@ -87,14 +87,6 @@ async function upgradeAndPay(): Promise<void> {
   await act(async () => { upgradeButton()!.click(); });
   await settle();
 }
-async function fill(selector: string, value: string): Promise<void> {
-  const input = container.querySelector<HTMLInputElement>(selector)!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
-
 describe("P20 SubscriptionControls (S1)", () => {
   it("renders nothing while it asks, and nothing at all when billing is off, after ONE request", async () => {
     client.getBillingSubscription.mockReturnValue(new Promise(() => undefined));
@@ -116,10 +108,10 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("says the plan, the renewal date and total, the actions, and the invoices", async () => {
     await render();
     expect(text()).toContain("Plan: Plus");
-    expect(text()).toContain("Renews on October 29, 2026 for $24.20");
-    for (const label of ["Change plan", "Cancel", "Withdraw"]) expect(button(label), label).toBeDefined();
+    expect(text()).toContain("Renews on 29 October 2026 for $24.20");
+    for (const label of ["Change plan", "Cancel", "Withdraw from contract here"]) expect(button(label), label).toBeDefined();
     expect(container.querySelector('a[href="/settings/card"]')?.textContent).toBe("Update card");
-    expect(text()).toContain("DBAI 0042 · October 1, 2026 · $24.20");
+    expect(text()).toContain("DBAI 0042 · 1 October 2026 · $24.20");
     expect(container.querySelector('a[href="https://quadernoapp.com/i/abc"]')?.textContent).toBe("Open");
     expect(text()).toContain("Credit note");
   });
@@ -133,41 +125,42 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("cancels after a confirmation, then offers to undo it", async () => {
     await render();
     await click("Cancel");
-    expect(text()).toContain("Cancel your plan? You keep it until October 29, 2026.");
+    expect(text()).toContain("Cancel your plan? You keep it until 29 October 2026.");
     client.getBillingSubscription.mockResolvedValueOnce({
       subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true })
     });
     await click("Yes, cancel");
     expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
-    expect(text()).toContain("Your plan ends on October 29, 2026. You won't be charged again.");
+    expect(text()).toContain("Your plan ends on 29 October 2026. You won't be charged again.");
     await click("Undo cancellation");
     expect(client.revokeSubscriptionCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("withdraws through a fresh step-up, like account deletion", async () => {
-    client.stepUp.mockResolvedValue({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
-    });
+  it("withdraws with the button and its confirmation alone: no password, no code, no step-up (OUG 34/2014 art. 11^1)", async () => {
     client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
     await render();
-    await click("Withdraw");
-    expect(text()).toContain("You can withdraw until October 13, 2026.");
-    await fill("#billing-withdraw-password", "correct horse");
-    await fill("#billing-withdraw-code", "123456");
-    await click("Withdraw and refund");
-    expect(client.stepUp).toHaveBeenCalledWith("correct horse", "123456", { action: "WITHDRAW_SUBSCRIPTION" });
-    expect(client.withdrawSubscription).toHaveBeenCalledWith("G".repeat(43));
+    await click("Withdraw from contract here");
+    expect(text()).toContain("You can withdraw until 13 October 2026.");
+    // Recital 37: a person already signed in is not asked to identify again.
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(container.querySelector('input[autocomplete="one-time-code"]')).toBeNull();
+    expect(text()).not.toContain("password");
+    await click("Confirm withdrawal");
+    expect(client.withdrawSubscription).toHaveBeenCalledTimes(1);
+    expect(client.withdrawSubscription).toHaveBeenCalledWith();
     // W9 (P2-I11): only what has happened; the refund is on its way, and M8 says when it is done.
     expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
     expect(text()).not.toContain("We refunded");
   });
 
+  it("sends nothing until the confirmation is pressed", async () => {
+    await render();
+    await click("Withdraw from contract here");
+    expect(client.withdrawSubscription).not.toHaveBeenCalled();
+    expect(button("Confirm withdrawal")).toBeDefined();
+  });
+
   it("words P12d's two other withdrawal answers: nothing due back, and a refund the owner settles (refund: null)", async () => {
-    client.stepUp.mockResolvedValue({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
-    });
     for (const [refund, sentence] of [
       ["0.00", "Done. Your plan has ended. The part you already used covers the whole price, so nothing was due back."],
       [null, "Your plan has ended. A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days."]
@@ -176,32 +169,20 @@ describe("P20 SubscriptionControls (S1)", () => {
       root = createRoot(container);
       client.withdrawSubscription.mockResolvedValueOnce({ refund, currency: "USD" });
       await render();
-      await click("Withdraw");
-      await fill("#billing-withdraw-password", "correct horse");
-      await fill("#billing-withdraw-code", "123456");
-      await click("Withdraw and refund");
+      await click("Withdraw from contract here");
+      await click("Confirm withdrawal");
       expect(text(), String(refund)).toContain(sentence);
       expect(text(), String(refund)).not.toContain("$0.00");
       expect(text(), String(refund)).not.toContain("We refunded");
     }
   });
 
-  it("refuses to withdraw without the right grant, and hides Withdraw once the window closed", async () => {
-    client.stepUp.mockResolvedValue({ status: "step_up_complete", csrf_token: "c".repeat(43) });
-    await render();
-    await click("Withdraw");
-    await fill("#billing-withdraw-password", "x");
-    await fill("#billing-withdraw-code", "123456");
-    await click("Withdraw and refund");
-    expect(client.withdrawSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("The withdrawal couldn't be completed.");
-    act(() => root.unmount());
-    root = createRoot(container);
+  it("hides the withdrawal button once the window closed", async () => {
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ withdrawal_open_until: "2026-10-01T00:00:00.000Z", withdrawal_last_day: "2026-09-30" })
     });
     await render();
-    expect(button("Withdraw")).toBeUndefined();
+    expect(button("Withdraw from contract here")).toBeUndefined();
   });
 
   it("names the window's last day in the person's calendar, not the UTC day of its closing instant", async () => {
@@ -210,9 +191,9 @@ describe("P20 SubscriptionControls (S1)", () => {
       subscription: subscription({ withdrawal_open_until: "2026-11-16T00:00:00.000Z", withdrawal_last_day: "2026-11-15" })
     });
     await render();
-    await click("Withdraw");
-    expect(text()).toContain("You can withdraw until November 15, 2026.");
-    expect(text()).not.toContain("November 16, 2026");
+    await click("Withdraw from contract here");
+    expect(text()).toContain("You can withdraw until 15 November 2026.");
+    expect(text()).not.toContain("16 November 2026");
   });
 
   it("upgrades with a quote for the rest of the month, the agreement with the new monthly total, then NETOPIA's page", async () => {
@@ -228,7 +209,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Change plan");
     await click("Upgrade to Pro");
     expect(text()).toContain(
-      "Pay $36.30 now for the rest of this month. From October 29, 2026, Pro costs $60.50 a month, tax included, until you cancel."
+      "Pay $36.30 now for the rest of this month. From 29 October 2026, Pro costs $60.50 a month, tax included, until you cancel."
     );
     expect(text()).toContain((billingEnglish as Record<string, string>)["billing.consent.renewal"]!.replace("{total}", "$60.50"));
     expect(upgradeButton()!.textContent).toBe("Upgrade and pay $36.30");
@@ -285,15 +266,15 @@ describe("P20 SubscriptionControls (S1)", () => {
     // The price is P8a's public net price, "+ tax", from the renewal date; nothing has changed yet.
     expect(client.getBillingPlans).toHaveBeenCalledTimes(1);
     expect(client.downgradeSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from October 29, 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 29 October 2026.");
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ plan_id: "MAX", scheduled_downgrade_plan_id: "PLUS" })
     });
     await click("Yes, move to Plus");
     expect(client.downgradeSubscription).toHaveBeenCalledWith("PLUS");
     const paragraphs = [...container.querySelectorAll("p")].map((paragraph) => paragraph.textContent);
-    expect(paragraphs).toContain("Done. You'll move to Plus on October 29, 2026, for $24.20 a month, tax included.");
-    expect(paragraphs).toContain("You'll move to Plus on October 29, 2026.");
+    expect(paragraphs).toContain("Done. You'll move to Plus on 29 October 2026, for $24.20 a month, tax included.");
+    expect(paragraphs).toContain("You'll move to Plus on 29 October 2026.");
   });
 
   it("offers a downgrade at the price in the subscription's currency, never the visitor's, and words its amounts in it (spec 2026-10-05 §2.16.3)", async () => {
@@ -306,12 +287,12 @@ describe("P20 SubscriptionControls (S1)", () => {
     });
     client.getBillingPlans.mockResolvedValue({ ...PLANS, currency: "EUR" });
     await render();
-    expect(text()).toContain(`Renews on October 29, 2026 for ${formatMoney("en", "1210.00", "RON")}`);
-    expect(text()).toContain(`DBAI 0044 · October 1, 2026 · ${formatMoney("en", "1210.00", "RON")}`);
+    expect(text()).toContain(`Renews on 29 October 2026 for ${formatMoney("en", "1210.00", "RON")}`);
+    expect(text()).toContain(`DBAI 0044 · 1 October 2026 · ${formatMoney("en", "1210.00", "RON")}`);
     await click("Change plan");
     await click("Move to Pro at renewal");
     expect(text()).toContain(`Move to Pro at your next renewal? It costs ${formatMoney("en", "250.00", "RON")} a month + tax,`
-      + " from October 29, 2026.");
+      + " from 29 October 2026.");
     expect(text()).not.toContain("€");
     expect(text()).not.toContain("$");
   });
@@ -342,7 +323,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Cancel");
     expect(text()).toContain("Cancel your plan? It ends now, and we stop trying to take the payment.");
     expect(text()).not.toContain("You keep it until");
-    expect(text()).not.toContain("September 28, 2026");
+    expect(text()).not.toContain("28 September 2026");
   });
 
   it("offers Undo only when the server says the undo would work: never for a sandbox plan on the live site (C-15)", async () => {
@@ -352,7 +333,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       withdrawal_open_until: null, withdrawal_last_day: null };
     client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ ...pending, can_revoke_cancel: false }) });
     await render();
-    expect(text()).toContain("Your plan ends on October 29, 2026. You won't be charged again.");
+    expect(text()).toContain("Your plan ends on 29 October 2026. You won't be charged again.");
     expect(button("Undo cancellation")).toBeUndefined();
     expect(button("Cancel")).toBeUndefined();
     // Control: the same plan on its own system, where the server offers the undo.
@@ -411,15 +392,15 @@ describe("P20 SubscriptionControls (S1)", () => {
     // INVOICES lists a credit note of October 2; no invoice here, so any "October 2, 2026" would be the promise.
     client.getBillingInvoices.mockResolvedValue({ invoices: [] });
     await render();
-    expect(text()).not.toContain("Renews on October 2");
+    expect(text()).not.toContain("Renews on 2 October");
     expect(text()).toContain("We're processing your renewal. Your plan stays active meanwhile.");
     await click("Change plan");
     await click("Move to Plus at renewal");
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from October 3, 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 3 October 2026.");
     await click("Keep my plan");
     await click("Cancel");
-    expect(text()).toContain("Cancel your plan? You keep it until October 3, 2026.");
-    expect(text()).not.toContain("October 2, 2026");
+    expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");
+    expect(text()).not.toMatch(/\b2 October 2026/u);
   });
 
   it("once the paid month is over, a pending cancel names today and offers no undo the server would refuse", async () => {
@@ -435,8 +416,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     expect(button("Undo cancellation")).toBeUndefined();
     expect(button("Cancel")).toBeUndefined();
-    expect(text()).toContain("Your plan ends on October 3, 2026.");
-    expect(text()).not.toContain("October 2, 2026");
+    expect(text()).toContain("Your plan ends on 3 October 2026.");
+    expect(text()).not.toMatch(/\b2 October 2026/u);
     expect(client.revokeSubscriptionCancel).not.toHaveBeenCalled();
   });
 
@@ -446,12 +427,12 @@ describe("P20 SubscriptionControls (S1)", () => {
       subscription: subscription({ current_period_end: "2026-10-02T10:00:00.000Z", renews_on: "2026-10-12T10:00:00.000Z" })
     });
     await render();
-    expect(text()).toContain("Renews on October 12, 2026 for $24.20");
+    expect(text()).toContain("Renews on 12 October 2026 for $24.20");
     expect(text()).not.toContain("We're processing your renewal.");
     await click("Cancel");
     // P12's requestCancelLocked ends a plan whose period end has passed today, so the confirm promises no more.
-    expect(text()).toContain("Cancel your plan? You keep it until October 3, 2026.");
-    expect(text()).not.toContain("You keep it until October 12, 2026");
+    expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");
+    expect(text()).not.toContain("You keep it until 12 October 2026");
   });
 
   it("says 'Nothing changed' only for a refusal made before any charge, and 'still confirming' when money may be moving", async () => {
@@ -493,7 +474,9 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("words a refused upgrade quote and a refused downgrade by what the server said, before any money moves", async () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now."],
-      [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."]
+      [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."],
+      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee).
+      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
@@ -635,38 +618,20 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("That didn't work.");
   });
 
-  it("words a closed window, a spent confirmation and an unknown refund outcome, instead of blaming the password", async () => {
-    client.stepUp.mockResolvedValue({
-      status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: "G".repeat(43), action: "WITHDRAW_SUBSCRIPTION", expires_at: "2026-10-03T12:05:00.000Z" }
-    });
+  it("words a closed window and an unknown refund outcome, and never asks to check a password", async () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_WINDOW_CLOSED"), "The 14-day withdrawal period has ended, or it doesn't apply where you live. You can still cancel at any time."],
-      [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."],
-      // The password and code were right (the step-up succeeded); only the grant expired or was already used.
-      [new ContractHttpError("FORBIDDEN", 403, "x", "STEP_UP_REQUIRED"), "Please confirm it's you again: that confirmation expired or was already used."]
+      [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
       client.withdrawSubscription.mockRejectedValueOnce(failure);
       await render();
-      await click("Withdraw");
-      await fill("#billing-withdraw-password", "correct horse");
-      await fill("#billing-withdraw-code", "123456");
-      await click("Withdraw and refund");
+      await click("Withdraw from contract here");
+      await click("Confirm withdrawal");
       expect(text(), String(failure.serverCode ?? failure.status)).toContain(sentence);
-      expect(text(), String(failure.serverCode ?? failure.status)).not.toContain("Check your password");
+      expect(text(), String(failure.serverCode ?? failure.status)).not.toContain("password");
     }
-    // A refused step-up (wrong password or code) is the one case that asks to check them.
-    act(() => root.unmount());
-    root = createRoot(container);
-    client.stepUp.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "x"));
-    await render();
-    await click("Withdraw");
-    await fill("#billing-withdraw-password", "wrong");
-    await fill("#billing-withdraw-code", "000000");
-    await click("Withdraw and refund");
-    expect(text()).toContain("Check your password and code, then try again.");
   });
 
   it("tells a person with a failed payment, and one without a plan, what is true", async () => {
@@ -709,7 +674,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     expect(text()).toContain("Plan: Plus");
     expect(text()).toContain("That didn't work. Please try again.");
-    for (const label of ["Change plan", "Cancel", "Withdraw"]) expect(button(label), label).toBeDefined();
+    for (const label of ["Change plan", "Cancel", "Withdraw from contract here"]) expect(button(label), label).toBeDefined();
     expect(text()).not.toContain("You're on the Free plan.");
     expect(text()).not.toContain("No invoices yet.");
     expect(container.querySelector('a[href="/pricing"]')).toBeNull();
@@ -723,7 +688,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
     expect(text()).toContain("Plan: Plus");
     expect(text()).toContain("That didn't work. Please try again.");
-    expect(text()).toContain("DBAI 0042 · October 1, 2026 · $24.20");
+    expect(text()).toContain("DBAI 0042 · 1 October 2026 · $24.20");
     expect(text()).not.toContain("You're on the Free plan.");
   });
 });

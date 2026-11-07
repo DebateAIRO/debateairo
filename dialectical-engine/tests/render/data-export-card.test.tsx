@@ -195,15 +195,15 @@ it("FIX-UI2 W-B2 sends the contract locale for regional English while keeping UI
 });
 it("U-7 shows localized PREPARING time and no request control", async () => {
   await mount(<DataExportCard catalog={settings} locale="en" client={client(PREPARING) as never} />);
-  expect(host?.textContent).toContain("Oct 8");
-  expect(host?.textContent).toContain("2026");
+  // Owner's answer to question 5 (5 Nov 2026): English pages write the day first ("8 Oct 2026").
+  expect(host?.textContent).toContain("8 Oct 2026");
   expect(host?.textContent).toContain(settings["settings.export.preparing"].split("{")[0]);
   expect(host?.querySelector("button")).toBeNull();
 });
 it("U-8 shows SENT times, request again and supersession note", async () => {
   await mount(<DataExportCard catalog={settings} locale="en" client={client(SENT) as never} />);
   expect(host?.textContent).toContain(settings["settings.export.sent"].split("{")[0]);
-  expect(host?.textContent).toContain("Oct 9");
+  expect(host?.textContent).toContain("9 Oct 2026");
   expect(button(settings["settings.export.requestAgain"]).disabled).toBe(false);
   expect(host?.textContent).toContain(settings["settings.export.supersedes"]);
 });
@@ -238,8 +238,10 @@ it("U-10 maps each refusal to a visible status then preserves the next read stat
     const status = host!.querySelector('[role="status"]')?.textContent ?? "";
     expect(status).toContain(settings[key].split("{")[0]);
     if (code === "EXPORT_RATE_LIMITED") {
-      const expectedTime = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date("2026-10-08T16:43:00.000Z"));
+      // English is day first on the 24-hour clock (question 5), in this machine's zone: "8 Oct 2026, 19:43" in Bucharest.
+      const expectedTime = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date("2026-10-08T16:43:00.000Z"));
       expect(status).toContain(expectedTime);
+      expect(status).not.toMatch(/\b(AM|PM)\b/u);
     }
     expect(host?.textContent).toContain(settings["settings.export.hint"]);
     await act(async () => root!.unmount()); root = null; host?.remove(); host = null;

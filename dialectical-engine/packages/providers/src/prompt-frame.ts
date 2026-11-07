@@ -341,6 +341,29 @@ function renderMaterialBlock(fence: string, fields: readonly FramedMaterialField
 }
 
 /**
+ * F5: a rendered material block as two blocks under the same fence: its first `count` fields, and the rest. Each is a block
+ * `renderMaterialBlock` would write. Null when `block` is not one, or either side would be empty.
+ */
+export function splitFramedMaterialBlock(block: string, count: number): Readonly<{ shared: string; rest: string }> | null {
+  if (!Number.isSafeInteger(count) || count < 1) return null;
+  const firstLine = block.indexOf("\n");
+  const lastLine = block.lastIndexOf("\n");
+  if (firstLine < 0 || lastLine <= firstLine) return null;
+  const fence = block.slice(0, firstLine);
+  if (block.slice(lastLine + 1) !== fence) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(block.slice(firstLine + 1, lastLine));
+  } catch {
+    return null;
+  }
+  const fields = typeof parsed === "object" && parsed !== null ? (parsed as { readonly fields?: unknown }).fields : undefined;
+  if (!Array.isArray(fields) || fields.length <= count) return null;
+  return Object.freeze({ shared: renderMaterialBlock(fence, fields.slice(0, count) as FramedMaterialField[]),
+    rest: renderMaterialBlock(fence, fields.slice(count) as FramedMaterialField[]) });
+}
+
+/**
  * THE fingerprint text for a sealed prompt contract (`policy.hashes.*`).
  *
  * It covers the frame VERSION as well as the instruction and the answer form,

@@ -24,7 +24,7 @@ import {
   type AskAccepted,
   type AskRequest
 } from "@debateai/contract";
-import { EntitlementRepository, RunWaitRepository, configureContentEncryption, contentCipherFor, migrate } from "@debateai/db";
+import { EntitlementRepository, RunWaitRepository, configureContentEncryption, contentCipherFor, migrate, type Pool } from "@debateai/db";
 import { argumentLanguageDirective } from "@debateai/kernel";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
@@ -53,7 +53,7 @@ import {
 } from "../support/storyEncryptedOwner.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
-import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
+import { apiTestPools, provisionRlsLogins, runnerPoolOrSuperuser, type ApiTestPools } from "../support/rls-logins.js";
 
 /**
  * Budget spec 2026-09-28 §2.14, "End to end": one hosted-mode debate under a
@@ -65,6 +65,8 @@ import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/
  * CI skips this directory; it is on the Part 1 pull request's hand-run list (B11d).
  */
 let database: TestDatabase;
+/** Upload check Task 7 (R21): the runner's own pool, its production login in login mode (rls-logins.ts). */
+let runnerPool: Pool;
 /** The API's pools (R21, PLAN S5.3): the product's logins in API-login mode, the harness superuser otherwise. */
 let pools: ApiTestPools | undefined;
 /**
@@ -385,14 +387,14 @@ function hostedGuard(): CostEnvelopeGuard {
 
 function hostedRunner(endpoint: string): WalkingSkeletonRunner {
   const guard = hostedGuard();
-  const gateway = (model: string, maker: string) => createPostgresProviderGateway(database.pool, {
+  const gateway = (model: string, maker: string) => createPostgresProviderGateway(runnerPool, {
     endpoint, model, maker,
     // Each call names its phase and whether it is walled (B9b's third parameter).
     buildCostEnvelopeSeam: (runId, phase, sharedWall) => guard.providerSeam({
       runId, price: PRICE, requireReportedUsage: true, phase, sharedWall
     })
   });
-  return new WalkingSkeletonRunner(database.pool, gateway("test-layer/primary-model", "Primary test maker"), {
+  return new WalkingSkeletonRunner(runnerPool, gateway("test-layer/primary-model", "Primary test maker"), {
     ...runnerSettings(),
     critique: {
       provider: gateway("test-layer/secondary-model", "Secondary test maker"),
@@ -634,6 +636,8 @@ beforeAll(async () => {
   // R21 (PLAN S5.3): the API side's pools are the mode's; main.ts gives the runtime pool the content cipher.
   pools = await apiTestPools(database, import.meta.url);
   if (contentCipherFor(pools.runtime) === undefined) configureContentEncryption(pools.runtime, contentCipherFor(database.pool)!);
+  // Upload check Task 7 (R21): the runner on its production login in login mode, with the same content cipher.
+  runnerPool = await runnerPoolOrSuperuser(database);
 }, 600_000);
 
 afterAll(async () => {
@@ -680,7 +684,7 @@ describe("budget spec §2.14 — one hosted debate under a tiny daily limit wait
         resetsAt: "2031-10-11T00:00:00.000Z"
       },
       whileWaiting: async ({ runId, accepted }) => {
-        expect(accepted.applied).toEqual({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 });
+        expect(accepted.applied).toEqual({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 1 });
         // Task11: queue entry pins the ordinary kind/event; wake retains current-plan rules.
         expect(await chargeScopeOf(runId)).toEqual([{owner_ref:owner.ownerRef,plan_id:"FREE"}]);
       },

@@ -12,6 +12,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { z } from "zod";
 import { StoryBodySchema } from "@debateai/contract";
 import {
   COMPARING_JUDGE_READING,
@@ -19,6 +20,7 @@ import {
   JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT,
   JUDGE_ARTIFACT_READING,
   POINT_INVESTIGATION_READING,
+  PublicContributionCheckReplySchema,
   classifyStructuredArtifact,
   comparingJudgeReplySchema,
   judgeArtifactSchema,
@@ -29,6 +31,11 @@ import {
   pointInvestigationReplySchema,
   REVIEW_ARTIFACT_READING,
   parsedStructuredRepairs,
+  webDigPlannerV2ReplySchema,
+  webPickReplySchema,
+  webPlannerV2ReplySchema,
+  webReadTopReplySchema,
+  webSuggestDigReplySchema,
   type JudgeAssessment,
   type JudgeLeg
 } from "@debateai/judgement";
@@ -102,8 +109,15 @@ import {
   STORY_FIXER_OPTIONS,
   STORYTELLER_CONTRACT_ID,
   STORYTELLER_V4_CONTRACT_ID,
+  PathRewriteCheckerReplySchema,
+  PathRewriteReplySchema,
+  ReportAnswerCheckReplySchema,
+  ReportStoryCheckReplySchema,
+  ReportStoryReplySchema,
+  ReportWriterReplySchema,
   StoryWriter,
   classifyCheckerContent,
+  classifyStoryChartsContent,
   type StoryPack,
   type StoryRecordInput,
   type StoryWriteInput
@@ -182,7 +196,10 @@ export function practiceModelOfRef(providerRef: string): string {
 }
 
 export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "INVESTIGATOR" | "VERDICT_JUDGE" | "SYNTHESIZER" | "EVALUATOR"
-  | "STORYTELLER" | "STORY_CHECKER" | "STRUCTURE_REPAIR" | "UNMAPPED";
+  | "STORYTELLER" | "STORY_CHECKER" | PracticeLaterFamily | "STRUCTURE_REPAIR" | "UNMAPPED";
+/** The calls beyond the arguing and the story: the web step, the story's charts, a dig's and a report's, the public debate's check. */
+export type PracticeLaterFamily = "WEB" | "WEB_RESEARCHED" | "STORY_CHARTS" | "SUGGESTIONS" | "PATH_REWRITE" | "PATH_CLIMB" | "REPORT" | "ANSWER_UPDATE"
+  | "PUBLIC_REPORT" | "CONTRIBUTION_CHECK";
 
 /** R2 (INTERFACE §15.4): the engine-2 verdict calls' key prefixes (A2's `pointInvestigationCallSiteKey`, `comparingJudgeCallSiteKey`). */
 const PRACTICE_VERDICT_KEY_PREFIXES = Object.freeze({ investigate: "VERDICT:investigate:", judge: "VERDICT:judge:" } as const);
@@ -197,6 +214,17 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   if (callSiteKey.startsWith("MAP:")) return "MAP";
   if (callSiteKey.startsWith("STORY:STORYTELLER:")) return "STORYTELLER";
   if (callSiteKey.startsWith("STORY:CHECKER:")) return "STORY_CHECKER";
+  if (callSiteKey.startsWith("STORY:CHARTS:")) return "STORY_CHARTS";
+  // The suggestions share the rewrite's prefix: they are read first.
+  if (callSiteKey.startsWith("PATH_REWRITE:SUGGEST:")) return "SUGGESTIONS";
+  if (callSiteKey.startsWith("PATH_REWRITE:")) return "PATH_REWRITE";
+  if (callSiteKey.startsWith("PATH_CLIMB:")) return "PATH_CLIMB";
+  if (callSiteKey.startsWith("INVESTIGATION_REPORT:")) return "REPORT";
+  if (callSiteKey.startsWith("ANSWER_UPDATE:")) return "ANSWER_UPDATE";
+  if (callSiteKey.startsWith("PUBLIC_REPORT:")) return "PUBLIC_REPORT";
+  if (callSiteKey.startsWith("CONTRIBUTION_CHECK:")) return "CONTRIBUTION_CHECK";
+  if (callSiteKey.startsWith("WEB_RESEARCHED:")) return "WEB_RESEARCHED";
+  if (callSiteKey.startsWith("WEB:")) return "WEB";
   if (callSiteKey.startsWith("COMPOSER:SYNTHESIZER:")) return "SYNTHESIZER";
   if (callSiteKey.startsWith("POST_COMPOSE_R9:EVALUATOR:")) return "EVALUATOR";
   if (callSiteKey.startsWith("PANEL:")) return "PANEL";
@@ -220,9 +248,14 @@ export function practiceMapStepOf(callSiteKey: string): PracticeMapStep | null {
 }
 
 /** LG-A (INTERFACE §1.3): a call's step, in the thinking table's words; finer than the family (positions, pros/cons and cross-replies apart). */
-export type PracticeStep = LengthCallStep | "UNMAPPED";
+export type PracticeStep = LengthCallStep | Lowercase<PracticeLaterFamily> | "UNMAPPED";
+const PRACTICE_LATER_FAMILIES: ReadonlySet<PracticeCallFamily> = new Set<PracticeLaterFamily>(["WEB", "WEB_RESEARCHED", "STORY_CHARTS", "SUGGESTIONS",
+  "PATH_REWRITE", "PATH_CLIMB", "REPORT", "ANSWER_UPDATE", "PUBLIC_REPORT", "CONTRIBUTION_CHECK"]);
 export function practiceStepOf(callSiteKey: string): PracticeStep {
-  return lengthCallStepOf(callSiteKey) ?? "UNMAPPED";
+  const step = lengthCallStepOf(callSiteKey);
+  if (step !== null) return step;
+  const family = callFamilyOf(callSiteKey);
+  return PRACTICE_LATER_FAMILIES.has(family) ? family.toLowerCase() as Lowercase<PracticeLaterFamily> : "UNMAPPED";
 }
 
 /** One way a map step's reply is read: its schema and the code salvage its step makes (ruling MAP-SALVAGE). */
@@ -503,6 +536,33 @@ function fromStructured(result: ReturnType<typeof parseStructuredArtifact>): rea
   return issueListFromParseError(result.message);
 }
 
+/** Reader 1 keeps every usable entry (apps/runner/src/web-reader-all.ts) and needs the ids it showed, so here: a list of pages. */
+const practiceReadAllReplySchema = z.object({ pages: z.array(z.unknown()).min(1) });
+
+/**
+ * The reply form of a call beyond the arguing and the story, from its key (a seat suffix ignored), or null for any other key.
+ * Their content checks need the run's refs and are not re-run here: the schema re-check is the diagnosis, the call-time check
+ * the verdict. A first debate's suggestions may not be empty, a dig's may: the looser form reads both.
+ */
+function practiceLaterReplySchema(key: string): z.ZodType | null {
+  const site = key.replace(/:seat:(?:main|runnerUp)$/u, "");
+  if (site.startsWith("PATH_REWRITE:SUGGEST:")) return webSuggestDigReplySchema;
+  const rewrite = /^(?:PATH_REWRITE|PATH_CLIMB):(WRITER|CHECKER):/u.exec(site);
+  if (rewrite !== null) return rewrite[1] === "WRITER" ? PathRewriteReplySchema : PathRewriteCheckerReplySchema;
+  const report = /^(?:INVESTIGATION_REPORT|ANSWER_UPDATE|PUBLIC_REPORT):(ANSWER|ANSWER_ASKED|ANSWER_CHECK|STORY|STORY_CHECK):/u.exec(site);
+  if (report !== null) {
+    return report[1] === "ANSWER_CHECK" ? ReportAnswerCheckReplySchema : report[1] === "STORY" ? ReportStoryReplySchema
+      : report[1] === "STORY_CHECK" ? ReportStoryCheckReplySchema : ReportWriterReplySchema;
+  }
+  if (site.startsWith("CONTRIBUTION_CHECK:")) return PublicContributionCheckReplySchema;
+  if (site === "WEB:plan") return webPlannerV2ReplySchema;
+  if (site.startsWith("WEB:plan:")) return webDigPlannerV2ReplySchema;
+  if (site.startsWith("WEB:read1:") || site.startsWith("WEB_RESEARCHED:read1")) return practiceReadAllReplySchema;
+  if (site.startsWith("WEB:pick:")) return webPickReplySchema;
+  if (site.startsWith("WEB:read-top:") || site.startsWith("WEB_RESEARCHED:read-top:")) return webReadTopReplySchema;
+  return null;
+}
+
 /**
  * Re-runs the job's own format check on a stored reply. The story's storyteller check needs the run's material
  * index (which refs exist), which is not stored: the reply is checked against the story's schema only (after the reply
@@ -529,6 +589,7 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
     case "SYNTHESIZER": return { family, issues: fromClassification(classifySynthesisRoleContent("SYNTHESIZER", content)) };
     case "EVALUATOR": return { family, issues: fromClassification(classifyEvaluatorContent(content)) };
     case "STORY_CHECKER": return { family, issues: fromClassification(classifyCheckerContent(content)) };
+    case "STORY_CHARTS": return { family, issues: fromClassification(classifyStoryChartsContent(content)) };
     case "STORYTELLER": {
       let parsed: unknown;
       try { parsed = JSON.parse(content); } catch (error) {
@@ -550,7 +611,12 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       pointInvestigationReplySchema, undefined, POINT_INVESTIGATION_READING, pointInvestigationContentIssues)) };
     case "VERDICT_JUDGE": return { family, issues: fromStructured(parseStructuredArtifact(content, comparingJudgeReplySchema,
       undefined, COMPARING_JUDGE_READING)) };
-    default: return { family, issues: Object.freeze(["UNMAPPED"]) };
+    default: {
+      const schema = practiceLaterReplySchema(key);
+      if (schema === null) return { family, issues: Object.freeze(["UNMAPPED"]) };
+      const decoded = decodeModelJson(content);
+      return { family, issues: decoded.ok ? fromZod(schema.safeParse(decoded.value)) : Object.freeze([`invalid_json@$:${decoded.error.slice(0, 120)}`]) };
+    }
   }
 }
 

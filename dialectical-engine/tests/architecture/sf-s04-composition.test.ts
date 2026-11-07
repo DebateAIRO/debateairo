@@ -34,7 +34,7 @@ describe("S04 production composition", () => {
     expect(readFileSync("apps/api/src/question-check/compose.ts", "utf8")).not.toMatch(/keeper|\.keep\(/u);
     expect(readFileSync("apps/api/src/question-check/ask-gate.ts", "utf8")).not.toMatch(/keep\(/u);
     const askRoute = readFileSync("apps/api/src/index.ts", "utf8");
-    const at = askRoute.indexOf("options.questionCheck.check(ask.question_line)");
+    const at = askRoute.indexOf("options.questionCheck.check(questionWithPurposeLines(ask.question_line, ask.purpose_lines))");
     expect(at).toBeGreaterThan(0);
     expect(askRoute.slice(at, at + 1_500)).not.toMatch(/\.keep\(/u);
   });
@@ -43,6 +43,12 @@ describe("S04 production composition", () => {
   it("projects the price from the instruction built from the subjects file", () => {
     const source = readFileSync("apps/api/src/question-check/compose.ts", "utf8");
     expect(source).toContain("Buffer.byteLength(questionCheckContract(input.subjects).instruction");
+  });
+
+  // R22's first debate (2026-11-02): the test site has the Anthropic gate and no support target; without the gate the check
+  // was never on and every ask was refused. tests/unit/question-check-preview-route.test.ts runs what this wiring builds.
+  it("hands the check the preview gate exactly as the language check gets it (ruling L-ROUTE)", () => {
+    expect(main()).toMatch(/composeQuestionCheck\(\{[\s\S]*?preview: previewGate === undefined \? null : \{ fetch: previewFetch, anthropicSocket: previewProviderSocket\(previewGate, "anthropic"\) \}\n\}\)\);/u);
   });
 
   it("composes from the support target and the sealed policy through the local switch", () => {

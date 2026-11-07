@@ -267,17 +267,30 @@ describe('release table door (side-by-side spec §4)', () => {
   });
 
   it('counts only the release\'s own open work', async () => {
+    // A database before 0143 (the upload that brings it reads this first): the stamp, nothing else asked of it.
     const { calls, run } = recorder(ok('3\n'));
     expect(await countOpenWork({ releaseKey: KEY, layout: LAYOUT, run })).toBe(3);
-    expect(sql(calls[0])).toMatch(/FROM core\.work_item AS item\s+JOIN core\.run AS run ON run\.run_id = item\.run_id/);
-    expect(sql(calls[0])).toMatch(/item\.state IN \('READY', 'CLAIMED'\)/);
-    expect(sql(calls[0])).toMatch(/run\.release_key = :'release_key'/);
-    expect(variables(calls[0])).toEqual([`release_key=${KEY}`]);
+    expect(sql(calls[0])).toMatch(/to_regprocedure\('identity\.run_work_is_parked/);
+    expect(sql(calls[1])).toMatch(/FROM core\.work_item AS item\s+JOIN core\.run AS run ON run\.run_id = item\.run_id/);
+    expect(sql(calls[1])).toMatch(/item\.state IN \('READY', 'CLAIMED'\)/);
+    expect(sql(calls[1])).toMatch(/run\.release_key = :'release_key'/);
+    expect(sql(calls[1])).not.toMatch(/identity\./);
+    expect(variables(calls[1])).toEqual([`release_key=${KEY}`]);
     const all = recorder(ok('0\n'));
     expect(await countOpenWork({ releaseKey: null, layout: LAYOUT, run: all.run })).toBe(0);
-    expect(sql(all.calls[0])).toMatch(/FROM core\.work_item AS item\s+WHERE item\.state IN \('READY', 'CLAIMED'\)/);
-    expect(sql(all.calls[0])).not.toMatch(/release_key/);
-    expect(variables(all.calls[0])).toEqual([]);
+    expect(sql(all.calls[1])).toMatch(/FROM core\.work_item AS item\s+WHERE item\.state IN \('READY', 'CLAIMED'\)/);
+    expect(sql(all.calls[1])).not.toMatch(/release_key/);
+    expect(variables(all.calls[1])).toEqual([]);
+  });
+
+  it('with 0143 on the database: the release that owns the run now, a paused debate left out (decision 12)', async () => {
+    const calls: Call[] = [];
+    const answers = [ok('t\n'), ok('2\n')];
+    const run = async (argv: string[], opts: Call['opts']) => { calls.push({ argv, opts }); return answers[calls.length - 1]!; };
+    expect(await countOpenWork({ releaseKey: KEY, layout: LAYOUT, run })).toBe(2);
+    expect(sql(calls[1])).toMatch(/NOT identity\.run_work_is_parked\(item\.run_id, item\.state, item\.claim_deadline\)/);
+    expect(sql(calls[1])).toMatch(/identity\.run_release_now\(run\.run_id\) = :'release_key'/);
+    expect(sql(calls[1])).not.toMatch(/run\.release_key/);
   });
 
   it('counts the waiting line', async () => {

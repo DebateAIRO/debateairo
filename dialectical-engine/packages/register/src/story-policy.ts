@@ -303,3 +303,47 @@ export async function readStoryPolicyFromRegister(
     sourceRef: row.source_ref
   })), registerVersion);
 }
+
+/**
+ * THE PATH REWRITE (dig-model revision 2026-10-30, task W3-5; owner answers Q-D10, Q-D13, Q-D14): a dig writes no story;
+ * one writer call (Claude Haiku 5.5) and one checker call (GLM; Luna later) rewrite the path it was dug from. Code-owned,
+ * never a register row: the rewrite is part of the dig and its contracts are sealed by engineContractHash, so these
+ * numbers move with a release, as the web step's do.
+ *  - thinking: both steps think at the low level (the owner's rule for the final steps of a dig, as the web steps). The
+ *    step names are the names the preview's thinking table reads for the two call sites (`PATH_REWRITE:WRITER:{round}`,
+ *    `PATH_REWRITE:CHECKER:{round}`, packages/story/src/path-rewrite.ts).
+ *  - rounds: at most 2 on a paid plan, 1 on Free (Q-D14), and the backup writer's loop the same again after them.
+ *  - the writer's output cap is 8,192 tokens; the checker answers in one short object.
+ */
+export const PATH_REWRITE_THINKING = Object.freeze({
+  writer: Object.freeze({ step: "path_rewrite_writer", level: "low" } as const),
+  checker: Object.freeze({ step: "path_rewrite_checker", level: "low" } as const)
+});
+
+export const PATH_REWRITE_POLICY = Object.freeze({
+  maxRounds: 2,
+  freeMaxRounds: 1,
+  writerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 8192, deadlineMs: 240_000 }),
+  checkerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 180_000 })
+} as const);
+
+/**
+ * THE FINAL REPORT OVER AN INVESTIGATION (plan 2026-10-30 task W5-1; design W0-1 with the owner's answers F1-F14).
+ * Code-owned, never a register row, as the path rewrite's: its contracts are sealed by engineContractHash.
+ *  - rounds: the answer and the story at most 2 rounds each on a paid plan; Free's slim report 1 round each (owner F1),
+ *    then a backup writer of another maker the same again, as the story does;
+ *  - output caps (owner F3, his own figures): 16K tokens for the answer, 80K for the story; Free's slim story 16K, so its
+ *    whole report fits its plan's reserve (owner F2);
+ *  - money (the money rule of 31 Oct, point 6; R22 decision 18): the reserve always kept is billingPlans' `reserve_micros`,
+ *    read through `closingReservesOf`, never a constant here. It is the closing's ceiling and is never walled; the largest
+ *    is the gateway's safety net, and the closing admits each call against its own plan's reserve before it is sent.
+ *  - thinking: the four steps are the owner's answer_writer, answer_checker, story_writer and story_checker rows.
+ */
+export const INVESTIGATION_REPORT_POLICY = Object.freeze({
+  maxRounds: 2,
+  freeMaxRounds: 1,
+  answerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 16_384, deadlineMs: 300_000 }),
+  storyBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 81_920, deadlineMs: 600_000 }),
+  freeStoryBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 16_384, deadlineMs: 300_000 }),
+  checkerBound: Object.freeze({ maxAttempts: 3, tokenCeiling: 8_192, deadlineMs: 300_000 })
+} as const);

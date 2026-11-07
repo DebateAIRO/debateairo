@@ -48,7 +48,8 @@ import {
   buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   costEnvelopePolicyFromValue, costEnvelopeBand, COST_ENVELOPE_POLICY_ROW_KEY,
   admissionPolicyFromValue, assertAskRoomAdmissionSealed, assertHostedSupportAdmissionSealed, ADMISSION_POLICY_ROW_KEY,
-  billingPolicyFromValue, billingPlansFromValue, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
+  billingPolicyFromValue, billingPlansFromValue, billingPlansAreMadeUp, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
+  abuseLimitsFromValue, ABUSE_LIMITS_ROW_KEY,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue, COUNTRY_POLICY_ROW_KEY, readStoryPolicy,
   callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
   COST_ESTIMATE_START_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW, costEstimateStartPolicyFromValue,
@@ -97,12 +98,12 @@ export const PREVIEW_SOURCE_ROW_KEYS_V3 = Object.freeze([...PREVIEW_SOURCE_ROW_K
 export const PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY = 'US' as const;
 /** Why each owner-input row changed, as the proposal shows it to the owner. */
 const OWNER_INPUT_REASON = 'owner-hosted-billing-input' as const;
-const OWNER_INPUT_KEYS = Object.freeze([COST_ENVELOPE_POLICY_ROW_KEY, ADMISSION_POLICY_ROW_KEY, BILLING_POLICY_ROW_KEY] as string[]);
+const OWNER_INPUT_KEYS = Object.freeze([COST_ENVELOPE_POLICY_ROW_KEY, ADMISSION_POLICY_ROW_KEY, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY, ABUSE_LIMITS_ROW_KEY] as string[]);
 const OWNER_RULING = 'owner rulings 2026-10-13: hosted preview, NETOPIA and Quaderno sandboxes';
 
 /**
- * Sanity bounds on the owner's ceilings, never a ceiling themselves: the values are the owner's plan inputs (suggested
- * $3 per debate and $10 per day, pending the owner's confirmation). A typed extra digit stops here, before the review.
+ * Sanity bounds on the owner's ceilings, never a ceiling themselves: the values are the owner's plan inputs. A typed
+ * extra digit stops here, before the review.
  */
 export const PREVIEW_HOSTED_CEILING_BOUNDS = Object.freeze({ perRunMaxMicros: 50_000_000, dailyMaxMicros: 200_000_000 });
 /** The register's own bounds of an admission scope (packages/register/src/session-policy.ts admissionScopeValueSchema). */
@@ -110,13 +111,16 @@ const SCOPE_BOUNDS = Object.freeze({ limit: 1_000_000, windowMs: 86_400_000, cap
 
 /**
  * The owner's inputs for a hosted preview publication (the native plan's `hostedBilling`): billing on or off, the
- * per-run and daily ceilings in micro-dollars, and the room read's budget (key `owner`, the register's only form).
+ * per-run and daily ceilings in micro-dollars, the room read's budget (key `owner`, the register's only form), and, since
+ * R22 decision 18, the real `billingPlans` and `abuseLimits` rows, whose only home is the owner's plan on the server.
  */
 export type PreviewHostedBillingChoice = Readonly<{
   billing: 'on' | 'off';
   perRunCeilingMicros: number;
   dailyCeilingMicros: number;
   askRoomReads: Readonly<{ limit: number; windowMs: number; capacity: number }>;
+  billingPlans: unknown;
+  abuseLimits: unknown;
 }>;
 
 const plain = (value:unknown):value is Record<string,unknown> => value!==null&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype;
@@ -125,15 +129,20 @@ const whole = (value:unknown,most:number):value is number => Number.isSafeIntege
 
 /** The one check of the owner's inputs (the native operator runs the same rule before it opens the database). */
 export function previewHostedBillingChoice(value:unknown):PreviewHostedBillingChoice {
-  if(!plain(value)||!exactly(value,['askRoomReads','billing','dailyCeilingMicros','perRunCeilingMicros']))return fail('hosted-billing-choice');
+  if(!plain(value)||!exactly(value,['abuseLimits','askRoomReads','billing','billingPlans','dailyCeilingMicros','perRunCeilingMicros']))return fail('hosted-billing-choice');
   const reads=value.askRoomReads;
   if(value.billing!=='on'&&value.billing!=='off')return fail('hosted-billing-choice');
   if(!whole(value.perRunCeilingMicros,PREVIEW_HOSTED_CEILING_BOUNDS.perRunMaxMicros)||!whole(value.dailyCeilingMicros,PREVIEW_HOSTED_CEILING_BOUNDS.dailyMaxMicros)
     ||value.perRunCeilingMicros>value.dailyCeilingMicros)return fail('hosted-billing-ceilings');
   if(!plain(reads)||!exactly(reads,['capacity','limit','windowMs'])||!whole(reads.limit,SCOPE_BOUNDS.limit)||!whole(reads.windowMs,SCOPE_BOUNDS.windowMs)
     ||!whole(reads.capacity,SCOPE_BOUNDS.capacity))return fail('hosted-billing-ask-room-reads');
+  // By the register's own parsers (BILLING_PLANS_INVALID, ABUSE_LIMITS_INVALID): a typing slip stops here, before the review.
+  const plans=billingPlansFromValue(value.billingPlans,OWNER_RULING);
+  abuseLimitsFromValue(value.abuseLimits,OWNER_RULING);
+  if(value.billing==='on'&&billingPlansAreMadeUp(plans))return fail('hosted-billing-plans-made-up');
   return Object.freeze({billing:value.billing,perRunCeilingMicros:value.perRunCeilingMicros,dailyCeilingMicros:value.dailyCeilingMicros,
-    askRoomReads:Object.freeze({limit:reads.limit,windowMs:reads.windowMs,capacity:reads.capacity})});
+    askRoomReads:Object.freeze({limit:reads.limit,windowMs:reads.windowMs,capacity:reads.capacity}),
+    billingPlans:value.billingPlans,abuseLimits:value.abuseLimits});
 }
 
 const canonicalValue = (value:unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value),'utf8'));
@@ -194,7 +203,10 @@ export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runt
   const replaced=new Map<string,RegisterPublicationRow>([
     [COST_ENVELOPE_POLICY_ROW_KEY,{rowKey:COST_ENVELOPE_POLICY_ROW_KEY,valueJsonText:canonicalValue(cost),sourceRef:costRef}],
     [ADMISSION_POLICY_ROW_KEY,{rowKey:ADMISSION_POLICY_ROW_KEY,valueJsonText:canonicalValue(admission),sourceRef:admissionRef}],
-    [BILLING_POLICY_ROW_KEY,billingRows[0]!]
+    [BILLING_POLICY_ROW_KEY,billingRows[0]!],
+    // R22 decision 18: the code's rows hold made-up values; these two are always the owner's, from the plan.
+    [BILLING_PLANS_ROW_KEY,{rowKey:BILLING_PLANS_ROW_KEY,valueJsonText:canonicalValue(choice.billingPlans),sourceRef:`the owner's plans, from the hosted preview publish plan (${OWNER_RULING})`}],
+    [ABUSE_LIMITS_ROW_KEY,{rowKey:ABUSE_LIMITS_ROW_KEY,valueJsonText:canonicalValue(choice.abuseLimits),sourceRef:`the owner's abuse limits, from the hosted preview publish plan (${OWNER_RULING})`}]
   ]);
   // Fresh-site estimate (owner rulings 2026-10-22): the code-owned row a hosted build seals, with the code's values.
   if(byKey.has(COST_ESTIMATE_START_POLICY_ROW_KEY))fail('hosted-estimate-start-row');
@@ -285,6 +297,9 @@ export function assertHostedPreviewBootRows(rows:readonly RegisterPublicationRow
   // estimate as before), but a malformed row refuses the API's boot (COST_ESTIMATE_START_POLICY_INVALID).
   const estimateStart=map.has(COST_ESTIMATE_START_POLICY_ROW_KEY)?parsed(COST_ESTIMATE_START_POLICY_ROW_KEY):null;
   if(estimateStart!==null)costEstimateStartPolicyFromValue(estimateStart.value,estimateStart.sourceRef);
+  // R22 decision 18: main.ts's abuse-limits stage; a version without the row refuses the API's boot.
+  const abuse=parsed(ABUSE_LIMITS_ROW_KEY);
+  abuseLimitsFromValue(abuse.value,abuse.sourceRef);
   const billingRow=parsed(BILLING_POLICY_ROW_KEY),policy=billingPolicyFromValue(billingRow.value,billingRow.sourceRef);
   const plansRow=map.has(BILLING_PLANS_ROW_KEY)?parsed(BILLING_PLANS_ROW_KEY):null;
   assertBillingReady({policy,plans:plansRow===null?null:billingPlansFromValue(plansRow.value,plansRow.sourceRef),envelope});

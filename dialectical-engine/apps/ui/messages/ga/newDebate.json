@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Ní féidir an díospóireacht a chruthú",
   "newDebate.sessionReadFailed": "Theip ar léamh an tseisiúin",
   "newDebate.planRosterFailed": "Theip ar léamh liosta na leibhéal plean",
-  "newDebate.checkingSession": "An seisiún á sheiceáil…",
+  "newDebate.checkingSession": "Nóiméad amháin…",
   "newDebate.redirectingToSignIn": "Do do thabhairt chuig an síniú isteach…",
   "newDebate.continueToSignIn": "Lean ar aghaidh chuig an síniú isteach",
   "newDebate.defaultUnavailable": "Níl aon tsraith riskTier bhailí san imscaradh; tá an leibhéal riosca ag fanacht le hionchur.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Tá teorainn an lae inniu do do phlean sroichte agat. Is féidir leat ceist a chur fós: tosóidh do dhíospóireacht léi féin ag {time}.",
   "newDebate.room.personWeekFullTopPlan": "Tá teorainn na seachtaine seo do do phlean sroichte agat. Is féidir leat ceist a chur fós: tosóidh do dhíospóireacht léi féin ar {time}.",
   "newDebate.room.personMonthFullTopPlan": "Tá teorainn na míosa seo do do phlean sroichte agat. Is féidir leat ceist a chur fós: tosóidh do dhíospóireacht léi féin ar {time}.",
-  "newDebate.room.freeMonthFull": "D’úsáid tú díospóireachtaí saor in aisce na míosa seo. Is féidir le do chéad díospóireacht eile tosú ar {time}, nó roghnaigh plean chun leanúint ar aghaidh anois.",
+  "newDebate.room.freeMonthFull": "D’úsáid tú cuóta saor in aisce na míosa seo. Is féidir le do chéad díospóireacht eile tosú ar {time}, nó roghnaigh plean chun leanúint ar aghaidh anois.",
   "newDebate.room.personClose": "Tá tú gar do theorainn do phlean. Rithfear an díospóireacht seo ina hiomláine fós.",
   "newDebate.room.ownDebatesFull": "Tá do dhíospóireachtaí eile ag úsáid an chuid eile de do theorainn faoi láthair. Tosóidh an díospóireacht seo léi féin chomh luath agus a chríochnaíonn ceann acu.",
   "newDebate.room.upgradeLink": "Féach ar na pleananna",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Do phlean: Saor in aisce",
   "newDebate.plan.current.PLUS": "Do phlean: Plus",
   "newDebate.plan.current.PRO": "Do phlean: Pro",
-  "newDebate.plan.current.MAX": "Do phlean: Max"
+  "newDebate.plan.current.MAX": "Do phlean: Max",
+  "newDebate.askText.otherAnswer": "Freagra eile…",
+  "newDebate.askText.otherLabel": "Bhur soiléiriú breise féin",
+  "newDebate.askText.matters": "Má tá na freagraí ag dul i dtreonna éagsúla, is é an rud is tábhachtaí dom: {matters}",
+  "newDebate.askText.angles": "Le bhur dtoil, féachaigí freisin ar: {list}.",
+  "newDebate.freePublicNotice": "Ar an bplean saor in aisce, tá do cheist agus an díospóireacht uirthi poiblí. Ná cuir sonraí pearsanta san áireamh."
 }

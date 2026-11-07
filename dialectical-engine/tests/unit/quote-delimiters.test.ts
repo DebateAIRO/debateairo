@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
-  JUDGE_ANSWER_FORM, JUDGE_ARTIFACT_READING, classifyStructuredArtifact, judgeArtifactSchema, parseStructuredArtifact
+  JUDGE_ANSWER_FORM, JUDGE_ARTIFACT_READING, PANEL_ANSWER_FORM, classifyStructuredArtifact, judgeArtifactSchema, parseStructuredArtifact
 } from "@debateai/judgement";
 import { decodeModelJson, decodedRepairsOf, structureRepairKeepsWords, structureRepairTextsKeptAt } from "@debateai/providers";
 
@@ -278,6 +278,132 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED fix rounds 2-3: the syntax pass reads th
     const started = performance.now();
     decodeModelJson(text, STOP);
     classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+});
+
+/**
+ * R21 practice, 2026-10-23 (PRACTICE-2.md, sequence 281 and its repair 287): GLM-5.3-Flash wrote a panel vote with
+ * typographic quotes as the JSON delimiters of its KEYS and texts, mixed with a few straight ones (`“evidence": {`, a flag
+ * opened with “ and closed with "). The decode never repairs a key, so the vote went to the structure repair. Haiku's copy
+ * was the reply letter for letter with only those delimiters made straight, yet the keep-words check refused it
+ * (STRUCTURE_REPAIR_NOT_VERBATIM): it read the broken reply with straight quotes only and found none of GLM's words.
+ * Shortened texts of the same shape: single curly quotes and apostrophes, a dash, and one typographic quotation INSIDE a
+ * text, which is the AI's own words and must stay as written.
+ */
+describe("the keep-words check: typographic quotes used as a broken reply's key and text delimiters (R21 practice)", () => {
+  const SM = "The statement argues that the fair comparison must be made at system level, not per MWh. It identifies the literature’s key insight (the ‘deep decarbonisation’ studies), but hedges with ‘can plausibly be lower’.";
+  const CS = "A strong counter is available from the statement’s own terms: it names no country — and the word “plausibly” lowers the burden improperly.";
+  const FLAGS = [
+    "The question’s cost basis is undefined (LCOE or system cost).",
+    "The statement names no country, though the question is about ‘a country’.",
+    "Terms like “very long-duration storage” have no defined duration."
+  ];
+  const GLM_PANEL_REPLY = `{
+  “steelman”: {
+    “summary”: “${SM}”,
+    “fidelity”: 0.9
+  },
+  “critic”: {
+    “summary”: “${CS}”,
+    “counterargumentStrength”: 0.7,
+    “basis”: “PLAUSIBLE_COUNTER”
+  },
+  “evidence": {
+    “quality”: 0.3,
+    “relevance”: 0.85
+  },
+  “context”: {
+    “fit”: 0.8,
+    “ambiguityFlags": [
+      “${FLAGS[0]}",
+      "${FLAGS[1]}",
+      "${FLAGS[2]}"
+    ]
+  },
+  “fallacy": {
+    “severity”: 0.25,
+    “fatalFlags": []
+  }
+}`;
+  /** Haiku's copy, as the R21 repair was: the reply with every delimiter “ ” made a straight quote, nothing else. */
+  const HAIKU_COPY = Object.freeze({
+    steelman: { summary: SM, fidelity: 0.9 },
+    critic: { summary: CS, counterargumentStrength: 0.7, basis: "PLAUSIBLE_COUNTER" },
+    evidence: { quality: 0.3, relevance: 0.85 },
+    context: { fit: 0.8, ambiguityFlags: [...FLAGS] },
+    fallacy: { severity: 0.25, fatalFlags: [] as unknown[] }
+  });
+  type Panel = { steelman: { summary: string; fidelity: number }; critic: { summary: string; counterargumentStrength: number; basis: string };
+    evidence: { quality: number; relevance: number }; context: { fit: number; ambiguityFlags: string[] };
+    fallacy: { severity: number; fatalFlags: unknown[] } };
+  const edit = (change: (copy: Panel) => void): Panel => { const copy = structuredClone(HAIKU_COPY) as Panel; change(copy); return copy; };
+  const textsKept = structureRepairTextsKeptAt("REPAIR:STRUCTURE:PANEL:JUDGE:defender:root0:r1:p0:preview:fixture-a", "served");
+  const keeps = (repaired: unknown, broken = GLM_PANEL_REPLY) => structureRepairKeepsWords(broken, repaired, PANEL_ANSWER_FORM, { textsKept });
+
+  it("the reply still does not decode in code (a key's quotes are never repaired), and its delimiters made straight are Haiku's copy", () => {
+    expect(textsKept).toBe("place");
+    expect(decodeModelJson(GLM_PANEL_REPLY, STOP).ok).toBe(false);
+    // Every “ ” of the reply is a delimiter except the two quotations inside texts, which stay as written.
+    const straight = GLM_PANEL_REPLY.replace("“plausibly”", "\u0001").replace("“very long-duration storage”", "\u0002")
+      .replace(/[\u201C\u201D]/gu, "\"").replace("\u0001", "“plausibly”").replace("\u0002", "“very long-duration storage”");
+    expect(JSON.parse(straight)).toEqual(HAIKU_COPY);
+  });
+
+  it("accepts Haiku's copy: the same words, only the delimiter quotes made straight", () => {
+    expect(keeps(HAIKU_COPY)).toBe(true);
+    expect(structureRepairKeepsWords(GLM_PANEL_REPLY, HAIKU_COPY, PANEL_ANSWER_FORM, { textsKept: "anywhere" })).toBe(true);
+  });
+
+  it("refuses a copy that also straightened a typographic quotation INSIDE a text: those quotes are the AI's words", () => {
+    expect(keeps(edit((copy) => { copy.critic.summary = CS.replace("“plausibly”", "\"plausibly\""); }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.context.ambiguityFlags[2] = FLAGS[2]!.replace("“very long-duration storage”", "\"very long-duration storage\""); }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.critic.summary = CS.replace("“plausibly”", "plausibly"); }))).toBe(false);
+  });
+
+  it("refuses a change hidden right next to a straightened quote", () => {
+    // A word changed right after an opening delimiter, a word added right before a closing one.
+    expect(keeps(edit((copy) => { copy.steelman.summary = SM.replace("The statement argues", "This statement argues"); }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.steelman.summary = `${SM} Or so it says.`; }))).toBe(false);
+    // A closing delimiter kept as a word, or a text cut where a delimiter stood.
+    expect(keeps(edit((copy) => { copy.steelman.summary = `${SM}”`; }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.steelman.summary = `“${SM}`; }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.critic.summary = CS.slice(0, CS.indexOf(" — ")); }))).toBe(false);
+    // A number changed beside a straightened key, a label reworded beside straightened quotes.
+    expect(keeps(edit((copy) => { copy.steelman.fidelity = 0.8; }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.critic.basis = "REAL_ATTACK"; }))).toBe(false);
+  });
+
+  it("refuses an added, a removed or a moved text, including the flag opened with “ and closed with a straight quote", () => {
+    expect(keeps(edit((copy) => { copy.context.ambiguityFlags = FLAGS.slice(1); }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.context.ambiguityFlags[0] = FLAGS[0]!.replace("undefined", "unclear"); }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.context.ambiguityFlags.push("The time horizon is unstated."); }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.steelman.summary = CS; copy.critic.summary = SM; }))).toBe(false);
+    expect(keeps(edit((copy) => { copy.fallacy.fatalFlags = [{ type: "hedging", severity: 0.25, description: "It hedges." }]; }))).toBe(false);
+  });
+
+  it("reads Romanian „…” and German „…“ delimiters the same way, a „…\" quotation inside a text kept as written", () => {
+    const broken = "{„rezumat”: „Planul e bun, dar „scump\" pentru oraș.”, „note“: [„prima”, „a doua“], „scor”: 0.5}";
+    const copy = { rezumat: "Planul e bun, dar „scump\" pentru oraș.", note: ["prima", "a doua"], scor: 0.5 };
+    expect(structureRepairKeepsWords(broken, copy)).toBe(true);
+    expect(structureRepairKeepsWords(broken, { ...copy, rezumat: "Planul e bun, dar \"scump\" pentru oraș." })).toBe(false);
+    expect(structureRepairKeepsWords(broken, { ...copy, note: ["prima", "a treia"] })).toBe(false);
+    expect(structureRepairKeepsWords(broken, { ...copy, scor: 0.6 })).toBe(false);
+  });
+
+  it("a typographic quote where no text may begin is a word, never a delimiter", () => {
+    // In prose before the object, and inside a straight-quoted text, typographic quotes open nothing.
+    const broken = "Here is “my” answer:\n{\"answer\": \"He said “yes”: then left\" \"score\": 0.5}";
+    expect(structureRepairKeepsWords(broken, { answer: "He said “yes”: then left", score: 0.5 })).toBe(true);
+    expect(structureRepairKeepsWords(broken, { answer: "He said \"yes\": then left", score: 0.5 })).toBe(false);
+    expect(structureRepairKeepsWords(broken, { answer: "yes", score: 0.5 })).toBe(false);
+  });
+
+  // CI-1b (model text is untrusted): a typographic opener that never closes is read once, to the end, never again.
+  it("answers 100 000 unclosed typographic openers in linear time", () => {
+    const text = `{"list": [${"“x, „y, ".repeat(100000)}]}`;
+    const started = performance.now();
+    expect(structureRepairKeepsWords(text, { list: ["x"] })).toBe(false);
     expect(performance.now() - started).toBeLessThan(2000);
   });
 });

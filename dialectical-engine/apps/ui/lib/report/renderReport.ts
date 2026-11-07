@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Font, renderToBuffer } from "@react-pdf/renderer";
 import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
+import { InvestigationReportDocument } from "./InvestigationReportDocument.js";
+import { buildInvestigationReportPdfModel, type FinishedInvestigationReport } from "./investigationReportModel.js";
 import { ReportDocumentView } from "./ReportDocument.js";
 import { reportPlacedFont } from "./reportGlyphs.js";
 import { REPORT_FONT_FACES, type ReportFontFamily } from "./reportFonts.js";
@@ -127,4 +129,24 @@ export async function renderReportPdf(input: Readonly<{
   const { faces } = reportLayout(model.language, reportPrintedText(model));
   await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
   return renderToBuffer(ReportDocumentView({ model, logo: model.charts.length === 0 ? null : resolveReportLogo(fontDirectory) }));
+}
+
+/**
+ * The current version of the final report over an investigation (plan 2026-10-31 decision 17), through the same fonts, faces
+ * and glyph placement as the debate's own report, with the same refusal for a language whose script it cannot print.
+ */
+export async function renderInvestigationReportPdf(input: Readonly<{
+  question: string;
+  version: FinishedInvestigationReport;
+  catalogs: ReportCatalogs;
+  /** r2-13: the debate ran on Free (the PDF then says it was not checked on the web). */
+  free?: boolean;
+  fontDirectory?: string;
+}>): Promise<Buffer> {
+  if (!reportSupportedForLocale(input.catalogs.locale)) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${input.catalogs.locale}`);
+  registerReportFonts(input.fontDirectory ?? resolveReportFontDirectory());
+  const model = buildInvestigationReportPdfModel(input);
+  const { faces } = reportLayout(model.language, reportPrintedText(model));
+  await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
+  return renderToBuffer(InvestigationReportDocument({ model }));
 }

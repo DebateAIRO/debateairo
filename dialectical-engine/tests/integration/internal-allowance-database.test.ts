@@ -246,7 +246,10 @@ it("severs the account mapping on actual erasure while retaining immutable grant
   const before = (await database.pool.query("SELECT row_to_json(e)::text AS bytes FROM billing.internal_grant_event e WHERE grant_id=$1", [command.operationId])).rows;
   await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [actor.userId]);
   expect((await database.pool.query("SELECT owner_ref FROM billing.internal_grant WHERE grant_id=$1", [command.operationId])).rows[0].owner_ref).toBeNull();
-  expect((await database.pool.query("SELECT row_to_json(e)::text AS bytes FROM billing.internal_grant_event e WHERE grant_id=$1", [command.operationId])).rows).toEqual(before);
+  // The events stand, byte for byte; decision 32: the erasure also ended the grant, with one more event of its own (0146).
+  const after = (await database.pool.query("SELECT row_to_json(e)::text AS bytes, e.event_type FROM billing.internal_grant_event e WHERE grant_id=$1 ORDER BY revision", [command.operationId])).rows;
+  expect(after.map(row => row.event_type)).toEqual(["CONFIGURED", "REVOKED"]);
+  expect([{ bytes: after[0].bytes }]).toEqual(before);
   await expect(runtime.query("SELECT staff.read_self_allowance_command($1::jsonb,$2,$3)", [actor.context, hash(actor.sessionId), command.operationId])).rejects.toThrow();
 });
 

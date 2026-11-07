@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import type { ActionBinding, InvitationContext, OwnerPossessionContext, StaffCapability, StaffContext, StaffProof } from '@debateai/kernel';
+import type { ActionBinding, InvitationContext, OwnerPossessionContext, StaffCapability, StaffContext, StaffProof, TeamLimitAuthority } from '@debateai/kernel';
 import type { StaffRepository } from '@debateai/db';
 import type { AuthenticatedSession, SessionApplication } from '../sessions.js';
 /** Internal only: never serialize this wrapper or its CSRF digest. Task2/3 use .context. */
@@ -13,7 +13,7 @@ export interface StaffAccessApplication {
     authenticate(baseSession: AuthenticatedSession, staffToken: string, now?: Date): Promise<StaffAuthentication | null>;
     readInvitationContext(baseSession: AuthenticatedSession, invitationToken: string): Promise<InvitationContext | null>;
     readOwnerPossessionContext(baseSession: AuthenticatedSession, commandId: string, nonce: string, selectedCredentialId: string, prerequisiteHandle: string): Promise<OwnerPossessionContext | null>;
-    requireCapability(auth: StaffAuthentication, capability: StaffCapability, binding?: ActionBinding): Promise<void>;
+    requireCapability(auth: StaffAuthentication, capability: StaffCapability | TeamLimitAuthority, binding?: ActionBinding): Promise<void>;
     readActionProof(auth: StaffAuthentication, proofHandle: string, binding: ActionBinding): Promise<StaffProof | null>;
     verifyCsrf(auth: StaffAuthentication, token: string): Promise<boolean>;
     registerPrivilegedConnection(auth: StaffAuthentication, abort: () => void): () => void;
@@ -80,7 +80,7 @@ export class StaffAccessService implements StaffAccessApplication {
             throw denied();
         }
     }
-    async requireCapability(auth: StaffAuthentication, capability: StaffCapability, binding?: ActionBinding): Promise<void> {
+    async requireCapability(auth: StaffAuthentication, capability: StaffCapability | TeamLimitAuthority, binding?: ActionBinding): Promise<void> {
         try {
             await this.current(auth);
             if (!await this.repository.authorize({ context: auth.context, capability }))

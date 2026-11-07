@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { contractInventory, staffContractInventory, fundedStaffContractInventory,
   consumerAuthContractSchemas, consumerSecurityContractSchemas, accountProfileContractSchemas, SocialLoginStatusRequestSchema, SocialLoginStatusResponseSchema,
-  BillingUsageResponseSchema, AskRoomResponseSchema,
+  BillingUsageResponseSchema, AskRoomResponseSchema, AskClarifyRequestSchema, AskClarifyResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
   StaffActionOptionsRequestSchema, FundedStaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, FundedStaffActionVerifyRequestSchema,
@@ -19,7 +19,7 @@ const endpointSchemas = {
   ...consumerAuthContractSchemas,
   ...consumerSecurityContractSchemas,
   ...accountProfileContractSchemas,
-  BillingUsageResponseSchema, AskRoomResponseSchema,
+  BillingUsageResponseSchema, AskRoomResponseSchema, AskClarifyRequestSchema, AskClarifyResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
   StaffActionOptionsRequestSchema, FundedStaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, FundedStaffActionVerifyRequestSchema,
@@ -32,6 +32,8 @@ const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(referen
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  // Decision 33: a public debate hidden under review answers 410, with no text of it.
+  "GET /v1/public/debates/{id}": { responses: { "200": { description: "The public debate" }, "404": { description: "No public debate here" }, "410": { description: "Hidden under review: error DEBATE_UNDER_REVIEW, no-store" } } },
   "POST /v1/auth/social/login/status": {...request(reference("SocialLoginStatusRequestSchema")),...response(reference("SocialLoginStatusResponseSchema"))},
   "POST /v1/auth/recovery/prove": {...request(reference("ConsumerRecoveryProveRequestSchema")),...response(reference("ConsumerRecoveryProofResponseSchema"))},
   "POST /v1/auth/recovery/enrollment/options": {...request(reference("RecoveryEnrollmentBeginRequestSchema")),...response(reference("RecoveryEnrollmentOptionsResponseSchema"))},
@@ -69,6 +71,7 @@ const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "POST /v1/account/recovery-email/confirm": { ...request(reference("EmailChangeLinkRequestSchema")), ...response(reference("EmailChangeConfirmedSchema")) },
   "GET /v1/billing/usage": response(reference("BillingUsageResponseSchema")),
   "GET /v1/asks/room": response(reference("AskRoomResponseSchema")),
+  "POST /v1/asks/clarify": { ...request(reference("AskClarifyRequestSchema")), ...response(reference("AskClarifyResponseSchema")) },
   "GET /v1/admin/enrollment": response(variants("StaffEnrollmentResponseSchema","FundedStaffEnrollmentResponseSchema")),
   "POST /v1/admin/webauthn/elevation/verify": response(variants("StaffElevationResponseSchema", "FundedStaffElevationResponseSchema")),
   "GET /v1/admin/team": response(variants("StaffTeamPageSchema", "FundedStaffTeamPageSchema")),

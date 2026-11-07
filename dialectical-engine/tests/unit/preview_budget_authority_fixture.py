@@ -2,6 +2,7 @@
 
 Temporary directories only: no real keys, ledgers, sockets to services, or upstream calls.
 """
+import atexit
 import hashlib
 import importlib.util
 import json
@@ -40,8 +41,30 @@ SCOPE = 'preview-team-synthetic'
 # (.gitleaksignore, PR #86); the joined value is the same as before.
 KEY = 'synthetic' + '-key-' + '01234' + '56789'
 PEER = 42
+# Made-up caps, nothing like the server's (the real figures live only on the server): a test proves the behaviour with these.
+CAPS = {'schema': 'preview-provider-budget-caps-v1', 'max_go_budget_usd': '33.00', 'team_total_budget_usd': '44.00'}
 REMOVE = object()  # go_document(field=REMOVE) drops a required field
 AS_REQUESTED = object()  # Gate.call(model=...) default: the reply names the requested model
+
+
+_caps_file = None
+
+
+def caps_file():
+    """One temporary settings file per test process, removed at its exit."""
+    global _caps_file
+    if _caps_file is None:
+        folder = tempfile.mkdtemp(prefix='preview-gate-caps-')
+        atexit.register(shutil.rmtree, folder, ignore_errors=True)
+        _caps_file = Path(folder) / 'caps.json'
+        _caps_file.write_text(json.dumps(CAPS))
+    return str(_caps_file)
+
+
+def with_test_caps(module):
+    """The offline tests' seam, as with the helper's custody: they run as the developer and must never read /etc."""
+    module.CAPS_PATH, module.CAPS_OWNER_UID = caps_file(), os.getuid()
+    return module
 
 
 def load_bridge():
@@ -51,7 +74,7 @@ def load_bridge():
     # The offline tests run as the developer, not root, so they use the explicit custody seam that
     # main() never passes. HelperCustodyTests check the custody path itself on copies.
     module.load_helper(skip_custody_for_tests=True)
-    return module
+    return with_test_caps(module)
 
 
 def load_bridge_copy(source):
@@ -59,7 +82,7 @@ def load_bridge_copy(source):
     spec = importlib.util.spec_from_file_location('copied_preview_budget_authority', source)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module
+    return with_test_caps(module)
 
 
 def custody_copy(root, helper_suffix=b''):
@@ -83,7 +106,7 @@ def go_document(**changes):
     document = {'schema': 'preview-provider-budget-go-v3', 'allow_paid_calls': True,
                 'bridge_sha256': file_sha(SOURCE), 'helper_sha256': file_sha(HELPER_SOURCE),
                 'provider': 'deepinfra', 'enabled_models': [MODEL], 'scope_id': SCOPE, 'target_host': HOST,
-                'allowed_peer_uids': [PEER], 'daily_budget_usd': '5.00', 'max_paid_posts_per_day': 500,
+                'allowed_peer_uids': [PEER], 'daily_budget_usd': '5.50', 'max_paid_posts_per_day': 500,
                 'max_concurrent_calls': 4, 'open_days': 7}
     document.update(changes)
     return {k: v for k, v in document.items() if v is not REMOVE}
@@ -166,7 +189,7 @@ class Gate:
         # folder, where none exists unless a test writes one, never under the host's /etc.
         options = {'host': HOST, 'platform': 'linux', 'now': self.clock, 'owner_uid': os.getuid(),
                    'gate_go_paths': {name: str(self.root / ('team-go-' + name + '.json'))
-                                     for name in ('deepinfra', 'anthropic', 'google')}}
+                                     for name in ('deepinfra', 'anthropic', 'perplexity', 'google')}}
         options.update(kwargs)
         return self.bridge.activate(self.private, self.go_path, **options)
 

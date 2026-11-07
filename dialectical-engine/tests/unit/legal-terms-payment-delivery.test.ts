@@ -26,12 +26,12 @@ const occurrences = (text: string, token: string): number => text.split(token).l
 
 const PINNED = {
   en: [
-    "**Taxes, and who you pay.** Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.",
+    "**Taxes, and who you pay.** Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live). The tax for your billing address is added at checkout, and the checkout shows the total you pay, tax included, before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.",
     "**Payment methods.** You pay by card. We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments (netopia-payments.com), and your full card number never reaches us.",
     "**Delivery.** Dialectical Engine is an online service, so nothing is shipped to you. The features of your paid plan are available in your account as soon as your payment is confirmed."
   ],
   ro: [
-    "**Taxe și beneficiarul plății.** Prețurile includ TVA, GST sau taxa pe vânzări, în funcție de locul în care locuiți, iar acest lucru este afișat înainte de plată. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni.",
+    "**Taxe și beneficiarul plății.** Prețurile noastre sunt afișate fără taxe, ca preț + TVA (sau GST ori taxa pe vânzări, în funcție de locul în care locuiți). Taxa pentru adresa dumneavoastră de facturare se adaugă la plată, iar pagina de plată vă arată totalul de plată, cu taxe incluse, înainte să plătiți. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni.",
     "**Modalități de plată.** Plătiți cu cardul. Acceptăm Visa și Mastercard; nu acceptăm American Express. Plățile cu cardul sunt procesate de NETOPIA Payments (netopia-payments.com), iar numărul complet al cardului dumneavoastră nu ajunge niciodată la noi.",
     "**Livrare.** Dialectical Engine este un serviciu online, așa că nu vă expediem nimic. Funcțiile planului cu plată devin disponibile în contul dumneavoastră imediat ce plata este confirmată."
   ]

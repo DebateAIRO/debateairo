@@ -80,26 +80,26 @@ describe("S02 public honesty and export", () => {
     expect(container.querySelector('section[aria-label="Answer state"]')?.closest('[data-ai-generated="true"]')).toBeNull();
   });
 
-  it("opens honesty from the public page and exposes export immediately", async () => {
+  /*
+   * Owner's screen review, 3 Nov 2026 (public-f1): the public page keeps the site's AI notice with its AI transparency link (published debates are
+   * labelled for readers), in the wording that names no scores and no verdict (the old one did), and offers a stranger neither the honesty drawer with
+   * its measures nor the snapshot download whose file carried the scores. The drawer and the export below stay as they are, for the pages that use them.
+   */
+  it("labels the public page as AI-generated without naming scores or a verdict, and opens no honesty drawer or snapshot export", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const container = await mount(<PublicDebatePageClient debate={publicDebate} {...PUBLIC_PAGE_I18N} />);
+    const container = await mount(<PublicDebatePageClient debate={publicDebate} {...PUBLIC_PAGE_I18N} storyLocale="en" storyCatalog={publicEnglish} homeCatalog={{}} />);
     const notice = container.querySelector('[aria-label="AI disclosure"]');
     expect(notice?.textContent).toContain("may be inaccurate");
-    expect(notice?.textContent).toContain("It is not medical, psychological, legal or financial advice, or any other professional advice.");
+    expect(notice?.textContent).toContain("machine-readably marked");
+    expect(notice?.textContent).not.toMatch(/scores?|verdict/iu);
     expect(notice?.querySelector('a[href="/ai-transparency"]')).not.toBeNull();
-    expect(container.querySelector('[data-ai-generated="true"]')?.textContent).toContain("Public answer content.");
-    const download = container.querySelector<HTMLAnchorElement>("a[download]");
-    expect(download).not.toBeNull();
-    expect(download!.getAttribute("href")).toMatch(/^data:application\/json/);
-
-    const drawerSelector = '[role="dialog"][aria-label="Public answer honesty"]';
-    expect(container.querySelector(drawerSelector)).toBeNull();
-    const honesty = container.querySelector<HTMLButtonElement>('button[aria-label="Honesty"]');
-    expect(honesty).not.toBeNull();
-    await act(async () => honesty!.click());
-    const drawer = container.querySelector<HTMLElement>(drawerSelector);
-    expect(drawer).not.toBeNull();
-    expect(drawer!.textContent).toContain(publicDebate.answer.reversal_point);
+    expect(container.querySelector('[data-ai-generated="true"]')).not.toBeNull();
+    expect(container.textContent).toContain("Public answer content.");
+    expect(container.querySelector("a[download]")).toBeNull();
+    expect(container.querySelector('button[aria-label="Honesty"]')).toBeNull();
+    expect(container.querySelector('[role="dialog"][aria-label="Public answer honesty"]')).toBeNull();
+    expect(container.textContent).not.toContain("Export the published snapshot");
+    expect(publicEnglish).not.toHaveProperty(["public.export.publishedSnapshotLabel"]);
   });
 
   it("exports only the projected public envelope and no owner-only key", () => {
@@ -138,5 +138,34 @@ describe("S02 public honesty and export", () => {
       />
     );
     expect(tree.textContent).not.toContain("predates argument-tree publishing");
+  });
+
+  it("other languages keep their own way of joining the evidence date and its clock (only English takes the comma)", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const german = await mount(
+      <PublicAnswerDisclosure answer={publicDebate.answer} catalog={publicEnglish} locale="de" engineLines={false} />
+    );
+    const expected = new Intl.DateTimeFormat("de", { dateStyle: "long", timeStyle: "short", hourCycle: "h23" }).format(new Date(publicDebate.answer.as_of));
+    expect(german.textContent).toContain(`Evidence as of ${expected}.`);
+  });
+
+  it("on the V4 public page the disclosure says only the indexing and the evidence date, no engine state (public-f1)", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const plain = await mount(
+      <PublicAnswerDisclosure answer={{ ...publicDebate.answer, verdict_available: false }} catalog={publicEnglish} locale="en" engineLines={false} />
+    );
+    expect(plain.textContent).toContain(publicEnglish["public.disclosure.indexing"]);
+    expect(plain.textContent).toContain("Evidence as of");
+    // The owner's third round (5 Nov afternoon): pages keep the comma between the date and the clock; only the data download,
+    // the sign-in link email and the classic report PDF keep "at". The long form with the year (question 4 A).
+    expect(plain.textContent).toMatch(/Evidence as of \d{1,2} August 2026, \d{2}:\d{2}\./u);
+    expect(plain.textContent).not.toMatch(/Evidence as of [^.]* at /u);
+    expect(plain.textContent).not.toContain("DOWNGRADED");
+    expect(plain.textContent).not.toContain("Answer status");
+    expect(plain.textContent).not.toContain(publicEnglish["public.disclosure.verdictUnavailableMode"]);
+    expect(plain.textContent).not.toContain("predates argument-tree publishing");
+    const page = await mount(<PublicDebatePageClient debate={publicDebate} {...PUBLIC_PAGE_I18N} storyLocale="en" storyCatalog={publicEnglish} homeCatalog={{}} />);
+    expect(page.querySelector("[data-public-foot]")!.textContent).toContain(publicEnglish["public.disclosure.indexing"]);
+    expect(page.textContent).not.toContain("Answer status");
   });
 });

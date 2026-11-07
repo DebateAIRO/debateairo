@@ -1,0 +1,52 @@
+{
+  "version": "public-report-team-month-forward0149-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0148_erasure_keeps_public.sql",
+    "manifestSha256": "acb26dc07d46d43f5e598efa3fb6830b1382c3e8d04372d26c66f423faecbe2b",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0149_public_report_team_month.sql",
+    "sha256": "3089c30cfc9250fa63ac358a91e37c85f1b389346c9f3c89483f780c61b97b57"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0137_public_debates.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+        "identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+        "identity.read_public_debate_updates(uuid)"
+      ]
+    },
+    {
+      "step": "0139_passage_retention.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.debate_nothing_runs(uuid)"
+      ]
+    },
+    {
+      "step": "0142_team_limit.sql",
+      "field": "function_definition",
+      "functions": [
+        "staff.read_team_month_spent(timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "step": "0147_public_tree.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.read_public_dig_parent(uuid,uuid)",
+        "identity.read_public_tree_of_run(uuid)",
+        "identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+        "identity.public_tree_ongoing(uuid)"
+      ]
+    }
+  ]
+}

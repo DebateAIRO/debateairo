@@ -33,7 +33,7 @@ import {
   comparingJudgeOrder,
   pickComparingJudges
 } from "@debateai/judgement";
-import { ServeRepository, judgesRecountApplies } from "@debateai/serve";
+import { ServeRepository, deriveJudgesVerdict, judgesRecountApplies } from "@debateai/serve";
 import {
   ENGINE_SEALED_CONTRACT_IDS,
   engineContractFingerprintText,
@@ -294,6 +294,103 @@ describe("who judges: pickComparingJudges", () => {
     // B1 Minor 2 (R2b final wave P1): the offset is checked before the empty-seats return.
     expect(() => pickComparingJudges({ seats: [], arguingMakers: ARGUING, count: 3, rotationOffset: -1 }))
       .toThrowError(expect.objectContaining({ code: "COMPARING_JUDGE_SEATS_INVALID" }));
+  });
+});
+
+/*
+ * Owner ruling 2026-10-29 (MORNING-2026-10-17 item 6, "prefer neutral judges"): the comparing judges come from makers that
+ * argued no answer whenever enough are available, a judge seat's other member included; only the seats that cannot be
+ * filled that way fall back to today's seating, in a fixed order. Same number of judges, same calls.
+ */
+describe("who judges: neutral judges first (owner ruling 2026-10-29)", () => {
+  const ARGUED = new Set(["deepseek", "zhipu"]);
+  // Seat 1's planned member (DeepSeek) argued; its other member (Qwen) argued nothing.
+  const WITH_OTHER_MEMBER = Object.freeze([
+    { maker: "deepseek", providerRef: "ds", alternate: { maker: "qwen", providerRef: "qw" } },
+    { maker: "zhipu", providerRef: "glm" },
+    { maker: "anthropic", providerRef: "haiku" },
+    { maker: "moonshot", providerRef: "kimi" }
+  ]);
+  const ANSWERS = Object.freeze([
+    { letter: "A" as const, rootNodeId: "root-a", arguedByMaker: "deepseek" },
+    { letter: "B" as const, rootNodeId: "root-b", arguedByMaker: "zhipu" }
+  ]);
+  const allChooseA = (seats: readonly { seat: number; maker: string }[]) => deriveJudgesVerdict({
+    votes: seats.map(({ seat, maker }) => ({ seat, maker,
+      reply: { best: "A" as const, conditional: false, sameAs: [], questionKind: "general" as const } })),
+    answers: ANSWERS,
+    honestFinalStrength: new Map([["root-a", 0.6], ["root-b", 0.5]]),
+    label: { clearAgreeing: 3, closeCallAgreeing: 2 }
+  });
+
+  it("seats only makers that argued no answer when enough are available, a seat's other member included", () => {
+    const seats = pickComparingJudges({ seats: WITH_OTHER_MEMBER, arguingMakers: ARGUED, count: 3, rotationOffset: 0 });
+    expect(seats).toEqual([
+      { seat: 1, maker: "qwen", providerRef: "qw", argued: false },
+      { seat: 2, maker: "anthropic", providerRef: "haiku", argued: false },
+      { seat: 3, maker: "moonshot", providerRef: "kimi", argued: false }
+    ]);
+    // Every rotation seats the same three neutral makers (the order of the seats turns with the rotation).
+    for (const rotationOffset of [1, 2, 3]) {
+      const turned = pickComparingJudges({ seats: WITH_OTHER_MEMBER, arguingMakers: ARGUED, count: 3, rotationOffset });
+      expect(turned.every((seat) => !seat.argued)).toBe(true);
+      expect(new Set(turned.map((seat) => seat.maker))).toEqual(new Set(["qwen", "anthropic", "moonshot"]));
+    }
+  });
+
+  it("makes Clear answer reachable: with neutral seats every vote counts; today's seating ignored one", () => {
+    const neutral = pickComparingJudges({ seats: WITH_OTHER_MEMBER, arguingMakers: ARGUED, count: 3, rotationOffset: 0 });
+    expect(allChooseA(neutral)).toMatchObject({ label: "SUPPORTED", trigger: "JUDGES_UNANIMOUS", winnerVotes: 3 });
+    // Without the seat's other member, DeepSeek (A's own maker) sits as the third judge: its vote is not counted.
+    const planned = WITH_OTHER_MEMBER.map(({ maker, providerRef }) => ({ maker, providerRef }));
+    const today = pickComparingJudges({ seats: planned, arguingMakers: ARGUED, count: 3, rotationOffset: 0 });
+    expect(today.map((seat) => seat.maker)).toEqual(["anthropic", "moonshot", "deepseek"]);
+    expect(allChooseA(today)).toMatchObject({ label: "CONTESTED", winnerVotes: 2 });
+  });
+
+  it("prefers the planned member when both members of a seat argued nothing, and never seats one maker twice", () => {
+    const seats = [
+      { maker: "anthropic", providerRef: "haiku", alternate: { maker: "qwen", providerRef: "qw" } },
+      { maker: "zhipu", providerRef: "glm", alternate: { maker: "anthropic", providerRef: "haiku-2" } }
+    ];
+    expect(pickComparingJudges({ seats, arguingMakers: ARGUED, count: 3, rotationOffset: 0 })).toEqual([
+      { seat: 1, maker: "anthropic", providerRef: "haiku", argued: false },
+      { seat: 2, maker: "zhipu", providerRef: "glm", argued: true }
+    ]);
+  });
+
+  describe("too few neutral makers: the other seats fall back in a fixed order", () => {
+    // One neutral maker (Anthropic); three arguing makers.
+    const FEW = Object.freeze([
+      { maker: "deepseek", providerRef: "ds" },
+      { maker: "zhipu", providerRef: "glm", alternate: { maker: "openai", providerRef: "luna" } },
+      { maker: "anthropic", providerRef: "haiku" },
+      { maker: "moonshot", providerRef: "kimi" }
+    ]);
+    const ARGUED_THREE = new Set(["deepseek", "zhipu", "moonshot", "openai"]);
+
+    it.each([
+      [0, ["haiku", "ds", "glm"]],
+      [1, ["haiku", "glm", "kimi"]],
+      [2, ["haiku", "kimi", "ds"]],
+      [3, ["haiku", "kimi", "ds"]]
+    ] as const)("rotation %i: the neutral maker first, then arguing makers' planned members in seat rotation", (rotationOffset, refs) => {
+      const seats = pickComparingJudges({ seats: FEW, arguingMakers: ARGUED_THREE, count: 3, rotationOffset });
+      expect(seats.map((seat) => seat.providerRef)).toEqual(refs);
+      expect(seats.map((seat) => seat.argued)).toEqual([false, true, true]);
+    });
+
+    it("never seats a seat's other member as a fallback: only a neutral other member stands in", () => {
+      const seats = pickComparingJudges({ seats: FEW, arguingMakers: ARGUED_THREE, count: 5, rotationOffset: 0 });
+      expect(seats.map((seat) => seat.providerRef)).toEqual(["haiku", "ds", "glm", "kimi"]);
+    });
+
+    it("seats nobody of a lone arguing maker, even through a seat's other member", () => {
+      const seats = [{ maker: "qwen", providerRef: "qw", alternate: { maker: "zhipu", providerRef: "glm" } },
+        { maker: "zhipu", providerRef: "glm-2" }];
+      expect(pickComparingJudges({ seats, arguingMakers: new Set(["zhipu"]), count: 3, rotationOffset: 0 }))
+        .toEqual([{ seat: 1, maker: "qwen", providerRef: "qw", argued: false }]);
+    });
   });
 });
 

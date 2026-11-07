@@ -11,6 +11,7 @@ import {
   PROVIDER_CONTENT_REFUSED,
   PROVIDER_PACKET_UNSUPPORTED,
   PROVIDER_REPLY_UNSUPPORTED,
+  ANTHROPIC_DOSSIER_FIRST_SYSTEM,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
   assertAnthropicCredentialShape,
@@ -20,6 +21,8 @@ import {
 } from "./anthropic-messages.js";
 import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
 import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+import { PROVIDER_SENT_INPUT_OVER_LIMIT, assertSentForm, packetWithPageTexts } from "./sent-form.js";
+import { ANTHROPIC_TOKEN_COUNT, type TokenCounter } from "./anthropic-token-count.js";
 import { contentRepairsOf, type ModelJsonRepair, type ModelReplyFacts } from "./model-json.js";
 import { replyWordCount } from "./reply-words.js";
 import { replyFailureClassOf, type ReplyFailureClass } from "./reply-fixer.js";
@@ -161,6 +164,11 @@ export interface RejectedProviderContent {
   readonly failureClass?: ReplyFailureClass;
 }
 
+export type ProviderReplyRecord = Readonly<{
+  store: (artifactId: string, rawText: string) => Promise<string>;
+  refOf: (artifactId: string) => string;
+}>;
+
 export interface ProviderCallRequest {
   readonly runId: string | null;
   readonly subjectItemId: string;
@@ -170,7 +178,45 @@ export interface ProviderCallRequest {
   readonly bound: CallBound;
   readonly contractHash: string;
   readonly providerRef: string;
+  /**
+   * The packet as RECORDED (`persistCallPrompt`, `inputHash`) and replayed. With `vendorPacketOf` it is the reference
+   * form: each web page named by its reference, never its text. Every repair packet (the patch follow-up, the full
+   * re-ask) is built from it, so it is the reference form too.
+   */
   readonly packet: PromptPacket;
+  /**
+   * W3-0 (Perplexity plan 2026-10-30; the owner's privacy rows): makes the packet as SENT from a packet as recorded,
+   * putting the page texts in (`packetWithPageTexts`, ./sent-form.ts). Called for EVERY attempt's packet (the original,
+   * the patch follow-up, the full re-ask, a length retry), just before that attempt is sized and sent, and checked
+   * (`assertSentForm`): only material may change, and the door passes again with the same fence, canary and contract.
+   * The sent form is never recorded, logged or held in an error: the prompt record and `inputHash` keep the recorded
+   * form, while the body, its byte cap, the money projection, the declared window and `sentInputTokensBelow` all measure
+   * the sent one. A throw (a page whose text was wiped, a guard of the caller's) refuses the attempt before anything is
+   * sent or recorded and passes through untouched. Absent: the recorded packet is sent, byte for byte as before. Never
+   * sent itself.
+   */
+  readonly vendorPacketOf?: (recorded: PromptPacket) => PromptPacket | Promise<PromptPacket>;
+  /**
+   * R22 (plan 2026-10-31 decisions 6, 7): a call whose reply copies page passages (the web readers). The call records are
+   * append-only and replayed, so the reply never enters them: `store` keeps the vendor's whole body in its own wiped store
+   * BEFORE the attempt's artifact row and answers what that row records instead (`webReplyTextRef`). The parse error detail
+   * is recorded as null (it can quote the reply). A follow-up handing the reply back names it the same way (`refOf`), and
+   * the structure-repair call carries the same seam. Absent: the reply is recorded as it came.
+   */
+  readonly replyRecord?: ProviderReplyRecord;
+  /**
+   * F5: the packet's first this many material fields are the same bytes, under the same fence, on several calls of one
+   * closing: on the Anthropic wire they go first, with the one cache mark, so a call with another instruction reads them from
+   * the cache (anthropic-messages.ts). Ignored on every other wire. Never sent, never recorded. Absent: today's form.
+   */
+  readonly sharedFirstFieldCount?: number;
+  /**
+   * W3-0: the window count (`estimateWindowTokens`) every sent form of this call stays below (reader 1's Haiku line,
+   * 100,000). The first packet over it is refused before anything is sent or recorded (PROVIDER_SENT_INPUT_OVER_LIMIT);
+   * a repair packet over it is not sent (the patch gives way to the full re-ask, a later attempt ends the call as the
+   * declared window does). Absent: no such line. Never sent.
+   */
+  readonly sentInputTokensBelow?: number;
   readonly preferredResponseFormat?: "json_object";
   /**
    * `reply` (story format robustness, 2026-10-12): how this reply ended, so a classifier can refuse to
@@ -206,7 +252,8 @@ export interface ProviderCallRequest {
   readonly retryOnlyAfterContentRejection?: boolean;
   /**
    * LG-A (spec 2026-10-15, L32, L33; INTERFACE §2.4-§2.5): set ONLY by `withStructureRepair` (./structure-repair.ts), never
-   * by a step. A routed call sends at most 2 POSTs. Its first reply's class decides the one follow-up: STRUCTURE ends the
+   * by a step. A routed call sends at most 2 POSTs (R22: a judge call's full re-ask after its patch is a third,
+   * `fullReAskAfterPatch`). Its first reply's class decides the one follow-up: STRUCTURE ends the
    * call with ProviderStructureUnrepairedError (the wrapper sends the structure-repair call); CONTENT gets one PATCH, or a
    * full re-ask when no member can be named; EMPTY a full re-ask; CUT_OFF today's length retry. Every follow-up states in
    * plain words what is missing (`machine_rejection_reason`). Absent: today's loop, byte for byte. Never sent.
@@ -214,6 +261,15 @@ export interface ProviderCallRequest {
    * the follow-up B, is sent alone as attempt 2.
    */
   readonly structureRepairRouted?: boolean;
+  /**
+   * R22 (owner ruling 2026-10-29, "Allow 3 sends"): set ONLY by the preview's call policy, for a judge call
+   * (`withPreviewProviderCallPolicy`). A routed call (`structureRepairRouted`) whose SECOND POST was the short patch
+   * follow-up may send a third, the step's full re-ask, so the owner's slip-recovery order runs whole: code salvage, the
+   * short follow-up, one full re-ask. Still within `bound.maxAttempts` (on the preview the counting gateway's
+   * `remaining`), and each POST passes `assertAttemptAllowed` and the money envelope before it is sent, as every POST
+   * does. Absent: L33's 2 POSTs in all, byte for byte. Never sent.
+   */
+  readonly fullReAskAfterPatch?: boolean;
   /**
    * Refused-repair salvage (2026-10-16, B): set ONLY by `withStructureRepair` (./structure-repair.ts), after its
    * structure-repair call did not do, never by a step. Requires `structureRepairRouted: true` and `classifyContent`
@@ -1325,6 +1381,8 @@ export interface ProviderLedgerInput {
  * member exactly as it is serialised into the request body; `messages` is the
  * same value, for the canonical fingerprint the composition computes. The
  * gateway never stores it itself: the store is the run's content envelope.
+ * W3-0: for a call with `vendorPacketOf` it is the attempt's RECORDED form (the
+ * page references), never the sent one with the page texts in it.
  */
 export interface CallPromptRecordInput {
   readonly runId: string;
@@ -1432,6 +1490,11 @@ export interface OpenAICompatibleGatewayOptions {
    * built, so the guarded fetch never sees a bound its row refuses. Absent = no clamp.
    */
   readonly maxOutputTokens?: number;
+  /**
+   * R22 decision 28: Anthropic's free token count. A call with `sentInputTokensBelow` whose estimate looks close to the line
+   * (`ANTHROPIC_TOKEN_COUNT.fromEstimate`) asks it first, for each attempt's packet as sent. Absent, or a failed count: the estimate alone.
+   */
+  readonly countInputTokens?: TokenCounter;
   /**
    * Length guidance L30 (LG-B): on the Anthropic wire only, send the first user turn's material with the cache mark
    * (anthropic-messages.ts anthropicCacheableMessages). Set by `previewTargetGatewayControls` for the preview's Anthropic
@@ -1969,11 +2032,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
    * Patch follow-up: the short follow-up packet for a refused reply, or null when it cannot go out — the door or the
    * builder refuses it (an answer that contains the boundary marker), the wire cannot say it, or it would not fit the
    * packet cap or the declared window. Null means the step's full re-ask instead; nothing is sent or recorded here.
+   * W3-0: the cap and the window are measured on the patch as it would be SENT (`sendable`).
    */
-  #patchPacket(
+  async #patchPacket(
     packet: PromptPacket, ownReply: string, plan: PatchFollowUpPlan, tokenCeiling: number, thinkingLevel: string,
-    fits: (packet: PromptPacket, tokenCeiling: number) => boolean, packetCap: number, markMaterial: boolean
-  ): PromptPacket | null {
+    sendable: (packet: PromptPacket, tokenCeiling: number) => Promise<boolean>, markMaterial: boolean
+  ): Promise<PromptPacket | null> {
     let patch: PromptPacket;
     try {
       patch = buildFramedPatchPrompt(packet, ownReply, plan.locator);
@@ -1984,10 +2048,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       if (error instanceof TypedDomainError) return null;
       throw error;
     }
-    return Buffer.byteLength(JSON.stringify(patch.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
-      && fits(patch, tokenCeiling)
-      ? patch
-      : null;
+    return await sendable(patch, tokenCeiling) ? patch : null;
   }
 
   async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
@@ -2012,6 +2073,13 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     }
     if (request.outputTokenCap !== undefined && (!Number.isSafeInteger(request.outputTokenCap) || request.outputTokenCap < 1)) {
       throw new TypeError("ProviderCallRequest.outputTokenCap must be a positive whole number");
+    }
+    if (request.vendorPacketOf !== undefined && typeof request.vendorPacketOf !== "function") {
+      throw new TypeError("ProviderCallRequest.vendorPacketOf must be a function");
+    }
+    if (request.sentInputTokensBelow !== undefined
+      && (!Number.isSafeInteger(request.sentInputTokensBelow) || request.sentInputTokensBelow < 1)) {
+      throw new TypeError("ProviderCallRequest.sentInputTokensBelow must be a positive whole number");
     }
     // Refused-repair salvage (B): the follow-up continues a routed structured call, never any other.
     const followUp = request.structureFollowUp;
@@ -2039,10 +2107,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     const callAttempts = (): number => {
       // Refused-repair salvage (B): the continuation is the routed call's second POST and its last.
       if (followUp !== undefined) return 2;
-      const sealed = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
-      // LG-A (L33): a routed call sends at most 2 POSTs in all; the patch's extra POST is never added for it.
-      return routed ? Math.min(2, sealed) : Math.min(request.bound.maxAttempts,
-        (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + (patchWasSecondPost ? 1 : 0));
+      // LG-A (L33): a routed call sends at most 2 POSTs in all; the patch's extra POST is never added for it — except
+      // R22's judge call (`fullReAskAfterPatch`), whose patch as its second POST leaves room for the one full re-ask.
+      const reAsk = patchWasSecondPost && (!routed || request.fullReAskAfterPatch === true) ? 1 : 0;
+      const sealed = Math.min(request.bound.maxAttempts, (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + reAsk);
+      return routed ? Math.min(2 + reAsk, sealed) : sealed;
     };
     /**
      * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
@@ -2107,7 +2176,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * wire cannot say ends the loop below as exhaustion does, never as an escape mid-attempt.
      */
     if (this.#anthropic) {
-      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages, cacheFirstUserTurn: markMaterial });
+      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages, cacheFirstUserTurn: markMaterial,
+        ...(request.sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount: request.sharedFirstFieldCount }) });
     }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
@@ -2138,6 +2208,54 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
     /**
+     * W3-0 — THE SENT FORM. A packet as recorded (the page references) becomes the packet as sent (the page texts in)
+     * only here, once per attempt, just before the attempt is sized and sent; it is checked against the recorded one
+     * (./sent-form.ts) and then only measured and put in the body. Without `vendorPacketOf` the recorded packet is sent.
+     */
+    const vendorPacketOf = request.vendorPacketOf;
+    /** R22: what a follow-up's recorded answer turn names (`replyRecord`), by reference: put back only for the vendor. */
+    const repliesHandedBack = new Map<string, string>();
+    const ownReplyTurn = (rawArtifactRef: string, reply: string): string => {
+      if (request.replyRecord === undefined) return reply;
+      const ref = request.replyRecord.refOf(rawArtifactRef);
+      repliesHandedBack.set(ref, reply);
+      return ref;
+    };
+    const sentFormOf = async (recorded: PromptPacket): Promise<PromptPacket> => {
+      if (vendorPacketOf === undefined && repliesHandedBack.size === 0) return recorded;
+      const filled = vendorPacketOf === undefined ? recorded : await vendorPacketOf(recorded);
+      const sent = repliesHandedBack.size === 0 ? filled : packetWithPageTexts(filled, repliesHandedBack);
+      assertSentForm(recorded, sent);
+      return sent;
+    };
+    const underSentLine = async (sent: PromptPacket): Promise<boolean> => {
+      if (request.sentInputTokensBelow === undefined) return true;
+      const estimate = estimateWindowTokens(sent.messages);
+      if (estimate >= request.sentInputTokensBelow) return false;
+      const count = this.#options.countInputTokens;
+      if (count === undefined || estimate < ANTHROPIC_TOKEN_COUNT.fromEstimate) return true;
+      // Bytes are an estimate; near the line the vendor's own count decides. A failed count (null) leaves the estimate's answer.
+      const real = await count({ packet: sent, ...(request.sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount: request.sharedFirstFieldCount }) });
+      return real === null || real < request.sentInputTokensBelow;
+    };
+    /**
+     * Whether a repair packet can go out: its sent form can be made, and fits the packet cap (less the body's other
+     * members), the declared window and the call's input line. False sends the call on to its next step; nothing is
+     * sent or recorded here.
+     */
+    const sendable = async (packet: PromptPacket, tokenCeiling: number): Promise<boolean> => {
+      let sent: PromptPacket;
+      try {
+        sent = await sentFormOf(packet);
+      } catch (error) {
+        if (error instanceof TypedDomainError) return false;
+        throw error;
+      }
+      return Buffer.byteLength(JSON.stringify(sent.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
+        && fitsContextWindow(sent, tokenCeiling) && await underSentLine(sent);
+    };
+
+    /**
      * Patch follow-up: the plan while `attemptPacket` is the patch packet (its reply is merged into the first reply
      * before the step's classifier sees it); whether this call already sent one (one per call); and the first reply's
      * refusal, which the full re-ask after a patch that did not do describes.
@@ -2164,8 +2282,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       const followUpTokenCeiling = Math.min(request.bound.tokenCeiling, outputCap);
       let followUpPacket: PromptPacket | null;
       if (followUp.form === "PATCH") {
-        followUpPacket = this.#patchPacket(request.packet, first.rejected.rawText, followUp.plan, followUpTokenCeiling,
-          repairThinking.sent, fitsContextWindow, packetCap, markMaterial);
+        followUpPacket = await this.#patchPacket(request.packet, ownReplyTurn(first.rawArtifactRef, first.rejected.rawText), followUp.plan, followUpTokenCeiling,
+          repairThinking.sent, sendable, markMaterial);
       } else {
         // As `#patchPacket`: a packet the step's builder or the door refuses is one that cannot go out. A chosen swallow
         // (spec §6 step 3, "only if B cannot be sent, today's refusal"): the refusal is the first reply's, never the builder's.
@@ -2177,9 +2295,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           if (!(error instanceof TypedDomainError)) throw error;
           full = undefined;
         }
-        followUpPacket = full !== undefined
-          && Buffer.byteLength(JSON.stringify(full.messages), "utf8") + PATCH_PACKET_HEADROOM_BYTES <= packetCap
-          && fitsContextWindow(full, followUpTokenCeiling) ? full : null;
+        followUpPacket = full !== undefined && await sendable(full, followUpTokenCeiling) ? full : null;
       }
       if (followUpPacket === null) {
         throw new ProviderContentUnacceptedError(firstRefusal.attempts, firstRefusal.parseStatus, firstRefusal.parseError,
@@ -2211,7 +2327,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        * attempt that never happened, and the caller sees the earlier content
        * rejection (or the usual PROVIDER_CALL_FAILED), never the window code.
        */
-      if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
+      // W3-0: this attempt's packet as SENT, made here and measured below; `attemptPacket` stays the recorded form. A later
+      // attempt over the call's input line ends the call as one over the window does; the first is refused before
+      // anything is sent or recorded.
+      const sentPacket = await sentFormOf(attemptPacket);
+      const sentUnderLine = await underSentLine(sentPacket);
+      if (attempt > 1 && (!fitsContextWindow(sentPacket, attemptTokenCeiling) || !sentUnderLine)) break;
+      if (!sentUnderLine) {
+        throw new TypedDomainError(PROVIDER_SENT_INPUT_OVER_LIMIT,
+          `${request.providerRef}: this call is sent only under ${String(request.sentInputTokensBelow)} input tokens`);
+      }
       // Spec 2026-10-12 §4.4: the original packet (and its length retries) runs at the call's level; an adopted repair
       // packet (the patch follow-up or the full re-ask, `repairForm` set, reset by a length retry) at the repair level.
       // Length guidance L25: the original packet's length retries run one level lower once thinking ate the answer's room.
@@ -2239,8 +2364,9 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             model: this.#options.model,
             maxTokens: attemptTokenCeiling,
             thinkingLevel: attemptThinking.sent,
-            messages: attemptPacket.messages,
-            cacheFirstUserTurn: markMaterial
+            messages: sentPacket.messages,
+            cacheFirstUserTurn: markMaterial,
+            ...(request.sharedFirstFieldCount === undefined ? {} : { sharedFirstFieldCount: request.sharedFirstFieldCount })
           });
         } catch (error) {
           // Only a later attempt can get here (the first packet was checked before the loop).
@@ -2255,7 +2381,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         max_tokens: attemptTokenCeiling,
         ...attemptThinking.wire,
         ...previewSamplingMembers(this.#options.endpoint, this.#options.model),
-        messages: attemptPacket.messages,
+        messages: sentPacket.messages,
         ...(responseFormat===undefined?{}:{response_format:responseFormat})
       });
       /**
@@ -2309,7 +2435,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * later attempt that would not fit ended the loop at its head (fix
          * round 1, finding 3).
          */
-        if (!fitsContextWindow(attemptPacket, attemptTokenCeiling)) {
+        if (!fitsContextWindow(sentPacket, attemptTokenCeiling)) {
           throw new TypedDomainError(
             PROVIDER_CONTEXT_WINDOW_EXCEEDED,
             `${request.providerRef} declares a ${contextWindowTokens}-token context window and this attempt would not fit`
@@ -2319,6 +2445,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // before it leaves and under this attempt's id, so every attempt the
         // ledger shows as sent — a transport failure included — has its prompt
         // on record. A call with no run records none (the support chat).
+        // W3-0: the RECORDED form (`attemptPacket`, the page references), never `sentPacket`.
         if (request.runId !== null && this.#options.persistCallPrompt !== undefined) {
           try {
             await this.#options.persistCallPrompt({
@@ -2456,7 +2583,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * a capped count; never the material and never the answer.
          */
         const tripwires = scanPromptTripwires({
-          frame,
+          // W3-0: the material the AI read is the sent form's (the page texts, where an instruction-like page would be).
+          frame: sentPacket === attemptPacket ? frame : assertFramedPrompt(sentPacket),
           contractId: frame.contractId,
           answer: content ?? rawText
         });
@@ -2503,8 +2631,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             attemptWords = replyWordsOf(request, salvaged.content, replyFacts);
           }
         }
+        // R22: a reply that copies passages goes to its own store first, and the record keeps only its name (`replyRecord`).
+        const attemptArtifactId = randomUUID();
+        const recordedReply = request.replyRecord === undefined ? rawText : await request.replyRecord.store(attemptArtifactId, rawText);
         rawArtifactRef = await this.#options.persistRawArtifact({
-          artifactId: randomUUID(),
+          artifactId: attemptArtifactId,
           attemptId,
           runId: request.runId,
           providerRef: request.providerRef,
@@ -2512,7 +2643,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           model: candidate.success ? candidate.data.model : this.#options.model,
           maker: this.#options.maker,
           modelVersion: candidate.success ? candidate.data.model : null,
-          rawText,
+          rawText: recordedReply,
           metadata: {
             status: response.status,
             attempt,
@@ -2534,10 +2665,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             // reaches it through its run_id rather than carrying a readable copy.
           },
           parseStatus: classifiedContent.parseStatus,
-          parseError: classifiedContent.parseError,
+          parseError: request.replyRecord === undefined ? classifiedContent.parseError : null,
           inputHash,
           contractHash: request.contractHash,
-          contentHash: digest(rawText),
+          contentHash: digest(recordedReply),
           thinkingTokens: reasoningTokens,
           cachedInputTokens,
           actualWords: attemptWords,
@@ -2784,7 +2915,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
               ? Object.freeze({ ...planned, locator: Object.freeze({ ...planned.locator,
                   reason: contentFollowUpSentence(planned.locator.code, attemptFailureClass ?? undefined) }) })
               : planned;
-            const patch = plan === null ? null : this.#patchPacket(request.packet, content!, plan, attemptTokenCeiling, repairThinking.sent, fitsContextWindow, packetCap, markMaterial);
+            const patch = plan === null ? null : await this.#patchPacket(request.packet, ownReplyTurn(rawArtifactRef, content!), plan, attemptTokenCeiling, repairThinking.sent, sendable, markMaterial);
             if (plan !== null && patch !== null) {
               attemptPacket = patch;
               patchPlan = plan;
@@ -3099,6 +3230,10 @@ export {
 } from "./provider-probe.js";
 
 export { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
+
+export {
+  PROVIDER_PAGE_TEXT_UNPLACED, PROVIDER_SENT_FORM_INVALID, PROVIDER_SENT_INPUT_OVER_LIMIT, assertSentForm, packetWithPageTexts, packetWithPassageRefs
+} from "./sent-form.js";
 // Story format robustness (2026-10-12): the tolerant decode of a model's JSON answer.
 export {
   contentRepairsOf,
@@ -3145,7 +3280,10 @@ export {
   // Refused-repair salvage (2026-10-16): a reclaim replays an A1-rescued or B-answered call from its recorded rows.
   structureReplayReaders
 } from "./structure-repair.js";
+export * from "./anthropic-token-count.js";
 export * from "./preview-test.js";
+// Perplexity plan 2026-10-30, task W2-1: the web search adapter (a search provider kind, never a model).
+export * from "./perplexity-search.js";
 // Side-by-side spec §13, addition D12-D20 (owner 2026-10-22): the preview line-up as a settings value, the env's gate part.
 export * from "./preview-line-up.js";
 // Side-by-side spec §13, addition D24 (owner 2026-10-22: providers only, not the models, listed automatically): the
@@ -3159,10 +3297,12 @@ export * from "./preview-busy.js";
 // rule are exported from the one file that owns them.
 export {
   ANTHROPIC_API_HOST,
+  ANTHROPIC_DOSSIER_FIRST_SYSTEM,
   ANTHROPIC_API_VERSION,
   ANTHROPIC_EFFORT_LEVELS,
   ANTHROPIC_MESSAGES_BASE_URL,
   ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_COUNT_TOKENS_PATH,
   ANTHROPIC_MESSAGES_PATH,
   ANTHROPIC_PER_CALL_MARKERS_SEPARATOR,
   PROVIDER_CONTENT_REFUSED,
@@ -3170,6 +3310,7 @@ export {
   PROVIDER_REPLY_UNSUPPORTED,
   anthropicCacheableMessages,
   anthropicCacheableSystem,
+  anthropicCountTokensRequestBody,
   anthropicMessagesRequestBody,
   anthropicMessagesRequestHeaders,
   anthropicUsageAsEngineUsage,

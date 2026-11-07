@@ -8,6 +8,7 @@
  * call, its format check, its time and tokens; the served answer; the story), the database is deleted, and a report
  * says PASS or why not.
  */
+import { practiceTeamSpendLine, readPracticeTeamSpend } from "./practice-team-spend.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
@@ -67,6 +68,9 @@ import {
   type PracticeMapLanguage
 } from "./practice-language.js";
 import { readPracticeInvestigations, type PracticeInvestigationBlock } from "./practice-investigations.js";
+import { readPracticeRewrites, type PracticeRewriteBlock } from "./practice-rewrites.js";
+import { practiceWithSearchStandIn, type PracticeSearchStandIn } from "./practice-search-stand-in.js";
+import { readPracticeWeb, type PracticeWebBlock } from "./practice-web.js";
 import { practiceJudgesBlocks, readPracticeJudges, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
@@ -217,6 +221,8 @@ export type PracticeDebateResult = Readonly<{
   answersByModel: Readonly<Record<string, Readonly<{ answered: number; unanswered: number }>>>;
   /** Information only: each accepted reply that needed a tolerant repair, by model and code. */
   jsonRepairs: readonly Readonly<{ model: string; repair: string }>[];
+  /** Every call-site key the report has no name for, once each: a new call nobody told the practice about. Absent: none. */
+  unmappedCallSites?: readonly string[];
   /** LG-A (L34): each accepted reply's repairs, counted per AI, step and kind (from raw_artifact.reply_repairs). */
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
@@ -253,6 +259,10 @@ export type PracticeDebateResult = Readonly<{
   language?: PracticeDebateLanguageBlock;
   /** R2 (E12, E13): the "cannot assess" reviews and the investigations, counts, money and time (practice-investigations.ts). */
   investigations?: PracticeInvestigationBlock;
+  /** W5-2: the web table, per path (practice-web.ts); absent when the run's web step left no row (today's keys). */
+  web?: PracticeWebBlock;
+  /** W5-2: the rewrite table, per dig under the run (practice-rewrites.ts); absent without a dig (today's keys). */
+  rewrites?: PracticeRewriteBlock;
   /** Engine redesign R2: the comparing judges' votes, the label and its trigger, today's ladder, the judging time, D1's conditional winner (engine 2 only). */
   judges?: PracticeJudgesBlocks;
   /**
@@ -281,8 +291,9 @@ export type PracticeDebateResult = Readonly<{
 }>;
 
 /** The per-AI table's order: the steps in debate order (R2: the investigations after the reviews, then the comparing judges). */
-export const ROSTER_ORDER = Object.freeze(["MAP", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
-  "STORYTELLER", "STORY_CHECKER", "STRUCTURE_REPAIR", "UNMAPPED"]);
+export const ROSTER_ORDER = Object.freeze(["MAP", "WEB", "JUDGE", "PANEL", "REVIEW", "INVESTIGATOR", "VERDICT_JUDGE", "SYNTHESIZER", "EVALUATOR",
+  "STORYTELLER", "STORY_CHECKER", "STORY_CHARTS", "SUGGESTIONS", "PATH_REWRITE", "PATH_CLIMB", "REPORT", "ANSWER_UPDATE", "PUBLIC_REPORT",
+  "CONTRIBUTION_CHECK", "WEB_RESEARCHED", "STRUCTURE_REPAIR", "UNMAPPED"]);
 
 /** LG-A (L34): one try as the report's two new tables read it (the ledger row with its artifact's 0120 columns). */
 export type PracticeTryRecord = Readonly<{
@@ -476,7 +487,7 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
-  "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
+  "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs" | "unmappedCallSites"
   | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "languageFollowUps" | "structureRescues" | "tokensByModelAndStep"
   | "lengthByModelAndStep">
   & Readonly<{ answerWritersServed: readonly string[] }>> {
@@ -667,6 +678,8 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     repairKindsByModel: practiceRepairKindsByModel(callList.map(([, call]) => call)),
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
+    unmappedCallSites: Object.freeze([...new Set(entries.map((entry) => entry.call_site_key)
+      .filter((key) => callFamilyOf(structureRepairOriginalKey(key)) === "UNMAPPED"))].sort()),
     repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
     languageFollowUps: practiceLanguageFollowUpRows(records),
     ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),
@@ -738,6 +751,12 @@ export async function runPracticeDebate(input: Readonly<{
    * the line-up of the version the debate runs on (its previewLineUpPolicy row, else the settings' env line-up).
    */
   lineUp?: PreviewLineUp;
+  /**
+   * W5-2: the Perplexity stand-in (practice-search-stand-in.ts) in the search gate's place: the runner's own search port
+   * (runnerWebSearchSettings, unchanged) then sends its searches through the real adapter and guarded fetch to it, and
+   * nothing is paid for a search. Absent: the practice's own gate ports, as today.
+   */
+  searchStandIn?: PracticeSearchStandIn;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -922,7 +941,9 @@ export async function runPracticeDebate(input: Readonly<{
       // Hosted only: the room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision).
       ...(hosted ? { roomDecisionPool: database.extraPool() } : {})
     });
-    const runner = await composePracticeRunner({ pool, environment: settings.runner, budgetPorts: input.budgetPorts,
+    // W5-2: the stand-in is one more gate port, beside the watched ones; the runner's settings are composed as main.ts's.
+    const standIn = practiceWithSearchStandIn(settings.runner, input.budgetPorts, input.searchStandIn);
+    const runner = await composePracticeRunner({ pool, environment: standIn.environment, budgetPorts: standIn.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
@@ -1052,6 +1073,9 @@ export async function runPracticeDebate(input: Readonly<{
       // Before the finally below deletes the database and with it the only way to read the run's sealed text; and before
       // the report's own reading (collect), so a reading that breaks there cannot cost the transcript.
       try {
+        // Decision 14: the practice's money counts for the team; a failed read here never fails the practice.
+        await readPracticeTeamSpend(pool).then((spend) => progress(practiceTeamSpendLine(spend.practiceRef, spend.chargeMicros)),
+          () => progress("team limit: could not read what this practice was charged; take it from the report"));
         const written = await recordPracticeTranscript({
           pool, directory: input.transcriptDirectory, ownerRef, answer: projection, story: storedStory,
           ...(shapeSource === null ? {} : { map: () => readPracticeMap(practiceMapReaders(pool), job.runId) }),
@@ -1080,6 +1104,19 @@ export async function runPracticeDebate(input: Readonly<{
       investigations = await readPracticeInvestigations(pool, job.runId, collected.byModelAndSite);
     } catch (error) {
       progress(`investigations: could not be read (${codeOf(error)})`);
+    }
+    // W5-2: the web table and the rewrite table. A reading that breaks costs only its block, never the report.
+    let web: PracticeWebBlock | undefined;
+    try {
+      web = await readPracticeWeb(pool, job.runId, input.searchStandIn === undefined ? "PERPLEXITY" : "STAND_IN") ?? undefined;
+    } catch (error) {
+      progress(`web table: could not be read (${codeOf(error)})`);
+    }
+    let rewrites: PracticeRewriteBlock | undefined;
+    try {
+      rewrites = await readPracticeRewrites(pool, job.runId) ?? undefined;
+    } catch (error) {
+      progress(`rewrite table: could not be read (${codeOf(error)})`);
     }
     // R2 B11: the comparing judges, read before the database goes. Engine 1: absent (today's report keys). A reading
     // that breaks costs only this block, never the report.
@@ -1181,6 +1218,8 @@ export async function runPracticeDebate(input: Readonly<{
       ...(length === undefined ? {} : { length }),
       ...(language === undefined ? {} : { language }),
       ...(investigations === undefined ? {} : { investigations }),
+      ...(web === undefined ? {} : { web }),
+      ...(rewrites === undefined ? {} : { rewrites }),
       ...(judges === undefined ? {} : { judges }),
       ...(writerPins === undefined ? {} : { writerPins }),
       ...(deployment === undefined ? {} : { deployment })

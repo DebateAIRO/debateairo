@@ -101,7 +101,7 @@ are never the reason.
 
 - **Money is set aside for the answer.** A debate may spend 70% of its money while it is argued. The
   last 30% is kept for writing the answer. Writing the answer may go up to 20% over the debate's
-  limit. Example: with a debate limit of $0.25, arguing may use $0.175, and the whole debate may
+  limit. Example: with a debate limit of <amount>, arguing may use $0.175, and the whole debate may
   reach $0.30.
 - **A stop while arguing no longer skips the answer.** When the debate hits its limit (money, the
   number of calls, or a vendor that does not report what it charged), it stops arguing and writes
@@ -119,7 +119,7 @@ are never the reason.
   always ended without an answer. Now the engine shortens what it sends. As a last resort it keeps
   the positions and the most important points, and counts the rest. The report then says "The
   debate was very large, so the answer was written from its most important points."
-- **The story has its own small budget:** $0.05 per story, plus a 20% margin, so $0.06. If that
+- **The story has its own small budget:** a fixed amount per story, plus a margin. If that
   is not enough, it also tries a cheaper model. If even that fails, the page simply shows the answer
   without a story.
 - **Your records.** For every answer, the engine keeps a note of the model that was planned, the
@@ -150,11 +150,11 @@ are never the reason.
 
 ## What is provisional
 
-- **The story's budget:** $0.05 per story plus 20%. It is written into the code, not into your
+- **The story's budget:** <amount> per story plus 20%. It is written into the code, not into your
   settings file, so changing it means a code change and a new publish. The first real runs will
   show the right number.
 - **The reserve and the margin:** 30% and 20%. They are guesses until paid runs are measured.
-- **The debate and day limits** ($0.25 per debate and $2 per day) are still the deliberately low
+- **The debate and day limits** (<amount> per debate and <amount> per day) are still the deliberately low
   temporary values for your first paid run. Every charge is now recorded as spent either while
   arguing or while writing the answer, so the first paid runs will show both amounts separately.
   The real limits are set from those measurements.

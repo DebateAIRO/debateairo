@@ -151,9 +151,9 @@ class AnthropicTest(unittest.TestCase):
             gate.close()
 
     def gate(self, **changes):
-        # The proposed GO (README-anthropic.md): $2.00 and 600 calls a day, 2 calls in flight.
-        go = {'provider': 'anthropic', 'enabled_models': [HAIKU], 'daily_budget_usd': '2.00',
-              'max_paid_posts_per_day': 600, 'max_concurrent_calls': 2, **changes}
+        # A made-up pot and call count (the real ones live only on the server), 2 calls in flight.
+        go = {'provider': 'anthropic', 'enabled_models': [HAIKU], 'daily_budget_usd': '2.20',
+              'max_paid_posts_per_day': 660, 'max_concurrent_calls': 2, **changes}
         gate = Gate(bridge, **go)
         self.gates.append(gate)
         return gate
@@ -352,22 +352,21 @@ class FinalWriterTierTests(AnthropicTest):
 
 
 class GoAndActivateTests(AnthropicTest):
-    def test_the_owners_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
-        # Owner answer M1 (2026-10-15): Anthropic $4.00 (this GO) + DeepInfra $12.00 = the $16.00 team total. Each GO
-        # alone may ask up to the $12.00 per-GO ceiling, so a $4.01 Anthropic GO is itself valid: what refuses it is
-        # the team-total check at activate.
+    def test_the_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
+        # The fixture's made-up caps: 11.00 (this GO) + 31.90 + 1.10 = the team total of 44.00. Each GO alone may ask up to
+        # the per-GO cap, so 11.01 here is itself valid: what refuses it is the team-total check at activate.
         def deepinfra_go(gate, budget):
-            path = gate.root / 'team-go-deepinfra.json'
-            path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'deepinfra',
-                                        'daily_budget_usd': budget}))
-            os.chmod(path, 0o600)
-        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('16.00'), Decimal('12.00')))
-        gate = self.gate(daily_budget_usd='4.00')
-        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '4.00')
+            for provider, amount in (('deepinfra', budget), ('perplexity', '1.10')):
+                path = gate.root / ('team-go-' + provider + '.json')
+                path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': provider,
+                                            'daily_budget_usd': amount}))
+                os.chmod(path, 0o600)
+        gate = self.gate(daily_budget_usd='11.00')
+        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '11.00')
         gate.init()
-        deepinfra_go(gate, '12.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 4.00 + 12.00 = 16.00 exactly.
-        for mine, theirs in (('4.01', '12.00'), ('4.02', '11.99')):
+        deepinfra_go(gate, '31.90')
+        self.assertEqual(gate.activate()['state'], 'active')
+        for mine, theirs in (('11.01', '31.90'), ('11.02', '31.89')):
             with self.subTest(anthropic=mine, deepinfra=theirs):
                 gate = self.gate(daily_budget_usd=mine)
                 self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], mine)  # Valid on its own.
@@ -388,8 +387,8 @@ class GoAndActivateTests(AnthropicTest):
                                                                  **changes}))
 
     def test_activate_checks_the_calls_in_flight_times_the_worst_case_against_the_pot(self):
-        # The proposed GO: 2 x 0.24704 = 0.49408 fits $2.00. 4 x 0.24704 = 0.98816 (a cached full-size request).
-        for budget, calls, ok in (('2.00', 2, True), ('0.50', 2, True), ('0.49', 2, False),
+        # A made-up GO: 2 x 0.24704 = 0.49408 fits 2.20. 4 x 0.24704 = 0.98816 (a cached full-size request).
+        for budget, calls, ok in (('2.20', 2, True), ('0.50', 2, True), ('0.49', 2, False),
                                   ('0.98', 4, False), ('0.99', 4, True), ('0.24', 1, False), ('0.25', 1, True)):
             with self.subTest(budget=budget, calls=calls):
                 gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=calls)
@@ -1141,7 +1140,7 @@ class UnreportedChargeBookedTests(AnthropicTest):
         status = gate.status()
         self.assertEqual((status['today_posts'], status['today_booked_max'], Decimal(status['today_spend_usd']),
                           Decimal(status['today_booked_max_usd'])), (1, 1, reserved, reserved))
-        self.assertEqual(Decimal(status['remaining_today_usd']), Decimal('2.00') - reserved)
+        self.assertEqual(Decimal(status['remaining_today_usd']), Decimal('2.20') - reserved)
         logged = [json.loads(line) for line in self.out.getvalue().splitlines() if line.startswith('{')]
         booked = [line for line in logged if line.get('status') == 'settled_reserved_max']
         self.assertEqual({name: booked[0][name] for name in ('model', 'alert', 'reason', 'http_status', 'authority')},
@@ -1329,6 +1328,7 @@ class RequestShapeTests(AnthropicTest):
         self.assertTrue(re.fullmatch(ANTHROPIC.key_pattern, KEY))
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, KEY))  # An Anthropic key in the DeepInfra gate is refused.
         self.assertFalse(re.fullmatch(deepinfra.key_pattern, 'AIza' + 'x' * 35))
+        self.assertFalse(re.fullmatch(deepinfra.key_pattern, 'pp' + 'lx-' + 'x' * 40))  # Nor a Perplexity key (W1-1).
         self.assertTrue(re.fullmatch(deepinfra.key_pattern, 'synthetic-key-0123456789'))
 
 
@@ -1399,10 +1399,10 @@ class RemainingAndProbeTests(AnthropicTest):
                                        'largest_reservation_usd', 'enabled_models'})
         self.assertEqual({k: report[k] for k in ('state', 'window_open', 'remaining_calls', 'max_concurrent_calls',
                                                  'enabled_models')},
-                         {'state': 'active', 'window_open': True, 'remaining_calls': 599, 'max_concurrent_calls': 2,
+                         {'state': 'active', 'window_open': True, 'remaining_calls': 659, 'max_concurrent_calls': 2,
                           'enabled_models': [HAIKU]})
         self.assertEqual((Decimal(report['remaining_usd']), Decimal(report['largest_reservation_usd'])),
-                         (Decimal('1.99965'), Decimal('0.24704')))
+                         (Decimal('2.19965'), Decimal('0.24704')))
 
     def test_probe_sends_the_tiny_request_and_reports_what_it_measured(self):
         gate = self.ready()
@@ -1689,6 +1689,74 @@ class PromptCachingTests(AnthropicTest):
         entry = entry_of(gate)
         self.assertEqual((entry['state'], entry['cache_write_requested']), ('settled', '5m'))
         self.assertEqual(Decimal(entry['held_usd']), cost(LOWER, input_tokens=200, read=3000, output=400))
+
+class TokenCountTests(AnthropicTest):
+    """R22 decision 28: the gate's free token count. Nothing is held, charged or recorded, and a failure never halts."""
+
+    def body(self, **changes):
+        value = {'model': HAIKU, 'system': 'Offline synthetic system text', 'messages': [{'role': 'user', 'content': 'Offline synthetic test'}]}
+        value.update(changes)
+        return json.dumps(value)
+
+    def count(self, gate, body, dispatch, **kwargs):
+        options = {'peer_uid': PEER, 'slots': gate.slots, 'dispatch': dispatch, 'key_loader': lambda _private: KEY,
+                   'host': HOST, 'platform': 'linux'}
+        options.update(kwargs)
+        return bridge.count_tokens(gate.private, gate.go_path, {'scope_id': SCOPE, 'requestBody': body}, **options)
+
+    def test_it_sends_the_exact_body_under_the_gates_key_and_answers_only_the_number(self):
+        gate = self.ready()
+        sent = []
+
+        def dispatch(raw, key):
+            sent.append((raw, key))
+            return 200, {'input_tokens': 4321, 'anything_else': 'not passed on'}
+        before = gate.day(DAY)
+        body = self.body()
+        self.assertEqual(self.count(gate, body, dispatch), {'input_tokens': 4321})
+        self.assertEqual(sent, [(body.encode(), KEY)])
+        self.assertEqual(gate.day(DAY), before)  # Nothing reserved, charged or recorded.
+
+    def test_the_marked_forms_a_call_may_send_are_counted_too(self):
+        gate = self.ready()
+        answer = lambda _raw, _key: (200, {'input_tokens': 1})  # noqa: E731
+        self.assertEqual(self.count(gate, self.body(system=cached_system()), answer), {'input_tokens': 1})
+        marked = [{'role': 'user', 'content': [{'type': 'text', 'text': 'Material', 'cache_control': dict(CACHE_MARK)}, {'type': 'text', 'text': 'Rest'}]}]
+        self.assertEqual(self.count(gate, self.body(messages=marked), answer), {'input_tokens': 1})
+
+    def test_it_refuses_what_a_count_may_not_carry_before_any_key_is_read(self):
+        gate = self.ready()
+
+        def never(*_args):
+            raise AssertionError('must not be read or sent')
+        for body in (self.body(max_tokens=1), self.body(tools=[]), self.body(model='claude-opus-5-5'), self.body(messages=[]), 'not json', '[]'):
+            with self.assertRaises(SafetyError):
+                self.count(gate, body, never, key_loader=never)
+        with self.assertRaises(SafetyError):
+            bridge.count_tokens(gate.private, gate.go_path, {'scope_id': 'another', 'requestBody': self.body()}, peer_uid=PEER, slots=gate.slots,
+                                dispatch=never, key_loader=never, host=HOST, platform='linux')
+        with self.assertRaises(SafetyError):
+            self.count(gate, self.body(), never, key_loader=never, peer_uid=PEER + 1)
+
+    def test_a_failed_count_is_a_refusal_and_never_halts_the_gate(self):
+        gate = self.ready()
+        for reply in ((429, {'type': 'error'}), (200, {'input_tokens': 'many'}), (200, {}), (500, {})):
+            with self.assertRaises(SafetyError) as caught:
+                self.count(gate, self.body(), lambda _raw, _key, reply=reply: reply)
+            self.assertEqual(str(caught.exception), 'COUNT_UNAVAILABLE')
+        report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
+        self.assertEqual(report['state'], 'active')
+        self.assertEqual(report['remaining_calls'], 660)
+
+    def test_only_the_anthropic_profile_offers_it(self):
+        self.assertEqual(ANTHROPIC.count_path, '/v1/messages/count_tokens')
+        source = (Path(__file__).resolve().parents[2] / 'packages/providers/ops/preview_budget_authority.py').read_text()
+        self.assertIn("count=count,\n", source)  # serve wires /count to the same socket and uid list.
+        self.assertTrue(bridge.helper.path_valid(ANTHROPIC.count_path))
+        for name, profile in bridge.helper.PROFILES.items():
+            if name != 'anthropic':
+                self.assertIsNone(getattr(profile, 'count_path', None), name)
+
 
 if __name__ == '__main__':
     unittest.main()

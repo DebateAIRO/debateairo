@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and row-level security (0130, below) the twentieth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0130: 0130,
-   `row-level-security-forward0130.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0152: 0152,
+   `report-export-forward0152.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0152 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -443,6 +443,248 @@ so it was renumbered again, to 0130, at its merge onto that dev (2026-10-28). Th
 `serve.synthesis_check_*` tables 0126 grants `debateai_runtime` SELECT on to the in-scope set (113 to 118 relations; each
 keyed on its run, K4) and V-18's guard on `serve.synthesis_check_attempt.request_id`.
 
+## The V4 account memory (0131)
+
+The twenty-first step, after row-level security (0130), is `0131_v4_account_memory.sql` with
+`v4-account-memory-forward0131.json` and `packages/db/src/migration-forward0131.ts` (`loadForward0131`, appended
+last to `STEPS`, `MIGRATION_FORWARD0131_` refusals). Owner rulings N7 and N11 (2026-10-29, test-site release R22):
+the V4 pages keep the reading level, each debate's last visit and each dig's link in the account, never in the
+browser. It creates `identity.page_reading_level`, `identity.debate_last_visit` and `identity.dig_link`, each keyed
+by the account's `owner_ref` with `ON DELETE CASCADE` (account erasure deletes the `identity."user"` row, so the
+rows go with it), and nine functions: six for the API's own role `debateai_billing_runtime` (never the shared
+runtime role), a private ownership helper, `identity.forget_erased_debate_page_memory(uuid)` for
+`debateai_erasure_runtime` (R22 item 16: deleting one private debate also deletes its visit row and every dig link
+where it is the parent or the child, in the transaction that writes the run's erasure tombstone, called by
+`packages/db/src/erasure-page-memory.ts` from both finalize paths), and the export reader
+`identity.read_data_export_page_memory(uuid,uuid)` for `debateai_data_export_worker` behind 0128's lease gate.
+Tables and functions take 0115's export owner, as 0125's export reader does. Its postcondition records its own three
+tables and nine functions. It declares `-- n1: expand` (new objects only; the erasure role's one new grant changes
+the count the erasure boot check expects, which R22's drained upload makes moot) and `-- n1: keeps-verifier`: `verify-effective-capabilities-130.sql` (0130's) stays the
+verifier in force and there is no `replayVerifierSql`. Row-level security (0130) leaves the three tables outside its
+scope rule: no request role (`debateai_billing_runtime`, `debateai_authorization_runtime`) can SELECT them (every
+role's table rights are revoked; only the definers, owned by the migrator as 0115's export owner, read and write them),
+so row security stays off on them, as on every out-of-scope table, and the step stays expand-only. Written as 0130, it
+was renumbered to 0131 at the merge of `origin/dev` 64ef40c21 (2026-10-30), whose row-level security took 0130 first
+(C1's recipe: every file and constant that carries the number, `previous` now 0130's manifest and its verifier, the
+manifest digests recomputed, the chain lists re-pinned). If an earlier pending step takes 0131 first, renumber this
+step again by the same recipe before merge.
+
+## The web evidence store (0132) and investigations (0133)
+
+The twenty-second and twenty-third steps, after the V4 account memory (0131), carry the Perplexity plan's storage
+(`docs/superpowers/plans/2026-10-30-perplexity-and-dig-map.md`, task W1-3; the owner's answers of 2026-10-29/30 override
+it): `0132_web_evidence.sql` with `web-evidence-forward0132.json` and `packages/db/src/migration-forward0132.ts`
+(`loadForward0132`, `MIGRATION_FORWARD0132_` refusals), then `0133_investigations.sql` with
+`investigations-forward0133.json` and `packages/db/src/migration-forward0133.ts` (`loadForward0133`,
+`MIGRATION_FORWARD0133_` refusals), appended in that order to `STEPS`. Each declares `-- n1: expand` (new tables and
+functions only; the erasure role's one new function each changes the count its boot check expects, which R22's drained
+upload makes moot, as 0131's did) and `-- n1: keeps-verifier`: no billing relation or function (the reserve lives in the
+identity schema), so `verify-effective-capabilities-130.sql` stays in force and neither has a `replayVerifierSql`.
+
+0132 keeps one debate's web step: `identity.web_search`, `identity.web_page`, the transient `identity.web_page_text`,
+`identity.web_reading`, `identity.web_extract`, `identity.web_pick`, `identity.web_pack` and
+`identity.web_researched`. Six of them are run content carriers (`CONTENT_CARRIERS` in `packages/crypto`): the search
+words, a page's address, site, title and date, its whole text, a reading's line, an extract's quote and a pack are
+encrypted under the run's key and attested by the runner; one trigger refuses a run without content encryption, an
+erased run and a wrong attestation, so no web text is ever plaintext. The page text lives only in its own table: a
+reader prompt kept in `ledger.call_prompt` names a page by its id and keyed digest (`webPageTextRef`,
+`packages/db/src/web-evidence.ts`), never its text. 0133 keeps `identity.investigation`,
+`identity.investigation_member` (the server-side dig parent; joining writes 0131's `identity.dig_link` too),
+`identity.investigation_closing` (one row per report version, kept when the investigation reopens) and
+`identity.investigation_reserve_event` (the person's one reserve as an event list: HELD, USED, RELEASED, BLOCKED until
+the limit that ran out resets). Closing an investigation wipes its page texts in the same transaction, and the
+scheduler's sweep wipes them 30 days after the investigation's last activity even while it is open.
+
+Every row of both names its account's `owner_ref` with `ON DELETE CASCADE`, so account erasure removes them; deleting one
+private debate calls `identity.forget_erased_debate_investigation(uuid)` and
+`identity.forget_erased_debate_web_evidence(uuid)` for `debateai_erasure_runtime` in the finalize transaction, beside
+0131's (`packages/db/src/erasure-page-memory.ts`). The export worker reads both through 0128's lease gate. Tables and
+definers take 0115's export owner, as 0131's do; no role holds a table right, so row-level security (0130) leaves them
+outside its scope rule and the steps stay expand-only. If an earlier pending step takes 0132 or 0133 first, renumber
+these steps by the same recipe before merge (C1's: every file and constant that carries the number, `previous`, the
+manifest digests, the chain lists).
+
+## The dig model and the month pause (0134)
+
+The twenty-fourth step, after the investigations (0133), carries the new dig model's storage and the money rule's
+month pause (`docs/superpowers/plans/2026-10-30-dig-model-revision.md`, task W2-8 and "The money rule (owner, 31 Oct
+2026)"): `0134_dig_model_and_month_pause.sql` with `dig-model-forward0134.json` and
+`packages/db/src/migration-forward0134.ts` (`loadForward0134`, `MIGRATION_FORWARD0134_` refusals), appended last to
+`STEPS`. It declares `-- n1: expand` (new tables and functions; `ledger.model_spend`'s shared source list re-added NOT
+VALID with `PATH_REWRITE`, and that source's own run rule NOT VALID; the erasure role's one new function changes the
+count its boot check expects, which R22's drained upload makes moot) and `-- n1: keeps-verifier`: no billing relation
+or function, so `verify-effective-capabilities-130.sql` stays in force and it has no `replayVerifierSql`.
+
+It keeps `identity.investigation_dig_level` (each dig's level, 1..10; the first debate is 0 and has no row; the members
+0133 already held are filled in by walking their parents), `identity.path_rewrite_turn` (a settled dig's place in the
+line of rewrites of the path it was dug from), `identity.path_rewrite` (one rewrite per dig, insert-once: outcome,
+fates, the verdict's codes and lineage in clear; the path's new text, "What the dig changed", the verdict's reason and the
+dig's own paths only in an envelope under the dig's run key, a `CONTENT_CARRIERS` entry) and
+`identity.web_plan_path` (the search planner's decision for each path of a run, written once: PLANNED,
+NO_SEARCH_PLANNED with its reason sealed under the run's key and checked by 0132's content trigger, NOT_ON_PLAN,
+SWITCHED_OFF or FAILED, and the searches it sends) and `identity.run_pause_event` (PAUSED at the month wall with its reset and the planned work left, RESUMED on the person's
+Continue). 0133's member table and join function are NOT altered or revoked: 0133's postcondition digests that table's
+columns and the join's grants, so the level is a table of its own and `identity.join_investigation_nested` supersedes
+the join (TOO_DEEP at level 11, under 0133's two locks); no source calls 0133's join any more. Day and week borrowing
+keeps no record: it is derived from the spend windows (`packages/db/src/dig-model.ts`).
+
+Every row names its account's `owner_ref` with `ON DELETE CASCADE`; deleting one private debate calls
+`identity.forget_erased_debate_dig_model(uuid)` in the finalize transaction after 0133's (an erased dig takes its own
+rewrite and turn; an erased debate the rewrites of its paths; a dig's level goes with its 0133 member row). The export
+worker reads `identity.read_data_export_dig_model(uuid,uuid)` through 0128's lease gate. Tables and definers take
+0115's export owner; no role holds a table right, so row-level security (0130) leaves them outside its scope rule. If
+an earlier pending step takes 0134 first, renumber this step by the same recipe before merge (C1's: every file and
+constant that carries the number, `previous`, the manifest digests, the chain lists).
+
+## The dig picks (0135)
+
+The twenty-fifth step, after the dig model (0134), carries what the path rewrite needs to run for real
+(`docs/superpowers/plans/2026-10-30-dig-model-revision.md`, task W3-7: the path rewrite switched on):
+`0135_dig_picks.sql` with `dig-picks-forward0135.json` and `packages/db/src/migration-forward0135.ts` (`loadForward0135`,
+`MIGRATION_FORWARD0135_` refusals), appended last to `STEPS`. It declares `-- n1: expand` (three new tables and seven new
+functions; no earlier function, table or trigger changes, 0132's content check is called by two new triggers and 0134's
+turn and rewrite tables are only read; the erasure role's one new function changes the count its boot check expects,
+which R22's drained upload makes moot) and `-- n1: keeps-verifier`: no billing relation or function, so
+`verify-effective-capabilities-130.sql` stays in force and it has no `replayVerifierSql`.
+
+It keeps `identity.dig_pick_set` (one per dig, insert-once: its parent, the path of the parent's map its picks are on,
+null when they hang under the main question, and how many picks it holds), `identity.dig_pick` (each pick in the
+person's order: its kind, the suggestion it chose, its place and who wrote it in clear; its text only in an envelope under
+the dig's run key, a `CONTENT_CARRIERS` entry checked by 0132's content trigger) and `identity.path_rewrite_input` (the
+dig's own paths as its settled run gave them to its rewrite, written once before the rewrite takes its turn, sealed the
+same way, so a runner that stops mid-rewrite can build the same material again). The asks route writes the picks
+(`identity.record_dig_picks`, the API's own role); the runner reads them, stores the material and lists the settled digs
+whose rewrite has no row (`identity.read_unwritten_path_rewrites`, the sweep).
+
+Every row names its account's `owner_ref` with `ON DELETE CASCADE`; deleting one private debate calls
+`identity.forget_erased_debate_dig_picks(uuid)` in the finalize transaction after 0134's (an erased dig takes its own
+picks and material; the digs dug from an erased debate keep theirs). The export worker reads
+`identity.read_data_export_dig_picks(uuid,uuid)` through 0128's lease gate. Tables and definers take 0115's export owner;
+no role holds a table right, so row-level security (0130) leaves them outside its scope rule. If an earlier pending step
+takes 0135 first, renumber this step by the same recipe before merge (C1's: every file and constant that carries the
+number, `previous`, the manifest digests, the chain lists).
+
+## The investigation reports (0136)
+
+The twenty-sixth step, after the dig picks (0135), carries the final report the runner writes over an investigation
+(R22, plan task W5-1: the report the runner writes for a closing; owner answer F7 A: the report waits for the digs still
+running and for their path rewrites): `0136_investigation_reports.sql` with `investigation-reports-forward0136.json` and
+`packages/db/src/migration-forward0136.ts` (`loadForward0136`, `MIGRATION_FORWARD0136_` refusals), appended last to
+`STEPS`. It declares `-- n1: expand` (one new table and eleven new functions; no earlier function, table or trigger
+changes, 0133's `identity.record_investigation_report` is called by the new writer, not redefined, and 0133's to 0135's
+tables are only read; `ledger.model_spend`'s shared source list is re-added `NOT VALID` in 0134's pattern with one more
+source, `INVESTIGATION_REPORT`, whose run rule `model_spend_investigation_report_names_its_run` restricts only the new
+source) and `-- n1: keeps-verifier`: no billing relation or function, so `verify-effective-capabilities-130.sql` stays
+in force and it has no `replayVerifierSql`.
+
+It keeps `identity.investigation_report` (one row per closing whose report the runner wrote, insert-once: the 0133
+closing it answers, by investigation and report version, the id that closing records as its report, the
+investigation's root debate, the outcome and the story's, the newest path rewrite the version covered, the dossier's
+fingerprint, the ladder step and how many items were left out, the writer's and checker's lineage, rounds, artifact
+refs and what it cost; its text only in an envelope under the ROOT's run key, a `CONTENT_CARRIERS` entry checked on
+insert by this step's trigger in 0134's shape, 0132's checks called, not redefined). The runner lists the closings
+still waiting for their report (`identity.read_unreported_closings`), reads the members a report still waits for,
+writes the report (`identity.record_investigation_report_version`, which also records it on 0133's closing in the same
+transaction), reads a debate's reports and when the newest closing without a report was made (the money seam sums that
+closing's charges from then on); the API reads the person's reports (`identity.read_investigation_reports`, its own
+role).
+
+Every row names its account's `owner_ref` and its closing with `ON DELETE CASCADE`: an erased root takes its
+investigation and closings with it (0133's `identity.forget_erased_debate_investigation`, in the finalize transaction
+of the run's erasure), and so its reports; an erased dig leaves them, as they are sealed under the root's key and stay
+with the root. So this step adds no deletion function and the erasure role's count is unchanged. The export worker
+reads `identity.read_data_export_investigation_reports(uuid,uuid)` through 0128's lease gate. The table and ten of the
+eleven definers take 0115's export owner (the content trigger keeps the migrator, as 0134's does); no role holds a
+table right, so row-level security (0130) leaves it outside its scope rule. If an earlier pending step takes 0136
+first, renumber this step by the same recipe before merge (C1's: every file and constant that carries the number,
+`previous`, the manifest digests, the chain lists).
+
+## The public debates (0137)
+
+The twenty-seventh step, after the investigation reports (0136), carries digs by anyone on a public debate (R22, plan 2026-10-31-r22-owner-changes decision 13): `0137_public_debates.sql` with `public-debates-forward0137.json` and `packages/db/src/migration-forward0137.ts` (`loadForward0137`, `MIGRATION_FORWARD0137_` refusals). It declares `-- n1: expand` and `-- n1: keeps-verifier`: no earlier function, table or trigger changes, and `ledger.model_spend`'s shared source list is re-added `NOT VALID` with `PATH_CLIMB`, `ANSWER_UPDATE`, `CONTRIBUTION_CHECK` and `PUBLIC_REPORT`, whose run rule `model_spend_r22_sources_name_their_run` restricts only them.
+
+It keeps `identity.public_contribution` (one dig on a public debate: its path, its AI check's outcome set once, and its digger, `SET NULL` on erasure so the name goes and the row stays), `identity.public_debate_update` (what an allowed contribution changed on the page, numbered per publication and sealed under the PUBLICATION's key, keyId `publication-snapshot:<ref>:v1`, so it is not a `CONTENT_CARRIERS` entry), `identity.free_public_ask` (a Free ask that showed the notice, and its outcome), `identity.public_report_writer` and `identity.public_report_charge` (who asked for a report on a public debate and who pays each of its charges). A stranger's dig joins through `identity.join_public_investigation`, which names the digger on 0133's member row; 0131's, 0133's and 0135's writers keep their one-owner rules, and the pick set's `position_ref` stays NULL so 0135's sweep and 0136's waiting list keep theirs. `core.publish_free_debate` writes the same rows as 0085's transition for a debate with no session present, making and consuming 0110's one-shot binding itself, so 0110's pinned trigger is unchanged. The erasure role calls `identity.forget_erased_debate_public(uuid)`; the export worker reads `identity.read_data_export_public_debates(uuid,uuid)` through 0128's lease gate. If an earlier pending step takes 0137 first, renumber this step by the same recipe before merge.
+
+## The tree updates (0138)
+
+The twenty-eighth step (decisions 2, 3, 5 and 13's report rule): `0138_tree_updates.sql` with `tree-updates-forward0138.json` and `packages/db/src/migration-forward0138.ts` (`loadForward0138`, `MIGRATION_FORWARD0138_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. 0134's `identity.path_rewrite` is one row per dig and frozen, so `identity.path_update_turn` and `identity.path_update` hold every other rewrite of a path, with its cause and turn: a CLIMB (a child rewrite really changed a path, so the path above is rewritten too) and a PUBLIC_DIG. A path's order is the time each turn was taken, under 0134's per-path lock, across both tables; `identity.record_path_rewrite_in_line` holds a dig's own rewrite to the whole line and then calls 0134's writer. `identity.main_answer_update` keeps the main answer's automatic versions, sealed under the ROOT's key, naming what triggered each and who paid; `identity.run_purpose_lines` a debate's place, time and purpose lines. Three `CONTENT_CARRIERS` entries, each checked by 0132's content trigger. `identity.close_public_investigation` and `identity.reopen_public_investigation` are the report on a public debate. The erasure role calls `identity.forget_erased_debate_tree_updates(uuid)`; the export worker reads `identity.read_data_export_tree_updates(uuid,uuid)`. If an earlier pending step takes 0138 first, renumber this step by the same recipe before merge.
+
+## The passage retention (0139)
+
+The twenty-ninth step (decisions 6 and 7): `0139_passage_retention.sql` with `passage-retention-forward0139.json` and `packages/db/src/migration-forward0139.ts` (`loadForward0139`, `MIGRATION_FORWARD0139_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.web_shown_quote` keeps the quote people see apart from the passage, and survives; `identity.web_reply_text` keeps a reader's whole saved reply, transient, so `ledger.raw_artifact` records only a reference (the W3-0 rule, for replies: the call records are append-only and replay byte for byte, so they never hold a passage); `identity.web_passage_wipe` records each deletion, codes and counts. `identity.wipe_debate_passages` deletes one debate's top page texts, extracts, packs and saved replies when nothing runs on it, refusing while a shown quote is missing; "other pages" stay for 0133's sweep. `identity.close_investigation_keeping_texts` is 0133's closing without its wipe. Two `CONTENT_CARRIERS` entries, each checked by 0132's content trigger. The erasure role calls `identity.forget_erased_debate_passages(uuid)`; the export worker reads `identity.read_data_export_passage_retention(uuid,uuid)`. If an earlier pending step takes 0139 first, renumber this step by the same recipe before merge.
+
+## The funded spend kinds (0140)
+
+The thirtieth step (the plan's known gap and decision 14): `0140_internal_spend_kinds.sql` with `internal-spend-kinds-forward0140.json` and `packages/db/src/migration-forward0140.ts` (`loadForward0140`, `MIGRATION_FORWARD0140_` refusals). It declares `-- n1: drained` (R22 is uploaded with no debate waiting or running) and `-- n1: keeps-verifier`: `billing.read_internal_grant_spent`, `billing.read_internal_grant_commitments` and `billing.reserve_internal_provider_call` are redefined in place, with the same names, signatures, owner and grants, and `billing.internal_provider_admission`'s two CHECKs are widened, so a funded person's window and admission know `PATH_REWRITE`, `INVESTIGATION_REPORT`, `PATH_CLIMB`, `ANSWER_UPDATE` and `CONTRIBUTION_CHECK`. `staff.read_team_internal_spent` reads the team's one limit's spend; the limit itself has been in the database since 0142 (decision 24), not a server setting (`packages/register/src/team-limit.ts`). If an earlier pending step takes 0140 first, renumber this step by the same recipe before merge.
+
+## The path suggestions (0141)
+
+The thirty-first step (decision 9): `0141_path_suggestions.sql` with `path-suggestions-forward0141.json` and `packages/db/src/migration-forward0141.ts` (`loadForward0141`, `MIGRATION_FORWARD0141_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.path_suggestions` keeps the AI's suggestions of what to dig into on one path of a debate's map, one row each time they are worked out, append-only, the newest of a path winning: `run_id` is the run whose key seals the content and who paid (the debate itself for a first debate's suggestions, the dig that rewrote the path for a refresh), `debate_run_id` the debate whose map holds the path. One `CONTENT_CARRIERS` entry, bound to `set_id` and checked by 0132's content trigger. The runner writes through `identity.record_path_suggestions` and reads the newest set per path through `identity.read_path_suggestions_of_run`. The erasure role calls `identity.forget_erased_debate_path_suggestions(uuid)`, which takes the rows on either run; the export worker reads `identity.read_data_export_path_suggestions(uuid,uuid)`. If an earlier pending step takes 0141 first, renumber this step by the same recipe before merge.
+
+## The team limit (0142)
+
+The thirty-second step (R22, decisions 14 and 24): `0142_team_limit.sql` with `team-limit-forward0142.json` and `packages/db/src/migration-forward0142.ts` (`loadForward0142`, `MIGRATION_FORWARD0142_` refusals), `-- n1: drained` (no debate may wait or run while it applies) and `-- n1: keeps-verifier`. The team's one limit is no server setting any more. It lives in an insert-only log, `staff.team_limit_event`, private to the staff security owner. Its holders are the Owner and one partner the Owner picks (`staff.team_limit_holder`: the database allows one partner, and a new Owner starts with none). `staff.team_practice_spend` records what each practice charged against the month, and `staff.team_limit_notice` the notices a change or a partner grant sends, leased as 0128's threat-report alerts are. The staff functions the API calls are granted to the runtime's role in section 9 of the step's SQL and disclosed in P3-01 with the other grants. The step replaces `staff.authorize_action`, `staff.owned_action_allowed`, `staff.begin_owned_webauthn` and `staff.read_audit_page` with versions that know the team's actions (`begin_owned_webauthn` also gains the two allowance actions it never had). A funded question waits past the team's month rather than being refused, a running debate is never stopped, and a funded debate counts as the top plan's features, web search among them. If an earlier pending step takes 0142 first, renumber this step by the same recipe before merge.
+
+## The hand-over (0143)
+
+The thirty-third step (decision 12): `0143_run_handover.sql` with `run-handover-forward0143.json` and `packages/db/src/migration-forward0143.ts` (`loadForward0143`, `MIGRATION_FORWARD0143_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.run_handover` keeps, append-only and in codes only, when a debate paused at the month wall moved to a newer release: core.run's stamps stay as they were written. `identity.run_release_now` and `identity.run_settings_version_now` read who owns a debate now; `identity.run_work_is_parked` says a work item is open only because its debate is paused; `identity.continue_paused_run_in_release` moves the debate and records 0134's RESUMED in one transaction; `identity.wipe_inactive_web_page_text_of_idle_debates` is 0133's 30-day sweep sparing a debate with open work and its investigation. Numbered 0143 by plan: this branch's step before is 0141. When 0142 lands first, renumber this step's `previous` by the same recipe before merge.
+
+## The small AI's quota charge (0144)
+
+The thirty-fourth step (decisions 29 and 31): `0144_ask_clarify_charge.sql` with `ask-clarify-charge-forward0144.json` and `packages/db/src/migration-forward0144.ts` (`loadForward0144`, `MIGRATION_FORWARD0144_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. Step 2's small AI runs before a debate exists, so it has no run to pin its cost to. `identity.ask_clarify_charge` holds one row per call: the person, the cost, the time and, for a team member, the grant; never the question or the suggestions. `identity.record_ask_clarify_charge` writes that row and a run-less `ASK_CLARIFY` row in `ledger.model_spend` together. An erased account takes its rows by cascade. It redefines 0140's `billing.read_internal_grant_spent` and `staff.read_team_internal_spent`, and declares that (`amendsPostconditionsOf`, `field: function_definition`) because 0140's digest pins them. It stays numbered 0144 on its lane's branch and follows 0141 there; the coordinator will renumber or re-chain it at merge.
+
+## The pages waiting after "Add to researched" (0145)
+
+The thirty-fifth step (dig-model revision W4-4): `0145_web_researched_unsettled.sql` with `web-researched-unsettled-forward0145.json` and `packages/db/src/migration-forward0145.ts` (`loadForward0145`, `MIGRATION_FORWARD0145_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. `identity.read_unsettled_web_researched(integer)`, on `debateai_runtime`: the runner's list of the pages people added whose readers have not settled, oldest first, so a runner that stopped goes on from them. One function; no table.
+
+## The Owner's allowances for team members (0146)
+
+The thirty-sixth step (decision 32): `0146_team_allowances.sql` with `team-allowances-forward0146.json` and `packages/db/src/migration-forward0146.ts` (`loadForward0146`, `MIGRATION_FORWARD0146_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. It replaces `staff.configure_internal_allowance`, `staff.revoke_internal_allowance`, their binding and body functions and `billing.guard_internal_grant_commit` (same names and signatures, so 0130's verifier stays), and adds `staff.internal_grant_holder` and `staff.internal_grant_end`, append-only and private to the staff security owner, `staff.allowance_notice` with its three lease functions (0142's shape, its own table because 0142's postcondition pins that CHECK), the triggers on `staff.subject` and `staff.owner_designation` that end an allowance with the person or the Owner, and the two readers the Owner's page and ceremony use. The old self command and its proof bytes are unchanged.
+
+## The public tree (0147)
+
+The thirty-seventh step (decisions 13 and 22): `0147_public_tree.sql` with `public-tree-forward0147.json` and `packages/db/src/migration-forward0147.ts` (`loadForward0147`, `MIGRATION_FORWARD0147_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Number 0146 is held by another lane that merges later: on this branch the chain goes 0145, 0147, 0148. Every dig on a public debate, the author's too, lives on the publication, so the tree goes on when the first author leaves and a stranger's AI work reads only the public copy. Eight new tables, reached through definers only, none readable by a request role: `identity.public_material` (the page as the API read it, sealed again under a live run's key), `identity.public_dig_input` (a dig's own paths, for a stopped runner), `identity.public_contribution_check` (the AI check's pass), `identity.public_climb_done` (the climb's end), `identity.public_answer_update` (the main answer's version when the root's key is gone, under the dig's key), `identity.public_report` and `identity.public_debate_report` (a report, and the copy the page reads under the publication's key), and `identity.public_page_skip` (a text the page will never show). Four `CONTENT_CARRIERS` entries: `identity.public_material`, `identity.public_dig_input`, `identity.public_answer_update` and `identity.public_report`. The API's billing role starts things (`join_public_tree`, `record_public_material`, `open_public_report`, two readers), the runner's role does the rest, the erasure role calls `identity.forget_erased_debate_public_tree(uuid)` and the export worker reads `identity.read_data_export_public_tree(uuid,uuid)`. No earlier object changes: 0137's join and 0138's public turn stay in the database, unused by the feature.
+
+## An erased account keeps its public debates (0148)
+
+The thirty-eighth step (decision 21): `0148_erasure_keeps_public.sql` with `erasure-keeps-public-forward0148.json` and `packages/db/src/migration-forward0148.ts` (`loadForward0148`, `MIGRATION_FORWARD0148_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. Rows only: a stored `delete_public_debates = true` that has not started is cleared, and the step refuses with `ERASURE_WITH_PUBLIC_REMOVAL_IN_FLIGHT` while such a request is already past prepare, because its keys are on their way out and it cannot be turned back. Drained because 0110's frozen function reads those rows at prepare; R22 is already a drained upload, so no erasure runs while it applies.
+
+## A funded person's public report in the team's month (0149)
+
+The thirty-ninth step (decisions 7, 13 and 24): `0149_public_report_team_month.sql` with `public-report-team-month-forward0149.json` and `packages/db/src/migration-forward0149.ts` (`loadForward0149`, `MIGRATION_FORWARD0149_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. Drained because it redefines earlier steps' functions in place, and R22 is already a drained upload, so no debate runs while it applies. It adds three insert-only tables, none of them read by a request role: `staff.team_public_report_spend` (what a member with a live allowance at the moment of the charge paid for a report on a public debate, written in the charge's own transaction, so the team's month counts it once and a later end of the allowance or the member's erasure changes nothing), `identity.public_update_ref` (a random public reference for each update a page shows, because the row's own id is worked out from the digger's run id) and `identity.public_report_check` (the publication check's record of a report, naming the report and not a run). It adds `identity.team_public_report_record`, `identity.team_public_report_funded`, `identity.read_public_report_spent_by_funding` and `identity.record_public_report_check`; the last two are the runtime's, the first two are private to their callers' owner. It keeps 0130's verifier, and it amends with `amendsPostconditionsOf` (field `function_definition`) the receipts of four steps: 0137's `record_public_report_charge` (writes the team's row), `record_public_debate_update` (writes the reference) and `read_public_debate_updates` (a page's `update_id` is the reference); 0139's `debate_nothing_runs` (a settled contribution, `contribution.outcome IS NULL` no longer true, holds no passages); 0142's `read_team_month_spent` in `staff` (adds the new table); and 0147's `read_public_dig_parent` and `read_public_tree_of_run` (name the reference; `writing` stays in the answer, always false), `join_public_tree` (no wait for a report) and `public_tree_ongoing` (a dig with no work items yet holds no report back). Owners and grants of the redefined functions stay as they were. 0137's `join_public_investigation` and its other functions stay.
+
+## A public debate under review (0150)
+
+The fortieth step (decision 33): `0150_public_review.sql` with `public-review-forward0150.json` and `packages/db/src/migration-forward0150.ts` (`loadForward0150`, `MIGRATION_FORWARD0150_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. Drained because it replaces functions every release calls (`core.run_is_published`, the proof's list of actions, `begin_owned_webauthn`) and readers the runner calls, and R22 is already a drained upload, so no debate runs while it applies. It adds five tables, none of them read by a request role: `identity.public_review_event` (the log: hide, put back, take out a dig, correct, hide a report), `identity.public_review_correction` (a new text for one piece under the publication's key; the newest per piece wins and nothing that exists changes), `identity.public_review_detached` (a dig cut off when its debate was hidden) and `identity.public_review_read` (what a reviewer read), these four insert-only, and `staff.public_review_notice` (one content-free notice per person per step, the same loop and tries as 0142's). Its definers are `public_review_held`, `public_review_dig_out`, `public_review_row_off`, `public_review_report_off`, `public_review_row_closed`, `read_public_review_overlay`, `public_review_replay`, `public_review_apply`, `public_review_material`, `public_review_mark_read` and `public_review_list` in `identity`, `core.public_review_snapshot`, and `queue_public_review_notices`, `claim_public_review_notices`, `complete_public_review_notice`, `public_review_notice_user`, `read_public_review_command`, `read_public_review`, `read_public_review_list`, `public_review_body` and `public_review_act` in `staff`; the runtime calls the three staff readers' doors, `public_review_act`, the notice loop's three, `read_public_review_overlay` and `public_review_held`. A step needs a passkey of one of the two accounts of 0142's `staff.team_limit_authority`; only a hide goes without the independent alert. It widens `staff.audit_event`'s event check by `PUBLIC_REVIEW_CHANGED`, and it replaces 0039's `core.run_is_published` in place (a hidden debate is not published; it is before this chain, so no receipt declares it, and its signature, owner and grants stay). It keeps 0130's verifier, and it amends with `amendsPostconditionsOf` (field `function_definition`) the receipts of five steps: 0137's `current_publication_of_run` (no publication while hidden), `read_public_debate_updates` (the corrected page) and `read_own_public_contributions` (says a dig was removed or kept private); 0138's `path_line_json`, `main_answer_updates_json` and `read_data_export_tree_updates` (a row a review closed has no content); 0142's `read_audit_page` (leaves the new event out as it leaves the team's own), `owned_action_allowed` and `begin_owned_webauthn` (the two new actions); 0147's `read_public_dig_parent`, `join_public_tree`, `read_public_tree_of_run`, `read_public_debate_reports`, `read_public_page_owed`, `take_public_path_turn` and `read_public_answer_updates`; and 0149's `read_public_debate_updates`, `read_public_dig_parent`, `join_public_tree` and `read_public_tree_of_run`, which 0149 had redefined too. Owners and grants of the redefined functions stay as they were.
+
+## The Report button and the sealed originals' six months (0151)
+
+The forty-first step (decisions 35 and 36): `0151_public_flag.sql` with `public-flag-forward0151.json` and `packages/db/src/migration-forward0151.ts` (`loadForward0151`, `MIGRATION_FORWARD0151_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. Drained because it replaces the proof's action lists every release calls, and R22 is already a drained upload, so no debate runs while it applies. It adds four tables, none of them read by a request role: `identity.public_flag` (a report: its words sealed under the publication's key, the check's answer, the dismissal; `guard_public_flag` lets a row only move forward and refuses a delete; erasing the reporter takes the link with `ON DELETE SET NULL` and keeps the words), `identity.public_flag_event` (who read the queue, who dismissed what) and `identity.public_review_purged` (what went after six months, by digest, no text), these two insert-only, and `staff.public_flag_notice` (one content-free notice per person, the same loop and tries as 0150's, in the kinds `PUBLIC_FLAG_HIDDEN` and `PUBLIC_FLAG_WAITING`). Its definers are `guard_public_flag`, `read_public_flag_target`, `open_public_flag`, `settle_public_flag`, `public_flag_queue`, `public_flag_mark_read`, `public_flag_dismiss`, `public_flag_replay`, `delete_public_flag_words_due`, `read_public_review_purge_due` and `public_review_purge` in `identity`, `core.public_review_replace_snapshot`, and `queue_public_flag_notices`, `claim_public_flag_notices`, `complete_public_flag_notice`, `public_flag_notice_user`, `read_public_flag_queue` and `public_flag_dismiss` in `staff`; the runtime calls `read_public_flag_target`, `open_public_flag`, `settle_public_flag`, `delete_public_flag_words_due`, `read_public_review_purge_due`, `public_review_purge`, the notice loop's three and the two staff doors. The limits on reports are the API's and reach `open_public_flag` as arguments, so no number of theirs is in this file; the database counts them from its rows, under locks. `settle_public_flag` hides through 0150's `public_review_apply`, with the nil staff id for "the automatic check", only on `AGREE` and only for a debate never hidden. The six months' purge disables the `reject_mutation` trigger of the rows it replaces inside its own transaction, as 0129 does in a step, and only `public_review_purge` and `core.public_review_replace_snapshot` do. It keeps 0130's verifier, and it amends with `amendsPostconditionsOf` (field `function_definition`) the receipt of one step: 0142's `owned_action_allowed` and `begin_owned_webauthn` (the new action `PUBLIC_REPORT_DISMISS`). Owners and grants of the redefined functions stay as they were.
+
+## A reporter's own reports in their export, and what the AI checks on public rows used (0152)
+
+The forty-second step: `0152_report_export_and_check_usage.sql` with `report-export-forward0152.json` and `packages/db/src/migration-forward0152.ts` (`loadForward0152`, `MIGRATION_FORWARD0152_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Expand because it is additive only: the release before reads and writes none of what it adds, so it needs no drain. It adds one table, read by no request role: `identity.public_check_usage` (per check of a public row, what the judge reported using: calls, tokens, cost when the vendor says; ids and numbers only; insert-only by `core.reject_mutation`), and two definers: `record_public_check_usage`, which the runtime calls, and `read_data_export_public_flags`, which only `debateai_data_export_worker` calls and which hands the export which debate, when, what became of the report and its sealed words. It reads no verdict, no reason, no judge and no token column, since what the AI answered is about other people's text and a cost is left out of every export. The words stay under the publication's key; the run id goes out only to find that key, and the archive leaves it out. It keeps 0130's verifier and amends no earlier step's receipt (`amendsPostconditionsOf` is empty).
+
+## A finished dig stops counting in the test site's estimate (0153)
+
+The forty-third step: `0153_dig_tree_settled.sql` with `dig-tree-settled-forward0153.json` and `packages/db/src/migration-forward0153.ts` (`loadForward0153`, `MIGRATION_FORWARD0153_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Expand because it is additive only: the release before reads and writes neither its table nor its functions. `identity.dig_tree_settled` holds the runner's mark, ids and a time only, written through `identity.mark_dig_tree_settled`. `identity.dig_is_settled` is what `PREVIEW_UNFINISHED_RUNS_SQL` reads, and for a dig on a public debate it reads 0147's own marks. No mark keeps the hold, so an open rewrite, climb or answer update is never hidden.
+
+## Iceland and Liechtenstein in the Region list (0154)
+
+The forty-fourth step: `0154_region_iceland_liechtenstein.sql` with `region-iceland-liechtenstein-forward0154.json` and `packages/db/src/migration-forward0154.ts` (`loadForward0154`, `MIGRATION_FORWARD0154_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Expand because it only widens 0095's `registration_region_country_code_check` by `IS` and `LI` (dropped `IF EXISTS`, added `NOT VALID` under a `-- n1: reviewed` line, as 0125 widens its kind list): every code the release before writes stays accepted. It adds no table, function or grant. Its postcondition records the CHECK's name, table and kind, not its code list, which `registration-region-database.test.ts` B2 pins equal to `REGION_COUNTRY_CODES`, so a later step may widen it again without drift. It keeps 0130's verifier and amends no earlier step's receipt.
+
+## The owner's two writes on their own answer (0155)
+
+The forty-fifth step: `0155_owner_answer_writes.sql` with `owner-answer-writes-forward0155.json` and `packages/db/src/migration-forward0155.ts` (`loadForward0155`, `MIGRATION_FORWARD0155_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Expand because it only adds two definers, which the release before never calls: `core.record_owned_investigation_request` (the gap-investigation request's row) and `memory.unlink_owned_memory_link` (the memory link's UNLINKED event). On the real logins the runtime may neither insert the first nor lock the second's link, so both buttons answered 500. Each locks the run through 0040's `core.lock_owned_live_runs`, checks the owner again after the lock and answers NULL for every refusal. Both are owned by `core.lock_owned_live_runs`'s owner and granted to `debateai_runtime` only; no table right changes. Its postcondition records the two functions (owner, definer, settings, body, ACL). It keeps 0130's verifier and amends no earlier step's receipt.
+
+## The moderation notice (0156)
+
+The forty-sixth step: `0156_moderation_notice.sql` with `moderation-notice-forward0156.json` and `packages/db/src/migration-forward0156.ts` (`loadForward0156`, `MIGRATION_FORWARD0156_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Expand because it only adds, and touches no earlier object: two new tables, `identity.moderation_notice` (the email owed to the person whose content a review took off the public page) and `identity.moderation_notice_since` (one row, the time the step was applied, which `core.reject_mutation` and the truncate guard keep from being changed), and four definers owned by `identity.public_review_apply`'s owner. `identity.queue_moderation_notices()` is internal and granted to no login: it queues one notice per `HIDE`, `REMOVE_DIG` or `HIDE_REPORT` row of 0150's append-only `identity.public_review_event` recorded since that time, for that piece's author; it reads 0150's log and changes nothing of it. Three are granted to `debateai_runtime` only: `identity.claim_moderation_notices` (queues first, then claims), `identity.read_moderation_notice` and `identity.complete_moderation_notice`. The release before calls none of them. Its postcondition records the two tables and the four functions. It keeps 0130's verifier and amends no earlier step's receipt.
+
+## The moderation statements (0157)
+
+The forty-seventh step: `0157_moderation_statements.sql` with `moderation-statement-forward0157.json` and `packages/db/src/migration-forward0157.ts` (`loadForward0157`, `MIGRATION_FORWARD0157_` refusals), `-- n1: expand`, `-- n1: keeps-verifier`. Expand because it only adds, under new names, and touches no earlier object: 0150's review log and 0151's Report button keep their tables, guards and functions, and the release before keeps calling them. Three new append-only tables, keyed by the log's `event_id` or the report's `flag_id`: `identity.moderation_ground` (the ground of each review step: one or more fixed codes, the source of the facts and the facts a person typed, sealed under the publication's key), `identity.moderation_decision` (the final ground of a debate that stays hidden) and `identity.public_flag_quote` (the automatic hide's quote, sealed), each under the truncate guard and a trigger that lets its sealed words go only forward. Eight identity functions owned by `identity.public_review_apply`'s owner, and staff's grounded body and change door (`staff.public_review_body_grounded`, `staff.public_review_act_grounded`) owned by `debateai_staff_security_owner`, under 0150's action names, so the proof's key set and action list do not move. The release before calls none of them. Its fourth section adds the statements of reasons (DSA Art 17; the owner's D1, D3, D7-D9 of 6 November 2026): `identity.moderation_statement` (one per person a step affects, the debate's author, a digger, a report's writer, or a person whose piece left with the review, gone with the account), `identity.moderation_statement_seen` and `identity.moderation_statement_since` (the start, 0156's own, so nothing before 0156 is told), and ten identity functions: the queue the sender runs when it claims, never the step itself, so a hide is never slowed or refused by it; the ground each statement gives; claim, read and complete, as 0156's; the person's own statements for the signed-in page; the twelve months' deletion of the typed facts and the quote; and the digger's own review line. 0156's queue is never written to: this release stops claiming it. `staff.public_review_act_grounded`, `identity.record_public_flag_quote` and section 4's six doors (`claim_moderation_statements`, `read_moderation_statement`, `complete_moderation_statement`, `read_own_moderation_statements`, `delete_moderation_words_due`, `read_own_contribution_review`) are granted to `debateai_runtime` only. Its sixth section answers the people who report (DSA Art 16(4)-(6); D4): `identity.public_flag_answer` (a close's outcome, NO_BREACH or ACTED, keyed by `flag_id`, beside 0151's dismissal, which the close still writes through `identity.public_flag_dismiss`), `identity.public_flag_mail` (one mail of each kind per report: the receipt, the automatic hide, the automatic not-found, and a person's decision, read to the reporter's own address at sending time, so an erased reporter is never mailed) and `identity.public_flag_mail_since`; eight identity functions (the mail locale, the queue, claim, read and complete, the five minutes' sweep of a report left CHECKING through 0151's own settle, the close's identity half, the queue with its outcomes) and staff's two doors, `staff.read_public_flag_queue_answered` and `staff.public_flag_close`, the latter 0151's Dismiss with the outcome in the passkey's body under the same action name, `PUBLIC_REPORT_DISMISS`. Its eighth section adds the person's own export of all of it, `identity.read_data_export_moderation` (the statements in full, 0156's earlier notices, and how each of their reports was closed and which mails went), granted to `debateai_data_export_worker` only, whose boot check now counts 23 functions. Its postcondition records the nine tables and the thirty-one functions. It keeps 0130's verifier and amends no earlier step's receipt.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -454,7 +696,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`) still
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133), the dig model (0134), the dig picks (0135), the investigation reports (0136), the public debates (0137), the tree updates (0138), the passage retention (0139), the funded spend kinds (0140), the path suggestions (0141), the team's one limit (0142), the hand-over (0143), the small AI's quota charge (0144), the pages waiting after "Add to researched" (0145), the public tree (0147), an erased account keeping its public debates (0148), a funded person's public report in the team's month (0149), a public debate under review (0150), the Report button with the sealed originals' six months (0151) and a reporter's own reports in their export (0152) keep) still
 runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
 declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
 amendment instead of its receipt.

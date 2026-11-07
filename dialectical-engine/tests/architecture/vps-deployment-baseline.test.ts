@@ -1047,7 +1047,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     const readme = read("deploy/vps/README.md");
     for (const needle of [
       // V-28: the temporary values for the owner's first paid run, and how they are superseded.
-      "`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false",
+      "`440000`", "`5500000`", "0.44 USD", "5.50 USD", "provisional: true", "provisional: false",
       // The settings register on this host, and the rows a hosted start-up refuses without.
       "### Publishing the settings register on this host", "costEnvelopePolicy", "admissionPolicy",
       "configuredProviderSet",

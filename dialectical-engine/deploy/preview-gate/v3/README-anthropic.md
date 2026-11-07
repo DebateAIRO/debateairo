@@ -21,11 +21,12 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
   Qwen3.8-Flash on DeepInfra ("Google is too expensive at the moment; we will use it in the
   future"). So the near-term setup is two gates: DeepInfra (GLM, DeepSeek, MiMo, Qwen) and this
   Anthropic gate (Claude Haiku). Google comes later, with its own gate.
-- **Daily split of the team total:** since length guidance LG-B (owner answer M1, 2026-10-15) DeepInfra $12.00
-  (2,000 calls a day, 10 at once) and Anthropic $4.00 (600 calls a day, 2 at once), $16.00 together; from the owner's
-  ruling of 2026-10-10 (evening, calls late) until then, DeepInfra $10.00 and Anthropic $2.00. The first install's GO
-  (install step 5) says `"2.00"`; the LG-B section below writes `"4.00"`. One GO may ask at most $12.00, and each
-  gate's `activate` refuses if the GO files add up to more than $16.00.
+- **Daily split of the team total:** each gate's pot and day's call count are the owner's figures, in its GO on the
+  server and nowhere in this repository (R22 decision 18); DeepInfra runs 10 at once and Anthropic 2. One GO may ask at
+  most the per-GO cap, and each gate's `activate` refuses if the GO files add up to more than the team total. Both caps
+  are in the caps file on the server (README.md, "Money: DeepInfra's share of the team total").
+- **Web search (plan 2026-10-30):** a third gate, Perplexity (README-perplexity.md), with its own pot. This gate's two units are re-installed from that release first, so
+  they hide the Perplexity key folder and GO (README-perplexity.md, step 3a).
 - **Ready for Google later, already now:** every gate's unit hides a Google key folder and GO,
   the key command knows `install google` (key shape `AIza...`), and the DeepInfra gate refuses a
   key that starts with `AIza`. None of this needs a Google account today.
@@ -178,6 +179,12 @@ cache reads.
   gate cannot read, or counts that already price above the amount set aside; and any usage field
   the gate does not know (ruling R3: a new field may be a new way to bill, as `speed` was on
   2026-10-16).
+- **The token count (R22 decision 28).** Close to the 100,000-token line the app asks how many tokens a call would be, through the
+  gate's `/count` on the same socket, for the same peers. The gate holds the key, so this is its second path to Anthropic:
+  `POST /v1/messages/count_tokens`, which Anthropic does not charge for. Only the Anthropic profile offers it, only for an enabled
+  model, only for a body a call could also send. Nothing is reserved, charged, written in the day's ledger or halted, and only the
+  number comes back. A refusal or a failure stops nothing: the app falls back to its own byte estimate. A gate from before this
+  release answers every `/count` with its usual refusal, so the count is simply off until the new helper and bridge hashes are in its GO.
 - **Start check: the addresses only.** Anthropic has no list of models that can be read without
   a key, so there is no model check at start. The start check never sends the key, or any
   request, to Anthropic. Before every start it checks that every address of `api.anthropic.com`
@@ -193,8 +200,7 @@ cache reads.
 - **2 calls at the same time.** Before a debate starts, the app sets aside room for the calls that
   may be running at once, each at the largest hold it may need. Before LG-B that was 2 x $0.24704 = $0.49408 (a
   cached full-size call; since caching, 2026-10-12). Since length guidance LG-B one of the two may be a final writer:
-  1 x $0.24704 + 1 x $0.97664 = $1.22368. The $4.00 pot (owner answer M1, 2026-10-15) then still has about $2.78 for
-  the debates' own calls. A bigger pot allows more calls in flight (each standard one needs $0.24704 of room).
+  1 x $0.24704 + 1 x $0.97664 = $1.22368. The rest of the pot is what the debates' own calls have. A bigger pot allows more calls in flight (each standard one needs $0.24704 of room).
 - **The DeepInfra gate keeps its own copy of the code.** This gate's folder gets the new
   `preview_budget_helper.py` (the one that knows Anthropic). The DeepInfra gate's GO binds the
   hash of its own copy, so it keeps running unchanged. Updating the DeepInfra folder to this
@@ -232,10 +238,9 @@ cache reads.
 
 **0. In the Anthropic Console (the OWNER, in a browser).**
 1. Create a separate workspace for the preview only (for example "debateai-preview").
-2. Give that workspace its own monthly spend limit. The gate's pot is $4.00 a day since LG-B (owner answer M1),
-   so about $130 a month leaves a small margin (it was $65 for the $2.00 pot). This is Anthropic's own fuse,
-   independent of the gate. An existing workspace's limit is raised to about $130 here BEFORE the GO on $4.00 is
-   activated (section "Length guidance LG-B (2026-10-15): installing this change").
+2. Give that workspace its own monthly spend limit: a little over 31 times the gate's daily pot leaves a small margin.
+   This is Anthropic's own fuse, independent of the gate. An existing workspace's limit is raised here BEFORE a GO with a
+   higher pot is activated (section "Length guidance LG-B (2026-10-15): installing this change").
 3. Create one API key scoped to that workspace only (not the default workspace, and not a key
    for "all workspaces": Anthropic lets an unscoped personal or service-account key use the
    Admin API). Never use an Admin key here. Keep the browser tab open until step 4; do not paste
@@ -332,7 +337,8 @@ What to expect: one line with `"status": "installed"`, `"mode": "600"`, `"owner"
 The same command serves the other gates: `install deepinfra` and `install google`, each into its
 own folder.
 
-**5. The GO (the owner's limits; it holds no secret).** Proposed values:
+**5. The GO (the owner's limits; it holds no secret).** The caps file must already be on this server (README.md, "Money:
+DeepInfra's share of the team total"). Proposed values:
 
 | Field | Value | Why |
 |---|---|---|
@@ -342,23 +348,24 @@ own folder.
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration (today the DeepInfra gate's). The app asks every gate with its one `scope_id`; a gate with another one refuses every call and every "how much is left" question. Each gate still keeps its own pot and records, in its own folder. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the DeepInfra GO. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for DeepInfra. |
-| `daily_budget_usd` | `"2.00"` | Anthropic's share of the team total at the first install (DeepInfra $10.00), owner's ruling of 2026-10-10 (evening). Since length guidance LG-B (owner answer M1, 2026-10-15) the live GO carries `"4.00"` (DeepInfra $12.00, $16.00 together), written by "Length guidance LG-B (2026-10-15): installing this change" below. One GO may ask at most `"12.00"`; `activate` refuses if all gates' GO files add up to more than $16.00. |
-| `max_paid_posts_per_day` | `600` | A second fuse (owner's ruling, 2026-10-10 late). |
+| `daily_budget_usd` | the owner's figure | Anthropic's share of the team total. One GO may ask at most the per-GO cap; `activate` refuses if all gates' GO files add up to more than the team total. |
+| `max_paid_posts_per_day` | the owner's figure | A second fuse. |
 | `max_concurrent_calls` | `2` | See "2 calls at the same time" above. |
 | `max_final_writer_calls` | `1` | Length guidance LG-B (2026-10-15): Claude Haiku as a final writer may send up to 1 MiB and ask up to 128,000 tokens, held under its own cap of $1.00 (owner, 2026-10-15); one such call at a time. Without this member the gate refuses every final-writer request; the app of the LG-B release then keeps its final writers at the standard caps. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
 When the gate is opened (`activate`), it checks once more that the calls in flight, each setting
-aside the largest worst case it may hold, fit in the pot. Before LG-B: 2 x $0.24704 = $0.49408, inside $2.00. Since
+aside the largest worst case it may hold, fit in the pot. Before LG-B: 2 x $0.24704 = $0.49408. Since
 LG-B (with `max_final_writer_calls: 1`): 1 x $0.24704 (a standard call) + 1 x $0.97664 (a final writer, 1 MiB cached
-at the upper price step) = $1.22368, inside $4.00. The app's start-of-debate check sets the same amount aside, so
-about $2.78 of the $4.00 day is left for a debate's own Haiku calls.
+at the upper price step) = $1.22368. The app's start-of-debate check sets the same amount aside, so
+the rest of the day's pot is what a debate's own Haiku calls have.
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
+DAILY_BUDGET=<the owner's figure>; DAILY_CALLS=<the owner's figure>
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"2.00",max_paid_posts_per_day:600,max_concurrent_calls:2,max_final_writer_calls:1,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:2,max_final_writer_calls:1,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
 install -o root -g root -m 0600 /root/preview-archive/provider-anthropic-go-v1.json /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 jq -c . /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 ```
@@ -373,10 +380,10 @@ P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai
 ```
 
 What to expect: `init` prints `"state": "initialized"` and `"provider": "anthropic"`; `activate`
-prints `"state": "active"`, `"window_open": true` and `"daily_budget_usd": "2.00"`. A refusal is
-one line with `"status": "refused"` and a code, for example `ROOT_GO_INVALID` (a GO field or a
+prints `"state": "active"`, `"window_open": true` and `daily_budget_usd` the figure you wrote. A refusal is
+one line with `"status": "refused"` and a code, for example `ROOT_CAPS_REQUIRED` or `ROOT_CAPS_INVALID` (the caps file), `ROOT_GO_INVALID` (a GO field or a
 file hash), `CONCURRENCY_EXCEEDS_BUDGET`, `HELPER_CUSTODY_INVALID`, or
-`TEAM_TOTAL_BUDGET_EXCEEDED` (this pot plus the other gates' pots is above $16.00: lower one first).
+`TEAM_TOTAL_BUDGET_EXCEEDED` (this pot plus the other gates' pots is above the team total: lower one first).
 
 **7. Install the units and start the gate.** The boot drop-in comes later ("Switch it on").
 
@@ -406,12 +413,12 @@ Probe when nobody is using the preview. The command runs the probe inside its ow
 one the DeepInfra probe uses (the DeepInfra README, "The probe is a real paid call"): its own unit
 name (`debateai-preview-probe-anthropic`), the service's network allow-list (only the resolver and
 Anthropic's range), no root powers, and every other gate's folder and GO hidden (DeepInfra's,
-Google's and the retired v1 and v2 gates'). Copy it whole: the probe checks its fence and refuses
+Google's, Perplexity's since the web search release, and the retired v1 and v2 gates'). Copy it whole: the probe checks its fence and refuses
 without it (`PROBE_FENCE_REQUIRED`, with `missing` naming what is absent; nothing is read or spent).
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json; A=/opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-anthropic -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
+systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-anthropic -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-perplexity-authority-v1 -/etc/debateai-v3-preview/provider-perplexity-go-v1.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
 ```
 
 It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinking setting
@@ -524,13 +531,13 @@ gate's file hash changes; a new GO is written at install (the side-by-side trans
 As README.md's section of the same name (the two phases, the order, the checks, the ways back), for this gate:
 `G=/opt/debateai-v3-preview/operator/anthropic-budget-v1`, `GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json`,
 its service `debateai-preview-anthropic-budget.service`, this README's install step 1 for the files (with the hash
-check that step names), and the day budget `"4.00"` (owner answer M1, 2026-10-15). Never re-run install step 5's
+check that step names), and the owner's day budget (`DAILY_BUDGET` below). Never re-run install step 5's
 `jq -n` for this: it writes the first-install GO with its own limits.
 
 Two phases (final review, 2026-10-16), as README.md's section says: the app running on the server today (R17) reads
 `/remaining` as exactly seven members, and a gate whose GO names `max_final_writer_calls` answers nine, which the R17
 app reads as `PREVIEW_GATE_UNREACHABLE` (the live site refuses every new debate). So phase 1 brings the new files and
-`"4.00"` WITHOUT `max_final_writer_calls`, and phase 2, right before the practice proof, adds it.
+the new budget WITHOUT `max_final_writer_calls`, and phase 2, right before the practice proof, adds it.
 
 Phase 1, in the same sitting as the DeepInfra gate, right after it (README.md's section, "Both gates in ONE sitting":
 between the two installs, the gate still on the old code cannot be opened again). "Redeploy (2026-10-12)" steps 1-3 of
@@ -542,17 +549,18 @@ Anthropic's (else `WRONG_GO: stop here`):
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+DAILY_BUDGET=<the owner's figure>
 jq -e '.provider=="anthropic"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
 umask 077
-jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd="4.00"' "$GO" > "$GO.new"
+jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" --arg d "$DAILY_BUDGET" '.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd=$d' "$GO" > "$GO.new"
 diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
 cmp <(jq -S 'del(.bridge_sha256,.helper_sha256,.daily_budget_usd)' "$GO") <(jq -S 'del(.bridge_sha256,.helper_sha256,.daily_budget_usd)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,daily_budget_usd,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
 ```
 
-The last line must show `["claude-haiku-5-5"]`, `"4.00"`, `2` and `null`. Restart the service, then `activate`
-checks 2 x $0.24704 = $0.49408, inside $4.00, and the team total with DeepInfra's GO: $12.00 + $4.00 = $16.00 (with
-DeepInfra's GO still at $10.00, $14.00). Before the first `activate` on $4.00, the owner raises the workspace's
-monthly spend limit in the Anthropic Console (install step 0, item 2: about $130). Restart the runner after both gates
+The last line must show `["claude-haiku-5-5"]`, the owner's figure, `2` and `null`. Restart the service, then `activate`
+checks that 2 x $0.24704 = $0.49408 fits in the pot, and the team total with DeepInfra's GO. Before the first `activate`
+on the new figure, the owner raises the workspace's monthly spend limit in the Anthropic Console (install step 0,
+item 2). Restart the runner after both gates
 are `active`; the R17 app keeps reading seven members.
 
 Phase 2, right before the practice proof, in the same sitting as the DeepInfra gate's phase 2: `stop`, then add
@@ -567,8 +575,8 @@ diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
 cmp <(jq -S 'del(.max_final_writer_calls)' "$GO") <(jq -S 'del(.max_final_writer_calls)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,daily_budget_usd,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
 ```
 
-The last line must show `["claude-haiku-5-5"]`, `"4.00"`, `2` and `1`. Restart the service, then `activate` checks
-1 x $0.24704 + 1 x $0.97664 = $1.22368, inside $4.00. Do NOT restart the R17 runner. From here until the app upload the
+The last line must show `["claude-haiku-5-5"]`, the owner's figure, `2` and `1`. Restart the service, then `activate`
+checks that 1 x $0.24704 + 1 x $0.97664 = $1.22368 fits in the pot. Do NOT restart the R17 runner. From here until the app upload the
 live R17 site refuses every new debate (no real users today); the practice proof follows, and the app upload right
 after it.
 
@@ -576,7 +584,7 @@ Ways back, as README.md's section "Ways back": the app-only block (both gates: `
 from both GOs, both services restarted, then `activate` each) takes away phase 2's slots and gives the R17 app its seven
 members back. The gate files go back only together with the DeepInfra gate, by README.md's two-gate block (both gates
 stopped, both gates' old files and old GOs back, both services restarted, then `activate` each). Never this gate alone:
-its old code would refuse the DeepInfra GO's `"12.00"` (`TEAM_TOTAL_UNVERIFIABLE`). The one exception is README.md's
+its old code would refuse the DeepInfra GO's new figure (`TEAM_TOTAL_UNVERIFIABLE`). The one exception is README.md's
 half-done sitting: if the sitting stopped after the DeepInfra gate and this gate's phase 1 never began, this GO is still
 the old one, and the DeepInfra gate goes back alone by "Redeploy (2026-10-12)".
 

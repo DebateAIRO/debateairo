@@ -1,0 +1,17 @@
+{
+  "version": "team-allowances-forward0146-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0145_web_researched_unsettled.sql",
+    "manifestSha256": "b820bbf8fb5bc2b58935fced7cd31f82631846882e508e216ec708a2eea3c809",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0146_team_allowances.sql",
+    "sha256": "e7e255263f8c2ec6cc18c875545a0b195111f51a412315e0e48236ad982ae008"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

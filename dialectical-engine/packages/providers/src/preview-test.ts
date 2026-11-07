@@ -2,8 +2,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import {
-  LENGTH_GUIDANCE_START, THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, answerRoomTokens, lengthCallStepOf, lengthStartWordsOf,
-  storyShortWordsSum, storytellerAnswerRoomTokens
+  LENGTH_GUIDANCE_START, THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, answerRoomTokens, debateRoleFromCallSiteKey, lengthCallStepOf,
+  lengthStartWordsOf, storyShortWordsSum, storytellerAnswerRoomTokens
 } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
@@ -12,7 +12,7 @@ import { ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { createPreviewRemainingRpcPort, previewGateOffersFinalWriterTier, type PreviewGateRemaining, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
-  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
+  PREVIEW_ANTHROPIC_COUNT_TOKENS_URL, PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
   PREVIEW_REQUEST_BODY_MAX_BYTES, previewCallTierOfBody, previewModelRow, previewModelRowForRef, previewNanoUsdText,
   previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
   previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
@@ -22,6 +22,10 @@ import {
   previewThinkingStepOf, type PreviewThinkingLevels
 } from "./preview-thinking.js";
 import type { PreviewGateSettings } from "./preview-line-up.js";
+import {
+  PERPLEXITY_SEARCH_REQUEST_MAX_BYTES, PERPLEXITY_SEARCH_REQUEST_NANO_USD, PERPLEXITY_SEARCH_URL, perplexitySearchBodyAccepted,
+  type PERPLEXITY_SEARCH_VENDOR
+} from "./perplexity-search.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
@@ -41,6 +45,8 @@ export const PREVIEW_GLM_BASE_URL = PREVIEW_DEEPINFRA_BASE_URL;
 export const PREVIEW_GLM_DEADLINE_MS = 1_260_000 as const;
 /** The gate socket's own idle timeout: past the app's deadline, so the app's abort always ends a call first. */
 export const PREVIEW_GATE_IPC_TIMEOUT_MS = PREVIEW_GLM_DEADLINE_MS + 30_000;
+/** How long a gate queues a call for one of its slots before refusing it (preview_budget_authority.py SLOT_WAIT_SECONDS). */
+export const PREVIEW_GATE_SLOT_WAIT_MS = 60_000 as const;
 export const PREVIEW_GLM_GENERATION_TOKEN_FLOOR = 8192 as const;
 /** GLM's row bound; every row's own bound is PreviewModelRow.outputBound. */
 export const PREVIEW_GLM_OUTPUT_RESERVATION = 32_768 as const;
@@ -72,12 +78,27 @@ export interface PreviewProviderTestConfig {
   readonly budget_socket: string;
   readonly scope_id: string;
   readonly anthropic_budget_socket?: string;
+  /**
+   * Perplexity plan 2026-10-30, task W2-1: the web search gate's socket (README-perplexity.md: perplexity-budget-v1.sock).
+   * Search is a gate, never a model provider: no roster names it, and absent, no debate searches the web.
+   */
+  readonly perplexity_budget_socket?: string;
   /** Spec 2026-10-12 §4.2: the owner's thinking-level table, keyed by reviewed model id; absent = every row's default. */
   readonly thinking_levels?: PreviewThinkingLevels;
 }
 /** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
 export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
   Object.freeze({ anthropic: "anthropic_budget_socket" });
+/**
+ * Perplexity plan W2-1: every spending gate the app can call: the model providers' gates and the web search gate. The
+ * search gate is not a model provider (PreviewProviderName stays the providers with model rows).
+ */
+export type PreviewGateName = PreviewProviderName | typeof PERPLEXITY_SEARCH_VENDOR;
+/** The web search gate's optional socket key. */
+export const PREVIEW_SEARCH_SOCKET_KEY = "perplexity_budget_socket" as const;
+/** Each non-DeepInfra gate's optional socket key: the providers' keys, then the search gate's. */
+export const PREVIEW_GATE_SOCKET_KEYS: Readonly<Record<Exclude<PreviewGateName, "deepinfra">, "anthropic_budget_socket" | "perplexity_budget_socket">> =
+  Object.freeze({ ...PREVIEW_PROVIDER_SOCKET_KEYS, perplexity: PREVIEW_SEARCH_SOCKET_KEY });
 const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u;
 /**
  * The gate socket a provider's calls go through under this config, or undefined when it has none. Addition D16: only the
@@ -86,6 +107,10 @@ const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u
 export function previewProviderSocket(config: PreviewGateSettings, provider: PreviewProviderName): string | undefined {
   return provider === "deepinfra" ? config.budget_socket : config[PREVIEW_PROVIDER_SOCKET_KEYS[provider]];
 }
+/** Perplexity plan W2-1: any gate's socket under this config (a provider's, or the web search gate's), or undefined. */
+export function previewGateSocket(config: PreviewGateSettings, gate: PreviewGateName): string | undefined {
+  return gate === "deepinfra" ? config.budget_socket : config[PREVIEW_GATE_SOCKET_KEYS[gate]];
+}
 /** What the target check needs; the legacy five-key literal (v1 publish kit) still fits it. */
 export type PreviewTargetRosters = Readonly<Partial<PreviewProviderTestConfig> & { free_model_ids: readonly string[] }>;
 function refused(): never { throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"); }
@@ -93,7 +118,7 @@ const LEGACY_CONFIG_KEYS = ["budget_socket", "deployment", "free_model_ids", "re
 const CONFIG_KEYS = [...LEGACY_CONFIG_KEYS, "premium_model_ids"].sort();
 /** Addition D14 (owner 2026-10-22): the sockets-only form, the five keys less the roster (plus optional provider sockets). */
 const SOCKETS_ONLY_CONFIG_KEYS = LEGACY_CONFIG_KEYS.filter(key => key !== "free_model_ids");
-const OPTIONAL_SOCKET_KEYS: readonly string[] = Object.values(PREVIEW_PROVIDER_SOCKET_KEYS);
+const OPTIONAL_SOCKET_KEYS: readonly string[] = Object.values(PREVIEW_GATE_SOCKET_KEYS);
 function reviewedRoster(value: unknown): readonly string[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > PREVIEW_MODEL_ROWS.length
     || value.some(id => previewModelRow(id) === undefined) || new Set(value).size !== value.length) return refused();
@@ -389,6 +414,8 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
  * to an object refused at named members (the gateway decides; `planPatchFollowUp`), and a call whose second POST was a
  * patch may send a third, the full re-ask, still within the sealed bound the counting gateway hands down as what is
  * left (`remaining`), so it never meets a spent step. The story's sealed bound of two leaves the patch only.
+ * LG-A (L33) then capped every ROUTED call (every structured step on the preview) at 2 POSTs, so the full re-ask never
+ * ran; R22 (owner ruling 2026-10-29) gives it back to the judge calls only (`previewJudgeCall`, `fullReAskAfterPatch`).
  */
 function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
   if (request.lane !== "served" || (request.role !== "JUDGE" && request.role !== "SYNTHESIZER" && request.role !== "EVALUATOR")
@@ -396,6 +423,18 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
     || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
   try { assertFramedPrompt(request.packet); return true; }
   catch { return false; }
+}
+/**
+ * R22 (owner ruling 2026-10-29, "Allow 3 sends"): the judge calls, whose format repair may end with the owner's one full
+ * re-ask (`ProviderCallRequest.fullReAskAfterPatch`): the calls of the judge contract — every author leg (the roots,
+ * support/attack, cross-exchange), the panel judges, the reviews, and engine 2's comparing judges and investigators — read
+ * off the call-site key (`debateRoleFromCallSiteKey`). The answer writer and checker, the map steps (JUDGE-role calls
+ * that are not judge calls) and the story keep the patch alone.
+ */
+const PREVIEW_JUDGE_CALL_ROLES: ReadonlySet<string> = new Set(["POSITION", "SUPPORT_ATTACK", "CROSS_EXCHANGE", "JUDGE", "REVIEWER"]);
+function previewJudgeCall(request: ProviderCallRequest): boolean {
+  const role = debateRoleFromCallSiteKey(request.callSiteKey);
+  return role !== null && PREVIEW_JUDGE_CALL_ROLES.has(role);
 }
 /**
  * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
@@ -660,6 +699,10 @@ export function withPreviewProviderCallPolicy(
     if (request.packetByteCap !== undefined || request.outputTokenCap !== undefined) {
       throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's size caps itself");
     }
+    // R22: the judge call's third send is the policy's alone (`previewJudgeCall`), never the caller's.
+    if (request.fullReAskAfterPatch !== undefined) {
+      throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's sends itself");
+    }
     const preview = previewCallBound(request.bound, config);
     // Length guidance L26/L29 (owner answer 7): the four final writers ask each model's own maximum and may send 1 MiB; on
     // a slow row all four keep the storyteller's 16,384 and its retry today's clamp (final review, Important 3, below).
@@ -697,6 +740,8 @@ export function withPreviewProviderCallPolicy(
           () => tierUnread("READ_FAILED"));
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
+    // R22: a judge call's format repair may go on to the one full re-ask after its patch (a third POST in the call).
+    const judgeReAsk = formatRepair && previewJudgeCall(request);
     // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
     // step (absent = the row's default = today's request: "high" on an effort row, DEFAULT_ONLY on a row without one,
     // which the gateway treats exactly as "no level"). Decided once per call, so the unbilled resend below runs at it
@@ -719,7 +764,8 @@ export function withPreviewProviderCallPolicy(
         ...(lengthRetry === undefined ? {} : { lengthRetry }),
         ...(tier === undefined ? {} : tier.caps),
         bound: tier === undefined ? standardBound : tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
-        attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+        attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}),
+        ...(judgeReAsk ? { fullReAskAfterPatch: true } : {}) });
     };
     /** The first send, after the coordinator admits it; an answer tells the coordinator. */
     const firstSend = async () => {
@@ -820,9 +866,11 @@ export interface PreviewBudgetExecution {
 /** Root-owned authority reserves atomically before any paid POST, then records or retains its charge. */
 export interface PreviewBudgetPort {
   execute(input: PreviewBudgetExecution, signal?: AbortSignal): Promise<Readonly<{ status: number; body: string }>>;
+  /** R22 decision 28: the gate's free token count (its /count). Absent, or a refusal: the app falls back to its byte guard. */
+  count?(requestBody: string, signal?: AbortSignal): Promise<number>;
 }
-/** Each provider's gate port; a single port (the pre-PR-B form) is the DeepInfra gate's. */
-export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewProviderName, PreviewBudgetPort>>>;
+/** Each gate's port (Perplexity plan W2-1: the web search gate's too); a single port (the pre-PR-B form) is the DeepInfra gate's. */
+export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewGateName, PreviewBudgetPort>>>;
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -937,6 +985,10 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
  * (exact keys, the row's effort and JSON switches and its reviewed sampling, at most 256 KiB for a standard call and 1 MiB
  * for a final writer (LG-B), with 1 <= max_tokens <= that tier's bound), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
  * mark: its input at the step's 5-minute cache-write price, 2026-10-12).
+ *
+ * Perplexity plan 2026-10-30, task W2-1: the exact search URL (PERPLEXITY_SEARCH_URL) goes to the web search gate's
+ * port only, with a body that gate accepts (perplexitySearchBodyAccepted: exactly its reviewed members and bounds, at
+ * most 16 KiB), never a key header, and a hold of exactly one search ($0.001, the gate's request_usd).
  */
 export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
   const byProvider: PreviewBudgetPorts = typeof (ports as PreviewBudgetPort).execute === "function"
@@ -944,6 +996,8 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
   return async (input, init) => {
     if (init?.signal?.aborted) throw new DOMException("Private preview call canceled", "TimeoutError");
     const url = String(input);
+    if (url === PERPLEXITY_SEARCH_URL) return previewGuardedSearch(byProvider, init);
+    if (url === PREVIEW_ANTHROPIC_COUNT_TOKENS_URL) return previewGuardedCount(byProvider, init);
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
       : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
@@ -973,6 +1027,40 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
       ...(tier === "FINAL_WRITER" ? { callTier: "FINAL_WRITER" as const } : {}) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
+}
+/**
+ * R22 decision 28: one free token count through the Anthropic gate, which holds the key (its /count: nothing reserved or charged).
+ * The body is what a call would send, without `max_tokens` and the effort.
+ */
+async function previewGuardedCount(ports: PreviewBudgetPorts, init: RequestInit | undefined): Promise<Response> {
+  if (init?.method !== "POST" || typeof init.body !== "string"
+    || Buffer.byteLength(init.body, "utf8") > PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes || carriesKeyHeader(init.headers)) refused();
+  const body = init!.body as string;
+  let decoded: unknown; try { decoded = JSON.parse(body); } catch { return refused(); }
+  if (!isPlainObject(decoded)) return refused();
+  const reviewed = previewModelRow(decoded.model) ?? refused();
+  const members = Object.keys(decoded).filter(key => key !== "system").sort().join();
+  if (reviewed.provider !== "anthropic" || members !== "messages,model" || !anthropicMessagesAccepted(decoded.messages)
+    || (Object.hasOwn(decoded, "system") && !anthropicSystemAccepted(decoded.system))) refused();
+  const port = ports.anthropic;
+  if (port?.count === undefined) throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
+  const tokens = await port.count(body, init!.signal ?? undefined);
+  return new Response(JSON.stringify({ input_tokens: tokens }), { status: 200, headers: { "content-type": "application/json" } });
+}
+/** Perplexity plan W2-1: one web search through its own gate (see createPreviewGuardedFetch). */
+async function previewGuardedSearch(ports: PreviewBudgetPorts, init: RequestInit | undefined): Promise<Response> {
+  if (init?.method !== "POST" || typeof init.body !== "string"
+    || Buffer.byteLength(init.body, "utf8") > PERPLEXITY_SEARCH_REQUEST_MAX_BYTES || carriesKeyHeader(init.headers)) refused();
+  const body = init!.body as string;
+  let decoded: unknown; try { decoded = JSON.parse(body); } catch { return refused(); }
+  if (!perplexitySearchBodyAccepted(decoded)) refused();
+  const port = ports.perplexity;
+  // No search gate configured: nothing is reserved or sent.
+  if (port === undefined) throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
+  const result = await port.execute({ operationId: randomUUID(), requestBody: body,
+    requestSha256: createHash("sha256").update(body).digest("hex"),
+    reservedUsd: previewNanoUsdText(PERPLEXITY_SEARCH_REQUEST_NANO_USD) }, init!.signal ?? undefined);
+  return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
 }
 /**
  * Step 1 (owner, 2026-10-08): the v2 gate refuses with 409 and {"error": CODE}. The team's day
@@ -1102,7 +1190,32 @@ export function createPreviewBudgetRpcPort(
   // Fix (c): the same gate's read-only `/remaining`, asked only after a STOPPED refusal.
   remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id })
 ): PreviewBudgetPort {
-  return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
+  return Object.freeze({ count(requestBody: string, signal?: AbortSignal) {
+    return new Promise<number>((resolve, reject) => {
+      const data = JSON.stringify({ scope_id: config.scope_id, requestBody });
+      const request = httpRequest({ socketPath, path: "/count", method: "POST",
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) } }, response => {
+        const chunks: Buffer[] = [];
+        const unread = new TypedDomainError("PROVIDER_TOKEN_COUNT_UNAVAILABLE", "No token count");
+        response.on("data", (chunk: Buffer) => { chunks.push(chunk); });
+        response.on("error", () => reject(unread));
+        response.on("close", () => { if (!response.complete) reject(unread); });
+        response.on("end", () => {
+          let tokens: unknown;
+          try { tokens = (JSON.parse(Buffer.concat(chunks).toString("utf8")) as { input_tokens?: unknown }).input_tokens; } catch { reject(unread); return; }
+          if (response.statusCode !== 200 || !Number.isSafeInteger(tokens) || Number(tokens) < 0) { reject(unread); return; }
+          resolve(Number(tokens));
+        });
+      });
+      const canceled = () => request.destroy(new Error("Private preview call canceled"));
+      signal?.addEventListener("abort", canceled, { once: true });
+      if (signal?.aborted) canceled();
+      request.on("close", () => signal?.removeEventListener("abort", canceled));
+      request.setTimeout(PREVIEW_GATE_IPC_TIMEOUT_MS, () => request.destroy());
+      request.on("error", () => reject(new TypedDomainError("PROVIDER_TOKEN_COUNT_UNAVAILABLE", "No token count")));
+      request.end(data);
+    });
+  }, execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
     return new Promise<Readonly<{ status: number; body: string }>>((resolve, reject) => {
       const data = JSON.stringify({ scope_id: config.scope_id, ...input });
       const request = httpRequest({ socketPath, path: "/complete", method: "POST",
@@ -1146,13 +1259,14 @@ export function createPreviewBudgetRpcPort(
 }
 /**
  * PR B: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
- * `anthropic_budget_socket` when set). The guarded fetch routes each call to its own provider's port.
+ * `anthropic_budget_socket` when set; Perplexity plan W2-1: the web search gate on `perplexity_budget_socket` when set).
+ * The guarded fetch routes each call to its own gate's port.
  */
 export function createPreviewBudgetRpcPorts(config: PreviewGateSettings): PreviewBudgetPorts {
-  const ports: Partial<Record<PreviewProviderName, PreviewBudgetPort>> = {};
-  for (const provider of ["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[]) {
-    const socket = previewProviderSocket(config, provider);
-    if (socket !== undefined) ports[provider] = createPreviewBudgetRpcPort(config, socket);
+  const ports: Partial<Record<PreviewGateName, PreviewBudgetPort>> = {};
+  for (const gate of ["deepinfra", ...Object.keys(PREVIEW_GATE_SOCKET_KEYS)] as PreviewGateName[]) {
+    const socket = previewGateSocket(config, gate);
+    if (socket !== undefined) ports[gate] = createPreviewBudgetRpcPort(config, socket);
   }
   return Object.freeze(ports);
 }

@@ -13,7 +13,7 @@
   "home.publicDebates": "Các cuộc tranh luận công khai",
   "home.total": "Tổng cộng {count}",
   "home.signInHint": "Đăng nhập hoặc tạo tài khoản ở trên để xem các cuộc tranh luận của bạn.",
-  "home.publicIndexingNotice": "Các cuộc tranh luận đã xuất bản có thể được công cụ tìm kiếm lập chỉ mục. Các bản sao có thể vẫn tồn tại sau khi hủy xuất bản.",
+  "home.publicIndexingNotice": "Các cuộc tranh luận đã xuất bản có thể được công cụ tìm kiếm lập chỉ mục, và bản sao có thể còn ở nơi khác.",
   "home.debateClaim": "Luận điểm tranh luận",
   "home.claimPlaceholder": "Nhập một luận điểm hoặc câu hỏi có thể tranh luận…",
   "home.composerHint": "Các mô hình tranh luận · bạn đánh giá",
@@ -72,8 +72,10 @@
   "home.turn": "Lượt {turn}",
   "home.sampleCoda": "Vòng kết thúc tại đây. Không bên nào được tuyên bố thắng. Bạn nhận được bản ghi, hai điểm cho mỗi lượt và mắt xích mà bạn đã nhượng bộ.",
   "home.closingTitle": "Lập luận của bạn chỉ mạnh bằng mắt xích yếu nhất của nó.",
-  "home.closingLede": "Thực hiện một vòng. Bốn lượt, khoảng chín phút và một bản ghi chỉ rõ chính xác nơi bạn đã ngừng trả lời.",
-  "home.pricingCopy": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng cộng thuế. Hủy bất cứ lúc nào.",
+  "home.closingLede": "Thực hiện một vòng. Bốn lượt và một bản ghi chỉ rõ chính xác nơi bạn đã ngừng trả lời.",
+  "home.pricingCopyPlusTax": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} + {taxName} mỗi tháng. Hủy bất cứ lúc nào.",
+  "home.pricingCopyNoTax": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng, không cộng thêm thuế. Hủy bất cứ lúc nào.",
+  "home.pricingCopyChoose": "Bắt đầu miễn phí. Gói trả phí chỉ từ {price} mỗi tháng, cộng thêm thuế nếu áp dụng. Hủy bất cứ lúc nào.",
   "home.pricingCopyFree": "Bắt đầu miễn phí. Không cần thẻ.",
   "home.pricingLink": "Xem các gói",
   "home.card1Text": "Các công ty ưu tiên làm việc từ xa nhìn chung nên dùng khung lương không phụ thuộc vị trí cho những kỹ sư làm công việc tương đương, đồng thời cho phép điều chỉnh minh bạch theo chi phí bắt buộc về pháp lý, kỹ năng khan hiếm và phạm vi vai trò.",
@@ -144,6 +146,5 @@
   "home.removal.close": "Đóng",
   "home.flag.underReview": "BỊ GẮN CỜ · ĐANG XEM XÉT",
   "home.flag.approved": "ĐÃ ĐƯỢC PHÊ DUYỆT",
-  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT",
-  "home.takeDown.button": "Gỡ xuống"
+  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT"
 }

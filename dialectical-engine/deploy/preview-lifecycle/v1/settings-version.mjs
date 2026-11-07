@@ -20,9 +20,11 @@
 //                               folder's copy = this release's packages/providers/ops copy = the gate's GO record,
 //                               helper_sha256 and bridge_sha256; else SETTINGS_GATE_HELPER_DIFFERS, nothing asked,
 //                               nothing written to the database); then reads
-//                               both gates' read-only /remaining (the sockets from the current release's API env file),
-//                               saves each answer and the release's line-up and target models next to the current
-//                               release's plans and hands them to `cli.ts activate`, which checks condition 6 live over
+//                               both gates' read-only /remaining (the sockets from the current release's API env file)
+//                               as the API's pinned identity (remainingArgv: the gates admit only their GO's
+//                               allowed_peer_uids, never root), saves each answer and the release's line-up and target
+//                               models next to the current release's plans and hands them to `cli.ts activate`, which
+//                               checks condition 6 live over
 //                               the version's whole seatable set and moves the pointer; prints its line;
 //   - status                    `cli.ts status`: the current release, the pointer, what new asks use, what passed.
 // It also plans the release switch's settings step for release-switch.mjs and release-check.mjs (planSettingsForSwitch:
@@ -47,7 +49,6 @@
 // active pair adds ACTIVE_PAIR_FAIL_LINE after it). Exit codes: check 0 PASS, 2 FAIL, 1 refused (nothing recorded);
 // activate and status: the operator command's own (0 done, 1 refused by condition 6 or the version's kind, 2 usage or
 // unavailable, 3 conflict, 4 not passed); 1 for a refusal here.
-import { request } from 'node:http';
 import { lstat, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -133,6 +134,7 @@ const CHECK_LINE = 'DEBATEAI_SETTINGS_CHECK ';
 const VERSION = /^[1-9][0-9]{0,15}$/;
 const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const SOCKET = /^\/[A-Za-z0-9._/-]{1,200}\.sock$/;
+const SCOPE = /^[a-z0-9][a-z0-9-]{0,95}$/;
 const MAX_OUTPUT_BYTES = 256 * 1024;
 const MAX_REMAINING_BYTES = 64 * 1024;
 const GETENT_TIMEOUT_MS = 5000;
@@ -180,6 +182,32 @@ export const checkHalfEnvironment = (values, nodePath) => Object.freeze({
   ...values, PATH: `${dirname(nodePath)}:/usr/local/bin:/usr/bin:/bin`, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', TZ: 'UTC', TSX_DISABLE_CACHE: '1'
 });
 
+/**
+ * The /remaining reader's whole program: one read-only POST /remaining (Contract A §5) on the socket named by its first
+ * argument, for the scope named by its second. A 200 prints the reply body and exits 0; anything else exits 1 with
+ * nothing printed. Node built-ins only: it loads no release code and no file.
+ */
+export const REMAINING_SCRIPT = "const {request}=await import('node:http');const [socketPath,scope]=process.argv.slice(1);"
+  + "const body=JSON.stringify({scope_id:scope});const fail=()=>{process.exitCode=1;};"
+  + "const req=request({socketPath,path:'/remaining',method:'POST',headers:{'content-type':'application/json','content-length':Buffer.byteLength(body)}},res=>{"
+  + "const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('error',fail);"
+  + "res.on('end',()=>{if(res.statusCode===200)process.stdout.write(Buffer.concat(chunks));else fail();});});"
+  + "req.on('error',fail);req.end(body);";
+/**
+ * setpriv --reuid=<uid> --regid=<gid> --init-groups --inh-caps=-all --no-new-privs -- <node> --input-type=module -e <REMAINING_SCRIPT> <socket> <scope>
+ * Each gate answers only the peers its GO lists in allowed_peer_uids (the API and the runner, deploy/preview-gate/v3/README.md),
+ * so root asks as the API's pinned identity, never as itself (checkHalfArgv's identity rule). R22, 2026-11-02: the read ran
+ * in root's own process, so every gate refused it until uid 0 was added to two GOs by hand.
+ */
+export function remainingArgv({ layout, nodePath, identity, socket, scopeId }) {
+  if (!Number.isSafeInteger(identity?.uid) || identity.uid < 1 || !Number.isSafeInteger(identity?.gid) || identity.gid < 1
+    || typeof socket !== 'string' || !SOCKET.test(socket) || typeof scopeId !== 'string' || !SCOPE.test(scopeId)) refuse('ARGUMENTS_REFUSED');
+  return [layout.setpriv, `--reuid=${identity.uid}`, `--regid=${identity.gid}`, '--init-groups', '--inh-caps=-all', '--no-new-privs', '--',
+    nodePath, '--input-type=module', '-e', REMAINING_SCRIPT, socket, scopeId];
+}
+/** The reader's environment: PATH, locale and TZ only (it reads no env file). */
+export const remainingEnvironment = nodePath => Object.freeze({ PATH: `${dirname(nodePath)}:/usr/local/bin:/usr/bin:/bin`, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', TZ: 'UTC' });
+
 const outputLines = buffer => (Buffer.isBuffer(buffer) ? buffer.toString('utf8') : '').split('\n').filter(Boolean);
 const finished = result => Boolean(result) && !result.error && !result.timedOut && !result.overflow && Number.isInteger(result.code);
 
@@ -199,6 +227,7 @@ export async function operatorGroupGid({ layout = LAYOUT, run = runBounded } = {
 /** The dependencies with the server's defaults; tests replace them. */
 function withDefaults(layout, deps) {
   const run = deps.run ?? runBounded;
+  const nodePath = deps.nodePath ?? process.execPath;
   const uid = layout.ownerUid ?? 0;
   const operatorGid = deps.operatorGid ?? (() => operatorGroupGid({ layout, run }));
   let group = null;
@@ -207,7 +236,7 @@ function withDefaults(layout, deps) {
   return {
     run,
     now: deps.now ?? Date.now,
-    nodePath: deps.nodePath ?? process.execPath,
+    nodePath,
     readLock: deps.readLock ?? (() => readLock(layout)),
     // A pinned release's lock entry and its reviewed launch plan (prestart.mjs), what the guard verifies against.
     loadPinned: deps.loadPinned ?? (({ service, label }) => loadPinnedRelease({ service, label, layout })),
@@ -216,7 +245,8 @@ function withDefaults(layout, deps) {
     // A per-release env file: root-owned 0640 with the service's group (deploy/preview-auth-dev/v1/README.md).
     readEnvironment: deps.readEnvironment ?? ((path, serviceGid) => readEnvironmentFile(path, { root: layout.nativePlanRoot, uid, gid: serviceGid, mode: 0o640 })),
     pathExists: deps.pathExists ?? (path => lstat(path).then(stat => stat.isFile(), () => false)),
-    readRemaining: deps.readRemaining ?? readRemaining,
+    // The API's pinned identity asks each gate (remainingArgv): root is not one of its peers.
+    readRemaining: deps.readRemaining ?? ((socket, scopeId, identity) => readRemaining({ socket, scopeId, identity, layout, nodePath, run })),
     // Root-only gate files and the release's own helper, read as bytes for their sha256 (addition D21).
     readBytes: deps.readBytes ?? (path => readFile(path)),
     // A release's lifecycle-current folder, as prestart.mjs makes it (root, 0755: the operator, postgres, reads what is saved there).
@@ -308,22 +338,14 @@ export async function readSettingsStatus({ label, layout = LAYOUT, deps = {} }) 
   return Object.freeze({ pointer: versionOrNull(status.pointer), effectiveActive: versionOrNull(status.effectiveActive), currentRelease: status.currentRelease ?? null });
 }
 
-/** A gate's read-only POST /remaining on its socket (Contract A §5): the raw reply body, or null on any failure. */
-export function readRemaining(socketPath, scopeId) {
-  return new Promise(resolve => {
-    const body = JSON.stringify({ scope_id: scopeId });
-    let settled = false;
-    const done = value => { if (!settled) { settled = true; resolve(value); } };
-    const req = request({ socketPath, path: '/remaining', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, response => {
-      const chunks = []; let size = 0;
-      response.on('data', chunk => { size += chunk.length; if (size > MAX_REMAINING_BYTES) { response.destroy(); done(null); } else chunks.push(chunk); });
-      response.on('end', () => done(response.statusCode === 200 ? Buffer.concat(chunks).toString('utf8') : null));
-      response.on('error', () => done(null));
-    });
-    req.setTimeout(REMAINING_TIMEOUT_MS, () => { req.destroy(); done(null); });
-    req.on('error', () => done(null));
-    req.end(body);
-  });
+/**
+ * A gate's read-only POST /remaining on its socket (Contract A §5), asked by a child running as `identity` (remainingArgv),
+ * bounded (REMAINING_TIMEOUT_MS, MAX_REMAINING_BYTES), from `/`: the raw reply body, or null on any failure.
+ */
+export async function readRemaining({ socket, scopeId, identity, layout = LAYOUT, nodePath = process.execPath, run = runBounded }) {
+  const argv = remainingArgv({ layout, nodePath, identity, socket, scopeId });
+  const result = await run(argv, { cwd: '/', env: remainingEnvironment(nodePath), timeoutMs: REMAINING_TIMEOUT_MS, maxOutputBytes: MAX_REMAINING_BYTES });
+  return finished(result) && result.code === 0 ? result.stdout.toString('utf8') : null;
 }
 
 /** The pinned release of `label` (prestart.mjs loadPinnedRelease): its key, and its runner and API entries with their plans. */
@@ -376,9 +398,12 @@ export async function checkSettingsVersion({ label, version, layout = LAYOUT, de
   // The guard for both folders before anything runs: the runner half's files, and the API folder's half and operator.
   await verified(io, release.pinned.runner, 'runner', [TSX_LOADER, HALF_ENTRIES.runner]);
   await verified(io, release.pinned.api, 'api', [TSX_LOADER, HALF_ENTRIES.api, ...OPERATOR_IMPORTS.slice(1)]);
+  const folder = currentDirFor(layout, label);
+  // A drained upload checks the new release before its first start, so prestart has not made this folder yet (R22,
+  // 2026-11-02: LIFECYCLE_WRITE_REFUSED): made here the same way (root, 0755), before any half runs.
+  await io.ensureCurrentDir(folder).catch(() => refuse('CURRENT_DIRECTORY_REFUSED'));
   const runner = await runHalf(io, layout, label, release, 'runner', v);
   const api = await runHalf(io, layout, label, release, 'api', v);
-  const folder = currentDirFor(layout, label);
   const stamp = utcStamp(io.now());
   const receipt = `${folder}/settings-check-${v}-${stamp}.json`;
   await io.writeFile(receipt, `${JSON.stringify({ schema: RECEIPT_SCHEMA, label, releaseKey: release.releaseKey, version: v, recordedAt: new Date(io.now()).toISOString(), runner, api })}\n`);
@@ -410,7 +435,7 @@ export async function checkSettingsVersion({ label, version, layout = LAYOUT, de
 export function gateSockets(configText, gates) {
   let config;
   try { config = JSON.parse(configText); } catch { refuse('PREVIEW_GATE_SETTINGS_MISSING'); }
-  if (config === null || typeof config !== 'object' || typeof config.scope_id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,95}$/.test(config.scope_id)) refuse('PREVIEW_GATE_SETTINGS_MISSING');
+  if (config === null || typeof config !== 'object' || typeof config.scope_id !== 'string' || !SCOPE.test(config.scope_id)) refuse('PREVIEW_GATE_SETTINGS_MISSING');
   const sockets = {};
   for (const gate of gates) {
     const socket = gate.name === 'deepinfra' ? config.budget_socket : config[`${gate.name}_budget_socket`];
@@ -474,8 +499,9 @@ export function seatableEnvironmentText(environment) {
 /**
  * The live condition 6's inputs for release `label` (its pinned API entry and verified engine folder), in order: the
  * gate-code fingerprint (SETTINGS_GATE_HELPER_DIFFERS refuses before any gate is asked or anything written, with every
- * code and its hint); the release's line-up and target models, saved; each gate's /remaining answer, saved (a gate that
- * does not answer gets no file: the operator then refuses the models it serves). Resolves the operator arguments
+ * code and its hint); the release's line-up and target models, saved; each gate's /remaining answer, asked as that
+ * release's API identity (the lock's serviceUid/serviceGid), saved (a gate that does not answer gets no file: the
+ * operator then refuses the models it serves). Resolves the operator arguments
  * `--seatable-env <file> [--gate-remaining <gate>=<file>]…`. `prefix` names the files (settings-activate, settings-switch).
  */
 async function liveGateArguments(io, layout, { label, pinned, engine, prefix }) {
@@ -492,9 +518,10 @@ async function liveGateArguments(io, layout, { label, pinned, engine, prefix }) 
   const seatablePath = `${folder}/${prefix}-${stamp}-seatable-env.json`;
   await io.writeFile(seatablePath, handOver);
   const args = ['--seatable-env', seatablePath];
+  const identity = { uid: pinned.entry.serviceUid, gid: pinned.entry.serviceGid };
   for (const gate of layout.gates) {
     if (!Object.hasOwn(sockets, gate.name)) continue;
-    const answer = await io.readRemaining(sockets[gate.name], scopeId);
+    const answer = await io.readRemaining(sockets[gate.name], scopeId, identity);
     if (typeof answer !== 'string') continue;
     const path = `${folder}/${prefix}-${stamp}-${gate.name}-remaining.json`;
     await io.writeFile(path, answer);

@@ -152,7 +152,6 @@ function publications(overrides: Partial<PublicationApplication> = {}): Publicat
     auditPreflightDenial: async () => true,
     readOwnedVisibility: async () => ({ state: "PRIVATE", public_ref: null }),
     publish: async () => ({ state: "PUBLISHED", public_ref: PUBLIC_REF }),
-    unpublish: async () => ({ state: "PRIVATE", public_ref: null }),
     readPublicDebate: async (publicationRef) => publicationRef === PUBLIC_REF ? publicDebate : null,
     list: async () => ({
       items: [{
@@ -215,6 +214,23 @@ describe("S8 publication HTTP boundary", () => {
     await api.close();
   });
 
+  it("has no Unpublish route: a signed-in owner's request is refused and nothing changes (owner decision 13)", async () => {
+    const preflightGrant = vi.fn(async () => true);
+    const api = buildApi({
+      application: application(),
+      sessions: sessions(),
+      publications: publications({ preflightGrant }),
+      allowedOrigin: ORIGIN
+    });
+    const response = await api.inject({
+      method: "POST", url: `/v1/runs/${RUN_ID}/unpublish`, headers: mutationHeaders,
+      payload: { step_up_grant: GRANT_TOKEN, copies_may_persist_acknowledged: true }
+    });
+    expect(response.statusCode).toBe(404);
+    expect(preflightGrant).not.toHaveBeenCalled();
+    await api.close();
+  });
+
   it("audits authenticated invalid grants before private S6 reads, corpus key I/O, or audit KDF work", async () => {
     const privateS6Read = vi.fn<AskApplication["readRunAnswer"]>(async () => answer());
     const privateRunRead = vi.fn<AskApplication["readRun"]>(async (runId) => ({
@@ -271,15 +287,13 @@ describe("S8 publication HTTP boundary", () => {
       allowedOrigin: ORIGIN
     });
     for (const attempt of [
-      { label: "random", method: "publish", token: "r".repeat(43) },
-      { label: "expired", method: "publish", token: "e".repeat(43) },
-      { label: "wrong-action", method: "unpublish", token: "w".repeat(43) }
+      { label: "random", token: "r".repeat(43) },
+      { label: "expired", token: "e".repeat(43) },
+      { label: "wrong-action", token: "w".repeat(43) }
     ] as const) {
       const response = await api.inject({
-        method: "POST", url: `/v1/runs/${RUN_ID}/${attempt.method}`, headers: mutationHeaders,
-        payload: attempt.method === "publish"
-          ? { step_up_grant: attempt.token, warning_acknowledged: true }
-          : { step_up_grant: attempt.token, copies_may_persist_acknowledged: true }
+        method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
+        payload: { step_up_grant: attempt.token, warning_acknowledged: true }
       });
       expect(response.statusCode, attempt.label).toBe(404);
       expect(response.json()).toEqual({ error: "RUN_NOT_FOUND" });

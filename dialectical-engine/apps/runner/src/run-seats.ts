@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Judge, PanelMemberFailure } from "@debateai/judgement";
+import { Judge, JudgeContentRefusedError, PanelMemberFailure } from "@debateai/judgement";
 import { TypedDomainError, isRunLevelSpendStop, type DebateRole } from "@debateai/kernel";
 import {
   PROVIDER_USAGE_CAP,
@@ -88,11 +88,13 @@ export type RouteHealth =
 
 /**
  * Why a seat moved to its other member: during a call (R4 — a transport failure
- * after the normal retries, or a usage cap at once), at claim (the main was not
- * claim-eligible), or on a RESUMED pass whose ledger holds the planned member's
- * key at this site already at its allowance (A16c, controller carry 8c).
+ * after the normal retries, or a usage cap at once; R22 — a root position's
+ * answer refused after every repair, for a call that asks for it), at claim (the
+ * main was not claim-eligible), or on a RESUMED pass whose ledger holds the
+ * planned member's key at this site already at its allowance (A16c, controller
+ * carry 8c).
  */
-export type BackupSwitchCause = "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
+export type BackupSwitchCause = "TRANSPORT_FAILURE" | "USAGE_CAP" | "CONTENT_REFUSED" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
 
 /**
  * One seat moving to its other member — main to runner-up, or back from a
@@ -476,6 +478,12 @@ export interface SeatCall<T> {
   readonly ledgerMove?: LedgerSeatMove;
   /** The member-specific base key (the panel names the answering route in its key). */
   readonly keyFor?: (member: SeatMember) => string;
+  /**
+   * R22 (owner ruling 2026-10-29, "Backup AI takes the seat"): which other member may answer when the first one's
+   * answer was refused after the gateway's whole repair chain (`JudgeContentRefusedError`). The runner passes it for a
+   * root position only (`positionBackup`: another maker, not sitting out). Absent, a refusal never moves the seat (R4).
+   */
+  readonly contentRefusalBackup?: (backup: SeatMember, refused: SeatMember) => boolean;
   readonly call: (member: SeatMember, callSiteKey: string) => Promise<T>;
 }
 
@@ -546,7 +554,9 @@ function hasCode(error: unknown, code: string): boolean {
  *  · a subscription usage cap, IMMEDIATELY: the gateway short-circuits it, so
  *    there is no retry to wait for.
  * NEVER: a wrong-format or schema failure (retried as today by the gateway's
- * repair loop, then refused as today); a run-wide spend or attempt stop (the
+ * repair loop, then refused as today; R22's root-position hand-over is the
+ * call's own opt-in, `SeatCall.contentRefusalBackup`, never a cause read
+ * here); a run-wide spend or attempt stop (the
  * RUN's, never a seat's — V-28), bare or carried as a failure's cause; a key
  * at its per-site allowance (`CALL_BUDGET_EXHAUSTED`, which spent nothing);
  * anything else, including a changed model identity, an unsupported thinking
@@ -702,6 +712,15 @@ export function plannedSeatSlot(
  * in memory only (DR-184-v5 says so): what binds across restarts is the
  * ledger's per-key count.
  *
+ * R22 (owner ruling 2026-10-29, "Backup AI takes the seat") — A REFUSED ROOT
+ * POSITION. A call that passes `contentRefusalBackup` (the runner: a root
+ * position) and whose member's answer the gateway refused after every repair
+ * (`JudgeContentRefusedError`) is answered the same way by the other member
+ * the rule allows (another maker, not sitting out), with cause
+ * CONTENT_REFUSED; the refused member stays down, and like a capped one its
+ * key is never called again at the site's retry. The site's spend stays inside
+ * v5's bound: the refused key's `k <= judge`, then one sequence on the backup.
+ *
  * DR-184-v5 — ONE BACKUP SEQUENCE PER SITE. A site called AGAIN on this pass
  * is the cooldown's post-cooldown final retry, and it never switches: a
  * backup reached on the retry would open a fresh key at `judge + final`, one
@@ -779,13 +798,22 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
       : plannedSeatSlot(seat, callSiteKey, { runId, ...(plan.ordinal === undefined ? {} : { ordinal: plan.ordinal }) }) === "RUNNER_UP";
     return (toRunnerUp ? [seat.runnerUp, seat.main] : [seat.main, seat.runnerUp]).filter(eligible);
   };
-  const cappedAt = (seat: RunSeat, member: SeatMember): boolean =>
-    downFailures.get(slotId(seat, member))?.cause === "USAGE_CAP";
+  /**
+   * A member whose key is never called again at a site's retry: one a usage cap
+   * downed (R4: "cap → switch NOW"), or one whose answer was refused after every
+   * repair and handed to its backup (R22): asking it again is what the gateway's
+   * repair chain already did.
+   */
+  const cappedAt = (seat: RunSeat, member: SeatMember): boolean => {
+    const cause = downFailures.get(slotId(seat, member))?.cause;
+    return cause === "USAGE_CAP" || cause === "CONTENT_REFUSED";
+  };
   /**
    * The member this call calls first. A site's retry goes back to the member
    * that ran its first sequence — unless a usage cap downed that member (R4:
-   * "cap → switch NOW"): then the other member takes the retry and the capped
-   * key is never called again. Any other call takes the first member up.
+   * "cap → switch NOW"), or its refused answer was handed to its backup (R22):
+   * then the other member takes the retry and that key is never called again.
+   * Any other call takes the first member up.
    */
   const firstOf = (seat: RunSeat, callSiteKey: string, members: readonly SeatMember[]): SeatMember | undefined => {
     const firstSlot = firstSlotAt.get(siteId(seat, callSiteKey));
@@ -881,9 +909,18 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
         if (announced !== undefined) await announced;
         else if (from !== undefined) await recordSwitch(from, first, "SPENT_ON_EARLIER_PASS", moved.callSiteKey);
       }
-      /** R4: a member that fails with a switching cause stays down for the rest of this pass. */
+      /**
+       * R22: the other member that may take this call's refused answer (`contentRefusalBackup`), or null. Only the
+       * gateway's refusal after its repairs counts, and never on the post-cooldown retry (DR-184-v5).
+       */
+      const refusalBackup = (member: SeatMember, error: unknown): SeatMember | null => {
+        const rule = input.contentRefusalBackup;
+        if (rule === undefined || retry || !(error instanceof JudgeContentRefusedError)) return null;
+        return members.find((other) => other !== member && !isDown(input.seat, other) && rule(other, member)) ?? null;
+      };
+      /** R4: a member that fails with a switching cause stays down for the rest of this pass (R22: so does a refused one). */
       const failed = (member: SeatMember, error: unknown): BackupSwitchCause | null => {
-        const cause = seatFailureCause(error);
+        const cause = seatFailureCause(error) ?? (refusalBackup(member, error) === null ? null : "CONTENT_REFUSED");
         if (cause !== null && !isDown(input.seat, member)) {
           downFailures.set(slotId(input.seat, member), Object.freeze({ cause, callSiteKey: keyOf(input, member) }));
         }
@@ -897,7 +934,9 @@ export function createSeatCaller(options: SeatCallerOptions): SeatCaller {
         if (cause === null) throw error;
         // DR-184-v5: the post-cooldown retry belongs to ONE key; it never opens the backup's.
         if (retry) throw error;
-        const second = members.find((member) => member !== first && !isDown(input.seat, member));
+        const second = cause === "CONTENT_REFUSED"
+          ? refusalBackup(first, error) ?? undefined
+          : members.find((member) => member !== first && !isDown(input.seat, member));
         if (second === undefined) throw error;
         // O7: another call in flight on this seat may have downed and switched this slot already —
         // one notice per seat slot; this call waits for that notice, then goes to the backup too.
@@ -957,7 +996,8 @@ export const BACKUP_MODEL_USED_WORDING = Object.freeze({
   /**
    * A planned model was replaced: a main answered by its runner-up (during a
    * call, at claim or on a resumed pass), or a role whose planned models were
-   * all unavailable, answered by the debaters. Final review m1: "could not be
+   * all unavailable, answered by the debaters; or (R22) a position a spare
+   * debater wrote after its seat's answer was refused. Final review m1: "could not be
    * used", never "unavailable" — a main whose key reached its bound with only
    * OK answers on resumed passes is handed over too, and it was never down.
    */
@@ -987,6 +1027,11 @@ export function backupModelUsedRecords(
     readonly answers: readonly BackupAnswer[];
     /** Roles whose pinned seats were all absent at claim and whose calls the debaters answered (carry 8d). */
     readonly fallbackRoles: readonly string[];
+    /**
+     * R22 (owner ruling 2026-10-30, "Yes, use the spare debater"): how many positions a spare debater answered because
+     * their seat's answer was refused after every repair (the runner's `spareAnswers`). Each is a stand-in. Absent: none.
+     */
+    readonly spareAnswers?: number;
   },
   servedRootNodeId: string
 ): readonly ConditionMarkRecord[] {
@@ -1002,7 +1047,8 @@ export function backupModelUsedRecords(
       callSiteKey: null,
       terminalTransportOutcome: null
     });
-  const standIn = input.fallbackRoles.length > 0 || input.answers.some((answer) => answer.answeredSlot === "RUNNER_UP");
+  const standIn = input.fallbackRoles.length > 0 || (input.spareAnswers ?? 0) > 0
+    || input.answers.some((answer) => answer.answeredSlot === "RUNNER_UP");
   const usual = input.answers.some((answer) => answer.answeredSlot === "MAIN");
   return Object.freeze([
     ...(standIn ? [record(BACKUP_MODEL_USED_WORDING.STAND_IN)] : []),

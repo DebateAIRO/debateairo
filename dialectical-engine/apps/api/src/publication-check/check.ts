@@ -14,7 +14,7 @@ export class PublicationJudgeFailure extends Error {
 export interface PublicationJudgePort {
   readonly providerRef: string;
   readonly modelId: string;
-  complete(input: { packet: PromptPacket; signal: AbortSignal }): Promise<{ text: string }>;
+  complete(input: { packet: PromptPacket; signal: AbortSignal }): Promise<{ text: string; usage?: Readonly<{ input_tokens?: number; output_tokens?: number; cost_usd?: number }> }>;
 }
 export type PublicationRefusalGround = PublicationRefusalStatement["ground"];
 export type PublicationCheckResult = { outcome: "ALLOW" }
@@ -72,6 +72,8 @@ function configuredJudge(judge: PublicationJudgePort | null): PublicationJudgePo
 }
 export type JudgedParts = {
   result: PublicationCheckResult;
+  /** What the judge reported across this check's calls; empty when it reported nothing. */
+  usage?: Readonly<{ input_tokens?: number; output_tokens?: number; cost_usd?: number }>;
   rules: readonly (1 | 2)[];
   partKinds: readonly PublicationPartKind[];
   ground: PublicationRefusalGround | null;
@@ -79,7 +81,7 @@ export type JudgedParts = {
 };
 
 /** Race even a non-cooperating port; always detach this call's abort listener. */
-async function withinDeadline(judge: PublicationJudgePort, packet: PromptPacket, signal: AbortSignal): Promise<{ text: string }> {
+async function withinDeadline(judge: PublicationJudgePort, packet: PromptPacket, signal: AbortSignal): Promise<Awaited<ReturnType<PublicationJudgePort["complete"]>>> {
   if (signal.aborted) throw new PublicationJudgeFailure("JUDGE_DEADLINE");
   let onAbort = () => {};
   const deadline = new Promise<never>((_resolve, reject) => {
@@ -101,6 +103,8 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
   const results: JudgeCallResult[] = new Array(calls.length);
   const sentFieldNames = new Set<string>();
   let next = 0, judgeCallCount = 0;
+  const usage: { input_tokens?: number; output_tokens?: number; cost_usd?: number } = {};
+  const add = (key: keyof typeof usage, value: number | undefined) => { if (value !== undefined) usage[key] = (usage[key] ?? 0) + value; };
   async function worker() {
     while (next < calls.length) {
       const index = next++, call = calls[index]!;
@@ -111,6 +115,9 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
         judgeCallCount++;
         for (const field of call.fields) sentFieldNames.add(field.name);
         const response = await withinDeadline(judge!, packet, signal);
+        add("input_tokens", response.usage?.input_tokens);
+        add("output_tokens", response.usage?.output_tokens);
+        add("cost_usd", response.usage?.cost_usd);
         results[index] = parseJudgeAnswer(response.text, call.fields.map(field => field.name), expectedCall);
       } catch (error) {
         const cause = error instanceof TypedDomainError && error.code.startsWith("PROMPT_") ? "JUDGE_DOOR_REFUSED"
@@ -122,15 +129,15 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, calls.length) }, () => worker()));
   const combined = combineJudgeCalls(results);
-  if (combined.outcome === "ALLOW") return { result: { outcome: "ALLOW" }, rules: [], partKinds: [], ground: null, judgeCallCount };
-  if (combined.outcome === "UNAVAILABLE") return { result: { outcome: "UNAVAILABLE", cause: combined.cause! }, rules: [], partKinds: [], ground: null, judgeCallCount };
+  if (combined.outcome === "ALLOW") return { result: { outcome: "ALLOW" }, rules: [], partKinds: [], ground: null, judgeCallCount, usage };
+  if (combined.outcome === "UNAVAILABLE") return { result: { outcome: "UNAVAILABLE", cause: combined.cause! }, rules: [], partKinds: [], ground: null, judgeCallCount, usage };
   const names = combined.outcome === "UNSURE" && combined.parts.length === 0
     ? [...sentFieldNames] : combined.parts;
   const partKinds = PUBLICATION_PART_KINDS.filter(kind => names.includes(kind.toLowerCase()));
   const ground = combined.outcome === "BLOCK" && combined.possibly_illegal ? "TERMS_AND_POSSIBLY_ILLEGAL" : "TERMS";
   return {
     result: { outcome: combined.outcome, statement: { outcome: combined.outcome, parts: partKinds, ground, automated: true, visibility: "PRIVATE" } },
-    rules: combined.outcome === "BLOCK" ? combined.rules : [], partKinds, ground, judgeCallCount
+    rules: combined.outcome === "BLOCK" ? combined.rules : [], partKinds, ground, judgeCallCount, usage
   };
 }
 
@@ -141,6 +148,8 @@ export function createPublicationContentCheck(deps: {
   deadlineMs: number;
   maxMaterialCodePoints?: number;
   maxConcurrentCalls?: number;
+  /** The first-run measure: what the judge reported using on this check. A failure here is no reason to fail the check. */
+  recordUsage?: (row: Readonly<{ subject_id: string; attempted_at: Date; judge_call_count: number; input_tokens: number | null; output_tokens: number | null; cost_usd: number | null }>) => Promise<void>;
 }): PublicationContentCheck {
   return { async check({ runId, snapshot }) {
     const attemptedAt = deps.clock(), judge = configuredJudge(deps.judge());
@@ -152,6 +161,11 @@ export function createPublicationContentCheck(deps: {
       judge_provider_ref: judge?.providerRef ?? null, judge_model_id: judge?.modelId ?? null,
       policy_version: PUBLICATION_CHECK_POLICY_VERSION, judge_call_count: judged.judgeCallCount
     });
+    if (judged.judgeCallCount > 0) {
+      try {
+        await deps.recordUsage?.({ subject_id: runId, attempted_at: attemptedAt, judge_call_count: judged.judgeCallCount, input_tokens: judged.usage?.input_tokens ?? null, output_tokens: judged.usage?.output_tokens ?? null, cost_usd: judged.usage?.cost_usd ?? null });
+      } catch { /* Only a measure: the check's answer stands without it. */ }
+    }
     return judged.result;
   } };
 }

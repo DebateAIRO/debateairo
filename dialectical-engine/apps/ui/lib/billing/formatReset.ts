@@ -1,3 +1,5 @@
+import { dateLocale } from "../i18n/translate.js";
+
 /**
  * `{time}` in the waiting, room and usage sentences (budget spec §2.11;
  * interface contract §10). It uses the site locale and the viewer's time zone:
@@ -18,11 +20,12 @@ export function formatReset(at: Date, now: Date, locale: string, timeZone?: stri
       Number(parts.find((candidate) => candidate.type === type)?.value);
     return Math.round(Date.UTC(part("year"), part("month") - 1, part("day")) / 86_400_000);
   };
+  // English writes the day first on the 24-hour clock ("19 Oct, 03:00"), as every English page does (question 5).
   const format = (options: Intl.DateTimeFormatOptions): string => {
     try {
-      return new Intl.DateTimeFormat(locale, { ...zone, ...options }).format(at);
+      return new Intl.DateTimeFormat(dateLocale(locale), { ...zone, ...options }).format(at);
     } catch {
-      return new Intl.DateTimeFormat("en", { ...zone, ...options }).format(at);
+      return new Intl.DateTimeFormat(dateLocale("en"), { ...zone, ...options }).format(at);
     }
   };
   const daysAhead = calendarDay(at) - calendarDay(now);

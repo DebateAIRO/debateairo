@@ -70,7 +70,8 @@ const reply = (best: "A" | "B" | "C", conditional = false): ComparingJudgeReply 
 });
 const asked = (seat: ComparingJudgeSeat, best: "A" | "B" | "C", conditional = false): ComparingJudgeAsked => Object.freeze({
   reply: reply(best, conditional), rawArtifactRef: `artifact-${String(seat.seat)}`, maker: seat.maker,
-  providerRef: seat.providerRef, modelId: CANDIDATES.find((candidate) => candidate.providerRef === seat.providerRef)!.modelId
+  providerRef: seat.providerRef,
+  modelId: CANDIDATES.find((candidate) => candidate.providerRef === seat.providerRef)?.modelId ?? `${seat.providerRef}-model`
 });
 
 function step(over: Partial<ComparingJudgesStepInput> & Readonly<{ answers?: Readonly<Record<string, "A" | "B" | "C" | Error>> }> = {}) {
@@ -218,6 +219,33 @@ describe("the judging step", () => {
     expect(result.verdict).toMatchObject({ label: "SPLIT", trigger: "JUDGES_VOTES_IGNORED", winnerRootNodeId: ROOT.B });
     expect(result.records).toEqual([expect.objectContaining({ mark: "VERDICT-VOTES-IGNORED", reason: "VERDICT_VOTES_IGNORED:2" })]);
   });
+
+  // Owner ruling 2026-10-29 (MORNING-2026-10-17 item 6, "prefer neutral judges"): a judge seat whose planned member argued
+  // an answer is judged by its other member when that member's maker argued none; the vote then counts, and Clear answer
+  // is reachable. Same three judges, same three calls.
+  it("asks a seat's other member when its maker argued no answer, so all three votes count (Clear answer)", async () => {
+    const { run, asks, records } = step({
+      candidates: [CANDIDATES[0]!, CANDIDATES[1]!,
+        { ...CANDIDATES[2]!, alternate: { maker: "qwen", providerRef: "qw", modelId: "qwen-4" } }],
+      answers: { haiku: "A", mimo: "A", qw: "A" }
+    });
+    const result = await run();
+    expect(asks.map((seat) => [seat.seat, seat.providerRef, seat.argued])).toEqual([[1, "haiku", false], [2, "mimo", false],
+      [3, "qw", false]]);
+    expect(result.verdict).toMatchObject({ winnerRootNodeId: ROOT.A, label: "SUPPORTED", trigger: "JUDGES_UNANIMOUS", winnerVotes: 3 });
+    expect(records.map((vote) => [vote.judgeSeat, vote.maker, vote.providerRef, vote.counted]))
+      .toEqual([[1, "anthropic", "haiku", true], [2, "xiaomi", "mimo", true], [3, "qwen", "qw", true]]);
+  });
+
+  it("names a failed other member's model from its own candidate entry", async () => {
+    const { run, records } = step({
+      candidates: [CANDIDATES[0]!, CANDIDATES[1]!,
+        { ...CANDIDATES[2]!, alternate: { maker: "qwen", providerRef: "qw", modelId: "qwen-4" } }],
+      answers: { haiku: "A", mimo: "A", qw: new TypedDomainError("PROVIDER_CALL_FAILED", "x") }
+    });
+    await run();
+    expect(records[2]).toMatchObject({ judgeSeat: 3, maker: "qwen", providerRef: "qw", modelId: "qwen-4", notCountedReason: "JUDGE_FAILED" });
+  });
 });
 
 describe("reclaim resume: a recorded vote is never asked again", () => {
@@ -247,6 +275,20 @@ describe("reclaim resume: a recorded vote is never asked again", () => {
       expect(result.seats.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "deepseek"], [2, "xiaomi"], [3, "anthropic"]]);
       expect(records.map((vote) => [vote.judgeSeat, vote.maker])).toEqual([[2, "xiaomi"], [3, "anthropic"]]);
       expect(result).toMatchObject({ asked: 2, reused: 1 });
+    });
+
+    // Owner ruling 2026-10-29: a seat's other member already holding a recorded seat never sits twice; the clashing seat
+    // goes to the next neutral maker no seat holds.
+    it("never seats a seat's other member twice when an earlier copy recorded its maker", async () => {
+      const { run, asks } = step({
+        candidates: [CANDIDATES[0]!, CANDIDATES[1]!,
+          { ...CANDIDATES[2]!, alternate: { maker: "qwen", providerRef: "qw", modelId: "qwen-4" } }],
+        recorded: [row(1, "qwen", "qw", "A")],
+        answers: { mimo: "A", haiku: "A" }
+      });
+      const result = await run();
+      expect(result.seats.map((seat) => [seat.seat, seat.maker])).toEqual([[1, "qwen"], [2, "xiaomi"], [3, "anthropic"]]);
+      expect(asks.map((seat) => [seat.seat, seat.providerRef])).toEqual([[2, "mimo"], [3, "haiku"]]);
     });
 
     it("prefers a maker the recorded seat displaced, then leaves the seat unfilled when no maker is left", async () => {

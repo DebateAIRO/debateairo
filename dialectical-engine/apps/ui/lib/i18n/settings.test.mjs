@@ -147,7 +147,7 @@ test("server settings routes load settings while client controls receive their c
   assert.doesNotMatch(page, /^"use client";/);
   assert.match(page, /loadNamespace\(locale, "settings"\)/);
   // Review F2 (REV-FIX-CATALOGS): the page also serves the newDebate catalogue
-  // so the AuthGate's "Checking session…" paints in the reader's language.
+  // so the AuthGate's session check ("One moment…") paints in the reader's language.
   assert.match(page, /loadNamespace\(locale, "newDebate"\)/);
   assert.match(page, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\}\s+renewalConsent=\{currentDocument\("CONSENT_RENEWAL", locale\)\} \/>/);
 

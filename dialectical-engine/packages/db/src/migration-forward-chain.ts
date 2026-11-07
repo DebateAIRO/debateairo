@@ -22,6 +22,33 @@ import { loadForward0127 } from './migration-forward0127.js';
 import { loadForward0128 } from './migration-forward0128.js';
 import { loadForward0129 } from './migration-forward0129.js';
 import { loadForward0130 } from './migration-forward0130.js';
+import { loadForward0131 } from './migration-forward0131.js';
+import { loadForward0132 } from './migration-forward0132.js';
+import { loadForward0133 } from './migration-forward0133.js';
+import { loadForward0134 } from './migration-forward0134.js';
+import { loadForward0135 } from './migration-forward0135.js';
+import { loadForward0136 } from './migration-forward0136.js';
+import { loadForward0137 } from './migration-forward0137.js';
+import { loadForward0138 } from './migration-forward0138.js';
+import { loadForward0139 } from './migration-forward0139.js';
+import { loadForward0140 } from './migration-forward0140.js';
+import { loadForward0141 } from './migration-forward0141.js';
+import { loadForward0142 } from './migration-forward0142.js';
+import { loadForward0143 } from './migration-forward0143.js';
+import { loadForward0144 } from './migration-forward0144.js';
+import { loadForward0145 } from './migration-forward0145.js';
+import { loadForward0146 } from './migration-forward0146.js';
+import { loadForward0147 } from './migration-forward0147.js';
+import { loadForward0148 } from './migration-forward0148.js';
+import { loadForward0149 } from './migration-forward0149.js';
+import { loadForward0150 } from './migration-forward0150.js';
+import { loadForward0151 } from './migration-forward0151.js';
+import { loadForward0152 } from './migration-forward0152.js';
+import { loadForward0153 } from './migration-forward0153.js';
+import { loadForward0154 } from './migration-forward0154.js';
+import { loadForward0155 } from './migration-forward0155.js';
+import { loadForward0156 } from './migration-forward0156.js';
+import { loadForward0157 } from './migration-forward0157.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -39,8 +66,10 @@ import { loadForward0130 } from './migration-forward0130.js';
  * every later migrate() compares that step against its latest amendment instead of its receipt.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
-/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added. */
-export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>;
+/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added; or which functions it redefined. */
+export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>
+ // 0144: a step that redefines functions an earlier step's digest pins names them.
+ |Readonly<{step:string;functions:readonly string[];field:'function_definition'}>;
 export type ForwardStepPlan=Readonly<{
  name:string; version:string; manifestSha256:string; sourceSha256:string; sql:string;
  previousName:string; previousManifestSha256:string; previousVerifierSha256:string;
@@ -76,9 +105,14 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13: settings changes without
  * an upload), then the Italy-specific approval (0125, mission italy-clause-approval), then mission synthesis-flag's
  * synthesis check (0126, S01), publication review (0127, S02), threat reports (0128, S04) and support answer scope
- * (0129, S05), then row-level security (0130, mission row-level-security S01). A new step appends its loader here (README).
+ * (0129, S05), then row-level security (0130, mission row-level-security S01), then the V4 account memory (0131, owner
+ * rulings N7 and N11), then the web evidence store (0132) and investigations (0133) of the Perplexity plan (2026-10-30,
+ * task W1-3), then the new dig model and the month pause (0134, dig-model revision task W2-8), then a dig's picks and its
+ * path rewrite's material (0135, task W3-7), then the final report over an investigation (0136, task W5-1), then the owner's changes of
+ * 31 Oct: public debates (0137), tree updates (0138), passage retention (0139) and the drained spend kinds (0140), then a path's suggestions (0141), the team's one limit (0142, drained), then the hand-over of a paused debate (0143), then the drained step that puts step 2's small AI in the person's quota (0144), then the runner's list of pages added to researched (0145), then the Owner's allowances for team members (0146). A new step
+ * appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

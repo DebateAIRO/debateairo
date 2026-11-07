@@ -117,3 +117,15 @@ fd422018e71b56b9826d8d6ce9f6a0fb4840b249:dialectical-engine/tests/unit/preview_b
 42af415d85116f4e49fa24866ae9744f556e00e4:dialectical-engine/tests/unit/preview-thinking-levels-check.test.ts:generic-api-key:85
 # a fake 40-character test string (random letters and digits) that the long-run redaction test must blank, not a key (owner yes 2026-10-12)
 42af415d85116f4e49fa24866ae9744f556e00e4:dialectical-engine/tests/unit/preview-practice.test.ts:generic-api-key:355
+# 2026-10-29 — V4 initial (PR #224, first commit): generic-api-key matched the NAME of a browser-storage key (the
+# label for remembered dig parents) in dialectical-engine/apps/ui/lib/v4/storage.ts, a label, not a key. The line was
+# removed in the next commit (V4 stores nothing in the browser). Owner's ruling of 2026-10-29 (U5).
+5fa1b5224445fbd36ccb2a4bb9316d0db3cf0da6:dialectical-engine/apps/ui/lib/v4/storage.ts:generic-api-key:15
+# 2026-10-29 — the same false alarm echoed: this file's first comment for the entry above quoted that storage-key line
+# word for word (commit cdef99219, line 121), and gitleaks matched the quote. The comment no longer quotes it.
+cdef992197a9b6c4d904e9e9269c50cc2a59a915:.gitleaksignore:generic-api-key:121
+# 2026-10-30 — Perplexity gate test (PR #224, commit c1ea4d571): generic-api-key matched a made-up DeepInfra-shaped
+# test value (the word synthetic, a key label and the digits zero to nine) used to check that the DeepInfra gate accepts
+# its own key shape and refuses a Perplexity one. Not a key; the test now builds the value from pieces. Owner's ruling of
+# 2026-10-30, as for U5.
+c1ea4d571f6feab2576eea18b0a1546573371a4c:dialectical-engine/tests/unit/preview_budget_authority_perplexity_test.py:generic-api-key:513

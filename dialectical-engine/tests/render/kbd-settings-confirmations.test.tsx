@@ -12,7 +12,7 @@ import settings from "../../apps/ui/messages/en/settings.json" with { type: "jso
 
 const methods = { methods: [], recovery_codes_remaining: 0, available_step_up_methods: ["password_totp"], step_up_providers: [] };
 const grant = (action: string) => ({ status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action, token: "g".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() } });
-const SCHEDULED = { status: "SCHEDULED" as const, execute_at: "2026-10-30T00:00:00.000Z", cancellation_ref: "55555555-5555-4555-8555-555555555555", delete_public_debates: false };
+const SCHEDULED = { status: "SCHEDULED" as const, execute_at: "2026-10-30T00:00:00.000Z", cancellation_ref: "55555555-5555-4555-8555-555555555555" };
 let root: Root | null = null;
 async function settle() { await act(async () => { for (let index = 0; index < 6; index += 1) await Promise.resolve(); }); }
 async function mount(node: React.ReactNode) {

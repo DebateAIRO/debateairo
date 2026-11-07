@@ -52,7 +52,10 @@ describe("S2 identity schema on real PostgreSQL", () => {
     expect(tables.rows.map((row) => row.table_name)).toEqual([
       "account_erasure_notification_outbox", "account_erasure_request",
       "account_recovery_binding", "account_recovery_request",
-      "account_recovery_state_event", "account_security_hold", "age_check", "audit_event", "authentication_risk_signal",
+      "account_recovery_state_event", "account_security_hold", "age_check",
+      // 0144 the small AI at step 2: one row naming the person, the cost and the time of each call.
+      "ask_clarify_charge",
+      "audit_event", "authentication_risk_signal",
       // 0105 backup-email verification, 0106 known-password MFA recovery, 0104 password-only reset.
       "backup_email_control", "backup_email_notice", "backup_email_notice_binding", "backup_email_proof_window", "backup_email_source_window",
       "channel_binding",
@@ -60,16 +63,79 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
       "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
       "data_export",
-      "email_change_request", "login_challenge", "mfa_factor",
+      // 0131 V4 account memory: the reading level, debate visits and dig links.
+      "debate_last_visit", "dig_link",
+      // 0135 a dig's picks: the set and each pick.
+      "dig_pick", "dig_pick_set",
+      // 0153: the runner's mark that a dig has ended.
+      "dig_tree_settled",
+      "email_change_request",
+      // 0137 public debates: a free ask, a public dig's contribution, the debate's updates, the report's writer and charges.
+      "free_public_ask",
+      // 0133 investigations: a debate and its digs, their closings and the one reserve.
+      "investigation", "investigation_closing",
+      // 0134 the dig model: each dig's level.
+      "investigation_dig_level",
+      "investigation_member",
+      // 0136 the investigation's final report: one per closing.
+      "investigation_report",
+      "investigation_reserve_event",
+      "login_challenge",
+      // 0138 tree updates: the main answer's new versions.
+      "main_answer_update", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
+      // 0156 the moderation notice: its queue and when it started. 0157 the statements of reasons: a hidden debate's final
+      // ground, each step's grounds, the statement, what the queue has read and when it started.
+      "moderation_decision", "moderation_ground", "moderation_notice", "moderation_notice_since",
+      "moderation_statement", "moderation_statement_seen", "moderation_statement_since",
+      "page_reading_level",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
       "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_source_window",
+      // 0134 the dig model: a path's rewrites and the turns that order them.
+      "path_rewrite",
+      // 0135 the path rewrite's material: the dig's own paths, stored before its turn.
+      "path_rewrite_input",
+      "path_rewrite_turn",
+      // 0141 the path suggestions: what to dig into on one path, each time they are worked out.
+      "path_suggestions",
+      // 0138 tree updates: a path's rewrites that a dig did not start, and the turns that order them.
+      "path_update", "path_update_turn",
       "private_erasure_audit_binding",
-      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding", "runtime_audit_attempt",
+      // 0137 public debates: the public debates' contributions, updates and report charges. 0147 the public tree: the sealed copy, a dig's paths, the
+      // AI check's pass, the climb's end, the answer's versions, a report and its copy, the skipped texts.
+      "public_answer_update",
+      // 0152: what the AI checks on public rows used.
+      "public_check_usage",
+      "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update", "public_dig_input",
+      // 0151: a report on a public debate and the queue's log; public_review_purged, below, is the receipt of what six months removed.
+      // 0157: a person's close of a report, the mails to the reporter (and when they started), the words an automatic hide copied.
+      "public_flag", "public_flag_answer", "public_flag_event", "public_flag_mail", "public_flag_mail_since", "public_flag_quote",
+      "public_material", "public_page_skip", "public_report", "public_report_charge",
+      // 0149: a report's publication-check record and the public reference of each update on the page.
+      "public_report_check", "public_report_writer",
+      // 0150: a public debate under review: its log, its corrections, the digs detached when it was hidden, what each reviewer read.
+      "public_review_correction", "public_review_detached", "public_review_event", "public_review_purged", "public_review_read", "public_update_ref",
+      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
+      // 0143 the hand-over of a paused debate: which release and settings version it moved from and to.
+      "run_handover",
+      // 0134 the month pause of a running debate.
+      "run_pause_event",
+      // 0138 tree updates: a run's purpose lines.
+      "run_purpose_lines",
+      "runtime_audit_attempt",
       "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
-      "verification_delivery_reservation", "verification_token_credential"
+      "verification_delivery_reservation", "verification_token_credential",
+      // 0132 web evidence store: a debate's searches, pages, transient page texts, readings, extracts, packs, picks, choices.
+      "web_extract", "web_pack", "web_page", "web_page_text",
+      // 0139 passage retention: each deletion of a debate's passages, with its codes and counts.
+      "web_passage_wipe", "web_pick",
+      // 0134 the web plan: the planner's decision for each path.
+      "web_plan_path",
+      "web_reading", "web_reply_text", "web_researched", "web_search",
+      // 0139 passage retention: a debate's shown quotes (kept) and its saved replies (transient).
+      "web_shown_quote"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`

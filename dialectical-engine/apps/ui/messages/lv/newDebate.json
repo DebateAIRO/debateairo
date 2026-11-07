@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Neizdevās izveidot debates",
   "newDebate.sessionReadFailed": "Sesijas nolasīšana neizdevās",
   "newDebate.planRosterFailed": "Plāna līmeņa saraksta nolasīšana neizdevās",
-  "newDebate.checkingSession": "Pārbauda sesiju…",
+  "newDebate.checkingSession": "Vienu mirkli…",
   "newDebate.redirectingToSignIn": "Novirza uz pierakstīšanos…",
   "newDebate.continueToSignIn": "Turpināt uz pierakstīšanos",
   "newDebate.defaultUnavailable": "Izvietojumā nav derīgas riskTier rindas; riska līmenis gaida ievadi.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Jūs esat sasnieguši sava plāna šodienas ierobežojumu. Jūs joprojām varat uzdot jautājumu: jūsu debates sāksies pašas {time}.",
   "newDebate.room.personWeekFullTopPlan": "Jūs esat sasnieguši sava plāna šīs nedēļas ierobežojumu. Jūs joprojām varat uzdot jautājumu: jūsu debates sāksies pašas {time}.",
   "newDebate.room.personMonthFullTopPlan": "Jūs esat sasnieguši sava plāna šī mēneša ierobežojumu. Jūs joprojām varat uzdot jautājumu: jūsu debates sāksies pašas {time}.",
-  "newDebate.room.freeMonthFull": "Jūs esat izmantojuši šī mēneša bezmaksas debates. Jūsu nākamās debates varēs sākties {time}, vai izvēlieties plānu, lai turpinātu tūlīt.",
+  "newDebate.room.freeMonthFull": "Jūs esat izmantojuši šī mēneša bezmaksas kvotu. Jūsu nākamās debates varēs sākties {time}, vai izvēlieties plānu, lai turpinātu tūlīt.",
   "newDebate.room.personClose": "Jūs tuvojaties sava plāna ierobežojumam. Šīs debates tik un tā notiks pilnībā.",
   "newDebate.room.ownDebatesFull": "Jūsu pārējās debates pagaidām izmanto atlikušo jūsu ierobežojuma daļu. Šīs debates sāksies pašas, tiklīdz kādas no tām beigsies.",
   "newDebate.room.upgradeLink": "Skatīt plānus",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Jūsu plāns: Bezmaksas",
   "newDebate.plan.current.PLUS": "Jūsu plāns: Plus",
   "newDebate.plan.current.PRO": "Jūsu plāns: Pro",
-  "newDebate.plan.current.MAX": "Jūsu plāns: Max"
+  "newDebate.plan.current.MAX": "Jūsu plāns: Max",
+  "newDebate.askText.otherAnswer": "Cita atbilde…",
+  "newDebate.askText.otherLabel": "Jūsu pašu papildu skaidrojums",
+  "newDebate.askText.matters": "Ja atbildes ved dažādos virzienos, man vissvarīgākais ir: {matters}",
+  "newDebate.askText.angles": "Lūdzu, apskatiet arī šos aspektus: {list}.",
+  "newDebate.freePublicNotice": "Bezmaksas plānā jūsu jautājums un tā debates ir publiskas. Neiekļaujiet personas datus."
 }

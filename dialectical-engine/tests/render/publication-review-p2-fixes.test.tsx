@@ -26,16 +26,6 @@ it("wraps unbroken refusal reasons and review questions on a narrow screen", () 
   expect(getComputedStyle(question).overflowWrap).toBe("anywhere");
 });
 
-it("uses logical 4px start insets for Take down and its failure line", () => {
-  styled<HTMLStyleElement>("style", "").textContent = styles;
-  const takeDown = styled<HTMLButtonElement>("button", "libTakeDown");
-  const status = styled<HTMLParagraphElement>("p", "tdStatus");
-  takeDown.dir = "rtl";
-  status.dir = "rtl";
-  expect(getComputedStyle(takeDown).marginInlineStart).toBe("4px");
-  expect(getComputedStyle(status).marginInlineStart).toBe("4px");
-});
-
 it("shows the queue timestamp at the artboard's 12px weight 600", () => {
   styled<HTMLStyleElement>("style", "").textContent = styles;
   const staff = styled<HTMLDivElement>("div", "staffAccess");

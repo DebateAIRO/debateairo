@@ -218,6 +218,29 @@ describe("RoomNotice picks exactly one sentence", () => {
     expect(container.querySelector('a[href="/debate/run%3Awaiting"]')?.textContent).toBe(en["newDebate.room.openWaiting"]);
   });
 
+  // V4 review ask-f11, read-f4, public-f21: on a V4 page the link opens the waiting debate's V4 map, at the reading level
+  // the address carries; the classic pages keep the classic debate page.
+  it.each([
+    ["/v4?level=expert", "/v4/debate/run%3Awaiting?level=expert"],
+    ["/v4", "/v4/debate/run%3Awaiting"],
+    ["/v4/debate/run-1?path=p1&level=background", "/v4/debate/run%3Awaiting?level=background"],
+    ["/v4/debate/run-1?level=nonsense", "/v4/debate/run%3Awaiting"],
+    ["/v4x?level=plain", "/debate/run%3Awaiting"],
+    ["/new?level=plain", "/debate/run%3Awaiting"]
+  ])("on %s, links the waiting debate to %s", async (address, href) => {
+    window.history.replaceState(null, "", address);
+    try {
+      const container = await mount(<RoomNotice
+        room={room({ room: "ALREADY_WAITING", resets_at: RESET, waiting_run_ref: "run:waiting" }) as never}
+        catalog={en} locale="en" />);
+      const links = [...container.querySelectorAll<HTMLAnchorElement>(".roomNoticeLink")];
+      expect(links.map((link) => link.getAttribute("href"))).toEqual([href]);
+      expect(links[0]?.textContent).toBe(en["newDebate.room.openWaiting"]);
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
   it("speaks the interface's language", async () => {
     const ro = catalogue("ro", "newDebate");
     const container = await mount(<RoomNotice room={room({ room: "CLOSE", scope: "SITE_DAY" }) as never} catalog={ro} locale="ro" />);
@@ -418,7 +441,9 @@ describe("/new hides the plan chooser and names the plan the server decided (spe
     expect(mocks.createDebate).toHaveBeenCalledWith(
       "Cities should ban cars downtown",
       expect.objectContaining({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 }),
-      "test-token"
+      "test-token",
+      // Decision 13: this Free person read the public notice, and the ask says so.
+      undefined, undefined, undefined, undefined, { freePublicNotice: true }
     );
   });
 
@@ -450,6 +475,28 @@ describe("/new hides the plan chooser and names the plan the server decided (spe
     expect(tierChosen(container, "premium")).toBe(true);
     await click(container, "#planTier-free");
     expect(tierChosen(container, "free")).toBe(true);
+  });
+
+  it("decision 13: a person the server named as Free reads the public notice before Start, and the ask says it was shown", async () => {
+    mocks.getAskRoom.mockResolvedValue(room({ plan_id: "FREE" }));
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    expect(container.querySelector(".ndPublicNotice")?.textContent).toBe("On the Free plan your question and its debate are public. Don't include personal details.");
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Should cities ban cars downtown on Sundays?");
+    await submitForm(container);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]![7]).toEqual({ freePublicNotice: true });
+  });
+
+  it.each([["a paid plan", "PLUS"], ["no plans (a local site)", null]])("decision 13: %s shows no notice and sends no flag", async (_name, planId) => {
+    mocks.getAskRoom.mockResolvedValue(room({ plan_id: planId }));
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    expect(container.querySelector(".ndPublicNotice")).toBeNull();
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Should cities ban cars downtown on Sundays?");
+    await submitForm(container);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]![7]).toBeUndefined();
   });
 
   it("keeps the chooser hidden after a later read fails: the decided plan is remembered", async () => {

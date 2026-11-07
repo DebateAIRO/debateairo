@@ -2041,7 +2041,7 @@ describe("pickRoleAssignment — the per-run money ceiling (HOSTED)", () => {
 
   it("cannot step down on an estimate it does not have, and says so", () => {
     const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
-      scorecard: budgetScorecard, reachable, mode: "HOSTED", strength: "BEST", perRunCeilingMicros: 10, prices,
+      scorecard: budgetScorecard, reachable, mode: "HOSTED", strength: "BEST", perRunCeilingMicros: <the plan's limit> prices,
       seatDemand: roleNumbers({ ANSWER_WRITER: 1, JUDGE: 2 }),
       expectedCallsByRole: roleNumbers({ ANSWER_WRITER: 10, JUDGE: 5 })
     })));
@@ -2432,7 +2432,7 @@ import { roleNumbers, testCandidate, testEntry, testScorecard } from "../support
 
 describe("typicalCallMicros — the budget's own arithmetic on a typical call", () => {
   it.each([
-    { inputTokens: 1000, outputTokens: 500, thinkingTokens: 250, input: 1_250_000, output: 10_000_000 },
+    { inputTokens: 1000, outputTokens: 500, thinkingTokens: 250, input: 1_250_000, output: <amount> },
     { inputTokens: 1, outputTokens: 1, thinkingTokens: null, input: 1, output: 1 },
     { inputTokens: 0, outputTokens: 0, thinkingTokens: 0, input: 5, output: 5 },
     { inputTokens: 123_457, outputTokens: 9_999, thinkingTokens: 77, input: 3_000_000, output: 15_000_000 }
@@ -2448,7 +2448,7 @@ describe("typicalCallMicros — the budget's own arithmetic on a typical call", 
 
   it("bills thinking tokens as output and rounds each side up to a whole micro", () => {
     expect(typicalCallMicros({ inputTokens: 1000, outputTokens: 500, thinkingTokens: 250, seconds: 1 },
-      { inputMicrosPerMTok: 1_250_000, outputMicrosPerMTok: 10_000_000 })).toBe(8750);
+      { inputMicrosPerMTok: 1_250_000, outputMicrosPerMTok: <amount> })).toBe(8750);
     expect(typicalCallMicros({ inputTokens: 1, outputTokens: 1, thinkingTokens: null, seconds: 1 },
       { inputMicrosPerMTok: 1, outputMicrosPerMTok: 1 })).toBe(2);
   });
@@ -7520,7 +7520,7 @@ import { framedFixturePacket } from "../support/framed-packet.js";
 
 const MODEL = "fixture/model";
 const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 });
-const POLICY = Object.freeze({ perRunCeilingMicros: 1_000_000_000, dailyCeilingMicros: 10_000_000_000 });
+const POLICY = Object.freeze({ perRunCeilingMicros: <the plan's limit> dailyCeilingMicros: <the plan's limit> });
 
 function memoryStore() {
   const rows: ModelSpendEntry[] = [];
@@ -25467,8 +25467,8 @@ function hostedFile(): Record<string, unknown> {
       kind: "COST_ENVELOPE_POLICY",
       currency: "USD",
       minor_units_per_unit: 1_000_000,
-      per_run_ceiling_micros: 250_000,
-      daily_ceiling_micros: 2_000_000,
+      per_run_ceiling_micros: <the plan's limit>
+      daily_ceiling_micros: <the plan's limit>
       provisional: true,
       provisional_reason: "PROVISIONAL first hosted run ceiling under V-28"
     },
@@ -25878,10 +25878,10 @@ describe("A20 · deployment facts", () => {
   it("builds HOSTED settings with the per-run ceiling, and LOCAL settings without one", () => {
     const absent = Object.freeze({ state: "ABSENT" as const });
     expect(askModelPickerSettings({
-      scorecard: absent, deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros: 250_000
-    })).toMatchObject({ mode: "HOSTED", perRunCeilingMicros: 250_000 });
+      scorecard: absent, deploymentMode: "hosted", targets: TARGETS, perRunCeilingMicros: <the plan's limit>
+    })).toMatchObject({ mode: "HOSTED", perRunCeilingMicros: <the plan's limit> });
     expect(askModelPickerSettings({
-      scorecard: absent, deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: 250_000
+      scorecard: absent, deploymentMode: "local", targets: TARGETS, perRunCeilingMicros: <the plan's limit>
     })).toMatchObject({ mode: "LOCAL", perRunCeilingMicros: null });
   });
 
@@ -26491,7 +26491,7 @@ describe("A20 · with a VALID scorecard the picker replaces the roster filter", 
     await evaluateAskAdmission(settingsWith({
       modelPicker: valid({
         mode: "HOSTED",
-        perRunCeilingMicros: 250_000,
+        perRunCeilingMicros: <the plan's limit>
         targetFacts: new Map([["development:claude-premium-cli", Object.freeze({
           thinkingLevels: Object.freeze([]), contextWindowTokens: null, price
         })]])
@@ -26499,7 +26499,7 @@ describe("A20 · with a VALID scorecard the picker replaces the roster filter", 
     }), ask("premium", "BEST"));
     const hosted = lastInput();
     expect(hosted).toMatchObject({
-      scorecard: SCORECARD, mode: "HOSTED", strength: "BEST", planTier: "premium", perRunCeilingMicros: 250_000
+      scorecard: SCORECARD, mode: "HOSTED", strength: "BEST", planTier: "premium", perRunCeilingMicros: <the plan's limit>
     });
     expect([...hosted.prices]).toEqual([["development:claude-premium-cli", price]]);
     await evaluateAskAdmission(settingsWith({ modelPicker: valid() }), ask("premium"));
@@ -26592,14 +26592,14 @@ describe("A20 · the attempt ceiling provisions a backup only when a seat has a 
 describe("A20 · refusals", () => {
   it("refuses 'even Economy does not fit' with a constant message that names no money", async () => {
     picker.outcome = Object.freeze({
-      state: "REFUSED", reason: "BUDGET_TOO_SMALL", detail: "ECONOMY estimate 912345 exceeds the ceiling 250000"
+      state: "REFUSED", reason: "BUDGET_TOO_SMALL", detail: "ECONOMY estimate 912345 exceeds the ceiling <amount>"
     });
     const lines: string[] = [];
     const error = await evaluateAskAdmission(settingsWith({
-      modelPicker: valid({ mode: "HOSTED", perRunCeilingMicros: 250_000, log: (line) => lines.push(line) })
+      modelPicker: valid({ mode: "HOSTED", perRunCeilingMicros: <the plan's limit> log: (line) => lines.push(line) })
     }), ask("premium")).catch((failure: unknown) => failure);
     expect(error).toMatchObject({ name: "AskRefusal", code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
-    expect((error as Error).message).not.toMatch(/250000|912345/u);
+    expect((error as Error).message).not.toMatch(/<amount>|912345/u);
     expect(lines.some((line) => line.includes("912345"))).toBe(true);
   });
 
@@ -29128,7 +29128,7 @@ with:
 ```ts
   it("A21 names the model-strength refusals as refusals, in copy the server never wrote", () => {
     const tooSmall = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
-      "UNPROCESSABLE", 422, "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: estimate 912345 over 250000",
+      "UNPROCESSABLE", 422, "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: estimate 912345 over <amount>",
       "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL"
     ));
     const unavailable = classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
@@ -29138,7 +29138,7 @@ with:
     expect(unavailable.kind).toBe("MODEL_UNAVAILABLE");
     for (const classified of [tooSmall, unavailable]) {
       expect(classified.message).toMatch(/refused/u);
-      expect(classified.message).not.toMatch(/unknown|912345|250000|glm/u);
+      expect(classified.message).not.toMatch(/unknown|912345|<amount>|glm/u);
       expect(classified.message).not.toContain("ASK_MODEL");
     }
     expect(tooSmall.message).not.toBe(unavailable.message);

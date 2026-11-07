@@ -1,0 +1,78 @@
+import type { Pool } from "pg";
+
+/** 0131 §4b: the erasure role's one page-memory function. */
+export const FORGET_ERASED_DEBATE_PAGE_MEMORY = "identity.forget_erased_debate_page_memory(uuid)" as const;
+/** 0132 §12: the erasure role's deletion of one debate's web evidence. */
+export const FORGET_ERASED_DEBATE_WEB_EVIDENCE = "identity.forget_erased_debate_web_evidence(uuid)" as const;
+/** 0133 §9: the erasure role's deletion of one debate's investigation rows. */
+export const FORGET_ERASED_DEBATE_INVESTIGATION = "identity.forget_erased_debate_investigation(uuid)" as const;
+/** 0134 §9: the erasure role's deletion of one debate's pauses, its own path rewrite and the rewrites of its paths. */
+export const FORGET_ERASED_DEBATE_DIG_MODEL = "identity.forget_erased_debate_dig_model(uuid)" as const;
+/** 0135 §6: the erasure role's deletion of one debate's dig picks and its path rewrite's material (the same signature as
+ *  dig-picks.ts's, kept here as the others are: dig-picks.ts imports the package index, which imports the erasure code). */
+export const FORGET_ERASED_DEBATE_DIG_PICKS = "identity.forget_erased_debate_dig_picks(uuid)" as const;
+/** 0137, 0138, 0139 (the owner's changes of 31 Oct): one debate's public contribution and Free ask, its tree updates, its quotes and saved replies. */
+export const FORGET_ERASED_DEBATE_PUBLIC = "identity.forget_erased_debate_public(uuid)" as const;
+export const FORGET_ERASED_DEBATE_TREE_UPDATES = "identity.forget_erased_debate_tree_updates(uuid)" as const;
+export const FORGET_ERASED_DEBATE_PASSAGES = "identity.forget_erased_debate_passages(uuid)" as const;
+/** 0147: one debate's copy of the public page, its check's pass, its climb's mark and an answer version under its key. */
+export const FORGET_ERASED_DEBATE_PUBLIC_TREE = "identity.forget_erased_debate_public_tree(uuid)" as const;
+/** 0141: every path suggestion one debate sealed or holds on its paths. */
+export const FORGET_ERASED_DEBATE_PATH_SUGGESTIONS = "identity.forget_erased_debate_path_suggestions(uuid)" as const;
+
+/**
+ * R22 item 16 (owner, 2026-10-29: "Yes, delete them too"): deleting one private debate also deletes its V4 page memory
+ * (0131: its last-visit row and every dig link where it is the parent or the child) in the SAME transaction as the
+ * rest of that deletion, the one that writes the run's erasure tombstone. `finalizeSql` is that finalize statement
+ * (0040/0123's core.finalize_private_run_erasure or 0126's core.finalize_synthesis_check_erasure), one row with an
+ * `outcome` column. The run is read from 0040's manifest first (finalize deletes the intent it names); only a COMMITTED
+ * finalize, which has just written the tombstone, is followed by the deletion. Any error rolls the whole transaction
+ * back, so the run stays marked and the next try (the same request again, or the reconciler) finishes both together.
+ * The same transaction also deletes the debate's investigation rows (0133: an erased root takes its investigation, an
+ * erased dig leaves it) and its web evidence (0132: searches, pages, page texts, readings, extracts, picks, packs and
+ * researched choices), and its dig model rows (0134: its month pauses, its own path rewrite and turn as a dig, so the
+ * path it was dug from falls back to its previous text, and every rewrite and turn of its own paths) and its dig picks
+ * (0135: as a dig, its picks and its rewrite's material; the digs dug from it keep theirs), its public contribution and Free ask
+ * (0137: a contribution on the page stays with no name), its tree updates (0138: what it caused or sits on, its answer versions and
+ * purpose lines), its quotes and saved replies (0139) and its path suggestions (0141: what it sealed and what sits on its paths).
+ */
+export async function finalizeWithPageMemory<Outcome extends string>(
+  pool: Pool,
+  erasureId: string,
+  finalizeSql: string,
+  values: readonly unknown[]
+): Promise<Outcome | undefined> {
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  try {
+    await client.query("BEGIN");
+    try {
+      const manifest = await client.query<{ run_id: string }>(
+        "SELECT run_id FROM core.private_run_erasure_manifest($1)", [erasureId]);
+      const outcome = (await client.query<{ outcome: Outcome }>(finalizeSql, [...values])).rows[0]?.outcome;
+      const runId = manifest.rows[0]?.run_id;
+      if (outcome === "COMMITTED" && runId !== undefined) {
+        await client.query("SELECT identity.forget_erased_debate_page_memory($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_investigation($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_web_evidence($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_dig_model($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_dig_picks($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_public($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_tree_updates($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_passages($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_path_suggestions($1)", [runId]);
+        await client.query("SELECT identity.forget_erased_debate_public_tree($1)", [runId]);
+      }
+      await client.query("COMMIT");
+      return outcome;
+    } catch (error) {
+      // A failed ROLLBACK leaves the connection in an unknown state: it leaves the pool rather than return to it.
+      await client.query("ROLLBACK").catch((rollback: unknown) => {
+        broken = rollback instanceof Error ? rollback : new Error("ROLLBACK_FAILED");
+      });
+      throw error;
+    }
+  } finally {
+    client.release(broken);
+  }
+}

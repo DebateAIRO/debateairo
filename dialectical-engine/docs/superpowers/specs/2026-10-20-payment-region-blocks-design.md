@@ -33,6 +33,8 @@ Research behind the list (20 October 2026, eight passes, official sources where 
      - Italy: Livigno, Campione d'Italia.
      - Germany: Heligoland, Büsingen.
 2. The owner opens each place when the company registers there.
+   *Amended 4 November 2026: the owner opened New Jersey. Its bulletin TB-72 treats SaaS as a service it does not
+   tax, and a seller with no taxable sales there need not register.*
 3. The United Kingdom stays closed as today (country level, unchanged).
 
 ## 3. Goals

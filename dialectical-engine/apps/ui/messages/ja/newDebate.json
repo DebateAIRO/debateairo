@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "ディベートを作成できません",
   "newDebate.sessionReadFailed": "セッションの読み取りに失敗しました",
   "newDebate.planRosterFailed": "プラン階層一覧の読み取りに失敗しました",
-  "newDebate.checkingSession": "セッションを確認しています…",
+  "newDebate.checkingSession": "少々お待ちください…",
   "newDebate.redirectingToSignIn": "ログイン画面に移動しています…",
   "newDebate.continueToSignIn": "ログインに進む",
   "newDebate.defaultUnavailable": "デプロイに有効なriskTier行がありません。リスク階層の入力が必要です。",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "ご利用のプランの本日の上限に達しました。質問はこのまま送れます。ディベートは{time}に自動的に始まります。",
   "newDebate.room.personWeekFullTopPlan": "ご利用のプランの今週の上限に達しました。質問はこのまま送れます。ディベートは{time}に自動的に始まります。",
   "newDebate.room.personMonthFullTopPlan": "ご利用のプランの今月の上限に達しました。質問はこのまま送れます。ディベートは{time}に自動的に始まります。",
-  "newDebate.room.freeMonthFull": "今月の無料ディベート枠を使い切りました。次のディベートは{time}から始められます。今すぐ続けるには、プランを選んでください。",
+  "newDebate.room.freeMonthFull": "今月の無料の利用枠を使い切りました。次のディベートは{time}から始められます。今すぐ続けるには、プランを選んでください。",
   "newDebate.room.personClose": "ご利用のプランの上限に近づいています。このディベートは最後まで行われます。",
   "newDebate.room.ownDebatesFull": "現在、ほかのディベートが上限の残りを使っています。このディベートは、そのいずれかが終わりしだい自動的に始まります。",
   "newDebate.room.upgradeLink": "プランを見る",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "ご利用のプラン：無料",
   "newDebate.plan.current.PLUS": "ご利用のプラン：Plus",
   "newDebate.plan.current.PRO": "ご利用のプラン：Pro",
-  "newDebate.plan.current.MAX": "ご利用のプラン：Max"
+  "newDebate.plan.current.MAX": "ご利用のプラン：Max",
+  "newDebate.askText.otherAnswer": "別の回答…",
+  "newDebate.askText.otherLabel": "ご自身の補足説明",
+  "newDebate.askText.matters": "回答同士が食い違うとき、私にとって一番大事なのは：{matters}",
+  "newDebate.askText.angles": "次の観点も見てください：{list}。",
+  "newDebate.freePublicNotice": "無料プランでは、お客様の質問とそのディベートは公開されます。個人情報を含めないでください。"
 }

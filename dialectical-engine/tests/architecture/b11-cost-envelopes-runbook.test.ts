@@ -33,7 +33,7 @@ describe("the runbook's cost envelopes (B11b)", () => {
   it("names the boot check and each person's windows, with their refusals", () => {
     for (const needle of [
       "RUN_CEILING_BELOW_ONE_CALL", "BILLING_REQUIRES_ENVELOPE_MEMBERS", "BILLING_PLANS_UNRESOLVED",
-      "BILLING_PLAN_WINDOW_BELOW_RUN_CEILING", "ASK_SIGN_IN_REQUIRED", "PERSON_ALLOWANCE_REACHED", "110%", "115%",
+      "BILLING_PLAN_WINDOW_BELOW_RUN_CEILING", "ASK_SIGN_IN_REQUIRED", "PERSON_ALLOWANCE_REACHED", "`finish_up_to_basis_points`",
       // B9d prices the boot check per plan: each plan's cheapest model must fit.
       "every plan's cheapest must fit"
     ]) expect(money, needle).toContain(needle);
@@ -48,7 +48,7 @@ describe("the runbook's cost envelopes (B11b)", () => {
   });
 
   it("keeps the first paid run's values and their provisional flag", () => {
-    for (const needle of ["`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false"]) {
+    for (const needle of ["`440000`", "`5500000`", "0.44 USD", "5.50 USD", "provisional: true", "provisional: false"]) {
       expect(money, needle).toContain(needle);
     }
   });

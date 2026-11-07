@@ -357,7 +357,9 @@ describe("PR B — usage in the engine's shape", () => {
     expect(anthropicUsageAsEngineUsage({
       input_tokens: 100, output_tokens: 40, cache_creation_input_tokens: 7, cache_read_input_tokens: 3,
       service_tier: "standard", speed: "standard"
-    })).toStrictEqual({ prompt_tokens: 110, completion_tokens: 40, total_tokens: 150 });
+    })).toStrictEqual({ prompt_tokens: 110, completion_tokens: 40, total_tokens: 150,
+      // Owner answer F4 (W2-2): the cache parts the vendor named travel on to the charge.
+      cache_creation_input_tokens: 7, cache_read_input_tokens: 3 });
     expect(anthropicUsageAsEngineUsage({
       input_tokens: 5, output_tokens: 1, cache_creation_input_tokens: null
     })).toStrictEqual({ prompt_tokens: 5, completion_tokens: 1, total_tokens: 6 });
@@ -378,7 +380,9 @@ describe("PR B — usage in the engine's shape", () => {
     const { gateway, artifacts } = gatewayWith(() => reply(body));
     const spy = chargeSpy();
     await gateway.call(request({ costEnvelope: spy.costEnvelope }));
-    expect(spy.charges).toStrictEqual([{ prompt_tokens: 30, completion_tokens: 9, total_tokens: 39 }]);
+    // Owner answer F4 (W2-2): the charge also sees the cache parts, priced at their own rates (web-cache-charge.test.ts).
+    expect(spy.charges).toStrictEqual([{ prompt_tokens: 30, completion_tokens: 9, total_tokens: 39,
+      cache_creation_input_tokens: 4, cache_read_input_tokens: 6 }]);
     expect(artifacts[0]!.metadata.usage).toStrictEqual({ prompt_tokens: 30, completion_tokens: 9, total_tokens: 39 });
 
     const bad = gatewayWith(() => reply(message({ usage: { input_tokens: 20 } })));

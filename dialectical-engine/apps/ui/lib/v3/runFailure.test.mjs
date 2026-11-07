@@ -39,11 +39,11 @@ const ENGLISH = Object.freeze({
   // longer offers is asked to be asked again, and told it cost nothing.
   CHOICE_GONE:
     "The site was updated while your question waited, and one of the options you chose is no longer offered. "
-    + "Please ask it again. It did not use any of your allowance.",
+    + "Please ask it again. It did not use any of your quota.",
   // Side-by-side uploads spec 2026-10-21 §4, §9 (plan B15, D7): a debate an upload set aside is told it used none of the
-  // person's allowance. The brief's phrasing 1, with the site's own word "allowance" (controller ruling); the owner picks.
+  // person's quota. The brief's phrasing 1, with the site's word "quota" (owner, V4 screen review 3 Nov 2026).
   SET_ASIDE:
-    "We could not finish this debate because of an update on our side. It did not use your allowance. "
+    "We could not finish this debate because of an update on our side. It did not use your quota. "
     + "Please ask your question again."
 });
 
@@ -375,7 +375,7 @@ test("a waiting question whose chosen option is gone after an update is told to 
   assert.equal(runFailureKind("RUN_SETUP_FAILED:READMISSION"), "NOT_STARTED");
 });
 
-test("a debate set aside by an upload is told it used no allowance (side-by-side §4, §9)", () => {
+test("a debate set aside by an upload is told it used no quota (side-by-side §4, §9)", () => {
   for (const namespace of NAMESPACES) {
     const message = runFailureMessage("RUN_SET_ASIDE:BACKSTOP", catalogue("en", namespace));
     assert.equal(message, ENGLISH.SET_ASIDE, `en/${namespace}`);

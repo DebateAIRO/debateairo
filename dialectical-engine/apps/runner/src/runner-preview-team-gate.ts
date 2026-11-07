@@ -95,7 +95,7 @@ export function postgresRunnerPreviewTeamGateStore(
           `SELECT item.work_item_id, item.run_id,
                   (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()) AS claim_live
            FROM core.work_item AS item
-           JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+           JOIN core.run AS run ON run.run_id = item.run_id AND identity.run_release_now(run.run_id) = $2
            WHERE item.run_id IS NOT NULL AND item.state IN ('READY', 'CLAIMED')
            ORDER BY item.created_at_seq, item.work_item_id
            LIMIT $1`,
@@ -112,7 +112,7 @@ export function postgresRunnerPreviewTeamGateStore(
            SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = $3
            WHERE work_item_id = $1 AND run_id = $2 AND settled_attempt_id IS NULL
              AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
-             AND EXISTS (SELECT 1 FROM core.run r WHERE r.run_id = $2 AND r.release_key = $4)`,
+             AND identity.run_release_now($2) = $4`,
           [failure.workItemId, failure.runId, failure.reason, releaseKey]
         ));
         return result.rowCount === 1;

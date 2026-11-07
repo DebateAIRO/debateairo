@@ -13,7 +13,7 @@
   "home.publicDebates": "Publiskās debates",
   "home.total": "KOPĀ {count}",
   "home.signInHint": "Pierakstieties vai izveidojiet kontu, lai skatītu savas debates.",
-  "home.publicIndexingNotice": "Publicētās debates var indeksēt meklētājprogrammas. Kopijas var saglabāties arī pēc publikācijas atcelšanas.",
+  "home.publicIndexingNotice": "Publicētas debates var indeksēt meklētājprogrammas, un kopijas var saglabāties citur.",
   "home.debateClaim": "Debašu apgalvojums",
   "home.claimPlaceholder": "Ierakstiet apspriežamu apgalvojumu vai jautājumu…",
   "home.composerHint": "Modeļi argumentē · jūs vērtējat",
@@ -74,8 +74,10 @@
   "home.turn": "Gājiens {turn}",
   "home.sampleCoda": "Raunds beidzas šeit. Neviens netiek pasludināts par uzvarētāju. Jūs saņemat transkriptu, divus vērtējumus par katru gājienu un posmu, kurā piekāpāties.",
   "home.closingTitle": "Jūsu arguments ir tikai tik stiprs, cik tā vājākais posms.",
-  "home.closingLede": "Aizvadiet vienu raundu. Četri gājieni, aptuveni deviņas minūtes un transkripts, kas precīzi parāda, kur pārtraucāt atbildēt.",
-  "home.pricingCopy": "Sāciet bez maksas. Maksas plāni sākas no {price} mēnesī plus nodoklis. Abonementu varat atcelt jebkurā laikā.",
+  "home.closingLede": "Aizvadiet vienu raundu. Četri gājieni un transkripts, kas precīzi parāda, kur pārtraucāt atbildēt.",
+  "home.pricingCopyPlusTax": "Sāciet bez maksas. Maksas plāni sākas no {price} + {taxName} mēnesī. Abonementu varat atcelt jebkurā laikā.",
+  "home.pricingCopyNoTax": "Sāciet bez maksas. Maksas plāni sākas no {price} mēnesī, bez pievienota nodokļa. Abonementu varat atcelt jebkurā laikā.",
+  "home.pricingCopyChoose": "Sāciet bez maksas. Maksas plāni sākas no {price} mēnesī, plus nodoklis, kur tas piemērojams. Abonementu varat atcelt jebkurā laikā.",
   "home.pricingCopyFree": "Sāciet bez maksas. Karte nav vajadzīga.",
   "home.pricingLink": "Skatīt plānus",
   "home.card1Text": "Uzņēmumiem, kuros priekšroka dota attālinātam darbam, attiecībā uz inženieriem, kas veic līdzvērtīgu darbu, parasti būtu jāizmanto no atrašanās vietas neatkarīgi algu diapazoni, pieļaujot pārredzamas korekcijas likumā noteikto izmaksu, retu prasmju un amata tvēruma dēļ.",
@@ -146,6 +148,5 @@
   "home.removal.close": "Aizvērt",
   "home.flag.underReview": "ATZĪMĒTS · TIEK PĀRSKATĪTS",
   "home.flag.approved": "APSTIPRINĀTS",
-  "home.flag.refused": "NAV APSTIPRINĀTS",
-  "home.takeDown.button": "Noņemt"
+  "home.flag.refused": "NAV APSTIPRINĀTS"
 }

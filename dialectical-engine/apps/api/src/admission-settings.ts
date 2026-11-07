@@ -67,7 +67,7 @@ import {
 import { journalSettingsCode } from "./admission-alarm.js";
 import { composeAskModelPicker, type AskModelPickerBoot, type AskModelPickerSettings, type CallTokenCeilings } from "./ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
-import { previewVersionTermsOf, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
+import { previewVersionTermsOf, previewWebRolePrices, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
 import { composeQuestionLanguage, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock, QuestionLanguagePort } from "./question-language/decider.js";
 import type { QuestionLanguageReferenceKey } from "./question-language/reference.js";
@@ -353,7 +353,9 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
         prices: site.prices,
         maximumMicros: mostOneRunMaySpendMicros(guardPolicy),
         // Fresh-site estimate: the site's starting figures (a SITE row, read once from the site version).
-        start: site.costEstimateStart
+        start: site.costEstimateStart,
+        // Web search (W2-2): a web class short of samples starts at its depth's figure plus its web part at the caps.
+        webPrices: previewWebRolePrices(site.prices)
       })
     });
   });
@@ -515,7 +517,9 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
       // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
       ...(input.length === null ? {} : { length: input.length }),
       // Engine redesign (R1d): engine 2's settings admission resolved for this panel, or none (today's receipt).
-      ...(input.engine === null ? {} : { engine: input.engine })
+      ...(input.engine === null ? {} : { engine: input.engine }),
+      // W2-2 (R22): the web part admission counted, or none (today's receipt).
+      ...(input.web === null ? {} : { web: input.web })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({

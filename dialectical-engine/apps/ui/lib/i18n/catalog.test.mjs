@@ -77,6 +77,10 @@ test("all 35 locales have exact CLDR plural categories, non-plural keys, and pla
 // Values that equal their English value in a non-English home/public catalogue, measured at 95d36b737
 // (FIX-SF-S01-p1-C): brand and product names, file names, cognates. Any other English value fails.
 const SAME_AS_ENGLISH = {
+  // The report's PDF (plan 2026-10-31 decision 17): the same word in these languages.
+  "public.report.investigation.version": ["da", "de", "fr", "sv"],
+  "public.report.investigation.sources": ["fr"],
+  "public.report.investigation.sideFor": ["da"],
   "home.baseScore": ["it", "pt"],
   "home.crisisSupport.chat": ["cs", "da", "ro", "sk"],
   "home.crisisSupport.website": ["de", "nl"],
@@ -86,11 +90,7 @@ const SAME_AS_ENGLISH = {
   "public.badges.heading": ["fr"],
   "public.export.filename": ["ar", "bg", "cs", "da", "el", "et", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "mt", "nl", "pl", "pt", "sk", "sl", "sv", "tr", "vi", "zh"],
   "public.honesty.verdict": ["fr", "ro"],
-  "public.overview.baseAndFinalAria": ["pt"],
-  "public.overview.convergence": ["fr"],
   "public.overview.details": ["de", "nl"],
-  "public.overview.proLabel": ["cs", "de", "hu", "id", "ro"],
-  "public.overview.proSideName": ["cs", "hu", "id", "ro"],
   "public.report.point.position": ["da", "de", "fr"]
 };
 

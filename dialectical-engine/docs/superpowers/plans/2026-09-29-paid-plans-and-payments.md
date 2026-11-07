@@ -28,9 +28,9 @@ These are copied from the spec. Every task includes them implicitly.
 
 **Plans and limits**
 
-- Plans are exactly FREE / PLUS / PRO / MAX. Net prices are 0 / 20.00 / 50.00 / 200.00 USD. Monthly credit is 0.20 / 5.00 / 20.00 / 150.00 USD.
+- Plans are exactly FREE / PLUS / PRO / MAX. Net prices are the public ones. Monthly credit is the plan's limit.
 - Paid plans get a day cap of 2000 basis points and a week cap of 5000 basis points of the monthly credit. Free has only its monthly credit.
-- Every person window has a finish edge of 11000 basis points (110%). The site day keeps 11500 (115%), and the close edge is 9500 (95%).
+- Every person window has a finish edge of <amount> basis points (<amount>). The site day keeps <amount> (<amount>), and the close edge is <amount> (<amount>).
 - One waiting question per person.
 - Periods are anchored at the subscription instant (for Free, at account creation). A month runs from the anchor day-of-month, clamped to the month's end. A week is a 7-day block from the month start; a day is a 24-hour block from the month start. All in UTC.
 - An upgrade takes effect at once, is prorated by seconds, and keeps the anchor. A downgrade takes effect at the next renewal. Cancelling ends the plan at the period end.
@@ -8150,7 +8150,7 @@ describe("B1 costEnvelopePolicy carries the band (budget spec §2.4)", () => {
       finishBasisPoints: null,
       waitingLinePerPerson: null,
       // The members that were already there keep their meaning.
-      perRunCeilingMicros: 250_000,
+      perRunCeilingMicros: <the plan's limit>
       serveReserveBasisPoints: 3_000
     });
     expect(costEnvelopeBand(policy)).toBeNull();
@@ -8244,7 +8244,7 @@ describe("B1 decideRoom — FITS, CLOSE, FULL", () => {
   });
 
   it("A5: an estimate far above the whole limit is CLOSE, never FULL, while nothing is used", () => {
-    // Free's cold-start estimate is the run maximum (about 0.36 USD) against a 0.20 USD month.
+    // Free's cold-start estimate is the run maximum (about 0.36 USD) against a <amount> month.
     expect(decideRoom({
       usedMicros: 0, estimateMicros: 360_000, limitMicros: 200_000, closeBasisPoints: CLOSE
     })).toBe("CLOSE");
@@ -8276,7 +8276,7 @@ describe("B1 decideSharedWall — the running wall, real spend only", () => {
     decideSharedWall({ spentMicros, projectedMicros: 0, limitMicros: LIMIT, finishBasisPoints });
 
   it.each([[109_990, "WITHIN"], [110_000, "WITHIN"], [110_010, "WOULD_CROSS"]] as const)(
-    "a person window (finish 110%%): %i spent is %s", (spent, expected) => {
+    "a person window (finish <amount>): %i spent is %s", (spent, expected) => {
       expect(wall(spent, 11_000)).toBe(expected);
     }
   );
@@ -10760,12 +10760,12 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
     expect(planCapMicros(planById(plans, "PLUS"), "DAY")).toBe(1_000_000);
     expect(planCapMicros(planById(plans, "PLUS"), "WEEK")).toBe(2_500_000);
     expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(30_000_000);
-    expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(150_000_000);
+    expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(<the plan's limit>);
     expect(planCapMicros(planById(plans, "FREE"), "DAY")).toBeNull();
-    expect(planCapMicros(planById(plans, "FREE"), "MONTH")).toBe(200_000);
+    expect(planCapMicros(planById(plans, "FREE"), "MONTH")).toBe(<the plan's limit>);
     const odd = plansRow();
     odd.plans[1]!.monthly_credit_micros = 1_000_001;
-    expect(planCapMicros(planById(plansOf(odd), "PLUS"), "DAY")).toBe(200_000);
+    expect(planCapMicros(planById(plansOf(odd), "PLUS"), "DAY")).toBe(<the plan's limit>);
   });
 
   it("refuses an unknown plan id by name", () => {
@@ -10785,7 +10785,7 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
     ["a fixed depth outside 1-5", (row: ReturnType<typeof plansRow>) => {
       row.plans[0]!.fixed_gauges = { risk_tier: "standard", composition_budget_tier: "low", depth: 6 };
     }],
-    ["plans out of price order", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.net_price_micros = 10_000_000; }],
+    ["plans out of price order", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.net_price_micros = <amount>; }],
     ["plans in the wrong order", (row: ReturnType<typeof plansRow>) => { [row.plans[1], row.plans[2]] = [row.plans[2]!, row.plans[1]!]; }],
     ["a duplicated plan", (row: ReturnType<typeof plansRow>) => { row.plans[3] = structuredClone(row.plans[2]!); }],
     ["a missing plan", (row: ReturnType<typeof plansRow>) => { row.plans.pop(); }],
@@ -10947,7 +10947,7 @@ import { RISK_TIERS, TypedDomainError, type RiskTier } from "@debateai/kernel";
  *  - Free has a monthly credit only; each paid plan also has a day and a week
  *    cap, as basis points of its monthly credit (`day_bp`, `week_bp`).
  *  - `finish_bp` is how far a RUNNING debate may take a person's window so it
- *    can finish (110%). New questions still wait at 100%.
+ *    can finish (<amount>). New questions still wait at 100%.
  *  - Free's `fixed_gauges` are the values `/new` sends for Free today
  *    (NewDebatePageClient.tsx `choosePlanTier`). The server enforces them when
  *    billing is on (§2.3.4); the API never imports UI code for them.
@@ -11046,28 +11046,28 @@ const billingPlansValueSchema = z.object({
 export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: BILLING_PLANS_ROW_KEY,
   sourceRef: "paid-plans-and-payments-design-2026-09-29#2.5.1 billingPlans v1"
-    + " (owner decisions 2026-09-29: Free/Plus/Pro/Max, day 20%, week 50%, finish 110%)",
+    + " (owner decisions 2026-09-29: Free/Plus/Pro/Max, a day share and a week share, finish <amount>)",
   value: Object.freeze({
     kind: "BILLING_PLANS" as const,
     currency: "USD" as const,
     minor_units_per_unit: 1_000_000 as const,
     plans: Object.freeze([
       Object.freeze({
-        plan_id: "FREE" as const, tier: "free" as const, net_price_micros: 0, monthly_credit_micros: 200_000,
-        day_bp: null, week_bp: null, finish_bp: 11_000,
+        plan_id: "FREE" as const, tier: "free" as const, net_price_micros: 0, monthly_credit_micros: <the plan's limit>
+        day_bp: null, week_bp: null, finish_bp: <a share>,
         fixed_gauges: Object.freeze({ risk_tier: "standard" as const, composition_budget_tier: "low" as const, depth: 2 })
       }),
       Object.freeze({
-        plan_id: "PLUS" as const, tier: "premium" as const, net_price_micros: 20_000_000, monthly_credit_micros: 5_000_000,
-        day_bp: 2_000, week_bp: 5_000, finish_bp: 11_000, fixed_gauges: null
+        plan_id: "PLUS" as const, tier: "premium" as const, net_price_micros: 20_000_000, monthly_credit_micros: <the plan's limit>
+        day_bp: <a share>, week_bp: <a share>, finish_bp: <a share>, fixed_gauges: null
       }),
       Object.freeze({
-        plan_id: "PRO" as const, tier: "premium" as const, net_price_micros: 50_000_000, monthly_credit_micros: 20_000_000,
-        day_bp: 2_000, week_bp: 5_000, finish_bp: 11_000, fixed_gauges: null
+        plan_id: "PRO" as const, tier: "premium" as const, net_price_micros: 50_000_000, monthly_credit_micros: <the plan's limit>
+        day_bp: <a share>, week_bp: <a share>, finish_bp: <a share>, fixed_gauges: null
       }),
       Object.freeze({
-        plan_id: "MAX" as const, tier: "premium" as const, net_price_micros: 200_000_000, monthly_credit_micros: 150_000_000,
-        day_bp: 2_000, week_bp: 5_000, finish_bp: 11_000, fixed_gauges: null
+        plan_id: "MAX" as const, tier: "premium" as const, net_price_micros: 200_000_000, monthly_credit_micros: <the plan's limit>
+        day_bp: <a share>, week_bp: <a share>, finish_bp: <a share>, fixed_gauges: null
       })
     ])
   })
@@ -11636,7 +11636,7 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
   it("gives a paid plan a day, a week and a month, each with the plan's finish edge and the site's close edge", () => {
     const windows = personWindowsFor(planById(plans, "PLUS"), anchor, now, 9_500);
     expect(windows.map((window) => [window.scope, window.limitMicros])).toEqual([
-      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", 5_000_000]
+      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", <the plan's limit>]
     ]);
     const computed = computeWindows(anchor, now);
     expect(windows[0]).toMatchObject({ periodStart: computed.day.start, resetsAt: computed.day.end, finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
@@ -11646,7 +11646,7 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
 
   it("gives Free only its month", () => {
     expect(personWindowsFor(planById(plans, "FREE"), anchor, now, 9_500).map((window) => [window.scope, window.limitMicros]))
-      .toEqual([["PERSON_MONTH", 200_000]]);
+      .toEqual([["PERSON_MONTH", <the plan's limit>]]);
   });
 
   it("uses a prorated month credit after an upgrade, and never lets a day or week cap exceed it (A6)", () => {
@@ -11654,8 +11654,8 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
     // PLUS -> PRO at half the period: 5 + (20 - 5) x 0.5 = 12.50 USD for the month.
     expect(personWindowsFor(pro, anchor, now, 9_500, 12_500_000).map((window) => window.limitMicros))
       .toEqual([4_000_000, 10_000_000, 12_500_000]);
-    expect(personWindowsFor(pro, anchor, now, 9_500, 3_000_000).map((window) => window.limitMicros))
-      .toEqual([3_000_000, 3_000_000, 3_000_000]);
+    expect(personWindowsFor(pro, anchor, now, 9_500, <amount>).map((window) => window.limitMicros))
+      .toEqual([3_000_000, 3_000_000, <amount>]);
     expect(personWindowsFor(pro, anchor, now, 9_500, null).map((window) => window.limitMicros))
       .toEqual([4_000_000, 10_000_000, 20_000_000]);
   });
@@ -12540,7 +12540,7 @@ describe("an entitlement anchored just after the caller's clock (the view's cloc
     const windows = await source("PLUS", null, justAfter).allowance.read(OWNER, now);
     const opened = computeWindows(justAfter, justAfter);
     expect(windows.map((window) => [window.scope, window.limitMicros])).toEqual([
-      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", 5_000_000]
+      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", <the plan's limit>]
     ]);
     expect(windows.map((window) => window.periodStart)).toEqual([justAfter, justAfter, justAfter]);
     expect(windows.map((window) => window.resetsAt)).toEqual([opened.day.end, opened.week.end, opened.month.end]);
@@ -13375,7 +13375,7 @@ function arrange(input: {
     estimator: { estimateMicros: async () => input.estimate ?? 1_000 },
     personAllowance: { read: async (ownerRef) => input.windows?.[ownerRef] ?? [] },
     entitlements: input.entitlements ?? null,
-    dailyCeilingMicros: 100_000,
+    dailyCeilingMicros: <the plan's limit>
     closeBasisPoints: 9_500,
     waitingLinePerPerson: 1,
     clock: input.clock ?? (() => NOW)
@@ -13657,7 +13657,7 @@ describe("B6a the helpers", () => {
   });
 
   it("refuses options that are not whole positive numbers", () => {
-    for (const broken of [{ dailyCeilingMicros: 0 }, { closeBasisPoints: 9_500.5 }, { waitingLinePerPerson: 0 }]) {
+    for (const broken of [{ dailyCeilingMicros: <the plan's limit> }, { closeBasisPoints: 9_500.5 }, { waitingLinePerPerson: 0 }]) {
       expect(() => new AskRoom({
         lockPool: lockPool().pool,
         spend: {} as AskRoomSpend,
@@ -13665,7 +13665,7 @@ describe("B6a the helpers", () => {
         estimator: { estimateMicros: async () => 1 },
         personAllowance: { read: async () => [] },
         entitlements: null,
-        dailyCeilingMicros: 100_000,
+        dailyCeilingMicros: <the plan's limit>
         closeBasisPoints: 9_500,
         waitingLinePerPerson: 1,
         ...broken
@@ -13904,7 +13904,7 @@ function roomWith(overrides: Partial<AskRoomOptions>): AskRoom {
     estimator: { estimateMicros: async () => 1_000 },
     personAllowance: { read: async () => [] },
     entitlements: null,
-    dailyCeilingMicros: 10_000_000,
+    dailyCeilingMicros: <the plan's limit>
     closeBasisPoints: 9_500,
     waitingLinePerPerson: 1,
     ...overrides
@@ -13973,7 +13973,7 @@ async function decideAndApply(room: AskRoom, access: Readonly<{ ownerRef: string
 
 describe("B6a two concurrent asks under one lock (budget spec §2.14, paid-plans spec §2.8)", () => {
   it("admits exactly one of two SIMULTANEOUS asks into a day that holds one debate", async () => {
-    const room = roomWith({ dailyCeilingMicros: 1_000, clock: () => new Date("2031-07-01T10:00:00.000Z") });
+    const room = roomWith({ dailyCeilingMicros: <the plan's limit> clock: () => new Date("2031-07-01T10:00:00.000Z") });
     const outcomes = await Promise.all([
       decideAndApply(room, { ownerRef: null, legacyAskerId: `site:${randomUUID()}` }),
       decideAndApply(room, { ownerRef: null, legacyAskerId: `site:${randomUUID()}` })
@@ -15289,7 +15289,7 @@ describe("B6b the waiting answers on the wire (budget spec §2.7, A16)", () => {
   it("answers the old settings' day-spent refusal exactly as today: 429, the code only, Retry-After", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const response = await ask(async () => {
-      throw new AskRefusal(new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "spent 2000000 of 2000000 micro-units"));
+      throw new AskRefusal(new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "spent <amount> of <amount> micro-units"));
     });
     expect(response.statusCode).toBe(429);
     expect(response.json()).toEqual({ error: "DAILY_COST_ENVELOPE_REACHED", message: "DAILY_COST_ENVELOPE_REACHED" });
@@ -15501,7 +15501,7 @@ async function holdOf(runId: string): Promise<number | null> {
 describe("B6b a hosted ask through the room", () => {
   it("STARTs: queues the first job, holds the estimate in the same decision, and dispatches", async () => {
     const dispatched: string[] = [];
-    const application = applicationWith(roomAt(new Date("2031-08-01T10:00:00.000Z"), 10_000_000),
+    const application = applicationWith(roomAt(new Date("2031-08-01T10:00:00.000Z"), <amount>),
       { dispatch: async ({ runId }) => { dispatched.push(runId); } });
     const accepted = await submitAs(application, `b6b:start:${randomUUID()}`);
     expect(accepted.status).toBe("QUEUED");
@@ -15545,7 +15545,7 @@ describe("B6b a hosted ask through the room", () => {
 
   it("records a START whose dispatch fails FAILED, and its hold stops counting", async () => {
     const now = new Date("2031-08-04T10:00:00.000Z");
-    const application = applicationWith(roomAt(now, 10_000_000), {
+    const application = applicationWith(roomAt(now, <amount>), {
       dispatch: async () => { throw new Error("test: the job system refused"); }
     });
     const askerId = `b6b:dispatch:${randomUUID()}`;
@@ -15559,7 +15559,7 @@ describe("B6b a hosted ask through the room", () => {
 
   it("queues the first job on the decision's own transaction: a failure after it leaves no job a runner could claim", async () => {
     const now = new Date("2031-08-05T10:00:00.000Z");
-    const application = applicationWith(roomAt(now, 10_000_000), { dispatch: async () => undefined });
+    const application = applicationWith(roomAt(now, <amount>), { dispatch: async () => undefined });
     const askerId = `b6b:commit:${randomUUID()}`;
     const seenOutside: number[] = [];
     const queue = WorkItemRepository.prototype.enqueueOn;
@@ -16186,7 +16186,7 @@ function roomWith(input: {
     estimator: { estimateMicros: async () => input.estimate ?? 1_000 },
     personAllowance: { read: async () => input.windows ?? [] },
     entitlements: input.entitlements ?? null,
-    dailyCeilingMicros: 100_000,
+    dailyCeilingMicros: <the plan's limit>
     closeBasisPoints: 9_500,
     waitingLinePerPerson: 1,
     clock: () => NOW
@@ -16659,7 +16659,7 @@ import type { BillingUsageReader } from "./index.js";
 /**
  * Paid-plans spec §1.2 (U1) — WHAT THE USAGE BARS SHOW: what the person has spent
  * in each window, as a whole percentage of its limit, rounded DOWN and clamped to
- * 0–110 (a running debate may take a window to its 110% finish edge). Holds are
+ * 0–110 (a running debate may take a window to its <amount> finish edge). Holds are
  * not shown: a bar says what was used, not what is promised to a running debate.
  */
 export function usagePercent(spentMicros: number, limitMicros: number): number {
@@ -17230,7 +17230,7 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
       },
       entitlements: input.entitlements ?? null,
       billingPlans: input.withPlans === true ? PLANS : null,
-      dailyCeilingMicros: 100_000,
+      dailyCeilingMicros: <the plan's limit>
       closeBasisPoints: 9_500,
       waitingLinePerPerson: 1,
       clock: () => NOW
@@ -17437,7 +17437,7 @@ function roomWith(overrides: Partial<AskRoomOptions> = {}): AskRoom {
     estimator: { estimateMicros: async () => estimate },
     personAllowance: { read: async () => [] },
     entitlements: null,
-    dailyCeilingMicros: 1_000,
+    dailyCeilingMicros: <the plan's limit>
     closeBasisPoints: 9_500,
     waitingLinePerPerson: 1,
     clock: () => now,
@@ -17677,7 +17677,7 @@ describe("B7b the waiting line, woken", () => {
     const entitlements = new EntitlementRepository(database.pool);
     // The month's limit follows the plan in force: Free 1 000, any paid plan 5 000.
     const room = roomWith({
-      dailyCeilingMicros: 10_000_000,
+      dailyCeilingMicros: <the plan's limit>
       personAllowance: {
         read: async (ownerRef, at) => ownerRef !== owner ? []
           : [monthWindow((await entitlements.current(owner, at)).planId === "FREE" ? 1_000 : 5_000)]
@@ -17782,7 +17782,7 @@ describe("B7b a run waiting only for its own person holds nobody back (budget sp
         return typeof value === "function" ? (value as (...values: unknown[]) => unknown).bind(target) : value;
       }
     }) as Pool;
-    const room = roomWith({ dailyCeilingMicros: 10_000_000, lockPool });
+    const room = roomWith({ dailyCeilingMicros: <the plan's limit> lockPool });
     const { dispatched, dispatcher } = recording();
     const application = applicationWith(room, dispatcher);
     // This process's first sweep is done while the line is empty.
@@ -17833,7 +17833,7 @@ describe("B7b a run waiting only for its own person holds nobody back (budget sp
       Object.freeze({ scope, limitMicros, periodStart: new Date(periodStart), resetsAt: new Date(resetsAt), finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
     const month = window("PERSON_MONTH", 5_000, "2031-10-01T00:00:00.000Z", "2031-11-01T00:00:00.000Z");
     const room = roomWith({
-      dailyCeilingMicros: 10_000_000,
+      dailyCeilingMicros: <the plan's limit>
       personAllowance: {
         read: async (ownerRef, at) => ownerRef !== owner ? [] : [
           at.getTime() < dayOne.getTime()
@@ -17859,7 +17859,7 @@ describe("B7b a run waiting only for its own person holds nobody back (budget sp
   it("re-measures every PERSON run at boot: a stale one waits for no one after a restart", async () => {
     now = new Date("2031-10-12T10:00:00.000Z");
     estimate = 1;
-    const room = roomWith({ dailyCeilingMicros: 10_000_000 });
+    const room = roomWith({ dailyCeilingMicros: <the plan's limit> });
     const first = recording();
     const running = applicationWith(room, first.dispatcher);
     await running.wakeWaitingRuns();
@@ -17867,7 +17867,7 @@ describe("B7b a run waiting only for its own person holds nobody back (budget sp
     const stale = await waitingWith(await activeOwner(), { waitsFor: "PERSON", personRecheckAt: new Date("2031-11-12T10:00:00.000Z") }, now);
     await expect(running.wakeWaitingRuns()).resolves.toMatchObject({ waiting: 0, started: 0 });
     const restarted = recording();
-    await expect(applicationWith(roomWith({ dailyCeilingMicros: 10_000_000 }), restarted.dispatcher).wakeWaitingRuns())
+    await expect(applicationWith(roomWith({ dailyCeilingMicros: <the plan's limit> }), restarted.dispatcher).wakeWaitingRuns())
       .resolves.toMatchObject({ started: 1 });
     expect(restarted.dispatched).toEqual([stale]);
   });
@@ -17887,12 +17887,12 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
       subscriptionId, paidThrough
     }));
     const room = roomWith({
-      dailyCeilingMicros: 10_000_000,
+      dailyCeilingMicros: <the plan's limit>
       personAllowance: new BillingPersonAllowanceSource({ entitlements, plans: PLANS, closeBasisPoints: 9_500 }),
       entitlements,
       billingPlans: PLANS
     });
-    // PLUS's day cap is 20 % of 5 USD: one dollar, spent.
+    // PLUS's day cap is 20 % of <amount>: one dollar, spent.
     await spendAs(owner, 1_000_000, new Date("2031-10-15T11:59:00.000Z"));
     const waitingRunId = await waitAs(room, owner, "premium");
     const { dispatched, dispatcher } = recording();
@@ -17946,12 +17946,12 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     const owner = await activeOwner();
     const entitlements = new EntitlementRepository(database.pool);
     const room = roomWith({
-      dailyCeilingMicros: 10_000_000,
+      dailyCeilingMicros: <the plan's limit>
       personAllowance: new BillingPersonAllowanceSource({ entitlements, plans: PLANS, closeBasisPoints: 9_500 }),
       entitlements,
       billingPlans: PLANS
     });
-    // Free's month is 0.20 USD, spent.
+    // Free's month is <amount>, spent.
     await spendAs(owner, 200_000, new Date("2031-10-20T11:59:59.000Z"));
     const waitingRunId = await waitAs(room, owner, "free");
     const { dispatched, dispatcher } = recording();
@@ -18016,7 +18016,7 @@ and after `siteLineBlocking` add:
            OR line.reason_at <= $1::timestamptz - interval '1 hour'
            OR ${PERSON_BLOCK_MAY_HAVE_LIFTED})
        ORDER BY line.waiting_since, line.run_id
-       LIMIT $5`,
+       LIMIT <amount>`,
       [input.now, input.after?.waitingSince ?? null, input.after?.runId ?? null, input.everyPerson, input.limit]
     );
     return Object.freeze(result.rows.map(waitingRun));
@@ -18722,10 +18722,10 @@ describe("decideCoarseFit: cheaper models only when that helps (§2.6 item 7, A5
     ["a Free ask is already the cheapest", "free", 300_000, [window(900_000, 1_000_000)], "AS_ASKED"],
     ["no person window", "premium", 300_000, [], "AS_ASKED"],
     ["the estimate fits every window", "premium", 100_000, [window(900_000, 1_000_000)], "AS_ASKED"],
-    ["an exact fit still fits", "premium", 100_000, [window(900_000, 1_000_000), window(0, 5_000_000)], "AS_ASKED"],
+    ["an exact fit still fits", "premium", 100_000, [window(900_000, 1_000_000), window(0, <amount>)], "AS_ASKED"],
     ["a FULL window waits instead (B6b)", "premium", 300_000, [window(1_000_000, 1_000_000)], "AS_ASKED"],
     ["the estimate does not fit and nothing is full", "premium", 300_000, [window(900_000, 1_000_000)], "FREE_ROSTER"],
-    ["one of several windows does not fit", "premium", 300_000, [window(0, 5_000_000), window(2_400_000, 2_500_000)], "FREE_ROSTER"]
+    ["one of several windows does not fit", "premium", 300_000, [window(0, <amount>), window(2_400_000, 2_500_000)], "FREE_ROSTER"]
   ] as const)("%s", (_name, planTier, estimateMicros, windows, expected) => {
     expect(decideCoarseFit({ planTier, estimateMicros, windows })).toBe(expected);
   });
@@ -20021,7 +20021,7 @@ import { TypedDomainError } from "@debateai/kernel";
  * A call made while arguing (BODY) is measured, after the run's own ceiling admitted it, against:
  *  · the site's day: the day's whole spend plus this call, against 115% of the daily ceiling — only when the
  *    guard carries the site's finish edge (the register sealed the band; `finishBasisPoints: null` is none);
- *  · each of the run owner's windows: the owner's spend in the window plus this call, against 110% of the window,
+ *  · each of the run owner's windows: the owner's spend in the window plus this call, against <amount> of the window,
  *    with or without the band.
  * Answer-writing calls, story calls and the first position's own call ("EXEMPT") are never walled.
  * Real spend only: holds are not counted here.
@@ -20032,7 +20032,7 @@ const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicr
 const PROJECTION = Object.freeze({ requestBytes: 800, completionTokenCeiling: 64 });
 const PROJECTED = 464;
 const NOW = new Date("2026-09-29T11:00:00.000Z");
-const POLICY = Object.freeze({ perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000 });
+const POLICY = Object.freeze({ perRunCeilingMicros: <the plan's limit> dailyCeilingMicros: <the plan's limit> });
 /** floor(2 000 000 x 11 500 / 10 000): the site day's finish edge. */
 const SITE_EDGE = 2_300_000;
 
@@ -20119,7 +20119,7 @@ describe("B9a · the site's day, walled at its finish edge while arguing", () =>
   });
 
   it("never walls an answer-writing call, nor the first position's own call", async () => {
-    const spend = store({ daySpent: 10_000_000 });
+    const spend = store({ daySpent: <amount> });
     const persons = owner("owner-1", [window("PERSON_DAY", DAY_START, 1)], new Map([[DAY_START.getTime(), 10]]));
     const guard = new CostEnvelopeGuard({
       store: spend.spend, policy: POLICY, clock: () => NOW,
@@ -20133,14 +20133,14 @@ describe("B9a · the site's day, walled at its finish edge while arguing", () =>
   });
 
   it("behaves exactly as before when the guard has no wall at all (local mode)", async () => {
-    const spend = store({ daySpent: 10_000_000 });
+    const spend = store({ daySpent: <amount> });
     const guard = new CostEnvelopeGuard({ store: spend.spend, policy: POLICY, clock: () => NOW });
     expect(await decide(guard, "BODY")).toBe("ADMITTED");
     expect(spend.dayReads).toEqual([]);
   });
 
   it("asks the run's own ceiling first: a run that cannot pay is refused as a run, and the day is not read", async () => {
-    const spend = store({ daySpent: 10_000_000, runSpent: 250_000 });
+    const spend = store({ daySpent: 10_000_000, runSpent: <amount> });
     const persons = owner(null, [], new Map());
     const guard = new CostEnvelopeGuard({
       store: spend.spend, policy: POLICY, clock: () => NOW,
@@ -20151,7 +20151,7 @@ describe("B9a · the site's day, walled at its finish edge while arguing", () =>
   });
 
   it("never walls a story call", async () => {
-    const spend = store({ daySpent: 10_000_000 });
+    const spend = store({ daySpent: <amount> });
     const persons = owner(null, [], new Map());
     const guard = new CostEnvelopeGuard({
       store: spend.spend, policy: { ...POLICY, perStoryCeilingMicros: 50_000 }, clock: () => NOW,
@@ -20163,10 +20163,10 @@ describe("B9a · the site's day, walled at its finish edge while arguing", () =>
   });
 });
 
-describe("B9a · each of the run owner's windows, walled at its own finish edge (110%)", () => {
+describe("B9a · each of the run owner's windows, walled at its own finish edge (<amount>)", () => {
   const WINDOWS = [
     window("PERSON_DAY", DAY_START, 100_000),     // edge 110 000
-    window("PERSON_WEEK", WEEK_START, 250_000),   // edge 275 000
+    window("PERSON_WEEK", WEEK_START, <amount>),   // edge 275 000
     window("PERSON_MONTH", MONTH_START, 1_000_000) // edge 1 100 000
   ];
 
@@ -20202,7 +20202,7 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   });
 
   it("has no person scope for a run billing pinned no owner on, and never asks for windows", async () => {
-    const persons = owner(null, WINDOWS, new Map([[DAY_START.getTime(), 10_000_000]]));
+    const persons = owner(null, WINDOWS, new Map([[DAY_START.getTime(), <amount>]]));
     const guard = new CostEnvelopeGuard({
       store: store({ daySpent: 0 }).spend, policy: POLICY, clock: () => NOW,
       sharedWall: { finishBasisPoints: 11_500, persons: persons.persons, owners: persons.owners }
@@ -20224,7 +20224,7 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   // Hosted without the band (a register version older than the band members): no site-day wall, but the person
   // half stands, so a run billing pinned an owner on is still held to that owner's windows (ruling R-19).
   it("walls the owner's windows with no site-day wall when the guard has no site finish edge (null)", async () => {
-    const spend = store({ daySpent: 10_000_000 });
+    const spend = store({ daySpent: <amount> });
     const pinned = owner("owner-1", WINDOWS, new Map([[DAY_START.getTime(), 110_000 - PROJECTED + 1]]));
     const guard = new CostEnvelopeGuard({
       store: spend.spend, policy: POLICY, clock: () => NOW,
@@ -20236,8 +20236,8 @@ describe("B9a · each of the run owner's windows, walled at its own finish edge 
   });
 
   it("leaves a run with no pinned owner untouched when there is no site finish edge, and reads neither", async () => {
-    const spend = store({ daySpent: 10_000_000 });
-    const unpinned = owner(null, WINDOWS, new Map([[DAY_START.getTime(), 10_000_000]]));
+    const spend = store({ daySpent: <amount> });
+    const unpinned = owner(null, WINDOWS, new Map([[DAY_START.getTime(), <amount>]]));
     const guard = new CostEnvelopeGuard({
       store: spend.spend, policy: POLICY, clock: () => NOW,
       sharedWall: { finishBasisPoints: null, persons: unpinned.persons, owners: unpinned.owners }
@@ -20416,7 +20416,7 @@ describe("B9a · the run's owner, as billing pinned it", () => {
 });
 
 describe("B9a · the person's wall over the real ledger", () => {
-  it("walls the owner's window at 110% of it, counting RUN and STORY spend and nobody else's", async () => {
+  it("walls the owner's window at <amount> of it, counting RUN and STORY spend and nobody else's", async () => {
     const store = new PostgresModelSpendStore(database.pool);
     const ownerRef = randomUUID();
     const runId = await createRun(`b9a-wall-${randomUUID()}`);
@@ -20436,12 +20436,12 @@ describe("B9a · the person's wall over the real ledger", () => {
     const guard = new CostEnvelopeGuard({
       store,
       // The site's day is far away, so only the person's window can speak.
-      policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 1_000_000_000 },
+      policy: { perRunCeilingMicros: <the plan's limit> dailyCeilingMicros: <the plan's limit> },
       sharedWall: { finishBasisPoints: 11_500, persons, owners: store }
     });
 
-    // 110 000 is floor(100 000 x 110%). Another owner's run spending plenty does not count.
-    await charge(store, otherRun, "RUN", 5_000_000);
+    // 110 000 is floor(100 000 x <amount>). Another owner's run spending plenty does not count.
+    await charge(store, otherRun, "RUN", <amount>);
     await charge(store, runId, "RUN", 110_000 - PROJECTED);
     expect(await decide(guard, runId)).toBe("ADMITTED");
     // One micro-unit of STORY spend is the owner's too.
@@ -20466,7 +20466,7 @@ describe("B9a · the person's wall over the real ledger", () => {
     const edge = Math.floor((month.limitMicros * month.finishBasisPoints) / 10_000);
     const guard = new CostEnvelopeGuard({
       store,
-      policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 1_000_000_000 },
+      policy: { perRunCeilingMicros: <the plan's limit> dailyCeilingMicros: <the plan's limit> },
       sharedWall: { finishBasisPoints: 11_500, persons, owners: store }
     });
 
@@ -20692,7 +20692,7 @@ already under way finishes, which is V-28(2) in as many words."):
    *    `finishBasisPoints: null` there is no site-day wall and the day is not
    *    read.
    *  · each of the run owner's windows: the owner's RUN + STORY spend inside the
-   *    window plus this call, against that window's own finish edge (110%),
+   *    window plus this call, against that window's own finish edge (<amount>),
    *    with or without the band (ruling R-19: the person wall applies iff the
    *    run has a charge scope).
    *
@@ -21053,7 +21053,7 @@ describe("B9b · the person wall fails closed when the runner cannot read the pl
       readDaySpentMicros: async () => 0,
       admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
     },
-    policy: { perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000 },
+    policy: { perRunCeilingMicros: <the plan's limit> dailyCeilingMicros: <the plan's limit> },
     sharedWall: { finishBasisPoints, persons: plansUnresolvedPersonAllowance(), owners: owners(ownerRef) }
   }).providerSeam({ runId: "run-b9b", price: PRICE, requireReportedUsage: true, phase: "BODY" })
     .assertCallAllowed({ requestBytes: 800, completionTokenCeiling: 64 })
@@ -21178,7 +21178,7 @@ the ROUND 4 paragraph), and add after it:
   DAILY_COST_ENVELOPE_REACHED: "DAILY",
   /**
    * B9 (budget spec §2.9, paid-plans spec §2.4.1): one of the run owner's
-   * allowance windows would be crossed at its finish edge (110%). Its OWN
+   * allowance windows would be crossed at its finish edge (<amount>). Its OWN
    * kind, for ruling R-C's reason: it is lifted by the person's window
    * resetting or a larger plan, not by the site's day or the run's ceiling.
    */
@@ -21383,7 +21383,7 @@ const modelSpendStore = new PostgresModelSpendStore(pool);
  *    fallback (budget spec §2.4): `finishBasisPoints` is null.
  *  · THE PERSON, for every run with a charge scope (ruling R-19: the person wall
  *    applies iff the row exists), band or no band: each of the run owner's
- *    windows at its own finish edge (110%, from the plan). The owner is the one
+ *    windows at its own finish edge (<amount>, from the plan). The owner is the one
  *    billing pinned on the run at admission (`billing.run_charge_scope`, read by
  *    the spend store); the windows come from `BillingPersonAllowanceSource`
  *    (billing-core) over the READ-ONLY entitlement port —
@@ -21555,7 +21555,7 @@ import {
  * B9b (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE ARGUING, over the production
  * runner and a REAL CostEnvelopeGuard. The wall is "fused": its reads report nothing spent before the
  * `fuseAt`-th counted walled read, and a crossed edge from then on, for every maker — the site's day (2 300 000
- * is 115% of 2 000 000) or the run owner's week (1 100 000 is 110% of 1 000 000). Each walled attempt makes
+ * is <amount> of 2 000 000) or the run owner's week (1 100 000 is <amount> of 1 000 000). Each walled attempt makes
  * exactly ONE counted read in either scope (the day's in SITE_DAY; in PERSON the day reads nothing and the
  * owner's one window is the counted read), so the n-th read is the n-th walled attempt in both scopes. The
  * doubles report no usage, so the seam does not require it.
@@ -21632,7 +21632,7 @@ function b9WallGuard(input: Readonly<{
       readDaySpentMicros: async () => (input.scope === "SITE_DAY" ? fusedSpend() : 0),
       admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
     },
-    policy: { perRunCeilingMicros: input.prices === undefined ? 250_000 : 1_000_000, dailyCeilingMicros: 2_000_000 },
+    policy: { perRunCeilingMicros: input.prices === undefined ? <amount> : 1_000_000, dailyCeilingMicros: <the plan's limit> },
     sharedWall: {
       finishBasisPoints: 11_500,
       persons,
@@ -22114,7 +22114,7 @@ function judgeCall(callSiteKey: string, providerRef = "provider:planned"): Provi
 }
 
 const CHEAP = Object.freeze({ inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 });
-const MIDDLING = Object.freeze({ inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: 3_000_000 });
+const MIDDLING = Object.freeze({ inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: <amount> });
 const DEAR = Object.freeze({ inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 });
 
 describe("B9c · which refusals move a call, and which calls may move", () => {
@@ -22556,7 +22556,7 @@ const B9_PRICES = new Map([
 
 /** M=3: C (THIRD_REF) is the cheapest, B (SECONDARY_REF) the dearest. */
 const B9_THREE_PRICES = new Map([
-  [PRIMARY_REF, { inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: 3_000_000 }],
+  [PRIMARY_REF, { inputMicrosPerMillionTokens: 3_000_000, outputMicrosPerMillionTokens: <amount> }],
   [SECONDARY_REF, { inputMicrosPerMillionTokens: 9_000_000, outputMicrosPerMillionTokens: 9_000_000 }],
   [THIRD_REF, { inputMicrosPerMillionTokens: 1_000_000, outputMicrosPerMillionTokens: 1_000_000 }]
 ]);
@@ -22581,7 +22581,7 @@ function b9OnlyTheCheaperMakerPays() {
       readDaySpentMicros: async () => 0,
       admitNewRun: async () => Object.freeze({ admitted: true, committedMicros: 0 })
     },
-    policy: { perRunCeilingMicros, dailyCeilingMicros: 2_000_000 }
+    policy: { perRunCeilingMicros, dailyCeilingMicros: <the plan's limit> }
   });
   return Object.freeze({
     buildFor: (maker: "primary" | "secondary") =>
@@ -23861,7 +23861,7 @@ const TOKEN_CEILING = 2_048;
 
 /** Every model on both rosters, the Free plan's cheap and the premium plan's dear, and one model on no roster. */
 const EVERY_TARGET: readonly ProviderDiscoveryTarget[] = Object.freeze([
-  ...rosterTargets("free", 1_000_000, 5_000_000),
+  ...rosterTargets("free", 1_000_000, <amount>),
   ...rosterTargets("premium", 5_000_000, 25_000_000),
   target("provider:support", "support-model", 100_000, 100_000)
 ]);
@@ -26363,7 +26363,7 @@ describe("UsageBars", () => {
     expect(container.querySelectorAll('[role="meter"]')).toHaveLength(1);
   });
 
-  it("shows a debate's finish leeway as 110%, with the bar full, not overflowing", async () => {
+  it("shows a debate's finish leeway as <amount>, with the bar full, not overflowing", async () => {
     const container = await mount({ getBillingUsage: async () => ({
       plan_id: "FREE", windows: [{ scope: "PERSON_MONTH", percent: 110, resets_at: RESET }]
     }) });
@@ -26556,7 +26556,7 @@ function windowsOf(usage: BillingUsage | null): readonly UsageWindow[] {
 /**
  * Paid-plans spec §1.2 and §2.10: the person's day, week and month as a percent
  * with the reset time under each. No dollar amount of credit is shown anywhere.
- * 110% is a running debate's finish leeway; the bar is then full.
+ * <amount> is a running debate's finish leeway; the bar is then full.
  */
 export function UsageBars({
   catalog,
@@ -26767,7 +26767,7 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
     );
     expect(rendered).toContain("billing_policy enabled=false\n");
     expect(rendered).toContain("billing_plans plan_ids=FREE,PLUS,PRO,MAX\n");
-    // §2.5.1: Free's whole month (0.20 USD) is below 0.25 USD per debate. A warning, never a refusal.
+    // §2.5.1: Free's whole month (<amount>) is below <amount> per debate. A warning, never a refusal.
     expect(rendered).toContain("warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:FREE\n");
     expect(rendered).not.toContain("BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:PLUS");
     // The existing cost_envelope line keeps its shape (the M1 regex above still matches it).
@@ -26969,11 +26969,11 @@ const TOP_LEVEL_KEYS = Object.freeze([
     "currency": "USD",
     "minor_units_per_unit": 1000000,
     "plans": [
-      { "plan_id": "FREE", "tier": "free", "net_price_micros": 0, "monthly_credit_micros": 200000, "day_bp": null, "week_bp": null, "finish_bp": 11000,
+      { "plan_id": "FREE", "tier": "free", "net_price_micros": 0, "monthly_credit_micros": <the plan's limit> "day_bp": null, "week_bp": null, "finish_bp": <a share>,
         "fixed_gauges": { "risk_tier": "standard", "composition_budget_tier": "low", "depth": 2 } },
-      { "plan_id": "PLUS", "tier": "premium", "net_price_micros": 20000000, "monthly_credit_micros": 5000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null },
-      { "plan_id": "PRO", "tier": "premium", "net_price_micros": 50000000, "monthly_credit_micros": 20000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null },
-      { "plan_id": "MAX", "tier": "premium", "net_price_micros": 200000000, "monthly_credit_micros": 150000000, "day_bp": 2000, "week_bp": 5000, "finish_bp": 11000, "fixed_gauges": null }
+      { "plan_id": "PLUS", "tier": "premium", "net_price_micros": 20000000, "monthly_credit_micros": <the plan's limit> "day_bp": <a share>, "week_bp": <a share>, "finish_bp": <a share>, "fixed_gauges": null },
+      { "plan_id": "PRO", "tier": "premium", "net_price_micros": 50000000, "monthly_credit_micros": <the plan's limit> "day_bp": <a share>, "week_bp": <a share>, "finish_bp": <a share>, "fixed_gauges": null },
+      { "plan_id": "MAX", "tier": "premium", "net_price_micros": 200000000, "monthly_credit_micros": <the plan's limit> "day_bp": <a share>, "week_bp": <a share>, "finish_bp": <a share>, "fixed_gauges": null }
     ]
   },
   "billingPolicy": {
@@ -27040,7 +27040,7 @@ git commit -m "feat(register): hosted publish checks billing rows and prints the
   - **B8**: `ASK_SIGN_IN_REQUIRED` (401) and the interim roster swap, recorded with `RunCostSubstitutionReason` `PERSON`;
   - **B9a–B9d**: `PERSON_ALLOWANCE_REACHED` (B9a), the log line `runner.body.cheaper_model` (B9c) and `RUN_CEILING_BELOW_ONE_CALL` (B9d: the maximum question built from the character that grows most, and the cheapest price among each plan's models, every plan's cheapest required to fit);
   - **B11a**: the plan lines `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…` / `cost_envelope_band absent` and `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` (B11a also prints `billing_policy …` and `billing_plans …`, which this runbook does not quote).
-- Produces documentation only, including `GO-LIVE-CHECKLIST.md` row 13 (the three `costEnvelopePolicy` budget members; P22, D7, numbers its rows from 14) and, in `deploy/vps/register/README.md`'s "What the file holds" table, the rows `` | `billingPlans` | `` and `` | `billingPolicy` | `` after `synthesisRoles` (P22 builds on both). The needles `tests/architecture/vps-deployment-baseline.test.ts:677-705` and `tests/unit/m5-serve-disclosure-cli.test.ts:249-251` depend on stay present: `` `250000` ``, `` `2000000` ``, `0.25 USD`, `2.00 USD`, `provisional: true`, `provisional: false` and `pnpm ops:serve-disclosure`. The first six are in the rewritten section; the last is in the untouched "One answer's record".
+- Produces documentation only, including `GO-LIVE-CHECKLIST.md` row 13 (the three `costEnvelopePolicy` budget members; P22, D7, numbers its rows from 14) and, in `deploy/vps/register/README.md`'s "What the file holds" table, the rows `` | `billingPlans` | `` and `` | `billingPolicy` | `` after `synthesisRoles` (P22 builds on both). The needles `tests/architecture/vps-deployment-baseline.test.ts:677-705` and `tests/unit/m5-serve-disclosure-cli.test.ts:249-251` depend on stay present: `` `<amount>` ``, `` `<amount>` ``, `<amount>`, `<amount>`, `provisional: true`, `provisional: false` and `pnpm ops:serve-disclosure`. The first six are in the rewritten section; the last is in the untouched "One answer's record".
 
 - [ ] **Step 1: Write the failing test**
 
@@ -27078,14 +27078,14 @@ describe("the runbook's cost envelopes (B11b)", () => {
   it("names the boot check and each person's windows, with their refusals", () => {
     for (const needle of [
       "RUN_CEILING_BELOW_ONE_CALL", "BILLING_REQUIRES_ENVELOPE_MEMBERS", "BILLING_PLANS_UNRESOLVED",
-      "BILLING_PLAN_WINDOW_BELOW_RUN_CEILING", "ASK_SIGN_IN_REQUIRED", "PERSON_ALLOWANCE_REACHED", "110%", "115%",
+      "BILLING_PLAN_WINDOW_BELOW_RUN_CEILING", "ASK_SIGN_IN_REQUIRED", "PERSON_ALLOWANCE_REACHED", "<amount>", "<amount>",
       // B9d prices the boot check per plan: each plan's cheapest model must fit.
       "every plan's cheapest must fit"
     ]) expect(money, needle).toContain(needle);
   });
 
   it("keeps the first paid run's values and their provisional flag", () => {
-    for (const needle of ["`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false"]) {
+    for (const needle of ["`<amount>`", "`<amount>`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false"]) {
       expect(money, needle).toContain(needle);
     }
   });
@@ -27144,8 +27144,8 @@ Every charged call is one row in `ledger.model_spend`, and every limit is a sum 
 
 | Row member | Value | Meaning |
 |---|---|---|
-| `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
-| `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
+| `per_run_ceiling_micros` | `<amount>` | <amount> per debate |
+| `daily_ceiling_micros` | `<amount>` | <amount> per UTC day |
 | `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
 | `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
 | `admission_close_basis_points` | `9500` | from 95% of a limit, the ask page says the limit is close |
@@ -27160,7 +27160,7 @@ The reserve and the overrun keep money for writing the answer (spec 2026-09-26 �
 
 - **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
 - **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
-- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: 0.05 USD, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
+- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`). The day must hold one debate AND its story, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
 - **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
 - **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
 
@@ -27180,7 +27180,7 @@ The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09
   - From 95%, or when the question would cross 100%, the debate still starts, and the ask page says the limit is close.
   - From 100%, the question is accepted (`202`, `WAITING`) and **waits in line**. The API's 60-second waker starts it by itself at the reset, oldest first and one per person.
   - A second waiting question from the same person is refused `422 ASK_ALREADY_WAITING`, and the page names the time the first will start.
-- **While a debate runs** it is measured against real spend only, up to the **finish edge**: 115% of the site's day, 110% of a person's window.
+- **While a debate runs** it is measured against real spend only, up to the **finish edge**: <amount> of the site's day, <amount> of a person's window.
   - An arguing call that would cross it is retried on the debate's cheaper models first.
   - Only when none fits does the arguing stop, and the answer is still written.
   - The opening position and the answer are exempt.
@@ -27222,7 +27222,7 @@ With billing on (hosted, and a published `billingPolicy` saying `enabled: true`)
 All are in UTC, and each person sees them in their own time zone.
 
 - **The limits** come from the `billingPlans` row: the plan's monthly credit, and for paid plans a day and a week share of it. Free has its month only.
-- **A running debate may finish up to 110%** of any person window (`finish_bp` `11000`). The extra is on the site; it is not taken from the next month.
+- **A running debate may finish up to <amount>** of any person window (`finish_bp` `<amount>`). The extra is on the site; it is not taken from the next month.
 - **The server decides the ask:**
   - the plan's tier;
   - for Free, the sealed fixed gauges;
@@ -27234,7 +27234,7 @@ All are in UTC, and each person sees them in their own time zone.
   - `BILLING_PLANS_UNRESOLVED` when it seals no `billingPlans`.
 - **The publish command warns** `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` when a plan's smallest window (its day cap, or Free's whole month) is below the per-run ceiling.
   - It does not refuse: admission uses the estimate, so a small window still fits a small debate.
-  - At today's 0.25 USD per debate, Free's 0.20 USD month triggers it. Publish realistic per-run and daily ceilings before switching billing on.
+  - At today's <amount> per debate, Free's <amount> month triggers it. Publish realistic per-run and daily ceilings before switching billing on.
 - **The site's daily ceiling protects the company, not the person.** At launch it must be at least the expected daily spend of all subscribers: subscribers × each plan's day cap × 0.3, or better, the measured figure.
 
 #### The provisional values
@@ -27315,7 +27315,7 @@ Set a monthly spending cap on each vendor's own dashboard as well (go-live check
 **Owner, 28 and 29 September 2026.** The rules are "a debate must almost never be interrupted for budget reasons" (`docs/superpowers/specs/2026-09-28-budget-never-stops-a-debate-design.md`) and the paid plans (`docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md`). The row above is left as ruled; this note amends it.
 
 - **Part (2) is amended.** It said that when the daily ceiling is reached "no new run starts until the next day". Now a new question waits in line and starts by itself at the reset: one per person, and a second is refused `ASK_ALREADY_WAITING`. From 95% the ask page says the limit is close. A running debate may take the day to 115% to finish, cheaper models first. The old `429` remains only for register versions without the three new `costEnvelopePolicy` members.
-- **Each person's windows (billing).** With billing on, each person has a month from their subscription (Free: sign-up), with 7-day and 24-hour blocks, from the `billingPlans` row: paid plans have day and week caps of 20% and 50% of their credit. A running debate may finish at up to 110%, and the extra is on the site. Billing may be switched on only with the three members (`BILLING_REQUIRES_ENVELOPE_MEMBERS`).
+- **Each person's windows (billing).** With billing on, each person has a month from their subscription (Free: sign-up), with 7-day and 24-hour blocks, from the `billingPlans` row: paid plans have day and week caps of <amount> and <amount> of their credit. A running debate may finish at up to <amount>, and the extra is on the site. Billing may be switched on only with the three members (`BILLING_REQUIRES_ENVELOPE_MEMBERS`).
 - **J24's cost exception extends to arguing calls.** J24 ("a sealed identity is never substituted") already had a disclosed exception for cost in the answer's calls (verdict-story spec §14.4.2). An arguing call refused for money may now be retried on a cheaper model of the same run. Panel seats are excluded, because a swap would give one model two votes. The interim cheaper roster for a paid ask that does not fit the person's room is the same exception. Every swap is recorded in `core.run_cost_substitution`, owner-only.
 - **Parts (1) and (3) stand,** with the 28 September amendment above.
 - **Deploy as one.** Publish the three members only on a build that runs the whole rule (GO-LIVE-CHECKLIST line 13).
@@ -27332,7 +27332,7 @@ Set a monthly spending cap on each vendor's own dashboard as well (go-live check
 ```text
 ## Update 2026-09-29: the waiting line and each person's windows
 
-Since the budget rule (spec 2026-09-28) and the paid plans (spec 2026-09-29), a spent day no longer refuses new debates: they wait in line and start by themselves at the reset, one per person. A running debate is measured against a shared wall at 115% of the day, or 110% of a person's window, and swaps to cheaper models before it stops arguing; the answer is always written. The refusal table above describes only register versions without the three budget members. The operator's description, the new codes (`ASK_ALREADY_WAITING`, `PERSON_ALLOWANCE_REACHED`, `RUN_CEILING_BELOW_ONE_CALL`, `BILLING_REQUIRES_ENVELOPE_MEMBERS`) and how to publish the members are in `deploy/vps/README.md`, "The cost envelopes".
+Since the budget rule (spec 2026-09-28) and the paid plans (spec 2026-09-29), a spent day no longer refuses new debates: they wait in line and start by themselves at the reset, one per person. A running debate is measured against a shared wall at <amount> of the day, or <amount> of a person's window, and swaps to cheaper models before it stops arguing; the answer is always written. The refusal table above describes only register versions without the three budget members. The operator's description, the new codes (`ASK_ALREADY_WAITING`, `PERSON_ALLOWANCE_REACHED`, `RUN_CEILING_BELOW_ONE_CALL`, `BILLING_REQUIRES_ENVELOPE_MEMBERS`) and how to publish the members are in `deploy/vps/README.md`, "The cost envelopes".
 ```
 
 - [ ] **Step 4: Run the tests and see them pass**
@@ -27457,8 +27457,8 @@ const BAND = costEnvelopeBand({ closeBasisPoints: 9_500, finishBasisPoints: 11_5
  * (the register's own rule: the day must hold one run with its answer's overrun).
  */
 const GUARD_POLICY = Object.freeze({
-  perRunCeilingMicros: 20_000,
-  dailyCeilingMicros: 30_000,
+  perRunCeilingMicros: <the plan's limit>
+  dailyCeilingMicros: <the plan's limit>
   serveReserveBasisPoints: 3_000,
   serveOverrunBasisPoints: 2_000
 });
@@ -30016,7 +30016,7 @@ describe("P2 — decimal money", () => {
   });
 
   it("round-trips every whole-cent amount", () => {
-    fc.assert(fc.property(fc.integer({ min: -10_000_000, max: 10_000_000 }), (cents) => {
+    fc.assert(fc.property(fc.integer({ min: -10_000_000, max: <amount> }), (cents) => {
       expect(decimalToMicros(microsToDecimal(cents * 10_000))).toBe(cents * 10_000);
     }));
   });
@@ -30046,7 +30046,7 @@ describe("P2 — upgrade proration", () => {
 describe("P2 — withdrawal refund (the larger of days used or credit used)", () => {
   const base = {
     paidTotalMicros: 24_200_000, periodStart: start, periodEnd: end30,
-    creditSpentMicros: 0, monthlyCreditMicros: 5_000_000
+    creditSpentMicros: 0, monthlyCreditMicros: <the plan's limit>
   };
   it("refunds the unused share of the period to the millisecond, floored to cents (a started day is NOT a used day)", () => {
     expect(withdrawalRefundMicros({ ...base, now: start })).toBe(24_200_000);
@@ -30065,7 +30065,7 @@ describe("P2 — withdrawal refund (the larger of days used or credit used)", ()
     expect(withdrawalRefundMicros({ ...base, now: plus30(45 * day) })).toBe(0);
   });
   it("uses days alone when the plan has no credit, and floors to cents", () => {
-    expect(withdrawalRefundMicros({ ...base, monthlyCreditMicros: 0, creditSpentMicros: 0, now: plus30(1) }))
+    expect(withdrawalRefundMicros({ ...base, monthlyCreditMicros: <the plan's limit> creditSpentMicros: 0, now: plus30(1) }))
       .toBe(24_190_000);
     expect(withdrawalRefundMicros({ ...base, periodEnd: end31, now: plus30(day) })).toBe(23_410_000);
   });
@@ -31743,7 +31743,7 @@ describe("P1a — the one sanctioned delete: retention purge (A15, R-13, R-36)",
         ($2, $6, 'PLUS', $10::timestamptz, $10::timestamptz, 'SUBSCRIBED', $13, NULL, $11::timestamptz),
         ($3, $6, 'FREE', $11::timestamptz, $11::timestamptz, 'ENDED_CANCEL', $13, NULL, NULL),
         ($4, $7, 'FREE', $9::timestamptz, $9::timestamptz, 'SIGNED_UP_FREE', NULL, NULL, NULL),
-        ($5, $8, 'FREE', $12::timestamptz, $12::timestamptz, 'SIGNED_UP_FREE', NULL, NULL, NULL)
+        (<amount>, $8, 'FREE', <amount>::timestamptz, <amount>::timestamptz, 'SIGNED_UP_FREE', NULL, NULL, NULL)
     `, [signedUp, subscribed, ended, erasedLast, recent, living.ownerRef, erased.ownerRef, other,
       `${old}-01-10T10:00:00Z`, `${old}-02-10T10:00:00Z`, `${old}-03-10T10:00:00Z`, `${thisYear - 1}-05-01T10:00:00Z`,
       randomUUID()]);
@@ -31769,9 +31769,9 @@ describe("P1a — the one sanctioned delete: retention purge (A15, R-13, R-36)",
       VALUES
         ($1, $6, 'FREE', $9::timestamptz, $9::timestamptz, 'SIGNED_UP_FREE', NULL, NULL, NULL),
         ($2, $7, 'FREE', $10::timestamptz, $10::timestamptz, 'SIGNED_UP_FREE', NULL, NULL, NULL),
-        ($3, $7, 'PLUS', $11::timestamptz, $11::timestamptz, 'SUBSCRIBED', $14, NULL, $12::timestamptz),
+        (<amount>, <amount>, 'PLUS', <amount>::timestamptz, <amount>::timestamptz, 'SUBSCRIBED', <amount>, NULL, <amount>::timestamptz),
         ($4, $8, 'PLUS', $9::timestamptz, $9::timestamptz, 'SUBSCRIBED', $15, NULL, $13::timestamptz),
-        ($5, $8, 'FREE', $16::timestamptz, $16::timestamptz, 'ENDED_CANCEL', $15, NULL, NULL)
+        (<amount>, $8, 'FREE', <amount>::timestamptz, <amount>::timestamptz, 'ENDED_CANCEL', $15, NULL, NULL)
     `, [onlySignup, oldSignup, recentPaid, lapsedPaid, aheadFree, onlyFree.ownerRef, superseded.ownerRef, lapsed.ownerRef,
       `${old}-01-10T10:00:00Z`, `${old - 1}-01-10T10:00:00Z`, `${thisYear - 1}-05-01T10:00:00Z`,
       `${thisYear - 1}-06-01T10:00:00Z`, `${old}-02-10T10:00:00Z`, randomUUID(), randomUUID(),
@@ -31803,7 +31803,7 @@ describe("P1a — the one sanctioned delete: retention purge (A15, R-13, R-36)",
         subscription_id, month_credit_override_micros, paid_through)
       VALUES
         ($1, $3, 'FREE', $4::timestamptz, $4::timestamptz, 'SIGNED_UP_FREE', NULL, NULL, NULL),
-        ($2, $3, 'FREE', $5::timestamptz, $5::timestamptz, 'ENDED_CANCEL', $6, NULL, NULL)
+        (<amount>, <amount>, 'FREE', <amount>::timestamptz, <amount>::timestamptz, 'ENDED_CANCEL', <amount>, NULL, NULL)
     `, [superseded, inForce, frozen.ownerRef, `${thisYear - 12}-01-10T10:00:00Z`, `${thisYear - 11}-01-10T10:00:00Z`,
       randomUUID()]);
     // The older event is superseded and goes; the frozen account's event in force (eleven years old) stays.
@@ -33262,7 +33262,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
       await billing.appendChargeEvent(c, event(open.chargeId, "DUPLICATE_PAYMENT", paidAt, "32003", 24_200_000));
       await billing.appendChargeEvent(c, event(open.chargeId, "CHARGEBACK", disputedAt, "32003", 24_200_000));
       await billing.appendChargeEvent(c, event(won.chargeId, "SUCCEEDED", paidAt, "32002", 24_200_000));
-      await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK", disputedAt, "32002", 10_000_000));
+      await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK", disputedAt, "32002", <amount>));
       // The owner's `billing:dispute --outcome won` (D6b): that charge-back is over; the sale stays.
       await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK_RESOLVED", new Date("2032-03-01T12:00:00.000Z"), "32002", null));
     });
@@ -41620,13 +41620,13 @@ export const testBillingPlans: BillingPlans = Object.freeze({
   sourceRef: "test:billing-plans",
   plans: Object.freeze([
     // R-11: Free's fixed risk tier is "standard", what apps/ui/app/new/defaults.tsx sends today.
-    { planId: "FREE", tier: "free", netPriceMicros: 0, monthlyCreditMicros: 200_000, dayBasisPoints: null,
+    { planId: "FREE", tier: "free", netPriceMicros: 0, monthlyCreditMicros: <the plan's limit> dayBasisPoints: null,
       weekBasisPoints: null, finishBasisPoints: 11_000, fixedGauges: { riskTier: "standard", compositionBudgetTier: "low", depth: 1 } },
-    { planId: "PLUS", tier: "premium", netPriceMicros: 20_000_000, monthlyCreditMicros: 5_000_000, dayBasisPoints: 2_000,
+    { planId: "PLUS", tier: "premium", netPriceMicros: 20_000_000, monthlyCreditMicros: <the plan's limit> dayBasisPoints: 2_000,
       weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
-    { planId: "PRO", tier: "premium", netPriceMicros: 50_000_000, monthlyCreditMicros: 20_000_000, dayBasisPoints: 2_000,
+    { planId: "PRO", tier: "premium", netPriceMicros: 50_000_000, monthlyCreditMicros: <the plan's limit> dayBasisPoints: 2_000,
       weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
-    { planId: "MAX", tier: "premium", netPriceMicros: 200_000_000, monthlyCreditMicros: 150_000_000, dayBasisPoints: 2_000,
+    { planId: "MAX", tier: "premium", netPriceMicros: 200_000_000, monthlyCreditMicros: <the plan's limit> dayBasisPoints: 2_000,
       weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null }
   ])
 }) as BillingPlans;
@@ -45866,13 +45866,13 @@ describe("P9b the refund split, newest transaction first (A4b)", () => {
       { chargeId: "upgrade", transactionId: "2", amountMicros: 18_150_000 },
       { chargeId: "initial", transactionId: "1", amountMicros: 11_850_000 }
     ]);
-    expect(allocateRefund(10_000_000, paid)).toEqual([{ chargeId: "upgrade", transactionId: "2", amountMicros: 10_000_000 }]);
+    expect(allocateRefund(10_000_000, paid)).toEqual([{ chargeId: "upgrade", transactionId: "2", amountMicros: <amount> }]);
     expect(allocateRefund(0, paid)).toEqual([]);
   });
 
   it("skips what is already refunded and refuses a refund larger than what is left", () => {
     const partly = [paid[0]!, { ...paid[1]!, refundedMicros: 18_150_000 }];
-    expect(allocateRefund(5_000_000, partly)).toEqual([{ chargeId: "initial", transactionId: "1", amountMicros: 5_000_000 }]);
+    expect(allocateRefund(5_000_000, partly)).toEqual([{ chargeId: "initial", transactionId: "1", amountMicros: <the plan's limit> }]);
     expect(() => allocateRefund(42_350_001, paid)).toThrow(expect.objectContaining({ code: "REFUND_EXCEEDS_CHARGE" }));
   });
 
@@ -45887,7 +45887,7 @@ describe("P9b the refund split, newest transaction first (A4b)", () => {
       charge("CARD_CHECK", "hold", [{ kind: "SUCCEEDED", xmoneyTransactionId: "9", amountMicros: 1_000_000, at: T1 }]),
       charge("UPGRADE", "upgrade", [
         { kind: "SUCCEEDED", xmoneyTransactionId: "2", amountMicros: 18_150_000, at: T1 },
-        { kind: "REFUNDED", xmoneyTransactionId: "2", amountMicros: 2_000_000 }
+        { kind: "REFUNDED", xmoneyTransactionId: "2", amountMicros: <amount> }
       ])
     ];
     expect(paidTransactions(rows, T0)).toEqual([
@@ -48325,7 +48325,7 @@ describe("P9c reversals of a verified payment", () => {
       ["REFUND_REQUESTED", "PROVIDER_REFUND", 5_000_000, paid.transaction.transactionId, null]
     ]);
     expect((await h.outboxRows(paid.chargeId)).find((row) => row.kind === "SMARTBILL_STORNO")).toMatchObject({
-      payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 5_000_000 }
+      payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: <the plan's limit> }
     });
     // D5 5m: the REFUNDED row carries the refund transaction's own time, which dates the quarter's REFUND row.
     const refundedRow = await h.database.pool.query<{ xmoney_created_at: Date | null }>(
@@ -53506,7 +53506,7 @@ describe("P12a the WITHDRAW_SUBSCRIPTION grant on real PostgreSQL", () => {
       VALUES ($1, $2, $3, $4, $5)
     `, [subscriptionId, withdrawnEventId, ownerRef, micros, new Date(long.getTime() + 2 * 86_400_000)]);
     await expect(settle(-1)).rejects.toMatchObject({ code: "23514" });
-    await settle(5_000_000);
+    await settle(<amount>);
     // One settlement per withdrawal.
     await expect(settle(1_000_000)).rejects.toMatchObject({ code: "23505" });
     const privileges = (await database.pool.query<{ can_select: boolean; can_insert: boolean; can_update: boolean; can_delete: boolean }>(`
@@ -55914,8 +55914,8 @@ describe("P12c A6: the month credit after an upgrade", () => {
   it("adds the new plan's extra credit for the part of the period still to run", () => {
     expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: at(0.5) })).toBe(12_500_000);
     expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: START })).toBe(20_000_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: END })).toBe(5_000_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(END.getTime() + 1) })).toBe(5_000_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: END })).toBe(<the plan's limit>);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(END.getTime() + 1) })).toBe(<the plan's limit>);
     expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(START.getTime() - 1) })).toBe(20_000_000);
   });
 
@@ -57570,7 +57570,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     });
     const expected = withdrawalRefundMicros({
       paidTotalMicros: run.seeded.totalMicros + 18_150_000, periodStart: run.seeded.periodStart,
-      periodEnd: run.seeded.periodEnd, now: run.now, creditSpentMicros: 1_000_000, monthlyCreditMicros: 12_500_000
+      periodEnd: run.seeded.periodEnd, now: run.now, creditSpentMicros: 1_000_000, monthlyCreditMicros: <the plan's limit>
     });
     // Both transactions are needed: the upgrade alone cannot cover the refund.
     expect(expected).toBeGreaterThan(18_150_000);
@@ -57647,7 +57647,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
   });
 
   it("writes no refund intent and sends M8 at once when the whole credit was used", async () => {
-    const run = await start("p12d-used", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 5_000_000 });
+    const run = await start("p12d-used", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: <the plan's limit> });
     const response = await run.withdraw();
     expect(response.json()).toEqual({ refund: "0.00" });
     expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("WITHDRAWN");
@@ -61644,7 +61644,7 @@ describe("P14c the withdrawal command", () => {
     expect(parseWithdrawArguments(["--owner", OWNER, "--refund", "0.00"])).toMatchObject({ refundMicros: 0, dashboardMicros: 0 });
     // What the owner refunded in the xMoney dashboard for this withdrawal: M8 names the sum of both parts.
     expect(parseWithdrawArguments(["--owner", OWNER, "--dashboard", "5.00", "--refund", "3.00"]))
-      .toEqual({ kind: "SETTLE", ownerRef: OWNER, refundMicros: 3_000_000, dashboardMicros: 5_000_000 });
+      .toEqual({ kind: "SETTLE", ownerRef: OWNER, refundMicros: 3_000_000, dashboardMicros: <the plan's limit> });
     for (const args of [
       [], ["--received", RECEIVED], ["--owner", "not-a-ref", "--refund", "1.00"],
       ["--owner", OWNER, "--received", "2026-10-12"], ["--owner", OWNER, "--received", "2026-10-12T08:30:00+03:00"],
@@ -61670,7 +61670,7 @@ describe("P14c the withdrawal command", () => {
     expect(review).toContain(`pnpm billing:withdraw --owner ${OWNER} --refund <amount through this command>`
       + " --dashboard <amount refunded in the dashboard>");
     const settle = parseWithdrawArguments(["--owner", OWNER, "--refund", "3.00", "--dashboard", "5.00"]);
-    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000 }, settle))
+    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: <the plan's limit> }, settle))
       .toContain("3.00 USD goes back to the card and 5.00 USD was refunded in the dashboard (M8 says 8.00)");
     expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000 }, settle))
       .toContain("17.59 USD was refunded in the dashboard. M8 is queued");
@@ -61872,12 +61872,12 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     expect(await rows().withdrawalOwnerSettlement(seeded.subscriptionId)).toBeNull();
     const audit = recordingAudit();
     // 3.00 through RefundDesk, and 5.00 the owner refunded in the dashboard for this withdrawal.
-    expect(await settleOwnerWithdrawal(stores(audit), { ownerRef: seeded.ownerRef, refundMicros: 3_000_000, dashboardMicros: 5_000_000 }))
-      .toEqual({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000 });
+    expect(await settleOwnerWithdrawal(stores(audit), { ownerRef: seeded.ownerRef, refundMicros: 3_000_000, dashboardMicros: <the plan's limit> }))
+      .toEqual({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: <the plan's limit> });
     // Only the payment no dashboard refund touched takes it; the touched one is the owner's to judge.
-    expect(await withdrawalRequests(upgrade.chargeId)).toEqual([["7720001", 3_000_000]]);
+    expect(await withdrawalRequests(upgrade.chargeId)).toEqual([["7720001", <amount>]]);
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([]);
-    expect(await rows().withdrawalOwnerSettlement(seeded.subscriptionId)).toMatchObject({ dashboardRefundMicros: 5_000_000 });
+    expect(await rows().withdrawalOwnerSettlement(seeded.subscriptionId)).toMatchObject({ dashboardRefundMicros: <the plan's limit> });
     expect(audit.events).toContainEqual({ event: "billing.withdrawal.settled", fields: { refunds: 1 } });
     expect(await rows().withdrawalsAwaitingOwner(seeded.ownerRef)).toEqual([]);
     await expect(settleOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, refundMicros: 1_000_000, dashboardMicros: 0 }))
@@ -63774,7 +63774,7 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
         due: Object.freeze({ rule: "QUARTER_FOLLOWING_MONTH_END" as const })
       }),
       afterThreshold("NO_VOEC", "NO", "Norway", "Norway's VOEC scheme (Skatteetaten)", "NOK 50,000 in a year"),
-      afterThreshold("IS_VOES", "IS", "Iceland", "Iceland's VOES scheme (Skatturinn)", "ISK 2,000,000 in a year"),
+      afterThreshold("IS_VOES", "IS", "Iceland", "Iceland's VOES scheme (Skatturinn)", "ISK <amount> in a year"),
       fromFirstSale("GB_HMRC", "GB", "the UK", "HM Revenue & Customs (HMRC), for UK VAT"),
       Object.freeze({
         scheme: "US_STATE", countries: Object.freeze(["US"]), tax_statuses: null, registration: "AFTER_THRESHOLD" as const,
@@ -69164,7 +69164,7 @@ describe("P18 /pricing", () => {
   it("never shows a dollar amount of AI credit", async () => {
     mocks.getBillingPlans.mockResolvedValue(PLANS);
     const text = (await renderPricing()).body.textContent ?? "";
-    for (const credit of ["$0.20", "$5.00", "$150.00", "0.04"]) expect(text).not.toContain(credit);
+    for (const credit of ["<amount>", "<amount>", "<amount>", "0.04"]) expect(text).not.toContain(credit);
   });
 
   it("is not found when billing is off, and says so plainly when the plans cannot be read", async () => {
@@ -77325,7 +77325,7 @@ describe("P23 paid plans, end to end on the fake stack", () => {
       "SELECT total_micros::text FROM billing.charge WHERE charge_id = $1", [chargeRef]
     );
     const paidCents = Number(paid.rows[0]!.total_micros) / 10_000;
-    await stack.spend(person, 2_000_000);              // 10% of Pro's 20.00 month (testBillingPlans)
+    await stack.spend(person, <amount>);              // 10% of Pro's 20.00 month (testBillingPlans)
     stack.advanceDays(2);                               // 2 days of a 28–31-day period: under 10%
     const stepped = await stack.post(person, "/v1/auth/step-up", {
       password: "not-checked-by-the-stack", code: "000000", authorization: { action: "WITHDRAW_SUBSCRIPTION" }
@@ -78225,7 +78225,7 @@ describe("S1a · a RUN charge names its phase and its attempt", () => {
     } as unknown as ModelSpendStore;
     const seam = new CostEnvelopeGuard({
       store,
-      policy: { perRunCeilingMicros: 1_000_000_000, dailyCeilingMicros: 10_000_000_000 },
+      policy: { perRunCeilingMicros: <the plan's limit> dailyCeilingMicros: <the plan's limit> },
       clock: () => new Date("2026-10-01T10:00:00.000Z")
     }).providerSeam({
       runId: "run-s1a",
@@ -81718,7 +81718,7 @@ The rules this task implements (spec §2.6 items 2–7, amended by A5):
 - **The ceiling.** `min(site per-run ceiling, personRoom)`; its body share is cut exactly as the site's is
   (`costEnvelopeCeilings`, `packages/register/src/cost-envelope-policy.ts:181-205`), and with a person scope the
   whole run is held to the room itself: `serveMicros = min(the site-cut serve share, personRoom)`. The finish edge
-  (110 %) is for running debates, never for planning (spec §2.6 item 2, "at 100%"); without a person the serve share
+  (<amount>) is for running debates, never for planning (spec §2.6 item 2, "at 100%"); without a person the serve share
   keeps the site's overrun, exactly as the site's own guard does.
 - **Like with like.** The estimate's arguing part (POSITION, SUPPORT_ATTACK, CROSS_EXCHANGE, JUDGE, REVIEWER) must
   fit `bodyMicros`; the whole run (arguing + ANSWER_WRITER + ANSWER_CHECKER) must fit `serveMicros`, because both
@@ -81913,9 +81913,9 @@ describe("fitsMoneyLimits", () => {
 describe("pickRoleAssignment — the phase-split limits (moneyLimits)", () => {
   it("steps down when the arguing part is over the body ceiling although the whole run fits", () => {
     // The whole-total rule of the per-run ceiling alone keeps BEST at 8000 …
-    expect(assignedOutcome(pickRoleAssignment(hosted({ perRunCeilingMicros: 8000 }))).appliedStrength).toBe("BEST");
+    expect(assignedOutcome(pickRoleAssignment(hosted({ perRunCeilingMicros: <the plan's limit> }))).appliedStrength).toBe("BEST");
     // … the phase split does not: arguing 4000 > 3200.
-    const outcome = assignedOutcome(pickRoleAssignment(hosted({ perRunCeilingMicros: 8000, moneyLimits: limits(3200, 8000) })));
+    const outcome = assignedOutcome(pickRoleAssignment(hosted({ perRunCeilingMicros: <the plan's limit> moneyLimits: limits(3200, 8000) })));
     expect(outcome.appliedStrength).toBe("BALANCED");
     expect(outcome.steppedDown).toBe(true);
     expect(outcome.notes).toContain("STEPPED_DOWN:BEST->BALANCED");
@@ -81946,7 +81946,7 @@ describe("pickRoleAssignment — the phase-split limits (moneyLimits)", () => {
   });
 
   it("gives moneyLimits precedence over the whole-total ceiling", () => {
-    expect(assignedOutcome(pickRoleAssignment(hosted({ perRunCeilingMicros: 1, moneyLimits: limits(10_000, 10_000) }))).appliedStrength).toBe("BEST");
+    expect(assignedOutcome(pickRoleAssignment(hosted({ perRunCeilingMicros: <the plan's limit> moneyLimits: limits(10_000, 10_000) }))).appliedStrength).toBe("BEST");
   });
 
   it("ignores every money limit in LOCAL mode", () => {
@@ -82073,7 +82073,7 @@ describe("personRoomMicrosAt", () => {
 });
 
 describe("pickerMoneyLimits", () => {
-  const policy = Object.freeze({ perRunCeilingMicros: 250_000, serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
+  const policy = Object.freeze({ perRunCeilingMicros: <the plan's limit> serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
   it("is the site's own shares with no person scope", () => {
     expect(pickerMoneyLimits({ moneyPolicy: policy, runMaximumMicros: 300_000, personRoomMicros: null }))
       .toEqual({ bodyMicros: 175_000, serveMicros: 300_000, personRoomMicros: null, unknownEstimateMicros: 300_000 });
@@ -82230,7 +82230,7 @@ const HOUR = 3_600_000;
 const TX = Object.freeze({ marker: "the room decision's own transaction" }) as unknown as PoolClient;
 const START = Object.freeze({ kind: "START" as const, worst: "CLOSE" as const, worstScope: "PERSON_DAY" as const });
 const WAIT = Object.freeze({ kind: "WAIT" as const, waitsUntil: new Date(NOW.getTime() + HOUR), worstScope: "PERSON_DAY" as const });
-const SITE = Object.freeze({ perRunCeilingMicros: 250_000, serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
+const SITE = Object.freeze({ perRunCeilingMicros: <the plan's limit> serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
 const CEILING_TERMS = Object.freeze({
   judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1, finalRetryAttempts: 1,
   branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
@@ -82492,7 +82492,7 @@ const settingsFor = (caps: Caps, deploymentMode: "hosted" | "local", billingEnab
   scorecard: Object.freeze({ state: "VALID" as const, scorecard: scorecardWith(caps), sourceRef: "test:s2-caps" }),
   deploymentMode,
   targets: [],
-  perRunCeilingMicros: deploymentMode === "hosted" ? 250_000 : null,
+  perRunCeilingMicros: deploymentMode === "hosted" ? <amount> : null,
   callTokenCeilings: { judge: 2048, synthesizer: 2048, evaluator: 2048 },
   billingEnabled
 });
@@ -82767,7 +82767,7 @@ const PANEL: readonly DiscoveredPanelMember[] = CANDIDATES.map((candidate) => Ob
   provider_ref: `provider:${candidate.candidateId}`, maker: candidate.maker, model_id: candidate.modelId,
   probe_evidence_ref: `probe:${candidate.candidateId}`, probed_at: "2026-10-01T00:00:00.000Z"
 }));
-const SITE: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: 250_000, serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
+const SITE: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: <the plan's limit> serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
 
 function plan(planId: "FREE" | "PLUS" | "PRO" | "MAX", monthlyCreditMicros: number) {
   const free = planId === "FREE";
@@ -82780,7 +82780,7 @@ function plan(planId: "FREE" | "PLUS" | "PRO" | "MAX", monthlyCreditMicros: numb
 }
 const PLANS: BillingPlans = Object.freeze({
   currency: "USD",
-  plans: Object.freeze([plan("FREE", 200_000), plan("PLUS", 5_000_000), plan("PRO", 20_000_000), plan("MAX", 150_000_000)]),
+  plans: Object.freeze([plan("FREE", 200_000), plan("PLUS", <amount>), plan("PRO", 20_000_000), plan("MAX", <amount>)]),
   sourceRef: "test:s2-plans"
 });
 
@@ -82880,7 +82880,7 @@ function realRoom(): AskRoom {
     estimator: { estimateMicros: async () => 30_000 },
     personAllowance: new BillingPersonAllowanceSource({ entitlements: entitlements(), plans: PLANS, closeBasisPoints: 9500 }),
     entitlements: entitlements(),
-    dailyCeilingMicros: 1_000_000_000_000,
+    dailyCeilingMicros: <the plan's limit>
     closeBasisPoints: 9500,
     waitingLinePerPerson: 1
   });
@@ -82960,7 +82960,7 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
     // Today 550 000 spent of 1 000 000, and a live debate holding 550 000 more: the day is FULL on holds, not on
     // spend, so B6a looks again at the next whole minute (the live debate may end any time) — long before the day
     // resets. A wake plan sized for a whole new day (BEST) could start at that minute into what the live debate
-    // left, past the owner's 110 % leeway; the plan is made for the room as measured instead.
+    // left, past the owner's <amount> leeway; the plan is made for the room as measured instead.
     const ref = await owner("PLUS", 550_000);
     await liveDebateHolding(ref, 550_000);
     const preview = await previewOf(ref);
@@ -83009,7 +83009,7 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
   });
 
   it("keeps the site's refusal when the site's own ceiling cannot hold ECONOMY — person or not", async () => {
-    const tinySite: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: 500, serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
+    const tinySite: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: <the plan's limit> serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
     const withoutPerson = await evaluateAskAdmission(settings(tinySite), ask("premium"), null).then(() => null, (error: unknown) => error);
     expect(withoutPerson).toBeInstanceOf(AskRefusal);
     expect(withoutPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
@@ -83352,7 +83352,7 @@ export function personRoomMicrosAt(uses: ReadonlyArray<RoomWindowUse>, at: Date)
 /**
  * The picker's limits: the site's body share cut from min(site per-run ceiling,
  * room); the whole run held to the site's serve share, and with a person scope
- * to the room itself — spec §2.6 item 2's "at 100%": the finish edge (110 %) is
+ * to the room itself — spec §2.6 item 2's "at 100%": the finish edge (<amount>) is
  * for running debates, never for planning one.
  */
 export function pickerMoneyLimits(input: Readonly<{
@@ -85270,7 +85270,7 @@ copied into INTERFACE-CONTRACT): §1 the budget migration is `migrations/0080_bu
 #### Open questions (for the assembler)
 
 - **Switching the band off while questions wait — refused in code; drain step only if the owner asks.** A later register version without the band builds no room and no waker, so B6b's `ask-room` boot step refuses that boot with `WAITING_LINE_REQUIRES_BAND` while `core.run_waiting_v` lists any run, and `readRun` refuses a WAITING run with no room by the same name. D3's B11b runbook ("Removing them again") now says exactly this and keeps the operator's `SELECT count(*) FROM core.run_waiting_v` check. Still open for the owner: keep the refusal (default), or ask for a drain step instead (record each waiting run FAILED `RUN_SETUP_FAILED:WAITING_LINE` before such a version is published).
-- **PLAN_CHANGED — the end state of a stranded premium question (owner question, narrowed by RULINGS-R2 Q-11).** A waiting premium question whose owner's plan has dropped to Free by the time room frees up (period-end cancel, withdrawal, dunning end, chargeback suspension, a lapse past `paid_through` — including one after Q-1's up-to-72 h `RENEWAL_PENDING` extension runs out) is recorded FAILED `RUN_SETUP_FAILED:PLAN_CHANGED` ("ask again under your current plan"), not started on the paid roster under a Free charge scope (the Free 110% wall does not bound the first position's call or the answer, budget spec §2.9). RULINGS-R2 Q-11 rules out a re-pick at wake time, so re-picking the run at ECONOMY under the Free cap is closed. The one remaining alternative is to start it as CLOSE on the paid roster under the Free charge scope with the B9 wall — not the default for the reason above. Default FAILED until the owner rules otherwise; a move between paid plans, and Free → paid, still start. D8's S2 lists the same case among its Q-11 known limits ("a plan change before the wake", settled by this `PLAN_CHANGED`) and agrees that nothing runs under Free's windows on a premium pin; D3's B8 stores a swapped question that waits on its plan's own ask, so the check sees it as premium.
+- **PLAN_CHANGED — the end state of a stranded premium question (owner question, narrowed by RULINGS-R2 Q-11).** A waiting premium question whose owner's plan has dropped to Free by the time room frees up (period-end cancel, withdrawal, dunning end, chargeback suspension, a lapse past `paid_through` — including one after Q-1's up-to-72 h `RENEWAL_PENDING` extension runs out) is recorded FAILED `RUN_SETUP_FAILED:PLAN_CHANGED` ("ask again under your current plan"), not started on the paid roster under a Free charge scope (the Free <amount> wall does not bound the first position's call or the answer, budget spec §2.9). RULINGS-R2 Q-11 rules out a re-pick at wake time, so re-picking the run at ECONOMY under the Free cap is closed. The one remaining alternative is to start it as CLOSE on the paid roster under the Free charge scope with the B9 wall — not the default for the reason above. Default FAILED until the owner rules otherwise; a move between paid plans, and Free → paid, still start. D8's S2 lists the same case among its Q-11 known limits ("a plan change before the wake", settled by this `PLAN_CHANGED`) and agrees that nothing runs under Free's windows on a premium pin; D3's B8 stores a swapped question that waits on its plan's own ask, so the check sees it as premium.
 - **`apps/api`'s manifest edge for `@debateai/billing-core` (for the assembler).** B6b imports `BillingPersonAllowanceSource` from `@debateai/billing-core` through the root devDependency B4b added, and changes neither `apps/api/package.json` nor the `apps/api` row of `tools/orphan-audit/src/index.ts` — the `@debateai/budget` precedent (`apps/api/src/main.ts:45` imports it with no manifest entry), R-1's wording, and D5's P6a, which adds `billing-core` to that manifest and row together with the three connector packages and says B6b edits neither. D3 and D4 asked B6b to add the edge now instead. If the assembler prefers the edge declared at first import, B6b's Step 5 gains `"@debateai/billing-core":"workspace:*"` in `apps/api/package.json` `dependencies` (sorted after `@debateai/battery`), `"billing-core"` appended to the `apps/api` row's allowed list, a `pnpm install` (lockfile importers only) and `pnpm-lock.yaml`, `apps/api/package.json` and `tools/orphan-audit/src/index.ts` in its `git add`; P6a's "keep any of the four already present" rule already tolerates that.
 - **Why a run waits is re-measured, not walked.** A PERSON reason is looked at again at its `person_recheck_at` (the latest reset among the windows full on spend alone, or the next tick when only the person's own live holds fill them), after an entitlement event it was not measured with, at every process start (the first full sweep), and at least hourly (the backstop for time-driven changes such as a lapse past `paid_through`). Between those instants a person-blocked run is neither a waker candidate nor a line-blocker. A tick that must re-measure many PERSON runs at once (the boot sweep, or an hour after it) is long; the single-flight trigger then skips a minute rather than overlapping. No per-tick time budget is added; owner to confirm.
 - **Serialisation cost, accepted for now.** The room decision holds the site's day lock across the run's creation (key provisioning, the memory question, the hold and the first job) so the hold commits with the job; asks are serialised site-wide for that span. The first job is queued last, on the decision's transaction, so the one shared sequence row it takes is held only until that commit. Provider discovery runs outside the lock (between the precheck and the decision). One API instance in production (spec §2.14 item 5). The line's own cost under the lock is now one statement, whatever its length.

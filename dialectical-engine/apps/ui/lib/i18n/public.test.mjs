@@ -15,7 +15,6 @@ const sourcePaths = [
   "components/PublicHonestyDrawer.tsx",
   "components/PublicationControl.tsx",
   "components/PublicationReviewPanel.tsx",
-  "components/TakeDownControl.tsx",
   "components/auth/SecurityActionResume.tsx",
   "lib/publicDebatePresentation.ts",
   "lib/v3/publicAnswerExport.ts",
@@ -33,12 +32,21 @@ const sourcePaths = [
   "lib/report/reportTables.ts",
   // The PDF download route's refusals (Task 15): short plain lines, `public.report.error.*`.
   "lib/report/reportRoute.ts",
+  // The final report's PDF (plan 2026-10-31 decision 17): `public.report.investigation.*`, the same words as the debate's own.
+  "lib/report/investigationReportModel.ts",
   // The floor answer (Task M6): "Our best answer:" and the thin-basis line, `public.story.floor*`.
   "lib/v3/floorAnswer.ts",
   // Debate shape P2c: "Also raised, not debated" and the position titles, `public.alsoRaised.*` and
   // `public.positionTitle`, in the QUESTION's `public` catalogue.
   "components/AlsoRaisedList.tsx",
-  "lib/v3/mapView.ts"
+  "lib/v3/mapView.ts",
+  // The owner's screen review of 3 Nov 2026 (public-d1 A): the public page's V4 body reads the story's fixed words (its reservation line, "Worth
+  // knowing") from the question's `public` catalogue, and a publication review's "Details" and "Read" from the interface's; the review panel names its
+  // own panels with the same two words.
+  "components/v4/V4PublicPage.tsx",
+  "components/PublicationReviewsPanel.tsx",
+  // 0157 (D1): the statements of reasons page.
+  "components/ModerationNotices.tsx"
 ];
 const sources = new Map(sourcePaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
 const catalogPath = join(root, "messages/en/public.json");
@@ -145,6 +153,19 @@ test("the public namespace exists and covers every public translation call", () 
     usedKeys.add(`public.publicationReview.category.${category}`);
     usedKeys.add(`public.publicationReview.rule.${category}`);
   }
+  // Decision 27: the PDF's trust words, sides and verdicts are chosen through small maps and conditions.
+  for (const match of sources.get("lib/report/investigationReportModel.ts").matchAll(/\bpublic\.report\.(?:trust|investigation)\.[A-Za-z0-9_]+/g)) {
+    usedKeys.add(match[0]);
+  }
+  // 0157: the statements page picks each line by the statement's kind, ground code, source and place.
+  for (const kind of ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED"]) {
+    usedKeys.add(`public.moderation.kind.${kind}`);
+    usedKeys.add(`public.moderation.what.${kind}`);
+  }
+  for (const code of ["REVIEW_HOLD", "UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]) usedKeys.add(`public.moderation.ground.${code}`);
+  for (const source of ["REPORT_BUTTON", "EMAIL_NOTICE", "AUTHORITY_ORDER", "OWN_INITIATIVE"]) usedKeys.add(`public.moderation.source.${source}`);
+  for (const place of ["SNAPSHOT", "UPDATE", "REPORT"]) usedKeys.add(`public.moderation.place.${place}`);
+  for (const match of sources.get("components/ModerationNotices.tsx").matchAll(/"(public\.moderation\.[A-Za-z]+)"/g)) usedKeys.add(match[1]);
   assert.ok(usedKeys.size > 0, "S2-public sources must use public namespace keys");
   for (const key of usedKeys) assert.ok(Object.hasOwn(catalog, key), `missing ${key}`);
   assert.deepEqual([...usedKeys].sort(), Object.keys(catalog).sort(), "public catalog has no unused keys");
@@ -182,28 +203,31 @@ test("S2-public sources contain no hard-coded user-visible English", () => {
   assert.doesNotMatch(overview, /["'](?:PRO|CON)["']/);
 });
 
-test("the public overview keeps the guarded verdict-first structure and owner return path", () => {
+// The owner's screen review of 3 Nov 2026 (public-d1 A): the public page leads with the answer and opens the person's own map, read-only, one click
+// away. The classic overview (its verdict shell, support meter and argument grid) and the classic workspace behind it are gone from the public route.
+test("the public overview leads with the answer, in V4's page, with the map one click away", () => {
   const overview = sources.get("components/PublicDebateOverview.tsx");
   const page = sources.get("app/public/debate/[id]/PublicDebatePageClient.tsx");
   const serverPage = sources.get("app/public/debate/[id]/page.tsx");
+  const body = sources.get("components/v4/V4PublicPage.tsx");
   assert.match(serverPage, /loadNamespace\(locale, "public"\)/);
   assert.match(serverPage, /publicCatalog=\{publicCatalog\}/);
   assert.match(page, /<PublicDebateOverview/);
-  assert.match(overview, /data-design-turn="3b"/);
-  assert.match(overview, /className="publicVerdictShell"/);
-  assert.match(overview, /className="publicSupportRow"/);
-  assert.match(overview, /className="publicArgumentGrid"/);
-  assert.match(overview, /next=\$\{encodeURIComponent\(returnPath\)\}/);
+  assert.match(overview, /<V4PublicAnswerFirst/);
+  assert.match(body, /data-public-answer-first/);
+  assert.match(body, /"v4\.public\.exploreMap"/);
+  assert.match(body, /readOnly: true/);
+  for (const gone of ["publicVerdictShell", "publicSupportRow", "publicArgumentGrid", "publicUnlockNote", "publicLockedAction"]) {
+    assert.doesNotMatch(overview + body + page, new RegExp(gone));
+  }
 });
 
-test("the public route threads debateChrome through the server-client boundary", () => {
+test("the public route reads only what the V4 page needs, and no classic workspace", () => {
   const serverPage = sources.get("app/public/debate/[id]/page.tsx");
   const clientPage = sources.get("app/public/debate/[id]/PublicDebatePageClient.tsx");
-  assert.match(serverPage, /loadNamespace\(locale, "debateChrome"\)/);
-  assert.match(serverPage, /debateChromeCatalog=\{debateChromeCatalog\}/);
-  assert.match(clientPage, /debateChromeCatalog: MessageCatalog/);
-  assert.match(
-    clientPage,
-    /<DebatePageClient[\s\S]*?debateChromeCatalog=\{debateChromeCatalog\}/
-  );
+  for (const namespace of ["public", "home", "chrome", "v4", "newDebate"]) assert.match(serverPage, new RegExp(`loadNamespace\\(locale, "${namespace}"\\)`));
+  for (const namespace of ["debateChrome", "debateDrawers", "compose", "misc", "time"]) assert.doesNotMatch(serverPage, new RegExp(`loadNamespace\\(locale, "${namespace}"\\)`));
+  assert.match(serverPage, /chromeCatalog=\{chromeCatalog\}/);
+  assert.match(clientPage, /<AiNotice catalog=\{\{ \.\.\.homeCatalog, \.\.\.chromeCatalog \}\} \/>/);
+  assert.doesNotMatch(clientPage, /<DebatePageClient/);
 });

@@ -9,15 +9,13 @@ import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { typ
 const G = "g".repeat(43);
 const CANCELLATION_REF = "55555555-5555-4555-8555-555555555555";
 const EXECUTE_AT = "2026-10-14T00:00:00.000Z";
-const REMOVE_WARNING = "Encrypted private content becomes permanently unreadable when its keys are destroyed. When the deletion runs, your public debates are removed from Dialectical Engine and the keys to our copies are destroyed; downloaded, quoted, cached, indexed, or provider-retained copies may persist. Claimed legacy plaintext is reported as a retained residual, not as fully cleaned content.";
 
 let dom: JSDOM;
 let root: Root | null = null;
 
 const none = { status: "NONE" as const };
-const scheduled = (status: "SCHEDULED" | "DUE" | "PROCESSING", remove: boolean) => ({
-  status, execute_at: EXECUTE_AT, cancellation_ref: CANCELLATION_REF,
-  delete_public_debates: remove
+const scheduled = (status: "SCHEDULED" | "DUE" | "PROCESSING") => ({
+  status, execute_at: EXECUTE_AT, cancellation_ref: CANCELLATION_REF
 });
 // origin/dev confirms the step-up AFTER "Schedule deletion", in <SecurityConfirmation> (PLAN Revision 4, S01-Q18):
 // the stub offers password + authenticator code, and stepUp answers as dev's contract does.
@@ -58,16 +56,6 @@ async function mount(client: unknown): Promise<void> {
   await act(async () => { root!.render(<AccountErasureControls client={client as never} />); });
 }
 
-function checkbox(): HTMLInputElement {
-  const found = document.querySelector<HTMLInputElement>("#account-deletion-public-debates");
-  if (found === null) throw new Error("CHECKBOX_NOT_FOUND");
-  return found;
-}
-
-async function tick(): Promise<void> {
-  await act(async () => { checkbox().click(); });
-}
-
 async function fill(id: string, value: string): Promise<void> {
   const input = document.getElementById(id) as HTMLInputElement;
   const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")!.set!;
@@ -103,121 +91,50 @@ async function confirmSecurity(codeValue = "123456"): Promise<void> {
   await act(async () => { await Promise.resolve(); });
 }
 
-describe("DPD S01 account erasure choice", () => {
-  it("R1 R3 one checkbox and its label sit between the confirmation field and the submit button", async () => {
+describe("R22 decision 21: erasing an account offers no public-debate choice", () => {
+  it("there is no tick box, on the form or in any status", async () => {
     await mount(stubClient());
-    const boxes = document.querySelectorAll('input[type="checkbox"]#account-deletion-public-debates');
-    expect(boxes).toHaveLength(1);
-    const label = document.querySelector("label[for=account-deletion-public-debates]");
-    expect(label?.textContent).toBe("Also delete my public debates");
-    const field = document.querySelector("#account-deletion-confirmation")!;
-    const box = boxes[0]!;
-    const button = document.querySelector("button[type=submit]")!;
-    expect(field.closest("form")).toBe(box.closest("form"));
-    expect(box.closest("form")).toBe(button.closest("form"));
-    expect(field.compareDocumentPosition(box) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(box.compareDocumentPosition(button) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    for (const element of [field, box, button]) expect(element.hasAttribute("tabindex")).toBe(false);
-  });
-
-  it("R2 the box is unticked on mount, keeps its state after a failed schedule, and is unticked when the form returns", async () => {
-    const client = stubClient();
-    client.stepUp.mockRejectedValueOnce(new Error("DENIED"));
-    await mount(client);
-    expect(checkbox().checked).toBe(false);
-    await tick();
-    await fill("account-deletion-confirmation", "DELETE MY ACCOUNT");
-    await submit();
-    await confirmSecurity();
-    expect(client.stepUp).toHaveBeenCalledTimes(1);
-    expect(checkbox().checked).toBe(true);
-    await confirmSecurity("654321");
-    expect(client.scheduleAccountErasure).toHaveBeenCalledWith(G, true);
-    expect(document.querySelector("#account-deletion-confirmation")).toBeNull();
-    const cancel = [...document.querySelectorAll("button")].find((button) => button.textContent?.includes("Cancel account deletion"))!;
-    await act(async () => { cancel.click(); });
-    expect(checkbox().checked).toBe(false);
+    expect(document.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(document.querySelector("#account-deletion-public-debates")).toBeNull();
     await act(async () => { root?.unmount(); });
     root = null;
-
-    vi.useFakeTimers();
-    const poll = stubClient(vi.fn()
-      .mockResolvedValueOnce(none)
-      .mockResolvedValueOnce(scheduled("SCHEDULED", false))
-      .mockResolvedValueOnce(none));
-    await mount(poll);
-    await tick();
-    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
-    expect(checkbox().checked).toBe(false);
-  });
-
-  it("R4 the box does not gate the button", async () => {
-    await mount(stubClient());
-    const button = document.querySelector<HTMLButtonElement>("button[type=submit]")!;
-    expect(button.disabled).toBe(true);
-    await tick();
-    expect(button.disabled).toBe(true);
-    await fill("account-deletion-confirmation", "DELETE MY ACCOUNT");
-    expect(button.disabled).toBe(false);
-    await tick();
-    expect(button.disabled).toBe(false);
-  });
-
-  it("R6 the warning note swaps on tick and untick without a request", async () => {
-    const client = stubClient();
-    await mount(client);
-    const warning = document.querySelector("p.setCardNote")!;
-    expect(warning.textContent).toBe(settingsEnglish["settings.erasure.dataWarning"]);
-    await tick();
-    expect(warning.textContent).toBe(REMOVE_WARNING);
-    await tick();
-    expect(warning.textContent).toBe(settingsEnglish["settings.erasure.dataWarning"]);
-    expect(client.scheduleAccountErasure).toHaveBeenCalledTimes(0);
-    expect(client.stepUp).toHaveBeenCalledTimes(0);
-  });
-
-  it("R7 the stored choice note follows the status response", async () => {
     for (const status of ["SCHEDULED", "DUE", "PROCESSING"] as const) {
-      for (const remove of [true, false]) {
-        const client = stubClient(vi.fn(async () => scheduled(status, remove)));
-        await mount(client);
-        const statusLine = document.querySelector("p.setStatus[role=status]")!;
-        const note = statusLine.nextElementSibling;
-        expect(note?.matches("p.setCardNote")).toBe(true);
-        expect(note?.textContent).toBe(remove
-          ? "Your public debates will be removed when the deletion runs."
-          : "Your public debates will stay public under a retired pseudonym.");
-        await act(async () => { root?.unmount(); });
-        root = null;
-      }
-    }
-  });
-
-  it("R10 the request body carries the box state at submit", async () => {
-    for (const remove of [true, false]) {
-      const bodies: string[] = [];
-      const fakeFetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
-        if (init?.method === "DELETE") bodies.push(String(init.body));
-        return new Response(JSON.stringify(scheduled("SCHEDULED", remove)), {
-          status: 202, headers: { "content-type": "application/json" }
-        });
-      });
-      const client = {
-        ...createContractClient("http://api.test", fakeFetch as typeof fetch),
-        stepUp: stepUpGrant(), authMethods,
-        readAccountErasure: vi.fn(async () => none)
-      };
-      await mount(client);
-      if (remove) await tick();
-      await fill("account-deletion-confirmation", "DELETE MY ACCOUNT");
-      await submit();
-      await confirmSecurity();
-      expect(bodies).toEqual([
-        JSON.stringify({ confirmation: "DELETE MY ACCOUNT", step_up_grant: G, delete_public_debates: remove })
-      ]);
+      await mount(stubClient(vi.fn(async () => scheduled(status))));
+      expect(document.querySelector('input[type="checkbox"]')).toBeNull();
       await act(async () => { root?.unmount(); });
       root = null;
     }
+  });
+
+  it("the warning says public debates stay and the name goes, before and after scheduling", async () => {
+    expect(settingsEnglish["settings.erasure.dataWarning"]).toContain("Your public debates stay public");
+    expect(settingsEnglish["settings.erasure.dataWarning"]).toContain("a contributor");
+    expect(settingsEnglish).not.toHaveProperty("settings.erasure.deletePublicDebates");
+    await mount(stubClient());
+    expect(document.querySelector("p.setCardNote")!.textContent).toBe(settingsEnglish["settings.erasure.dataWarning"]);
+    await act(async () => { root?.unmount(); });
+    root = null;
+    await mount(stubClient(vi.fn(async () => scheduled("SCHEDULED"))));
+    expect(document.querySelector("p.setCardNote")!.textContent).toBe(settingsEnglish["settings.erasure.dataWarning"]);
+    expect(document.body.textContent).not.toContain("retired pseudonym");
+  });
+
+  it("the request carries the confirmation and the grant, nothing else", async () => {
+    const bodies: string[] = [];
+    const fakeFetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      if (init?.method === "DELETE") bodies.push(String(init.body));
+      return new Response(JSON.stringify(scheduled("SCHEDULED")), {
+        status: 202, headers: { "content-type": "application/json" }
+      });
+    });
+    await mount({
+      ...createContractClient("http://api.test", fakeFetch as typeof fetch),
+      stepUp: stepUpGrant(), authMethods,
+      readAccountErasure: vi.fn(async () => none)
+    });
+    await fill("account-deletion-confirmation", "DELETE MY ACCOUNT");
+    await submit();
+    await confirmSecurity();
+    expect(bodies).toEqual([JSON.stringify({ confirmation: "DELETE MY ACCOUNT", step_up_grant: G })]);
   });
 });

@@ -18,7 +18,8 @@ export function runShapeClassOf(depthParams: DepthParams, plan: DebateShapePlanK
  * The plan's normalisation applied to an ask (spec §3.2): the same object when nothing changes. Every ask the API
  * stores, prices or admits passes through here first, so its depth_params is `{ depth }` exactly (no row),
  * `{ depth, answerLength }` (the length row alone, spec 2026-10-15 §3.1) or `{ depth, depthMode, scrutiny, answerLength }`
- * (the shape row in force), never anything in between.
+ * (the shape row in force), never anything in between — each with the V4 reading level last when the ask carried one
+ * (`readingLevel`, owner N6, 2026-10-29), which the runner reads back for the final writers.
  */
 export function normaliseAskForDebateShape<T extends Pick<AskRequest, "depth_params">>(
   ask: T, policy: DebateShapePolicy | null, plan: DebateShapePlanKey, lengthPolicy: LengthGuidancePolicy | null = null

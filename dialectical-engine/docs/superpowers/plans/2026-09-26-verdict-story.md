@@ -30,7 +30,7 @@
   | Storyteller bound | tokenCeiling 12,000, maxAttempts 2, deadlineMs 300,000 |
   | Checker bound | tokenCeiling 2,048, maxAttempts 2, deadlineMs 180,000 |
   | `storyMaterialBudget` | low 40,000 / medium 80,000 / high 120,000 bytes |
-  | `storyCostEnvelopePolicy` (hosted) | `perStoryCeilingMicros` 50,000 (= $0.05) |
+  | `storyCostEnvelopePolicy` (hosted) | `perStoryCeilingMicros` 50,000 (= <amount>) |
   | Waiting window | 40 minutes |
 
 - Output limits (verbatim from the spec):
@@ -1331,7 +1331,7 @@ What the debate could not know about you: the circumstances and preferences that
 What would change the answer, and a next step: the findings or preferences that would move the hinge points, and one small, practical next step.
 ```
 
-Sizes, measured: `common.md` 9,553 bytes, `checker.md` 4,012 bytes, and each shape between 1,579 and 2,463 bytes. The assembled storyteller instruction is 22,036 bytes, well under the 48 KB limit. That leaves room in the $0.05 hosted story envelope, because every storyteller call sends the whole instruction.
+Sizes, measured: `common.md` 9,553 bytes, `checker.md` 4,012 bytes, and each shape between 1,579 and 2,463 bytes. The assembled storyteller instruction is 22,036 bytes, well under the 48 KB limit. That leaves room in the <amount> hosted story envelope, because every storyteller call sends the whole instruction.
 
 - [ ] **Step 6: Run the test again**
 
@@ -2945,7 +2945,7 @@ describe("verdict story — the shrink ladder, step by step", () => {
   });
 
   it("walks steps 1 to 7 in order, each taken only when the one before does not fit", () => {
-    const full = built(at(10_000_000));
+    const full = built(at(<amount>));
     expect(full.compressionStep).toBe(0);
     expect(characters(pointFor(full, id(26)).best_case)).toBe(600);
 
@@ -6724,8 +6724,8 @@ function guard(spendStore: ModelSpendStore, perStoryCeilingMicros?: number) {
   return new CostEnvelopeGuard({
     store: spendStore,
     policy: {
-      perRunCeilingMicros: 250_000,
-      dailyCeilingMicros: 2_000_000,
+      perRunCeilingMicros: <the plan's limit>
+      dailyCeilingMicros: <the plan's limit>
       ...(perStoryCeilingMicros === undefined ? {} : { perStoryCeilingMicros })
     },
     clock: CLOCK
@@ -6782,7 +6782,7 @@ describe("the story's money seam counts STORY spend only", () => {
 
 describe("the run's money seam never sees STORY spend", () => {
   it("admits a debate call whatever the story has spent", async () => {
-    const { spendStore } = store({ run: 0, story: 10_000_000 });
+    const { spendStore } = store({ run: 0, story: <amount> });
     const seam = guard(spendStore, 50_000).providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true });
     await expect(seam.assertCallAllowed(PROJECTION)).resolves.toBeUndefined();
   });
@@ -6795,7 +6795,7 @@ describe("the daily admission reserves the story beside the run", () => {
     expect(withStory.reservations).toEqual([300_000]);
     const withoutStory = store({ run: 0, story: 0 });
     await guard(withoutStory.spendStore).assertDailyEnvelopeAdmitsNewRun();
-    expect(withoutStory.reservations).toEqual([250_000]);
+    expect(withoutStory.reservations).toEqual([<amount>]);
   });
 
   it("refuses a STORY charge with no run before it reaches the database", async () => {
@@ -15981,7 +15981,7 @@ Branch `feature/2026-09-26-verdict-story`. Design: `2026-09-26-verdict-story-des
 
 ## What is provisional
 
-- The story's own money cap on the website: $0.05 per story, counted in the $2 daily cap. At that
+- The story's own money cap on the website: <amount> per story, counted in the <amount> daily cap. At that
   cap, a high-priced storyteller model will often be refused before it writes. The first real runs
   will set the real number.
 - At most 2 write-and-check rounds per story.

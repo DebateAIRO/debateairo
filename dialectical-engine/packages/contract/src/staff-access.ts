@@ -13,7 +13,9 @@ export const ActiveStaffCapabilitiesSchema = z.array(z.enum([
 export const StaffActionSchema = z.enum([
     "TEAM_INVITE", "INVITATION_ACCEPT", "TEAM_GRANT", "TEAM_DISABLE", "EMERGENCY_DISABLE",
     "CREDENTIAL_REGISTER", "CREDENTIAL_REVOKE", "PUBLICATION_REVIEW_APPROVE", "PUBLICATION_REVIEW_REFUSE",
-    "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED"
+    "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED",
+    "TEAM_LIMIT_SET", "TEAM_LIMIT_PARTNER_GRANT", "TEAM_LIMIT_PARTNER_REVOKE", "TEAM_PRACTICE_RECORD",
+    "PUBLIC_REVIEW_HIDE", "PUBLIC_REVIEW_STEP", "PUBLIC_REPORT_DISMISS"
 ]);
 const RevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const DigestSchema = z.string().regex(/^[0-9a-f]{64}$/u);
@@ -107,6 +109,39 @@ export const StaffElevationResponseSchema = z.object({
 }).strict();
 /** Business inputs only: the server derives every binding field and digest. */
 const ActionMutationShape = { expected_revision: RevisionSchema, operation_id: z.uuid(), reason: ReasonSchema };
+/**
+ * Decision 24: the new amount, and the amount and log revision the person is looking at (0 and 0 before any limit), so a page or a
+ * ceremony made against another value never applies. Whole micros; made-up numbers only in examples.
+ */
+const TeamLimitMicrosSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const TeamLimitSetShape = { amount_micros: TeamLimitMicrosSchema, current_micros: TeamLimitMicrosSchema, expected_revision: RevisionSchema, operation_id: z.uuid() };
+const TeamPracticeShape = { practice_ref: z.uuid(), charge_micros: TeamLimitMicrosSchema, operation_id: z.uuid() };
+/**
+ * Decision 33: a public debate under review. Each passkey is bound to the debate, the step, the piece and the log's revision (and to the text's digest for a correction, whose words never enter the proof).
+ */
+export const PublicReviewPieceKindSchema = z.enum(["SNAPSHOT", "UPDATE", "REPORT", "DIG"]);
+export const PublicReviewStepSchema = z.enum(["REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT", "DECIDE"]);
+/**
+ * The DSA notices (migration 0157; DSA Art 17(3)): what a statement of reasons needs from each step. The ground is one or more fixed codes (Terms §7's rules, or
+ * the law), never free text; the source says where the facts came from (the Report button names its report). A removal, a hidden report, a correction and
+ * DECIDE (the final ground of a debate that stays hidden) need all of it and the facts a person typed; a hide may carry a suspected ground and a source, and
+ * never waits for them; a re-publish and a put-back carry none. The facts' words never enter the proof: their digest does, as a correction's text.
+ */
+export const ModerationGroundSchema = z.enum(["UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]);
+export type ModerationGround = z.infer<typeof ModerationGroundSchema>;
+export const ModerationSourceSchema = z.enum(["REPORT_BUTTON", "EMAIL_NOTICE", "OWN_INITIATIVE", "AUTHORITY_ORDER"]);
+export type ModerationSource = z.infer<typeof ModerationSourceSchema>;
+const ModerationGroundsSchema = z.array(ModerationGroundSchema).max(7).refine((grounds) => new Set(grounds).size === grounds.length, "MODERATION_GROUND_REPEATED");
+const Sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/u);
+const ModerationFactsSchema = z.string().trim().min(1).max(4000);
+const PublicReviewPointerSchema = z.string().regex(/^(\/[A-Za-z0-9_]{1,64}){1,12}$/u);
+const PublicReviewGroundShape = { grounds: ModerationGroundsSchema, source: ModerationSourceSchema.nullable(), flag_id: z.uuid().nullable() };
+const PublicReviewHideShape = { publication_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape };
+const PublicReviewStepShape = { ...PublicReviewHideShape, step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
+    pointer: PublicReviewPointerSchema.nullable(), text_sha256: Sha256HexSchema.nullable(), facts_sha256: Sha256HexSchema.nullable() };
+/** 0157 (D4): a close of a report: NO_BREACH (nothing to act on) or ACTED (a person acted on it). The reporter is told which. */
+export const PublicFlagOutcomeSchema = z.enum(["NO_BREACH", "ACTED"]);
+export type PublicFlagOutcome = z.infer<typeof PublicFlagOutcomeSchema>;
 export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("TEAM_INVITE"), target_user_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_GRANT"), target_staff_id: z.uuid(), capabilities: DelegatedStaffCapabilitiesSchema, ...ActionMutationShape }).strict(),
@@ -115,12 +150,71 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("CREDENTIAL_REGISTER"), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_APPROVE"), review_ref: z.uuid(), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_REFUSE"), review_ref: z.uuid(), reason: z.string().trim().min(1).max(500), operation_id: z.uuid() }).strict(),
-    z.object({ action: z.literal("THREAT_REPORT_DECIDE"), target_report_ref: z.uuid(), decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema, operation_id: z.uuid() }).strict()
+    z.object({ action: z.literal("THREAT_REPORT_DECIDE"), target_report_ref: z.uuid(), decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema, operation_id: z.uuid() }).strict(),
+    z.object({ action: z.literal("TEAM_LIMIT_SET"), ...TeamLimitSetShape }).strict(),
+    z.object({ action: z.literal("TEAM_LIMIT_PARTNER_GRANT"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
+    z.object({ action: z.literal("TEAM_LIMIT_PARTNER_REVOKE"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
+    z.object({ action: z.literal("TEAM_PRACTICE_RECORD"), ...TeamPracticeShape }).strict(),
+    z.object({ action: z.literal("PUBLIC_REVIEW_HIDE"), ...PublicReviewHideShape }).strict(),
+    z.object({ action: z.literal("PUBLIC_REVIEW_STEP"), ...PublicReviewStepShape }).strict(),
+    // 0157 (D4): the close says what the person found; it is bound into the passkey's body.
+    z.object({ action: z.literal("PUBLIC_REPORT_DISMISS"), flag_id: z.uuid(), outcome: PublicFlagOutcomeSchema, operation_id: z.uuid() }).strict()
 ]);
 export const StaffActionOptionsRequestSchema = z.object({ intent: StaffActionIntentSchema }).strict();
 export const StaffActionVerifyRequestSchema = z.object({ intent: StaffActionIntentSchema,
     challenge_handle: OpaqueHandleSchema, credential: WebAuthnAuthenticationCredentialSchema
 }).strict().superRefine(ceremonyBodyBound);
+export const TeamLimitSetRequestSchema = z.object({ ...TeamLimitSetShape, proof_handle: OpaqueHandleSchema }).strict();
+export const TeamLimitPartnerRequestSchema = z.object({ ...ActionMutationShape, proof_handle: OpaqueHandleSchema }).strict();
+export const TeamPracticeRequestSchema = z.object({ ...TeamPracticeShape, proof_handle: OpaqueHandleSchema }).strict();
+const TeamLimitLogEntrySchema = z.object({
+    kind: z.enum(["LIMIT", "PARTNER_GRANTED", "PARTNER_REVOKED", "PRACTICE"]), at: z.iso.datetime({ offset: true }),
+    amount_micros: TeamLimitMicrosSchema.optional(), previous_micros: TeamLimitMicrosSchema.nullable().optional(),
+    actor_staff_id: z.uuid().nullable(), subject_staff_id: z.uuid().optional(),
+    cause: z.enum(["OWNER_REVOKED", "STAFF_DISABLED", "ACCOUNT_ERASED", "OWNER_CHANGED"]).optional(),
+    notice: z.enum(["NONE", "WAITING", "SENT", "FAILED"])
+}).strict();
+/** The private team panel: only the two accounts ever receive it. A null amount: no limit yet, so the team has no room. */
+export const TeamLimitPageSchema = z.object({
+    amount_micros: TeamLimitMicrosSchema.nullable(), revision: RevisionSchema, spent_micros: TeamLimitMicrosSchema, committed_micros: TeamLimitMicrosSchema,
+    month_starts_at: z.iso.datetime({ offset: true }), month_ends_at: z.iso.datetime({ offset: true }), is_owner: z.boolean(),
+    partner: z.object({ staff_id: z.uuid(), pseudonym: z.string().regex(/^staff-[0-9a-f]{32}$/u), grant_revision: RevisionSchema }).strict().nullable(),
+    log: z.array(TeamLimitLogEntrySchema).max(100)
+}).strict();
+export type TeamLimitPage = z.infer<typeof TeamLimitPageSchema>;
+export const PublicReviewHideRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape, proof_handle: OpaqueHandleSchema }).strict();
+export const PublicReviewStepRequestSchema = z.object({ step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
+    pointer: PublicReviewPointerSchema.nullable(), text: z.string().trim().min(1).max(20000).nullable(), expected_revision: RevisionSchema, operation_id: z.uuid(),
+    ...PublicReviewGroundShape, facts: ModerationFactsSchema.nullable(), proof_handle: OpaqueHandleSchema }).strict();
+export type PublicReviewStepRequest = z.infer<typeof PublicReviewStepRequestSchema>;
+const PublicReviewPieceSchema = z.object({ pointer: PublicReviewPointerSchema, original: z.string(), corrected: z.string().nullable() }).strict();
+const PublicReviewLogEntrySchema = z.object({ revision: z.number().int().positive(), action: z.enum(["HIDE", "REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT"]), piece_kind: PublicReviewPieceKindSchema.nullable(),
+    actor_staff_id: z.uuid(), at: z.iso.datetime({ offset: true }) }).strict();
+/** The whole debate for the two accounts. The originals are here and nowhere else now: no-store, and each read is logged. */
+export const PublicReviewPageSchema = z.object({
+    publication_ref: z.uuid(), hidden: z.boolean(), revision: RevisionSchema, question: z.string(), published_at: z.iso.datetime({ offset: true }),
+    snapshot_unreadable: z.boolean(), snapshot: z.array(PublicReviewPieceSchema),
+    digs: z.array(z.object({ dig_run_id: z.uuid(), parent_run_id: z.uuid(), position_ref: z.string().nullable(), contributor: z.string().nullable(), contributed_at: z.iso.datetime({ offset: true }), removed: z.boolean() }).strict()),
+    updates: z.array(z.object({ update_id: z.uuid(), update_seq: z.number().int().positive(), dig_run_id: z.uuid().nullable(), kind: z.enum(["PATH", "MAIN_ANSWER"]), position_ref: z.string().nullable(), recorded_at: z.iso.datetime({ offset: true }),
+        state: z.enum(["ON_THE_PAGE", "ITS_DIG_REMOVED", "AFFECTED"]), before: z.string().nullable(), pieces: z.array(PublicReviewPieceSchema) }).strict()),
+    reports: z.array(z.object({ report_id: z.uuid(), report_version: z.number().int().positive(), writer: z.string().nullable(), requested_at: z.iso.datetime({ offset: true }), recorded_at: z.iso.datetime({ offset: true }),
+        state: z.enum(["ON_THE_PAGE", "HIDDEN", "AFFECTED"]), pieces: z.array(PublicReviewPieceSchema) }).strict()),
+    log: z.array(PublicReviewLogEntrySchema)
+}).strict();
+export type PublicReviewPage = z.infer<typeof PublicReviewPageSchema>;
+export const PublicReviewListSchema = z.object({
+    hidden: z.array(z.object({ publication_ref: z.uuid(), hidden_at: z.iso.datetime({ offset: true }) }).strict()),
+    log: z.array(PublicReviewLogEntrySchema.extend({ publication_ref: z.uuid() }).strict()).max(100)
+}).strict();
+export type PublicReviewList = z.infer<typeof PublicReviewListSchema>;
+/** Decision 35: the Report button's queue, for the same two accounts. The reporter's name is here and nowhere else, and each read is logged. `claim` and `where` go null six months after a report closed. */
+export const PublicFlagQueueSchema = z.object({ reports: z.array(z.object({
+    flag_id: z.uuid(), publication_ref: z.uuid(), reporter: z.string().nullable(), state: z.enum(["CHECKING", "QUEUED", "NOT_FOUND", "HIDDEN"]), verdict: z.enum(["AGREE", "NOT_FOUND", "UNSURE", "UNAVAILABLE"]).nullable(), reason: z.enum(["CONTENT", "PERSONAL"]).nullable(),
+    created_at: z.iso.datetime({ offset: true }), judged_at: z.iso.datetime({ offset: true }).nullable(), dismissed_at: z.iso.datetime({ offset: true }).nullable(), where: z.string().nullable(), claim: z.string().nullable(), debate_hidden: z.boolean(),
+    /** 0157 (D4): what the close found; null while open, or closed by the release before's Dismiss. */
+    outcome: PublicFlagOutcomeSchema.nullable() }).strict()).max(200) }).strict();
+export type PublicFlagQueue = z.infer<typeof PublicFlagQueueSchema>;
+export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), outcome: PublicFlagOutcomeSchema, proof_handle: OpaqueHandleSchema }).strict();
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();
 const CredentialDescriptorSchema = z.object({ id: CredentialIdSchema, type: z.literal("public-key"), transports: TransportsSchema.optional() }).strict();
 export const StaffRegistrationOptionsResponseSchema = z.object({
@@ -233,7 +327,11 @@ export const staffContractInventory = Object.freeze({
         "GET /v1/admin/publication-reviews", "GET /v1/admin/publication-reviews/{reviewRef}",
         "POST /v1/admin/publication-reviews/{reviewRef}/approve", "POST /v1/admin/publication-reviews/{reviewRef}/refuse",
         "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
-        "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision"
+        "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision",
+        "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
+        "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
+        "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step",
+        "GET /v1/admin/public-reports", "POST /v1/admin/public-reports/{id}/dismiss"
     ]),
     resources: Object.freeze({
         StaffCapabilitySchema, DelegatedStaffCapabilitiesSchema, ActiveStaffCapabilitiesSchema, StaffActionSchema,
@@ -246,7 +344,10 @@ export const staffContractInventory = Object.freeze({
         StaffInviteRequestSchema, StaffInviteResponseSchema, StaffInvitationOptionsRequestSchema, StaffInvitationOptionsResponseSchema, StaffInvitationVerifyRequestSchema,
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
-        ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema
+        ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema,
+        TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema,
+        PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema,
+        PublicFlagQueueSchema, PublicFlagDismissRequestSchema
     })
 });
 
@@ -277,20 +378,46 @@ function finiteFundingWindow(value: { amount_micros: number; day_micros: number;
 }
 const FundedConfigureIntentSchema = z.object({ action: z.literal("ALLOWANCE_CONFIGURE"), ...FundingConfigureShape }).strict().superRefine(finiteFundingWindow);
 const FundedRevokeIntentSchema = z.object({ action: z.literal("ALLOWANCE_REVOKE"), grant_id: z.uuid(), ...FundingMutationShape }).strict();
-export const FundedStaffActionIntentSchema = z.union([StaffActionIntentSchema, FundedConfigureIntentSchema, FundedRevokeIntentSchema]);
+/** Decision 32: the Owner's allowance for a member. The revision is the one the page was looking at; the database's own is what the proof binds. */
+const TeamAllowanceMemberShape = { target_staff_id: z.uuid(), expected_revision: RevisionSchema };
+const TeamAllowanceConfigureIntentSchema = z.object({ action: z.literal("TEAM_ALLOWANCE_CONFIGURE"), ...TeamAllowanceMemberShape, ...FundingConfigureShape }).strict().superRefine(finiteFundingWindow);
+const TeamAllowanceRevokeIntentSchema = z.object({ action: z.literal("TEAM_ALLOWANCE_REVOKE"), ...TeamAllowanceMemberShape, grant_id: z.uuid(), ...FundingMutationShape }).strict();
+export type TeamAllowanceIntent = z.infer<typeof TeamAllowanceConfigureIntentSchema> | z.infer<typeof TeamAllowanceRevokeIntentSchema>;
+export const FundedStaffActionIntentSchema = z.union([StaffActionIntentSchema, FundedConfigureIntentSchema, FundedRevokeIntentSchema, TeamAllowanceConfigureIntentSchema, TeamAllowanceRevokeIntentSchema]);
 export const FundedStaffActionOptionsRequestSchema = z.object({ intent: FundedStaffActionIntentSchema }).strict();
 export const FundedStaffActionVerifyRequestSchema = z.object({ intent: FundedStaffActionIntentSchema,
     challenge_handle: OpaqueHandleSchema, credential: WebAuthnAuthenticationCredentialSchema }).strict().superRefine(ceremonyBodyBound);
 export const InternalAllowanceConfigureRequestSchema = z.object({ ...FundingConfigureShape, proof_handle: OpaqueHandleSchema }).strict().superRefine(finiteFundingWindow);
 export const InternalAllowanceRevokeRequestSchema = z.object({ ...FundingMutationShape, proof_handle: OpaqueHandleSchema }).strict();
 export const InternalAllowanceTargetParamsSchema = z.object({ grantId: z.uuid() }).strict();
+export const TeamAllowanceConfigureRequestSchema = z.object({ expected_revision: RevisionSchema, ...FundingConfigureShape, proof_handle: OpaqueHandleSchema }).strict().superRefine(finiteFundingWindow);
+export const TeamAllowanceRevokeRequestSchema = z.object({ expected_revision: RevisionSchema, ...FundingMutationShape, proof_handle: OpaqueHandleSchema }).strict();
+export const TeamAllowanceRevokeParamsSchema = z.object({ staffId: z.uuid(), grantId: z.uuid() }).strict();
+const TeamAllowanceMicrosSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const TeamAllowanceLogEntrySchema = z.object({
+    kind: z.enum(["GIVEN", "TAKEN_BACK", "ENDED"]), subject_staff_id: z.uuid(), actor_staff_id: z.uuid().nullable(), at: z.string(),
+    amount_micros: FiniteFundingMicrosSchema.optional(), day_micros: FiniteFundingMicrosSchema.optional(), week_micros: FiniteFundingMicrosSchema.optional(), expires_at: z.string().optional(),
+    cause: z.enum(["STAFF_DISABLED", "ACCOUNT_ERASED", "OWNER_CHANGED"]).optional(), notice: z.enum(["NONE", "WAITING", "SENT", "FAILED"])
+}).strict();
+export const TeamAllowancePageSchema = z.object({
+    limits: z.object({ maximum_grant_micros: FiniteFundingMicrosSchema, maximum_day_micros: FiniteFundingMicrosSchema, maximum_week_micros: FiniteFundingMicrosSchema, maximum_lifetime_ms: FiniteFundingMicrosSchema }).strict(),
+    members: z.array(z.object({
+        staff_id: z.uuid(), pseudonym: z.string().regex(/^staff-[0-9a-f]{32}$/u), is_owner: z.boolean(), revision: RevisionSchema,
+        allowance: z.object({ grant_id: z.uuid(), amount_micros: FiniteFundingMicrosSchema, day_micros: FiniteFundingMicrosSchema, week_micros: FiniteFundingMicrosSchema,
+            starts_at: z.string(), expires_at: z.string(), spent_micros: TeamAllowanceMicrosSchema }).strict().nullable()
+    }).strict()).max(100),
+    log: z.array(TeamAllowanceLogEntrySchema).max(100)
+}).strict();
+export type TeamAllowancePage = z.infer<typeof TeamAllowancePageSchema>;
 export type InternalAllowanceIntent = z.infer<typeof FundedConfigureIntentSchema> | z.infer<typeof FundedRevokeIntentSchema>;
 export type FundedStaffActionIntent = z.infer<typeof FundedStaffActionIntentSchema>;
 export const fundedStaffContractInventory = Object.freeze({
     fundingPolicyVersion: 1 as const,
-    routes: Object.freeze(["POST /v1/admin/internal-allowances", "DELETE /v1/admin/internal-allowances/{grantId}"] as const),
+    routes: Object.freeze(["POST /v1/admin/internal-allowances", "DELETE /v1/admin/internal-allowances/{grantId}",
+        "GET /v1/admin/team-allowances", "POST /v1/admin/team-allowances/{staffId}", "DELETE /v1/admin/team-allowances/{staffId}/{grantId}"] as const),
     resources: Object.freeze({ FundedStaffEnrollmentResponseSchema, SelectedStaffEnrollmentResponseSchema, FundedActiveStaffCapabilitiesSchema, FundedStaffActionSchema, FundedActionBindingSchema,
         FundedStaffElevationResponseSchema, FundedStaffTeamMemberSchema, FundedStaffTeamPageSchema,
         FundedStaffActionIntentSchema, FundedStaffActionOptionsRequestSchema, FundedStaffActionVerifyRequestSchema,
-        InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, InternalAllowanceTargetParamsSchema })
+        InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, InternalAllowanceTargetParamsSchema,
+        TeamAllowanceConfigureRequestSchema, TeamAllowanceRevokeRequestSchema, TeamAllowanceRevokeParamsSchema, TeamAllowancePageSchema })
 });

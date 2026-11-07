@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import { exhaustive, LENGTH_GUIDANCE_START } from "@debateai/kernel";
 import {
-  debateShapeSettingsOf, type AnswerLength, type DebateShapeSettings, type DepthMode, type DepthParams, type PlanTier, type Scrutiny
+  debateShapeSettingsOf, readingLevelOf, type AnswerLength, type DebateShapeSettings, type DepthMode, type DepthParams, type PlanTier, type Scrutiny
 } from "@debateai/contract";
 import type { PlanId } from "./billing-plans.js";
 import type { LengthGuidancePolicy } from "./length-guidance-policy.js";
@@ -299,21 +299,26 @@ const FREE_SHAPE_DEPTH_CEILING = 2;
  * today's stored bytes and the depth is untouched. Length guidance (spec 2026-10-15 §3.1): with the shape row absent and
  * the length row in force, `{ depth, answerLength }` exactly, in that order (the answer length is the one setting the
  * length row reads). With billing on, billing's Free gauge sets the depth first; this ceiling can only lower it.
+ * V4 reading level (owner N6, 2026-10-29): an asked `readingLevel` is kept, last, in every branch; it is no shape setting
+ * and no row changes it. An ask without one is normalised exactly as before (the same object for `{ depth }`).
  */
 export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: DebateShapePolicy | null, plan: DebateShapePlanKey,
   lengthPolicy: LengthGuidancePolicy | null = null): DepthParams {
+  const readingLevel = readingLevelOf(depthParams);
+  const level = readingLevel === null ? {} : { readingLevel };
   if (policy === null) {
     if (lengthPolicy !== null) {
-      return Object.freeze({ depth: depthParams.depth, answerLength: debateShapeSettingsOf(depthParams).answerLength });
+      return Object.freeze({ depth: depthParams.depth, answerLength: debateShapeSettingsOf(depthParams).answerLength, ...level });
     }
-    return Object.keys(depthParams).length === 1 ? depthParams : Object.freeze({ depth: depthParams.depth });
+    return Object.keys(depthParams).length === 1 + Object.keys(level).length
+      ? depthParams : Object.freeze({ depth: depthParams.depth, ...level });
   }
   const rules = policy.plans[plan];
   const asked = debateShapeSettingsOf(depthParams);
   const depth = plan === "free" ? Math.min(depthParams.depth, FREE_SHAPE_DEPTH_CEILING) : depthParams.depth;
   const depthMode: DepthMode = asked.depthMode === "fixed" && !rules.fixedDepthAllowed ? "adaptive" : asked.depthMode;
   const scrutiny: Scrutiny = scrutinyBudgetOf(rules, asked.scrutiny) === null ? "standard" : asked.scrutiny;
-  return Object.freeze({ depth, depthMode, scrutiny, answerLength: asked.answerLength });
+  return Object.freeze({ depth, depthMode, scrutiny, answerLength: asked.answerLength, ...level });
 }
 
 const notNormalised = (key: string): never => { throw new TypeError(`DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:${key}`); };

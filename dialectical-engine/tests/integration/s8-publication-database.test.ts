@@ -2484,12 +2484,17 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     })).toBe(true);
     return { runId,ref };
   }
-  async function schedule(fixture:Awaited<ReturnType<typeof identityWithGrant>>,remove:boolean) {
-    return erasureRepository.schedule({
+  // R22 decision 21: the code always asks to keep. `stored` writes a request's old choice through 0110's frozen function, as a row from before the release holds it.
+  async function schedule(fixture:Awaited<ReturnType<typeof identityWithGrant>>,stored:boolean) {
+    if (!stored) return erasureRepository.schedule({
       userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
-      sessionId:fixture.identity.sessionId,grantTokenHash:fixture.grantTokenHash,
-      deletePublicDebates:remove
+      sessionId:fixture.identity.sessionId,grantTokenHash:fixture.grantTokenHash
     });
+    const row=(await withMailLocale(erasurePool,"en",(client)=>client.query<{
+      erasure_id:string;status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:Date;cancellation_ref:string;
+    }>("SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4,true)",
+      [fixture.identity.userId,fixture.identity.ownerRef,fixture.identity.sessionId,fixture.grantTokenHash]))).rows[0];
+    return row===undefined ? null : { erasureId:row.erasure_id,status:row.status,executeAt:row.execute_at,cancellationRef:row.cancellation_ref };
   }
   async function due(userId:string) {
     await database.pool.query(`
@@ -2619,14 +2624,19 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     `)).rows[0]).toEqual({ column_default:"false",is_nullable:"NO" });
   });
 
-  it("DPD-S01 R9 R12 R13 schedule stores the choice and an idempotent retry returns the stored row's choice",async ()=>{
+  it("R22 decision 21 a request through the repository stores keep",async ()=>{
+    const fixture=await identityWithGrant("always-keep");
+    const scheduled=await schedule(fixture,false);
+    expect((await database.pool.query("SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",[scheduled!.erasureId])).rows[0]?.delete_public_debates).toBe(false);
+    expect(Object.keys(scheduled!)).not.toContain("deletePublicDebates");
+  });
+
+  it("DPD-S01 R9 R12 R13 an idempotent retry returns the stored row and leaves its old choice as it is",async ()=>{
     const fixture=await identityWithGrant("schedule");
     const first=await schedule(fixture,true);
-    expect(first?.deletePublicDebates).toBe(true);
     expect((await database.pool.query("SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",[first!.erasureId])).rows[0]?.delete_public_debates).toBe(true);
     const retry=await schedule(fixture,false);
     expect(retry?.erasureId).toBe(first?.erasureId);
-    expect(retry?.deletePublicDebates).toBe(true);
     expect((await database.pool.query("SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",[first!.erasureId])).rows[0]?.delete_public_debates).toBe(true);
     const oldClient=await identityWithGrant("old-client");
     const oldClientRow=(await withMailLocale(erasurePool, 'en', (c) => c.query<{
@@ -2646,7 +2656,7 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     expect(await erasureRepository.current({
       userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
       sessionId:fixture.identity.sessionId
-    })).toMatchObject({ status:"SCHEDULED",deletePublicDebates:true });
+    })).toMatchObject({ status:"SCHEDULED",erasureId:first!.erasureId });
   });
 
   it("DPD-S01 R16 R17 nothing changes during the grace and cancel restores every public debate",async ()=>{
@@ -2656,8 +2666,7 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     const before=await httpSnapshot(refs);
     for (const ref of before.refs) expect(ref.statusCode).toBe(200);
     for (const ref of refs) expect(before.list).toContain(ref);
-    const scheduled=await schedule(fixture,true);
-    expect(scheduled?.deletePublicDebates).toBe(true);
+    const scheduled=await schedule(fixture,false);
     await publications().reconcileKeyCleanup();
     const coordinator=new AccountErasureCoordinator(
       erasureRepository,users,runKeys,publicationCipher
@@ -2673,92 +2682,6 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     })).toBe(true);
     await publications().reconcileKeyCleanup();
     expect(await httpSnapshot(refs)).toEqual(before);
-  });
-
-  it("DPD-S01 R18 R20 R21 R23 a remove erasure removes exactly the prepared refs, as unpublish does",async ()=>{
-    const fixture=await identityWithGrant("remove");
-    const a1=await publish(fixture.identity,"a1");
-    const a2=await publish(fixture.identity,"a2");
-    const a3=await publish(fixture.identity,"a3");
-    const unpublishToken=await grant(fixture.identity,a3.runId,"UNPUBLISH","a3",new Date());
-    expect(await repository.unpublish({
-      runId:a3.runId,userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
-      sessionId:fixture.identity.sessionId,
-      grantTokenHash:hashToken("step-up-grant",unpublishToken),occurredAt:new Date(),source
-    })).toBe(a3.ref);
-    await publications().reconcileKeyCleanup();
-    const oracle=await publicRead(a3.ref);
-    const scheduled=await schedule(fixture,true);
-    const a4=await publish(fixture.identity,"a4");
-    const before=await httpSnapshot([a1.ref,a2.ref,a4.ref]);
-    for (const ref of before.refs) expect(ref.statusCode).toBe(200);
-    for (const ref of [a1.ref,a2.ref,a4.ref]) expect(before.list).toContain(ref);
-    expect((await database.pool.query(`
-      SELECT retained_public_snapshot_count,removed_public_snapshot_count
-      FROM identity.account_erasure_request WHERE erasure_id=$1
-    `,[scheduled!.erasureId])).rows[0]).toEqual({
-      retained_public_snapshot_count:0,removed_public_snapshot_count:null
-    });
-    await due(fixture.identity.userId);
-    const coordinator=new AccountErasureCoordinator(
-      erasureRepository,users,runKeys,publicationCipher
-    );
-    expect(await coordinator.execute(scheduled!.erasureId,source)).toBe("CONTENDED");
-    expect(await erasureRepository.current({
-      userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
-      sessionId:fixture.identity.sessionId
-    })).toMatchObject({ status:"PROCESSING",deletePublicDebates:true });
-    expect((await database.pool.query(`
-      SELECT prepared_current_publication_refs,retained_public_snapshot_count,
-        removed_public_snapshot_count,keyless_historical_snapshot_count
-      FROM identity.account_erasure_request WHERE erasure_id=$1
-    `,[scheduled!.erasureId])).rows[0]).toEqual({
-      prepared_current_publication_refs:[a1.ref,a2.ref,a4.ref].sort(),
-      retained_public_snapshot_count:0,removed_public_snapshot_count:3,
-      keyless_historical_snapshot_count:1
-    });
-    await ackNotifications();
-    expect(await clean(scheduled!.erasureId,coordinator)).toBe("CLEANED");
-    const after=await httpSnapshot([a1.ref,a2.ref,a4.ref]);
-    for (const ref of after.refs) expect({ statusCode:ref.statusCode,body:ref.body }).toEqual(oracle);
-    for (const ref of [a1.ref,a2.ref,a4.ref]) {
-      expect(after.list).not.toContain(ref);
-      expect((await database.pool.query<{ state:string }>(`
-        SELECT state FROM core.run_visibility_event WHERE publication_ref=$1
-        ORDER BY at_seq DESC LIMIT 1
-      `,[ref])).rows[0]?.state).toBe("PRIVATE");
-      expect(await publicationCipher.exists(ref)).toBe(false);
-      expect(await publicationCipher.keyReadable(ref)).toBe(false);
-    }
-    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(0);
-    expect((await database.pool.query("SELECT committed_at FROM identity.account_erasure_request WHERE erasure_id=$1",[scheduled!.erasureId])).rows[0]?.committed_at).not.toBeNull();
-  });
-
-  it("DPD-S01 R19 a failed key destroy blocks finalize and the next cycle completes",async ()=>{
-    const fixture=await identityWithGrant("destroy-failure");
-    const ref=(await publish(fixture.identity,"destroy-failure")).ref;
-    const scheduled=await schedule(fixture,true);
-    await due(fixture.identity.userId);
-    expect(await prepare(scheduled!.erasureId)).toBe("PREPARED");
-    await ackNotifications();
-    const finalize=vi.spyOn(erasureRepository,"finalize");
-    let first=true;
-    const cipher={
-      destroy:async (candidate:string)=>{
-        if (candidate===ref && first) { first=false;throw new Error("DPD_FORCED_DESTROY_FAILURE"); }
-        return publicationCipher.destroy(candidate);
-      },
-      exists:(candidate:string)=>publicationCipher.exists(candidate),
-      keyReadable:(candidate:string)=>publicationCipher.keyReadable(candidate)
-    };
-    const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,cipher);
-    await expect(coordinator.execute(scheduled!.erasureId,source)).rejects.toThrow("DPD_FORCED_DESTROY_FAILURE");
-    expect(finalize).toHaveBeenCalledTimes(0);
-    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(1);
-    expect((await database.pool.query("SELECT committed_at FROM identity.account_erasure_request WHERE erasure_id=$1",[scheduled!.erasureId])).rows[0]?.committed_at).toBeNull();
-    expect(await clean(scheduled!.erasureId,coordinator)).toBe("CLEANED");
-    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(0);
-    finalize.mockRestore();
   });
 
   it("DPD-S01 R19 finalize refuses a remove request whose removed keys lack cleanup receipts",async ()=>{
@@ -2787,25 +2710,21 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     for (const ref of before) expect(ref.statusCode).toBe(200);
     const beforeList=(await httpSnapshot(refs)).list;
     for (const ref of refs) expect(beforeList).toContain(ref);
-    const scheduled=(await withMailLocale(erasurePool, 'en', (c) => c.query<{ erasure_id:string }>(
-      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4)",
-      [fixture.identity.userId,fixture.identity.ownerRef,
-        fixture.identity.sessionId,fixture.grantTokenHash]
-    ))).rows[0]!;
+    const scheduled=(await schedule(fixture,false))!;
     await due(fixture.identity.userId);
     const keyReadable=vi.fn((ref:string)=>publicationCipher.keyReadable(ref));
     const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,{
       destroy:(ref:string)=>publicationCipher.destroy(ref),
       exists:(ref:string)=>publicationCipher.exists(ref),keyReadable
     });
-    expect(await clean(scheduled.erasure_id,coordinator)).toBe("CLEANED");
+    expect(await clean(scheduled.erasureId,coordinator)).toBe("CLEANED");
     expect(await Promise.all(refs.map(publicRead))).toEqual(before);
     for (const ref of refs) expect(keyReadable).toHaveBeenCalledWith(ref);
     expect((await database.pool.query(`
       SELECT delete_public_debates,retained_public_snapshot_count,
         removed_public_snapshot_count,keyless_historical_snapshot_count
       FROM identity.account_erasure_request WHERE erasure_id=$1
-    `,[scheduled.erasure_id])).rows[0]).toEqual({
+    `,[scheduled.erasureId])).rows[0]).toEqual({
       delete_public_debates:false,retained_public_snapshot_count:2,
       removed_public_snapshot_count:0,keyless_historical_snapshot_count:0
     });
@@ -2968,7 +2887,6 @@ describe("DPD-S01 delete public debates at account erasure", () => {
       await barrier.query("COMMIT");
       const retry=await scheduling;
       expect(retry?.erasureId).toBe(inserted.erasure_id);
-      expect(retry?.deletePublicDebates).toBe(true);
       expect((await database.pool.query<{ delete_public_debates:boolean }>(`
         SELECT delete_public_debates FROM identity.account_erasure_request
         WHERE erasure_id=$1

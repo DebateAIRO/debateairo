@@ -24,8 +24,9 @@ describe("the runner hands the receipt's engine and length table to the story (R
   });
 
   it("passes the table beside the language lock, the engine only for engine 2, and the backups in panel order", () => {
+    // R22 (owner N6, 2026-10-29): the V4 reading level rides between the language lock and the table.
     expect(snapshot).toMatch(
-      /languageLocked: shapeLanguage !== null,\s*\n(?:\s*\/\/[^\n]*\n)*\s*\.\.\.\(lengthGuidance === null \? \{\} : \{ lengthGuidance \}\),/u);
+      /languageLocked: shapeLanguage !== null,\s*\n(?:\s*\/\/[^\n]*\n)*\s*readingLevel,\s*\n(?:\s*\/\/[^\n]*\n)*\s*\.\.\.\(lengthGuidance === null \? \{\} : \{ lengthGuidance \}\),/u);
     expect(snapshot).toContain("engine: engine.engine === 2 ? engine : null,");
     // Pre-flight PF-D7.3 (ruling "backup vs sit-out book"): the members the sit-out book has benched are not offered.
     // Whole-branch review Minor 1 (ruling W1): the maker rule reads every claim-eligible member's maker BEFORE the

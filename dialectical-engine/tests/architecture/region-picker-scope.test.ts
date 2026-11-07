@@ -20,6 +20,9 @@ const exportTypes = "apps/api/src/data-export/types.ts";
 // Italy clause approval S01: 0125 names record_registration_region only in a comment (its writer's grant follows that
 // writer's); its bytes are sha-pinned by the lineage, so it is listed here rather than edited.
 const italyApprovalMigration = "migrations/0125_italy_specific_approval.sql";
+// 0154 widens 0095's country CHECK by Iceland and Liechtenstein; its loader names the CHECK for its postcondition.
+const widenMigration = "migrations/0154_region_iceland_liechtenstein.sql";
+const widenLoader = "packages/db/src/migration-forward0154.ts";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -37,8 +40,14 @@ describe("registration region scope", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
     expect(references.sort()).toEqual([
       migration, forwardContract, verifier, supersedingVerifier, rlsVerifier, writer, socialWriter,
-      exportMigration, exportSnapshot, exportTypes, italyApprovalMigration,
+      exportMigration, exportSnapshot, exportTypes, italyApprovalMigration, widenMigration, widenLoader,
     ].sort());
+    // 0154 only swaps the country CHECK: it never reads or writes a region row.
+    expect(source(widenMigration)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+    expect(source(widenMigration).replace(/--[^\n]*/g, "").trim().split(/;\s*/).filter(Boolean)).toEqual([
+      "ALTER TABLE identity.registration_region DROP CONSTRAINT IF EXISTS registration_region_country_code_check",
+      expect.stringMatching(/^ALTER TABLE identity\.registration_region ADD CONSTRAINT registration_region_country_code_check CHECK \(country_code IN \(.*\)\) NOT VALID$/)
+    ]);
 
     // The export reads this account's declared region; it never creates or changes a region row.
     expect(source(exportMigration)).toMatch(/FROM identity\.registration_region r WHERE r\.user_id=v_user/);

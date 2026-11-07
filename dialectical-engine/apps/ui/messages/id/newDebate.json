@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Tidak dapat membuat debat",
   "newDebate.sessionReadFailed": "Gagal membaca sesi",
   "newDebate.planRosterFailed": "Gagal membaca daftar tingkat paket",
-  "newDebate.checkingSession": "Memeriksa sesi…",
+  "newDebate.checkingSession": "Sebentar…",
   "newDebate.redirectingToSignIn": "Mengarahkan Anda untuk masuk…",
   "newDebate.continueToSignIn": "Lanjutkan untuk masuk",
   "newDebate.defaultUnavailable": "Penerapan tidak memiliki baris riskTier yang valid; tingkat risiko menunggu masukan.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Anda telah mencapai batas hari ini untuk paket Anda. Anda tetap dapat bertanya: debat Anda akan dimulai dengan sendirinya pada {time}.",
   "newDebate.room.personWeekFullTopPlan": "Anda telah mencapai batas minggu ini untuk paket Anda. Anda tetap dapat bertanya: debat Anda akan dimulai dengan sendirinya pada {time}.",
   "newDebate.room.personMonthFullTopPlan": "Anda telah mencapai batas bulan ini untuk paket Anda. Anda tetap dapat bertanya: debat Anda akan dimulai dengan sendirinya pada {time}.",
-  "newDebate.room.freeMonthFull": "Anda telah menggunakan jatah debat gratis bulan ini. Debat Anda berikutnya dapat dimulai pada {time}, atau pilih paket untuk melanjutkan sekarang.",
+  "newDebate.room.freeMonthFull": "Anda telah menggunakan kuota gratis bulan ini. Debat Anda berikutnya dapat dimulai pada {time}, atau pilih paket untuk melanjutkan sekarang.",
   "newDebate.room.personClose": "Anda hampir mencapai batas paket Anda. Debat ini tetap berjalan penuh.",
   "newDebate.room.ownDebatesFull": "Debat Anda yang lain sedang memakai sisa batas Anda untuk saat ini. Debat ini akan dimulai dengan sendirinya begitu salah satunya selesai.",
   "newDebate.room.upgradeLink": "Lihat paket",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Paket Anda: Gratis",
   "newDebate.plan.current.PLUS": "Paket Anda: Plus",
   "newDebate.plan.current.PRO": "Paket Anda: Pro",
-  "newDebate.plan.current.MAX": "Paket Anda: Max"
+  "newDebate.plan.current.MAX": "Paket Anda: Max",
+  "newDebate.askText.otherAnswer": "Jawaban lain…",
+  "newDebate.askText.otherLabel": "Penjelasan tambahan Anda sendiri",
+  "newDebate.askText.matters": "Jika jawaban-jawabannya mengarah ke arah yang berbeda, yang paling penting bagi saya: {matters}",
+  "newDebate.askText.angles": "Mohon juga perhatikan aspek berikut: {list}.",
+  "newDebate.freePublicNotice": "Pada paket Gratis, pertanyaan Anda dan debatnya bersifat publik. Jangan sertakan data pribadi."
 }

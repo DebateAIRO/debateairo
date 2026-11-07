@@ -9,6 +9,7 @@ import { GenericContainer, Wait, type StartedTestContainer } from "testcontainer
 import { createPool, type Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { loadBootstrapRegister } from "@debateai/register";
+import { armSuperuserGuardForTestFile, currentTestFile } from "./master-key-guard.js";
 
 export interface TestDatabase {
   readonly pool: Pool;
@@ -17,6 +18,37 @@ export interface TestDatabase {
   readonly testcontainersStatus: "ACTIVE" | "DEFERRED BY DR-121";
   readonly expectedPostgresMajor: string;
   stop(): Promise<void>;
+}
+
+const beforeStopHooks = new WeakMap<object, (() => Promise<void>)[]>();
+
+/**
+ * Upload check Task 7: `hook` runs when `database.stop()` is called, before its pool ends and the cluster stops. The
+ * logins of tests/support/rls-logins.ts use it to end their own pools, so a file that never ends them itself (a file
+ * whose runner the preview harness builds on the runner login) does not leave connections open on a stopping cluster.
+ */
+export function beforeTestDatabaseStops(database: Pick<TestDatabase, "pool">, hook: () => Promise<void>): void {
+  const hooks = beforeStopHooks.get(database) ?? [];
+  hooks.push(hook);
+  beforeStopHooks.set(database, hooks);
+}
+
+/**
+ * Runs every hook in turn, the later ones too when one rejects, and never rejects itself: it returns what failed (one
+ * error, or an AggregateError for several), or undefined. stop() ends the pool, stops the cluster and removes its
+ * folder whatever this returns, and throws the failure only after that.
+ */
+async function runBeforeStopHooks(database: TestDatabase): Promise<unknown> {
+  const failures: unknown[] = [];
+  for (const hook of (beforeStopHooks.get(database) ?? []).splice(0)) {
+    try {
+      await hook();
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  if (failures.length === 0) return undefined;
+  return failures.length === 1 ? failures[0] : new AggregateError(failures, "TEST_DATABASE_STOP_HOOKS_FAILED");
 }
 
 export function createTestAskAdmissionPoolFacades(pool:Pool):Readonly<{
@@ -71,17 +103,23 @@ async function startWithTestcontainers(postgresMajor: string): Promise<TestDatab
   const pool = createPool(connectionString);
   await pool.query("SELECT 1");
   console.info("[S00 DB] Testcontainers ACTIVE: real PostgreSQL container started");
-  return {
+  const database: TestDatabase = {
     pool,
     connectionString,
     mechanism: "testcontainers",
     testcontainersStatus: "ACTIVE",
     expectedPostgresMajor: postgresMajor,
     async stop() {
-      await pool.end();
-      await container.stop();
+      const hookFailure = await runBeforeStopHooks(database);
+      try {
+        await pool.end();
+      } finally {
+        await container.stop();
+      }
+      if (hookFailure !== undefined) throw hookFailure;
     }
   };
+  return database;
 }
 
 /**
@@ -169,18 +207,28 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
     await applyTestSchemaFrom(connectionString);
     const pool = createPool(connectionString);
     await pool.query("SELECT 1");
-    return {
+    const database: TestDatabase = {
       pool,
       connectionString,
       mechanism: "embedded-postgres",
       testcontainersStatus: policy.testcontainersStatus,
       expectedPostgresMajor: postgresMajor,
       async stop() {
-        await pool.end();
-        await embedded.stop();
-        await rm(directory, { recursive: true, force: true });
+        // A rejecting hook must not leave the pool, the cluster or its folder behind: they go first, then it is thrown.
+        const hookFailure = await runBeforeStopHooks(database);
+        try {
+          await pool.end();
+        } finally {
+          try {
+            await embedded.stop();
+          } finally {
+            await rm(directory, { recursive: true, force: true });
+          }
+        }
+        if (hookFailure !== undefined) throw hookFailure;
       }
     };
+    return database;
   } catch (error) {
     await embedded.stop().catch(() => undefined);
     await rm(directory, { recursive: true, force: true });
@@ -189,9 +237,25 @@ async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
   }
 }
 
+/**
+ * Starts a fresh embedded PostgreSQL cluster for one test file. Upload check Task 8: it also arms the R21 master-key
+ * guard (tests/support/master-key-guard.ts) for the test file that started it, so in login mode (the default) a query
+ * on this database's superuser inside a request is refused, unless that file is on tests/support/master-key-files.txt.
+ * Seeding, read-backs and the runner run outside any request and are not touched.
+ */
 export async function startTestDatabase(): Promise<TestDatabase> {
+  // Read before the first wait, while the calling test file is still on the stack (vitest's own record comes first).
+  const testFile = currentTestFile();
   // A10: a bad ★DEBATEAI_TEST_SCHEMA_FROM refuses before a cluster is spent on it.
   resolveTestSchemaFrom();
   const bootstrap = await loadBootstrapRegister();
-  return startWithEmbedded(bootstrap.values.postgresMajorVersion);
+  const database = await startWithEmbedded(bootstrap.values.postgresMajorVersion);
+  try {
+    armSuperuserGuardForTestFile(database.connectionString, testFile);
+  } catch (error) {
+    // A guard that refuses (MASTER_KEY_GUARD_TEST_FILE_UNKNOWN) must not leave the cluster and its folder behind.
+    await database.stop();
+    throw error;
+  }
+  return database;
 }

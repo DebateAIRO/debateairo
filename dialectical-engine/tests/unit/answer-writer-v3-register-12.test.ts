@@ -41,8 +41,15 @@ const COMPOSER_P2B = "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08
 const COMPOSER_V4 = "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47";
 /** serve.evaluator.v2 alone: the conformance seal before length guidance (history since LG-C Task 13). */
 const V2_CONFORMANCE = "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f";
-/** The conformance seal this code sends from length guidance on (LG-C Task 13): serve.evaluator.v2 + length.v1. */
+/** The conformance seal this code sent from length guidance on (LG-C Task 13): serve.evaluator.v2 + length.v1 (history since the reading level). */
 const CONFORMANCE_LENGTH = "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6";
+/**
+ * The two seals this code sends since the V4 reading level and the language-neutral length sentence (owner N6 and
+ * 17 Oct #5, 2026-10-29): v4 + length.v3 + reader.v1 + length.reader.v1, and v2 + length.v1 + reader.v1 +
+ * length.reader.v1. They supersede COMPOSER_V4 and CONFORMANCE_LENGTH in every check below, which stay sealed history.
+ */
+const COMPOSER_READER = "6fb174d4d75ad1d39bf8246f741a7ab0ee60fc2b6d117aa228de83cfca29324d";
+const CONFORMANCE_READER = "02e01cbfebf1eeb96e61eb9a56cdbccb7ca1f8fae32186ef7a8c72ab9834c2bd";
 /** What the live register version 11 carries (sealed history; never edited). */
 const LIVE_11 = Object.freeze({
   judge: "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365",
@@ -90,13 +97,13 @@ function exportOf(base: readonly Row[]): PracticeRegisterExport {
 
 describe("register 12: the new prompt seals reach the register as a new version", () => {
   it("the code's prompt fingerprints are the current seals", () => {
-    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_LG_C, composer: COMPOSER_V4, conformance: CONFORMANCE_LENGTH });
+    expect(codePromptContractHashes()).toEqual({ judge: JUDGE_LG_C, composer: COMPOSER_READER, conformance: CONFORMANCE_READER });
   });
 
   it("the development register's builder seals the same values the code sends", async () => {
     const rows = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((row) => [row.rowKey, row.value]));
-    expect(rows.composerContractHash).toBe(COMPOSER_V4);
-    expect(rows.conformanceContractHash).toBe(CONFORMANCE_LENGTH);
+    expect(rows.composerContractHash).toBe(COMPOSER_READER);
+    expect(rows.conformanceContractHash).toBe(CONFORMANCE_READER);
     expect(rows.judgeContractHash).toBe(JUDGE_LG_C);
   });
 
@@ -109,9 +116,9 @@ describe("register 12: the new prompt seals reach the register as a new version"
     expect([...plan.changedKeys].sort()).toEqual(["composerContractHash", "conformanceContractHash", "judgeContractHash"]);
     const entry = (key: string) => plan.delta.find((row) => row.rowKey === key)!;
     expect([entry("composerContractHash").oldValueJsonText, entry("composerContractHash").newValueJsonText])
-      .toEqual([`"${LIVE_11.composer}"`, `"${COMPOSER_V4}"`]);
+      .toEqual([`"${LIVE_11.composer}"`, `"${COMPOSER_READER}"`]);
     expect([entry("conformanceContractHash").oldValueJsonText, entry("conformanceContractHash").newValueJsonText])
-      .toEqual([`"${LIVE_11.conformance}"`, `"${CONFORMANCE_LENGTH}"`]);
+      .toEqual([`"${LIVE_11.conformance}"`, `"${CONFORMANCE_READER}"`]);
     expect([entry("judgeContractHash").oldValueJsonText, entry("judgeContractHash").newValueJsonText])
       .toEqual([`"${LIVE_11.judge}"`, `"${JUDGE_LG_C}"`]);
     // The base is not edited: version 11 keeps its values; the new rows are a new snapshot.
@@ -131,8 +138,8 @@ describe("the runner refuses a register that does not carry the code's prompt fi
     expect(caught).toMatchObject({ code: "REGISTER_PROMPT_CONTRACT_HASH_MISMATCH" });
     const message = (caught as Error).message;
     expect(message).toContain("Register version 11");
-    expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${COMPOSER_V4}`);
-    expect(message).toContain(`conformanceContractHash is ${LIVE_11.conformance}, the code's is ${CONFORMANCE_LENGTH}`);
+    expect(message).toContain(`composerContractHash is ${LIVE_11.composer}, the code's is ${COMPOSER_READER}`);
+    expect(message).toContain(`conformanceContractHash is ${LIVE_11.conformance}, the code's is ${CONFORMANCE_READER}`);
     expect(message).toContain(`judgeContractHash is ${LIVE_11.judge}, the code's is ${JUDGE_LG_C}`);
   });
 
@@ -183,7 +190,7 @@ describe("the practice can practise register 12 before it is published (--regist
     expect(next.deltaSha256).toBe(kit.deltaSha256);
     expect(next.deltaSha256).toBe(sha(JSON.stringify(kit.delta)));
     const value = (key: string) => JSON.parse(next.rows.find((row) => row.rowKey === key)!.valueJsonText);
-    expect([value("composerContractHash"), value("conformanceContractHash")]).toEqual([COMPOSER_V4, CONFORMANCE_LENGTH]);
+    expect([value("composerContractHash"), value("conformanceContractHash")]).toEqual([COMPOSER_READER, CONFORMANCE_READER]);
     expect(value("evaluatorRoleRef").providerRef).toBe("preview:deepseek-v4-1-flash");
     expect(value("answerRoleRotationPolicy").enabled).toBe(true);
   });
@@ -202,7 +209,7 @@ describe("the practice can practise register 12 before it is published (--regist
 
   it("refuses when the code changes no row, or when the base cannot be read back", async () => {
     const unchanged = await live11Base({
-      judgeContractHash: canonical(JUDGE_LG_C), composerContractHash: canonical(COMPOSER_V4), conformanceContractHash: canonical(CONFORMANCE_LENGTH)
+      judgeContractHash: canonical(JUDGE_LG_C), composerContractHash: canonical(COMPOSER_READER), conformanceContractHash: canonical(CONFORMANCE_READER)
     });
     await expect(composePracticeNextRegisterVersion(exportOf(unchanged)))
       .rejects.toMatchObject({ code: "PRACTICE_REGISTER_NEXT_UNSUPPORTED" });
@@ -223,7 +230,10 @@ describe("the practice can practise register 12 before it is published (--regist
     expect(source).toContain("String(input.settings.runner.REGISTER_VERSION) !== liveVersion");
     expect(source).toContain("String(nextVersion) !== receipt.registerVersion");
     expect(source).toContain("REGISTER_VERSION: nextVersion");
-    expect(source).toContain("composePracticeRunner({ pool, environment: settings.runner,");
+    // R22 W5-2: the runner's settings pass through the search stand-in, which returns them unchanged without a stand-in
+    // and otherwise adds only the search socket (tests/unit/practice-search-stand-in.test.ts), so the live file still runs.
+    expect(source).toContain("practiceWithSearchStandIn(settings.runner, input.budgetPorts, input.searchStandIn)");
+    expect(source).toContain("composePracticeRunner({ pool, environment: standIn.environment,");
     const cli = readFileSync(new URL("../../tools/preview-practice/practice.ts", import.meta.url), "utf8");
     expect(cli).toContain("\"--register-next\"");
     expect(cli).toContain("await composePracticeNextRegisterVersion(register)");

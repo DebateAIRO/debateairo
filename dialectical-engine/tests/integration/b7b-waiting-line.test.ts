@@ -242,7 +242,7 @@ function monthWindow(limitMicros: number): PersonWindow {
   return Object.freeze({
     scope: "PERSON_MONTH" as const, limitMicros,
     periodStart: new Date("2031-09-05T00:00:00.000Z"), resetsAt: new Date("2031-12-05T00:00:00.000Z"),
-    finishBasisPoints: 11_000, closeBasisPoints: 9_500
+    finishBasisPoints: 12_100, closeBasisPoints: 9_500
   });
 }
 
@@ -530,7 +530,7 @@ describe("B7b a run waiting only for its own person holds nobody back (budget sp
     const owner = await activeOwner();
     const dayOne = new Date("2031-10-11T00:00:00.000Z");
     const window = (scope: PersonWindow["scope"], limitMicros: number, periodStart: string, resetsAt: string): PersonWindow =>
-      Object.freeze({ scope, limitMicros, periodStart: new Date(periodStart), resetsAt: new Date(resetsAt), finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
+      Object.freeze({ scope, limitMicros, periodStart: new Date(periodStart), resetsAt: new Date(resetsAt), finishBasisPoints: 12_100, closeBasisPoints: 9_500 });
     const month = window("PERSON_MONTH", 5_000, "2031-10-01T00:00:00.000Z", "2031-11-01T00:00:00.000Z");
     const room = roomWith({
       dailyCeilingMicros: 10_000_000,
@@ -592,8 +592,8 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
       entitlements,
       billingPlans: PLANS
     });
-    // PLUS's day cap is 20 % of 5 USD: one dollar, spent.
-    await spendAs(owner, 1_000_000, new Date("2031-10-15T11:59:00.000Z"));
+    // PLUS's made-up day cap, spent.
+    await spendAs(owner, 726_000, new Date("2031-10-15T11:59:00.000Z"));
     const waitingRunId = await waitAs(room, owner, "premium");
     const { dispatched, dispatcher } = recording();
     const application = applicationWith(room, dispatcher);
@@ -651,8 +651,8 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
       entitlements,
       billingPlans: PLANS
     });
-    // Free's month is 0.20 USD, spent.
-    await spendAs(owner, 200_000, new Date("2031-10-20T11:59:59.000Z"));
+    // Free's made-up month, spent.
+    await spendAs(owner, 330_000, new Date("2031-10-20T11:59:59.000Z"));
     const waitingRunId = await waitAs(room, owner, "free");
     const { dispatched, dispatcher } = recording();
     const application = applicationWith(room, dispatcher);

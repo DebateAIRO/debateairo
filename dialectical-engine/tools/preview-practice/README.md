@@ -53,6 +53,13 @@ The practice works for both kinds of preview: the local-mode preview of today an
 NETOPIA's sandbox (`deploy/preview-release/v1/README.md`, "Hosted preview with NETOPIA sandbox billing"). The
 practice reads which one it is from the exported settings; "Practising the hosted preview" below says what changes.
 
+## Practice money counts as team
+
+The practice's throwaway database is deleted at the end, so the live ledger never sees what it spent. A debate practice ends by printing
+one line, `team limit: add this practice on the team page: reference ..., charged $...`. One of the two accounts adds that on the private
+team page (a passkey asks; the same reference is refused twice), and from then on it counts against the team's month. The other modes
+(formats, openings, language and the rest) print their cost in their own reports: add those by hand with a fresh reference.
+
 ## Practising the hosted preview
 
 Once the preview runs in hosted mode (runbook H6 onwards), the exported settings say
@@ -116,7 +123,7 @@ practice takes the same inputs, checked by the release tool's own rules, and com
 own code (`buildPreviewSourceRowsV3`, `composePreviewSnapshotV3`):
 
 - `--hosted-billing '<JSON>'`: exactly the plan's value, for example
-  `'{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'`
+  `"$(jq -c '.billing="off"' /etc/debateai-v3-preview/hosted-billing-v1.json)"`
   (use the owner's values; H7's is the same with `"billing":"on"`). It selects kit v3 and runs the practice in hosted
   mode, also on a local-mode settings file: that is how to practise the switch itself (runbook H6) before it happens.
 - `--checker glm|deepseek` (deepseek only with `--deepseek-enabled-on-gate yes`), `--role-rotation on|off`,
@@ -140,7 +147,7 @@ own code (`buildPreviewSourceRowsV3`, `composePreviewSnapshotV3`):
   rotation), and refuses on a hosted preview (`PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED`).
 
 ```sh
-HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB="$(jq -c '.billing="off"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question ro --register-next --hosted-billing "$HB" --out "$P/debate-report"
 echo "exit: $?"
 ```
@@ -417,7 +424,9 @@ runs it.
 
 `report.json` carries `tokensByModelAndStep` and `lengthByModelAndStep`, and `report.md` shows them as two tables, one
 row per AI and step (opening, pros_cons, cross_exchange, judge_panel, reviewer, answer_writer, answer_checker,
-story_writer, story_checker, map, structure_repair, and UNMAPPED for a call of no step):
+story_writer, story_checker, map, structure_repair, the later calls by their family (web, web_researched, story_charts,
+suggestions, path_rewrite, path_climb, report, answer_update, public_report, contribution_check), and UNMAPPED for a call of
+no step. A call whose key the practice has no name for also keeps the verdict at NOT_PROVEN (`CALL_SITE_UNMAPPED:<key>`)):
 - tokens: how many tries (each try whose reply was stored; a call's retries count apart); thinking and answer tokens
   (p50 / p90 / max); the share of the input the vendor read from its cache; how many length retries thought one level
   lower because thinking had used up the answer's room; how many tries asked for more than the standard 32,768 tokens
@@ -854,7 +863,7 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   to 2 hours, plus the same.
 - openings, all 12 questions and all four arms: about 350 calls. Cost: roughly $0.5 to $1 in all, a planning
   estimate, not yet measured (the first real run's report gives the real figure). The tighter pot is Haiku's: the test
-  budget is $5 a day for DeepInfra but only $1 a day for Haiku, so check Haiku's share in the first run's report before
+  budget a day (the owner's figures, not in this repository) is much smaller for Haiku than for DeepInfra, so check Haiku's share in the first run's report before
   running again the same day. `report.md` shows each gate's spend by the gate's own count ("spent by the gate's count"
   on its line under "Gates"), and Haiku is the only AI on the Anthropic gate, so the `anthropic` line is Haiku's share. The steps of one arm go one after another, so it takes several hours (the slow models
   take 30 to 170 seconds a call). That is why S-6 runs it in two halves (see there). `--dry` spends nothing.
@@ -871,7 +880,7 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
   day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
 - hosted preview: the same calls and cost; the debate is also held to the register's per-debate ceiling (the owner's
-  value, suggested $3) and its story to the story ceiling ($0.05), as on the server.
+  value) and its story to the story ceiling, as on the server.
 
 ## Operator steps
 
@@ -959,6 +968,13 @@ ls -l /run/debateai-practice
 The journal must show one `"event": "start"` line and the folder two sockets, `srw-rw----` with group
 `ubuntu`. A refusal prints one plain word (for example `GATE_RELAY_GATE_MISSING:anthropic`) and the unit
 ends.
+
+**Web search (plan 2026-10-30, task W1-1).** Once the Perplexity gate is installed (deploy/preview-gate/v3/
+README-perplexity.md), a practice run that searches the web needs its socket too: add
+`--perplexity-gate /run/debateai-v3-preview/perplexity-budget-v1.sock` at the end of the relay command above. The folder
+then holds three sockets (`perplexity.sock` beside the other two), the S-5 forward adds
+`-L "$D/perplexity.sock:/run/debateai-practice/perplexity.sock"`, and the relay refuses to start
+(`GATE_RELAY_GATE_MISSING:perplexity`) while that gate is not running. Without the option nothing changes.
 
 ### S-5, Mac: forward the two sockets
 
@@ -1174,10 +1190,10 @@ upload right after the proof. Same `D` and `P` as in S-5.
 
    Never re-run S-5's full copy (`scp ".../practice/*"`) now: it would overwrite the merged `$P/settings.env` with the
    server's and drop B-1. Re-run the checker (step 1's last line) before each run; it must still show the four
-   `story_writer` levels. Check: each gate `state` `active`; the
-   DeepInfra GO's `daily_budget_usd` `"12.00"` and the Anthropic one's `"4.00"`; the Anthropic gate's
+   `story_writer` levels. Check: each gate `state` `active`; each
+   gate's GO `daily_budget_usd` the owner's figure; the Anthropic gate's
    `remaining_today_usd` at least $1.60 (a final writer's hold of $1.22 plus the run's Haiku calls); and each gate's
-   `today_spend_usd` plus the run's rough cost inside the testing day's limits ($5 DeepInfra, $1 Haiku). Otherwise stop.
+   `today_spend_usd` plus the run's rough cost inside the testing day's limits (the owner's figures). Otherwise stop.
 3. The formats run (Haiku writes a story at least once). It runs with `--sequential`: formats mode sends its calls
    without the runner's call queue, so with DeepSeek and MiMo both on final-writer jobs a second final writer would
    wait at the DeepInfra gate's one final-writer slot (up to 60 seconds) and be refused. One call at a time avoids
@@ -1305,7 +1321,7 @@ Money and time, within the owners' daily test budget:
   - Run that debate first thing the next Bucharest day, into the same folder.
   - Note in your own log that the pair was split over two days.
 - **Daily stop.** After every run, read the "spent by the gate's count" on each gate's line in `report.md`. Stop for
-  the day once the day's runs add up to $4.50 DeepInfra or $0.90 Anthropic. Haiku is the only AI on the Anthropic gate,
+  the day once the day's runs come close to the testing day's limit on either gate (the owner's figures). Haiku is the only AI on the Anthropic gate,
   so its line is Haiku's share.
 - **Time.** Both debates of a pair run with the same call setting: the same `--call-concurrency` value on both
   commands, or none on either. The commands below give none, so they use the register's own setting, which on today's

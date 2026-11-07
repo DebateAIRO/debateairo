@@ -7,6 +7,10 @@
  * (tests/fixtures/r2/engine1-unchanged.json) where the value is a digest or long text: the engine-1 contract seals, the
  * four engine-1 fingerprint texts, deriveVerdictLabel's source, today's receipt bytes and one propagation outcome. The file
  * is written ONCE, at Task A1, by `R2_ENGINE1_PINS_WRITE=1` on the unchanged code; no later task rewrites it.
+ * One owner-ruled move since, edited by hand (never re-recorded): the V4 reading level and the language-neutral length
+ * sentence (owner N6 and 17 Oct #5, 2026-10-29) added sealed writer and checker variants, so the composer seal moved
+ * 879d2c5d… -> 6fb174d4… and the conformance seal 108f1b29… -> 02e01cbf… (in `contractRows` and `fingerprints`); every
+ * other recorded value is A1's.
  */
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

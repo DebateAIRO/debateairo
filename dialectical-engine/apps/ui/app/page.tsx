@@ -20,17 +20,20 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
-import { formatMoney } from "@/lib/billing/format";
+import { formatMoney, pricedTax, type PricedTax } from "@/lib/billing/format";
 import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
 export const dynamic = "force-dynamic";
 
-type LandingPlans = Readonly<{ lowestPaidPrice: string | null; footer: SiteFooterBilling }>;
+type LandingPlans = Readonly<{
+  lowestPaidPrice: string | null; tax: PricedTax; taxName: string | null; footer: SiteFooterBilling;
+}>;
 
 /**
- * The landing's one plans read: the lowest paid net price for the price line, and whether billing is on for the
- * footer. Only the route's 404 means off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
+ * The landing's one plans read: the lowest paid price before tax for the price line, with the connection country's
+ * tax by name (Terms §12: price + VAT), and whether billing is on for the footer. Only the route's 404 means
+ * off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
  */
 async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
   const footer = (billingOn: boolean): SiteFooterBilling => Object.freeze({ billingOn, marks: availablePaymentMarks() });
@@ -38,17 +41,21 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
     const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
-    const lowest = answer.plans
-      .filter((plan) => plan.plan_id !== "FREE")
+    const paid = answer.plans.filter((plan) => plan.plan_id !== "FREE");
+    const tax = pricedTax(answer);
+    const lowest = paid
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
       .map((plan) => plan.net_prices[answer.currency])
       .sort((left, right) => Number(left) - Number(right))[0];
     return Object.freeze({
-      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency), footer: footer(true)
+      lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency),
+      tax: paid.length === 0 ? "UNPRICED" : tax,
+      // `?? null`: an answer without the field (only a hand-made one: the contract client requires it) names no tax.
+      taxName: tax === "ADDED" ? answer.tax?.tax_name ?? null : null, footer: footer(true)
     });
   } catch (failure) {
     return Object.freeze({
-      lowestPaidPrice: null,
+      lowestPaidPrice: null, tax: "UNPRICED", taxName: null,
       footer: footer(!(failure instanceof ContractHttpError && failure.status === 404))
     });
   }
@@ -76,7 +83,10 @@ export default async function HomePage({
   const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
   if (token === null) {
     const plans = await landingPlans(locale, await headers());
-    return <><LandingPage catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} footerBilling={plans.footer} /><SupportWidget /></>;
+    return <><LandingPage
+      catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} tax={plans.tax} taxName={plans.taxName}
+      footerBilling={plans.footer}
+    /><SupportWidget /></>;
   }
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
@@ -211,7 +221,7 @@ export default async function HomePage({
             <div className="libList recentList">
               <SynthesisHoldRefresher active={debates.some((debate) => debate.synthesis_check === "CHECKING")} />
               <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale}
-                checkingLabel={t(publicCatalog, "public.publication.checkingDebate")} composeCatalog={composeCatalog} publicCatalog={publicCatalog} />
+                checkingLabel={t(publicCatalog, "public.publication.checkingDebate")} composeCatalog={composeCatalog} />
             </div>
           ) : (
             <p className="tabEmptyHint">{t(catalog, "home.signInHint")}</p>

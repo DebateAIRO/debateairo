@@ -14,16 +14,23 @@ const triples = continents.flatMap((continent) => {
   if (!line) throw new Error(`design continent missing: ${continent}`);
   return line[1]!.split(",").map((item) => [continent, item.slice(0, 2), item.slice(3)]);
 });
+/** Served countries the design left out (owner request, 3 November 2026), each placed after its alphabetical neighbour. */
+const additions = [["Europe", "IS", "Iceland", "HU"], ["Europe", "LI", "Liechtenstein", "LV"]] as const;
+const expected = additions.reduce<string[][]>((rows, [continent, code, name, after]) => {
+  const at = rows.findIndex((row) => row[1] === after) + 1;
+  return [...rows.slice(0, at), [continent, code, name], ...rows.slice(at)];
+}, triples);
 const stateNames = design.match(/const STATES = '([^']+)'/)?.[1]?.split(",");
 const stateCodes = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split(" ");
 
 describe("region vocabulary", () => {
-  it("A1 preserves each design country, its continent, and its order", () => {
+  it("A1 preserves each design country, its continent, and its order, plus the two served additions", () => {
     expect(REGION_CONTINENTS).toEqual(continents);
-    expect(REGION_COUNTRIES.map(({ continent, code, englishName }) => [continent, code, englishName])).toEqual(triples);
-    expect(REGION_COUNTRIES).toHaveLength(82);
-    expect(new Set(REGION_COUNTRY_CODES).size).toBe(82);
-    expect(REGION_CONTINENTS.map((c) => REGION_COUNTRIES.filter((x) => x.continent === c).length)).toEqual([12, 12, 33, 10, 5, 7, 3]);
+    expect(triples).toHaveLength(82);
+    expect(REGION_COUNTRIES.map(({ continent, code, englishName }) => [continent, code, englishName])).toEqual(expected);
+    expect(REGION_COUNTRIES).toHaveLength(84);
+    expect(new Set(REGION_COUNTRY_CODES).size).toBe(84);
+    expect(REGION_CONTINENTS.map((c) => REGION_COUNTRIES.filter((x) => x.continent === c).length)).toEqual([12, 12, 35, 10, 5, 7, 3]);
   });
   it("A2 preserves design state names and USPS codes in order", () => {
     expect(US_STATES.map((s) => s.name)).toEqual(stateNames);

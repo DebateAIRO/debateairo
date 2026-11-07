@@ -2,7 +2,7 @@
  * Fresh-site estimate (owner rulings 2026-10-22), on a real (embedded) PostgreSQL.
  *
  * On a fresh hosted site no debate has settled, so before the costEstimateStartPolicy row every estimate was the run's
- * maximum ($3.66 on the preview: per-run $3.00 × 1.2 plus story $0.05 × 1.2). A Plus person's day allowance is $1.00,
+ * maximum (here a made-up per-run ceiling and the story's, each with its overrun). A Plus person's made-up day limit is far below it,
  * so every room read said CLOSE and every premium ask was swapped to the Free AIs. This test publishes a HOSTED
  * register (the same builder the hosted publish and the preview kit v3 use), reads the row back at that version, and
  * asks the room and the coarse fit for a Plus depth-1 premium ask on the fresh database: FITS and AS_ASKED. The control
@@ -44,6 +44,7 @@ import {
 } from "../../apps/runner/src/hosted-register-publish.js";
 import { parseProviderDiscoveryTargets } from "../../packages/providers/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 let database: TestDatabase;
 let registerVersion: number;
@@ -63,16 +64,17 @@ const TARGETS = [
     authorization_file: "/etc/debateai/runner/providers/beta.header",
     input_price_micros_per_million: 1_000_000, output_price_micros_per_million: 4_000_000 }
 ];
-/** The preview's ceilings: $3.00 per debate, $10.00 per day. */
+/** Made-up ceilings, the size of the preview's. */
 const HOSTED_FILE = Object.freeze({
   format: HOSTED_REGISTER_FILE_FORMAT,
-  sourceRef: "fresh-site estimate integration: a hosted register with the preview's ceilings",
+  sourceRef: "fresh-site estimate integration: a hosted register with made-up ceilings",
+  ...TEST_OWNER_LIMIT_ROWS,
   configuredProviderSet: { requiredDistinctMakers: 2, providers: PROVIDERS },
   costEnvelopePolicy: {
     kind: "COST_ENVELOPE_POLICY", currency: "USD", minor_units_per_unit: 1_000_000,
-    per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000,
-    provisional: true, provisional_reason: "the preview's sandbox ceilings",
-    // The answer's 20 % overrun, as the code-owned row (and so the preview's) carries it: one run may spend $3.60.
+    per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000,
+    provisional: true, provisional_reason: "made-up sandbox ceilings",
+    // The answer's 20 % overrun, as the code-owned row (and so the preview's) carries it: one run may spend $3.96.
     serve_reserve_basis_points: 3_000, serve_overrun_basis_points: 2_000
   },
   providerTargets: TARGETS
@@ -189,7 +191,7 @@ describe("fresh-site estimate: a hosted register seals the starting figures, and
     const { room, billing, estimator, maximumMicros } = await composeAt(
       registerVersion, await readCostEstimateStartPolicy(database.pool, registerVersion)
     );
-    expect(maximumMicros).toBe(3_660_000);
+    expect(maximumMicros).toBe(4_020_000);
     await expect(estimator.estimateMicros(PREMIUM_DEPTH_ONE)).resolves.toBe(300_000);
     await expect(room.readRoom({ access: { ownerRef: owner, legacyAskerId: null }, settingsClass: PREMIUM_DEPTH_ONE }))
       .resolves.toMatchObject({ room: "FITS", scope: null, planId: "PLUS" });
@@ -198,9 +200,9 @@ describe("fresh-site estimate: a hosted register seals the starting figures, and
 
   it("control: a version without the row answers as before — the maximum, CLOSE on the person's windows, and the swap", async () => {
     const { room, billing, estimator } = await composeAt(registerVersion, null);
-    await expect(estimator.estimateMicros(PREMIUM_DEPTH_ONE)).resolves.toBe(3_660_000);
+    await expect(estimator.estimateMicros(PREMIUM_DEPTH_ONE)).resolves.toBe(4_020_000);
     await expect(room.readRoom({ access: { ownerRef: owner, legacyAskerId: null }, settingsClass: PREMIUM_DEPTH_ONE }))
-      // $3.66 is over both the day ($1.00) and the week ($2.50); the room names the week (its scope precedence).
+      // $4.02 is over both the made-up day ($0.726) and week ($2.904); the room names the week (its scope precedence).
       .resolves.toMatchObject({ room: "CLOSE", scope: "PERSON_WEEK", planId: "PLUS" });
     await expect(coarseFitFor(ask(), owner, billing, now)).resolves.toBe("FREE_ROSTER");
   });

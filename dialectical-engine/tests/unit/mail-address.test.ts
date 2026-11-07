@@ -287,8 +287,8 @@ describe("the DNS question at the entry points (fails open)", () => {
     expect(asked).toBe(0);
     expect(await check("example.com")).toBe("DELIVERABLE");
     // The running API's check, by deployment mode: decided before any DNS, so no network is touched here.
-    expect(await mailDomainRefused(systemMailDomainCheck("hosted"), "person@example.test")).toBe(true);
-    expect(await mailDomainRefused(systemMailDomainCheck("local"), "person@example.test")).toBe(false);
+    expect(await mailDomainRefused(systemMailDomainCheck("hosted", 110), "person@example.test")).toBe(true);
+    expect(await mailDomainRefused(systemMailDomainCheck("local", 110), "person@example.test")).toBe(false);
   });
   it("is asked about the lower-cased domain, never the address", async () => {
     const asked: string[] = [];

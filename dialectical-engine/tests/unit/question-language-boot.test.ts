@@ -63,7 +63,7 @@ function hostedDeps(over: Readonly<{ mode?: "hosted" | "local"; fastCheck?: type
         state.records.push(entry);
       }
     },
-    dayPot: "dayPot" in over ? over.dayPot! : { ceilingMicros: 5_000_000, spentMicros: async (day: string) => { state.potReads.push(day); return 0; } },
+    dayPot: "dayPot" in over ? over.dayPot! : { ceilingMicros: 5_500_000, spentMicros: async (day: string) => { state.potReads.push(day); return 0; } },
     clock: () => new Date("2026-10-13T23:59:59.000Z"),
     newSpendId: () => { const id = `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`; state.ids.push(id); return id; },
     report: (line: unknown) => { state.reports.push(line); }
@@ -211,9 +211,9 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
   it("ruling L-POT: with today's site pot at or above its day ceiling the fast check is skipped (no call, no spend), never a block", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}", { status: 500 }));
     vi.stubGlobal("fetch", fetchSpy);
-    for (const [spent, sends] of [[4_999_999, true], [5_000_000, false], [7_000_000, false]] as const) {
+    for (const [spent, sends] of [[5_499_999, true], [5_500_000, false], [7_700_000, false]] as const) {
       fetchSpy.mockClear();
-      const deps = hostedDeps({ dayPot: { ceilingMicros: 5_000_000, spentMicros: async (day) => { deps.potReads.push(day); return spent; } } });
+      const deps = hostedDeps({ dayPot: { ceilingMicros: 5_500_000, spentMicros: async (day) => { deps.potReads.push(day); return spent; } } });
       const decider = await compose(null, await hostedQuestionLanguageRoute(deps.input));
       const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
       expect(deps.potReads).toEqual(["2026-10-13"]);
@@ -226,7 +226,7 @@ describe("the question-language boot (question-language spec 2026-10-13)", () =>
     }
     // A pot that cannot be read is treated as full: skipped, never spent past.
     fetchSpy.mockClear();
-    const unreadable = hostedDeps({ dayPot: { ceilingMicros: 5_000_000, spentMicros: async () => { throw new Error("db down"); } } });
+    const unreadable = hostedDeps({ dayPot: { ceilingMicros: 5_500_000, spentMicros: async () => { throw new Error("db down"); } } });
     const decider = await compose(null, await hostedQuestionLanguageRoute(unreadable.input));
     const lock = await decider.decide({ ask: askOf(MIX_Q, "ro"), ownerScope: "owner:a", fastCheckAllowed: true });
     expect(fetchSpy).not.toHaveBeenCalled();

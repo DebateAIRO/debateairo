@@ -2415,7 +2415,44 @@ export const CONTENT_CARRIERS = Object.freeze([
   "serve.synthesis_check_result",
   // Publication review (migration 0127): decision reason and the transient reviewer copy.
   "serve.publication_review_decision",
-  "serve.publication_review_copy"
+  "serve.publication_review_copy",
+  // Web evidence store (migration 0132): the search words; a page's address, site, title and date; its whole text (the
+  // transient carrier, wiped on closing or 30 days after the investigation's last activity); a reading's line and leads;
+  // a checked extract's quote; a path's pack.
+  "identity.web_search",
+  "identity.web_page",
+  "identity.web_page_text",
+  "identity.web_reading",
+  "identity.web_extract",
+  "identity.web_pack",
+  // The path rewrite (migration 0134): a path's new line and summary, "What the dig changed", the verdict's reason and the
+  // dig's own paths' lines and fates, sealed under the DIG's run key (erasing the dig erases its rewrite).
+  "identity.path_rewrite",
+  // The web plan (migration 0134): the search planner's reason for a path with no search.
+  "identity.web_plan_path",
+  // A dig's picks (migration 0135): each pick's text, the person's own words or the AI suggestion as they sent it, sealed
+  // under the DIG's run key; and the dig's own paths as its settled run gave them to its path rewrite.
+  "identity.dig_pick",
+  "identity.path_rewrite_input",
+  // The final report over an investigation (migration 0136): the report's text, sealed under the investigation's ROOT
+  // run key and bound to the report id (erasing the root erases its investigation, its closings and their reports).
+  "identity.investigation_report",
+  // The owner's changes of 31 Oct: a climb's or a public dig's path rewrite (0138), sealed under the DIG that caused it; the main
+  // answer's automatic versions under the ROOT's key; a debate's place, time and purpose lines under its own key.
+  "identity.path_update",
+  "identity.main_answer_update",
+  "identity.run_purpose_lines",
+  // 0139: the quote people see, kept apart from the passage, and a reader's saved reply in its transient store, under the run's key.
+  "identity.web_shown_quote",
+  "identity.web_reply_text",
+  // 0141: the AI's suggestions of what to dig into on one path, sealed under the run that paid for them and bound to the set's id.
+  "identity.path_suggestions",
+  // 0147: the public page sealed again for the runner under a live run's key; the main answer once the root's key is gone, under the dig's; a report on a public
+  // debate under its carrier's. The page's own copies stay under the publication's key.
+  "identity.public_material",
+  "identity.public_dig_input",
+  "identity.public_answer_update",
+  "identity.public_report"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

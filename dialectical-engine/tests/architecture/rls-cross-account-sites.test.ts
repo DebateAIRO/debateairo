@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const MAIN = "apps/api/src/main.ts";
 const PREVIEW_BUDGET = "apps/api/src/preview-budget-estimate.ts";
+const PUBLIC_TREE = "apps/api/src/public-tree.ts";
 
 /** PLAN S4.5, verbatim as a map: reader id → the apps/api/src files where its sites are. */
 const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
@@ -29,17 +30,18 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
   X18h: [MAIN],
   X21: [PREVIEW_BUDGET],
   X27: [MAIN],
-  X28: [MAIN]
+  X28: [MAIN],
+  X29: [PUBLIC_TREE]
 });
 
 /**
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
  * X14 the three PostgresStaffRepository constructions; X18h the key store's owner lookup; X21 the gate's two reads; since
  * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
- * review's repository and its two readers. The file-level map alone cannot see a site added under an id already mapped to
- * that file.
+ * review's repository and its two readers; since upload check Task 9, X29 the report press's seal under the public
+ * debate's own run. The file-level map alone cannot see a site added under an id already mapped to that file.
  */
-const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 3, X18h: 1, X21: 2, X27: 1, X28: 3 });
+const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 3, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
 const EXPECTED_TARGETS = Object.freeze([
@@ -159,7 +161,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27 and X28 in main.ts and X21 in preview-budget-estimate.ts, each id a literal, with 3, 3, 1, 1, 3 and 2 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27 and X28 in main.ts, X21 in preview-budget-estimate.ts and X29 in public-tree.ts, each id a literal, with 3, 3, 1, 1, 3, 2 and 1 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);
@@ -180,6 +182,34 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     // Each reader's whole body is the crossAccount("X28", …) frame, so every statement it awaits runs on the target.
     for (const name of ["readVerdictCategories", "readReviewBody"]) {
       expect(property(name), name).toMatch(/^\([^)]*\) => crossAccount\("X28", \(\) =>\s*application\.withContentLease\(/u);
+    }
+  });
+
+  /**
+   * Upload check Task 9 (R22 path 9): a stranger's report on a public debate is sealed under the debate's own run key, so
+   * the runner can read it; that run is the author's, which the runtime login does not see inside the stranger's request.
+   * The public check is identity.open_public_report's. So the frame is that one seal and nothing else: the press
+   * decision and the material's record stay on the runtime login.
+   */
+  it("S4.3 (upload check Task 9) X29 is the report press's seal under the carrier open_public_report named, in pressPublicReport's OPENED case, and nothing else", async () => {
+    const tree = await parse(PUBLIC_TREE);
+    const x29 = callsOf(tree, "crossAccount").filter((call) => call.arguments[0]?.getText() === '"X29"');
+    expect(x29.map((call) => enclosingFunctionName(call))).toEqual(["pressPublicReport"]);
+    const frame = x29[0]!;
+    let clause: ts.Node | undefined = frame.parent;
+    while (clause !== undefined && !ts.isCaseClause(clause)) clause = clause.parent;
+    expect(clause !== undefined && ts.isCaseClause(clause) ? clause.expression.getText() : null).toBe('"OPENED"');
+    // The frame's whole body is the one seal, under the carrier and bound to the report's id: anchored at both ends, so
+    // anything chained after the seal (a `.then(...)`, a second call) fails here.
+    expect(frame.arguments[1]?.getText()).toMatch(
+      /^\(\) => sealFor\(input\.pool, opened\.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened\.reportId!, publicMaterialOf\(debate, \{ now: input\.now \}\)\)$/u);
+    const press = descendants(tree).find((node): node is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(node) && node.name?.text === "pressPublicReport")!;
+    const calls = (name: string) => descendants(press).filter((node): node is ts.CallExpression => ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === name);
+    for (const name of ["readPublicDebate", "openReport", "recordMaterial"]) {
+      expect({ name, found: calls(name).length, framed: calls(name).filter((call) => enclosedBy(call, frame)).length })
+        .toEqual({ name, found: 1, framed: 0 });
     }
   });
 
@@ -231,7 +261,7 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     const found = descendants(source).filter((node): node is ts.CallExpression => ts.isCallExpression(node)).flatMap((call) => {
       const callee = call.expression;
       const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : "";
-      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || name === "languageCheckSpendWriterPresent"
+      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || name === "languageCheckSpendWriterPresent" || name === "askClarifyChargeWriterPresent"
         ? [`${call.getText()} @ ${wrapperOf(call) ?? "UNWRAPPED"}`] : [];
     });
     expect(found).toEqual([
@@ -243,6 +273,8 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       "assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool) @ attestEveryRoute",
       "assertDataExportDatabaseRoles(authorizationPool, dataExportPool) @ attestEveryRoute",
       "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
+      // Decisions 29 and 31: dynamic step 2 asks after 0144's writer, of the same login.
+      "askClarifyChargeWriterPresent(pool) @ onOwnConnections",
       "passwordResetRepository.assertRole() @ attestEveryRoute",
       "backupEmailRepository.assertRole() @ attestEveryRoute",
       "mfaRecoveryRepository.assertRole() @ attestEveryRoute",

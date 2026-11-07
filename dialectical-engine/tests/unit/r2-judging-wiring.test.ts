@@ -69,6 +69,20 @@ describe("R2b: the comparing judges in the run body", () => {
     expect(source).toContain("const provider = throughCallLane(ref, maker.provider);");
   });
 
+  // Owner ruling 2026-10-29 (MORNING-2026-10-17 item 6, "prefer neutral judges"): each judge seat offers its other member,
+  // up and not sitting out, and a judge asked as that member resolves to the same run seat (its own gateway and checks).
+  it("offer each judge seat's other member to the pick, resolved to the same run seat", async () => {
+    const body = judgesBlock(await readFile(RUNNER, "utf8"));
+    for (const needle of [
+      "const other = seatCaller.plan(seat, planKey, { eligible: (candidate) => candidate.pinnedAs !== member.pinnedAs });",
+      "(sitOut !== null && sitOut.sitsOut(other.providerRef))",
+      "...(alternate === null ? [] : [[alternate.providerRef, seat] as const])",
+      "maker: alternate.maker, providerRef: alternate.providerRef, modelId: modelIdOf(alternate)"
+    ]) expect([needle, body.includes(needle)]).toEqual([needle, true]);
+    // The judges' run seats stay the JUDGE seats: no member of another role is borrowed.
+    expect(body).toContain("const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {");
+  });
+
   it("put the judges' records on the answer and their label on the persisted answer", async () => {
     const source = await readFile(RUNNER, "utf8");
     expect(source).toContain("...new Set((comparingJudges?.records ?? []).map((record) => record.mark))");

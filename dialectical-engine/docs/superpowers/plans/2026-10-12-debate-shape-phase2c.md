@@ -547,7 +547,7 @@ describe("debate shape P2c — also raised, not debated, in the story material",
   });
 
   it("never moves the ladder: also-raised points only use the bytes the debate leaves free", () => {
-    const plain = built(build({}, 10_000_000));
+    const plain = built(build({}, <amount>));
     expect(plain.compressionStep).toBe(0);
     // Exactly the debate's own size: no room, so no field, and still step 0.
     const tight = built(build({ alsoRaised: ALSO_RAISED }, plain.material.bytes));
@@ -565,7 +565,7 @@ describe("debate shape P2c — also raised, not debated, in the story material",
     const longNodes = snapshot().nodes.map((entry) => ({ ...entry, claim: text(entry.nodeId, 600) }));
     const longRaised = Array.from({ length: 12 }, (_, index) => ({ claim: text(`raised ${String(index)}`, 300), raisedBy: 1 }));
     const seenSteps = new Set<number>();
-    let budget = 10_000_000;
+    let budget = <amount>;
     for (let guard = 0; guard < 400; guard += 1) {
       const result = build({ nodes: longNodes, alsoRaised: longRaised }, budget);
       if (result.kind !== "OK") break;
@@ -645,8 +645,8 @@ describe("debate shape P2c — also raised, not debated, in the story material",
   });
 
   it("keeps answers_note in the debate's own material: never dropped, its bytes counted, also_raised fills what is left", () => {
-    const plain = built(build({}, 10_000_000));
-    const noted = built(build({ answersNote: "ANSWERS_FILLED" }, 10_000_000));
+    const plain = built(build({}, <amount>));
+    const noted = built(build({ answersNote: "ANSWERS_FILLED" }, <amount>));
     expect(noted.compressionStep).toBe(plain.compressionStep);
     expect(noted.material.bytes)
       .toBe(plain.material.bytes + Buffer.byteLength(JSON.stringify(STORY_ANSWERS_NOTE_ANSWERS_FILLED), "utf8"));

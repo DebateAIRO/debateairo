@@ -1,4 +1,4 @@
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket } from "@debateai/providers";
 import { type QuestionLanguagePolicy } from "@debateai/register";
 import { questionLanguageSiteRoute } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -6,7 +6,7 @@ import { questionLanguageReferenceKeyFrom } from "./question-language/reference.
 import {
   admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, decideAskRoomReadiness, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
-import { createActiveSettingsVersionReader } from "./active-settings-version.js";
+import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "./active-settings-version.js";
 import { activeVersionAlarm, checkActiveSettingsVersionAtBoot } from "./admission-alarm.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -23,10 +23,17 @@ import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
 import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
+import { PostgresModerationStatementRepository, PostgresPublicFlagMailRepository } from "@debateai/db";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "./moderation-statements.js";
 import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
+import { PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository, PostgresWebResearchedRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { investigationReportContentOpener } from "./investigation-report.js";
+import { postgresPurposeLines, readPurposeLinesOf } from "./purpose-lines.js";
+import { ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify } from "./ask-clarify.js";
+import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -38,6 +45,7 @@ import { randomUUID } from "node:crypto";
 import { DataExportApplication } from "./data-export/service.js";
 import { FileDataExportStore } from "./data-export/store.js";
 import { collectSnapshot } from "./data-export/snapshot.js";
+import { runContentOpener } from "./data-export/run-content.js";
 import { loadArchiveCatalog } from "./data-export/archive-catalog.js";
 import { OwnerViewAdapter } from "./data-export/owner-view-adapter.js";
 import { TemplatedDataExportMail } from "./data-export/mail.js";
@@ -62,7 +70,8 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import type { PreparedPublicationCipher } from "@debateai/crypto";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -92,6 +101,7 @@ import {
   readMfaPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readAbuseLimits,
   readQuestionCheckPolicy,
   readSupportNoSourceCheckPolicy,
   supportNoSourceCheckPolicyStartValues,
@@ -104,7 +114,9 @@ import {
 import {
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
+  askClarifyChargeWriterPresent,
   languageCheckSpendWriterPresent,
+  recordAskClarifyCharge,
   questionCheckSpendWriterPresent,
   recordLanguageCheckSpend,
   recordQuestionCheckSpend
@@ -153,11 +165,14 @@ import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
 import { readQuestionSubjects } from "./question-check/subjects.js";
 import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
+import { startTeamLimitNotices } from "./staff/team-limit.js";
 import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
 import { threatReportEmailReader } from "./staff/threat-reports.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
@@ -173,6 +188,7 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
+import { accountMemoryStoreFrom } from "./account-memory.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
@@ -672,6 +688,33 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
  * main.ts's own stage names; a refusal names its stage and refuses the boot with the loader's own typed code, as before.
  */
 const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));
+/**
+ * Decisions 29 and 31 (dynamic step 2): the small call before a debate exists takes the language check's one route decision (preview: the gate; hosted:
+ * the support target's key; local: none, so no questions) and counts in the person's quota through 0144's writer: without the writer, no call (never
+ * spend unrecorded). Above the support adapter, which clears the key this process keeps. A hosted site with no day ceiling makes no call: nothing here may stop a boot.
+ */
+const askClarifyDayCeiling = siteAdmission.costEnvelope?.guardPolicy.dailyCeilingMicros ?? null;
+const askClarifyWriter = await boot.run("ask-clarify-writer", () => onOwnConnections(() => askClarifyChargeWriterPresent(pool)));
+// R22 decision 18: the abuse limits are the register's, on the server's own row; a version without it refuses here (ABUSE_LIMITS_UNRESOLVED).
+const abuseLimits = await boot.run("abuse-limits", () => readAbuseLimits(pool, environment.REGISTER_VERSION));
+const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
+  limits: abuseLimits.askClarify,
+  transportFor: !askClarifyWriter || (previewGate === undefined && askClarifyDayCeiling === null) ? null : askClarifyTransportFor(await questionLanguageSiteRoute({
+    mode: environment.DEPLOYMENT_MODE,
+    policy: ASK_CLARIFY_ROUTE_POLICY,
+    dayCeilingMicros: askClarifyDayCeiling,
+    previewGate,
+    previewFetch,
+    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
+    // The route's own recorder goes unused: each call's charge is the person's (`record`, below). The probe above stands for this one.
+    spend: { writerPresent: async () => askClarifyWriter, record: async () => undefined },
+    daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
+    report: (line) => console.error(JSON.stringify(line))
+  })),
+  record: (entry) => recordAskClarifyCharge(pool, entry),
+  clock: () => new Date(),
+  report: (line) => console.error(JSON.stringify(line))
+}));
 // Side-by-side spec §13 API point 2: every other version is loaded once, on first use, and kept (sealed versions never
 // change); the site version is served from the boot's load.
 const admissionCache = createAdmissionSettingsCache({
@@ -921,7 +964,7 @@ const socialProviders = (()=>{try{return new SocialProviders(socialConfiguration
 const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
 // Ruling 2026-10-09: outside local mode the special-use endings (.test .example .invalid .localhost) are refused.
-const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE);
+const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE, abuseLimits.mailDomainChecksPerMinute);
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -1014,6 +1057,10 @@ const threatReportRepository = new PostgresThreatReportRepository(pool);
 // Row-level security (X27, merge onto synthesis-flag S04): a staff request reads the reported account's address, another
 // account's identity row, so the reader runs on the cross-account target.
 const readThreatReportRecipientEmail = threatReportEmailReader(crossAccountPool(pool, "X27"), dekStore);
+// Decision 24: 0142's definers only, and the notices open the named account's address through the same reader.
+const teamLimitRepository = new PostgresTeamLimitRepository(pool);
+const publicReviewRepository = new PostgresPublicReviewRepository(pool);
+const publicFlagRepository = new PostgresPublicFlagRepository(pool);
 const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
@@ -1021,6 +1068,15 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
+  teamLimit: { repository: teamLimitRepository },
+  publicFlags: { repository: publicFlagRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
+    if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return publications.withReviewKey(publicationRef, runId, use);
+  } },
+  publicReview: { repository: publicReviewRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
+    if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return publications.withReviewKey(publicationRef, runId, use);
+  } },
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
 // Self-service profile/recovery capabilities use the existing authorization
@@ -1110,7 +1166,15 @@ const publications = publicationCipher === undefined
       new RepositoryPublicationStoryReader(storyRepository),
       mapViews,
       // Final fix wave P5: an unparsable public snapshot is a newer release's only when its run is stamped by one.
-      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }
+      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) },
+      // Decision 13: what contributions and reports added to the page since its first snapshot.
+      {
+        readUpdates: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).readPageUpdates(publicationRef),
+        readReports: (publicationRef) => new PostgresPublicPageRepository(pool).readReports(publicationRef),
+        authorNameGone: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).isAuthorNameGone(publicationRef),
+        readOverlay: (publicationRef) => new PostgresPublicReviewRepository(pool).readOverlay(publicationRef),
+        isHeld: (publicationRef) => new PostgresPublicReviewRepository(pool).isHeld(publicationRef)
+      }
     );
 // Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
 await boot.run("release-watcher", () => releaseWatcher.start());
@@ -1129,6 +1193,8 @@ await boot.run("active-settings-version-check", () => checkActiveSettingsVersion
   log: (line) => { console.error(line); }
 }));
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
+let publicPageTimer: ReturnType<typeof setInterval> | undefined;
+let publicReviewPurgeTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
   // can accept traffic. Both bounded outboxes continue reconciling while the
@@ -1175,6 +1241,66 @@ const threatReportAlertsTimer = startThreatReportAlerts({
   }),
   readRecipientEmail: readThreatReportStaffEmail
 }, releaseWatcher);
+const teamLimitNoticesTimer = startTeamLimitNotices({
+  repository: teamLimitRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 32: the Owner's and the member's notices about an allowance, through the same loop and mail.
+const allowanceNoticesTimer = startTeamLimitNotices({
+  repository: new PostgresInternalAllowanceRepository(pool),
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 33: both accounts hear of every review step, content-free, through the same loop.
+const publicReviewNoticesTimer = startTeamLimitNotices({
+  repository: publicReviewRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 35: both accounts hear that a debate was hidden automatically or a report waits, content-free.
+const publicFlagNoticesTimer = startTeamLimitNotices({
+  repository: publicFlagRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// 0157: every person a review step affects gets a statement of reasons (DSA Art 17). It replaces 0156's content-free notice: this release no longer
+// claims 0156's queue, so nobody gets both from it; twelve months on, the typed facts and the quote go.
+const moderationStatementRepository = new PostgresModerationStatementRepository(pool);
+const moderationStatements = new ModerationStatementReconciler(moderationStatementRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs
+}), environment.PUBLIC_APP_URL);
+// 0157 (D4): the answers to people who report, and the sweep of a report left CHECKING (it goes to a person after five minutes).
+const publicFlagMailRepository = new PostgresPublicFlagMailRepository(pool);
+const publicFlagAnswers = new PublicFlagAnswerReconciler(publicFlagMailRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs
+}), environment.PUBLIC_APP_URL);
+const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(async () => {
+  await moderationStatements.reconcile(100);
+  await publicFlagAnswers.reconcile(100);
+  await publicFlagMailRepository.settleStuck();
+  await moderationStatementRepository.deleteWordsDue();
+}, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
@@ -1324,10 +1450,20 @@ const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget =
   }), { offFlagPath: publicationJudgeOffFlag });
 const publicationContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
   recorder: new PostgresPublicationCheckRecordRepository(pool),
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
 });
+// Decision 13: the same judge on a report on a public debate; its record names the report (0149).
+const publicReportContentCheck = createPublicationContentCheck({
+  judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
+  recorder: { record: (row) => new PostgresPublicPageRepository(pool).recordReportCheck({ reportId: row.run_id, attemptedAt: row.attempted_at, outcome: row.outcome, failureCause: row.failure_cause, rules: row.rules, partKinds: row.part_kinds, ground: row.ground, judgeProviderRef: row.judge_provider_ref, judgeModelId: row.judge_model_id, policyVersion: row.policy_version, judgeCallCount: row.judge_call_count }) },
+  clock: () => new Date(),
+  deadlineMs: publicationCheckPolicy.deadlineMs
+});
+const REPORT_CHECK_PREFIX = "report:";
 const questionCheckPolicy = await boot.run("question-check-policy", () =>
   readQuestionCheckPolicy(pool, environment.REGISTER_VERSION));
 // V, 2026-10-28: the question check's subjects come from one file; a bad file stops the boot.
@@ -1349,7 +1485,8 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
     spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   },
   clock: () => new Date(),
-  report: line => console.error(JSON.stringify(line))
+  report: line => console.error(JSON.stringify(line)),
+  preview: previewGate === undefined ? null : { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") }
 }));
 const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
 const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
@@ -1545,6 +1682,7 @@ const billingRuntime = billingConnectors === null
         payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)
       });
     return createBillingRuntime({
+      cancelLinksPerDay: abuseLimits.cancelLinksPerDay,
       pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
@@ -1616,6 +1754,10 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
       claim, workerId, source,
       ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId),
       decrypt: {
+        openPublicFlag: async (publicationRef, runId, envelope) => {
+          if (publications === undefined) throw new Error("DATA_EXPORT_PUBLICATION_KEY_UNAVAILABLE");
+          return publications.withReviewKey(publicationRef, runId, (cipher) => cipher.decrypt(envelope as never));
+        },
         openUserField: async (userId, field, envelope) => {
           const dek = await dekStore.load(userId);
           let plain: Buffer | undefined;
@@ -1636,7 +1778,9 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
             plain = supportKeys.openContent(context as Parameters<typeof supportKeys.openContent>[0], key, ciphertext);
             return plain.toString("utf8");
           } finally { plain?.fill(0); key.fill(0); }
-        }
+        },
+        // 0132's web values, under each debate's run key on the pool that carries the content cipher.
+        openRunContent: runContentOpener(pool)
       },
       now: () => new Date()
     })
@@ -1647,6 +1791,10 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   dataExportTimer = gatedInterval(releaseWatcher, triggerDataExportWork, DATA_EXPORT_TICK_MS);
 }
 const admission = new AdmissionLimiter(admissionPolicy);
+// V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
+// principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
+const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
+const investigations = new PostgresInvestigationRepository(pool);
 const api = buildApi({
   questionCheck,
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
@@ -1658,6 +1806,64 @@ const api = buildApi({
   // the content-free disclosure record, on the same runtime pool.
   disclosures: ownerDisclosures,
   mapViews,
+  accountMemory,
+  // Plan 2026-10-30 dig-model revision W3-2 (0133, 0134): dig levels and the month pause, and the dig's join at start,
+  // through 0134's and 0133's definers on the same runtime pool (debateai_billing_runtime); the month's room again after
+  // a pause is the ask room's (with billing on).
+  digModel: new PostgresDigModelRepository(pool),
+  investigations,
+  // R22 W5-1: the final report over an investigation, through 0136's and 0133's definers on the same runtime pool; a
+  // debate in no investigation is told from another account's by 0131's ownership rule (the last-visit read answers null
+  // only for a debate that is not this account's); what the runner sealed under the ROOT's run key opens on this pool.
+  investigationReports: {
+    reports: new PostgresInvestigationReportRepository(pool),
+    investigations,
+    owns: async (ownerRef, runId) => (await accountMemory.readLastVisit(ownerRef, runId)) !== null,
+    openRootContent: investigationReportContentOpener(pool)
+  },
+  // W4-4: "Add to researched" through 0132's and 0133's definers on the same runtime pool; adding counts as activity for the 30 days (owner F12).
+  webResearched: {
+    record: (ownerRef, runId, pageId) => new PostgresWebResearchedRepository(pool).record(ownerRef, runId, pageId),
+    markActivity: async (ownerRef, runId) => {
+      if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId);
+    }
+  },
+  // W3-7 (0135): a dig's picks, kept at start for its path rewrite, each text sealed under the dig's run key on this pool.
+  digPicks: new PostgresDigPicksRepository(pool),
+  // Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key on this pool.
+  purposeLines: postgresPurposeLines(pool),
+  // Decision 13 (0147): digs and reports on a public debate, by anyone with credit, read from the public copy.
+  ...(publications === undefined ? {} : { publicFlags: {
+    limits: abuseLimits.publicFlag,
+    repository: publicFlagRepository, judge: publicationJudgeSwitch.current,
+    seal: (publicationRef: string, runId: string, value: unknown) => publications.withReviewKey(publicationRef, runId, (cipher) => cipher.encrypt(value)),
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
+    log: (event: string, detail: Record<string, unknown>) => { console.error(JSON.stringify({ event, ...detail })); }
+  } }),
+  // 0157 (D1): the person's own statements of reasons, their facts opened under the debate's key as the two accounts' review opens them.
+  ...(publications === undefined ? {} : { moderationStatements: { repository: moderationStatementRepository,
+    withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
+  ...(publications === undefined ? {} : { publicTree: {
+    pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
+  } }),
+  askClarify,
+  ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
+  // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
+  // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
+  continuedRunWake: continuedRunWake({
+    claimableWorkItemOf: (runId) => new WorkItemRepository(pool).claimableWorkItemOfRun(runId),
+    dispatch: (job) => dispatcher.dispatch(job)
+  }),
+  // Decision 12: Continue on a debate of an older release moves it here first (0143), keeping everything it found.
+  runHandover: runHandoverOf({
+    ownReleaseKey: environment.RELEASE_KEY,
+    readRunReleaseNow: (runId) => new PostgresDigModelRepository(pool).readRunReleaseNow(runId),
+    versionPassed: (version) => settingsVersionPassed(pool, environment.RELEASE_KEY, version),
+    activeVersion: () => readActiveSettingsVersionOn(pool, environment.REGISTER_VERSION),
+    resumeInRelease: (ownerRef, runId, releaseKey, registerVersion) =>
+      new PostgresDigModelRepository(pool).resumeInRelease(ownerRef, runId, releaseKey, registerVersion)
+  }),
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape
@@ -1767,6 +1973,9 @@ const api = buildApi({
 // last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
 // one-shot pass can start a runtime the hooks below have already stopped.
 api.addHook("preClose",async () => endBecameCurrent?.());
+// Assigned once listening; clearing an unset timer does nothing.
+api.addHook("onClose",async () => clearInterval(publicPageTimer));
+api.addHook("onClose",async () => clearInterval(publicReviewPurgeTimer));
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
@@ -1780,6 +1989,11 @@ const supportSweepTimer = gatedInterval(releaseWatcher, () => {
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
+api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
+api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
+api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
+api.addHook("onClose",async () => clearInterval(moderationNoticesTimer));
+api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
@@ -1872,6 +2086,45 @@ console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELE
 // Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
 // release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.
 if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));
+// Decision 13: what allowed contributions wrote goes on the public page, and a finished Free debate goes public. Single-flight, gated: rows are claimed by what they already say, so an overlap at a
+// switch copies nothing twice.
+if (publications !== undefined) {
+  const publicPage = new PostgresPublicPageRepository(pool);
+  const publicContributions = new PostgresPublicDebateRunnerRepository(pool);
+  const publicTreeRepository = new PostgresPublicTreeRepository(pool);
+  // One wait for all three: they ask the same judge.
+  const judgeGate = backedOffContentCheck({ check: async (request) => request.runId.startsWith(REPORT_CHECK_PREFIX)
+    ? publicReportContentCheck.check({ runId: request.runId.slice(REPORT_CHECK_PREFIX.length), snapshot: request.snapshot }) : publicationContentCheck.check(request) });
+  const sweepContentCheck = judgeGate;
+  const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => judgeGate.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
+  const triggerPublicPage = createSingleFlightErasureReconciler(async () => {
+    await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,
+      withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
+    await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
+      const owner = await publicPage.readFreeOwner(waiting.run_id);
+      if (owner === null) return "NOT_WAITING";
+      const session = ownerSession(owner.owner_ref, "00000000-0000-0000-0000-000000000000");
+      const ownership = { ownerRef: owner.owner_ref, legacyAskerId: null };
+      const lease = { run: <T>(use: () => Promise<T>) => application.withContentLease(waiting.run_id, use),
+        readAnswer: () => application.readRunAnswer(waiting.run_id, session, ownership) };
+      const answer = await lease.run(lease.readAnswer);
+      if (answer === null) return "NO_ANSWER_YET";
+      // Wait a while for the story, so the page goes out with its short answer.
+      const story = await lease.run(() => new RepositoryPublicationStoryReader(storyRepository).readStoryShort({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownerRef: owner.owner_ref }));
+      if (story === null && Date.now() - Date.parse(waiting.notice_at) < FREE_PUBLICATION_STORY_WAIT_MS) return "WAITING_FOR_STORY";
+      const lines = await readPurposeLinesOf(pool, owner.owner_ref, waiting.run_id);
+      return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck: sweepContentCheck,
+        source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
+        store: { prepare: (runId, ref) => publicContributions.prepareFreePublication(runId, ref),
+          publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
+          refuse: (runId) => publicContributions.refuseFree(runId) } });
+    } });
+  }, () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
+  publicPageTimer = gatedInterval(releaseWatcher, triggerPublicPage, PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs);
+  // Decision 36: sealed originals and reports' words past their six months.
+  publicReviewPurgeTimer = gatedInterval(releaseWatcher, () => { void sweepPublicReviewPurge({ repository: publicFlagRepository, withKey: (publicationRef, runId, use) => publications.withReviewKey(publicationRef, runId, use),
+    log: (event, detail) => { console.error(JSON.stringify({ event, ...detail })); } }).catch(() => undefined); }, PUBLIC_REVIEW_PURGE_EVERY_MS);
+}
 if(triggerPasswordResetReconciliation)passwordResetTimer=gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000);
 if(triggerEmailRecoveryReconciliation)emailRecoveryTimer=gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000);
 // Side-by-side spec §4 (plan C7): the post-listen one-shots, in their order, run each time this release BECOMES current

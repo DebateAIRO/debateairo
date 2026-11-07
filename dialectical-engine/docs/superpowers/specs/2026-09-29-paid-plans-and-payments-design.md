@@ -35,17 +35,17 @@ switch billing on. People who run the code on their own computer never see billi
 
 | Plan | Price before tax | AI credit per month | Daily cap | Weekly cap | What it unlocks |
 |---|---|---|---|---|---|
-| **Free** | $0 | $0.20 | — | — | 2 debaters, the cheapest models, fixed settings |
-| **Plus** | $20 | $5 | $1 (20%) | $2.50 (50%) | everything: 3 debaters, all settings, the best models |
+| **Free** | $0 | <amount> | — | — | 2 debaters, the cheapest models, fixed settings |
+| **Plus** | <amount> | <amount> | <amount> (<amount>) | <amount> (<amount>) | everything: 3 debaters, all settings, the best models |
 | **Pro** | $50 | $20 | $4 | $10 | everything |
-| **Max** | $200 | $150 | $30 | $75 | everything |
+| **Max** | $200 | <amount> | $30 | $75 | everything |
 
 - **AI credit** means what the AI companies charge us for that person's debates, including the verdict story, at the
   prices we configure. The help chat is free.
 - **When limits reset.** The month starts on the day the person subscribed. For Free, it starts on the day they signed
   up. Weeks are 7-day blocks counted from that start. Days are 24-hour blocks that begin at the same time of day. So
   every reset has a fixed time, and the person sees it in their own time zone.
-- **The leeway (110%).** A debate that is already running may take the person up to 110% of any limit so it can
+- **The leeway (<amount>).** A debate that is already running may take the person up to <amount> of any limit so it can
   finish. The engine tries cheaper models first. The extra is on us; it is not taken from next month. New questions
   still wait once a limit reaches 100%.
 - **What people see.** Three bars, for example: "Today 40% · This week 22% · This month 15%", with the reset times.
@@ -121,7 +121,7 @@ If their country does not allow sign-up, the form says so in plain words before 
 | Romania | ANAF, in your normal Romanian VAT return (D300) | as today; the accountant uses SmartBill's data |
 | Other EU countries (consumers) | **ANAF, once, for all of them**, through the EU One-Stop Shop (form 398) | every quarter, by the end of the following month (30 Apr, 31 Jul, 31 Oct, 31 Jan), in euro at the ECB rate of the quarter's last day. ANAF passes each country its share. Quaderno's "EU OSS report" has the figures. |
 | EU companies with a valid VAT number | nothing: the invoice says "Reverse charge" | declared in the monthly D390 statement; the accountant uses Quaderno's list |
-| Norway, Iceland | nothing until sales pass NOK 50,000 or ISK 2,000,000 a year; after that, their simplified schemes (VOEC, VOES) | Quaderno warns you when a limit is crossed |
+| Norway, Iceland | nothing until sales pass NOK 50,000 or ISK <amount> a year; after that, their simplified schemes (VOEC, VOES) | Quaderno warns you when a limit is crossed |
 | US, Canada, Australia, New Zealand, Singapore, Japan | nothing until you pass each place's threshold; after that, a registration there | Quaderno watches the thresholds and warns you |
 | UK, South Korea, India, UAE, Saudi Arabia, Mexico, Argentina, Colombia, Chile, Thailand, Philippines | tax is due from the first sale | payment stays **switched off** in these countries until you register there and mark it done (§1.5) |
 
@@ -194,7 +194,7 @@ $12,000, so $3,000 is left. With the running costs of this design:
 | **Left** | **about $1,900–2,100**, before unused credit is counted |
 
 - **Unused credit raises the margin.** Most people do not spend their whole allowance.
-- **Free users cost up to $0.20 each.** 10,000 Free users would cost up to $2,000 a month.
+- **Free users cost up to <amount> each.** 10,000 Free users would cost up to <amount>,000 a month.
 - **Per plan, what is left after the full credit and about 2% card fees:**
   - Plus: about $14.35
   - Pro: about $28.75
@@ -256,8 +256,8 @@ room.
 | Question | Your choice |
 |---|---|
 | What paid plans unlock | the same features on every plan, only the credit differs; Free = 2 debaters, cheapest models, fixed settings |
-| Daily and weekly caps | day 20%, week 50% of the monthly credit; Free has only its monthly $0.20 |
-| Leeway | up to 110% of each limit to finish a running debate; the extra is on us |
+| Daily and weekly caps | a day share and a week share of the monthly credit; Free has only its monthly <amount> |
+| Leeway | up to <amount> of each limit to finish a running debate; the extra is on us |
 | How usage is shown | percentage bars with reset times |
 | Where we sell | the US and more, "almost the full list of languages"; then: every region the Terms already cover |
 | Who handles tax | a tax service at checkout, not our own code; then: Quaderno |
@@ -299,7 +299,7 @@ Paths are relative to `dialectical-engine/`. Line numbers are at `origin/dev` 24
   - There is no index on `owner_ref`.
 - **Ceilings.** The per-run and daily ceilings come from one deployment-wide policy (`CostEnvelopeGuard`,
   `packages/budget/src/model-spend.ts:326-569`; values `packages/register/src/cost-envelope-policy.ts:297-313`):
-  - per run: $0.25
+  - per run: <amount>
   - per day: $2
   - reserve: 30%
   - overrun: 20%
@@ -645,7 +645,7 @@ interface PersonAllowanceSource {
 - `waits_until` is the **latest** `resetsAt` among the FULL windows. If the site's day is also full, it is the later
   of the two.
 - `decideSharedWall` in the runner runs per window, with that window's finish edge.
-- The site's `SITE_DAY` keeps its own 115% (budget spec §2.4). Person windows use 110% (the owner, 29 September).
+- The site's `SITE_DAY` keeps its own <amount> (budget spec §2.4). Person windows use <amount> (the owner, 29 September).
 - The Free plan returns only `PERSON_MONTH`.
 
 #### 2.4.2 Person spend, and the ceiling pinned per run
@@ -714,10 +714,10 @@ computeWindows(anchor: Date, now: Date, plan: PlanRow):
   currency: "USD",
   minor_units_per_unit: 1000000,
   plans: [
-    { plan_id: "FREE", tier: "free",    net_price_micros: 0,         monthly_credit_micros: 200000,    day_bp: null, week_bp: null, finish_bp: 11000, fixed_gauges: {...} },
-    { plan_id: "PLUS", tier: "premium", net_price_micros: 20000000,  monthly_credit_micros: 5000000,   day_bp: 2000, week_bp: 5000, finish_bp: 11000 },
-    { plan_id: "PRO",  tier: "premium", net_price_micros: 50000000,  monthly_credit_micros: 20000000,  day_bp: 2000, week_bp: 5000, finish_bp: 11000 },
-    { plan_id: "MAX",  tier: "premium", net_price_micros: 200000000, monthly_credit_micros: 150000000, day_bp: 2000, week_bp: 5000, finish_bp: 11000 }
+    { plan_id: "FREE", tier: "free",    net_price_micros: 0,         monthly_credit_micros: <the plan's limit>    day_bp: null, week_bp: null, finish_bp: <a share>, fixed_gauges: {...} },
+    { plan_id: "PLUS", tier: "premium", net_price_micros: 20000000,  monthly_credit_micros: <the plan's limit>   day_bp: <a share>, week_bp: <a share>, finish_bp: <a share> },
+    { plan_id: "PRO",  tier: "premium", net_price_micros: 50000000,  monthly_credit_micros: <the plan's limit>  day_bp: <a share>, week_bp: <a share>, finish_bp: <a share> },
+    { plan_id: "MAX",  tier: "premium", net_price_micros: 200000000, monthly_credit_micros: <the plan's limit> day_bp: <a share>, week_bp: <a share>, finish_bp: <a share> }
   ]
 }
 ```
@@ -726,8 +726,8 @@ computeWindows(anchor: Date, now: Date, plan: PlanRow):
 - Plan order is by price. An upgrade means a higher price.
 - **Credit and the site's own limits.** `register:publish-hosted` **warns** (it does not refuse) when a plan's
   smallest window is below the site's per-run ceiling. The smallest window is the day cap, or the whole month for
-  Free. Admission uses the estimate, so a small window still fits a small debate. At today's provisional $0.25 per
-  run, Free's $0.20 month triggers the warning. The owner publishes a `costEnvelopePolicy` version with realistic
+  Free. Admission uses the estimate, so a small window still fits a small debate. At today's provisional <amount> per
+  run, Free's <amount> month triggers the warning. The owner publishes a `costEnvelopePolicy` version with realistic
   per-run and daily ceilings before switching billing on.
 - **The site's daily ceiling protects the company,** not the person. At launch it must be at least the expected daily
   spend of all subscribers. The runbook gives the formula: subscribers × day cap × 0.3, or better, the measured

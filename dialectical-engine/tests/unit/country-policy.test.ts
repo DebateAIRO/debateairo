@@ -22,8 +22,8 @@ const EU27 = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", 
 const GROUPS = [
   { codes: [...EU27, "NO", "IS"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["US", "CA", "AU", "NZ", "SG", "JP"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
-  { codes: ["LI"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
-  { codes: ["KR", "CH", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
+  { codes: ["LI", "CH"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
+  { codes: ["KR", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
   { codes: ["GB", "UA"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
   { codes: ["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL"], rule: { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false } },
   { codes: ["RU", "BY", "KP"], rule: { signup: false, pay: false, reason: "SANCTIONS", blocked: true } },
@@ -152,14 +152,22 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
       expect(decideAsk(policy, { ipCountry: country }), country).toEqual({ kind: "ALLOW" });
     }
     expect(decideSignup(policy, { ipCountry: "KR", tor: false })).toEqual({ kind: "ALLOW" });
-    // Owner's amendment of 1 October 2026: Switzerland, Taiwan and Moldova open for sign-up;
+    // Owner's amendment of 1 October 2026: Taiwan and Moldova open for sign-up;
     // payment stays off until each country's tax registration is checked.
-    for (const country of ["CH", "TW", "MD"]) {
+    for (const country of ["TW", "MD"]) {
       expect(decideSignup(policy, { ipCountry: country, tor: false }), country).toEqual({ kind: "ALLOW" });
       expect(countryRule(policy, country), country)
         .toEqual({ signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false });
       expect(decidePayment(policy, { ipCountry: country, tor: false, declaredCountry: country }), country)
         .toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
+    }
+    // Owner's amendment of 4 November 2026: Switzerland and Liechtenstein open for sign-up and payment.
+    for (const country of ["CH", "LI"]) {
+      expect(decideSignup(policy, { ipCountry: country, tor: false }), country).toEqual({ kind: "ALLOW" });
+      expect(countryRule(policy, country), country)
+        .toEqual({ signup: true, pay: true, reason: "OFFERED", blocked: false });
+      expect(decidePayment(policy, { ipCountry: country, tor: false, declaredCountry: country }), country)
+        .toEqual({ kind: "ALLOW" });
     }
     expect(decideSignup(policy, { ipCountry: "RO", tor: true })).toEqual({ kind: "REFUSE", code: "TOR_REFUSED" });
     expect(decideSignup(policy, { ipCountry: "XX", tor: true })).toEqual({ kind: "REFUSE", code: "TOR_REFUSED" });
@@ -170,7 +178,7 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
       decidePayment(policy, { ipCountry, tor, declaredCountry });
     // 1. the declared country's pay switch is off — even over Tor and an unknown address
     expect(pay("RO", "GB")).toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
-    expect(pay("XX", "LI", true)).toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
+    expect(pay("XX", "TW", true)).toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
     // 2. unknown address, or Tor (Tor wins when both)
     expect(pay("XX", "RO")).toEqual({ kind: "REFUSE", code: "COUNTRY_UNKNOWN" });
     expect(pay("DE", "RO", true)).toEqual({ kind: "REFUSE", code: "TOR_REFUSED" });
@@ -246,14 +254,17 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
 });
 
 /**
- * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026, spelled out here
- * on purpose (never derived from the code), so a changed code row fails this test.
+ * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026 without New Jersey,
+ * which the owner opened on 4 November 2026, and Tennessee, which the Terms exclude (section 2, Annex A.2; the owner's
+ * amendment of 8 October 2026), spelled out here on purpose (never derived from the code), so a changed code row
+ * fails this test.
  */
 const CLOSED = { pay: false, reason: "TAX_NOT_READY" } as const;
 const LAUNCH_REGIONS = {
   "CA-SK": CLOSED, "CA-MB": CLOSED,
-  "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED, "US-NJ": CLOSED,
+  "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED,
   "US-OH": { pay: false, reason: "TAX_NOT_READY", buyers: "business" },
+  "US-TN": { pay: false, reason: "TERMS_EXCLUDED" },
   "ES-CN": CLOSED, "ES-CE": CLOSED, "ES-ML": CLOSED,
   "FR-971": CLOSED, "FR-972": CLOSED, "FR-973": CLOSED, "FR-974": CLOSED, "FR-976": CLOSED,
   "FI-01": CLOSED, "GR-69": CLOSED, "IT-LIVIGNO": CLOSED, "IT-CAMPIONE": CLOSED, "DE-HELGOLAND": CLOSED, "DE-BUESINGEN": CLOSED
@@ -264,7 +275,7 @@ function invalidRegions(regions: unknown): string | undefined {
 }
 
 describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", () => {
-  it("carries exactly the owner's launch list of 20 October 2026, every id a known region", () => {
+  it("carries exactly the owner's launch list of 20 October 2026 and Tennessee, every id a known region", () => {
     expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.regions).toEqual(LAUNCH_REGIONS);
     expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(24);
     for (const id of Object.keys(LAUNCH_REGIONS)) expect(PAYMENT_REGION_IDS, id).toContain(id);
@@ -277,8 +288,12 @@ describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", (
     expect(regionRule(policy, "CA-SK")).toEqual(closed);
     expect(regionRule(policy, "ES-CN")).toEqual(closed);
     expect(regionRule(policy, "US-OH")).toEqual({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
+    // Tennessee is closed by the Terms, not by tax, and for every buyer.
+    expect(regionRule(policy, "US-TN")).toEqual({ pay: false, reason: "TERMS_EXCLUDED", buyers: "all" });
     // An open region, and a string that is no region id at all, have no rule: the country's rule decides.
     expect(regionRule(policy, "US-TX")).toBeNull();
+    // New Jersey (the owner's amendment of 4 November 2026) is open again, so the US rule decides there too.
+    expect(regionRule(policy, "US-NJ")).toBeNull();
     expect(regionRule(policy, "CA-ON")).toBeNull();
     expect(regionRule(policy, "toString")).toBeNull();
     // A pay switch that is on is a valid rule too (nothing refuses it), and is read back as written.

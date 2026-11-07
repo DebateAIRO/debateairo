@@ -1,0 +1,69 @@
+{
+  "version": "public-review-forward0150-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0149_public_report_team_month.sql",
+    "manifestSha256": "4cd95974d1cf587e24fbec3c54683907ede419311059ec11f6da0d68807a9088",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0150_public_review.sql",
+    "sha256": "0fdf8e19c7c0c6d11568f43f64f2a2bfa59e86440b220d09a46260f20623b486"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0137_public_debates.sql",
+      "field": "function_definition",
+      "functions": [
+        "core.current_publication_of_run(uuid)",
+        "identity.read_public_debate_updates(uuid)",
+        "identity.read_own_public_contributions(uuid,uuid)"
+      ]
+    },
+    {
+      "step": "0138_tree_updates.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.path_line_json(uuid,boolean)",
+        "identity.main_answer_updates_json(uuid)",
+        "identity.read_data_export_tree_updates(uuid,uuid)"
+      ]
+    },
+    {
+      "step": "0142_team_limit.sql",
+      "field": "function_definition",
+      "functions": [
+        "staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)",
+        "staff.owned_action_allowed(jsonb,jsonb)",
+        "staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)"
+      ]
+    },
+    {
+      "step": "0147_public_tree.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.read_public_dig_parent(uuid,uuid)",
+        "identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+        "identity.read_public_tree_of_run(uuid)",
+        "identity.read_public_debate_reports(uuid)",
+        "identity.read_public_page_owed(integer)",
+        "identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "identity.read_public_answer_updates(uuid)"
+      ]
+    },
+    {
+      "step": "0149_public_report_team_month.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.read_public_debate_updates(uuid)",
+        "identity.read_public_dig_parent(uuid,uuid)",
+        "identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+        "identity.read_public_tree_of_run(uuid)"
+      ]
+    }
+  ]
+}

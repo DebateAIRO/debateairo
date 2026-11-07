@@ -224,7 +224,7 @@ Runner-wide, per model, inside the preview call policy (`withPreviewProviderCall
   that adds the row to the THROWAWAY database's register only. README: the "one call at a time" line is replaced.
 - The report adds: peak calls in flight (per debate, per model, per gate), time each model's calls waited for a slot,
   and busy probes.
-- Measurement (owner test budget $5 DeepInfra / $1 Haiku, standing permission to reopen gates): depth 1, the same
+- Measurement (owner test budget <amount> DeepInfra / <amount> Haiku, standing permission to reopen gates): depth 1, the same
   four AIs as 2026-10-12, compared with that run (119 calls, 75 min); report wall time, calls, money, gate refusals,
   peak in flight. A depth-2 run follows if the first is clean and budget allows.
 

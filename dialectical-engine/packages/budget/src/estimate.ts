@@ -1,8 +1,10 @@
 import type { Pool } from "pg";
 import { crossAccount } from "@debateai/db";
 import { AnswerLengthSchema, DepthModeSchema, ScrutinySchema, type AnswerLength, type DepthMode, type Scrutiny } from "@debateai/contract";
-import { DEBATE_SHAPE_PLAN_KEYS, type CostEstimateStartPolicy, type DebateShapePlanKey } from "@debateai/register";
+import { DEBATE_SHAPE_PLAN_KEYS, webSitesOf, type CostEstimateStartPolicy, type DebateShapePlanKey, type WebSiteInput } from "@debateai/register";
 import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.js";
+import { WEB_SEARCH_REQUEST_MICROS, isWebSearchProviderRef } from "./web-charge.js";
+import { estimateDigUpdatesMicros, estimateWebPartMicros, type WebRolePrices } from "./web-estimate.js";
 
 /**
  * Budget spec 2026-09-28 §2.5 — THE ESTIMATE, "recent debates at today's prices".
@@ -24,7 +26,11 @@ import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.
  *    figure of the ask's depth, capped at the maximum (a depth with no figure,
  *    or nothing to price with, still answers the maximum). Without the row
  *    (null or left out) nothing changes: 20 samples, the maximum while short;
- *  - caches each class for `cacheMs` (60 s) per process.
+ *  - caches each class for `cacheMs` (60 s) per process;
+ *  - web search (plan 2026-10-30, W2-2): a class with a web part samples only runs admitted with that same web part,
+ *    and prices a sample's searches per search at today's price (they carry no tokens). While a web class is short of
+ *    samples (no web run has settled yet), its answer is the start figure of its depth PLUS its web part at the caps
+ *    (`estimateWebPartMicros`), still capped at the maximum; with no web prices to price it with, the maximum.
  * The estimate is never sent to a client (I6): the room read returns a word.
  */
 export type RunSettingsClass = Readonly<{
@@ -39,6 +45,8 @@ export type RunSettingsClass = Readonly<{
   depth: number;
   /** Debate shape: present only for a shaped run (see RunShapeClass). */
   shape?: RunShapeClass;
+  /** Web search (W2-2): present only for a run admitted with web search on (its receipt's `web` member). */
+  web?: WebSiteInput;
 }>;
 
 /**
@@ -49,6 +57,10 @@ export type RunShapeClass = Readonly<{ plan: DebateShapePlanKey; depthMode: Dept
 
 export interface CostEstimator {
   estimateMicros(settings: RunSettingsClass): Promise<number>;
+  /** R22 decision 9: a dig's web part at its most, for the share shown before it; absent or null: not known. */
+  digWebPartMicros?(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null;
+  /** The owner's ruling (31 Oct): what follows a dig at this level, for the same share; absent or null: not known. */
+  digUpdatesPartMicros?(dig: Readonly<{ level: number; free: boolean }>): number | null;
 }
 
 export type RecentRunCharge = Readonly<{ providerRef: string; inputTokens: number; outputTokens: number }>;
@@ -74,12 +86,20 @@ export function settingsClassKey(settings: RunSettingsClass): string {
   }
   const base = `${settings.planTier}|${settings.compositionBudgetTier}|${settings.makerCount}|${settings.depth}`;
   const shape = settings.shape;
-  if (shape === undefined) return base;
+  if (shape === undefined) return `${base}${webClassKey(settings.web)}`;
   if (!(DEBATE_SHAPE_PLAN_KEYS as readonly string[]).includes(shape?.plan) || !DepthModeSchema.safeParse(shape.depthMode).success
     || !ScrutinySchema.safeParse(shape.scrutiny).success || !AnswerLengthSchema.safeParse(shape.answerLength).success) {
     throw new TypeError("COST_ESTIMATE_SETTINGS_INVALID");
   }
-  return `${base}|${shape.plan}|${shape.depthMode}|${shape.scrutiny}|${shape.answerLength}`;
+  return `${base}|${shape.plan}|${shape.depthMode}|${shape.scrutiny}|${shape.answerLength}${webClassKey(settings.web)}`;
+}
+
+/** W2-2: the web part's place in the class key (empty without one, so every class key minted before stays the same). */
+function webClassKey(web: WebSiteInput | undefined): string {
+  if (web === undefined) return "";
+  let sites;
+  try { sites = webSitesOf(web); } catch { throw new TypeError("COST_ESTIMATE_SETTINGS_INVALID"); }
+  return `|web:${sites.kind}:${sites.depth}:${sites.packs}:${sites.searches}`;
 }
 
 /**
@@ -156,6 +176,11 @@ export function priceRecentRun(
   });
   let total = 0;
   for (const charge of run.charges) {
+    // W2-2: a search is billed per request, never by tokens (its row carries none): today's price per search.
+    if (isWebSearchProviderRef(charge.providerRef)) {
+      total += WEB_SEARCH_REQUEST_MICROS;
+      continue;
+    }
     total += chargeMicrosForUsage(prices.get(charge.providerRef) ?? highest, {
       promptTokens: charge.inputTokens,
       completionTokens: charge.outputTokens
@@ -174,6 +199,7 @@ export class RecentRunsCostEstimator implements CostEstimator {
   readonly #lookbackMs: number;
   readonly #cacheMs: number;
   readonly #start: CostEstimateStartPolicy | null;
+  readonly #webPrices: WebRolePrices | null;
   readonly #cache = new Map<string, Readonly<{ at: number; value: number }>>();
 
   constructor(options: Readonly<{
@@ -190,6 +216,11 @@ export class RecentRunsCostEstimator implements CostEstimator {
      * minimum and the per-depth starting figures. Null or left out: a version without the row, today's behaviour.
      */
     start?: CostEstimateStartPolicy | null;
+    /**
+     * W2-2: each web role's price (the dearest of its candidates), so a web class short of samples is estimated at its
+     * start figure plus its web part. Null or left out: a web class short of samples answers the maximum.
+     */
+    webPrices?: WebRolePrices | null;
   }>) {
     this.#source = options.source;
     this.#prices = options.prices;
@@ -199,6 +230,7 @@ export class RecentRunsCostEstimator implements CostEstimator {
     this.#lookbackMs = options.lookbackMs ?? 30 * 24 * 60 * 60 * 1_000;
     this.#cacheMs = options.cacheMs ?? 60_000;
     this.#start = options.start ?? null;
+    this.#webPrices = options.webPrices ?? null;
     for (const value of [this.#maximumMicros, this.#sampleSize, this.#lookbackMs, this.#cacheMs]) {
       if (!Number.isSafeInteger(value) || value < 1) throw new TypeError("COST_ESTIMATE_OPTIONS_INVALID");
     }
@@ -206,6 +238,21 @@ export class RecentRunsCostEstimator implements CostEstimator {
       || this.#start.minSamples > this.#sampleSize)) {
       throw new TypeError("COST_ESTIMATE_OPTIONS_INVALID");
     }
+  }
+
+  /**
+   * R22 decision 9: a dig's web part at the most it can do (up to 4 searches per chosen path, each chosen path's planner,
+   * the readers, its suggestions), for the share of today shown before it. Null with no web prices. It holds nothing and walls
+   * nothing (the owner's money rule, 31 Oct: no worst-case hold before a start): only the line reads it.
+   */
+  digWebPartMicros(web: Readonly<{ depth: "QUICK" | "THOROUGH"; digPicks: number }>): number | null {
+    if (this.#webPrices === null) return null;
+    return estimateWebPartMicros(webSitesOf({ kind: "DIG", depth: web.depth, digPicks: web.digPicks }), this.#webPrices).totalMicros;
+  }
+
+  /** What follows a dig: its rewrite, the climb and the main answer's update. Null with no web prices. Like the web part, only the line reads it. */
+  digUpdatesPartMicros(dig: Readonly<{ level: number; free: boolean }>): number | null {
+    return this.#webPrices === null ? null : estimateDigUpdatesMicros(dig, this.#webPrices);
   }
 
   async estimateMicros(settings: RunSettingsClass): Promise<number> {
@@ -223,14 +270,30 @@ export class RecentRunsCostEstimator implements CostEstimator {
       for (const run of runs) costs.push(priceRecentRun(run, this.#prices) ?? this.#maximumMicros);
     }
     // With nothing to price with, the starting figure is not used either: the careful side, the maximum.
+    const depthStart = this.#start === null ? null : this.#start.startMicrosByDepth.get(settings.depth) ?? null;
+    // W2-2: a web class starts at its depth's figure plus its web part at the caps; without web prices, the maximum.
+    const startMicros = depthStart === null || settings.web === undefined ? depthStart
+      : this.#webPrices === null ? null
+        : depthStart + estimateWebPartMicros(webSitesOf(settings.web), this.#webPrices).totalMicros;
     const start = this.#start === null || this.#prices.size === 0 ? {} : {
       minSamples: this.#start.minSamples,
-      startMicros: this.#start.startMicrosByDepth.get(settings.depth) ?? null
+      startMicros: startMicros !== null && Number.isSafeInteger(startMicros) ? startMicros : null
     };
     const value = estimateFromSampleCosts({ costs, sampleSize: this.#sampleSize, maximumMicros: this.#maximumMicros, ...start });
     this.#cache.set(key, Object.freeze({ at: now, value }));
     return value;
   }
+}
+
+/**
+ * W2-2: the sample's web filter: a web class's own kind, depth, packs and searches; '' for a class that names none, which samples
+ * every run of its settings, with or without a web receipt: the room's classes name none (only the quota line prices a dig's web
+ * part), so a minted receipt must not take a paid run out of the sample its own estimate learns from.
+ */
+function webSampleParams(web: WebSiteInput | undefined): readonly [string, string, string, string] {
+  if (web === undefined) return ["", "", "", ""];
+  const sites = webSitesOf(web);
+  return [sites.kind, sites.depth, String(sites.packs), String(sites.searches)];
 }
 
 function countedTokens(text: string): number {
@@ -281,6 +344,10 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
              AND COALESCE(run.depth_params->>'scrutiny', '') = $8
              AND COALESCE(run.depth_params->>'answerLength', '') = $9
              AND COALESCE(run.envelope_basis->'shape'->>'plan', '') = $10
+             AND ($11 = '' OR COALESCE(run.envelope_basis->'web'->>'kind', '') = $11)
+             AND ($12 = '' OR COALESCE(run.envelope_basis->'web'->>'depth', '') = $12)
+             AND ($13 = '' OR COALESCE(run.envelope_basis->'web'->>'packs', '') = $13)
+             AND ($14 = '' OR COALESCE(run.envelope_basis->'web'->>'searches', '') = $14)
              AND EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
              AND NOT EXISTS (
                SELECT 1 FROM core.work_item AS work
@@ -307,7 +374,8 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
           input.settings.shape?.depthMode ?? "",
           input.settings.shape?.scrutiny ?? "",
           input.settings.shape?.answerLength ?? "",
-          input.settings.shape?.plan ?? ""
+          input.settings.shape?.plan ?? "",
+          ...webSampleParams(input.settings.web)
         ]
       );
       const runs = new Map<string, RecentRunCharge[]>();

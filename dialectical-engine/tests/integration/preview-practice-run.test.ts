@@ -36,6 +36,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { startTestDatabase } from "../support/testDatabase.js";
+import { TEST_OWNER_LIMIT_ROWS } from "../support/hostedRegisterRows.js";
 
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -678,6 +679,14 @@ describe("preview practice: debate mode", () => {
       expect(report.byModelAndSite.some((row) => row.model === model && row.site === "PANEL")).toBe(true);
     }
     expect(stubs.requests.filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    // The calls after the story are really made and really answered, and the report names them (the 2026-11-01 reds: both
+    // were a billed 500 at the stand-in, and the report's UNMAPPED row): one chart call, one suggestion per path.
+    expect(stubs.requests.filter((request) => request.kind === "STORY_CHARTS").map((request) => request.answer)).toEqual(["OK"]);
+    expect(stubs.requests.filter((request) => request.kind === "SUGGESTIONS").length).toBeGreaterThan(0);
+    expect(stubs.requests.filter((request) => request.kind === "SUGGESTIONS").every((request) => request.answer === "OK")).toBe(true);
+    const sites = new Set(report.byModelAndSite.map((row) => row.site));
+    expect(["STORY_CHARTS", "SUGGESTIONS"].filter((site) => !sites.has(site))).toEqual([]);
+    expect(sites.has("UNMAPPED")).toBe(false);
     // Without --transcript nothing but the two report files.
     expect(existsSync(join(out, "transcript.json"))).toBe(false);
   }, 600_000);
@@ -691,8 +700,8 @@ describe("preview practice: debate mode", () => {
         "NETOPIA_API_BASE_URL=https://secure-sandbox.netopia-payments.com", "NETOPIA_API_KEY_PATH=/etc/debateai-v3-preview/billing/netopia-api-key",
         "NETOPIA_IPN_KEYS_PATH=/etc/debateai-v3-preview/billing/netopia-ipn-keys.pem", ""].join("\n"));
     const logged: string[] = [];
-    const hostedBilling = JSON.stringify({ billing: "on", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
-      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const hostedBilling = JSON.stringify({ billing: "on", perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS });
     const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
     const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--depth", "1", "--register-next",
       "--hosted-billing", hostedBilling], env, { ...quiet, log: (line) => logged.push(line) });
@@ -711,7 +720,7 @@ describe("preview practice: debate mode", () => {
     expect(report.register.codeNext.changedKeys).toEqual(expect.arrayContaining(["admissionPolicy", "billingPolicy", "costEnvelopePolicy"]));
     expect(report.deployment).toEqual({ mode: "hosted", room: true, billingInRegister: "on", billingInPractice: "off",
       setAsideSettings: ["GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH", "NETOPIA_API_BASE_URL", "NETOPIA_API_KEY_PATH", "NETOPIA_IPN_KEYS_PATH"],
-      ceilings: { perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, perStoryCeilingMicros: 50_000, band: true, billingPlansSealed: true } });
+      ceilings: { perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, perStoryCeilingMicros: 50_000, band: true, billingPlansSealed: true } });
     expect(report.admission.admitted).toBe(true);
     expect(report.admission.panel.map((member) => member.modelId).sort()).toEqual([...FIVE].sort());
     expect(report.run).toMatchObject({ workItemOutcome: "COMPLETED", answer: { served: true }, story: { outcome: "READY" } });
@@ -734,7 +743,7 @@ describe("preview practice: debate mode", () => {
     await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
     const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
     const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
-      JSON.stringify({ billing: "off", perRunCeilingMicros: 1, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } })],
+      JSON.stringify({ billing: "off", perRunCeilingMicros: 1, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS })],
     env, quiet);
     expect(outcome.exitCode).toBe(20);
     expect(outcome.report).toMatchObject({ verdict: "FAIL", admission: { admitted: true },
@@ -858,8 +867,10 @@ describe("preview practice: debate mode", () => {
       }
     }
     // Every refused call went first, then the patch follow-up. LG-A (L33, controller ruling 8; Tasks 11 and 13): the practice
-    // wires the structure-repair route (Haiku is a target), so each MiMo call is routed and sends at most 2 POSTs: no full re-ask.
-    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH"]));
+    // wires the structure-repair route (Haiku is a target), so each MiMo call is routed and sent at most 2 POSTs. R22 (owner
+    // ruling 2026-10-29, "Allow 3 sends"): a panel seat is a judge call, so after its refused patch it sends the one full
+    // re-ask too, refused again here.
+    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH", "FULL"]));
   }, 600_000);
 
   it("refuses to start (HARNESS_ERROR, exit 40) without the acknowledgement, and sends nothing", async () => {
@@ -1055,8 +1066,8 @@ describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 Â
     const hostedSettings = join(folder, `hosted-settings-${randomUUID()}.env`);
     await writeFile(hostedSettings, settingsText().replace("DEBATEAI_DEPLOYMENT_MODE=local", "DEBATEAI_DEPLOYMENT_MODE=hosted"));
     const args = common.map((arg) => arg.endsWith("settings.env") ? hostedSettings : arg);
-    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000,
-      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } });
+    const hostedBilling = JSON.stringify({ billing: "off", perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000,
+      askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS });
     const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--register-next", "--hosted-billing",
       hostedBilling, "--depth", "1", "--shape-policy", SHAPE_POLICY_START], env, quiet);
     const report = outcome.report as unknown as ShapeReport & {
@@ -1290,6 +1301,8 @@ describe("engine 2's story (R1d)", () => {
     storyJsonBreaks?: { model: string; replies: number; parseFailed: number }[];
     writerPins?: { answerWriter: PinOutcome | null; storyteller: PinOutcome | null };
     investigations?: { cannotAssessReviews: number; run: number; capped: number; skipped: number; unavailable: number };
+    /** W5-2: the web table (an engine-2 debate with a debate-shape map only); absent when the web step left no row. */
+    web?: { search: string; paths: { plan: string | null; searches: number }[]; totals: { searches: number; searchFeeMicros: number } };
     /** R2 B11: the comparing judges' block (engine 2 only). */
     judgeVotes?: { model: string; maker: string; letter: string | null; counted: boolean | null }[];
     labels?: { label: string; trigger: string; engine1LadderLabel: string | null } | null;
@@ -1321,6 +1334,14 @@ describe("engine 2's story (R1d)", () => {
     expect(report.investigations).toBeDefined();
     if (engine === 1) expect(report.investigations).toMatchObject({ run: 0, capped: 0, skipped: 0, unavailable: 0 });
     expect(markdown).toContain("| cannot-assess reviews | asked |");
+    // W5-2: billing is kept off in the practice, so its run has no paid plan: a web step that ran planned no search for
+    // any path, sent none and paid none, and its table says so.
+    if (report.web !== undefined) {
+      expect(report.web.search).toBe("PERPLEXITY");
+      expect(report.web.paths.every((path) => path.plan === "NOT_ON_PLAN" && path.searches === 0)).toBe(true);
+      expect(report.web.totals).toMatchObject({ searches: 0, searchFeeMicros: 0 });
+      expect(markdown).toContain("Web search per path (W5-2;");
+    }
   };
   const framedOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body)));
   const answered = (requests: readonly GateRecord[], kind: "STORYTELLER" | "STORY_CHECKER") =>

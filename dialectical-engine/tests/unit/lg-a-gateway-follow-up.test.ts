@@ -106,10 +106,16 @@ describe("LG-A: the routed rule (L32, L33)", () => {
     expect(artifacts.map((artifact) => [artifact.replyForm, artifact.replyFailureClass])).toEqual([["ORIGINAL", "CONTENT"], ["PATCH", null]]);
   });
 
-  it("a patch that does not do ends the call: 2 POSTs in all, never a third", async () => {
+  it("a patch that does not do ends the call: 2 POSTs in all, never a third (every step but a judge call)", async () => {
+    // R22 (owner ruling 2026-10-29, "Allow 3 sends"): a judge call (this file's `JUDGE` request) goes on to its one full
+    // re-ask as a third POST (tests/unit/r22-judge-three-sends.test.ts); the answer writer, here, keeps L33's two.
     const { gateway, executions } = harness([{ content: "{\"answer\": \"It is so\"}" }, { content: "{\"score\": \"high\"}" }, { content: "{}" }]);
-    await expect(gateway.call(request(true))).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2 });
+    await expect(gateway.call({ ...request(true), callSiteKey: "COMPOSER:SYNTHESIZER:1", role: "SYNTHESIZER" }))
+      .rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 2 });
     expect(executions).toHaveLength(2);
+    const judge = harness([{ content: "{\"answer\": \"It is so\"}" }, { content: "{\"score\": \"high\"}" }, { content: "{}" }]);
+    await expect(judge.gateway.call(request(true))).rejects.toMatchObject({ code: "PROVIDER_CONTENT_UNACCEPTED", attempts: 3 });
+    expect(judge.executions).toHaveLength(3);
   });
 
   it("an empty answer gets one full re-ask that says it arrived empty", async () => {

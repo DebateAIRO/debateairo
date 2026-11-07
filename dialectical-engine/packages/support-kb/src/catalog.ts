@@ -534,8 +534,11 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
 
 export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
   // Knowing these stateful routes grants no model-selectable action or private account authority.
+  // V4 initial (2026-10-28): the /v4 preview pages are known here too, with no support action yet.
+  // 0157 (D1): the statements of reasons page, with no support action.
   [...new Set([...SUPPORT_CAPABILITIES.map(({ route }) => route),
-    "/admin/invitation", "/admin/reviews", "/admin/team", "/admin/threat-reports", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email", "/export"
+    "/admin/invitation", "/admin/reviews", "/admin/team", "/admin/threat-reports", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email", "/export", "/settings/notices",
+    "/v4", "/v4/debate/[id]", "/v4/debate/[id]/report"
   ])].sort(),
 );
 

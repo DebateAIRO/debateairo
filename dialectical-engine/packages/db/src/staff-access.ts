@@ -1,13 +1,14 @@
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { cancelAndDestroyPrivateClient } from './private-stream.js';
-import type { InvitationContext, InvitationProof, OwnerPossessionContext, Reason, SecurityReceipt, StaffCapability, StaffContext, StaffProof } from '@debateai/kernel';
+import type { InvitationContext, InvitationProof, OwnerPossessionContext, Reason, SecurityReceipt, StaffCapability, StaffContext, StaffProof, TeamLimitAuthority } from '@debateai/kernel';
 import type { CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 import { withMailLocale } from './mail-locale.js';
 /** Internal encrypted intent: constructed by the trusted alert application, never a browser DTO. */
 export type StaffAlertIntent = Readonly<{
     schema: 'staff-alert-v1';
-    event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED';
+    event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED'
+      | 'TEAM_LIMIT_CHANGED' | 'TEAM_LIMIT_PARTNER_GRANTED' | 'TEAM_LIMIT_PARTNER_REVOKED' | 'TEAM_PRACTICE_RECORDED' | 'PUBLIC_REVIEW_CHANGED';
     operationId: string;
     envelope: CryptoEnvelope;
 }>;
@@ -117,7 +118,7 @@ export interface StaffRepository {
     /** Capability-only persistent authority check; mutations validate and consume action proof separately. */
     authorize(input: Readonly<{
         context: StaffContext;
-        capability: StaffCapability;
+        capability: StaffCapability | TeamLimitAuthority;
     }>): Promise<boolean>;
     invite(input: StaffMutation & Readonly<{
         targetUserId: string;

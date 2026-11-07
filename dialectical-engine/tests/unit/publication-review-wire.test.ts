@@ -109,12 +109,13 @@ describe("publication review wire", () => {
   });
 
   // Property: requesting a review reuses PUBLISH and does not widen the run-targeted grant union.
-  it("RunTargetedGrantActionSchema holds exactly PUBLISH, UNPUBLISH and DELETE_PRIVATE_DEBATE", () => {
+  it("RunTargetedGrantActionSchema holds exactly PUBLISH and DELETE_PRIVATE_DEBATE (Unpublish removed, owner decision 13)", () => {
     const action = wire("RunTargetedGrantActionSchema");
-    for (const value of ["PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"]) {
+    for (const value of ["PUBLISH", "DELETE_PRIVATE_DEBATE"]) {
       expect(action.safeParse(value).success, value).toBe(true);
     }
     expect(action.safeParse("REQUEST_PUBLICATION_REVIEW").success).toBe(false);
+    expect(action.safeParse("UNPUBLISH").success).toBe(false);
   });
 
   // Property: answer summaries may carry a strict publication review summary.

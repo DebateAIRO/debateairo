@@ -14,21 +14,27 @@ import {
   type PublicMakerLineage,
   type PublicNode,
   type PublicStoryShort,
-  type PublicationRefusalStatement
+  type PublicationRefusalStatement,
+  type PurposeLines
 } from "@debateai/contract";
 import {
   hashToken,
-  PublicationCipher
+  PublicationCipher,
+  type CryptoEnvelope
 } from "@debateai/crypto";
 import {
   isRunContentLeaseHeld,
   PostgresPublicationRepository,
-  type AuthSourceContext
+  type AuthSourceContext,
+  type PublicPageUpdateRead,
+  type PublicReportCopyRead
 } from "@debateai/db";
 import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-release.js";
+import { mergedPublicDebate, type PublicReviewOverlay } from "./public-tree.js";
+import { questionWithPurposeLines } from "./purpose-lines.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
@@ -87,7 +93,11 @@ function redactNodeForPublic(node: Node): PublicNode {
           ledger_unknown_ref: "REDACTED_OWNER_ONLY"
         },
     staleness_state: node.staleness_state,
-    relevant_as_of: node.relevant_as_of
+    relevant_as_of: node.relevant_as_of,
+    // Plan 2026-10-30 W3-3: a point's web sources and the server's checked flag, as the owner's answer serves them (the
+    // publication check judges every source text, 432c6bdec); absent on a point without them, so older snapshots match.
+    ...(node.sources === undefined ? {} : { sources: node.sources.map((source) => ({ ...source })) }),
+    ...(node.looked_up_checked === undefined ? {} : { looked_up_checked: node.looked_up_checked })
   };
 }
 
@@ -359,6 +369,27 @@ export type PublicationPublishResult =
   | Readonly<{ state: "REFUSED"; statement: PublicationRefusalStatement }>
   | Readonly<{ state: "CHECK_UNAVAILABLE" }>;
 
+/**
+ * Decision 13: what the page shows besides its first snapshot, read through 0137's and 0147's definers; absent: the snapshot alone. A page whose copies cannot be read still serves its snapshot.
+ */
+export type PublicPageReader = Readonly<{
+  readUpdates(publicationRef: string): Promise<readonly PublicPageUpdateRead[]>;
+  readReports(publicationRef: string): Promise<readonly PublicReportCopyRead[]>;
+  authorNameGone(publicationRef: string): Promise<boolean>;
+  /** Decision 33: what the review changed. Null: not public now. */
+  readOverlay?(publicationRef: string): Promise<PublicReviewOverlay | null>;
+  isHeld?(publicationRef: string): Promise<boolean>;
+}>;
+
+/** Decision 13: what a Free debate's publishing needs without a session: the sweep's own, one per pass. */
+export type FreePublicationStore = Readonly<{
+  prepare(runId: string, publicationRef: string): Promise<Readonly<{ outcome: "PREPARED" | "NOT_WAITING" | "ALREADY_PUBLIC" | "NO_SESSION" | "COLLISION"; grantTokenHash: string | null }>>;
+  publish(input: Readonly<{ runId: string; publicationRef: string; grantTokenHash: string; content: CryptoEnvelope; presentedAt: Date }>): Promise<"PUBLISHED" | "NOT_WAITING" | "NO_INTENT">;
+  refuse(runId: string): Promise<"RECORDED" | "ALREADY" | "NOT_FOUND">;
+}>;
+
+export type FreePublishOutcome = "PUBLISHED" | "REFUSED" | "CHECK_UNAVAILABLE" | "NOT_WAITING" | "NO_SESSION";
+
 export interface PublicationApplication {
   reconcileKeyCleanup(limit?: number): Promise<number>;
   reconcileKeyProvisionCleanup(limit?: number): Promise<number>;
@@ -366,7 +397,7 @@ export interface PublicationApplication {
     runId: string;
     authenticated: AuthenticatedSession;
     grantToken: string;
-    action: "PUBLISH" | "UNPUBLISH";
+    action: "PUBLISH";
   }>): Promise<boolean>;
   auditPreflightDenial(input: Readonly<{
     authenticated: AuthenticatedSession;
@@ -390,13 +421,9 @@ export interface PublicationApplication {
     /** FIX-HS2-p1 sd-B1: the route's lease; the judge is awaited outside it. */
     contentLease?: PublicationContentLease;
   }>): Promise<PublicationPublishResult | null>;
-  unpublish(input: Readonly<{
-    runId: string;
-    authenticated: AuthenticatedSession;
-    grantToken: string;
-    source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PRIVATE"; public_ref: null }> | null>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate | null>;
+  /** Decision 33: is this a public debate hidden under review? Only the plain line follows. */
+  isUnderReview?(publicationRef: string): Promise<boolean>;
   list(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
       public_ref: string;
@@ -430,14 +457,123 @@ export class PostgresPublicationApplication implements PublicationApplication {
     private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES,
     private readonly mapViews: MapViewReader = NO_MAP_VIEWS,
     /** Final fix wave P5: null (no release to compare with) reads an unparsable snapshot as before C14: not found. */
-    private readonly releases: PublicSnapshotReleases | null = null
+    private readonly releases: PublicSnapshotReleases | null = null,
+    /** Decision 13: the page's copies; null: the snapshot alone. */
+    private readonly publicPage: PublicPageReader | null = null
   ) {}
+
+  /**
+   * Decision 13: A FREE DEBATE GOES PUBLIC when finished, with no session: the same body and the same publication check as an owner's publish, the clarifying answers published with the
+   * question and checked with it. A refusal keeps it private for good; an unavailable check records nothing, and the sweep tries again. 0137's core.publish_free_debate does the rest.
+   */
+  async publishFreeDebate(input: Readonly<{
+    runId: string; answer: Answer; owner: { userId: string; ownerRef: string }; purposeLines: PurposeLines | null; source: AuthSourceContext; contentCheck: PublicationContentCheck;
+    store: FreePublicationStore; lease: PublicationContentLease;
+  }>): Promise<FreePublishOutcome> {
+    const owner = input.owner;
+    if (input.answer.run_ref !== input.runId || input.answer.terminal === "BLOCKED") {
+      await input.store.refuse(input.runId);
+      return "REFUSED";
+    }
+    const staged = await input.lease.run(async () => {
+      const pseudonym = await this.repository.readAuthorPseudonym(input.runId, owner.userId, owner.ownerRef);
+      if (pseudonym === null) return null;
+      const body = await buildPublicDebateBody({ runId: input.runId, answer: input.answer, owner, source: input.source,
+        readers: { stories: this.stories, repository: this.repository, mapViews: this.mapViews } });
+      const publicationRef = randomUUID();
+      const occurredAt = this.clock();
+      return Object.freeze({ publicationRef, occurredAt, publicDebate: PublicDebateSchema.parse({ public_ref: publicationRef, author_pseudonym: pseudonym, published_at: occurredAt.toISOString(), ...body,
+        question: questionWithPurposeLines(body.question, input.purposeLines ?? undefined) }) });
+    });
+    if (staged === null) return "NOT_WAITING";
+    if (isRunContentLeaseHeld()) throw new TypeError("PUBLICATION_CHECK_UNDER_CONTENT_LEASE");
+    let checked: Awaited<ReturnType<PublicationContentCheck["check"]>>;
+    try {
+      checked = await input.contentCheck.check({ runId: input.runId, snapshot: staged.publicDebate });
+    } catch (error) {
+      logCheckFailed(input.source.requestId, storyReadDiagnostic(error));
+      return "CHECK_UNAVAILABLE";
+    }
+    if (checked.outcome === "BLOCK" || checked.outcome === "UNSURE") {
+      await input.store.refuse(input.runId);
+      return "REFUSED";
+    }
+    if (checked.outcome !== "ALLOW") return "CHECK_UNAVAILABLE";
+    return input.lease.run(async () => {
+      const prepared = await input.store.prepare(input.runId, staged.publicationRef);
+      if (prepared.outcome === "NO_SESSION") return "NO_SESSION";
+      if (prepared.outcome !== "PREPARED" || prepared.grantTokenHash === null) return "NOT_WAITING";
+      const cipher = await this.cipher.create(staged.publicationRef, input.runId);
+      try {
+        const content = cipher.encrypt(staged.publicDebate);
+        const published = await input.store.publish({ runId: input.runId, publicationRef: staged.publicationRef, grantTokenHash: prepared.grantTokenHash, content, presentedAt: staged.occurredAt });
+        if (published !== "PUBLISHED") await this.cipher.destroy(staged.publicationRef).catch(() => undefined);
+        return published === "PUBLISHED" ? "PUBLISHED" : "NOT_WAITING";
+      } finally {
+        cipher.close();
+      }
+    });
+  }
+
+  /** The publication's key for a sweep's sealing, under its content lease, while it is public. Null: it is not. */
+  /** Decision 33: the key for the two accounts' review, of a debate that may be hidden. Their authority was proved by the caller; never a public path. */
+  async withReviewKey<T>(publicationRef: string, runId: string, use: (cipher: Awaited<ReturnType<PublicationCipher["open"]>>) => T): Promise<T> {
+    return this.repository.withContentLease(publicationRef, async () => {
+      const prepared = await this.cipher.open(publicationRef, runId);
+      try {
+        return use(prepared);
+      } finally {
+        prepared.close();
+      }
+    });
+  }
+
+  async withPublicationKey<T>(publicationRef: string, use: (cipher: Awaited<ReturnType<PublicationCipher["open"]>>) => T): Promise<T | null> {
+    return this.repository.withContentLease(publicationRef, async () => {
+      const snapshot = await this.repository.readPublic(publicationRef);
+      if (snapshot === null) return null;
+      const prepared = await this.cipher.open(publicationRef, snapshot.runId);
+      try {
+        return use(prepared);
+      } finally {
+        prepared.close();
+      }
+    });
+  }
+
+  /** The first snapshot with what contributions and reports added since. A failure to read them serves the snapshot alone. */
+  async #withPage(snapshot: PublicDebate, publicationRef: string, runId: string): Promise<PublicDebate | null> {
+    if (this.publicPage === null) return snapshot;
+    // Decision 33, failing shut: a page whose review cannot be read is not served, because its first snapshot may hold what was corrected.
+    let overlay: PublicReviewOverlay | null = { changed: false, corrections: [] };
+    try {
+      if (this.publicPage.readOverlay !== undefined) overlay = await this.publicPage.readOverlay(publicationRef);
+    } catch (error) {
+      console.error(JSON.stringify({ event: "api.publication.review_unread", id: publicationRef, diagnostic: storyReadDiagnostic(error) }));
+      return null;
+    }
+    if (overlay === null) return null;
+    const reviewed = overlay.changed || overlay.corrections.length > 0;
+    let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
+    try {
+      const [updates, reports, authorNameGone] = await Promise.all([this.publicPage.readUpdates(publicationRef), this.publicPage.readReports(publicationRef), this.publicPage.authorNameGone(publicationRef)]);
+      prepared = await this.cipher.open(publicationRef, runId);
+      const opener = prepared;
+      return mergedPublicDebate(snapshot, { updates, reports, authorNameGone, overlay, open: (envelope) => opener.decrypt(envelope) });
+    } catch (error) {
+      console.error(JSON.stringify({ event: "api.publication.page_copies_unread", id: publicationRef, diagnostic: storyReadDiagnostic(error) }));
+      if (reviewed) return null;
+      return snapshot;
+    } finally {
+      prepared?.close();
+    }
+  }
 
   async preflightGrant(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
     grantToken: string;
-    action: "PUBLISH" | "UNPUBLISH";
+    action: "PUBLISH";
   }>): Promise<boolean> {
     return this.repository.preflightGrant({
       runId: input.runId,
@@ -630,42 +766,6 @@ export class PostgresPublicationApplication implements PublicationApplication {
     }
   }
 
-  async unpublish(input: Readonly<{
-    runId: string;
-    authenticated: AuthenticatedSession;
-    grantToken: string;
-    source: AuthSourceContext;
-  }>): Promise<Readonly<{ state: "PRIVATE"; public_ref: null }> | null> {
-    const grantTokenHash = hashToken("step-up-grant", input.grantToken);
-    if (!await this.preflightGrant({
-      runId: input.runId,
-      authenticated: input.authenticated,
-      grantToken: input.grantToken,
-      action: "UNPUBLISH"
-    })) {
-      await this.auditPreflightDenial({
-        authenticated: input.authenticated,
-        requestId: input.source.requestId
-      });
-      return null;
-    }
-    // Retry durable cleanup from a prior committed PRIVATE transition before
-    // handling the next request. Key I/O runs outside every DB transaction.
-    await this.reconcileKeyCleanup();
-    const publicationRef = await this.repository.unpublish({
-      runId: input.runId,
-      userId: input.authenticated.userId,
-      ownerRef: input.authenticated.ownerRef,
-      sessionId: input.authenticated.session.session_id,
-      grantTokenHash,
-      occurredAt: this.clock(),
-      source: input.source
-    });
-    if (publicationRef === null) return null;
-    await this.reconcileKeyCleanup();
-    return Object.freeze({ state: "PRIVATE" as const, public_ref: null });
-  }
-
   async reconcileKeyCleanup(limit = 100): Promise<number> {
     const claimed = await this.cleanupRepository.claimKeyCleanup(limit);
     let completed = 0;
@@ -720,6 +820,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
    * old not found (null), with one content-free journal line (api.publication.snapshot_unreadable), since it is not a
    * newer release's data. The key is read only after the parse failed, inside the same content lease.
    */
+  async isUnderReview(publicationRef: string): Promise<boolean> {
+    return this.publicPage?.isHeld?.(publicationRef) ?? false;
+  }
+
   async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
     return this.repository.withContentLease(publicationRef,async () => {
       const snapshot = await this.repository.readPublic(publicationRef);
@@ -747,7 +851,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
         prepared?.close();
       }
       const publicDebate = PublicDebateSchema.safeParse(decrypted);
-      if (publicDebate.success) return publicDebate.data;
+      if (publicDebate.success) return this.#withPage(publicDebate.data, publicationRef, snapshot.runId);
       const releaseKey = await this.#runReleaseKey(snapshot.runId);
       if (releaseKey !== null && this.releases !== null && madeByNewerRelease(releaseKey, this.releases.ownReleaseKey)) {
         // The owner reads' line (index.ts withNewerReleaseFallback): content-free — the route, the public id, the key.

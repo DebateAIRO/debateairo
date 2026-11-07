@@ -12,7 +12,7 @@ import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "
  * Side-by-side uploads spec 2026-10-21 §4 (plan C task C9, controller ruling (h) on its review) — A PAGE OPENED FROM AN
  * OLD LINK ACTS ON THE NEWEST RUN. A debate re-admitted from the waiting line gets a new run; GET /v1/runs/OLD answers
  * with the new run's projection, whose `run_ref` is NEW. A step-up grant stays bound to the id the page sends (the API no
- * longer rewrites it), so the page must send NEW everywhere it acts: PublicationControl (publish, unpublish, delete and
+ * longer rewrites it), so the page must send NEW everywhere it acts: PublicationControl (publish, delete and
  * their step-up target) and the run stream take the projection's `run_ref`, or the answer's, never the URL's id.
  */
 const OLD = "11111111-1111-4111-8111-111111111111";

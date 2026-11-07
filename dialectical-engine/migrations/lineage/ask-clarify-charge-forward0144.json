@@ -1,0 +1,27 @@
+{
+  "version": "ask-clarify-charge-forward0144-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0143_run_handover.sql",
+    "manifestSha256": "4ddfb6b3a97a7ae82e56b5d5422be5e785ef8af88ffc7de549d5d67d65705dea",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0144_ask_clarify_charge.sql",
+    "sha256": "ab55ced0af69534261048c82ba279e51e0f9a46661d1fc9f839d75918a7671ba"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0140_internal_spend_kinds.sql",
+      "functions": [
+        "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ],
+      "field": "function_definition"
+    }
+  ]
+}

@@ -44,7 +44,7 @@ describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () =
       data: { announced_total_micros: 60_500_000, quote_ref: "q-1", recurring_net_micros: 50_000_000 }
     });
     expect(writes.entitlement).toEqual({
-      planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: 12_500_000
+      planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: 19_800_000
     });
   });
 

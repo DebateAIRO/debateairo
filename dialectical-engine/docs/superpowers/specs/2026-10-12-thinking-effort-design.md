@@ -264,7 +264,7 @@ change is needed. A unit test pins that the estimate is the same with and withou
 - **The noise band:** for each metric, the gap between today's level run 1 and run 2. A lower level is reported as
   better or worse only where the gap to today's level is clearly larger than that band. Otherwise it is reported as
   "same within chance".
-- **Budget:** the owner's standing test budget, $5 DeepInfra and $1 Haiku for the testing day, counting what other
+- **Budget:** the owner's standing test budget, <amount> DeepInfra and <amount> Haiku for the testing day, counting what other
   sessions already spent that day (read from both gates' day spend before starting). The run stops before the day's
   total passes $4.75 / $0.95. Expected spend is about $1.5–2.5 DeepInfra and $0.2–0.4 Haiku.
 - **Output:**

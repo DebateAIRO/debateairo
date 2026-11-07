@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Не вдалося створити дебати",
   "newDebate.sessionReadFailed": "Не вдалося прочитати сеанс",
   "newDebate.planRosterFailed": "Не вдалося прочитати перелік рівнів плану",
-  "newDebate.checkingSession": "Перевірка сеансу…",
+  "newDebate.checkingSession": "Одну мить…",
   "newDebate.redirectingToSignIn": "Перехід до входу…",
   "newDebate.continueToSignIn": "Перейти до входу",
   "newDebate.defaultUnavailable": "У розгортанні немає дійсного рядка riskTier; для рівня ризику потрібне значення.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Ви досягли сьогоднішнього ліміту свого плану. Ви все одно можете поставити запитання: ваші дебати почнуться самі о {time}.",
   "newDebate.room.personWeekFullTopPlan": "Ви досягли ліміту свого плану на цей тиждень. Ви все одно можете поставити запитання: ваші дебати почнуться самі {time}.",
   "newDebate.room.personMonthFullTopPlan": "Ви досягли ліміту свого плану на цей місяць. Ви все одно можете поставити запитання: ваші дебати почнуться самі {time}.",
-  "newDebate.room.freeMonthFull": "Ви використали безкоштовні дебати цього місяця. Ваші наступні дебати можуть початися {time}, або виберіть план, щоб продовжити зараз.",
+  "newDebate.room.freeMonthFull": "Ви використали безкоштовну квоту цього місяця. Ваші наступні дебати можуть початися {time}, або виберіть план, щоб продовжити зараз.",
   "newDebate.room.personClose": "Ви близькі до ліміту свого плану. Ці дебати все одно пройдуть повністю.",
   "newDebate.room.ownDebatesFull": "Ваші інші дебати поки що використовують залишок вашого ліміту. Ці дебати почнуться самі, щойно одні з них завершаться.",
   "newDebate.room.upgradeLink": "Переглянути плани",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Ваш план: Безкоштовний",
   "newDebate.plan.current.PLUS": "Ваш план: Plus",
   "newDebate.plan.current.PRO": "Ваш план: Pro",
-  "newDebate.plan.current.MAX": "Ваш план: Max"
+  "newDebate.plan.current.MAX": "Ваш план: Max",
+  "newDebate.askText.otherAnswer": "Інша відповідь…",
+  "newDebate.askText.otherLabel": "Ваше власне додаткове уточнення",
+  "newDebate.askText.matters": "Якщо відповіді тягнуть у різні боки, для мене найважливіше: {matters}",
+  "newDebate.askText.angles": "Будь ласка, також погляньте на: {list}.",
+  "newDebate.freePublicNotice": "На безкоштовному плані ваше запитання та його дебати є публічними. Не вказуйте персональні дані."
 }

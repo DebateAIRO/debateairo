@@ -136,7 +136,7 @@ function recordingRoom(admission: RoomDecision = START) {
   return { room, questions };
 }
 
-function billingFor(planId: PlanId, day: Readonly<{ spent: number; limit: number }> | null = null, estimate = 300_000) {
+function billingFor(planId: PlanId, day: Readonly<{ spent: number; limit: number }> | null = null, estimate = 330_000) {
   const current = vi.fn(async () => ({ planId, eventId: EVENT_ID }));
   const estimateMicros = vi.fn(async () => estimate);
   const billing: AskBilling = Object.freeze({
@@ -147,7 +147,7 @@ function billingFor(planId: PlanId, day: Readonly<{ spent: number; limit: number
         read: async () => day === null ? [] : [{
           scope: "PERSON_DAY" as const, limitMicros: day.limit,
           periodStart: new Date("2026-09-29T00:00:00.000Z"), resetsAt: new Date("2026-09-30T00:00:00.000Z"),
-          finishBasisPoints: 11_000, closeBasisPoints: 9_500
+          finishBasisPoints: 12_100, closeBasisPoints: 9_500
         }]
       },
       spend: {
@@ -186,7 +186,7 @@ function arrange(billing: AskBilling | undefined, room?: AskRoomPort, panel?: re
 const setupFailureFor = (reason: string) => ({ runId: RUN_ID, batteryRowId: "Q1", commandKey: `S00:${RUN_ID}:Q1`, reason });
 
 const freeClass = Object.freeze({
-  planTier: "free", compositionBudgetTier: "low", makerCount: PLAN_TIER_ROSTERS.free.length, depth: 2
+  planTier: "free", compositionBudgetTier: "low", makerCount: PLAN_TIER_ROSTERS.free.length, depth: 1
 });
 
 /** An application for the HTTP cases: every read answers nothing, and `submit` is the case's own. */
@@ -225,14 +225,14 @@ describe("normaliseAskForPlan: Free's gauges are the server's (§2.3.4)", () => 
     expect(result.normalised).toBe(true);
     expect(result.ask).toMatchObject({
       plan_tier: "free", risk_tier: "standard", tier_source: "MACHINE_DEFAULT",
-      tier_provenance_ref: "machine:plan-tier-free", composition_budget_tier: "low", depth_params: { depth: 2 }
+      tier_provenance_ref: "machine:plan-tier-free", composition_budget_tier: "low", depth_params: { depth: 1 }
     });
   });
 
   it("changes nothing for a Free ask that already carries the defaults", () => {
     const sent = ask({
       plan_tier: "free", risk_tier: "standard", tier_source: "MACHINE_DEFAULT", tier_provenance_ref: "machine:plan-tier-free",
-      composition_budget_tier: "low", depth_params: { depth: 2 }
+      composition_budget_tier: "low", depth_params: { depth: 1 }
     });
     expect(normaliseAskForPlan(sent, planById(plans, "FREE"))).toEqual({ ask: sent, normalised: false });
   });
@@ -255,13 +255,13 @@ describe("normaliseAskForPlan: Free's gauges are the server's (§2.3.4)", () => 
 describe("decideCoarseFit: cheaper models only when that helps (§2.6 item 7, A5)", () => {
   const window = (usedMicros: number, limitMicros: number) => ({ usedMicros, limitMicros });
   it.each([
-    ["a Free ask is already the cheapest", "free", 300_000, [window(900_000, 1_000_000)], "AS_ASKED"],
-    ["no person window", "premium", 300_000, [], "AS_ASKED"],
-    ["the estimate fits every window", "premium", 100_000, [window(900_000, 1_000_000)], "AS_ASKED"],
-    ["an exact fit still fits", "premium", 100_000, [window(900_000, 1_000_000), window(0, 5_000_000)], "AS_ASKED"],
-    ["a FULL window waits instead (B6b)", "premium", 300_000, [window(1_000_000, 1_000_000)], "AS_ASKED"],
-    ["the estimate does not fit and nothing is full", "premium", 300_000, [window(900_000, 1_000_000)], "FREE_ROSTER"],
-    ["one of several windows does not fit", "premium", 300_000, [window(0, 5_000_000), window(2_400_000, 2_500_000)], "FREE_ROSTER"]
+    ["a Free ask is already the cheapest", "free", 330_000, [window(990_000, 1_100_000)], "AS_ASKED"],
+    ["no person window", "premium", 330_000, [], "AS_ASKED"],
+    ["the estimate fits every window", "premium", 99_000, [window(990_000, 1_100_000)], "AS_ASKED"],
+    ["an exact fit still fits", "premium", 110_000, [window(990_000, 1_100_000), window(0, 5_500_000)], "AS_ASKED"],
+    ["a FULL window waits instead (B6b)", "premium", 330_000, [window(1_100_000, 1_100_000)], "AS_ASKED"],
+    ["the estimate does not fit and nothing is full", "premium", 330_000, [window(990_000, 1_100_000)], "FREE_ROSTER"],
+    ["one of several windows does not fit", "premium", 330_000, [window(0, 5_500_000), window(2_640_000, 2_750_000)], "FREE_ROSTER"]
   ] as const)("%s", (_name, planTier, estimateMicros, windows, expected) => {
     expect(decideCoarseFit({ planTier, estimateMicros, windows })).toBe(expected);
   });
@@ -278,17 +278,17 @@ describe("submit with billing on", () => {
     expect(started).toHaveLength(1);
     expect(started[0]).toMatchObject({
       planTier: "free", askerRiskTier: "standard", tierSource: "MACHINE_DEFAULT",
-      tierProvenanceRef: "machine:plan-tier-free", compositionBudgetTier: "low", depthParams: { depth: 2 }
+      tierProvenanceRef: "machine:plan-tier-free", compositionBudgetTier: "low", depthParams: { depth: 1 }
     });
     expect(started[0]!.discoveredPanel.map((panelMember) => panelMember.model_id)).toEqual([...PLAN_TIER_ROSTERS.free]);
     expect(AskAcceptedSchema.parse(accepted).applied).toEqual({
-      plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2
+      plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 1
     });
     expect(substitutions).not.toHaveBeenCalled();
   });
 
   it("runs a paid person's ask on the premium roster even when the client chose Free", async () => {
-    const { billing } = billingFor("PLUS", { spent: 100_000, limit: 1_000_000 });
+    const { billing } = billingFor("PLUS", { spent: 110_000, limit: 1_100_000 });
     const { application, started, substitutions } = arrange(billing);
     const accepted = await application.submit(ask({ plan_tier: "free" }), serverSession, serverPrincipal);
     expect(started[0]).toMatchObject({ planTier: "premium", compositionBudgetTier: "medium", depthParams: { depth: 3 } });
@@ -298,7 +298,7 @@ describe("submit with billing on", () => {
   });
 
   it("moves a paid ask that does not fit the person's room to the Free roster, owner-side only", async () => {
-    const { billing, estimateMicros } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing, estimateMicros } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { application, started, substitutions } = arrange(billing);
     const accepted = await application.submit(ask(), serverSession, serverPrincipal);
     expect(estimateMicros).toHaveBeenCalledWith({
@@ -315,7 +315,7 @@ describe("submit with billing on", () => {
   });
 
   it("never starts a swapped run without its owner record: a failed record fails the run before its first job", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { application, substitutions, memory, enqueued, setupFailures } = arrange(billing);
     const failure = new Error("test: the substitution record failed");
     substitutions.mockRejectedValue(failure);
@@ -326,7 +326,7 @@ describe("submit with billing on", () => {
   });
 
   it("never swaps when a window is FULL: that question waits in B6b's line", async () => {
-    const { billing } = billingFor("PLUS", { spent: 1_000_000, limit: 1_000_000 });
+    const { billing } = billingFor("PLUS", { spent: 1_100_000, limit: 1_100_000 });
     const { application, started, substitutions } = arrange(billing);
     await application.submit(ask(), serverSession, serverPrincipal);
     expect(started[0]).toMatchObject({ planTier: "premium" });
@@ -359,16 +359,16 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
     expect(enqueued).not.toHaveBeenCalled();
     expect(questions.map((question) => question.settingsClass)).toEqual([freeClass, freeClass]);
     expect(questions[0]!.access).toEqual({ ownerRef: OWNER_REF, legacyAskerId: null });
-    expect(started[0]).toMatchObject({ planTier: "free", compositionBudgetTier: "low", depthParams: { depth: 2 } });
+    expect(started[0]).toMatchObject({ planTier: "free", compositionBudgetTier: "low", depthParams: { depth: 1 } });
     expect(AskAcceptedSchema.parse(accepted)).toEqual({
       run_ref: RUN_ID, status: "QUEUED",
-      applied: { plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 }
+      applied: { plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 1 }
     });
     expect(substitutions).not.toHaveBeenCalled();
   });
 
   it("records the interim swap in the room decision's own transaction, and the room sees the Free roster's class", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room, questions } = recordingRoom();
     const { application, started, substitutions, memory } = arrange(billing, room);
     const accepted = await application.submit(ask(), serverSession, serverPrincipal);
@@ -389,7 +389,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   });
 
   it("fails the run inside the room's decision when the record cannot be written, and queues nothing", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room } = recordingRoom();
     const { application, substitutions, memory, enqueued, enqueuedOnRoom, setupFailures } = arrange(billing, room);
     const failure = new Error("test: the substitution record failed");
@@ -409,7 +409,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
     // chose the Free roster, but only a START runs on it (A5, §2.3.4). Stored as
     // a "free" run, B7b's PLAN_CHANGED guard would miss it, and an owner who
     // dropped to Free before the reset would wake with a paid plan's settings.
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room } = recordingRoom(WAIT_SITE_DAY);
     const { application, started, substitutions, enqueued, enqueuedOnRoom } = arrange(billing, room);
     const accepted = AskAcceptedSchema.parse(await application.submit(ask(), serverSession, serverPrincipal));
@@ -429,7 +429,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   });
 
   it("refuses a swapped question that must WAIT when its plan's own roster is unavailable, before any run exists", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room } = recordingRoom(WAIT_SITE_DAY);
     const { application, started, substitutions, setupFailures } = arrange(billing, room, PLAN_TIER_ROSTERS.free);
     await expect(application.submit(ask(), serverSession, serverPrincipal))
@@ -442,7 +442,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   it("still STARTs a swapped question on the Free roster when only the plan's own roster is unavailable", async () => {
     // The plan's own admission is taken beside the swapped one, and its refusal is
     // kept as a value: it matters only when the locked decision says WAIT.
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room } = recordingRoom();
     const { application, started, substitutions } = arrange(billing, room, PLAN_TIER_ROSTERS.free);
     const accepted = AskAcceptedSchema.parse(await application.submit(ask(), serverSession, serverPrincipal));
@@ -468,7 +468,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   });
 
   it("drops the swap and STARTs on the plan's own roster when only the Free roster is unavailable, with no substitution row", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room, questions } = recordingRoom();
     const { application, started, substitutions, enqueuedOnRoom } = arrange(billing, room, PLAN_TIER_ROSTERS.premium);
     const accepted = AskAcceptedSchema.parse(await application.submit(ask(), serverSession, serverPrincipal));
@@ -484,7 +484,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   });
 
   it("drops the swap and WAITs on the plan's own roster when only the Free roster is unavailable", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room, questions } = recordingRoom(WAIT_SITE_DAY);
     const { application, started, substitutions, enqueuedOnRoom } = arrange(billing, room, PLAN_TIER_ROSTERS.premium);
     const accepted = AskAcceptedSchema.parse(await application.submit(ask(), serverSession, serverPrincipal));
@@ -497,7 +497,7 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   });
 
   it("still refuses, before any run exists, when neither roster is available", async () => {
-    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { billing } = billingFor("PLUS", { spent: 990_000, limit: 1_100_000 }, 330_000);
     const { room } = recordingRoom();
     const { application, started, substitutions, setupFailures } = arrange(billing, room, []);
     await expect(application.submit(ask(), serverSession, serverPrincipal))

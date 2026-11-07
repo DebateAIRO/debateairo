@@ -2,16 +2,17 @@
 // deploy/preview-lifecycle/v1/settings-version.mjs. Fake runners only: no server, no database, no gate, no AI call.
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const settings = await import('../../deploy/' + 'preview-lifecycle/v1/settings-version.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { ACTIVE_PAIR_FAIL_LINE, CHECK_HINTS, GATE_CODE_FILES, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, SEATABLE_ENV_SCHEMA,
+const { ACTIVE_PAIR_FAIL_LINE, CHECK_HINTS, GATE_CODE_FILES, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, REMAINING_SCRIPT, SEATABLE_ENV_SCHEMA,
   activateSettings, checkHalfArgv, checkSettingsGatesLive, checkSettingsVersion, gateHelperDifferences, gateSockets, hintFor, main, operatorArgv, operatorGroupGid,
-  planSettingsForSwitch, seatableEnvironmentText, settingsStatus } = settings;
+  planSettingsForSwitch, readRemaining, remainingArgv, remainingEnvironment, seatableEnvironmentText, settingsStatus } = settings;
 const operatorModule = await import('../../tools/settings-version/' + 'settings-operator.js');
 const LAYOUT = common.LAYOUT;
 const NODE = '/usr/local/lib/nodejs/bin/node';
@@ -66,6 +67,10 @@ type Options = Partial<{
   apiRoots: Record<string, string>;
   // SA10: the gate files and the releases' own helper, by path (absent = unreadable).
   gateFiles: Record<string, string>;
+  // R22 (2026-11-02): the server's own /remaining reader (asked as the API, through `run`), not the stand-in; and the
+  // lock's API identity per label.
+  realReader: boolean;
+  apiIds: Record<string, { uid: number; gid: number }>;
 }>;
 
 /** A fake preview host: the lock (two releases), the release table, the env files, the gates, the files root writes, and one runner for every command. */
@@ -76,12 +81,14 @@ function host(options: Options = {}) {
       ? result(`DEBATEAI_SETTINGS_VERDICT ${JSON.stringify({ releaseKey: NEW_KEY, version: '21', verdict: 'PASS', digest: 'd'.repeat(64), codes: [] })}\n`, 0)
       : result(`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${OLD_KEY}","pointer":"19","effectiveActive":"19","passed":["19"]}\n`)),
     current: OLD_KEY as string | null, remaining: { deepinfra: '{"enabled_models":[]}', anthropic: '{"enabled_models":["claude-haiku-5-5"]}' } as Record<string, string | null>,
-    envFails: [] as string[], existing: [] as string[], guardFails: [] as string[], apiRoots: {} as Record<string, string>, gateFiles: gateFilesOf(), ...options
+    envFails: [] as string[], existing: [] as string[], guardFails: [] as string[], apiRoots: {} as Record<string, string>, gateFiles: gateFilesOf(),
+    realReader: false, apiIds: {} as Record<string, { uid: number; gid: number }>, ...options
   };
   const calls: Call[] = [], log: string[] = [], files: Record<string, string> = {};
   const lockOf = () => {
     const release = (label: string, key: string) => ({ releaseKey: key, slot: label === OLD ? 'A' : 'B', databaseAhead: null, services: Object.fromEntries(['api', 'runner', 'ui'].map(service =>
-      [service, { sourceRoot: service === 'api' ? o.apiRoots[label] ?? root(label, service) : root(label, service), serviceUid: IDS[service]?.uid ?? 1401, serviceGid: IDS[service]?.gid ?? 1402 }])) });
+      [service, { sourceRoot: service === 'api' ? o.apiRoots[label] ?? root(label, service) : root(label, service),
+        ...(service === 'api' && o.apiIds[label] ? { serviceUid: o.apiIds[label]!.uid, serviceGid: o.apiIds[label]!.gid } : { serviceUid: IDS[service]?.uid ?? 1401, serviceGid: IDS[service]?.gid ?? 1402 }) }])) });
     return { schema: 'preview-lifecycle-release-lock-v2', releases: { [OLD]: release(OLD, OLD_KEY), [NEW]: release(NEW, NEW_KEY) } };
   };
   const deps = {
@@ -89,6 +96,13 @@ function host(options: Options = {}) {
     now: () => Date.parse('2026-10-23T01:46:00.123Z'),
     run: async (argv: string[], opts: Call['opts']) => {
       calls.push({ argv, opts });
+      if (argv[0] === LAYOUT.setpriv && argv.includes(REMAINING_SCRIPT)) {
+        const [socket, scope] = argv.slice(-2);
+        const gate = socket!.includes('anthropic') ? 'anthropic' : 'deepinfra';
+        log.push(`remaining ${gate} ${scope} as ${argv[1]} ${argv[2]}`);
+        const answer = o.remaining[gate];
+        return typeof answer === 'string' ? result(answer, 0) : result('', 1);
+      }
       if (argv[0] === LAYOUT.setpriv) {
         const half = argv.some(part => part.endsWith(HALF_ENTRIES.runner)) ? 'runner' : 'api';
         log.push(`half ${half}`);
@@ -134,6 +148,7 @@ function host(options: Options = {}) {
       return Buffer.from(o.gateFiles[path]!);
     }
   };
+  if (o.realReader) delete (deps as Partial<typeof deps>).readRemaining;
   return { deps, calls, log, files };
 }
 const refusal = async (promise: Promise<unknown>) => promise.then(() => { throw new Error('expected a refusal'); }, (error: any) => error);
@@ -159,6 +174,20 @@ describe('the command lines (side-by-side spec §13, S15)', () => {
     expect(HALF_ENTRIES).toEqual({ runner: 'apps/runner/src/settings-check-cli.ts', api: 'apps/api/src/settings-check-cli.ts' });
     for (const bad of [{ half: 'ui' }, { identity: { uid: 0, gid: 1 } }, { version: '021' }]) {
       expect(() => checkHalfArgv({ layout: LAYOUT, nodePath: NODE, engine: engine(NEW, 'runner'), identity: IDS.runner, half: 'runner', version: 21, ...bad })).toThrow();
+    }
+  });
+
+  it('asks a gate\'s /remaining as the API\'s pinned identity, never as root, with PATH, locale and TZ only (R22, 2026-11-02)', () => {
+    const socket = '/run/debateai-v3-preview/anthropic-budget-v1.sock';
+    expect(remainingArgv({ layout: LAYOUT, nodePath: NODE, identity: IDS.api, socket, scopeId: 'preview-team' })).toEqual([
+      '/usr/bin/setpriv', '--reuid=1301', '--regid=1302', '--init-groups', '--inh-caps=-all', '--no-new-privs', '--',
+      NODE, '--input-type=module', '-e', REMAINING_SCRIPT, socket, 'preview-team'
+    ]);
+    expect(remainingEnvironment(NODE)).toEqual({ PATH: '/usr/local/lib/nodejs/bin:/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', TZ: 'UTC' });
+    for (const bad of [{ identity: { uid: 0, gid: 0 } }, { identity: { uid: 0, gid: 1302 } }, { identity: { uid: 1301, gid: 0 } }, { identity: undefined },
+      { socket: 'anthropic-budget-v1.sock' }, { socket: '/run/x.sock --flag' }, { scopeId: 'Preview Team' }, { scopeId: '' }]) {
+      expect(() => remainingArgv({ layout: LAYOUT, nodePath: NODE, identity: IDS.api, socket, scopeId: 'preview-team', ...bad }), JSON.stringify(bad))
+        .toThrow(expect.objectContaining({ code: 'ARGUMENTS_REFUSED' }));
     }
   });
 });
@@ -195,9 +224,19 @@ describe('check <label> <version>', () => {
       // The release guard first, for both folders, before any half or operator run (release-guard.mjs rule).
       `guard ${root(NEW, 'runner')} runner ${LOADER} dialectical-engine/apps/runner/src/settings-check-cli.ts`,
       `guard ${root(NEW, 'api')} api ${LOADER} dialectical-engine/apps/api/src/settings-check-cli.ts dialectical-engine/tools/settings-version/cli.ts dialectical-engine/tools/settings-version/settings-operator.ts`,
+      // A drained upload checks before the first start, when prestart has not made the folder yet (R22, 2026-11-02).
+      `folder ${CURRENT_NEW}`,
       `env /etc/debateai-v3-preview/auth-dev-v1/runner-${NEW}.env gid 1202`, 'half runner', `env /etc/debateai-v3-preview/auth-dev-v1/api-${NEW}.env gid 1302`, 'half api',
       `write ${r.receipt}`, `write ${CURRENT_NEW}/settings-check-21-${STAMP}-runner.txt`, `write ${CURRENT_NEW}/settings-check-21-${STAMP}-api.txt`, 'operator verdict'
     ]);
+  });
+
+  it('makes the release\'s current folder before any half runs; a folder it cannot make refuses CURRENT_DIRECTORY_REFUSED with nothing run or written', async () => {
+    const h = host();
+    h.deps.ensureCurrentDir = async () => { throw Object.assign(new Error('x'), { code: 'LIFECYCLE_DIRECTORY_REFUSED' }); };
+    expect((await refusal(checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps }))).code).toBe('CURRENT_DIRECTORY_REFUSED');
+    expect(h.log.filter(line => /^(half|write|operator)/.test(line))).toEqual([]);
+    expect(h.calls).toEqual([]);
   });
 
   it('a FAIL lists every code with one plain hint each', async () => {
@@ -296,6 +335,66 @@ describe('activate and status', () => {
     const out = await settingsStatus({ layout: LAYOUT, deps: h.deps });
     expect(out).toEqual({ code: 0, stdout: [`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${OLD_KEY}","pointer":"19","effectiveActive":"19","passed":["19"]}`], stderr: [] });
     expect(operatorCalls(h.calls)[0]!.opts.cwd).toBe(engine(OLD, 'api'));
+  });
+});
+
+describe('the gates\' /remaining, asked as the API (R22, 2026-11-02: each gate answers only its GO\'s allowed_peer_uids)', () => {
+  const ACTIVATED = `DEBATEAI_SETTINGS_ACTIVATED {"version":"21","previous":"19","releaseKey":"${OLD_KEY}","activationSeq":"4"}\n`;
+  const reads = (calls: Call[]) => calls.filter(call => call.argv.includes(REMAINING_SCRIPT));
+
+  it('activate asks each gate as the current release\'s pinned API identity, from /, with no env-file value; a gate that does not answer gets no file', async () => {
+    const h = host({ realReader: true, apiIds: { [OLD]: { uid: 994, gid: 995 } }, remaining: { deepinfra: '{"enabled_models":[]}', anthropic: null }, operator: () => result(ACTIVATED) });
+    expect((await activateSettings({ version: 21, by: 'owner', reason: 'x', layout: LAYOUT, deps: h.deps })).code).toBe(0);
+    expect(h.log.filter(line => line.startsWith('remaining'))).toEqual([
+      'remaining deepinfra preview-team as --reuid=994 --regid=995', 'remaining anthropic preview-team as --reuid=994 --regid=995']);
+    expect(reads(h.calls).map(call => call.argv)).toEqual(['deepinfra-budget-v3', 'anthropic-budget-v1'].map(name =>
+      remainingArgv({ layout: LAYOUT, nodePath: NODE, identity: { uid: 994, gid: 995 }, socket: `/run/debateai-v3-preview/${name}.sock`, scopeId: 'preview-team' })));
+    for (const call of reads(h.calls)) expect([call.opts.cwd, call.opts.env, call.opts.timeoutMs, call.opts.maxOutputBytes]).toEqual(['/', remainingEnvironment(NODE), 10000, 64 * 1024]);
+    const folder = `/opt/debateai-v3-preview/artifacts/lifecycle-current-${OLD}`;
+    expect(h.files[`${folder}/settings-activate-${STAMP}-deepinfra-remaining.json`]).toBe('{"enabled_models":[]}');
+    expect(Object.hasOwn(h.files, `${folder}/settings-activate-${STAMP}-anthropic-remaining.json`)).toBe(false);
+    expect(operatorCalls(h.calls)[0]!.argv.filter(part => /^(deepinfra|anthropic)=/.test(part))).toEqual([`deepinfra=${folder}/settings-activate-${STAMP}-deepinfra-remaining.json`]);
+  });
+
+  it('a forward switch\'s live check asks as the NEW release\'s pinned API identity', async () => {
+    const h = host({ realReader: true, apiIds: { [OLD]: { uid: 994, gid: 995 }, [NEW]: { uid: 1994, gid: 1995 } }, operator: () => result('DEBATEAI_SETTINGS_GATES_SERVE {"version":"21"}\n') });
+    expect(await checkSettingsGatesLive({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps })).toEqual({ version: 21, checked: true });
+    expect(h.log.filter(line => line.startsWith('remaining'))).toEqual([
+      'remaining deepinfra preview-team as --reuid=1994 --regid=1995', 'remaining anthropic preview-team as --reuid=1994 --regid=1995']);
+    expect(h.files[`${CURRENT_NEW}/settings-switch-${STAMP}-anthropic-remaining.json`]).toBe('{"enabled_models":["claude-haiku-5-5"]}');
+  });
+
+  it('the reader itself (real node, a real socket, setpriv left out): a 200 is the body; a refusal, an oversized answer or no gate is null', async () => {
+    // A short folder of its own: socket paths stay under the 104-byte limit and inside the socket pattern.
+    const dir = await mkdtemp('/tmp/remaining-');
+    const socket = join(dir, 'gate.sock');
+    const seen: string[] = [];
+    let answer: { status: number; body: string } = { status: 200, body: '{"enabled_models":["m"]}' };
+    const server = createServer((request, response) => {
+      let body = '';
+      request.on('data', chunk => { body += chunk; });
+      request.on('end', () => { seen.push(`${request.method} ${request.url} ${body}`); response.statusCode = answer.status; response.end(answer.body); });
+    });
+    const prefixes: string[][] = [];
+    // The server's runner, minus the setpriv prefix it would run under (this Mac or CI has no API account).
+    const run = (argv: string[], opts: Call['opts']) => { prefixes.push(argv.slice(0, argv.indexOf('--') + 1)); return common.runBounded(argv.slice(argv.indexOf('--') + 1), opts); };
+    const ask = () => readRemaining({ socket, scopeId: 'preview-team', identity: IDS.api, layout: LAYOUT, nodePath: process.execPath, run });
+    try {
+      await new Promise<void>(done => server.listen(socket, done));
+      expect(await ask()).toBe('{"enabled_models":["m"]}');
+      expect(seen).toEqual(['POST /remaining {"scope_id":"preview-team"}']);
+      answer = { status: 403, body: 'PEER_REFUSED' };
+      expect(await ask()).toBeNull();
+      answer = { status: 200, body: 'x'.repeat(64 * 1024 + 1) };
+      expect(await ask()).toBeNull();
+      await new Promise<void>(done => server.close(() => done()));
+      expect(await ask()).toBeNull();
+      expect(seen).toHaveLength(3);
+      expect(prefixes).toEqual(Array(4).fill(['/usr/bin/setpriv', '--reuid=1301', '--regid=1302', '--init-groups', '--inh-caps=-all', '--no-new-privs', '--']));
+    } finally {
+      server.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -17,7 +17,7 @@ const OWNER = testHttpIdentity("b7a-usage-owner");
 const NOW = new Date("2026-09-30T18:00:00.000Z");
 const window = (scope: PersonWindow["scope"], limitMicros: number, resetsAt: string): PersonWindow => Object.freeze({
   scope, limitMicros, periodStart: new Date("2026-09-29T09:00:00.000Z"), resetsAt: new Date(resetsAt),
-  finishBasisPoints: 11_000, closeBasisPoints: 9_500
+  finishBasisPoints: 12_100, closeBasisPoints: 9_500
 });
 
 function fixtureApplication(): AskApplication {
@@ -72,21 +72,21 @@ describe("B7a usage as a percentage (paid-plans spec §1.2, U1)", () => {
   it("reads each window's spend in [periodStart, resetsAt), and orders day, week, month", async () => {
     const reads: Array<[string, Date, Date]> = [];
     const windows = [
-      window("PERSON_MONTH", 5_000_000, "2026-10-29T09:00:00.000Z"),
-      window("PERSON_DAY", 1_000_000, "2026-10-01T09:00:00.000Z"),
-      window("PERSON_WEEK", 2_500_000, "2026-10-06T09:00:00.000Z")
+      window("PERSON_MONTH", 4_400_000, "2026-10-29T09:00:00.000Z"),
+      window("PERSON_DAY", 1_100_000, "2026-10-01T09:00:00.000Z"),
+      window("PERSON_WEEK", 2_200_000, "2026-10-06T09:00:00.000Z")
     ];
     const reader = new PersonUsageReader({
       entitlements: { current: async () => ({ planId: "PLUS" }) },
       allowance: { read: async () => windows },
-      spend: { readOwnerSpentMicros: async (ownerRef, from, to) => { reads.push([ownerRef, from, to]); return 400_000; } }
+      spend: { readOwnerSpentMicros: async (ownerRef, from, to) => { reads.push([ownerRef, from, to]); return 440_000; } }
     });
     await expect(reader.read("owner:a", NOW)).resolves.toEqual({
       planId: "PLUS",
       windows: [
         { scope: "PERSON_DAY", percent: 40, resetsAt: new Date("2026-10-01T09:00:00.000Z") },
-        { scope: "PERSON_WEEK", percent: 16, resetsAt: new Date("2026-10-06T09:00:00.000Z") },
-        { scope: "PERSON_MONTH", percent: 8, resetsAt: new Date("2026-10-29T09:00:00.000Z") }
+        { scope: "PERSON_WEEK", percent: 20, resetsAt: new Date("2026-10-06T09:00:00.000Z") },
+        { scope: "PERSON_MONTH", percent: 10, resetsAt: new Date("2026-10-29T09:00:00.000Z") }
       ]
     });
     expect(reads).toContainEqual(["owner:a", new Date("2026-09-29T09:00:00.000Z"), new Date("2026-10-01T09:00:00.000Z")]);
@@ -234,5 +234,30 @@ describe("B7a the API root supplies the room read and the usage read", () => {
     expect(buildApiCall(main)).toMatch(
       /\.\.\.\(\s*billingRouteOptions\s*===\s*undefined\s*\?\s*\{\s*\}\s*:\s*\{\s*billing\s*:\s*billingRouteOptions\s*\}\s*\)\s*,/u
     );
+  });
+});
+
+// Plan 2026-10-30 dig-model revision W3-2 (the owner's money rule, 31 Oct): running work that went past a day or week
+// borrowed from the next one, and the read names each run doing so ("we used {percent}% of tomorrow's allowance").
+describe("W3-2 the borrow notice on the usage read", () => {
+  it("maps each borrowing run to the wire, and the contract accepts the read", async () => {
+    const response = await usageRoute({
+      read: async () => Object.freeze({
+        planId: "PLUS" as const,
+        windows: [{ scope: "PERSON_DAY" as const, percent: 105, resetsAt: new Date("2026-10-09T00:00:00.000Z") }],
+        borrowed: [{ scope: "PERSON_DAY" as const, runRef: "run-b", percent: 5, nextWindowStartsAt: new Date("2026-10-09T00:00:00.000Z") }]
+      })
+    });
+    expect(response.statusCode).toBe(200);
+    expect(BillingUsageResponseSchema.parse(response.json())).toMatchObject({
+      borrowed: [{ scope: "PERSON_DAY", run_ref: "run-b", percent: 5, next_window_starts_at: "2026-10-09T00:00:00.000Z" }]
+    });
+  });
+
+  it("writes no member when nothing is borrowed", async () => {
+    const response = await usageRoute({
+      read: async () => Object.freeze({ planId: "PLUS" as const, windows: [], borrowed: [] })
+    });
+    expect(response.json()).not.toHaveProperty("borrowed");
   });
 });

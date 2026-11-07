@@ -161,8 +161,13 @@ export async function assertSelectedApiConnection(environment:Readonly<Record<st
 /**
  * The runner's twin of the check above: only the selected opaque runner URL, on the exact
  * preview cluster, as the restricted runner principal, then the same sealed publication identity.
- * Its ONLY role membership is debateai_runtime (measured 2026-10-09; 0110 grants none), so any
- * billing, erasure, staff, API, migrator or recovery membership refuses.
+ * Its role memberships are exactly debateai_rls_all_accounts and debateai_runtime: the production
+ * principals manifest's runner-runtime row (P3-01, directMemberships), since 0130's row security
+ * makes the runner read across accounts through the marker role (docs/releases/2026-10-23-row-level-security.md).
+ * The marker must also be usable without SET ROLE (granted INHERIT TRUE): every 0130 policy applies
+ * through inherited privileges, so a runner without it would start and see no rows. Any billing,
+ * erasure, staff, API, migrator or recovery membership refuses. (Until R22 the set was debateai_runtime
+ * alone, measured 2026-10-09; R22's first start refused on it, 2026-11-02.)
  */
 export async function assertSelectedRunnerConnection(environment:Readonly<Record<string,string>>,publication:RegisterPublicationReceipt) {
  const pool=new pg.Pool({connectionString:environment.DATABASE_URL,max:1,connectionTimeoutMillis:5000});
@@ -174,7 +179,8 @@ export async function assertSelectedRunnerConnection(environment:Readonly<Record
    AND NOT pg_has_role(current_user,'debateai_prod_api_runtime','MEMBER')
    AND NOT pg_has_role(current_user,'debateai_prod_migrator','MEMBER')
    AND (SELECT coalesce(array_agg(g.rolname::text ORDER BY g.rolname),ARRAY[]::text[]) FROM pg_roles g
-     WHERE g.oid<>r.oid AND pg_has_role(current_user,g.oid,'MEMBER'))=ARRAY['debateai_runtime']::text[]
+     WHERE g.oid<>r.oid AND pg_has_role(current_user,g.oid,'MEMBER'))=ARRAY['debateai_rls_all_accounts','debateai_runtime']::text[]
+   AND pg_has_role(current_user,'debateai_rls_all_accounts','USAGE')
    AND NOT has_schema_privilege(current_user,'identity','CREATE')
    AND NOT has_table_privilege(current_user,'identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
    AND NOT has_any_column_privilege(current_user,'identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,REFERENCES')

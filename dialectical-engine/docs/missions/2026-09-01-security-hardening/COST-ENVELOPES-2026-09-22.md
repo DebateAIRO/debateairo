@@ -19,12 +19,12 @@ Both are enforced only in the **hosted** deployment. Local mode — the command-
 
 | Setting | Value now | In dollars |
 |---|---|---|
-| `per_run_ceiling_micros` | 250 000 | 0.25 USD |
-| `daily_ceiling_micros` | 2 000 000 | 2.00 USD |
+| `per_run_ceiling_micros` | 250 000 | <amount> |
+| `daily_ceiling_micros` | 2 000 000 | <amount> |
 
 These are development values, and the register row says so about itself: it carries `provisional: true` and a `provisional_reason` naming V-28.
 
-They are **meant to stop things.** A normal full debate measured 114 model calls on 2026-09-17; at ordinary vendor prices that is dollars, not cents. So the first paid run will hit the per-run ceiling partway through, on purpose. That stop **is** the measurement: it produces a real spend figure, against a real vendor, for the price of a quarter. The daily ceiling of 2.00 USD is eight such runs — low enough that a mistake in the first days costs the price of a coffee, high enough that the per-run ceiling is what the first measurement exercises.
+They are **meant to stop things.** A normal full debate measured 114 model calls on 2026-09-17; at ordinary vendor prices that is dollars, not cents. So the first paid run will hit the per-run ceiling partway through, on purpose. That stop **is** the measurement: it produces a real spend figure, against a real vendor, for the price of a quarter. The daily ceiling of <amount> is eight such runs — low enough that a mistake in the first days costs the price of a coffee, high enough that the per-run ceiling is what the first measurement exercises.
 
 ## How the real numbers get sealed
 
@@ -87,4 +87,4 @@ Support-chat spend is **not** yet written there. The table and the daily sum are
 
 ## Update 2026-09-29: the waiting line and each person's windows
 
-Since the budget rule (spec 2026-09-28) and the paid plans (spec 2026-09-29), a spent day no longer refuses new debates: they wait in line and start by themselves at the reset, one per person. A running debate is measured against a shared wall at 115% of the day, or 110% of a person's window, and swaps to cheaper models before it stops arguing; the answer is always written. The refusal table above describes only register versions without the three budget members. The operator's description, the new codes (`ASK_ALREADY_WAITING`, `PERSON_ALLOWANCE_REACHED`, `RUN_CEILING_BELOW_ONE_CALL`, `BILLING_REQUIRES_ENVELOPE_MEMBERS`) and how to publish the members are in `deploy/vps/README.md`, "The cost envelopes".
+Since the budget rule (spec 2026-09-28) and the paid plans (spec 2026-09-29), a spent day no longer refuses new debates: they wait in line and start by themselves at the reset, one per person. A running debate is measured against a shared wall at <amount> of the day, or <amount> of a person's window, and swaps to cheaper models before it stops arguing; the answer is always written. The refusal table above describes only register versions without the three budget members. The operator's description, the new codes (`ASK_ALREADY_WAITING`, `PERSON_ALLOWANCE_REACHED`, `RUN_CEILING_BELOW_ONE_CALL`, `BILLING_REQUIRES_ENVELOPE_MEMBERS`) and how to publish the members are in `deploy/vps/README.md`, "The cost envelopes".

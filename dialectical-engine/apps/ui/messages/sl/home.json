@@ -13,7 +13,7 @@
   "home.publicDebates": "Javne razprave",
   "home.total": "SKUPAJ {count}",
   "home.signInHint": "Prijavite se ali zgoraj ustvarite račun, da si ogledate svoje razprave.",
-  "home.publicIndexingNotice": "Iskalniki lahko indeksirajo objavljene razprave. Kopije se lahko ohranijo tudi po umiku objave.",
+  "home.publicIndexingNotice": "Objavljene razprave lahko indeksirajo spletni iskalniki, kopije pa lahko ostanejo drugje.",
   "home.debateClaim": "Trditev razprave",
   "home.claimPlaceholder": "Vnesite trditev ali vprašanje za razpravo …",
   "home.composerHint": "Modeli argumentirajo · vi presodite",
@@ -75,8 +75,10 @@
   "home.turn": "Poteza {turn}",
   "home.sampleCoda": "Krog se tukaj konča. Nihče ni razglašen za zmagovalca. Prejmete prepis, dve oceni za vsako potezo in šibki člen, pri katerem ste popustili.",
   "home.closingTitle": "Vaš argument je močan le toliko kot njegov najšibkejši člen.",
-  "home.closingLede": "Opravite en krog. Štiri poteze, približno devet minut in prepis, ki vam natančno pokaže, kje ste nehali odgovarjati.",
-  "home.pricingCopy": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} na mesec plus davek. Kadar koli lahko prekličete.",
+  "home.closingLede": "Opravite en krog. Štiri poteze in prepis, ki vam natančno pokaže, kje ste nehali odgovarjati.",
+  "home.pricingCopyPlusTax": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} + {taxName} na mesec. Kadar koli lahko prekličete.",
+  "home.pricingCopyNoTax": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} na mesec brez dodanega davka. Kadar koli lahko prekličete.",
+  "home.pricingCopyChoose": "Začnite brezplačno. Plačljivi paketi se začnejo pri {price} na mesec, plus davek, kjer se uporablja. Kadar koli lahko prekličete.",
   "home.pricingCopyFree": "Začnite brezplačno. Kartica ni potrebna.",
   "home.pricingLink": "Oglejte si pakete",
   "home.card1Text": "Podjetja, ki poslujejo predvsem na daljavo, bi morala za inženirje, ki opravljajo enakovredno delo, praviloma uporabljati plačne razrede, neodvisne od lokacije, pri tem pa dopuščati pregledne prilagoditve zaradi zakonsko predpisanih stroškov, redkih znanj in obsega vloge.",
@@ -147,6 +149,5 @@
   "home.removal.close": "Zapri",
   "home.flag.underReview": "OZNAČENO · V PREGLEDU",
   "home.flag.approved": "ODOBRENO",
-  "home.flag.refused": "NI ODOBRENO",
-  "home.takeDown.button": "Umakni"
+  "home.flag.refused": "NI ODOBRENO"
 }

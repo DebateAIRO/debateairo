@@ -6,11 +6,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  PERPLEXITY_SEARCH_URL,
   PREVIEW_ANTHROPIC_BASE_URL,
   PREVIEW_DEEPINFRA_BASE_URL,
   PREVIEW_MODEL_ROWS,
+  PREVIEW_PROVIDER_NAMES,
   PREVIEW_REVIEWED_PROVIDER_REFS,
   PROVIDER_COMPANY_HOSTS,
+  assertPreviewTargetSet,
   parseProviderDiscoveryTargets,
   previewModelRowForRef,
   previewTargetJsonRow,
@@ -87,5 +90,27 @@ describe("providerCompaniesOfTargets (addition D24)", () => {
     const keys = [...(catalogue ?? "").matchAll(/\["([a-z]+)",/gu)].map((match) => match[1]);
     expect(keys).toEqual(["anthropic", "deepinfra"]);
     for (const company of new Set(Object.values(PROVIDER_COMPANY_HOSTS))) expect(keys, company).toContain(company);
+  });
+});
+
+// Perplexity plan 2026-10-30, task W2-1: web search is a search provider kind, never a model. It is no declared target,
+// so it is never a debater and never a panel member (apps/runner/src/provider-topology.ts makes every declared target
+// one), and it never comes into this list through the targets: the website lists Perplexity on every answer by itself
+// (apps/ui/lib/legal/pages.ts PERPLEXITY_PROVIDER, owner 2026-10-27).
+describe("web search is not a debater", () => {
+  it("no reviewed model row, provider name or connection is Perplexity's", () => {
+    expect(PREVIEW_PROVIDER_NAMES).not.toContain("perplexity");
+    for (const row of PREVIEW_MODEL_ROWS) {
+      expect(new URL(row.baseUrl).hostname, row.model).not.toBe(new URL(PERPLEXITY_SEARCH_URL).hostname);
+      expect(row.maker, row.model).not.toBe("Perplexity");
+    }
+    expect(Object.keys(PROVIDER_COMPANY_HOSTS)).not.toContain(new URL(PERPLEXITY_SEARCH_URL).hostname);
+  });
+
+  it("a declared target at the search host is refused on the preview, so search can never take a seat", () => {
+    const reviewed = reviewedTargets(PREVIEW_REVIEWED_PROVIDER_REFS);
+    const searchTarget = Object.freeze({ ...reviewed[0]!, baseUrl: "https://api.perplexity.ai" });
+    expect(() => assertPreviewTargetSet([searchTarget, ...reviewed.slice(1)])).toThrowError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    expect(providerCompaniesOfTargets(reviewed)).toEqual(["anthropic", "deepinfra"]);
   });
 });

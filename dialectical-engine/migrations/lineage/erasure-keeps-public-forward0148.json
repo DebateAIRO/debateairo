@@ -1,0 +1,17 @@
+{
+  "version": "erasure-keeps-public-forward0148-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0147_public_tree.sql",
+    "manifestSha256": "593dda11a04d75720fbcade16fba800296c01a39a0ba3bf7f2f07795d34fe80b",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0148_erasure_keeps_public.sql",
+    "sha256": "43d3fa36c10fcb93db4cb64eca37fdc53476817b4e0962790c3a2db5303f42c0"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

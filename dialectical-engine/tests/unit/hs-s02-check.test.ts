@@ -17,15 +17,26 @@ const paths = [
   ["question", "QUESTION"],
   ["answer.confidence_band", "SUMMARY"], ["answer.summary_segments[].text", "SUMMARY"],
   ["answer.badges[]", "SUMMARY"], ["answer.residual_objections[]", "SUMMARY"], ["answer.reversal_point", "SUMMARY"],
+  // Decision 13 of 31 Oct: the main answer a contribution updated, judged with the summary.
+  ["main_answer_update.segments[].text", "SUMMARY"],
+  // Decisions 13 and 16: a report on a public debate, judged part by part, each part beside its kind.
+  ["reports[].answer.segments[]", "SUMMARY"],
   ...["claim", "base_score.kind", "base_score.source", "base_score.producer", "base_score.replay_handle",
     "final_strength.kind", "final_strength.source", "final_strength.producer", "final_strength.replay_handle",
     "locator", "abstention.question_class", "abstention.register_row_key", "abstention.unlock_condition"]
     .map(p => [`answer.nodes[].${p}`, "ARGUMENTS"]),
   // Debate shape P2c: the map view's public text, judged with the arguments.
   ["map_view.positions[].answer", "ARGUMENTS"], ["map_view.also_raised[]", "ARGUMENTS"],
+  // Plan 2026-10-30 W1-6: a point's web sources, judged with the arguments.
+  ...["quote", "title", "site", "link", "explanation.text"].map(p => [`answer.nodes[].sources[].${p}`, "ARGUMENTS"]),
+  // Decision 13: a contribution's path text, judged with the arguments.
+  ...["line", "summary", "what_changed[]", "dig_paths[].line", "dig_paths[].points[]"].map(p => [`contributions[].${p}`, "ARGUMENTS"]),
+  ...["sources[].site", "sources[].title", "sources[].quote", "sources[].line", "sources[].link", "paths[].line", "paths[].summary", "paths[].points[].text",
+    "paths[].dig.picks[]", "paths[].dig.own_words[]", "paths[].dig.view.reason", "paths[].dig.changed[]"].map(p => [`reports[].${p}`, "ARGUMENTS"]),
   ["answer.nodes[].review.reasons[]", "REVIEWS"],
   ...["headline", "summary", "confidence", "paths[].line", "change.text", "reviewer_note.text"]
-    .map(p => [`story_short.${p}`, "STORY"])
+    .map(p => [`story_short.${p}`, "STORY"]),
+  ...["story.short_answer", "story.what_would_change", "story.how_it_went[].paragraph", "story.still_open[]"].map(p => [`reports[].${p}`, "STORY"])
 ] as const;
 const kinds = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"];
 function setPath(root: Record<string, any>, path: string, value: string) {
@@ -104,12 +115,14 @@ describe("R2", () => {
   // transport + provider_ref from the two public lineages — 4 string leaves, both subtrees R2-excluded: 62 → 58, 36 → 32.
   // Debate shape P2c: map_view adds 3 string leaves — positions[].answer and also_raised[] checked,
   // positions[].node_id excluded: 58 → 61, 32 → 33, 26 → 28 checked paths.
-  it("covers the schema with 28 checked paths and 33 excluded strings", async () => {
+  // Plan 2026-10-30 W1-6: a point's web sources add 7 string leaves — quote, title, site, link and explanation.text
+  // checked, extract_id and published_on excluded: 61 → 68, 33 → 35, 28 → 33 checked paths.
+  it("covers the schema with 56 checked paths and 45 excluded strings", async () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     expect(m.CHECKED_TEXT_PATHS).toEqual(paths.map(([path, kind]) => ({ path, kind })));
     const leaves = walk(PublicDebateSchema).filter(l => l.type === "string");
-    expect(leaves).toHaveLength(61);
-    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(33);
+    expect(leaves).toHaveLength(101);
+    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(45);
     for (const leaf of walk(PublicDebateSchema)) {
       const checked = m.CHECKED_TEXT_PATHS.some(p => p.path === leaf.path);
       expect(Number(checked) + Number(m.isExcludedTextPath(leaf.path, leaf.type)), leaf.path).toBe(1);
@@ -122,8 +135,8 @@ describe("R2", () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     const leaves = m.extractCheckedText(snapshot(true));
     const expected = paths.flatMap(([path, kind]) => tuples(path, 2).map(t => ({ kind, text: markerOf(path, t) })));
-    // 28 paths: 8 without an array, 19 with one array (2 members each), 1 with two nested arrays (4 members).
-    expect(expected).toHaveLength(8 + 19 * 2 + 1 * 4);
+    // 56 paths: 8 without an array, 24 with one array (2 members each), 19 with two nested arrays (4 members), 5 with three (8 members).
+    expect(expected).toHaveLength(8 + 24 * 2 + 19 * 4 + 5 * 8);
     expect(leaves).toEqual(expected);
     const calls = m.packJudgeCalls(leaves);
     // FIX-HS2-t: one part kind per call — five kinds, five calls, one field each.
@@ -665,6 +678,65 @@ describe("check", () => {
       const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record() {} } });
       expect(await check.check({ runId, snapshot: { question: "q" } as PublicDebate })).toEqual({ outcome: "ALLOW" });
     });
+  // R22, the first-run measure: what a check's calls used goes to its own row, and only when the judge was called.
+  describe("recordUsage", () => {
+    type Usage = Readonly<{ input_tokens?: number; output_tokens?: number; cost_usd?: number }>;
+    /** Answers ALLOW on every call and reports `usage(n)` for its n-th call. */
+    const usageJudge = async (usage: (call: number) => Usage | undefined) => {
+      const { bindJudgeAnswer } = await import("../support/hs-s02-judge-stub.js");
+      const judge = { providerRef: "test:judge", modelId: "test-model", calls: 0,
+        async complete({ packet }) { const call = judge.calls++; return { text: bindJudgeAnswer(JSON.stringify(allow), packet), usage: usage(call) }; } } as PublicationJudgePort & { calls: number };
+      return judge;
+    };
+    const twoParts = { question: "q", answer: { summary_segments: [{ text: "s" }] } } as unknown as PublicDebate;
+
+    it("receives the sums across the check's calls, with its subject, time and call count", async () => {
+      const c = await import("../../apps/api/src/publication-check/check.js");
+      const judge = await usageJudge(call => ({ input_tokens: 100 + call, output_tokens: 10 + call, cost_usd: 0.25 }));
+      const recordUsage = vi.fn(async () => {});
+      const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record() {} }, recordUsage });
+      expect(await check.check({ runId, snapshot: twoParts })).toEqual({ outcome: "ALLOW" });
+      expect(judge.calls).toBe(2);
+      expect(recordUsage.mock.calls).toEqual([[{ subject_id: runId, attempted_at: now, judge_call_count: 2, input_tokens: 201, output_tokens: 21, cost_usd: 0.5 }]]);
+    });
+
+    it("a figure the judge never reported stays null, not zero; one call's silence does not lose the other's", async () => {
+      const c = await import("../../apps/api/src/publication-check/check.js");
+      const silent = vi.fn(async () => {});
+      const quiet = c.createPublicationContentCheck({ judge: await usageJudge(() => undefined).then(judge => () => judge), clock: () => now, deadlineMs: D, recorder: { async record() {} }, recordUsage: silent });
+      await quiet.check({ runId, snapshot: twoParts });
+      expect(silent.mock.calls).toEqual([[{ subject_id: runId, attempted_at: now, judge_call_count: 2, input_tokens: null, output_tokens: null, cost_usd: null }]]);
+      const partly = vi.fn(async () => {});
+      const judge = await usageJudge(call => call === 0 ? { input_tokens: 7 } : undefined);
+      await c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record() {} }, recordUsage: partly }).check({ runId, snapshot: twoParts });
+      expect(partly.mock.calls).toEqual([[{ subject_id: runId, attempted_at: now, judge_call_count: 2, input_tokens: 7, output_tokens: null, cost_usd: null }]]);
+    });
+
+    it("gets nothing when no judge call was made", async () => {
+      const c = await import("../../apps/api/src/publication-check/check.js");
+      const recordUsage = vi.fn(async () => {});
+      const check = c.createPublicationContentCheck({ judge: () => null, clock: () => now, deadlineMs: D, recorder: { async record() {} }, recordUsage });
+      expect(await check.check({ runId, snapshot: twoParts })).toEqual({ outcome: "UNAVAILABLE", cause: "JUDGE_NOT_CONFIGURED" });
+      expect(recordUsage).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["rejects", async () => { throw new Error("usage row refused"); }],
+      ["throws before it returns", () => { throw new Error("usage row refused"); }]
+    ] as const)("one that %s does not change the check's result, and the record is still written", async (_how, recordUsage) => {
+      const c = await import("../../apps/api/src/publication-check/check.js");
+      const allowed = await usageJudge(() => ({ input_tokens: 1 }));
+      const rows: PublicationCheckRecord[] = [];
+      const check = c.createPublicationContentCheck({ judge: () => allowed, clock: () => now, deadlineMs: D, recorder: { async record(row) { rows.push(row); } }, recordUsage });
+      expect(await check.check({ runId, snapshot: twoParts })).toEqual({ outcome: "ALLOW" });
+      expect(rows).toMatchObject([{ outcome: "ALLOW", judge_call_count: 2 }]);
+      // A refusal stays a refusal, too.
+      const { createPartJudgeStub } = await import("../support/hs-s02-judge-stub.js");
+      const refusing = c.createPublicationContentCheck({ judge: () => createPartJudgeStub({ question: JSON.stringify(block) }), clock: () => now, deadlineMs: D, recorder: { async record() {} }, recordUsage });
+      expect(await refusing.check({ runId, snapshot: twoParts })).toMatchObject({ outcome: "BLOCK" });
+    });
+  });
+
   // Property: a refused record write cannot resolve as ALLOW.
   it("propagates recorder failure", async () => {
     const c = await import("../../apps/api/src/publication-check/check.js");

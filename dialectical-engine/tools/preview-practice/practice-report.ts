@@ -19,6 +19,8 @@ import {
   type PracticeLanguageNotRun
 } from "./practice-language.js";
 import { practiceInvestigationLines, type PracticeInvestigationBlock } from "./practice-investigations.js";
+import { practiceRewriteLines, type PracticeRewriteBlock } from "./practice-rewrites.js";
+import { practiceWebLines, type PracticeWebBlock } from "./practice-web.js";
 import { practiceJudgeOrderLines } from "./practice-judge-order.js";
 import { practiceJudgesLines, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlockLines, type PracticeLengthBlock } from "./practice-length.js";
@@ -406,6 +408,7 @@ export function debateReport(input: Readonly<{
     busyModels: busyDuringRun,
     shapeNotExercised: r.shape === undefined || r.shape.notExercised === null ? [] : [r.shape.notExercised],
     pinsNotHeld: r.writerPins === undefined ? [] : practicePinsNotHeld(r.writerPins),
+    unmappedCallSites: r.unmappedCallSites ?? [],
     unbilledRefusals: GATES.reduce((sum, gate) => sum + input.observer.summary(gate).unbilled, 0),
     p90ByModel: Object.fromEntries(Object.entries(r.byModelAndSite.reduce<Record<string, number>>((acc, row) => {
       if (row.latencyMs.p90 !== null) acc[row.model] = Math.max(acc[row.model] ?? 0, row.latencyMs.p90);
@@ -434,6 +437,9 @@ export function debateReport(input: Readonly<{
     ...(r.language === undefined ? {} : { language: r.language }),
     // R2 (E12, E13): the "cannot assess" reviews and the investigations; absent only when the debate was never admitted.
     ...(r.investigations === undefined ? {} : { investigations: r.investigations }),
+    // W5-2: the web table and the rewrite table; absent when the run left no web row / had no dig (today's keys).
+    ...(r.web === undefined ? {} : { web: r.web }),
+    ...(r.rewrites === undefined ? {} : { rewrites: r.rewrites }),
     // Engine redesign R2 (B11): the four members, only when the debate ran on engine 2; absent otherwise (today's keys).
     ...(r.judges === undefined ? {} : r.judges),
     admission: r.admission,
@@ -529,6 +535,13 @@ export function reportMarkdown(report: PracticeReport): string {
   const investigations = report.mode === "debate" && typeof report.investigations === "object" && report.investigations !== null
     ? report.investigations as PracticeInvestigationBlock : undefined;
   if (investigations !== undefined) lines.push(...practiceInvestigationLines(investigations, usd));
+  // W5-2: the web table per path and the rewrite table per dig, only when the report has them.
+  if (report.mode === "debate" && typeof report.web === "object" && report.web !== null) {
+    lines.push(...practiceWebLines(report.web as PracticeWebBlock, usd));
+  }
+  if (report.mode === "debate" && typeof report.rewrites === "object" && report.rewrites !== null) {
+    lines.push(...practiceRewriteLines(report.rewrites as PracticeRewriteBlock, usd));
+  }
   // Engine redesign R2 (B11): the comparing judges' block, only when the report has it (engine 2).
   if (report.mode === "debate" && Array.isArray(report.judgeVotes)) {
     lines.push(...practiceJudgesLines({

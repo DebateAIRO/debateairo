@@ -33,6 +33,7 @@ import {
   previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
+  previewTargetChargePrice,
   previewTargetGatewayControls,
   previewTargetJsonRow,
   providerTargetGatewayControls,
@@ -42,7 +43,9 @@ import {
   withPreviewProviderCallPolicy,
   withStructureRepair,
   type PreviewProviderTestConfig,
-  type ProviderDiscoveryTarget
+  type ProviderCallRequest,
+  type ProviderDiscoveryTarget,
+  type ProviderGateway
 } from "@debateai/providers";
 import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
@@ -99,6 +102,8 @@ import {
   type StubUsage
 } from "./preview-gate-stubs.js";
 import { clearPendingRunId, fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
+import { runnerPoolOrSuperuser, shareContentCipher } from "./rls-logins.js";
+import type { TestDatabase } from "./testDatabase.js";
 
 export const GLM = "zai-org/GLM-5.3-Flash";
 export const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -212,11 +217,35 @@ export type AdmittedRun = Awaited<ReturnType<ReturnType<typeof previewDebateHarn
  * The harness over the caller's migrated database pool (read when called, so a `beforeAll` may start it) and the
  * caller's list of stub closers (closed by the caller's `afterEach`).
  */
+/** Decision 12: what another release's sealed wording sent: other bytes, under another contract hash. */
+export const OLDER_RELEASE_HASH = "older-release-sealed-contracts";
+export const olderReleaseWording = (request: ProviderCallRequest): ProviderCallRequest => {
+  const messages = request.packet.messages.map((message, index) => index === 0
+    ? { ...message, content: `Older wording of this instruction.\n${message.content}` } : message);
+  return { ...request, contractHash: OLDER_RELEASE_HASH, packet: Object.assign({}, request.packet, { messages }) };
+};
+
 export function previewDebateHarness(input: Readonly<{
   pool: () => Pool;
   stubClosers: (() => Promise<void>)[];
+  /**
+   * Upload check Task 7 (R21): the database `pool` belongs to. With it, the runner, its gateways and its story writer
+   * run on the production runner login in login mode (tests/support/rls-logins.ts, runnerPoolOrSuperuser), with the
+   * content cipher `pool` carries; admission, seeding and the read-backs stay on `pool`. Without it (a per-variant
+   * copy of the database), everything runs on `pool`, as before.
+   */
+  database?: () => TestDatabase;
 }>) {
   const pool = input.pool;
+  let runnerLogin: Promise<Pool> | undefined;
+  /** The runner's pool: one per harness, made on the first runner (so a `beforeAll` may start the database first). */
+  async function runnerPool(): Promise<Pool> {
+    if (input.database === undefined) return pool();
+    runnerLogin ??= runnerPoolOrSuperuser(input.database(), pool());
+    const own = await runnerLogin;
+    // A cipher `pool` was given after the first runner still reaches the runner's login.
+    return own === pool() ? own : shareContentCipher(pool(), own);
+  }
 
   /**
    * Both preview gates over real unix sockets, speaking the gate's RPC protocol (startPreviewGateStubs). Without
@@ -353,6 +382,11 @@ export function previewDebateHarness(input: Readonly<{
       noDigest?: boolean;
       /** Side-by-side spec §3 (B6): the release this runner runs as, as main.ts passes RELEASE_KEY; absent, `legacy`. */
       releaseKey?: string;
+      /**
+       * Decision 12 (the hand-over): each call as another release's sealed wording would have sent it, recorded so.
+       * Absent: the wording of this code.
+       */
+      reword?: (request: ProviderCallRequest) => ProviderCallRequest;
       /** Side-by-side spec §4 (B8): the retirement signal, as main.ts passes it; absent, the runner never retires. */
       retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
       /**
@@ -369,6 +403,7 @@ export function previewDebateHarness(input: Readonly<{
       perVersion?: Readonly<{ cache: RunnerSettingsCache; versions: RunSettingsVersions; site: RunnerSiteContext }>;
     }> = {}
   ) {
+    const own = await runnerPool();
     const perVersion = options.perVersion;
     const siteVersionSettings = perVersion === undefined ? undefined : perVersion.cache.loaded(perVersion.site.siteVersion);
     if (perVersion !== undefined && siteVersionSettings === undefined) {
@@ -432,7 +467,8 @@ export function previewDebateHarness(input: Readonly<{
     gates.remainingReads.splice(bootReads);
     const busy = createPreviewBusyCoordinator();
     const versionSeams = (target: ProviderDiscoveryTarget) => {
-      const price = providerTargetPrice(target);
+      // F4 (W2-2), as the runner: a reviewed Anthropic row's calls at the vendor's real prices.
+      const price = previewTargetChargePrice(true, target, providerTargetPrice(target));
       return runGuard === null || price === null ? {} : {
         buildCostEnvelopeSeam: (runId: string, phase: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[1],
           sharedWall: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[2]) =>
@@ -440,8 +476,10 @@ export function previewDebateHarness(input: Readonly<{
         buildStoryCostEnvelopeSeam: (runId: string) => runGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
       };
     };
-    const targetGateway = (target: ProviderDiscoveryTarget) => withPreviewProviderCallPolicy(
-      createPostgresProviderGateway(pool(), {
+    const reworded = (gateway: ProviderGateway): ProviderGateway => options.reword === undefined ? gateway
+      : Object.freeze({ call: (request: ProviderCallRequest) => gateway.call(options.reword!(request)) });
+    const targetGateway = (target: ProviderDiscoveryTarget) => reworded(withPreviewProviderCallPolicy(
+      createPostgresProviderGateway(own, {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
         ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight,
         ...(options.money === undefined ? {} : {
@@ -457,7 +495,7 @@ export function previewDebateHarness(input: Readonly<{
           thinkingLevelsOf: runPreviewThinkingLevelsOf(perVersion.cache, perVersion.versions, perVersion.site.siteVersion)
         })
       }
-    );
+    ));
     // LG-A (final review I-1): main.ts's order when the route is asked for; otherwise each target's gateway as before.
     const targetGateways = options.structureRepair === true
       ? new Map(TARGETS.map((target) => [target.providerRef, targetGateway(target)] as const)) : null;
@@ -466,7 +504,7 @@ export function previewDebateHarness(input: Readonly<{
     const topology = createRunnerProviderTopology(TARGETS, (target) => targetGateways === null ? targetGateway(target)
       : withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
     const story = new StoryWriter({
-      pool: pool(), pack: PACK,
+      pool: own, pack: PACK,
       // Ruling R36 (per version): no boot policy; every write carries its own debate's version's story policy.
       ...(perVersion === undefined ? { policy: STORY_POLICY } : {}),
       hosted: perVersion?.site.deploymentMode === "hosted", log: () => undefined,
@@ -505,7 +543,7 @@ export function previewDebateHarness(input: Readonly<{
       assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
     }
     const fixture = fixtureSettings();
-    const runner = new WalkingSkeletonRunner(pool(), topology.primary.provider, {
+    const runner = new WalkingSkeletonRunner(own, topology.primary.provider, {
       ...fixture,
       ...(options.stoppingPolicy === undefined ? {} : {
         stoppingPolicy: { ...fixture.stoppingPolicy!, delta: options.stoppingPolicy.delta, epsilon: options.stoppingPolicy.epsilon }

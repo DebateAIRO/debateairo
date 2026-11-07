@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Не може да се създаде дебат",
   "newDebate.sessionReadFailed": "Четенето на сесията не бе успешно",
   "newDebate.planRosterFailed": "Неуспешно четене на списъка с нива на план",
-  "newDebate.checkingSession": "Проверка на сесията…",
+  "newDebate.checkingSession": "Един момент…",
   "newDebate.redirectingToSignIn": "Пренасочваме Ви към страницата за влизане…",
   "newDebate.continueToSignIn": "Продължете към влизането",
   "newDebate.defaultUnavailable": "Разгръщането няма валиден ред riskTier; полето „Ниво на риск“ очаква въвеждане.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Достигнахте днешния лимит на плана си. Все още можете да зададете въпрос: дебатът ви ще започне сам в {time}.",
   "newDebate.room.personWeekFullTopPlan": "Достигнахте лимита на плана си за тази седмица. Все още можете да зададете въпрос: дебатът ви ще започне сам на {time}.",
   "newDebate.room.personMonthFullTopPlan": "Достигнахте лимита на плана си за този месец. Все още можете да зададете въпрос: дебатът ви ще започне сам на {time}.",
-  "newDebate.room.freeMonthFull": "Използвахте безплатните дебати за този месец. Следващият ви дебат може да започне на {time} или изберете план, за да продължите сега.",
+  "newDebate.room.freeMonthFull": "Използвахте безплатната си квота за този месец. Следващият ви дебат може да започне на {time} или изберете план, за да продължите сега.",
   "newDebate.room.personClose": "Близо сте до лимита на плана си. Този дебат ще се проведе изцяло.",
   "newDebate.room.ownDebatesFull": "Другите ви дебати засега използват остатъка от лимита ви. Този дебат ще започне сам веднага щом някой от тях приключи.",
   "newDebate.room.upgradeLink": "Вижте плановете",
@@ -133,5 +133,10 @@
   "newDebate.plan.current.FREE": "Вашият план: Безплатен",
   "newDebate.plan.current.PLUS": "Вашият план: Plus",
   "newDebate.plan.current.PRO": "Вашият план: Pro",
-  "newDebate.plan.current.MAX": "Вашият план: Max"
+  "newDebate.plan.current.MAX": "Вашият план: Max",
+  "newDebate.askText.otherAnswer": "Друг отговор…",
+  "newDebate.askText.otherLabel": "Собствено допълнително уточнение",
+  "newDebate.askText.matters": "Ако отговорите сочат в различни посоки, най-важното за мен е: {matters}",
+  "newDebate.askText.angles": "Моля, разгледайте също: {list}.",
+  "newDebate.freePublicNotice": "При плана „Безплатен“ въпросът Ви и дебатът по него са публични. Не включвайте лични данни."
 }

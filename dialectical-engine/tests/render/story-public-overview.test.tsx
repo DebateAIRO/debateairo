@@ -79,55 +79,78 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
-  it("shows the short story in the question's language in place of the summary paragraphs", async () => {
+/*
+ * The owner's screen review of 3 Nov 2026 rebuilt the public page answer-first in V4's look (public-d1 A). The short story still reads in the question's
+ * language (spec §14.3): its headline and summary lead the answer card, its reservation line and "Worth knowing" note keep the question's words, and each
+ * path is a row. What the page no longer shows (public-f1, r2-20 A): the verdict's label pill, the generic "confidence · …" words, and the outcome tags
+ * ("Held up", "Partly held", "Fell") on the paths.
+ */
+describe("public page short story (spec §10, R2 §14.2-§14.3; public-d1 A)", () => {
+  it("shows the short story in the question's language in place of the summary paragraphs, its paths as rows", async () => {
     const container = await render(STORY);
-    const verdict = container.querySelector(".publicVerdictText")!;
-    const text = verdict.textContent ?? "";
+    const card = container.querySelector(".v4PubAnswer")!;
+    const text = card.textContent ?? "";
     expect(text).toContain(STORY.headline);
     expect(text).toContain(STORY.summary);
-    expect(text).toContain(ro("public.story.fate.heldUp"));
-    expect(text).toContain(ro("public.story.fate.partlyHeld"));
-    expect(text).toContain(ro("public.story.fate.fell"));
-    expect(text).toContain("Mutare treptată, cu lucru hibrid: cea mai bună variantă.");
-    expect(text).toContain(ro("public.story.changeLead"));
-    expect(text).toContain(ro("public.story.noteTitle"));
     expect(text).not.toContain("The old two-paragraph summary.");
-    for (const english of ["Held up", "Partly held", "What would change the answer", "Worth knowing", "Reviewer"]) {
-      expect(text).not.toContain(english);
-    }
-    const story = verdict.querySelector('.publicStory[data-ai-generated="true"]');
+    const story = card.querySelector('[data-public-story][data-ai-generated="true"]');
     expect(story?.getAttribute("lang")).toBe("ro");
-    expect(story?.getAttribute("dir")).toBe("ltr");
+    expect(story?.getAttribute("dir")).toBe("auto");
+    // Each path is a row, its words as the AIs wrote them, in the question's language.
+    const rows = [...container.querySelectorAll("[data-public-path]")];
+    expect(rows.map((row) => row.getAttribute("data-public-path"))).toEqual(["n-hybrid", "n-yes", "n-not-now"]);
+    expect(rows[0]!.querySelector(".v4PubRowTitle")!.getAttribute("lang")).toBe("ro");
+    expect(rows[0]!.textContent).toContain("Mutare treptată, cu lucru hibrid");
+    // What would change the answer is an open question under the question itself, in the question's words.
+    expect(text).toContain("Răspunsul s-ar schimba dacă angajatorul refuză lucrul hibrid.");
+    expect(container.querySelector(".storyFate, .publicStory")).toBeNull();
   });
 
-  it("shows the storyteller's confidence sentence instead of the generic confidence words", async () => {
+  it("shows no outcome tags: a path that fell says \"Didn't hold\", the others carry no word without a published tree", async () => {
     const container = await render(STORY);
-    expect(container.querySelector(".publicStory .storyConfidence")?.textContent).toBe(STORY.confidence);
+    const text = container.textContent ?? "";
+    for (const fate of ["heldUp", "partlyHeld", "fell", "setAside"]) {
+      expect(container.querySelector(`[data-fate]`)).toBeNull();
+      expect(text).not.toContain(publicEnglish[`public.story.fate.${fate}` as keyof typeof publicEnglish]);
+    }
+    const fell = container.querySelector('[data-public-path="n-not-now"]')!;
+    expect(fell.querySelector(".v4MapTrust")!.textContent).toBe("Didn't hold");
+    expect(container.querySelector('[data-public-path="n-hybrid"] .v4MapTrust')).toBeNull();
+  });
+
+  it("shows the storyteller's confidence sentence, never the generic confidence words", async () => {
+    const container = await render(STORY);
+    expect(container.querySelector(".v4PubAnswer")!.textContent).toContain(STORY.confidence);
     expect(container.querySelector(".publicThresholdLabel")).toBeNull();
+    expect(container.textContent).not.toMatch(/confidence ·/u);
   });
 
-  it("words the label in human words, in the question's language", async () => {
-    const container = await render(STORY);
-    const pill = container.querySelector("#public-verdict-label")!;
-    expect(pill.textContent).toBe(ro("public.story.label.contested"));
-    expect(pill.getAttribute("lang")).toBe("ro");
-    expect(pill.getAttribute("data-verdict")).toBe("contested");
+  it("shows no verdict label pill and never the state's code (public-f1)", async () => {
+    for (const storyShort of [STORY, undefined]) {
+      const container = await render(storyShort);
+      expect(container.querySelector("#public-verdict-label")).toBeNull();
+      expect(container.textContent).not.toContain(ro("public.story.label.contested"));
+      expect(container.textContent).not.toContain(publicEnglish["public.story.label.contested"]);
+      expect(container.textContent).not.toContain("CONTESTED");
+      expect(container.textContent).not.toContain("CAPPED");
+      await act(async () => root!.unmount());
+      root = null;
+      document.body.replaceChildren();
+    }
   });
 
-  it("falls back to today's summary paragraphs, label and confidence for a snapshot without a story", async () => {
+  it("falls back to today's summary paragraphs for a snapshot without a story, with no label and no confidence words", async () => {
     const container = await render(undefined);
-    const text = container.querySelector(".publicVerdictText")?.textContent ?? "";
+    const text = container.querySelector(".v4PubAnswer")?.textContent ?? "";
     expect(text).toContain("The old two-paragraph summary.");
-    expect(text).not.toContain(ro("public.story.changeLead"));
-    expect(container.querySelector(".publicStory")).toBeNull();
-    // R2 B8 fix 1: the label in words (the reader's catalogue), never the state's code.
-    expect(container.querySelector("#public-verdict-label")?.textContent).toBe(publicEnglish["public.story.label.contested"]);
-    expect(container.querySelector(".publicThresholdLabel")?.textContent).toBe("confidence · capped");
+    expect(container.querySelector("[data-public-story]")).toBeNull();
+    expect(container.querySelectorAll("[data-public-path]")).toHaveLength(0);
+    // The reversal point is what could change the answer.
+    expect(text).toContain("O locuință mai ieftină în Cluj.");
+    expect(container.textContent).not.toMatch(/confidence ·|capped/iu);
   });
 
-  it("words every state's label without a story, and never prints the state's code (R2 B8 fix 1)", async () => {
-    // R2b final wave P8 (B8 re-review Minor 1): an English interface and a Romanian one, each in its own words.
+  it("words no state at all, in either interface language (R2 B8 fix 1, public-f1)", async () => {
     for (const interfaceCatalog of [publicEnglish, publicRomanian]) for (const [state, key] of [
       ["SUPPORTED", "public.story.label.supported"], ["CONTESTED", "public.story.label.contested"],
       ["UNSUPPORTED", "public.story.label.unsupported"], ["SPLIT", "public.story.label.split"]
@@ -138,8 +161,8 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
         <PublicDebateOverview debate={debate} catalog={interfaceCatalog} storyCatalog={publicRomanian} storyLocale="ro"
           onDetails={() => undefined} onRead={() => undefined} />
       );
-      expect(container.querySelector("#public-verdict-label")?.textContent).toBe(words[key]);
-      expect(container.querySelector("#public-verdict-label")?.getAttribute("data-verdict")).toBe(state.toLowerCase());
+      expect(container.querySelector("#public-verdict-label")).toBeNull();
+      expect(container.textContent).not.toContain(words[key]);
       expect(container.textContent).not.toContain(state);
       await act(async () => root!.unmount());
       root = null;
@@ -147,17 +170,20 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
     }
   });
 
-  it("leaves out the note box when the story has none, and shows no reservation for a story without the flag", async () => {
+  it("shows the reviewer's note in the question's words, and leaves it out when the story has none", async () => {
     const withNote = await render(STORY);
-    expect(withNote.querySelector('.storyBox[data-box="note"]')).not.toBeNull();
-    expect(withNote.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
+    const note = withNote.querySelector("[data-public-note]")!;
+    expect(note.textContent).toContain(ro("public.story.noteTitle"));
+    expect(note.textContent).toContain("Chiria poate fi mai mică într-un cartier mai ieftin.");
+    expect(note.querySelector(".v4PubWorthTitle")!.getAttribute("lang")).toBe("ro");
+    expect(withNote.querySelector("[data-public-reservation]")).toBeNull();
     expect(withNote.textContent).not.toContain(ro("public.story.reservation"));
     await act(async () => root!.unmount());
     root = null;
     document.body.replaceChildren();
     const container = await render({ ...STORY, reviewer_note: null });
-    expect(container.querySelector('.storyBox[data-box="note"]')).toBeNull();
-    expect(container.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
+    expect(container.querySelector("[data-public-note]")).toBeNull();
+    expect(container.querySelector("[data-public-reservation]")).toBeNull();
   });
 
   /**
@@ -168,23 +194,23 @@ describe("public page short story (spec §10, R2 §14.2-§14.3)", () => {
    */
   it("shows the gentle reservation line, in the question's language, for a story that was not fully double-checked", async () => {
     const container = await render({ ...STORY, double_checked: false });
-    const box = container.querySelector('.publicStory .storyBox[data-box="reservation"]');
-    expect(box?.textContent).toBe(ro("public.story.reservation"));
-    expect(box?.closest(".publicStory")?.getAttribute("lang")).toBe("ro");
+    const line = container.querySelector("[data-public-reservation]");
+    expect(line?.textContent).toBe(ro("public.story.reservation"));
+    expect(line?.getAttribute("lang")).toBe("ro");
     expect(container.textContent).not.toContain("Parts of this summary could not be fully double-checked.");
-    // The reviewer's note is still its own box.
-    expect(container.querySelector('.storyBox[data-box="note"]')).not.toBeNull();
+    // The reviewer's note is still its own line.
+    expect(container.querySelector("[data-public-note]")).not.toBeNull();
   });
 
   it("shows no reservation line for a story marked double-checked", async () => {
     const container = await render({ ...STORY, double_checked: true });
-    expect(container.querySelector('.storyBox[data-box="reservation"]')).toBeNull();
+    expect(container.querySelector("[data-public-reservation]")).toBeNull();
     expect(container.textContent).not.toContain(ro("public.story.reservation"));
   });
 
   it("prints model text literally, never as markup", async () => {
     const container = await render({ ...STORY, headline: "<script>alert(\"story\")</script>" });
-    expect(container.querySelector(".publicStory .storyHeadline")?.textContent).toBe("<script>alert(\"story\")</script>");
+    expect(container.querySelector("[data-public-story] .v4AnswerHeadline")?.textContent).toBe("<script>alert(\"story\")</script>");
     expect(container.querySelector("script")).toBeNull();
   });
 });

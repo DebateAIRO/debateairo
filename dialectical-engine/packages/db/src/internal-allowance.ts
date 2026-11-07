@@ -4,19 +4,27 @@ import type { InternalAllowanceConfigure, InternalAllowancePolicy, InternalAllow
   InternalGrant, InternalRunFundingState, SecurityReceipt, StaffContext } from "@debateai/kernel";
 import { guardedAuthorityQuery } from "./staff-access.js";
 import type { StaffMutation } from "./staff-access.js";
+import { readTeamRoom, type TeamRoom } from "./team-limit.js";
 
 export type SelectedInternalAllowancePolicy = Readonly<{
   registerVersion: number;
   policy: Extract<InternalAllowancePolicy, { enabled: true }>;
 }>;
 export type InternalAllowanceCommandState = Readonly<{ ownerRef: string; expectedRevision: number; policyRegisterVersion: number }>;
-export type InternalAllowanceConfigureCommand = StaffMutation & InternalAllowanceConfigure;
-export type InternalAllowanceRevokeCommand = StaffMutation & InternalAllowanceRevoke;
+/** Decision 32: the state a member's ceremony is bound to, for the API only. `keyUserId`: the account their alert is sealed for. */
+export type MemberAllowanceCommandState = InternalAllowanceCommandState & Readonly<{ keyUserId: string }>;
+export type AllowanceNoticeClaim = Readonly<{ notice_id: string; kind: "ALLOWANCE_CHANGED" | "ALLOWANCE_YOURS"; recipient_staff_id: string; claim_token: string }>;
+/** `targetStaffId`: the member the Owner chose (0146). Absent: the older self command, its proof bytes unchanged. */
+type MemberTarget = Readonly<{ targetStaffId?: string }>;
+export type InternalAllowanceConfigureCommand = StaffMutation & InternalAllowanceConfigure & MemberTarget;
+export type InternalAllowanceRevokeCommand = StaffMutation & InternalAllowanceRevoke & MemberTarget;
 export interface InternalAllowancePort extends InternalAllowanceReadPort {
   readPolicy(): Promise<SelectedInternalAllowancePolicy | null>;
   readPolicyAt(registerVersion: number): Promise<SelectedInternalAllowancePolicy | null>;
   readRunState(runId:string):Promise<InternalRunFundingState>;
   readSelfCommand(context: StaffContext, ordinaryTokenHash: string, grantId: string | null): Promise<InternalAllowanceCommandState>;
+  readMemberCommand(context: StaffContext, ordinaryTokenHash: string, targetStaffId: string, grantId: string | null): Promise<MemberAllowanceCommandState>;
+  readMemberPage(context: StaffContext, ordinaryTokenHash: string): Promise<unknown>;
   configure(input: InternalAllowanceConfigureCommand): Promise<SecurityReceipt>;
   revoke(input: InternalAllowanceRevokeCommand): Promise<SecurityReceipt>;
 }
@@ -106,6 +114,32 @@ export class PostgresInternalAllowanceRepository implements InternalAllowancePor
       || !Number.isSafeInteger(value.expectedRevision) || value.expectedRevision < 0 || !positive(value.policyRegisterVersion)) throw refusal();
     return Object.freeze({ ownerRef: value.ownerRef, expectedRevision: value.expectedRevision, policyRegisterVersion: value.policyRegisterVersion });
   }
+  async readMemberCommand(context: StaffContext, ordinaryTokenHash: string, targetStaffId: string, grantId: string | null): Promise<MemberAllowanceCommandState> {
+    const result = await guardedAuthorityQuery<{ value: unknown }>(this.pool, "SELECT staff.read_member_allowance_command($1::jsonb,$2,$3::uuid,$4::uuid) AS value",
+      [context, ordinaryTokenHash, identifier(targetStaffId), grantId === null ? null : identifier(grantId)]);
+    const value = result.rows[0]?.value;
+    if (!object(value) || !exact(value, ["ownerRef", "keyUserId", "expectedRevision", "policyRegisterVersion"])
+      || typeof value.ownerRef !== "string" || !uuid.test(value.ownerRef) || typeof value.keyUserId !== "string" || !uuid.test(value.keyUserId)
+      || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision) || value.expectedRevision < 0 || !positive(value.policyRegisterVersion)) throw refusal();
+    return Object.freeze({ ownerRef: value.ownerRef, keyUserId: value.keyUserId, expectedRevision: value.expectedRevision, policyRegisterVersion: value.policyRegisterVersion });
+  }
+  /** The Owner's page: every active member and the log (0146). Its shape is judged by the route's schema. */
+  async readMemberPage(context: StaffContext, ordinaryTokenHash: string): Promise<unknown> {
+    return (await guardedAuthorityQuery<{ value: unknown }>(this.pool, "SELECT staff.read_member_allowance_page($1::jsonb,$2) AS value", [context, ordinaryTokenHash])).rows[0]?.value;
+  }
+  /** The mail loop's leases over 0146's notices, as 0142's. No notice names an amount or a person. */
+  async claimNotices(limit: number): Promise<readonly AllowanceNoticeClaim[]> {
+    return (await this.pool.query<AllowanceNoticeClaim>("SELECT notice_id,kind,recipient_staff_id,claim_token FROM staff.claim_allowance_notices($1)", [limit])).rows;
+  }
+  async completeNotice(noticeId: string, claimToken: string, delivered: boolean): Promise<void> {
+    await this.pool.query("SELECT staff.complete_allowance_notice($1::uuid,$2::uuid,$3)", [noticeId, claimToken, delivered]);
+  }
+  /** The account a claimed notice goes to; null when that account is gone. */
+  async noticeUser(noticeId: string, claimToken: string): Promise<string | null> {
+    return (await this.pool.query<{ value: string | null }>("SELECT staff.allowance_notice_user($1::uuid,$2::uuid) AS value", [noticeId, claimToken])).rows[0]?.value ?? null;
+  }
+  /** Decision 24: does this estimate fit the team's month (0142). Nothing about the amount leaves the database. */
+  readTeamRoom(estimateMicros: number): Promise<TeamRoom> { return readTeamRoom(this.pool, estimateMicros); }
   async current(ownerRef: string, now: Date): Promise<InternalGrant | null> {
     const result = await this.pool.query<{ value: unknown }>("SELECT billing.read_internal_allowance($1::uuid,$2::timestamptz) AS value", [identifier(ownerRef), instant(now)]);
     return grantFrom(result.rows[0]?.value);
@@ -121,7 +155,8 @@ export class PostgresInternalAllowanceRepository implements InternalAllowancePor
     return state as InternalRunFundingState;
   }
   async configure(input: InternalAllowanceConfigureCommand): Promise<SecurityReceipt> {
-    const command = { ownerRef: identifier(input.ownerRef), expectedRevision: input.expectedRevision, policyRegisterVersion: input.policyRegisterVersion,
+    const command = { ...(input.targetStaffId === undefined ? {} : { targetStaffId: identifier(input.targetStaffId) }),
+      ownerRef: identifier(input.ownerRef), expectedRevision: input.expectedRevision, policyRegisterVersion: input.policyRegisterVersion,
       amountMicros: input.amountMicros, dayMicros: input.dayMicros, weekMicros: input.weekMicros,
       startsAt: instant(input.startsAt).toISOString(), expiresAt: instant(input.expiresAt).toISOString(),
       fundingApprovalRef: input.fundingApprovalRef, operationId: identifier(input.operationId), reason: input.reason };
@@ -130,7 +165,8 @@ export class PostgresInternalAllowanceRepository implements InternalAllowancePor
     return receiptFrom(result.rows[0]?.value);
   }
   async revoke(input: InternalAllowanceRevokeCommand): Promise<SecurityReceipt> {
-    const command = { ownerRef: identifier(input.ownerRef), grantId: identifier(input.grantId), expectedRevision: input.expectedRevision,
+    const command = { ...(input.targetStaffId === undefined ? {} : { targetStaffId: identifier(input.targetStaffId) }),
+      ownerRef: identifier(input.ownerRef), grantId: identifier(input.grantId), expectedRevision: input.expectedRevision,
       policyRegisterVersion: input.policyRegisterVersion, operationId: identifier(input.operationId), reason: input.reason };
     const result = await this.pool.query<{ value: unknown }>("SELECT staff.revoke_internal_allowance($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb) AS value",
       [input.actor, input.proof.proofId, input.proof.binding, command, input.alertIntent]);

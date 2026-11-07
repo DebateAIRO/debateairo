@@ -16,7 +16,7 @@ function fixture(beforeKeyDestruction: (input: { erasureId: string; userId: stri
   const order: string[] = [];
   let userKeyExists = true;
   const manifest = { userId, ownerRef, runIds: [], legacyRunIds: [], publishedRunIds: [],
-    currentPublicationRefs: [], cleanupPublicationRefs: [], deletePublicDebates: false };
+    currentPublicationRefs: [], cleanupPublicationRefs: [] };
   const repository = {
     preview: async () => manifest, withNotificationLease: async (_user: string, run: () => Promise<unknown>) => run(),
     prepare: async () => "PREPARED", cleanupManifest: async () => manifest,
@@ -57,7 +57,7 @@ describe("S04 threat report account erasure", () => {
     // Mutant: load the absent key on every retry; changing the report-erasure timer is a neighbour.
     const calls: string[] = [];
     const manifest = { userId, ownerRef, runIds: [], legacyRunIds: [], publishedRunIds: [],
-      currentPublicationRefs: [], cleanupPublicationRefs: [], deletePublicDebates: false };
+      currentPublicationRefs: [], cleanupPublicationRefs: [] };
     const repository = {
       preview: async () => null,
       status: async () => calls.includes("finalize") ? "CLEANED" : "PREPARED",

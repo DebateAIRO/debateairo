@@ -65,16 +65,16 @@ describe("admission with the debate shape (spec 2026-10-12 §3.1, §3.6)", () =>
 });
 
 describe("plan normalisation keeps the shape settings (spec §3.2)", () => {
-  it("Free keeps the asked answer length; a depth-only ask stays {\"depth\":2}", () => {
+  it("Free keeps the asked answer length; a depth-only ask stays {\"depth\":1}", () => {
     const free = planById(plans, "FREE");
     const asked = { ...ASK, plan_tier: "premium" as const, depth_params: { depth: 3, depthMode: "fixed" as const, answerLength: "detailed" as const } };
     const decided = normaliseAskForPlan(asked, free).ask;
-    expect(decided.depth_params).toEqual({ depth: 2, depthMode: "fixed", answerLength: "detailed" });
+    expect(decided.depth_params).toEqual({ depth: 1, depthMode: "fixed", answerLength: "detailed" });
     expect(normaliseAskForDebateShape(decided, POLICY, "free").depth_params)
-      .toEqual({ depth: 2, depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" });
-    expect(JSON.stringify(normaliseAskForPlan({ ...ASK, depth_params: { depth: 3 } }, free).ask.depth_params)).toBe('{"depth":2}');
+      .toEqual({ depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" });
+    expect(JSON.stringify(normaliseAskForPlan({ ...ASK, depth_params: { depth: 3 } }, free).ask.depth_params)).toBe('{"depth":1}');
     expect(decideSettingsForPlan({ plan_tier: "premium" as const, composition_budget_tier: "high" as const,
-      depth_params: { depth: 3, answerLength: "short" as const } }, free).depth_params).toEqual({ depth: 2, answerLength: "short" });
+      depth_params: { depth: 3, answerLength: "short" as const } }, free).depth_params).toEqual({ depth: 1, answerLength: "short" });
   });
   it("without the row a depth-only ask is the same object, and the shape settings are dropped", () => {
     expect(normaliseAskForDebateShape(ASK, null, "free")).toBe(ASK);

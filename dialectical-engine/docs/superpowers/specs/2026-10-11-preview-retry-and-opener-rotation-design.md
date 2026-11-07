@@ -366,7 +366,7 @@ Tests:
 
 1. **Should the start-of-debate check count the second paid try (the retry after the 10-minute wait) at every
    argument and review step?** Recommended: **yes**. For five AIs at depth 2 this adds about +$1.56 on DeepInfra and
-   +$0.40 on Anthropic. Five AIs at depth 3 then no longer fits today's $10 / $2 day (about $10.6 and $2.40), so the
+   +<amount> on Anthropic. Five AIs at depth 3 then no longer fits today's <amount>0 / <amount> day (about <amount> and <amount>), so the
    app will refuse that size at the start unless the pots are raised.
 2. **Should the gate's own "too many calls at once" refusal be treated as free, like the other two** (not counted,
    and given the one 60-second retry)? Recommended: **yes**. Nothing was sent for it
