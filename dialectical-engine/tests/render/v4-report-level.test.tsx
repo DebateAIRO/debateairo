@@ -11,9 +11,9 @@ import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
 /*
  * The owner's level ruling (5 Nov 2026, question 15): a debate keeps the level it was asked at, and its report shows its
  * details at that level. The run read says it (`reading_level`, the start-step session's Task 75c), and the map's loader
- * hands it on as `level` (lib/v4/load.ts on that branch). Once it says one, it wins over the address's `?level=`. Until it
- * does, the report keeps the address's level, so the map and its report still keep one level both ways (the `?level=`
- * links go only when the map reads the run's level too). At "In depth" the report lists every point of a path.
+ * hands it on as `level` (lib/v4/load.ts on that branch). No level is ever taken from the address: a debate whose run read
+ * names none reads as Plain words, as its map does on that branch (7 Nov, at the start-step session's request). At "In
+ * depth" the report lists every point of a path.
  */
 
 const mocks = vi.hoisted(() => ({ load: null as unknown }));
@@ -62,8 +62,8 @@ describe("the report shows its details at its debate's own level", () => {
     expect(everyPointListed(await report(null, "expert"))).toBe(true);
   });
 
-  it("with no level from the run read, the report keeps the address's level (and Plain words with none)", async () => {
-    expect(everyPointListed(await report("expert", undefined))).toBe(true);
+  it("with no level from the run read, the report shows Plain words, whatever the address says", async () => {
+    expect(everyPointListed(await report("expert", undefined))).toBe(false);
     expect(everyPointListed(await report("plain", undefined))).toBe(false);
     expect(everyPointListed(await report(null, undefined))).toBe(false);
   });
