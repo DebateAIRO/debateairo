@@ -166,7 +166,7 @@ describe("apps/api main.ts shutdown list", () => {
   });
 
   it("closes the system pools after every pool that routes to them, and before the keys are closed or zeroed", () => {
-    for (const [user, target] of [...main.matchAll(/setCrossAccountTarget\((\w+), (\w+)\);/gu)].map((match) => [match[1]!, match[2]!])) {
+    for (const [user, target] of [...main.matchAll(/setCrossAccountTarget\((\w+), (\w+)\);/gu)].map((match) => [match[1]!, match[2]!] as const)) {
       expect(closedAt(target), `${user} -> ${target}`).toBeGreaterThan(closedAt(user));
     }
     for (const name of ["systemPool", "authorizationSystemPool"]) {
