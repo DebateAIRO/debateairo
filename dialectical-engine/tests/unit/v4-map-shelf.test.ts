@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { AnswerIndex, DigLinks } from "@debateai/contract";
+import type { AnswerIndex, DigLinks, DigSuggestion } from "@debateai/contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { digPicksOf, digQuestion, parseDigDetail } from "../../apps/ui/lib/v4/askText.js";
 import { mergeShelfRows, readMapShelf, shelfExtrasOf, shelfPicksOf, type ShelfClient } from "../../apps/ui/lib/v4/mapShelf.js";
-import type { DigTarget, V4Path } from "../../apps/ui/lib/v4/types.js";
+import { placesOf } from "../../apps/ui/lib/v4/suggestions.js";
+import type { DigTarget, V4DigPick, V4OpenQuestion, V4Path } from "../../apps/ui/lib/v4/types.js";
 import { usedUpLine } from "../../apps/ui/lib/v4/money.js";
 
 /*
@@ -41,13 +42,15 @@ function answerList(items: readonly Item[], open: readonly Open[] = []) {
   return vi.fn(async (limit: number, offset: number) => pageOf(items, open, limit, offset));
 }
 
-/** A fake GET /v1/runs/{id}/dig-links from child → parent pairs; `failing` runs throw. */
-function digLinks(parents: Readonly<Record<string, string>>, failing: readonly string[] = []) {
+/** A fake GET /v1/runs/{id}/dig-links from child → parent pairs; `failing` runs throw; `places` are each link's map places. */
+function digLinks(parents: Readonly<Record<string, string>>, failing: readonly string[] = [], places: Readonly<Record<string, readonly string[]>> = {}) {
   return vi.fn(async (runId: string): Promise<DigLinks> => {
     if (failing.includes(runId)) throw new Error("NOT_FOUND");
     const parent = parents[runId];
     return {
-      parent: parent === undefined ? null : { parent_run_id: parent, child_run_id: runId, places: [], mode: "quick", created_at: "2026-11-03T10:00:00.000Z" },
+      parent: parent === undefined ? null : {
+        parent_run_id: parent, child_run_id: runId, places: [...(places[runId] ?? [])], mode: "quick", created_at: "2026-11-03T10:00:00.000Z"
+      },
       children: []
     };
   });
@@ -201,6 +204,66 @@ describe("readMapShelf", () => {
     };
     expect(shelfPicksOf(digQuestion(picks, parent, CATALOG, "en"), CATALOG))
       .toEqual(["Small reactors could be built faster.", "Costs fall with each reactor built."]);
+  });
+
+  /*
+   * The owner, 7 Nov 2026 (sixth round, "fix it now"): written off English, a dig's question says no item's kind, so its
+   * first line cannot tell the path's line from a pick. The account's dig link can: a dig of a path (or of picks on one)
+   * records that path's place first ("path:<id>", lib/v4/suggestions.ts placesOf), a dig of the main question's own open
+   * questions records only their places. So the person's own digs are named by their pick in every language too. Each dig
+   * below is written and its places recorded by the site's own code (digQuestion, placesOf), as the dig tray does.
+   */
+  it("off English, the dig link's first place says whether the first line is the path's: a dig is still named by its pick", async () => {
+    const parent = "Ar trebui să construim centrale nucleare noi?";
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    const own = (serial: number, text: string): V4DigPick => ({ kind: "OWN_VIEW", key: `own:n-nuclear:${serial}`, group: "n-nuclear", text });
+    const open = (at: number, text: string): V4OpenQuestion => ({ id: `o:${at}`, kind: "OBJECTION", text, star: false, pathId: null });
+    const suggestion: V4DigPick = {
+      kind: "SUGGESTION", key: "sug:s-1", group: "n-nuclear", text: "Check the newest build times.",
+      suggestion: { suggestion_id: "s-1", kind: "UNDOCUMENTED", side: null, text: "Check the newest build times.", places: ["p:node-7"] } satisfies DigSuggestion
+    };
+    const digs: ReadonlyArray<readonly [number, DigTarget]> = [
+      [7, { kind: "picks", path, picks: [own(1, "Small reactors could be built faster."), own(2, "Costs fall with each reactor built.")] }],
+      [6, { kind: "picks", path, picks: [own(1, "Small reactors could be built faster.")] }],
+      [5, { kind: "path", path }],
+      [4, { kind: "picks", path, picks: [suggestion] }],
+      [3, { kind: "open", questions: [open(1, "Storage is still too dear."), open(2, "Grids need years.")] }],
+      // Picks of the main question's own open questions: no path, so no path's line first.
+      [2, { kind: "picks", path: null, picks: [{ kind: "OPEN", key: "open:o:1", group: null, question: open(1, "Storage is still too dear.") }] }]
+    ];
+    const written = digs.map(([at, target]) => ({ at, line: digQuestion(target, parent, CATALOG, "ro") }));
+    expect(parseDigDetail(written[0]!.line, CATALOG)?.english).toBe(false);
+    const readAnswerIndex = answerList([
+      ...written.map(({ at, line }) => ({ run: id(at), seq: at * 10, line })),
+      { run: id(1), seq: 10, line: parent }
+    ]);
+    const readDigLinks = digLinks(
+      Object.fromEntries(digs.map(([at]) => [id(at), id(1)])), [],
+      Object.fromEntries(digs.map(([at, target]) => [id(at), placesOf(target)]))
+    );
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, readDigLinks) });
+    expect(shelf.maps.map((map) => map.runId)).toEqual([id(1)]);
+    expect(shelf.maps[0]!.digs.map((dig) => [dig.runId, dig.pick, dig.more])).toEqual([
+      [id(7), "Small reactors could be built faster.", true],
+      [id(6), "Small reactors could be built faster.", false],
+      // A whole path: its short label, as in English (map-f25), never its outcome words.
+      [id(5), "Nuclear first", false],
+      [id(4), "Check the newest build times.", false],
+      // The main question's own open questions name no path: the first line is a pick.
+      [id(3), "Storage is still too dear.", true],
+      [id(2), "Storage is still too dear.", false]
+    ]);
+    expect(shelf.maps[0]!.digs.every((dig) => !dig.pick.includes("did not hold"))).toBe(true);
+  });
+
+  it("off English with no place recorded, nothing tells the lines apart: every line is read as a pick, as before", () => {
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    const line = digQuestion({
+      kind: "picks", path, picks: [{ kind: "OWN_VIEW", key: "own:n-nuclear:1", group: "n-nuclear", text: "Small reactors could be built faster." }]
+    } as DigTarget, "Q?", CATALOG, "ro");
+    expect(shelfPicksOf(line, CATALOG)).toEqual([path.line, "Small reactors could be built faster."]);
+    expect(shelfPicksOf(line, CATALOG, false)).toEqual([path.line, "Small reactors could be built faster."]);
+    expect(shelfPicksOf(line, CATALOG, true)).toEqual(["Small reactors could be built faster."]);
   });
 
   it("an account with no debate at all is a first visit; the dig links read once are kept for the next read", async () => {
