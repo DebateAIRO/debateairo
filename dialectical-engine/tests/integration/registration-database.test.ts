@@ -950,7 +950,16 @@ for (let sample = 0; sample < 8; sample += 1) {
   await collectMainThreadGarbage();
   nullSamplesMib.push(process.memoryUsage().rss / 1024 / 1024);
 }
-const nullEnvelopeMib = Math.max(...nullSamplesMib) - Math.min(...nullSamplesMib);
+// Owner's ruling of 2026-11-08: a tripwire for retained memory counts GROWTH only. Each sample is compared with the lowest
+// sample before it, and only a rise counts. Drops are ignored: after a forced clean-up the operating system hands pages
+// back to it a little at a time (measured on macOS: the resident set fell 0.5 MiB per clean-up while heapTotal,
+// heapUsed and arrayBuffers stayed flat), and pages handed back are not growth. The 2 MiB bound below is unchanged.
+const residentRiseMib = (samples) => {
+  let lowest = Infinity, rise = 0;
+  for (const value of samples) { lowest = Math.min(lowest, value); rise = Math.max(rise, value - lowest); }
+  return rise;
+};
+const nullEnvelopeMib = residentRiseMib(nullSamplesMib);
 const confirmedPlatformPageSizeBytes = 16 * 1024;
 const tunedSecondaryPlateauCeilingMib = 2;
 
@@ -994,7 +1003,8 @@ for (let wave = 0; wave < 16; wave += 1) {
 clearInterval(sampler);
 sampler = undefined;
 const plateauSamples = waveRssMib.slice(12);
-const plateauSpreadMib = Math.max(...plateauSamples) - Math.min(...plateauSamples);
+// The same growth-only rule as the null envelope above: a rise across the plateau waves counts, a drop does not.
+const plateauSpreadMib = residentRiseMib(plateauSamples);
 
 service.drainMailCapacitySignals();
 // Keep the control allocation observably alive right to the end.
