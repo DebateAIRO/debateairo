@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   PATH_UPDATE_CARRIER, PUBLIC_DIG_INPUT_CARRIER, PUBLIC_REPORT_CARRIER, PostgresPublicDebateRunnerRepository, PostgresPublicTreeRunnerRepository, decryptContentForRun,
-  encryptAttestedContentForRun, withRunContentLease, type InvestigationReportRecord, type PathLineEntry, type Pool, type PublicContributionRead, type PublicReportUnwritten, type UnreportedClosing, type WebSealed
+  encryptAttestedContentForRun, withRunContentLease, type InvestigationReportRecord, type PathLineEntry, type PieceSettingsVersion, type Pool, type PublicContributionRead, type PublicReportUnwritten, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import {
   PublicContributionCheckReplySchema, classifyStructuredArtifact, framedPublicContributionCheck, parseStructuredArtifact, type PublicContributionCheckReply
@@ -24,6 +24,7 @@ import { digPathsForStore } from "./path-rewrite-sources.js";
 import { releaseRunPassages } from "./passage-record.js";
 import { dossierFromMaterial, openPublicMaterial, publicPathOf, publicTreePortsOf } from "./public-tree-sources.js";
 import { replayingGateway } from "./run-replay.js";
+import { runVersionMapper, type RunVersionMapper } from "./run-settings.js";
 
 /**
  * A DIG ON A PUBLIC DEBATE, FROM ITS END TO THE PAGE (plan 2026-10-31-r22-owner-changes decisions 13 and 22; migration 0147). Whoever digs, the first author too:
@@ -67,13 +68,20 @@ export type PublicTreeRunnerSettings = Readonly<{
   tokenCount?: TokenCounter;
   wait?: TreeUpdateSettings["wait"];
   contractHash?: string;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version a run's calls are charged
+   * under now (the runner's run → version map, main.ts): the dig's level, its climb and its passed check note the DIG's. Absent, or no version
+   * held for it (local mode, tests): none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>;
 
 function treeSettingsOf(settings: PublicTreeRunnerSettings, digRunId: string): TreeUpdateSettings {
   return Object.freeze({ ports: publicTreePortsOf(settings.pool, digRunId), roles: settings.roles, writerRoleRef: settings.writerRoleRef, checkerRoleRef: settings.checkerRoleRef,
     log: settings.log, ...(settings.inFlight === undefined ? {} : { inFlight: settings.inFlight }), ...(settings.tokenCount === undefined ? {} : { tokenCount: settings.tokenCount }),
-    ...(settings.wait === undefined ? {} : { wait: settings.wait }), ...(settings.contractHash === undefined ? {} : { contractHash: settings.contractHash }) });
+    ...(settings.wait === undefined ? {} : { wait: settings.wait }), ...(settings.contractHash === undefined ? {} : { contractHash: settings.contractHash }),
+    ...(settings.settingsVersionOf === undefined ? {} : { settingsVersionOf: settings.settingsVersionOf }) });
 }
 
 type CheckOutcome = Readonly<{ kind: "ALLOW" | "REFUSE" | "UNAVAILABLE" }>;
@@ -165,7 +173,9 @@ async function rewriteAndCheck(settings: PublicTreeRunnerSettings, digRunId: str
     line: text.line, summary: text.summary, whatChanged: text.whatChanged, digPaths: text.digPaths }, lease);
   const checkRef = contributionCheckIdOf(digRunId);
   if (outcome.kind === "ALLOW") {
-    await new PostgresPublicTreeRunnerRepository(settings.pool).recordCheckPassed(digRunId, checkRef);
+    // Task 57p: the passed check notes the version it was charged under (the dig's). A refused or unavailable one settles 0137's row, which
+    // notes none (its append-only guard lets only the outcome change; 0169's header).
+    await new PostgresPublicTreeRunnerRepository(settings.pool).recordCheckPassed(digRunId, checkRef, settings.settingsVersionOf?.(digRunId) ?? null);
   } else {
     await contributions.settleCheck(digRunId, outcome.kind === "REFUSE" ? "REFUSED" : "UNAVAILABLE", checkRef);
   }
@@ -242,7 +252,11 @@ export function composePublicReport(input: Readonly<{
   reserveMicros: Readonly<{ paid: number; free: number }>;
   tokenCount?: TokenCounter;
   log: (event: string, detail: Record<string, unknown>) => void;
-}>): Readonly<{ settings: InvestigationCloseSettings; list: () => Promise<readonly PublicReportUnwritten[]> }> | undefined {
+  /** Task 56h: before a report's calls, its carrier gets its own run's settings version (`carrierVersionMapper`; Task 57o: today's if its own is refused); absent (local mode, tests), nothing is mapped. */
+  mapCarrier?: (carrierRunId: string) => Promise<void>;
+  /** Task 57p: the run → version map's reader; the report notes its carrier's version (the closing's root here). Absent: none (NULL). */
+  settingsVersionOf?: (runId: string) => number | undefined;
+}>): Readonly<{ settings: InvestigationCloseSettings; list: () => Promise<readonly PublicReportUnwritten[]>; mapCarrier?: (carrierRunId: string) => Promise<void> }> | undefined {
   const writerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL)?.providerRef;
   const checkerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_CHECKER_MODEL)?.providerRef;
   if (writerRoleRef === undefined || checkerRoleRef === undefined) return undefined;
@@ -261,7 +275,7 @@ export function composePublicReport(input: Readonly<{
       readUnreported: async () => [],
       readWaiting: async () => null,
       readOfRun: async () => null,
-      record: async (record: InvestigationReportRecord) => {
+      record: async (record: InvestigationReportRecord & PieceSettingsVersion) => {
         const row = rows.get(record.reportId.toLowerCase());
         // Who pays first: the charge names the writer once (its id is the report's), and the report row then says it is over.
         if (row?.writer_ref !== null && row?.writer_ref !== undefined) {
@@ -270,7 +284,8 @@ export function composePublicReport(input: Readonly<{
         }
         const stored = await publicTree.recordReport({ reportId: record.reportId, outcome: record.outcome, storyOutcome: record.storyOutcome, failureCode: record.failureCode,
           fingerprint: record.dossierFingerprint, ladderStep: record.ladderStep, leftOut: record.leftOut, answerRounds: record.answerRounds, storyRounds: record.storyRounds,
-          writerLineage: record.writerLineage, checkerLineage: record.checkerLineage, artifactRefs: record.artifactRefs, spentMicros: record.spentMicros, content: record.content });
+          writerLineage: record.writerLineage, checkerLineage: record.checkerLineage, artifactRefs: record.artifactRefs, spentMicros: record.spentMicros, content: record.content,
+          settingsVersion: record.settingsVersion });
         return stored === "NOT_FOUND" ? "NO_CLOSING" as const : stored;
       }
     }),
@@ -307,6 +322,8 @@ export function composePublicReport(input: Readonly<{
       return Object.freeze({ ownerRef: row?.writer_ref ?? null, free: row?.free ?? true });
     },
     ...(input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount }),
+    // Task 57p: the closing stamps the report with its root's version, here the carrier's (mapped by mapCarrier first).
+    ...(input.settingsVersionOf === undefined ? {} : { settingsVersionOf: input.settingsVersionOf }),
     log: input.log
   });
   return Object.freeze({
@@ -315,8 +332,22 @@ export function composePublicReport(input: Readonly<{
       const listed = await publicTree.readReportsUnwritten();
       for (const row of listed) rows.set(row.report_id.toLowerCase(), row);
       return listed;
-    }
+    },
+    ...(input.mapCarrier === undefined ? {} : { mapCarrier: input.mapCarrier })
   });
+}
+
+/**
+ * V4 start step, Task 56h: in hosted mode each call is charged to its own run's settings version's guard (main.ts `runCostEnvelopeGuard`), and the run →
+ * version map is filled only when this process claims a run's work. A report's carrier is no claimed run: the debate's run after a restart, a digger's, and
+ * always a run made only to carry a visitor's report (0167). So before its calls the carrier is mapped to the version it owns now (Task 57o-fix:
+ * `identity.run_settings_version_now`), once that version's settings are loaded; a run already mapped is left as it is. Task 57o: a version this
+ * runner refuses maps the carrier to today's (57o-fix: the owners' switched-on version; if refused too, the release's own), with one journal
+ * line; a database failure maps nothing, and the report waits for the next pass.
+ */
+export function carrierVersionMapper(ports: Parameters<typeof runVersionMapper>[0]): RunVersionMapper {
+  // Task 57l: the one mapper every background lane uses (run-settings.ts), kept here under its first name.
+  return runVersionMapper(ports);
 }
 
 /* ----------------------------------------------------------------- the sweep */
@@ -328,7 +359,9 @@ export const PUBLIC_TREE_SWEEP_DEFAULTS = Object.freeze({ staleMs: 20 * 60_000, 
  * check (a runner that stopped) is rewritten and checked from the store; an allowed contribution climbs; a report waiting for its writer is written. Its passages, if any are still held, are
  * read by name as in the after-settle branch.
  */
-export async function sweepPublicTree(settings: PublicTreeRunnerSettings & Readonly<{ reports?: ReturnType<typeof composePublicReport>; staleMs?: number; limit?: number; now?: () => Date }>):
+export async function sweepPublicTree(settings: PublicTreeRunnerSettings & Readonly<{ reports?: ReturnType<typeof composePublicReport>; staleMs?: number; limit?: number; now?: () => Date;
+  /** Task 57l: each dig it takes on is mapped to the settings version it owns now first (`runVersionMapper`; Task 57o: today's if its own is refused); absent (local mode, tests), nothing is mapped. */
+  mapRun?: RunVersionMapper }>):
   Promise<Readonly<{ settled: number; advanced: number; climbed: number; reports: number }>> {
   const publicTree = new PostgresPublicTreeRunnerRepository(settings.pool);
   const contributions = new PostgresPublicDebateRunnerRepository(settings.pool);
@@ -338,22 +371,42 @@ export async function sweepPublicTree(settings: PublicTreeRunnerSettings & Reado
   let advanced = 0;
   let climbed = 0;
   let reports = 0;
+  // Task 57l: a dig's calls are charged on its own run, which this process may never have claimed (a restart): its own version first (Task 57o:
+  // today's if its own is refused). One that could not be mapped (a database failure) is left for a later pass, the others go on.
+  const digMapped = async (digRunId: string): Promise<boolean> => {
+    try {
+      await settings.mapRun?.(digRunId);
+      return true;
+    } catch (error) {
+      settings.log("PUBLIC_DIG_UNMAPPED", { runId: digRunId, code: codeOf(error) });
+      return false;
+    }
+  };
   try {
     for (const open of await publicTree.readDigsUnsettled(new Date(now.getTime() - (settings.staleMs ?? PUBLIC_TREE_SWEEP_DEFAULTS.staleMs)), limit)) {
       if (!open.finished) {
         await contributions.settleCheck(open.dig_run_id, "UNAVAILABLE", null);
         settled += 1;
       } else {
+        if (!await digMapped(open.dig_run_id)) continue;
         await advancePublicDig(settings, open.dig_run_id);
         advanced += 1;
       }
     }
     for (const digRunId of await publicTree.readClimbsOwed(limit)) {
+      if (!await digMapped(digRunId)) continue;
       await advancePublicDig(settings, digRunId);
       climbed += 1;
     }
     if (settings.reports !== undefined && settings.reports !== null) {
       for (const row of await settings.reports.list()) {
+        // Task 56h: the carrier's own settings version first; one that cannot be mapped is left for the next pass, the others go on.
+        try {
+          await settings.reports.mapCarrier?.(row.carrier_run_id);
+        } catch (error) {
+          settings.log("PUBLIC_REPORT_CARRIER_UNMAPPED", { reportId: row.report_id, code: codeOf(error) });
+          continue;
+        }
         await closeInvestigation(settings.reports.settings, { investigationId: row.report_id, reportVersion: row.report_version, rootRunId: row.carrier_run_id, closedAt: row.requested_at });
         reports += 1;
       }

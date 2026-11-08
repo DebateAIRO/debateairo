@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PoolClient } from "pg";
 import { createPool, migrate } from "@debateai/db";
 import { createActiveSettingsVersionReader } from "../../apps/api/src/active-settings-version.js";
+import { createRunSettingsVersions, createSwitchedOnSettingsReader, readRunSettingsVersionNow, runVersionMapper } from "../../apps/runner/src/run-settings.js";
 import {
   SUPPORT_CONFIGURATION_KEYS,
   createPostgresRegisterPublicationPort,
@@ -360,7 +361,9 @@ describe("0124: settings changes without an upload", () => {
     expect(await Promise.all(tables.map((table) => count(table)))).toEqual(counts);
   });
 
-  it("7. grants: the pointer for the API's role only, the pass readers for the runtime, the rest for the operator", async () => {
+  // V4 start step, Task 57o-fix (the owner's answer of 8 Nov, "Your switched-on one (Recommended)": "the runner may read which settings are
+  // switched on (a number, nothing private) ... (0169)"): since 0169 the runtime role (the runner's) may call the pointer's reader too.
+  it("7. grants: the pointer for the API's role and (0169) the runner's, the pass readers for the runtime, the rest for the operator", async () => {
     const functions = [
       "register.settings_version_passed(text,bigint)", "register.read_passed_settings_versions(text)",
       "register.read_active_settings_version()", "register.record_settings_verdict(text,bigint,text,text)",
@@ -371,9 +374,10 @@ describe("0124: settings changes without an upload", () => {
     const executable = async (role: string): Promise<string[]> => (await database.pool.query<{ signature: string }>(
       "SELECT signature FROM unnest($2::text[]) AS signature WHERE has_function_privilege($1, signature, 'EXECUTE') ORDER BY signature",
       [role, functions])).rows.map((row) => row.signature);
-    expect((await one<{ allowed: boolean }>("SELECT has_function_privilege('debateai_runtime', 'register.read_active_settings_version()', 'EXECUTE') AS allowed")).allowed).toBe(false);
+    expect((await one<{ allowed: boolean }>("SELECT has_function_privilege('debateai_runtime', 'register.read_active_settings_version()', 'EXECUTE') AS allowed")).allowed).toBe(true);
     expect((await one<{ allowed: boolean }>("SELECT has_function_privilege('debateai_billing_runtime', 'register.read_active_settings_version()', 'EXECUTE') AS allowed")).allowed).toBe(true);
-    expect(await executable("debateai_runtime")).toEqual(["register.read_passed_settings_versions(text)", "register.settings_version_passed(text,bigint)"]);
+    expect(await executable("debateai_runtime")).toEqual(["register.read_active_settings_version()", "register.read_passed_settings_versions(text)",
+      "register.settings_version_passed(text,bigint)"]);
     expect(await executable("debateai_billing_runtime")).toEqual(["register.read_active_settings_version()",
       "register.read_passed_settings_versions(text)", "register.settings_version_passed(text,bigint)"]);
     expect(await executable("debateai_release_operator")).toEqual(["register.activate_settings_version(bigint,bigint,text,text,text)",
@@ -386,6 +390,39 @@ describe("0124: settings changes without an upload", () => {
       [functions])).rows).toEqual([{ owner: "debateai_release_owner" }]);
     for (const table of ["settings_activation", "settings_verdict", "settings_switch_check"]) {
       expect((await one<{ any: boolean }>(`SELECT has_table_privilege('debateai_runtime', 'register.${table}', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS any`)).any, table).toBe(false);
+    }
+  });
+
+  it("8. (0169) the runner's own login reads the switched-on version, and a refused own version is mapped to it (A current, pointer G2)", async () => {
+    // A login holding the runner's role only, as the runner's (debateai_runtime), never the API's.
+    const login = ["s57o", "runner"].join("_");
+    const password = ["private", "fixture", login].join("-");
+    await database.pool.query(`CREATE ROLE ${login} LOGIN PASSWORD '${password}' IN ROLE debateai_runtime`);
+    const url = new URL(database.connectionString);
+    url.username = login;
+    url.password = password;
+    const runner = createPool(url.toString(), { max: 1, connectionTimeoutMillis: 5000, name: "test:runner-switched-on" });
+    try {
+      expect(await pointer()).toBe(G2);
+      expect(await createSwitchedOnSettingsReader({ pool: runner, siteVersion: 4 })()).toBe(G2);
+      // The pointer's table itself stays closed to the runner's login.
+      expect(codeOf(await refusal(runner.query("SELECT register_version FROM register.settings_activation")))).toBe("42501");
+      // The version a run owns now (0143, granted to the runtime role): no such run refuses RUN_NOT_FOUND.
+      await expect(readRunSettingsVersionNow(runner, randomUUID())).rejects.toMatchObject({ code: "RUN_NOT_FOUND" });
+      // The mapper over the runner's login: own version refused (made up), so the switched-on version, G2, with one line.
+      const versions = createRunSettingsVersions();
+      const lines: Array<Readonly<Record<string, unknown>>> = [];
+      const run = randomUUID();
+      const map = runVersionMapper({ readVersion: async () => 3, versions, siteVersion: 4, log: (line) => { lines.push(line); },
+        switchedOnVersion: createSwitchedOnSettingsReader({ pool: runner, siteVersion: 4 }),
+        requireSettings: async (version) => { if (version === 3) throw new Error("RUNNER_SETTINGS_VERSION_UNLOADABLE"); } });
+      await map(run);
+      expect(versions.versionOf(run)).toBe(G2);
+      expect(lines).toEqual([{ kind: "DEBATEAI_RUNNER_RUN_SETTINGS_TODAY", runId: run, ownVersion: "3", usedVersion: String(G2),
+        switchedOnVersion: String(G2), code: "RUNNER_SETTINGS_VERSION_UNLOADABLE" }]);
+    } finally {
+      await runner.end();
+      await database.pool.query(`DROP ROLE ${login}`);
     }
   });
 });

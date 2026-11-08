@@ -58,6 +58,9 @@ import { loadForward0163 } from './migration-forward0163.js';
 import { loadForward0164 } from './migration-forward0164.js';
 import { loadForward0165 } from './migration-forward0165.js';
 import { loadForward0166 } from './migration-forward0166.js';
+import { loadForward0167 } from './migration-forward0167.js';
+import { loadForward0168 } from './migration-forward0168.js';
+import { loadForward0169 } from './migration-forward0169.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -75,10 +78,14 @@ import { loadForward0166 } from './migration-forward0166.js';
  * every later migrate() compares that step against its latest amendment instead of its receipt.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
-/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added; or which functions it redefined; or which CHECKs it replaced. */
+/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added; or which functions it redefined; or which CHECKs it replaced; or which functions' grants it widened, to whom; or which columns it added to which tables. */
 export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>
  // 0144: a step that redefines functions an earlier step's digest pins names them.
  |Readonly<{step:string;functions:readonly string[];field:'function_definition'}>
+ // 0169: a step that grants a role EXECUTE on a function an earlier step's digest pins (0124's pointer reader) names the function and the roles.
+ |Readonly<{step:string;functions:readonly string[];grantees:readonly string[];field:'function_acl'}>
+ // 0169 (Task 57p): a step that adds a column (and its CHECK) to tables an earlier step's digest pins names the tables and the columns.
+ |Readonly<{step:string;relations:readonly string[];columns:readonly string[];field:'column_added'}>
  // 0164: a step that replaces a CHECK an earlier step's digest pins (0138's on identity.main_answer_update) names its table and the CHECK.
  |Readonly<{step:string;relations:readonly string[];constraints:readonly string[];field:'constraint_definition'}>;
 export type ForwardStepPlan=Readonly<{
@@ -127,9 +134,15 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * answer (0164, plan 2026-11-03 Task 55e, drained: it widens 0138's CHECK on what made a main-answer version and declares that
  * amendment), then a failed question giving back its path-list charge (0165, plan 2026-11-03 Task 57c, drained: it redefines 0158's
  * three readers and declares those amendments), then a later main-answer version revising the newest one, whichever table holds it
- * (0166, plan 2026-11-03 Task 56g, expand: one runner definer). A new step appends its loader here (README).
+ * (0166, plan 2026-11-03 Task 56g, expand: one runner definer), then a visitor's report of a public debate carried by a run of their own
+ * (0167, plan 2026-11-03 Task 56h, expand: one API definer), then a debate an update set aside continuing where it stopped, the person
+ * paying only for what runs after Continue (0168, plan 2026-11-03 Task 57j, drained: it redefines 0165's four person readers and its
+ * re-open and declares those amendments), then the runner reading which settings are switched on, for a new piece of an older debate whose
+ * own version it refuses (0169, plan 2026-11-03 Task 57o-fix, expand: one grant on 0124's pointer reader, declared as an amendment of 0124's
+ * postcondition; and, Task 57p, each piece's record noting which settings wrote it: a nullable column on eight tables of five steps, declared
+ * as their amendments, and ten new writers). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

@@ -139,6 +139,12 @@ export type RecordPlanPathStatuses = (runId: string, statuses: readonly WebPlanP
 
 export type WebStepInput = Readonly<{
   runId: string;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version the run's calls are charged
+   * under (the claimed run's, from the runner's run → version map, index.ts); each reading notes it. Absent or null (none held: local mode,
+   * tests): none (NULL).
+   */
+  settingsVersion?: number | null;
   /** The claimed work item: the replay book is read by it, so a re-claim of the same item replays these calls. */
   subjectItemId: string;
   /** The run's plan as billing pinned it; null when none is known (local mode, a team grant): no search. */
@@ -780,6 +786,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     if (reusedFrom !== null) {
       const readingId = webStepRowId(runId, "reading", pageId, "1");
       written(await store.recordReading({ runId, readingId, pageId, reader: 1, maker: reusedFrom.readerOneMaker, outcome: "READ",
+        settingsVersion: input.settingsVersion ?? null,
         grade: reusedFrom.grade, line: cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, reusedReadingContent(reusedFrom)) }));
       known.set(pageId, reusedFrom);
     }
@@ -892,6 +899,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
   for (const reading of readings) {
     const readingId = webStepRowId(runId, "reading", reading.pageId, String(reading.reader));
     const answer = await store.recordReading({ runId, readingId, pageId: reading.pageId, reader: reading.reader, maker: reading.maker,
+      settingsVersion: input.settingsVersion ?? null,
       outcome: reading.outcome, grade: reading.grade,
       line: reading.line === null ? null : cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, reading.line) });
     // Two readers of one company on a page is refused by 0132; the reading is left out, the group goes on.

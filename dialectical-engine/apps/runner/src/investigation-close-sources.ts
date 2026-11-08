@@ -619,6 +619,11 @@ export function composeInvestigationClose(input: Readonly<{
   payerOf?: (closing: UnreportedClosing, read: InvestigationCloseInput) => Promise<InvestigationReportPayer>;
   /** After a closing's row stands (RETENTION's wipe, decision 7; PUBLIC's reopening). */
   onReportSettled?: (settled: InvestigationReportSettled) => Promise<void> | void;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the runner's run → version map's reader
+   * (main.ts `pieceSettingsVersionOf`); each row written notes the version of the run its calls were charged to. Absent: none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>): InvestigationCloseSettings | undefined {
   const writerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL)?.providerRef;
@@ -654,6 +659,7 @@ export function composeInvestigationClose(input: Readonly<{
     ...(input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount }),
     ...(input.payerOf === undefined ? {} : { payerOf: input.payerOf }),
     ...(input.onReportSettled === undefined ? {} : { onReportSettled: input.onReportSettled }),
+    ...(input.settingsVersionOf === undefined ? {} : { settingsVersionOf: input.settingsVersionOf }),
     climbsOpen: async (rootRunId: string) => {
       const tree = new PostgresTreeUpdateRunnerRepository(pool);
       const members = (await new PostgresInvestigationRunnerRepository(pool).ofRun(rootRunId))?.members ?? [];

@@ -5842,7 +5842,9 @@ export class WalkingSkeletonRunner {
     /**
      * Side-by-side spec §13 (S6): the run's version, recorded right after the claim and before the keep-alive, the lane
      * or any call, so every money seam and (addition D17) every preview call finds this run's own version by its run
-     * id. Kept for the life of the process; a second, different value is refused (RUN_SETTINGS_VERSION_DRIFT).
+     * id. Kept for the life of the process; a second claim at a different value is refused (RUN_SETTINGS_VERSION_DRIFT).
+     * V4 start step, Task 57o-fix2 (owner, 8 Nov: "we shouldn't wait or stop anything"): a claim wins over any mapping a
+     * background lane set first (its own version or today's settings), with one content-free line; it never fails the debate.
      */
     if (resolution !== null) settings.runSettingsVersions?.set(claimedRunId, resolution.version);
     /**
@@ -8100,6 +8102,8 @@ export class WalkingSkeletonRunner {
         pool: this.pool, settings: settings.webSearch,
         lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
         runId: run.runId, subjectItemId: claimed.workItemId, mode: webModeOfDepth(expansionDepth), question: run.questionLine,
+        // Task 57p (0169): each reading notes the claimed run's settings version (its calls are charged under it).
+        settingsVersion: settings.runSettingsVersions?.versionOf(run.runId) ?? null,
         questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
         siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
         paths: debateShapeMap.choice.answers.slice(0, shapeMapPositions.length).map((answer) => ({ pathRef: answer.answerId,
@@ -8234,6 +8238,8 @@ export class WalkingSkeletonRunner {
         pool: this.pool, settings: webSearch,
         lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
         runId: run.runId, subjectItemId: claimed.workItemId, mode: webMode, question: run.questionLine,
+        // Task 57p (0169): each reading notes the claimed run's settings version (its calls are charged under it).
+        settingsVersion: settings.runSettingsVersions?.versionOf(run.runId) ?? null,
         questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
         siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
         paths: [],

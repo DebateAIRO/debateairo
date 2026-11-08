@@ -44,6 +44,11 @@ export function composePathRewrite(input: Readonly<{
   members: readonly Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>[];
   /** Decision 28: Anthropic's free token count (main.ts). */
   tokenCount?: TokenCounter;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the runner's run → version map's reader
+   * (main.ts `pieceSettingsVersionOf`); the rewrite, the tree's levels and main-answer versions and a public dig's passed check each note the version of the run its calls were charged to. Absent: none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>): PathRewriteComposed | undefined {
   const writerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL)?.providerRef;
@@ -62,7 +67,9 @@ export function composePathRewrite(input: Readonly<{
   const inFlight = createPathRewriteInFlight();
   const refreshSuggestions = refreshPathSuggestionsOnPool(pool);
   const tokenCount = input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount };
-  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount,
+  // Task 57p: one reader of the run → version map for the rewrite, the tree and the public tree alike.
+  const versionOf = input.settingsVersionOf === undefined ? {} : { settingsVersionOf: input.settingsVersionOf };
+  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount, ...versionOf,
     // Owner Q-D8: a level a climb really changed gets its suggestions worked out again, each level its own set and call site.
     afterLevel: async (level, written) => {
       if (written === null) return;
@@ -71,9 +78,10 @@ export function composePathRewrite(input: Readonly<{
         step: written.step, writer: written.writer, send: written.send, log: written.log }));
     } });
   // Decision 13: a dig on a public debate is a contribution, on its own pipeline (public-contribution.ts), read only from the public copy.
-  const publicTree: PublicTreeRunnerSettings = Object.freeze({ pool, roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount });
+  const publicTree: PublicTreeRunnerSettings = Object.freeze({ pool, roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount, ...versionOf });
   const settings: PathRewriteRunnerSettings = Object.freeze({
     ...tokenCount,
+    ...versionOf,
     publicDig: publicDigOnSettle(publicTree, () => settings),
     isPublicDig: async (runId: string) => (await new PostgresPublicDebateRunnerRepository(pool).readContribution(runId)) !== null,
     sources: postgresPathRewriteSources(pool),

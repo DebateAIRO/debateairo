@@ -36,10 +36,11 @@ const bodyOf = (sql: string): string => {
 };
 
 describe("0166: a later main-answer version revises the newest one, whichever table holds it", () => {
-  it("C-T is the chain's head, right after 0165, with its own loader and no amendment", async () => {
+  it("C-T is a step of the chain, right after 0165, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0166 } from './migration-forward0166.js';");
-    expect(chain).toContain("loadForward0164,loadForward0165,loadForward0166]);");
+    // Task 56h (0167): no longer the chain's head; found by its name below.
+    expect(chain).toContain("loadForward0164,loadForward0165,loadForward0166,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);

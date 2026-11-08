@@ -194,6 +194,12 @@ export type PathRewriteRunnerSettings = Readonly<{
   /** Decision 13: true when the settled run is a contribution to a public debate, and that pipeline ran for it. Absent: none. */
   publicDig?: (input: StoryWriteInput, lease: StepLease) => Promise<boolean>;
   isPublicDig?: (runId: string) => Promise<boolean>;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version a run's calls are charged
+   * under now, read from the runner's one run → version map (`runSettingsVersions.versionOf`, main.ts); each row written notes it for
+   * the DIG, whose run its calls were charged to. Absent, or no version held for that run (local mode, tests): the row notes none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   /** R22 decision 2: the path's whole line (absent: 0134's rows alone, a runner without the tree's settings). */
   line?: PathRewriteLine;
   /** R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. */
@@ -467,8 +473,10 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
         }
       }
     }
-    const stored = settings.line === undefined || front.lineBase === undefined ? await settings.turns.recordRewrite(record)
-      : await settings.line.recordRewriteInLine(front.lineBase, record);
+    // Task 57p: the row notes the version the dig's calls were charged under (a FAILED one written with no call: the dig's all the same).
+    const noted = { ...record, settingsVersion: settings.settingsVersionOf?.(digRunId) ?? null };
+    const stored = settings.line === undefined || front.lineBase === undefined ? await settings.turns.recordRewrite(noted)
+      : await settings.line.recordRewriteInLine(front.lineBase, noted);
     log("PATH_REWRITE_STORED", { runId: digRunId, outcome: record.outcome, failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
     if (stored === "RECORDED" && refreshAfter !== null) await (refreshAfter as () => Promise<void>)();

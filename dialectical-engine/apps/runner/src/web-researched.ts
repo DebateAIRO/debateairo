@@ -67,6 +67,19 @@ export type WebResearchedSettings = Readonly<{
   log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
   replayBookOf?: (runId: string, subjectItemId: string) => Promise<ReplayBook>;
   giveUpMs?: number;
+  /**
+   * V4 start step, Task 57l: before a debate's pages are read, its run (which every call and search names) is mapped to the settings
+   * version it owns now (run-settings.ts `runVersionMapper`; Task 57o: today's if its own is refused, 57o-fix: the owners' switched-on one): this process may never have claimed it.
+   * A run whose version could not be mapped (a database failure) has its pages skipped and logged, nothing read, settled or wiped, and they
+   * wait for a later pass. Absent (local mode, tests): as before.
+   */
+  mapRun?: (runId: string) => Promise<void>;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the runner's run → version map's reader
+   * (main.ts); each reading notes the version of the debate whose page it reads (its calls are charged to that run). Absent, or none held
+   * (local mode, tests): none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   now?: () => Date;
 }>;
 
@@ -203,6 +216,7 @@ export async function weighAddedPage(settings: WebResearchedSettings, chosen: Re
         if (readingOne === undefined) {
           const readingId = webStepRowId(runId, "reading", pageId, "1");
           accepted(await store.recordReading({ runId, readingId, pageId, reader: 1, maker: webMakerSlug(got.maker), outcome: "READ", grade: got.grade,
+            settingsVersion: settings.settingsVersionOf?.(runId) ?? null,
             line: cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: got.adds, language: siteLanguage.code, ...(got.note === null ? {} : { note: got.note }) }) }));
         }
       }
@@ -234,6 +248,7 @@ export async function weighAddedPage(settings: WebResearchedSettings, chosen: Re
     for (const reading of top.readings) {
       const readingId = webStepRowId(runId, "reading", pageId, String(reading.reader));
       const answered = await store.recordReading({ runId, readingId, pageId, reader: reading.reader, maker: webMakerSlug(reading.maker), outcome: reading.outcome, grade: reading.grade,
+        settingsVersion: settings.settingsVersionOf?.(runId) ?? null,
         line: reading.outcome === "READ" ? cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { leads: top.leads.filter((lead) => lead.from.includes(reading.reader)).map((lead) => lead.text) }) : null });
       if (answered !== "SAME_MAKER") accepted(answered);
     }
@@ -297,6 +312,13 @@ export async function sweepWebResearched(settings: WebResearchedSettings, limit:
   const now = (settings.now ?? (() => new Date()))().getTime();
   const giveUpMs = settings.giveUpMs ?? WEB_RESEARCHED_SWEEP_DEFAULTS.giveUpMs;
   await Promise.all([...byRun.entries()].map(async ([runId, rows]) => {
+    try {
+      await settings.mapRun?.(runId);
+    } catch (error) {
+      log("WEB_RESEARCHED_UNMAPPED", { runId, code: codeOf(error) });
+      skipped += rows.length;
+      return;
+    }
     for (const row of rows) {
       try {
         const outcome = await weighAddedPage(settings, { runId, pageId: row.page_id });
@@ -343,6 +365,8 @@ export function composeWebResearched(input: Readonly<{
   search: PerplexitySearchPort | null;
   searchSeamOf: ((runId: string) => WebSearchCostSeam) | null;
   log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
+  /** Task 57p: the run → version map's reader (main.ts); absent: none (NULL). */
+  settingsVersionOf?: (runId: string) => number | undefined;
 }>): WebResearchedSettings | undefined {
   const modelOf = new Map(input.targets.map((target) => [target.providerRef, target.model] as const));
   const members = input.members.flatMap((member): WebStepMember[] => {
@@ -351,5 +375,5 @@ export function composeWebResearched(input: Readonly<{
   });
   if (!members.some((member) => (WEB_TOP_READER_MODEL_ORDER as readonly string[]).includes(member.model))) return undefined;
   return Object.freeze({ pool: input.pool, members: Object.freeze(members), search: input.search, searchSeamOf: input.searchSeamOf,
-    ...(input.log === undefined ? {} : { log: input.log }) });
+    ...(input.log === undefined ? {} : { log: input.log }), ...(input.settingsVersionOf === undefined ? {} : { settingsVersionOf: input.settingsVersionOf }) });
 }

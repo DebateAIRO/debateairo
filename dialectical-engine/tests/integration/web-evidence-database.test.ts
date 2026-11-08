@@ -100,7 +100,7 @@ async function webStep(repository: PostgresWebEvidenceRepository, run: string, p
     const reading = randomUUID();
     readings.push(reading);
     expect(await repository.recordReading({ runId: run, readingId: reading, pageId: page!, reader, maker, outcome: "READ",
-      grade: reader === 1 ? 3 : 2, line: await sealed(run, "identity.web_reading", reading) })).toBe("RECORDED");
+      grade: reader === 1 ? 3 : 2, line: await sealed(run, "identity.web_reading", reading), settingsVersion: 4 })).toBe("RECORDED");
   }
   const extract = randomUUID();
   expect(await repository.recordExtract({ runId: run, extractId: extract, pageId: pages[0]!, label: "S1-1", foundBy: [1, 2],
@@ -227,10 +227,10 @@ describe("0132 the runner writes and reads a debate's web step", () => {
     const otherStep = await webStep(repository, other, "pos-9");
     const reading = randomUUID();
     expect(await repository.recordReading({ runId: run, readingId: reading, pageId: step.pages[1]!, reader: 2, maker: "anthropic",
-      outcome: "READ", grade: 1, line: await sealed(run, "identity.web_reading", reading) })).toBe("SAME_MAKER");
+      outcome: "READ", grade: 1, line: await sealed(run, "identity.web_reading", reading), settingsVersion: 4 })).toBe("SAME_MAKER");
     const failed = randomUUID();
     expect(await repository.recordReading({ runId: run, readingId: failed, pageId: step.pages[1]!, reader: 2, maker: "zhipu",
-      outcome: "FAILED", grade: null, line: null })).toBe("RECORDED");
+      outcome: "FAILED", grade: null, line: null, settingsVersion: 4 })).toBe("RECORDED");
     const extract = randomUUID();
     expect(await repository.recordExtract({ runId: run, extractId: extract, pageId: otherStep.pages[0]!, label: "S1-2", foundBy: [1],
       quote: await sealed(run, "identity.web_extract", extract) })).toBe("NO_PAGE");

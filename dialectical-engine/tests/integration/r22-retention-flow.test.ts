@@ -148,7 +148,7 @@ describe("the deletion and what later steps read", () => {
       await store.recordPage({ runId, pageId, searchId, rank: 1, readDepth: "whole", about: seal(WEB_EVIDENCE_CARRIERS.page, pageId, { url: "https://s.example/a", site: "s.example", title: "A", date: null }),
         text: { chars: text.length, digest: Buffer.alloc(32, 9), sealed: seal(WEB_EVIDENCE_CARRIERS.pageText, pageId, text) } });
       await store.recordReading({ runId, readingId, pageId, reader: 1, maker: "anthropic", outcome: "READ", grade: 3,
-        line: seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: "One line.", language: "en", note: "It is a report. It found queues doubled. It leaves out buses." }) });
+        line: seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: "One line.", language: "en", note: "It is a report. It found queues doubled. It leaves out buses." }), settingsVersion: 4 });
       await store.recordExtract({ runId, extractId, pageId, label: "S1-1", foundBy: [1], quote: seal(WEB_EVIDENCE_CARRIERS.extract, extractId, { quote: PASSAGE }) });
       await store.recordPicks(runId, "a1", [pageId]);
       await store.recordPack({ runId, packId, pathRef: "a1", extractLabels: ["S1-1"], pack: seal(WEB_EVIDENCE_CARRIERS.pack, packId, { path_ref: "a1", pages: [], extracts: [] }) });

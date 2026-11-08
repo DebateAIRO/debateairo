@@ -765,7 +765,7 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 // Side-by-side spec §13 (migration 0124, plan S1, D8), in source order: the activation pointer's one reader for the API's
-// role alone (the runner's login holds debateai_runtime only, so it cannot read the pointer), then the two pass readers
+// role (the runner's login holds debateai_runtime only; 0169, the owner's answer of 8 Nov, grants it the reader too), then the two pass readers
 // for the runtime. The release owner and operator stay outside this manifest until Phase 3 (sideBySideReleaseRoles).
 {
   "roleName": "debateai_billing_runtime",
@@ -1537,6 +1537,42 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_runtime",
   "source": "migrations/0166_main_answer_times.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_main_answer_times(uuid)"]
+},
+// V4 start step, Task 56h (0167): a visitor's report of a public debate nothing else can carry, on a run of their own made for it (the API's role).
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0167_public_report_own_carrier.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)"]
+},
+// V4 start step, Task 57j (0168): until when a set-aside debate's charges are the site's, for the readers' owner (they call it as their definer)
+// and the shared runtime role (packages/budget's subscription reader runs as it). Its table of Continues is read by no role.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0168_set_aside_continue.sql",
+  "grants": ["EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0168_set_aside_continue.sql",
+  "grants": ["EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"]
+},
+// V4 start step, Task 57o-fix (0169; the owner's answer of 8 Nov, "Your switched-on one (Recommended)": "the runner may read which settings are
+// switched on (a number, nothing private)"): 0124's pointer reader for the runner's role too, for a background piece of an older debate.
+// Task 57p (the owner's answer of 8 Nov, "On each piece's record"): the ten writers that store which settings wrote each piece, the runner's alone.
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0169_piece_settings_version.sql",
+  "grants": ["EXECUTE ON FUNCTION register.read_active_settings_version()",
+    "EXECUTE ON FUNCTION identity.record_web_reading_with_settings(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_with_settings(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version_with_settings(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line_with_settings(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_main_answer_update_with_settings(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_check_passed_with_settings(uuid,uuid,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_answer_update_with_settings(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_report_with_settings(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))

@@ -185,7 +185,7 @@ describe("0137: a stranger's dig joins a public tree", () => {
     expect(await tree.readTurn(updateId)).toMatchObject({ state: "FRONT", base_kind: null, base_id: null });
     const row = { updateId, basedOn: null, outcome: "READY" as const, failureCode: null, changed: true, fateBefore: "HELD_UP" as const,
       fateAfter: "PARTLY_HELD" as const, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [],
-      content: await sealed(dig, "identity.path_update", updateId) };
+      content: await sealed(dig, "identity.path_update", updateId), settingsVersion: 4 };
     expect(await tree.record(row)).toBe("RECORDED");
     expect(await tree.record(row)).toBe("ALREADY");
     // Not checked yet: it holds the path, and is no one's text. A climb of another dig of the same path waits.
@@ -224,7 +224,8 @@ describe("0137: a stranger's dig joins a public tree", () => {
     const updateId = randomUUID();
     await tree.takeTurn({ updateId, runId: dig, parentRunId: root, positionRef: "pos-1", kind: "PUBLIC_DIG", climbStep: 0, causeKind: "DIG_SETTLED", causeId: null });
     await tree.record({ updateId, basedOn: null, outcome: "READY", failureCode: null, changed: true, fateBefore: "HELD_UP", fateAfter: "FELL",
-      writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [], content: await sealed(dig, "identity.path_update", updateId) });
+      writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [], content: await sealed(dig, "identity.path_update", updateId),
+      settingsVersion: 4 });
     expect(await runnerRepo.settleCheck(dig, "REFUSED", randomUUID())).toBe("RECORDED");
     expect(await new PostgresTreeUpdateRepository(api).readLine(ana.ownerRef, root)).toEqual([]);
     expect((await runnerRepo.recordPageUpdate({ updateId: randomUUID(), publicationRef, kind: "PATH", positionRef: "pos-1", digRunId: dig,
@@ -338,7 +339,7 @@ describe("0138: the climb's turns, the one line and the main answer", () => {
     const rewriteId = randomUUID();
     const rewrite = { rewriteId, digRunId: dig, parentAnswerVersion: 1, basedOnRewriteId: null, outcome: "READY" as const, failureCode: null,
       fateBefore: "HELD_UP" as const, fateAfter: "FELL" as const, verdict: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1,
-      artifactRefs: [], content: await sealed(dig, "identity.path_rewrite", rewriteId) };
+      artifactRefs: [], content: await sealed(dig, "identity.path_rewrite", rewriteId), settingsVersion: 4 };
     expect(await tree.recordRewriteInLine({ kind: "PATH_UPDATE", id: randomUUID() }, rewrite)).toBe("BASE_MOVED");
     expect(await tree.recordRewriteInLine(null, rewrite)).toBe("RECORDED");
     expect(await tree.recordRewriteInLine(null, rewrite)).toBe("ALREADY");
@@ -348,7 +349,7 @@ describe("0138: the climb's turns, the one line and the main answer", () => {
     expect(await tree.readTurn(updateId)).toMatchObject({ state: "FRONT", base_kind: "PATH_REWRITE", base_id: rewriteId, climb_step: 1, cause_id: rewriteId });
     const row = { updateId, basedOn: { kind: "PATH_REWRITE" as const, id: rewriteId }, outcome: "READY" as const, failureCode: null, changed: false,
       fateBefore: "FELL" as const, fateAfter: "FELL" as const, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: ["a"],
-      content: await sealed(dig, "identity.path_update", updateId) };
+      content: await sealed(dig, "identity.path_update", updateId), settingsVersion: 4 };
     expect(await tree.record({ ...row, basedOn: null })).toBe("BASE_MOVED");
     // Plain text is refused: the run must use encryption and the envelope must be bound.
     expect((await sqlError(() => tree.record({ ...row, content: { envelope: { plain: "text" } as never, attestation: Buffer.alloc(32) } }))).message).toBe("CONTENT_ATTESTATION_REQUIRED");
@@ -382,7 +383,7 @@ describe("0138: the climb's turns, the one line and the main answer", () => {
     const updateId = randomUUID();
     const record = { updateId, rootRunId: root, basedOnUpdateId: null, triggerKind: "PATH_UPDATE" as const, triggerId: trigger, triggerRunId: dig,
       paidByOwnerRef: dan.ownerRef, outcome: "READY" as const, failureCode: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [],
-      spentMicros: 123, content: await sealed(root, "identity.main_answer_update", updateId) };
+      spentMicros: 123, content: await sealed(root, "identity.main_answer_update", updateId), settingsVersion: 4 };
     expect((await sqlError(() => tree.recordMainAnswer({ ...record, content: { envelope: ENVELOPE as never, attestation: Buffer.alloc(32) } }))).message).toBe("CONTENT_ATTESTATION_INVALID");
     expect(await tree.recordMainAnswer(record)).toEqual({ outcome: "RECORDED", answerSeq: 1 });
     expect(await tree.recordMainAnswer(record)).toEqual({ outcome: "ALREADY", answerSeq: 1 });
@@ -510,7 +511,7 @@ describe("0139: the deletion keeps the quote and the notes", () => {
     expect((await repo.wipe(dig, "NOTHING_RUNS")).outcome).toBe("STILL_RUNNING");
     await runner.query("SELECT * FROM identity.take_path_rewrite_turn($1,$2,'pos-1')", [dig, root]);
     await new PostgresTreeUpdateRunnerRepository(runner).recordRewriteInLine(null, { rewriteId: randomUUID(), digRunId: dig, parentAnswerVersion: 1, basedOnRewriteId: null,
-      outcome: "FAILED", failureCode: "FIXTURE_FAILED", fateBefore: "HELD_UP", fateAfter: null, verdict: null, writerLineage: null, checkerLineage: null, rounds: 0, artifactRefs: [], content: null });
+      outcome: "FAILED", failureCode: "FIXTURE_FAILED", fateBefore: "HELD_UP", fateAfter: null, verdict: null, writerLineage: null, checkerLineage: null, rounds: 0, artifactRefs: [], content: null, settingsVersion: 4 });
     expect((await repo.wipe(dig, "NOTHING_RUNS")).outcome).toBe("WIPED");
     await work(failed, "FAILED");
     expect((await repo.wipe(failed, "NOTHING_RUNS")).outcome).toBe("WIPED");

@@ -977,7 +977,7 @@ describe("data export over a real database and encrypted file store", () => {
           .toBe("RECORDED");
       }
       expect(await web.recordReading({ runId, readingId: reading, pageId: top, reader: 1, maker: "anthropic", outcome: "READ", grade: 3,
-        line: seal("identity.web_reading", reading, { line: "e15-reader-line" }) })).toBe("RECORDED");
+        line: seal("identity.web_reading", reading, { line: "e15-reader-line" }), settingsVersion: 4 })).toBe("RECORDED");
       expect(await web.recordExtract({ runId, extractId: extract, pageId: top, label: "S1-1", foundBy: [1],
         quote: seal("identity.web_extract", extract, { quote: "e15-short-quote" }) })).toBe("RECORDED");
       expect(await web.recordPicks(runId, "pos-1", [top])).toBe("RECORDED");

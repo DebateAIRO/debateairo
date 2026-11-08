@@ -674,7 +674,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0142_team_limit.sql",
       "0143_run_handover.sql",
       "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql"
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

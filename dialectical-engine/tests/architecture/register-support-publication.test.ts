@@ -60,9 +60,13 @@ function readerClassification(site:ReturnType<typeof latestRegisterSites>[number
  * pointer category, pinned the way the 0103 allow-list above is. The pointer (`register.settings_activation`) has ONE
  * SQL reader, `register.read_active_settings_version()`; 0124's activation, the release switch's hook and the switch's
  * commit check read it only through that function (R1). A site is pinned only while the file's bytes, the exact
- * {signature, line} and the catalog evidence (owner NOLOGIN without members; the runner's role cannot call it; only
- * the API's billing role and the release operator can) all hold; anything else is LIVE_OR_UNVERIFIED_POINTER_READER.
+ * {signature, line} and the catalog evidence (owner NOLOGIN without members; the API's billing role, the release operator
+ * and, since 0169, the runner's role can call it, and no other) all hold; anything else is LIVE_OR_UNVERIFIED_POINTER_READER.
  * A pointer name that merely slips past the latest-version regex above is exactly what this category catches.
+ * V4 start step, Task 57o-fix (the owner's answer of 8 Nov, "Your switched-on one (Recommended)": "the runner may read which
+ * settings are switched on (a number, nothing private) ... (0169)"): D8's "the runner never names it" became "the runner names
+ * it once": its reader of the switched-on version (run-settings.ts), for a background piece of a debate whose own version it
+ * refuses; 0169 grants debateai_runtime EXECUTE (and so its two member roles); the pointer's table stays unreadable to it.
  */
 const ACTIVATION_POINTER_FILE="migrations/0124_settings_activation.sql";
 const ACTIVATION_POINTER_SHA="2db64b6e96273123bfb3f7e4daecf33bb57514fbfb9dc44be608e9de2ed64a2f";
@@ -72,13 +76,21 @@ const ACTIVATION_POINTER_SITES=Object.freeze([
   {signature:"register.release_switch_settings_hook(text,bigint)",line:281},
   {signature:"register.settings_switch_check_at_commit()",line:303}
 ]);
-/** The only non-owner, non-superuser roles that may EXECUTE the reader (0124's two GRANT lines), sorted. */
-const ACTIVATION_POINTER_EXECUTE_HOLDERS=Object.freeze(["debateai_billing_runtime","debateai_release_operator"]);
+/**
+ * The only non-owner, non-superuser roles that may EXECUTE the reader (0124's two GRANT lines and 0169's, which reaches the runtime
+ * role's two members too: has_function_privilege follows membership), sorted.
+ */
+const ACTIVATION_POINTER_EXECUTE_HOLDERS=Object.freeze(["debateai_authorization_runtime","debateai_billing_runtime","debateai_release_operator","debateai_runtime"]);
 /** R2 + R15: the TypeScript files outside tests/ that may name the pointer, each under its own rule below. */
 const ACTIVATION_POINTER_API_FILE="apps/api/src/active-settings-version.ts";
 const ACTIVATION_POINTER_OPERATOR_FILE="tools/settings-version/settings-operator.ts";
 const ACTIVATION_POINTER_SCHEMA_FILE="packages/db/src/schema.ts";
 const ACTIVATION_POINTER_FORWARD_FILE="packages/db/src/migration-forward0124.ts";
+/** Task 57o-fix (0169): the runner's one reader of the switched-on version, the grant's migration and its forward step's evidence. */
+const ACTIVATION_POINTER_RUNNER_FILE="apps/runner/src/run-settings.ts";
+const ACTIVATION_POINTER_GRANT_FILE="migrations/0169_piece_settings_version.sql";
+const ACTIVATION_POINTER_GRANT_FORWARD_FILE="packages/db/src/migration-forward0169.ts";
+const ACTIVATION_POINTER_RUNNER_GRANT="GRANT EXECUTE ON FUNCTION register.read_active_settings_version() TO debateai_runtime;";
 /**
  * Case-INSENSITIVE (Postgres folds unquoted names: `REGISTER.READ_ACTIVE_SETTINGS_VERSION()` is the same call) and
  * whole-word: `_` is a word character, so packages/db/src/release-state.ts's SETTINGS_ACTIVATION_CONFLICT (a code, not a
@@ -118,7 +130,7 @@ function pointerSiteClassification(site:ReturnType<typeof activationPointerSites
   return site.file===ACTIVATION_POINTER_FILE && createHash('sha256').update(source).digest('hex')===ACTIVATION_POINTER_SHA
     && ACTIVATION_POINTER_SITES.some(expected=>expected.signature===site.signature && expected.line===site.line)
     && evidence.readerOwner==='debateai_release_owner' && !evidence.ownerLogin && evidence.ownerMemberships===0
-    && !evidence.runtimeExecute && evidence.executeHolders.join(',')===ACTIVATION_POINTER_EXECUTE_HOLDERS.join(',')
+    && evidence.runtimeExecute && evidence.executeHolders.join(',')===ACTIVATION_POINTER_EXECUTE_HOLDERS.join(',')
     && !evidence.runtimeTableSelect && evidence.tableSelectHolders.join(',')===ACTIVATION_POINTER_TABLE_SELECT_HOLDERS.join(',')
     ? 'PINNED_ACTIVATION_POINTER_SITE' : 'LIVE_OR_UNVERIFIED_POINTER_READER';
 }
@@ -176,12 +188,20 @@ function functionsReaching(root:ts.SourceFile,constant:string):ReadonlySet<strin
  * R2 + R15, file by file: the migration as written; the API's reader (the SQL text exactly ONCE, as one top-level module
  * constant both its readers reach: the cached reader and `readActiveSettingsVersionOn`); the operator (the reader's
  * call exactly once, plus at most one table read: the rollback's history, R78); files under tests/; the Drizzle table and 0124's postcondition evidence (no SQL
- * reading the table; the reader's name only as an entry of the evidence FUNCTIONS list). Anything else fails.
+ * reading the table; the reader's name only as an entry of the evidence FUNCTIONS list). Task 57o-fix (0169): the runner's reader (the
+ * SQL text exactly ONCE, one top-level module constant only createSwitchedOnSettingsReader reaches); 0169's migration (no read, only its
+ * one GRANT names the reader as a call; not pinned by digest, so Task 57p can add its columns); 0169's evidence, as 0124's. Anything else fails.
  */
 function pointerFileClassification(file:string,source:string) {
   if(!namesPointer(file,source))return 'NO_POINTER_NAME';
   if(file===ACTIVATION_POINTER_FILE)return createHash('sha256').update(source).digest('hex')===ACTIVATION_POINTER_SHA
     ?'ACTIVATION_POINTER_MIGRATION':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  if(file===ACTIVATION_POINTER_GRANT_FILE){
+    const code=source.replace(/--[^\n]*/gu,comment=>' '.repeat(comment.length));
+    const calls=[...code.matchAll(new RegExp(POINTER_READER_CALL.source,'giu'))];
+    return activationPointerSites(file,source).length===0&&!POINTER_TABLE_READ.test(code)&&calls.length===1
+      &&code.split(ACTIVATION_POINTER_RUNNER_GRANT).length===2?'RUNNER_GRANT_MIGRATION':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  }
   if(/^tests\//u.test(file))return 'TEST_FILE';
   if(!/[.][cm]?[jt]s$/u.test(file))return 'LIVE_OR_UNVERIFIED_POINTER_READER';
   const tokens=pointerNameTokens(file,source);
@@ -213,12 +233,22 @@ function pointerFileClassification(file:string,source:string) {
     }
     return 'OPERATOR_POINTER_READER';
   }
+  if(file===ACTIVATION_POINTER_RUNNER_FILE){
+    const literal=tokens[0];
+    const declaration=literal?.parent;
+    if(tokens.length!==1||!ts.isStringLiteralLike(literal!)||!POINTER_READER_CALL.test(tokenText(literal!))||POINTER_TABLE_READ.test(tokenText(literal!))
+      ||declaration===undefined||!ts.isVariableDeclaration(declaration)||!ts.isIdentifier(declaration.name)
+      ||!ts.isVariableDeclarationList(declaration.parent)||(declaration.parent.flags&ts.NodeFlags.Const)===0
+      ||!ts.isVariableStatement(declaration.parent.parent)||!ts.isSourceFile(declaration.parent.parent.parent))return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+    return [...functionsReaching(declaration.parent.parent.parent,declaration.name.text)].join(',')==='createSwitchedOnSettingsReader'
+      ?'RUNNER_POINTER_READER':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  }
   const readsTable=tokens.some(node=>POINTER_TABLE_READ.test(tokenText(node)));
   if(file===ACTIVATION_POINTER_SCHEMA_FILE){
     return !readsTable&&!/read_active_settings_version/iu.test(source)&&!tokens.some(node=>/read_active_settings_version/iu.test(tokenText(node)))
       ?'MIGRATION_MACHINERY':'LIVE_OR_UNVERIFIED_POINTER_READER';
   }
-  if(file===ACTIVATION_POINTER_FORWARD_FILE){
+  if(file===ACTIVATION_POINTER_FORWARD_FILE||file===ACTIVATION_POINTER_GRANT_FORWARD_FILE){
     const evidenceOnly=tokens.filter(node=>/read_active_settings_version/iu.test(tokenText(node))).every(node=>{
       const list=node.parent;
       const holder=list!==undefined&&ts.isArrayLiteralExpression(list)?list.parent:undefined;
@@ -931,7 +961,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     expect([...new Set(markerCapableGenericCalls)]).toEqual([]);
   });
 
-  it("pins the activation pointer's readers: 0124's sites, the two TypeScript readers, the runner's silence, and the catalog", async () => {
+  it("pins the activation pointer's readers: 0124's sites, the three TypeScript readers (the runner's since 0169), and the catalog", async () => {
     // Side-by-side spec §13, plan D8, task S16 (rulings R1, R2, R15). The census is git's, as above, plus deploy/.
     const listed = await execFileAsync("git", [
       "ls-files", "--cached", "--others", "--exclude-standard", "--", ...ACTIVATION_POINTER_CENSUS_ROOTS
@@ -944,23 +974,27 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     const named = [...sources].filter(([file, source]) => namesPointer(file, source))
       .map(([file, source]) => ({ file, kind: pointerFileClassification(file, source) }));
     expect(named.filter(({ kind }) => kind === "LIVE_OR_UNVERIFIED_POINTER_READER")).toEqual([]);
-    expect(named.filter(({ kind }) => kind !== "TEST_FILE")).toEqual([
+    expect(named.filter(({ kind }) => kind !== "TEST_FILE").sort((left, right) => left.file.localeCompare(right.file))).toEqual([
       { file: ACTIVATION_POINTER_API_FILE, kind: "API_POINTER_READER" },
+      { file: ACTIVATION_POINTER_RUNNER_FILE, kind: "RUNNER_POINTER_READER" },
       { file: ACTIVATION_POINTER_FILE, kind: "ACTIVATION_POINTER_MIGRATION" },
+      { file: ACTIVATION_POINTER_GRANT_FILE, kind: "RUNNER_GRANT_MIGRATION" },
       { file: ACTIVATION_POINTER_FORWARD_FILE, kind: "MIGRATION_MACHINERY" },
+      { file: ACTIVATION_POINTER_GRANT_FORWARD_FILE, kind: "MIGRATION_MACHINERY" },
       { file: ACTIVATION_POINTER_SCHEMA_FILE, kind: "MIGRATION_MACHINERY" },
       { file: ACTIVATION_POINTER_OPERATOR_FILE, kind: "OPERATOR_POINTER_READER" }
     ]);
     expect(named.filter(({ kind }) => kind === "TEST_FILE").every(({ file }) => file.startsWith("tests/"))).toBe(true);
 
-    // The negative scan the spec names: the runner never names the pointer nor imports a reader of it; no other file
-    // under packages/ names it (R2/R15: only the Drizzle table and 0124's evidence); the release tooling under deploy/
-    // (settings-version.mjs, release-switch.mjs, release-check.mjs) calls the operator CLI and names neither.
+    // The negative scan the spec names: the runner names the pointer only in its one reader (Task 57o-fix, 0169) and imports
+    // no reader of it; no other file under packages/ names it (R2/R15: only the Drizzle table and 0124's and 0169's evidence);
+    // the release tooling under deploy/ (settings-version.mjs, release-switch.mjs, release-check.mjs) calls the operator CLI
+    // and names neither.
     const runnerNaming = [...sources].filter(([file, source]) => file.startsWith("apps/runner/") && namesPointer(file, source));
-    expect(runnerNaming.map(([file]) => file)).toEqual([]);
+    expect(runnerNaming.map(([file]) => file)).toEqual([ACTIVATION_POINTER_RUNNER_FILE]);
     const packagesNaming = [...sources].filter(([file, source]) => file.startsWith("packages/") && namesPointer(file, source))
-      .map(([file]) => file);
-    expect(packagesNaming).toEqual([ACTIVATION_POINTER_FORWARD_FILE, ACTIVATION_POINTER_SCHEMA_FILE]);
+      .map(([file]) => file).sort();
+    expect(packagesNaming).toEqual([ACTIVATION_POINTER_FORWARD_FILE, ACTIVATION_POINTER_GRANT_FORWARD_FILE, ACTIVATION_POINTER_SCHEMA_FILE]);
     expect(sources.get("packages/db/src/release-state.ts")).toContain("SETTINGS_ACTIVATION_CONFLICT");
     const deployNaming = [...sources].filter(([file, source]) => file.startsWith("deploy/") && namesPointer(file, source));
     expect(deployNaming.map(([file]) => file)).toEqual([]);
@@ -1005,7 +1039,7 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
         WHERE f.oid = 'register.read_active_settings_version()'::regprocedure`)).rows[0];
       const evidence = await state();
       expect(evidence).toEqual({
-        readerOwner: "debateai_release_owner", ownerLogin: false, ownerMemberships: 0, runtimeExecute: false,
+        readerOwner: "debateai_release_owner", ownerLogin: false, ownerMemberships: 0, runtimeExecute: true,
         executeHolders: [...ACTIVATION_POINTER_EXECUTE_HOLDERS],
         runtimeTableSelect: false, tableSelectHolders: [...ACTIVATION_POINTER_TABLE_SELECT_HOLDERS]
       });
@@ -1062,6 +1096,19 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
       const apiSource = sources.get(ACTIVATION_POINTER_API_FILE)!;
       expect(pointerFileClassification(ACTIVATION_POINTER_API_FILE, apiSource
         + '\nexport const again = "SELECT register.read_active_settings_version()";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      // Task 57o-fix: the runner's reader stays allowed only in its exact form too: a second SQL text, a table read, or the
+      // constant reached from another function fails; so does 0169 with a read of the pointer or a second grant.
+      const runnerSource = sources.get(ACTIVATION_POINTER_RUNNER_FILE)!;
+      for (const planted of ['\nexport const again = "SELECT register.read_active_settings_version()";',
+        '\nexport const table = "SELECT a.register_version FROM register.settings_activation AS a";',
+        "\nexport function other() { return SWITCHED_ON_SETTINGS_SQL; }"]) {
+        expect(pointerFileClassification(ACTIVATION_POINTER_RUNNER_FILE, runnerSource + planted), planted).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      }
+      const grantSql = sources.get(ACTIVATION_POINTER_GRANT_FILE)!;
+      for (const planted of ["\nSELECT register.read_active_settings_version();", "\nSELECT a.register_version FROM register.settings_activation AS a;",
+        "\nGRANT EXECUTE ON FUNCTION register.read_active_settings_version() TO debateai_replay;"]) {
+        expect(pointerFileClassification(ACTIVATION_POINTER_GRANT_FILE, grantSql + planted), planted).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      }
       const operatorSource = sources.get(ACTIVATION_POINTER_OPERATOR_FILE)!;
       expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
         + '\nexport const again = "SELECT register.read_active_settings_version()";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
@@ -1078,17 +1125,28 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
       expect(pointerFileClassification(ACTIVATION_POINTER_SCHEMA_FILE, sources.get(ACTIVATION_POINTER_SCHEMA_FILE)!
         + "\n// register.read_active_settings_version()")).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
 
-      // Proof 3: a temporary grant to the runner's role breaks the evidence; revoked, the catalog is as before.
-      await db.pool.query("GRANT EXECUTE ON FUNCTION register.read_active_settings_version() TO debateai_runtime");
+      // Proof 3: a temporary grant to another role breaks the evidence; revoked, the catalog is as before. Task 57o-fix: and the
+      // runner's grant (0169) taken away breaks it too; given back, the catalog is as before.
+      await db.pool.query("GRANT EXECUTE ON FUNCTION register.read_active_settings_version() TO debateai_replay");
       try {
         const granted = await state();
-        expect(granted.runtimeExecute).toBe(true);
-        expect(granted.executeHolders).toContain("debateai_runtime");
+        expect(granted.executeHolders).toContain("debateai_replay");
         for (const site of pinned) {
           expect(pointerSiteClassification(site, pointerSql, granted)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
         }
       } finally {
-        await db.pool.query("REVOKE EXECUTE ON FUNCTION register.read_active_settings_version() FROM debateai_runtime");
+        await db.pool.query("REVOKE EXECUTE ON FUNCTION register.read_active_settings_version() FROM debateai_replay");
+      }
+      expect(await state()).toEqual(evidence);
+      await db.pool.query("REVOKE EXECUTE ON FUNCTION register.read_active_settings_version() FROM debateai_runtime");
+      try {
+        const revoked = await state();
+        expect(revoked.runtimeExecute).toBe(false);
+        for (const site of pinned) {
+          expect(pointerSiteClassification(site, pointerSql, revoked)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+        }
+      } finally {
+        await db.pool.query("GRANT EXECUTE ON FUNCTION register.read_active_settings_version() TO debateai_runtime");
       }
       expect(await state()).toEqual(evidence);
       // Proof 3b, the table backstop: a temporary SELECT on the pointer table for the runner's role breaks it too.

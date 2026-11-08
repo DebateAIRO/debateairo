@@ -159,6 +159,12 @@ export type TreeUpdateSettings = Readonly<{
   wait?: Readonly<{ pollMs: number; maxWaitMs: number; sleep?: (ms: number) => Promise<void> }>;
   /** Shared with the rewrite and both sweeps, so nothing runs a second copy beside a live one (paid twice). */
   inFlight?: PathRewriteInFlight;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version a run's calls are charged
+   * under now, read from the runner's one run → version map (`runSettingsVersions.versionOf`, main.ts); each row written notes it for
+   * the DIG whose run its calls were charged to (a level's and a main-answer version's alike; never the root). Absent, or no version held for that run (local mode, tests): the row notes none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   log?: (event: string, detail: Record<string, unknown>) => void;
   /**
    * THE ONE PLACE after a climb's rewrite is recorded, whatever it came out as: the path `positionRef` of `parentRunId` has a new row.
@@ -379,7 +385,8 @@ async function writeLevel(settings: TreeUpdateSettings, level: Level, log: Log):
     const base: PathLineBase | null = turn.base_kind === null || turn.base_id === null ? null : Object.freeze({ kind: turn.base_kind, id: turn.base_id });
     const wrote: { level: ClimbLevelWritten | null } = { level: null };
     const record = await composeLevel(settings, level, updateId, base, log, (written) => { wrote.level = written; });
-    const stored = await ports.tree.record(record);
+    // Task 57p: the level notes the version the dig's calls were charged under.
+    const stored = await ports.tree.record({ ...record, settingsVersion: settings.settingsVersionOf?.(level.digRunId) ?? null });
     log("PATH_CLIMB_STORED", { runId: level.digRunId, step: level.step, outcome: record.outcome, changed: record.changed,
       failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
@@ -549,7 +556,8 @@ async function updateMainAnswer(settings: TreeUpdateSettings, update: AnswerUpda
       if (versions.some((row) => row.trigger_kind === trigger && row.trigger_id.toLowerCase() === update.cause.id.toLowerCase())) return "ANSWER_UPDATED";
       const newest = versions.filter((row) => finishedState(row.outcome)).at(-1) ?? null;
       const record = await composeAnswer(settings, update, updateId, newest, log);
-      const stored = await ports.tree.recordMainAnswer(record);
+      // Task 57p: the version notes the settings its calls were charged under: the dig's, never the root's.
+      const stored = await ports.tree.recordMainAnswer({ ...record, settingsVersion: settings.settingsVersionOf?.(update.digRunId) ?? null });
       log("MAIN_ANSWER_STORED", { runId: update.digRunId, outcome: record.outcome, failureCode: record.failureCode, stored: stored.outcome, version: stored.answerSeq });
       if (stored.outcome === "BASE_MOVED") continue;
       return "ANSWER_UPDATED";
@@ -642,6 +650,13 @@ export type TreeSweepSettings = Readonly<{
   /** How far back it looks (longer than any stop of the runner a person would not notice). */
   windowMs?: number;
   limit?: number;
+  /**
+   * V4 start step, Task 57l: before a dig's climb or main-answer update, the dig (whose run every call names) is mapped to the settings
+   * version it owns now (run-settings.ts `runVersionMapper`; Task 57o: today's if its own is refused, 57o-fix: the owners' switched-on one): this process may never have claimed it.
+   * A dig whose version could not be mapped (a database failure) is skipped and logged, nothing sent, and asked again on a later pass.
+   * Absent: as before.
+   */
+  mapRun?: (runId: string) => Promise<void>;
   now?: () => Date;
 }>;
 
@@ -668,6 +683,13 @@ export async function sweepTreeUpdates(settings: TreeSweepSettings, finished: Se
     const release = settings.tree.inFlight === undefined ? () => undefined : settings.tree.inFlight.begin(digRunId);
     if (release === null) { skipped += 1; continue; }
     try {
+      try {
+        await settings.mapRun?.(digRunId);
+      } catch (error) {
+        log("TREE_SWEEP_UNMAPPED", { runId: digRunId, code: codeOf(error) });
+        skipped += 1;
+        continue;
+      }
       const outcome = await advanceTree(settings.tree, digRunId);
       if (outcome === "LEFT") { skipped += 1; continue; }
       // No finished rewrite yet: its own sweep writes it, and this one looks again.

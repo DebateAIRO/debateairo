@@ -122,13 +122,18 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const composed = (source: string) => flat(source).match(/const pathRewrite = composePathRewrite\(\{.*?\}\);/gu);
     expect(composed(RUNNER_MAIN)).toEqual(["const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }), members: "
       + "[providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), "
-      + "...providerTopology.additionalMakers], log: storyLog });"]);
+      + "...providerTopology.additionalMakers], settingsVersionOf: pieceSettingsVersionOf, log: storyLog });"]);
     expect(composed(PRACTICE_RUNNER)).toEqual(composed(RUNNER_MAIN));
+    // Task 57p (0169): both note each piece's settings version from their own run → version map.
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      expect(flat(source)).toContain("const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);");
+    }
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
       expect(flat(source)).toContain("...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),");
     }
     // The sweep is a process's: main.ts starts it after its worker; the practice runs one debate and starts none.
-    expect(flat(RUNNER_MAIN)).toContain("startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() })");
+    // Task 57l: the sweep maps each dig to its own settings version first (hosted and preview; none in local mode).
+    expect(flat(RUNNER_MAIN)).toContain("startPathRewriteSweep({ ...pathRewrite.sweep, ...mapRunOf, paused: () => retirementSignal.claimsStopped() })");
     expect(PRACTICE_RUNNER).not.toContain("startPathRewriteSweep");
   });
 

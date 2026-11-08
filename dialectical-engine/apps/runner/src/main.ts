@@ -51,7 +51,7 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf } from "./run-settings.js";
+import { createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, readRunSettingsVersionNow, createSwitchedOnSettingsReader, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, runVersionMapper } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -204,6 +204,12 @@ const siteVersionSettings = await runnerSettings.requireSettings(environment.REG
  */
 const runSettingsVersions = createRunSettingsVersions();
 const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+/**
+ * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): each piece's record notes the settings version of
+ * the run its calls were charged to, read from this same map (a claim's version, or a lane's mapping: its own, or today's, Task 57o). A run
+ * this process holds no version for notes none (NULL): local mode's background lanes, which map nothing.
+ */
+const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);
 /**
  * V4 start step, Task 53 (plan Review Focus 2): each claimed run's final-writer terms, by run id, set by the runner at the claim from
  * the run's own receipt, before any call: a v2 run's plan (Free or paid), a v1 run none. The preview call policy below reads it, so a
@@ -381,7 +387,7 @@ const writerTokenCount = (() => {
 })();
 const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
-  log: storyLog });
+  settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
 /**
  * W5-1: "WRITE MY REPORT", switched on: the closing (apps/runner/src/investigation-close.ts) on the runner's own pool,
  * Haiku writing and GLM checking, each call admitted against its plan's reserve at its target's price (hosted; local mode
@@ -390,13 +396,29 @@ const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(wri
 const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
 // R22 decision 18: the reserves are the plans row's, on the server. A version with none refuses every closing's call.
 const closingReserves = closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 };
-const investigationClose = composeInvestigationClose({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+/**
+ * V4 start step, Task 57l (S6): only a claim fills the run → version map, so a background lane charging a run this process never claimed (after a
+ * restart, or another process's claim) maps it first (`runVersionMapper`): "Write my report" (sweep and poke), the path-rewrite, tree and
+ * public tree sweeps, a public report's carrier (Task 56h) and "Add to researched". Today's rule (owner, 8 Nov; Task 57o-fix): the version the
+ * run owns now (after a Continue moved it, the one it was moved to); if this runner refuses that, the owners' switched-on version (0124's
+ * pointer, which 0169 lets the runner read, at most once a second); if that is refused too, this release's own (REGISTER_VERSION); with one
+ * DEBATEAI_RUNNER_RUN_SETTINGS_TODAY line. Hosted (the money seams) and on the preview (each call's thinking table) only; local mode reads no
+ * map, and maps nothing, as before.
+ */
+const runVersionMap = runnerSite.money === null && previewGate === undefined ? undefined
+  : runVersionMapper({ readVersion: (runId) => readRunSettingsVersionNow(pool, runId), requireSettings: (version) => runnerSettings.requireSettings(version),
+    versions: runSettingsVersions, switchedOnVersion: createSwitchedOnSettingsReader({ pool, siteVersion: environment.REGISTER_VERSION }),
+    siteVersion: environment.REGISTER_VERSION, log: (line) => { console.warn(JSON.stringify(line)); } });
+const mapRunOf = runVersionMap === undefined ? {} : { mapRun: runVersionMap };
+const investigationCloseComposed = composeInvestigationClose({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
   priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
   // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written
   // again; the sweep takes them once nothing runs either way.
   onReportSettled: (settled) => settled.outcome === "FAILED" ? undefined : wipeInvestigationPassages(pool, settled.rootRunId),
-  log: storyLog });
+  settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
+// Task 57l: the sweep's and the poke's closings map their root first.
+const investigationClose = investigationCloseComposed === undefined ? undefined : Object.freeze({ ...investigationCloseComposed, ...mapRunOf });
 /**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
  * preview, a gate-proven unbilled refusal gets the one 60-second resend, as at ask time, and the claim
@@ -635,18 +657,20 @@ const startupReconciliation = retireRequestStanding
 // Dig-model revision W3-7: a dig whose runner stopped mid-rewrite is rewritten again from the store (0135), at boot and
 // every five minutes, its answered calls replayed free; none while this release retires (claims stopped, §4).
 const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? null
-  : startPathRewriteSweep({ ...pathRewrite.sweep, paused: () => retirementSignal.claimsStopped() });
+  : startPathRewriteSweep({ ...pathRewrite.sweep, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
 // W5-1: an unreported closing ("Write my report" pressed) is written at boot and every minute, once its running digs and
 // their rewrites have settled (owner F7 A); none while this release retires.
 // R22 decisions 2 and 3: a climb or an answer update whose runner stopped goes on from the rows already there.
 const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
-  : startTreeSweep({ ...pathRewrite.treeSweep, paused: () => retirementSignal.claimsStopped() });
+  : startTreeSweep({ ...pathRewrite.treeSweep, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
 // Decision 13: a contribution to a public debate that stopped goes on, an allowed one climbs, and a report on a public debate is written. None while retiring.
 const publicReports = composePublicReport({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
-  priceOf: (providerRef) => closingPrices.get(providerRef) ?? null, log: storyLog });
+  priceOf: (providerRef) => closingPrices.get(providerRef) ?? null, log: storyLog, settingsVersionOf: pieceSettingsVersionOf,
+  // Task 56h: a report's carrier is charged to its own run's version's guard, as a claimed run is (S6); Task 57l: the one mapper above.
+  ...(runVersionMap === undefined ? {} : { mapCarrier: runVersionMap }) });
 const publicTreeSweep = pathRewrite === undefined || retireRequestStanding ? null
-  : startPublicTreeSweep({ ...pathRewrite.publicTree, reports: publicReports, paused: () => retirementSignal.claimsStopped() });
+  : startPublicTreeSweep({ ...pathRewrite.publicTree, reports: publicReports, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
 const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
   : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
 // R22 decision 7: whole page texts and passages go when nothing runs on a debate; other pages 30 days after last activity.
@@ -656,9 +680,9 @@ const passageSweep = retireRequestStanding ? null : startPassageSweep(pool, { pa
 const webResearchedSearch = runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard });
 const webResearched = composeWebResearched({ pool, targets: providerTargets,
   members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
-  search: webResearchedSearch.search, searchSeamOf: webResearchedSearch.searchSeamOf });
+  search: webResearchedSearch.search, searchSeamOf: webResearchedSearch.searchSeamOf, settingsVersionOf: pieceSettingsVersionOf });
 const webResearchedSweep = webResearched === undefined || retireRequestStanding ? null
-  : startWebResearchedSweep({ ...webResearched, paused: () => retirementSignal.claimsStopped() });
+  : startWebResearchedSweep({ ...webResearched, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,

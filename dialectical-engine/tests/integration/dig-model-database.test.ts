@@ -9,6 +9,7 @@ import {
   PostgresInvestigationRepository,
   PostgresWebEvidenceRepository,
   type PathRewriteRecord,
+  type PieceSettingsVersion,
   type Pool,
   type WebSealed
 } from "@debateai/db";
@@ -101,12 +102,14 @@ async function chain(owner: Account, depth: number): Promise<string[]> {
   }
   return runs;
 }
-async function ready(dig: string, basedOn: string | null, extra: Partial<PathRewriteRecord> = {}): Promise<PathRewriteRecord> {
+/** Task 57p (0169): the made-up settings version each rewrite notes (the dig's, whose run its calls were charged to). */
+const DIG_VERSION = 22;
+async function ready(dig: string, basedOn: string | null, extra: Partial<PathRewriteRecord & PieceSettingsVersion> = {}): Promise<PathRewriteRecord & PieceSettingsVersion> {
   const rewriteId = extra.rewriteId ?? randomUUID();
   return { rewriteId, digRunId: dig, parentAnswerVersion: 1, basedOnRewriteId: basedOn, outcome: "READY", failureCode: null,
     fateBefore: "HELD_UP", fateAfter: "PARTLY_HELD", verdict: { outcome: "HELPED", scope: "PATH" }, writerLineage: LINEAGE,
     checkerLineage: { maker: "zhipu", model: "fixture-checker" }, rounds: 1, artifactRefs: [randomUUID()],
-    content: await sealed(dig, rewriteId), ...extra };
+    content: await sealed(dig, rewriteId), settingsVersion: DIG_VERSION, ...extra };
 }
 const levelRows = async (owner: string): Promise<number> =>
   Number((await database.pool.query("SELECT count(*) AS n FROM identity.investigation_dig_level WHERE owner_ref=$1", [owner])).rows[0].n);
@@ -269,11 +272,16 @@ describe("0134 the path rewrite", () => {
     // The third must write on the second's rewrite.
     expect(await rewrites.recordRewrite(await ready(third, null))).toBe("BASE_MOVED");
     expect(await rewrites.readRewriteTurn(third)).toMatchObject({ state: "FRONT", base_rewrite_id: secondRecord.rewriteId });
-    const thirdRecord = await ready(third, secondRecord.rewriteId, { verdict: null });
+    const thirdRecord = await ready(third, secondRecord.rewriteId, { verdict: null, settingsVersion: 25 });
     expect(await rewrites.recordRewrite(thirdRecord)).toBe("RECORDED");
+    // Task 57p (0169): each rewrite notes the version that wrote it, the FAILED one too; the third was written under today's (25), not its own.
+    expect((await database.pool.query("SELECT path_seq, settings_version FROM identity.path_rewrite WHERE parent_run_id=$1 ORDER BY path_seq", [root])).rows
+      .map((row) => [row.path_seq, Number(row.settings_version)])).toEqual([[1, DIG_VERSION], [2, DIG_VERSION], [3, 25]]);
     const history = (await new PostgresDigModelRepository(api).readPathRewrites(person.ownerRef, root))!.paths;
     expect(history.map((entry) => [entry.path_seq, entry.state, entry.based_on_rewrite_id])).toEqual([
       [1, "FAILED", null], [2, "READY", null], [3, "READY", secondRecord.rewriteId]]);
+    // Nothing reads the version yet (0169): the page's reader names no such field.
+    expect(JSON.stringify(history)).not.toContain("settings_version");
   });
 
   it("P3 never keeps text in clear, nor a malformed rewrite; rows are insert-once", async () => {

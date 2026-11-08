@@ -227,6 +227,8 @@ export async function composePracticeRunner(input: Readonly<{
   // Side-by-side spec §13 (S6), as main.ts: each claimed run's version by run id, and each call's own version's guard.
   const runSettingsVersions = createRunSettingsVersions();
   const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+  // V4 start step, Task 57p (0169), as main.ts: each piece's record notes the version of the run its calls were charged to, from this map.
+  const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);
   // V4 start step, Task 53, as main.ts: each claimed run's final-writer terms by run id (a v2 run's plan), read by the call policy.
   const runFinalWriterTerms = createRunFinalWriterTerms();
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
@@ -343,14 +345,14 @@ export async function composePracticeRunner(input: Readonly<{
   })();
   const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
-    log: storyLog });
+    settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
   // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
   const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
   const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
     reserveMicros: closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 }, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
     priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
-    log: storyLog });
+    settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({
       preview: true,

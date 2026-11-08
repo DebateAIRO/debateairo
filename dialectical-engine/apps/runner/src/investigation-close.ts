@@ -172,6 +172,20 @@ export type InvestigationCloseSettings = Readonly<{
   onReportSettled?: (settled: InvestigationReportSettled) => Promise<void> | void;
   /** Decision 28: Anthropic's free token count for the writer's calls; absent (no Anthropic target): the byte guard alone. */
   tokenCount?: TokenCounter;
+  /**
+   * V4 start step, Task 57l: before the closing's calls, the ROOT run is mapped to the settings version it owns now (run-settings.ts
+   * `runVersionMapper`): the sweep and the poke charge a root this process may never have claimed (a restart; the poke's claim is the dig's).
+   * Task 57o: a root whose own version this runner refuses is mapped to today's and written (57o-fix: the owners' switched-on version; if
+   * this runner refuses that too, the release's own). Only a database failure
+   * leaves it: UNMAPPED, logged, nothing sent, and asked again on the next pass. Absent (local mode, tests): nothing mapped, as before.
+   */
+  mapRun?: (runId: string) => Promise<void>;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version a run's calls are charged
+   * under now, read from the runner's one run → version map (`runSettingsVersions.versionOf`, main.ts); each record written notes it for the
+   * run its calls were charged to. Absent, or no version held for that run (local mode, tests): the record notes none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   /** Decision 13: a report on a public debate: its report id is the row's own (the investigation id names it) and its calls are charged on their own sites. */
   publicReport?: Readonly<{ callSiteOf: (site: ReportSite, round: number) => string }>;
   /** The closing's one random source (F5); absent: 32 fresh random bytes per closing. Tests pass a fixed one. */
@@ -181,7 +195,7 @@ export type InvestigationCloseSettings = Readonly<{
   log?: (event: string, detail: Record<string, unknown>) => void;
 }>;
 
-export type InvestigationCloseOutcome = "WAITING" | "RECORDED" | "ALREADY" | "NO_CLOSING" | "RUNNING_HERE" | "NOT_RECORDED";
+export type InvestigationCloseOutcome = "WAITING" | "RECORDED" | "ALREADY" | "NO_CLOSING" | "RUNNING_HERE" | "NOT_RECORDED" | "UNMAPPED";
 
 export const INVESTIGATION_CLOSE_DEFAULTS = Object.freeze({ giveUpWaitingMs: 6 * 60 * 60_000, everyMs: 60_000, limit: 20 });
 /** The money refusal the story loop reads as its envelope speaking: the step keeps its last checked draft. */
@@ -253,9 +267,18 @@ export async function closeInvestigation(settings: InvestigationCloseSettings, c
       return "WAITING";
     }
     if (pending.length > 0) log("INVESTIGATION_REPORT_WAIT_GIVEN_UP", { investigationId: closing.investigationId, waiting: pending.length });
+    // Task 57l: the root's own settings version before any call (Task 57o: today's if its own is refused); a database failure leaves
+    // this closing for a later pass.
+    try {
+      await settings.mapRun?.(closing.rootRunId);
+    } catch (error) {
+      log("INVESTIGATION_REPORT_UNMAPPED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion, runId: closing.rootRunId, code: codeOf(error) });
+      return "UNMAPPED";
+    }
     const composed = await composeRecord(settings, closing, log);
     const { record, payer } = composed;
-    const stored = await settings.reports.record(record);
+    // Task 57p: the report notes the version its calls were charged under (the root's, mapped above).
+    const stored = await settings.reports.record({ ...record, settingsVersion: settings.settingsVersionOf?.(closing.rootRunId) ?? null });
     log("INVESTIGATION_REPORT_STORED", { investigationId: closing.investigationId, reportVersion: closing.reportVersion,
       outcome: record.outcome, storyOutcome: record.storyOutcome, failureCode: record.failureCode, ladderStep: record.ladderStep,
       spentMicros: record.spentMicros, stored });
