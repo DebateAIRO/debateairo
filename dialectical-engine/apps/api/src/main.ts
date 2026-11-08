@@ -2082,6 +2082,12 @@ const startup = installStartupResourceOwner({
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
     ...(dataExportPool === undefined ? [] : [dataExportPool]),
     supportPool,
+    // Row-level security S01: the two system pools close last among the pools, after every pool that routes to them as
+    // its cross-account target (pool and legacyAskAdmissionPool to systemPool, authorizationPool to
+    // authorizationSystemPool; setCrossAccountTarget above). Left open, their idle connections kept the process alive
+    // after SIGTERM until a supervisor killed it (preview-auth-dev-startup, 2026-11-08).
+    systemPool,
+    ...(authorizationSystemPool === systemPool ? [] : [authorizationSystemPool]),
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() },
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
