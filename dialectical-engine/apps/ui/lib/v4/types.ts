@@ -396,6 +396,17 @@ export type DigView = Readonly<{
    */
   quotaUntouched?: true;
   /**
+   * V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, "Continue the same dig"): FAILED, and its own run read says
+   * Continue would continue it where it stopped (the contract's `continuable`), so "Try this dig again" continues this dig. Absent:
+   * the server did not say so; the press digs afresh, as before.
+   */
+  continuable?: true;
+  /**
+   * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"): FAILED, and its own run read says it keeps failing
+   * (the contract's `keeps_failing`: two continues of it failed again), so its panel offers nothing more, only its line and the report.
+   */
+  keepsFailing?: true;
+  /**
    * map-f29 / dig-f20: DONE, a new-model dig: what it looked into, as its own answer names it (`Answer.dig.picks`: each
    * pick's words and who wrote them). Absent: not read yet, or a dig from before R22.
    */

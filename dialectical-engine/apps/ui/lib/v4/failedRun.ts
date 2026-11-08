@@ -74,6 +74,16 @@ export function continuingReason(reason: string | null | undefined, catalog: Mes
 }
 
 /**
+ * V4 start step, Task 57n (owner 8 Nov, "Drop it, like digs"): the reason sentence of a question that keeps failing (its read's
+ * `keeps_failing`). No ending promises another try: AIs unavailable drops "Please try again in a while." (a drafted line), and the
+ * our-side reasons drop their "ask again" ending as with Continue (continuingReason). Null: the shared sentence as it is.
+ */
+export function keepsFailingReason(reason: string | null | undefined, catalog: MessageCatalog): string | null {
+  if (runFailureKind(reason) === "MODELS_UNAVAILABLE") return t(catalog, "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE");
+  return continuingReason(reason, catalog);
+}
+
+/**
  * Question 20 A: the one quota line under a failed run's reason, as its catalogue key, or null when nothing is said. A
  * question: "Nothing was taken for the failed try." (NONE) or "The part that ran used some of your quota." (SOME). A dig:
  * "Nothing was taken from your quota for this." (NONE) only; a dig that used some says nothing about it (dig-f12).

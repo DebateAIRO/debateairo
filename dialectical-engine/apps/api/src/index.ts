@@ -11,7 +11,7 @@ import {
 import { addToResearched } from "./web-researched.js";
 import { continuePausedRun, monthPauseOf, type ContinuedRunWake, type MonthPausePort, type MonthRoomReader, type RunHandoverPort } from "./month-pause.js";
 // V4 start step, Task 57f: Continue also continues the person's own failed debate where it stopped.
-import { continueFailedRun, failedRunContinuable, type FailedRunContinueOptions } from "./run-continue.js";
+import { continueFailedRun, readFailedRunMark, type FailedRunContinueOptions } from "./run-continue.js";
 import {
   readInvestigationReports, reopenInvestigation, writeInvestigationReport, type InvestigationReportPorts
 } from "./investigation-report.js";
@@ -1936,6 +1936,11 @@ export type PublicTreeOptions = Readonly<{
   tree: PostgresPublicTreeRepository;
   contributions: PostgresPublicDebateRepository;
   readPublicDebate: (publicationRef: string) => Promise<PublicDebate | null>;
+  /**
+   * V4 start step, Task 56h: a run of the presser's own, made only to carry their report of a public debate nothing else can carry (its author left, nobody's
+   * dig is here); its id, or null when none can be made. Absent: such a press answers PUBLIC_DEBATE_NO_CARRIER, as before.
+   */
+  ownReportCarrier?: (presser: Readonly<{ ownerRef: string; userId: string; sessionId: string; free: boolean }>, publicationRef: string) => Promise<string | null>;
 }>;
 
 /**
@@ -4175,8 +4180,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (room.waitsForReset && !(await ownFirstReportLeftOnPage(ownerRef, publicationRef.data))) {
       return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_WAITS_FOR_RESET", message: "PUBLIC_DEBATE_WAITS_FOR_RESET" }));
     }
-    const press = await pressPublicReport({ ownerRef, publicationRef: publicationRef.data, reportId: randomUUID(), free: room.planId === "FREE", now: new Date(), pool: store.pool, tree: store.tree,
-      readPublicDebate: store.readPublicDebate });
+    // Task 56h: when nothing else can carry it, a run of the presser's own, made for this report (on their session, as their dig's run is).
+    const presser = request.authenticatedSession!;
+    const ownReportCarrier = store.ownReportCarrier;
+    const free = room.planId === "FREE";
+    const press = await pressPublicReport({ ownerRef, publicationRef: publicationRef.data, reportId: randomUUID(), free, now: new Date(), pool: store.pool, tree: store.tree,
+      readPublicDebate: store.readPublicDebate, ...(ownReportCarrier === undefined ? {} : {
+        ownCarrier: () => ownReportCarrier({ ownerRef, userId: presser.userId, sessionId: presser.session.session_id, free }, publicationRef.data) }) });
     switch (press.kind) {
       case "WRITING": return reply.status(202).send(PublicReportAcceptedSchema.parse({ state: "WRITING", report_version: press.reportVersion }));
       case "ONGOING": return reply.status(409).send(PublicDebateRefusedSchema.parse({ error: "PUBLIC_DEBATE_ONGOING", message: "PUBLIC_DEBATE_ONGOING" }));
@@ -5365,10 +5375,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // would continue it (./run-continue.ts, the rule the route shares), as far as the read can know; nothing when it cannot be read.
       const continueOwner = request.authenticatedSession?.ownerRef;
       const continueStore = options.failedRunContinue?.store;
-      const continuable = continueOwner !== undefined && continueStore !== undefined
-        && await Promise.resolve().then(() => continueStore.readContinue(continueOwner, runId)).then(failedRunContinuable, () => false);
-      const failed = quotaUsed === null && !continuable ? run
-        : RunProjectionSchema.parse({ ...run, ...(quotaUsed === null ? {} : { quota_used: quotaUsed }), ...(continuable ? { continuable: true } : {}) });
+      // Task 57j: a debate an update set aside, only where Continue would move it to this release (the route's hand-over).
+      // Task 57m: or `keeps_failing`, when only its two continues that failed again stand in the way.
+      const mark = continueOwner === undefined || continueStore === undefined ? null
+        : await Promise.resolve().then(() => readFailedRunMark({ ownerRef: continueOwner, runId }, {
+          store: continueStore, ...(options.runHandover === undefined ? {} : { handover: options.runHandover }) })).catch(() => null);
+      const failed = quotaUsed === null && mark === null ? run
+        : RunProjectionSchema.parse({ ...run, ...(quotaUsed === null ? {} : { quota_used: quotaUsed }),
+          ...(mark === "CONTINUABLE" ? { continuable: true } : {}), ...(mark === "KEEPS_FAILING" ? { keeps_failing: true } : {}) });
       // Decision 12: a debate an update set aside keeps what the AIs found readable on its page.
       if (failed.terminal_reason?.includes("RUN_SET_ASIDE:") === true && options.application.readRunFound !== undefined) {
         const found = await options.application.readRunFound(runId);

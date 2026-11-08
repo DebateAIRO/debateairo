@@ -1050,8 +1050,14 @@ export const RunProjectionSchema = z.object({
   // V4 start step, Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again"; Task 57e's
   // `reusable`, renamed), last: true when POST /v1/runs/{id}/continue would continue this FAILED debate, as far as the read can know: it is
   // the person's own, a first question or a dig, its content live, its stop ours (never their own act, a spending wall or a step's tries
-  // used up), not set aside by an upload, and not re-opened since it failed. Absent otherwise (the press is then 409 RUN_NOT_CONTINUABLE).
-  continuable: z.literal(true).optional()
+  // used up) or an upload's set-aside where Continue moves it to the release that is current (Task 57j), and fewer than 2 continues of it
+  // failed on our side (Task 57m; an update's set-aside is never one of them, Task 57m-fix). Absent otherwise (the press is then 409
+  // RUN_NOT_CONTINUABLE).
+  continuable: z.literal(true).optional(),
+  // V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"), last: true when this FAILED debate would be
+  // continuable but two continues of it already failed again, so Continue is no longer offered and the page says it keeps failing. Never
+  // beside `continuable`; absent for any other reason it cannot continue.
+  keeps_failing: z.literal(true).optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
@@ -1061,6 +1067,9 @@ export const RunProjectionSchema = z.object({
   }
   if (run.continuable !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", path: ["continuable"], message: "only a failed debate continues where it stopped" });
+  }
+  if (run.keeps_failing !== undefined && (run.state !== "FAILED" || run.continuable !== undefined)) {
+    context.addIssue({ code: "custom", path: ["keeps_failing"], message: "only a failed debate that cannot continue keeps failing" });
   }
   if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
     context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });

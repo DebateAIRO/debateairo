@@ -146,9 +146,12 @@ function digView(link: DigLink, state: DigView["state"], run?: RunProjection): D
   // (wait-f2, public-f16): with the server's answer whether it may continue now, so its panel can offer Continue.
   const pause = run?.month_pause;
   // wait-f18: a dig that did not finish keeps its run's reason (the panel shows only its plain sentence) and, when the
-  // server confirmed it, that nothing was taken from the quota for it.
+  // server confirmed it, that nothing was taken from the quota for it. V4 start step, Task 57i: and whether Continue would continue it.
   const failed = state === "FAILED" && run !== undefined
-    ? { terminalReason: run.terminal_reason, questionLine: run.question_line, ...(quotaUntouched(run) ? { quotaUntouched: true as const } : {}) }
+    ? { terminalReason: run.terminal_reason, questionLine: run.question_line, ...(quotaUntouched(run) ? { quotaUntouched: true as const } : {}),
+      ...(run.continuable === true ? { continuable: true as const } : {}),
+      // Task 57m: or that it keeps failing after two continues.
+      ...(run.keeps_failing === true ? { keepsFailing: true as const } : {}) }
     : {};
   return {
     link, state, headline: null, counts: null,

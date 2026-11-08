@@ -20,7 +20,9 @@ import { buildFramedPrompt, type PromptContract, type ProviderCallRequest, type 
 import { runFailureRetriesOnce, runnerTerminalFailureReason } from "@debateai/runner";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
-  continueFailedRun, continueRoomOf, failedRunContinuable, stopIsOurs, type FailedRunContinuePort, type RunContinueFacts, type RunReopenOutcome
+  continueFailedRun, continueRoomOf, failedRunContinuable, failedRunKeepsFailing, readFailedRunMark, stopIsOurs, stopIsSetAside,
+  type FailedRunContinuePort, type RunContinueFacts,
+  type RunReopenOutcome
 } from "../../apps/api/src/run-continue.js";
 import { PATHS_RUN_CODES } from "../../apps/runner/src/paths-run.js";
 import { callCreditsOf, createReplayBook, recordedCalls, replayingGateway, type RecordedAttempt } from "../../apps/runner/src/run-replay.js";
@@ -30,7 +32,7 @@ const RUN = "44444444-4444-4444-8444-444444444444";
 const OWNER = testHttpIdentity("run-continue-owner");
 const STOPPED: RunContinueFacts = Object.freeze({
   state: "FAILED", terminal_reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED", content_live: true, waived: false, settled: false,
-  paused: false, reopened: false
+  paused: false, reopened: false, failed_continues: 0
 });
 
 describe("which stops are ours (the runner's one-retry rule, read from the recorded terminal reason)", () => {
@@ -47,8 +49,9 @@ describe("which stops are ours (the runner's one-retry rule, read from the recor
       expect(stopIsOurs(`RUNNER_EXECUTION_FAILED:${code}`), code).toBe(false);
       expect(stopIsOurs(code), code).toBe(false);
     }
-    for (const reason of ["RUN_SET_ASIDE:BACKSTOP", "RUN_SET_ASIDE:OWNER_STOPPED", "RUN_SETUP_FAILED:COST_RECORD",
-      "RUN_SETUP_FAILED:RELEASE_NOT_SERVED", null, ""]) {
+    // Task 57j: nor a set-aside, as recorded or wrapped (the debate's own stop it is not; it continues only where it moves, below).
+    for (const reason of ["RUN_SET_ASIDE:BACKSTOP", "RUN_SET_ASIDE:OWNER_STOPPED", "RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:BACKSTOP",
+      "RUN_SETUP_FAILED:COST_RECORD", "RUN_SETUP_FAILED:RELEASE_NOT_SERVED", null, ""]) {
       expect(stopIsOurs(reason), String(reason)).toBe(false);
     }
   });
@@ -84,8 +87,8 @@ describe("whether a failed debate is continuable (one pure rule the read and the
     expect(failedRunContinuable({ ...STOPPED, terminal_reason: "RUNNER_EXECUTION_FAILED:PRIVATE_CONTENT_ERASED" })).toBe(false);
     expect(failedRunContinuable({ ...STOPPED, terminal_reason: "RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED" })).toBe(false);
     expect(failedRunContinuable({ ...STOPPED, terminal_reason: "CALL_BUDGET_EXHAUSTED", settled: true })).toBe(false);
+    // Task 57j: a set-aside only where Continue moves it to this release (below); the waiver alone no longer refuses.
     expect(failedRunContinuable({ ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true })).toBe(false);
-    expect(failedRunContinuable({ ...STOPPED, waived: true })).toBe(false);
     expect(failedRunContinuable({ ...STOPPED, paused: true })).toBe(false);
     for (const state of ["NONE", "OPEN", "DONE"] as const) expect(failedRunContinuable({ ...STOPPED, state, reopened: true })).toBe(false);
   });
@@ -128,6 +131,136 @@ describe("Task 57h: a debate's own call budget, and a path set that can never ru
       expect(store.reopen, reason).not.toHaveBeenCalled();
       expect(wake, reason).not.toHaveBeenCalled();
     }
+  });
+});
+
+/**
+ * Task 57j (the owner's answer of 7 Nov afternoon, "Continue, they pay the rest"; it supersedes 57f's ruling that a set-aside is not
+ * continued) — A DEBATE AN UPDATE SET ASIDE CONTINUES WHERE IT STOPPED. Continue moves the debate to this release (the route's hand-over), so
+ * it is continuable exactly where it would move: on its own release the same wall (a retired runner, a version it cannot run, the owner's
+ * stop) would meet it again. The waiver no longer refuses Continue: what ran before the set-aside stays the
+ * site's, what runs after Continue is the person's (0168).
+ */
+describe("Task 57j: a debate an update set aside continues where it stopped, only where Continue moves it to this release", () => {
+  const SET_ASIDE = ["RUN_SET_ASIDE:BACKSTOP", "RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED", "RUN_SET_ASIDE:OWNER_STOPPED",
+    "RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:BACKSTOP"] as const;
+  const input = { ownerRef: OWNER.authenticated.ownerRef, runId: RUN, now: new Date("2026-11-07T08:00:00.000Z") };
+  const destination = Object.freeze({ releaseKey: "r23-aaaaaaaaaaaa", registerVersion: 7 });
+  const moving = { destinationOf: async () => destination, resumeInRelease: async () => "RECORDED" as const };
+  const staying = { destinationOf: async () => null, resumeInRelease: async () => "RECORDED" as const };
+
+  it("a set-aside reads as one as recorded or as the runner's catch wraps it; nothing else is a set-aside", () => {
+    for (const reason of SET_ASIDE) {
+      expect(stopIsSetAside(reason), reason).toBe(true);
+      expect(stopIsOurs(reason), reason).toBe(false);
+    }
+    for (const reason of [STOPPED.terminal_reason, "RUN_SETUP_FAILED:RELEASE_NOT_SERVED", "RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED", null, ""]) {
+      expect(stopIsSetAside(reason), String(reason)).toBe(false);
+    }
+  });
+
+  it("continuable only where Continue moves it; the other conditions hold as for any stop; the waiver alone never refuses", () => {
+    for (const reason of SET_ASIDE) {
+      const facts = { ...STOPPED, terminal_reason: reason, waived: true };
+      expect(failedRunContinuable(facts), reason).toBe(false);
+      expect(failedRunContinuable(facts, true), reason).toBe(true);
+      for (const other of [{ content_live: false }, { settled: true }, { paused: true }, { state: "OPEN" as const }]) {
+        expect(failedRunContinuable({ ...facts, ...other }, true), `${reason} ${JSON.stringify(other)}`).toBe(false);
+      }
+    }
+    // A continued set-aside debate that then stopped on our side keeps its waiver row: it continues like any.
+    expect(failedRunContinuable({ ...STOPPED, waived: true })).toBe(true);
+    // Moving changes nothing for a stop that is not a set-aside.
+    expect(failedRunContinuable({ ...STOPPED, terminal_reason: "RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED" }, true)).toBe(false);
+  });
+
+  it("the press: moved and re-opened in one step where the hand-over has a destination; NOT_CONTINUABLE on its own release or with no hand-over", async () => {
+    for (const reason of SET_ASIDE) {
+      const { store, reopened } = storeOver({ ...STOPPED, terminal_reason: reason, waived: true });
+      const wake = vi.fn(async () => undefined);
+      await expect(continueFailedRun(input, { store, handover: moving, wake: { wake } }), reason).resolves.toEqual({ kind: "CONTINUING" });
+      expect(reopened, reason).toEqual([destination]);
+      expect(wake, reason).toHaveBeenCalledWith(RUN);
+      for (const handover of [staying, undefined]) {
+        const refused = storeOver({ ...STOPPED, terminal_reason: reason, waived: true });
+        await expect(continueFailedRun(input, { store: refused.store, ...(handover === undefined ? {} : { handover }) }), reason)
+          .resolves.toEqual({ kind: "NOT_CONTINUABLE" });
+        expect(refused.store.reopen, reason).not.toHaveBeenCalled();
+      }
+    }
+    // No room for the rest: NO_ROOM, as for any stop.
+    const { store } = storeOver({ ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true });
+    await expect(continueFailedRun(input, { store, handover: moving, room: { continueHasRoom: async () => false } })).resolves.toEqual({ kind: "NO_ROOM" });
+    expect(store.reopen).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Task 57m (the owner's 8 Nov words: "if it keeps failing we shouldn't tell the user that it can continue, because he clearly cannot. We
+ * should stop after 2 continues that fail"; "Yes, same rule" for a whole debate) — AFTER TWO CONTINUES THAT FAIL, NO MORE CONTINUE. The facts'
+ * `failed_continues` (0168) counts the re-opens that ended FAILED again; at 2 the rule says no, for a first question and a dig alike (the
+ * facts are the same for both), and the read says why (`keeps_failing`), only when nothing else would refuse it.
+ */
+describe("Task 57m: after two continues that fail, Continue is no longer offered", () => {
+  const input = { ownerRef: OWNER.authenticated.ownerRef, runId: RUN, now: new Date("2026-11-08T08:00:00.000Z") };
+
+  it("continuable after 0 or 1 failed continues; not after 2 or more", () => {
+    expect(failedRunContinuable({ ...STOPPED, failed_continues: 0 })).toBe(true);
+    expect(failedRunContinuable({ ...STOPPED, failed_continues: 1, reopened: true })).toBe(true);
+    expect(failedRunContinuable({ ...STOPPED, failed_continues: 2, reopened: true })).toBe(false);
+    expect(failedRunContinuable({ ...STOPPED, failed_continues: 3, reopened: true })).toBe(false);
+    // A set-aside that would move counts the same (the database already leaves every update's set-aside out of the count, below).
+    const setAside = { ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true, reopened: true };
+    expect(failedRunContinuable({ ...setAside, failed_continues: 1 }, true)).toBe(true);
+    expect(failedRunContinuable({ ...setAside, failed_continues: 2 }, true)).toBe(false);
+  });
+
+  it("the mark only for this reason: every other condition holds and two continues failed", () => {
+    expect(failedRunKeepsFailing({ ...STOPPED, failed_continues: 2, reopened: true })).toBe(true);
+    expect(failedRunKeepsFailing({ ...STOPPED, failed_continues: 3, reopened: true })).toBe(true);
+    for (const count of [0, 1]) expect(failedRunKeepsFailing({ ...STOPPED, failed_continues: count }), String(count)).toBe(false);
+    for (const other of [{ content_live: false }, { settled: true }, { paused: true }, { state: "OPEN" as const },
+      { terminal_reason: "RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED" }, { terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true },
+      { terminal_reason: PATHS_RUN_CODES.noSet }]) {
+      const facts = { ...STOPPED, failed_continues: 2, reopened: true, ...other };
+      expect(failedRunKeepsFailing(facts), JSON.stringify(other)).toBe(false);
+      expect(failedRunContinuable(facts), JSON.stringify(other)).toBe(false);
+    }
+    expect(failedRunKeepsFailing(null)).toBe(false);
+    // A set-aside: only where it would move (else it is refused for another reason, and no mark).
+    const setAside = { ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true, failed_continues: 3, reopened: true };
+    expect(failedRunKeepsFailing(setAside, true)).toBe(true);
+    expect(failedRunKeepsFailing(setAside, false)).toBe(false);
+  });
+
+  it("Task 57m-fix: `failed_continues` is the database's exact count (0168 leaves out every re-open an update set aside, the newest and the earlier ones), so nothing more is taken off here", () => {
+    const setAsideNow = { ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true, reopened: true };
+    // One continue that failed on our side, then set aside by an upload (the database says 1): it moves on.
+    expect(failedRunContinuable({ ...setAsideNow, failed_continues: 1 }, true)).toBe(true);
+    expect(failedRunKeepsFailing({ ...setAsideNow, failed_continues: 1 }, true)).toBe(false);
+    // Two continues that failed on our side, then set aside (the database says 2): it keeps failing.
+    expect(failedRunContinuable({ ...setAsideNow, failed_continues: 2 }, true)).toBe(false);
+    expect(failedRunKeepsFailing({ ...setAsideNow, failed_continues: 2 }, true)).toBe(true);
+  });
+
+  it("the press: NOT_CONTINUABLE after two failed continues, nothing re-opened or woken", async () => {
+    const { store } = storeOver({ ...STOPPED, failed_continues: 2, reopened: true });
+    const wake = vi.fn(async () => undefined);
+    await expect(continueFailedRun(input, { store, room: { continueHasRoom: async () => true }, wake: { wake } })).resolves.toEqual({ kind: "NOT_CONTINUABLE" });
+    expect(store.reopen).not.toHaveBeenCalled();
+    expect(wake).not.toHaveBeenCalled();
+    // After one, it still continues.
+    const once = storeOver({ ...STOPPED, failed_continues: 1, reopened: true });
+    await expect(continueFailedRun(input, { store: once.store })).resolves.toEqual({ kind: "CONTINUING" });
+  });
+
+  it("the read's verdict: CONTINUABLE, KEEPS_FAILING (only for this reason) or null", async () => {
+    const over = (facts: RunContinueFacts | null) => readFailedRunMark({ ownerRef: OWNER.authenticated.ownerRef, runId: RUN },
+      { store: { readContinue: async () => facts, reopen: async () => "NOT_FAILED" as const } });
+    expect(await over(STOPPED)).toBe("CONTINUABLE");
+    expect(await over({ ...STOPPED, failed_continues: 2, reopened: true })).toBe("KEEPS_FAILING");
+    expect(await over({ ...STOPPED, failed_continues: 2, reopened: true, content_live: false })).toBeNull();
+    expect(await over(null)).toBeNull();
   });
 });
 
@@ -190,7 +323,7 @@ describe("continueFailedRun", () => {
 
   it("a failed debate that is not continuable is NOT_CONTINUABLE, nothing re-opened", async () => {
     for (const facts of [{ ...STOPPED, content_live: false }, { ...STOPPED, terminal_reason: "RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED" },
-      { ...STOPPED, terminal_reason: "RUNNER_EXECUTION_FAILED:PRIVATE_CONTENT_ERASED" }, { ...STOPPED, waived: true }]) {
+      { ...STOPPED, terminal_reason: "RUNNER_EXECUTION_FAILED:PRIVATE_CONTENT_ERASED" }, { ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true }]) {
       const { store } = storeOver(facts);
       await expect(continueFailedRun(input, { store })).resolves.toEqual({ kind: "NOT_CONTINUABLE" });
       expect(store.reopen).not.toHaveBeenCalled();
@@ -421,12 +554,20 @@ describe("the contract", () => {
   });
 
   it("`continuable` (renamed from 57e's `reusable`) rides a FAILED run only, last and optional", () => {
-    expect(Object.keys(RunProjectionSchema.shape).slice(-2)).toEqual(["quota_used", "continuable"]);
+    // Task 57m: `keeps_failing` follows it, last.
+    expect(Object.keys(RunProjectionSchema.shape).slice(-3)).toEqual(["quota_used", "continuable", "keeps_failing"]);
     expect(RunProjectionSchema.safeParse({ ...FAILED, continuable: true }).success).toBe(true);
     expect(RunProjectionSchema.safeParse(FAILED).success).toBe(true);
     expect(RunProjectionSchema.safeParse({ ...FAILED, continuable: false }).success).toBe(false);
     expect(RunProjectionSchema.safeParse({ ...FAILED, state: "RUNNING", terminal_reason: null, continuable: true }).success).toBe(false);
     expect(RunProjectionSchema.safeParse({ ...FAILED, reusable: true }).success).toBe(false);
+  });
+
+  it("Task 57m: `keeps_failing` rides a FAILED run only, last and optional, and never beside `continuable`", () => {
+    expect(RunProjectionSchema.safeParse({ ...FAILED, keeps_failing: true }).success).toBe(true);
+    expect(RunProjectionSchema.safeParse({ ...FAILED, keeps_failing: false }).success).toBe(false);
+    expect(RunProjectionSchema.safeParse({ ...FAILED, state: "RUNNING", terminal_reason: null, keeps_failing: true }).success).toBe(false);
+    expect(RunProjectionSchema.safeParse({ ...FAILED, continuable: true, keeps_failing: true }).success).toBe(false);
   });
 
   it("57e's `again_of` is gone from the ask: an ask that sends it is refused like any unknown member", () => {
@@ -474,6 +615,37 @@ describe("GET /v1/runs/{id}: a failed debate says `continuable` exactly when the
     expect((await running.read()).json()).not.toHaveProperty("continuable");
     expect(running.asked).toEqual([]);
     await running.api.close();
+  });
+
+  it("Task 57j: a debate an update set aside says continuable exactly where Continue would move it to this release", async () => {
+    const setAside = { ...FAILED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP" };
+    const facts = { ...STOPPED, terminal_reason: "RUN_SET_ASIDE:BACKSTOP", waived: true };
+    const over = (destination: Readonly<{ releaseKey: string; registerVersion: number }> | null | undefined) => {
+      const application = { readRun: async () => setAside, readRunQuotaUsed: async () => "NONE" as const } as unknown as AskApplication;
+      return buildApi({
+        application, sessions: testSessionApplication([OWNER]), allowedOrigin: TEST_APP_ORIGIN,
+        failedRunContinue: { store: { readContinue: async () => facts, reopen: async () => "NOT_FAILED" as const } },
+        ...(destination === undefined ? {} : { runHandover: { destinationOf: async () => destination, resumeInRelease: async () => "RECORDED" as const } })
+      } as never);
+    };
+    for (const [destination, continuable] of [[{ releaseKey: "r23-aaaaaaaaaaaa", registerVersion: 7 }, true], [null, false], [undefined, false]] as const) {
+      const api = over(destination);
+      const body = (await api.inject({ method: "GET", url: `/v1/runs/${RUN}`, headers: testSessionHeaders(OWNER) })).json();
+      expect(body, String(destination)).toEqual({ ...setAside, quota_used: "NONE", ...(continuable ? { continuable: true } : {}) });
+      await api.close();
+    }
+  });
+
+  it("Task 57m: after two continues that fail, `keeps_failing: true` and no `continuable`; the mark only for this reason", async () => {
+    const keeps = readOver(FAILED, { ...STOPPED, failed_continues: 2, reopened: true });
+    expect((await keeps.read()).json()).toEqual({ ...FAILED, quota_used: "SOME", keeps_failing: true });
+    await keeps.api.close();
+    const once = readOver(FAILED, { ...STOPPED, failed_continues: 1, reopened: true });
+    expect((await once.read()).json()).toEqual({ ...FAILED, quota_used: "SOME", continuable: true });
+    await once.api.close();
+    const erased = readOver(FAILED, { ...STOPPED, failed_continues: 2, reopened: true, content_live: false });
+    expect((await erased.read()).json()).toEqual({ ...FAILED, quota_used: "SOME" });
+    await erased.api.close();
   });
 
   it("Task 57h: absent for a debate's own call budget used up and for each path set that can never run", async () => {

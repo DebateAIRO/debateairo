@@ -43,7 +43,7 @@ import {
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
-import { FAILED_DIGS, FAILED_DIGS_PARENT, mockContinueStep, RUN_FAILED_SOME } from "./failed-seed.js";
+import { FAILED_DIGS, FAILED_DIGS_PARENT, mockContinueStep, RUN_FAILED_KEEPS_FAILING, RUN_FAILED_SET_ASIDE, RUN_FAILED_SOME } from "./failed-seed.js";
 import { windowsForPlan } from "./plan-windows.js";
 import {
   routeStartStep, setStartRoomScene, setStartStepLogging, startAskRefusal, startRoomReadOutcome, startRoomScene, startSettingsVersion, startStepCounters,
@@ -321,6 +321,8 @@ type MockRun = {
   quotaUsed?: "NONE" | "SOME";
   /** V4 start step, Task 57g: a FAILED run that Continue would continue where it stopped (the contract's `continuable`, Task 57e's `reusable`). */
   continuable?: true;
+  /** V4 start step, Task 57m: a FAILED run whose two continues failed again (the contract's `keeps_failing`): never continued. */
+  keepsFailing?: true;
   /** Task 57g: a failed run Continue continued; while it runs again a second press is CONTINUING too, as on the API. */
   continued?: boolean;
   /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
@@ -480,9 +482,21 @@ settledRun({
   runRef: FAILED_DIGS_PARENT.runRef, answerId: FAILED_DIGS_PARENT.answerId, seq: FAILED_DIGS_PARENT.seq, web: "PAID", question: FAILED_DIGS_PARENT.question,
   askedAt: Date.parse(FAILED_DIGS_PARENT.askedAt), settleAt: Date.parse(FAILED_DIGS_PARENT.settledAt), storyReadyAt: 0
 });
-for (const dig of FAILED_DIGS) {
-  addRun({ runRef: dig.runRef, seq: dig.seq, question: dig.question, failedReason: dig.reason, quotaUsed: dig.quotaUsed });
+/**
+ * The seven failed digs, as seeded. V4 start step, Task 57i: the two whose stop is ours read `continuable` (failed-seed.ts), so their
+ * "Try this dig again" continues the same dig (continueStoppedRun: it runs again, then finishes); `failed=RESET` seeds them again.
+ */
+function seedFailedDigs(): void {
+  for (const dig of FAILED_DIGS) {
+    const before = runs.get(dig.runRef);
+    if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+    addRun({ runRef: dig.runRef, seq: dig.seq, question: dig.question, failedReason: dig.reason, quotaUsed: dig.quotaUsed,
+      ...(dig.continuable === true ? { continuable: true as const } : {}),
+      // Task 57m: the dig whose two continues failed again (failed-seed.ts: dig 1).
+      ...(dig.keepsFailing === true ? { keepsFailing: true as const } : {}) });
+  }
 }
+seedFailedDigs();
 /**
  * The failed question that used some of the quota and can continue (failed-seed.ts RUN_FAILED_SOME), as seeded. V4 start step, Task 57g:
  * its Continue replaces it with a run that runs again and finishes (continueStoppedRun); the switch `failed=RESET` seeds it again.
@@ -494,6 +508,28 @@ function seedFailedSome(): void {
     quotaUsed: RUN_FAILED_SOME.quotaUsed, continuable: RUN_FAILED_SOME.continuable });
 }
 seedFailedSome();
+/**
+ * V4 start step, Task 57j: the failed question an update set aside that can continue (failed-seed.ts RUN_FAILED_SET_ASIDE), as seeded; its
+ * Continue runs it again and it finishes (continueStoppedRun); the switch `failed=RESET` seeds it again.
+ */
+function seedFailedSetAside(): void {
+  const before = runs.get(RUN_FAILED_SET_ASIDE.runRef);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({ runRef: RUN_FAILED_SET_ASIDE.runRef, seq: RUN_FAILED_SET_ASIDE.seq, question: RUN_FAILED_SET_ASIDE.question,
+    failedReason: RUN_FAILED_SET_ASIDE.reason, quotaUsed: RUN_FAILED_SET_ASIDE.quotaUsed, continuable: RUN_FAILED_SET_ASIDE.continuable });
+}
+seedFailedSetAside();
+/**
+ * V4 start step, Task 57m: the failed question whose two continues failed again (failed-seed.ts RUN_FAILED_KEEPS_FAILING): its read says
+ * `keeps_failing`, its Continue is refused; the switch `failed=RESET` seeds it again.
+ */
+function seedFailedKeepsFailing(): void {
+  const before = runs.get(RUN_FAILED_KEEPS_FAILING.runRef);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({ runRef: RUN_FAILED_KEEPS_FAILING.runRef, seq: RUN_FAILED_KEEPS_FAILING.seq, question: RUN_FAILED_KEEPS_FAILING.question,
+    failedReason: RUN_FAILED_KEEPS_FAILING.reason, quotaUsed: RUN_FAILED_KEEPS_FAILING.quotaUsed, keepsFailing: RUN_FAILED_KEEPS_FAILING.keepsFailing });
+}
+seedFailedKeepsFailing();
 
 /**
  * V4 start step, Task 57g (the owner's 7 Nov answers): Continue on a failed question that can continue. It runs again for the stand-in's run
@@ -506,7 +542,9 @@ function continueStoppedRun(run: MockRun, now = Date.now()): void {
     runRef: run.runRef, answerId: randomUUID(), question: run.question, seq: run.seq, askedAt: now, settleAt,
     storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web: "PAID"
   }).continued = true;
-  if (investigationOf(run.runRef) === undefined) openInvestigation(run.runRef);
+  // Task 57i: a dig continued in place belongs to its debate's investigation; only a question opens its own.
+  const dig = digLinks.some((record) => record.child_run_id === run.runRef);
+  if (!dig && investigationOf(run.runRef) === undefined) openInvestigation(run.runRef);
 }
 
 // Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
@@ -710,7 +748,9 @@ function runProjection(run: MockRun, now = Date.now()) {
     // Owner review 3 Nov; V4 start step, Task 57c (the contract's RunProjectionSchema.quota_used, last): what a failed run took from the quota.
     ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {}),
     // V4 start step, Task 57g (the contract's RunProjectionSchema.continuable, last; Task 57e's `reusable`): Continue would continue it.
-    ...(state === "FAILED" && run.continuable === true ? { continuable: true } : {})
+    ...(state === "FAILED" && run.continuable === true ? { continuable: true } : {}),
+    // V4 start step, Task 57m (the contract's RunProjectionSchema.keeps_failing, last): two continues of it failed again.
+    ...(state === "FAILED" && run.keepsFailing === true ? { keeps_failing: true } : {})
   };
 }
 
@@ -1805,10 +1845,16 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         // The withdrawal can be clicked again: subscription=RESET puts the Plus subscription back inside its 14 days.
         if (url.searchParams.get("subscription") === "RESET") withdrawnAt = null;
         // V4 start step, Task 57g: Continue can be clicked again: failed=RESET puts the failed questions 4444 and 4500…45 back as seeded (failed, continuable).
+        // Task 57i: and the seven failed digs (two of them continuable).
         const failedSetting = url.searchParams.get("failed");
         if (failedSetting !== null && choice("failed", failedSetting, ["RESET"] as const, "RESET") === "RESET") {
           seedFailed();
           seedFailedSome();
+          seedFailedDigs();
+          // Task 57j: and the question an update set aside that can continue (4600…46).
+          seedFailedSetAside();
+          // Task 57m: and the question that keeps failing after two continues (4700…47).
+          seedFailedKeepsFailing();
         }
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
         if (publicStateSetting !== null) publicState = choice("publicstate", publicStateSetting, PUBLIC_STATES, publicState);
@@ -1951,7 +1997,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const refuse = (error: string) => sendJson(req, res, 409, { error, message: error }, C.PublicDebateRefusedSchema);
     if (roomMode === "FULL" || roomMode === "BLOCKED" || roomMode === "WAIT_RESET") return refuse("PUBLIC_DEBATE_WAITS_FOR_RESET");
     if (publicMode === "ONGOING") return refuse("PUBLIC_DEBATE_ONGOING");
-    if (debate.author_name_gone === true && (debate.contributions ?? []).length === 0) return refuse("PUBLIC_DEBATE_NO_CARRIER");
+    // Task 56h (owner, 7 Nov afternoon): with the author gone and no dig, the report is written from what the page holds, on the presser's own run;
+    // only a page holding nothing to write from (no story, no main answer, no report) still asks for a dig first.
+    if (debate.author_name_gone === true && (debate.contributions ?? []).length === 0 && debate.story_short === undefined && debate.main_answer_update === undefined
+      && (debate.reports ?? []).length === 0) return refuse("PUBLIC_DEBATE_NO_CARRIER");
     const version = (debate.reports ?? []).length + 1 + (publicReportsWriting.get(parts[3]!) ?? 0);
     publicReportsWriting.set(parts[3]!, (publicReportsWriting.get(parts[3]!) ?? 0) + 1);
     // public-f9: with `public=REPORT_STUCK` the version is accepted and never arrives (the page's "taking longer" and "Check again").

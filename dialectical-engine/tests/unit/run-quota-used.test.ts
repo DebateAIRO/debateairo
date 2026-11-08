@@ -30,8 +30,8 @@ describe("the run read's quota_used (contract)", () => {
     expect(messagesOf(RunProjectionSchema, FAILED)).toEqual(["accepted"]);
     expect(messagesOf(RunProjectionSchema, { ...RUNNING, quota_used: "NONE" })).toEqual(["only a failed debate says whether any quota was used"]);
     expect(RunProjectionSchema.safeParse({ ...FAILED, quota_used: "ALL" }).success).toBe(false);
-    // Task 57f's `continuable` of a failed run (57e's `reusable`, renamed) comes after it.
-    expect(Object.keys(RunProjectionSchema.shape).slice(-2)).toEqual(["quota_used", "continuable"]);
+    // Task 57f's `continuable` of a failed run (57e's `reusable`, renamed) comes after it, then Task 57m's `keeps_failing`.
+    expect(Object.keys(RunProjectionSchema.shape).slice(-3)).toEqual(["quota_used", "continuable", "keeps_failing"]);
   });
 });
 

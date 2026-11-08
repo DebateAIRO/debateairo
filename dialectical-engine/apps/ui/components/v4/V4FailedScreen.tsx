@@ -7,7 +7,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { ownWords } from "@/lib/v4/askText";
 import type { DigRetry } from "@/lib/v4/digRetry";
-import { continuingReason, digFailureMessage, failedQuotaKey, quotaSomeUsed } from "@/lib/v4/failedRun";
+import { continuingReason, digFailureMessage, failedQuotaKey, keepsFailingReason, quotaSomeUsed } from "@/lib/v4/failedRun";
 
 /*
  * Owner review 3 Nov 2026 (wait-f11, map-f30): the page of a debate that did not finish. Its plain reason sentence (one of
@@ -42,6 +42,13 @@ import { continuingReason, digFailureMessage, failedQuotaKey, quotaSomeUsed } fr
  * question; left as it is, this debate continues where it stopped. Without `onContinue` the grey line is the one above, as before.
  * Owner 7 Nov, questions 42 A and 43 A (relayed by the review session): with `onContinue`, a question's reason drops its "ask again" ending
  * (lib/v4/failedRun.ts continuingReason; a reason without one keeps the shared sentence), and the three quota lines are the owner's, as built.
+ * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail, and say that we're investigating this and a future fix
+ * will solve this"; "Yes, same rule" and "Use these drafts"): a question whose read says `keeps_failing` gets no Continue; under its reason
+ * (cut of its "ask again" ending, as with Continue: the way on is "Change the question") it says "This keeps failing. We're looking into it,
+ * and a future fix will solve it."; "Change the question" is the primary link, with the grey line from before Continue.
+ * Task 57n (owner 8 Nov: "Drop it, like digs" and "Yes, same line"): that question's reason promises no other try (AIs unavailable drops
+ * "Please try again in a while.", lib/v4/failedRun.ts keepsFailingReason). A dig's own page whose read says `keeps_failing` says its
+ * reason in the dig's keeps-failing form, then the panel's line ("…You can still write your report…"), and drops the try-again note.
  */
 
 export function V4FailedScreen({
@@ -88,8 +95,12 @@ export function V4FailedScreen({
 }>) {
   const quotaKey = failedQuotaKey(run, dig !== null);
   const continuing = onContinue !== undefined;
-  const keepsFailing = digRetry === "KEEPS_FAILING";
-  const mapOffersTry = digRetry === undefined || digRetry === "OFFER";
+  // Task 57m: a question whose two continues failed again (the read's `keeps_failing`): no Continue, its own line, "Change the question".
+  const questionKeepsFailing = dig === null && !continuing && run.keeps_failing === true;
+  // Task 57n (owner 8 Nov, "Yes, same line"): a dig's own page whose read says `keeps_failing` says the panel's line and offers no try.
+  const digKeepsFailing = dig !== null && run.keeps_failing === true;
+  const keepsFailing = digRetry === "KEEPS_FAILING" || digKeepsFailing;
+  const mapOffersTry = !digKeepsFailing && (digRetry === undefined || digRetry === "OFFER");
   return (
     <section className="v4Card v4DebStatus v4DebFailed">
       <p className="v4Eyebrow">{t(catalog, dig === null ? "v4.debate.yourQuestion" : "v4.seed.yourDig")}</p>
@@ -98,8 +109,13 @@ export function V4FailedScreen({
       <p>
         {dig !== null
           ? digFailureMessage(run.terminal_reason, catalog, keepsFailing)
-          : (continuing ? continuingReason(run.terminal_reason, catalog) : null) ?? runFailureMessage(run.terminal_reason, homeCatalog)}
+          : (questionKeepsFailing
+            ? keepsFailingReason(run.terminal_reason, catalog)
+            : continuing ? continuingReason(run.terminal_reason, catalog) : null)
+            ?? runFailureMessage(run.terminal_reason, homeCatalog)}
       </p>
+      {questionKeepsFailing ? <p>{t(catalog, "v4.failed.keepsFailing")}</p> : null}
+      {digKeepsFailing ? <p>{t(catalog, "v4.digFailed.keepsFailingContinues")}</p> : null}
       {quotaKey === null ? null : <p>{t(catalog, quotaKey)}</p>}
       {/* Decision 12: what the AIs found before an update stopped this debate stays readable here. */}
       {run.found === undefined || run.found.length === 0 ? null : (
@@ -126,7 +142,7 @@ export function V4FailedScreen({
             </>
           ) : null}
           <Link className={continuing ? "v4Btn" : "v4Btn v4BtnPrimary"} href={askAgainHref}>
-            {t(catalog, continuing ? "v4.failed.changeQuestion" : "v4.debate.askAgain")}
+            {t(catalog, continuing || questionKeepsFailing ? "v4.failed.changeQuestion" : "v4.debate.askAgain")}
           </Link>
           <p className="v4Muted v4DebFailedNote">
             {t(catalog, continuing

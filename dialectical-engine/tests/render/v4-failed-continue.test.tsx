@@ -365,6 +365,107 @@ describe("the route's answers, as the page reads them (Task 57g; apps/ui/lib/v4/
   });
 });
 
+/*
+ * V4 start step, Task 57m (the owner's 8 Nov words: "We should stop after 2 continues that fail, and say that we're investigating this and a
+ * future fix will solve this"; "Yes, same rule" for a whole debate's stopped page; "Use these drafts"): after two continues that failed again,
+ * the read says `keeps_failing`. The page offers no Continue, says the drafted line, and keeps "Change the question" with the grey line it had
+ * before Continue existed (the question-41 lines speak of continuing). The reason drops its "ask again" ending as with Continue (the way on is
+ * "Change the question"). Without the mark the page is as before.
+ */
+const KEEPS_FAILING_DEBATE = "This keeps failing. We're looking into it, and a future fix will solve it.";
+
+describe("a question that keeps failing after two continues (Task 57m)", () => {
+  it("drafts the debate's line in the catalogue", () => {
+    expect(CATALOG["v4.failed.keepsFailing"]).toBe(KEEPS_FAILING_DEBATE);
+  });
+
+  it("no Continue; the cut reason, then the drafted line; 'Change the question' (primary) with its grey line from before Continue", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME", keeps_failing: true });
+    await mountMap(1600, runId);
+    expect(buttonsNamed(CONTINUE)).toHaveLength(0);
+    const lines = [...page().querySelectorAll(".v4DebFailed > p")].map((line) => line.textContent);
+    expect(lines.indexOf(KEEPS_FAILING_DEBATE)).toBe(lines.indexOf(CATALOG["v4.failed.continueReason.STOPPED"]!) + 1);
+    expect(lines.indexOf(KEEPS_FAILING_DEBATE)).toBeGreaterThan(0);
+    expect(text()).not.toContain(HOME["runFailure.STOPPED"]);
+    expect(text()).toContain(CATALOG["v4.debate.failedSomeTaken"]);
+    expect(text()).not.toContain(LINE);
+    expect(linkHref(CHANGE)).toBe(`/v4?again=${runId}`);
+    expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBeNull();
+    const change = [...page().querySelectorAll("a")].find((link) => link.textContent?.trim() === CHANGE)!;
+    expect(change.className).toContain("v4BtnPrimary");
+    expect(change.nextElementSibling?.textContent).toBe(CATALOG["v4.debate.askAgainNoteQuestion"]);
+    expect(text()).not.toContain(BOTH_WAYS);
+    expect(stopped.press).not.toHaveBeenCalled();
+  });
+
+  it("with the picks kept: the picks' grey line from before Continue", async () => {
+    const run = failedRun("7b000000-0000-4000-8000-000000000005", { quota_used: "SOME", keeps_failing: true });
+    const html = await draw(<V4FailedScreen run={run} askAgainHref="/v4?again=7b000000-0000-4000-8000-000000000005" askHref="/v4" dig={null}
+      picksKept catalog={CATALOG} homeCatalog={HOME} />);
+    expect(html).toContain(CATALOG["v4.debate.askAgainNote"]);
+    expect(html).not.toContain(BOTH_WAYS_PICKS);
+    expect(html).toContain(KEEPS_FAILING_DEBATE);
+  });
+
+  it("a Continue refused because it keeps failing: the page is read again and then says so, with no button", async () => {
+    const runId = crypto.randomUUID();
+    harness.run = failedRun(runId, { quota_used: "SOME", continuable: true });
+    stopped.press = vi.fn(async (_runId: string): Promise<StoppedContinueOutcome> => {
+      harness.run = failedRun(runId, { quota_used: "SOME", keeps_failing: true });
+      return { kind: "NOT_CONTINUABLE" };
+    });
+    await mountMap(1600, runId);
+    await click(continueButton());
+    await advance(START_UNDO_MS);
+    await settle(10);
+    expect(stopped.press).toHaveBeenCalledTimes(1);
+    expect(buttonsNamed(CONTINUE)).toHaveLength(0);
+    expect(text()).toContain(KEEPS_FAILING_DEBATE);
+    expect(linkHref(CHANGE)).toBe(`/v4?again=${runId}`);
+  });
+
+  /*
+   * Task 57n (owner 8 Nov, "Yes, same line"): a dig's own page says the dig's keeps-failing line too, as the map's panel does, and no
+   * longer promises "You can try this dig again from the map.". Still no Continue and no debate line.
+   */
+  it("a dig's own page: the dig's keeps-failing line, no try-again note, no Continue", async () => {
+    const runId = crypto.randomUUID();
+    const parent = crypto.randomUUID();
+    harness.records = { parent: { parent_run_id: parent, child_run_id: runId, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-29T10:05:00.000Z" }, children: [] };
+    harness.run = failedRun(runId, { quota_used: "SOME", keeps_failing: true });
+    await mountMap(1600, runId);
+    expect(buttonsNamed(CONTINUE)).toHaveLength(0);
+    const lines = [...page().querySelectorAll(".v4DebFailed > p")].map((line) => line.textContent);
+    expect(lines).toContain(CATALOG["v4.digFailed.keepsFailingContinues"]);
+    expect(lines).not.toContain(KEEPS_FAILING_DEBATE);
+    expect(text()).not.toContain(CATALOG["v4.debate.digFailedBackNote"]);
+  });
+
+  it("a dig's own page, AIs unavailable: its reason drops 'You can try it again in a while.' (the dig's 5 Nov keeps-failing form)", async () => {
+    const run = failedRun("7b000000-0000-4000-8000-000000000006", { quota_used: "NONE", keeps_failing: true }, "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM");
+    const html = await draw(<V4FailedScreen run={run} askAgainHref="/v4?again=7b000000-0000-4000-8000-000000000006" askHref="/v4"
+      dig={{ backHref: "/v4/debate/7b000000-0000-4000-8000-000000000007" }} catalog={CATALOG} homeCatalog={HOME} />);
+    expect(html).toContain(CATALOG["v4.digFailed.unavailableKeepsFailing"]);
+    expect(html).not.toContain("You can try it again in a while.");
+    expect(html).toContain(CATALOG["v4.digFailed.keepsFailingContinues"]);
+  });
+
+  /*
+   * Task 57n (owner 8 Nov, "Drop it, like digs"): a question that keeps failing because the AIs were unavailable says its reason without
+   * "Please try again in a while." (a drafted V4 line), then the keeps-failing line. With Continue offered the shared sentence stays (57k).
+   */
+  it("AIs unavailable: the reason without 'Please try again in a while.', then the drafted line", async () => {
+    const run = failedRun("7b000000-0000-4000-8000-000000000008", { quota_used: "NONE", keeps_failing: true }, "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM");
+    const html = await draw(<V4FailedScreen run={run} askAgainHref="/v4?again=7b000000-0000-4000-8000-000000000008" askHref="/v4" dig={null}
+      catalog={CATALOG} homeCatalog={HOME} />);
+    expect(html).toContain(CATALOG["v4.failed.keepsFailingReason.MODELS_UNAVAILABLE"]);
+    expect(html).not.toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
+    expect(html).not.toMatch(/try again/iu);
+    expect(html).toContain(KEEPS_FAILING_DEBATE);
+  });
+});
+
 async function draw(node: ReactNode): Promise<string> {
   const box = document.body.appendChild(document.createElement("div"));
   const root = createRoot(box);

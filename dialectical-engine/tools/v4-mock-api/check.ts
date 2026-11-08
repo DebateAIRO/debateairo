@@ -113,7 +113,11 @@ const RUNS = {
   // The owner's answers of 5 Nov (failed-seed.ts): the debate with a failed dig per reason group, and the failed question
   // whose draft view says it used some of the quota.
   failedDigs: "f0000000-0000-4000-8000-000000000000",
-  failedSome: "45000000-0000-4000-8000-000000000045"
+  failedSome: "45000000-0000-4000-8000-000000000045",
+  // V4 start step, Task 57j: a question an update set aside, which can continue (failed-seed.ts RUN_FAILED_SET_ASIDE).
+  failedSetAside: "46000000-0000-4000-8000-000000000046",
+  // V4 start step, Task 57m: a question whose two continues failed again (failed-seed.ts RUN_FAILED_KEEPS_FAILING).
+  failedKeepsFailing: "47000000-0000-4000-8000-000000000047"
 };
 const MOCK = process.env.DIALECTICAL_API_BASE!;
 /** A mock control or a draft read, straight from the mock (not part of the real API). */
@@ -620,6 +624,15 @@ await step("a failed dig per reason group, and a failed question that used some 
   must(someRead.continuable === true, "the second failed question's run read says it can continue where it stopped");
   const firstRead: Loose = await client.readRun(RUNS.failed);
   must(firstRead.continuable === true && firstRead.quota_used === "NONE", "the first failed question can continue too, with nothing used");
+  // V4 start step, Task 57j: a question an update set aside continues too, with nothing used (what ran before the set-aside is the site's).
+  const setAsideRead: Loose = await client.readRun(RUNS.failedSetAside);
+  must(setAsideRead.state === "FAILED" && failure.runFailureKind(setAsideRead.terminal_reason) === "SET_ASIDE"
+    && setAsideRead.continuable === true && setAsideRead.quota_used === "NONE", "the question an update set aside can continue, with nothing used");
+  // V4 start step, Task 57m: a question, and the failed dig 1, whose two continues failed again: they keep failing, and never continue.
+  for (const id of [RUNS.failedKeepsFailing, FAILED_DIGS.find((dig) => dig.keepsFailing === true)!.runRef]) {
+    const keepsRead: Loose = await client.readRun(id);
+    must(keepsRead.state === "FAILED" && keepsRead.keeps_failing === true && keepsRead.continuable === undefined, `${id} keeps failing`);
+  }
   return `${links.children.length} failed digs (${[...kinds].join(", ")}); failed question quota_used ${String(some.quota_used)}, continuable ${String(someRead.continuable)}`;
 }, (value: string) => value);
 // V4 start step, Task 57g (the owner's 7 Nov answers): "Continue where it stopped". A failed run the API refuses too (the dig an update set
@@ -629,6 +642,9 @@ await step("a failed question continues where it stopped, then finishes (Task 57
   const press = (id: string) => fetch(`${MOCK}/v1/runs/${id}/continue`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
   const refused = await press(FAILED_DIGS.find((dig) => dig.kind === "SET_ASIDE")!.runRef);
   must(refused.status === 409 && (await refused.json()).error === "RUN_NOT_CONTINUABLE", "a debate an update set aside cannot continue");
+  // Task 57m: nor a question that keeps failing after two continues.
+  const keeps = await press(RUNS.failedKeepsFailing);
+  must(keeps.status === 409 && (await keeps.json()).error === "RUN_NOT_CONTINUABLE", "a question that keeps failing cannot continue");
   const first = await press(RUNS.failedSome);
   must(first.status === 200 && (await first.json()).state === "CONTINUING", "Continue continues the second one");
   const running: Loose = await client.readRun(RUNS.failedSome);
@@ -747,8 +763,9 @@ await step("the public state of your debate: PUBLISHED with its page; the stages
   return "PUBLISHED, BEING_CHECKED (draft), chips (draft)";
 }, (value: string) => value);
 await step("Write a report: 202 and its refusals", async () => {
-  const noCarrier: Loose = await client.writePublicReport(PUBLIC.authorGone);
-  must(noCarrier.error === "PUBLIC_DEBATE_NO_CARRIER", `author gone: ${JSON.stringify(noCarrier)}`);
+  // Task 56h: the author gone and no dig on it: the report is written from what the page holds (no "Dig into a path first").
+  const fromTheCopy: Loose = await client.writePublicReport(PUBLIC.authorGone);
+  must(fromTheCopy.state === "WRITING" && fromTheCopy.report_version === 1, `author gone: ${JSON.stringify(fromTheCopy)}`);
   await mock("/__mock/set?public=ONGOING");
   try {
     const ongoing: Loose = await client.writePublicReport(PUBLIC.debate);

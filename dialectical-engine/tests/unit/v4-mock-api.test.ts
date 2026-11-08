@@ -444,7 +444,7 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(catalog["v4.debate.failedSomeTaken"]).toBeTruthy();
   });
 
-  it("the 5 Nov seed (wave-4 browser check): each failed dig digs its own place, asked as the website asks it, so its panel offers a retry", () => {
+  it("the 5 Nov seed (wave-4 browser check): each failed dig digs its own place, asked as the website asks it, so read without the keeps-failing mark its panel would offer a retry (on the live mock, dig 1 keeps failing and offers none)", () => {
     const parent = FAILED_DIGS_PARENT;
     const answer = seed.answer({ answerId: parent.answerId, runRef: parent.runRef, question: parent.question, askedAt: parent.askedAt, servedAt: parent.settledAt, web: "PAID" });
     const map = buildV4Map({ runId: parent.runRef, answer, story: seed.story(parent.answerId, "READY", parent.settledAt) });

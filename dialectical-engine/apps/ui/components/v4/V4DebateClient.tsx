@@ -996,6 +996,24 @@ function V4Debate({
     const loop = digLoop.current;
     if (loop !== null && loop.seenKey() !== linkKey) loop.kick();
   }, [linkKey]);
+  // V4 start step, Task 57i (lib/v4/useFailedDigs.ts): a failed dig continued in place shows as running at once (the API re-opened it with
+  // its answer) and the dig loop follows it again; one the API would not continue is read once more.
+  const rereadDig = useCallback((childRunId: string, running: boolean): void => {
+    const link = linksRef.current.find((known) => known.childRunId === childRunId);
+    if (link === undefined) return;
+    const put = (view: Omit<DigView, "link">): void => {
+      const next = new Map(statusesRef.current);
+      next.set(childRunId, { view, failures: 0, headlessTries: 0 });
+      statusesRef.current = next;
+      setStatuses(next);
+    };
+    if (running) {
+      put(STAND_IN);
+      digLoop.current?.kick();
+      return;
+    }
+    loadDigView(link).then(({ link: _read, ...view }) => put(view), () => undefined);
+  }, []);
 
   // ── Rewrites (W4-6): read the answer again while a path is being rewritten, or a dig's rewrite is not on it yet ────
   // One read in flight; a finished rewrite a dig reports first is fetched at once, a path still being rewritten every 15 s.
@@ -1320,7 +1338,9 @@ function V4Debate({
   // ── A dig that did not finish (owner review 3 Nov, dig-f12/wait-f18): lib/v4/useFailedDigs.ts ───────────────────
   // Task 76j (wiring item 15): its optional homeCatalog is no longer read (question 3 A), so the page hands none.
   const failedDigs = useFailedDigs({
-    map, digs, canDig, digMode, planTier, servedQuestionLine, queueDig, catalog, locale
+    map, digs, canDig, digMode, planTier, servedQuestionLine, queueDig, catalog, locale,
+    // Task 57i: a dig that can continue is continued in place, through the same Undo.
+    room: ask.room, aboveRunIds, rereadDig
   });
 
   // ── What changed since your last visit and while you were here (D4, fix wave 1, N7) ─────────────────────────────

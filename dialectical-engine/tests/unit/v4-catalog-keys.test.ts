@@ -760,7 +760,14 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // V4 start step, Task 57k (owner 7 Nov, question 42 A, relayed by the review session): with Continue offered, the other our-side reasons
   // without their "ask again" ending (CONTINUE_REASON_DRAFTS below; STOPPED's cut line is the owner's), shown at the click-test.
   "v4.failed.continueReason.NOT_STARTED",
-  "v4.failed.continueReason.SET_ASIDE"
+  "v4.failed.continueReason.SET_ASIDE",
+  // V4 start step, Task 57m (owner 8 Nov, "Use these drafts"): after two continues that fail, the dig's and the debate's lines
+  // (KEEPS_FAILING_DRAFTS below), shown at the click-test.
+  "v4.digFailed.keepsFailingContinues",
+  "v4.failed.keepsFailing",
+  // V4 start step, Task 57n (owner 8 Nov, "Drop it, like digs"): a question that keeps failing because the AIs were unavailable gives its
+  // reason without "Please try again in a while." (the home sentence cut), shown at the click-test.
+  "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -1133,6 +1140,31 @@ describe("the owner's questions 42 A and 43 A (7 Nov): the stopped page's reason
     }
     // SET_ASIDE keeps its "It did not use your quota." (the page shows no second quota line beside it).
     expect(catalog["v4.failed.continueReason.SET_ASIDE"]).toMatch(/It did not use your quota\.$/u);
+  });
+
+  it("Task 57n (owner 8 Nov, 'Drop it, like digs'): a question that keeps failing, AIs unavailable, drops 'Please try again in a while.' (drafted)", () => {
+    const key = "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE";
+    expect(home["runFailure.MODELS_UNAVAILABLE"]).toBe(`${catalog[key]} Please try again in a while.`);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain(key);
+  });
+});
+
+/**
+ * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail, and say that we're investigating this and a future fix
+ * will solve this. Of course we should let him Write the report if he wants"; card "Use these drafts"): the dig's and the debate's lines,
+ * word for word, drafts until the click-test.
+ */
+const KEEPS_FAILING_DRAFTS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.digFailed.keepsFailingContinues":
+    "This keeps failing. We're looking into it, and a future fix will solve it. You can still write your report; it uses everything that finished.",
+  "v4.failed.keepsFailing": "This keeps failing. We're looking into it, and a future fix will solve it."
+});
+
+describe("Task 57m (owner 8 Nov): after two continues that fail, the dig's and the debate's lines", () => {
+  it("are the owner's drafts, pinned here, and wait on the drafted list; today's 'keeps failing' line is unchanged", () => {
+    expect(Object.fromEntries(Object.keys(KEEPS_FAILING_DRAFTS).map((key) => [key, catalog[key]]))).toEqual(KEEPS_FAILING_DRAFTS);
+    for (const key of Object.keys(KEEPS_FAILING_DRAFTS)) expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    expect(catalog["v4.digFailed.keepsFailing"]).toBe("This keeps failing. Write your report; it uses everything that finished.");
   });
 });
 

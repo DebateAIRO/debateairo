@@ -22,10 +22,17 @@ export type DigRetry =
   /**
    * "Try this dig again": this target, with this mode (null: unknown, the page's own choice then). V4 start step, Task 79
    * review: `paths`, the paths a path debate's dig went with (DIG_PICKS), sent again with it; absent, none were sent or known.
+   * V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, "Continue the same dig"): `continues`, the dig's own run read
+   * says it can continue where it stopped, so the press continues THAT dig (its run, its place and id on the map) instead of
+   * sending a new one; `target` and `mode` then only name it in the Undo note. Absent: a fresh dig, as before.
    */
-  | Readonly<{ kind: "OFFER"; target: DigTarget; mode: DigMode | null; paths?: StartPaths }>
-  /** The same dig failed twice: "This keeps failing. Write your report…". */
-  | Readonly<{ kind: "KEEPS_FAILING" }>
+  | Readonly<{ kind: "OFFER"; target: DigTarget; mode: DigMode | null; paths?: StartPaths; continues?: true }>
+  /**
+   * The same dig failed twice: "This keeps failing. Write your report…". V4 start step, Task 57m (owner 8 Nov: "We should stop after 2
+   * continues that fail"): `afterContinues`, its own run read says two continues of it failed again (`keeps_failing`), so the line says we
+   * are looking into it; nothing more is offered either way (no Continue, no fresh dig: "he clearly cannot").
+   */
+  | Readonly<{ kind: "KEEPS_FAILING"; afterContinues?: true }>
   /** A later try of the same dig is running or done: nothing more is offered here. */
   | Readonly<{ kind: "RETRIED" }>
   /** Not a failed dig, or its picks are no longer on the map. */
@@ -34,6 +41,7 @@ export type DigRetry =
 const NONE: DigRetry = Object.freeze({ kind: "NONE" });
 const RETRIED: DigRetry = Object.freeze({ kind: "RETRIED" });
 const KEEPS_FAILING: DigRetry = Object.freeze({ kind: "KEEPS_FAILING" });
+const KEEPS_FAILING_AFTER_CONTINUES: DigRetry = Object.freeze({ kind: "KEEPS_FAILING", afterContinues: true });
 
 /** A dig as sent, remembered for this visit (Task 79 review: with the paths it went with, when it sent any). */
 export type SentDig = Readonly<{ target: DigTarget; mode: DigMode; paths?: StartPaths }>;
@@ -99,13 +107,18 @@ export function digRetryOf(dig: DigView, digs: readonly DigView[], map: V4Map, s
   const same = digs.filter((other) => sameDig(other.link, dig.link));
   const later = at === -1 ? [] : digs.slice(at + 1).filter((other) => sameDig(other.link, dig.link));
   if (later.some((other) => other.state !== "FAILED")) return RETRIED;
+  // Task 57m: two continues of it failed again: nothing more is offered.
+  if (dig.keepsFailing === true) return KEEPS_FAILING_AFTER_CONTINUES;
   if (same.filter((other) => other.state === "FAILED").length >= 2) return KEEPS_FAILING;
+  // Task 57i: a dig the server can continue is continued, never asked again.
+  const continues = dig.continuable === true ? { continues: true as const } : {};
   if (sent !== null) {
-    return Object.freeze({ kind: "OFFER", target: sent.target, mode: sent.mode, ...(sent.paths === undefined ? {} : { paths: sent.paths }) });
+    return Object.freeze({ kind: "OFFER", target: sent.target, mode: sent.mode, ...(sent.paths === undefined ? {} : { paths: sent.paths }), ...continues });
   }
   const target = rebuildDigTarget(dig.link, map);
-  if (target === null || !asksTheSame(target)) return NONE;
-  return Object.freeze({ kind: "OFFER", target, mode: dig.link.mode });
+  // Continuing asks nothing again, so the rebuilt target only has to name the dig; a fresh dig must ask exactly the same.
+  if (target === null || (dig.continuable !== true && !asksTheSame(target))) return NONE;
+  return Object.freeze({ kind: "OFFER", target, mode: dig.link.mode, ...continues });
 }
 
 /** The pending dig a retry makes: the same target, mode and paths (Task 79 review), through the usual Undo window. */

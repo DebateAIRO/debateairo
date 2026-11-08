@@ -15,6 +15,8 @@ import type { DigView } from "@/lib/v4/types";
  * "This keeps failing. Write your report; it uses everything that finished." ("Write my report" stays in the rail and the
  * header, never beside a dig button.) A dig already tried again shows no second button here, and its reason promises no
  * later try (the owner's third round, 5 Nov: the AIs-unavailable line drops "You can try it again in a while.").
+ * V4 start step, Task 57m (owner 8 Nov, "Use these drafts"): a dig whose two continues failed again offers no button and says "This keeps
+ * failing. We're looking into it, and a future fix will solve it. You can still write your report; it uses everything that finished."
  */
 
 export type V4FailedDigs = Readonly<{
@@ -73,7 +75,11 @@ export function V4DigFailed({ dig, failed, digBusy, rest = null, catalog }: Read
       {retry.kind === "OFFER" && rest !== null ? (
         <p key={replay} id={restId} className={`v4PanelHint v4Muted${replay > 0 ? " v4Highlight" : ""}`} data-dig-rest="">{rest}</p>
       ) : null}
-      {retry.kind === "KEEPS_FAILING" ? <p className="v4PanelText v4DigFailedAgain">{t(catalog, "v4.digFailed.keepsFailing")}</p> : null}
+      {retry.kind === "KEEPS_FAILING" ? (
+        <p className="v4PanelText v4DigFailedAgain">
+          {t(catalog, retry.afterContinues === true ? "v4.digFailed.keepsFailingContinues" : "v4.digFailed.keepsFailing")}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -10,6 +10,9 @@
 //     retry stops too (the second time while a review's every attempt was charged and never answered); Continue re-opens it; the next copy
 //     replays every answered call (never bought again), buys the review again and finishes; the stopped copy's charges for that review are the
 //     site's, so the person pays each answered call once, what an unbroken debate of the same calls costs.
+//  5. Task 57i: a failed dig continues the same dig through the same route, with no second dig share: nothing new is started, recorded,
+//     admitted or charged by the press, and only a call bought again is charged (its earlier charge the site's).
+//  6. Task 57m: after two continues that fail again, the read says it keeps failing and Continue is refused.
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every figure and question is made up.
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -21,7 +24,7 @@ import { PostgresDigModelRepository, createPool, migrate, type Pool } from "@deb
 import type { ProviderCostEnvelopeSeam } from "@debateai/providers";
 import { runnerTerminalFailureReason } from "@debateai/runner";
 import { continuedRunWake } from "../../apps/api/src/month-pause.js";
-import { continueFailedRun, failedRunContinuable, type FailedRunContinuePort } from "../../apps/api/src/run-continue.js";
+import { continueFailedRun, failedRunContinuable, readFailedRunMark, type FailedRunContinuePort } from "../../apps/api/src/run-continue.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import { waiveRedoneCalls } from "../../apps/runner/src/run-replay.js";
 import { PANEL_REFS, TARGETS, previewDebateHarness, type PreviewRunnerMoney } from "../support/preview-debate-harness.js";
@@ -108,7 +111,8 @@ describe("0165 (Task 57f): Continue re-opens the person's own failed debate", ()
     const item = await workItem(run, "FAILED");
     const store = storeOn(billing);
     const facts = await store.readContinue(owner!.ownerRef, run);
-    expect(facts).toEqual({ state: "FAILED", terminal_reason: STOP, content_live: true, waived: false, settled: false, paused: false, reopened: false });
+    expect(facts).toEqual({ state: "FAILED", terminal_reason: STOP, content_live: true, waived: false, settled: false, paused: false, reopened: false,
+      failed_continues: 0 });
     expect(failedRunContinuable(facts)).toBe(true);
     const { dispatched, wake } = wakeLog();
     const press = () => continueFailedRun({ ownerRef: owner!.ownerRef, runId: run, now: new Date() }, { store, wake });
@@ -176,6 +180,32 @@ describe("0165 (Task 57f): Continue re-opens the person's own failed debate", ()
     const waiting = await ownRun();
     expect(await repository.readRunContinue(owner!.ownerRef, waiting)).toMatchObject({ state: "NONE", reopened: false });
     expect(await repository.continueFailedRun(owner!.ownerRef, waiting, null, null)).toBe("NOT_FAILED");
+  });
+});
+
+// Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"): the API's rule reads 0168's count of re-opens that ended FAILED again.
+describe("Task 57m: after two continues that fail, the debate reads keeps_failing and Continue is refused", () => {
+  it("continued twice, failing both times: KEEPS_FAILING on the read, NOT_CONTINUABLE (the route's 409) on the press, nothing re-opened", async () => {
+    const run = await ownRun();
+    const item = await workItem(run, "FAILED");
+    const store = storeOn(billing);
+    const { wake } = wakeLog();
+    const press = () => continueFailedRun({ ownerRef: owner!.ownerRef, runId: run, now: new Date() }, { store, wake });
+    const mark = () => readFailedRunMark({ ownerRef: owner!.ownerRef, runId: run }, { store });
+    const fail = () => database.pool.query("UPDATE core.work_item SET state='FAILED', terminal_reason=$2, claimed_by=NULL, claim_deadline=NULL WHERE work_item_id=$1",
+      [item, STOP]);
+    expect(await mark()).toBe("CONTINUABLE");
+    await expect(press()).resolves.toEqual({ kind: "CONTINUING" });
+    await fail();
+    // One continue failed: it may still continue.
+    expect(await mark()).toBe("CONTINUABLE");
+    await expect(press()).resolves.toEqual({ kind: "CONTINUING" });
+    await fail();
+    expect(await store.readContinue(owner!.ownerRef, run)).toMatchObject({ state: "FAILED", reopened: true, failed_continues: 2 });
+    expect(await mark()).toBe("KEEPS_FAILING");
+    await expect(press()).resolves.toEqual({ kind: "NOT_CONTINUABLE" });
+    expect(await itemRow(item)).toMatchObject({ state: "FAILED", terminal_reason: STOP });
+    expect((await reopens(item)).map((row) => row.reopen_no)).toEqual([1, 2]);
   });
 });
 
@@ -294,6 +324,71 @@ describe("0165 (Task 57f): the waiver, call by call", () => {
     expect(await waiveRedoneCalls(runner, run, [attempt])).toBe(1);
     expect(await granted()).toBe(2);
     expect(await team()).toBe(teamBefore - 40);
+  });
+});
+
+// V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, "Continue the same dig": "what the first try finished is kept, the person
+// pays only for what never ran, and anything we must redo is on us"): a failed DIG's "Try this dig again" continues the dig's own run through
+// the same route. A dig is charged call by call on its own run (no charge at its start): so continuing it starts no new debate, records no
+// new dig, admits nothing again, and adds no charge of its own; its answered calls stay charged once, and a call bought again because of our
+// failure is the site's (the same waiver as a question's).
+describe("Task 57i: a failed dig continues the same dig, and the person is charged no second share", () => {
+  const charge = async (runId: string, micros: number) => {
+    const attemptId = randomUUID();
+    await database.pool.query(`INSERT INTO ledger.model_spend (spend_id,spend_source,spend_phase,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,attempt_id)
+      VALUES (gen_random_uuid(),'RUN','BODY',$1,'fake-provider',(clock_timestamp() AT TIME ZONE 'UTC')::date,$2,1,1,$3)`, [runId, micros, attemptId]);
+    return attemptId;
+  };
+  const count = async (sql: string, values: readonly unknown[]) => Number((await database.pool.query<{ n: string }>(sql, [...values])).rows[0]!.n);
+  /** What the person pays for `runId`: its charges, less the ones the site took over. */
+  const personOf = async (runId: string) => count(`SELECT coalesce(sum(spend.charge_micros),0)::text AS n FROM ledger.model_spend AS spend
+    WHERE spend.run_id=$1 AND spend.spend_source='RUN'
+      AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_call_waiver AS waived WHERE waived.attempt_id = spend.attempt_id)`, [runId]);
+
+  it("re-opens the dig's own work item; no new debate, dig link or admission; only a call bought again is charged, and its earlier charge is the site's", async () => {
+    const [parent, dig] = [await ownRun(), await ownRun()];
+    expect((await database.pool.query<{ outcome: string }>("SELECT identity.record_dig_link($1,$2,$3,$4::text[],$5) AS outcome",
+      [owner!.ownerRef, parent, dig, ["path:b1"], "quick"])).rows[0]!.outcome).toBe("RECORDED");
+    await database.pool.query(`INSERT INTO billing.run_charge_scope (run_id,owner_ref,admitted_at,funding_kind,plan_id,entitlement_event_id)
+      VALUES ($1,$2,now() - interval '1 minute','SUBSCRIPTION','PLUS',gen_random_uuid())`, [dig, owner!.ownerRef]);
+    // The first try: one call answered (7), one charged that never got a usable answer (5); then it stopped on our side.
+    await charge(dig, 7);
+    const spoiled = await charge(dig, 5);
+    const item = await workItem(dig, "FAILED");
+    const from = new Date(Date.now() - 600_000);
+    const to = new Date(Date.now() + 600_000);
+    const spent = () => new PostgresModelSpendStore(runner).readOwnerSpentMicros(owner!.ownerRef, from, to);
+    const shape = async () => ({
+      debates: await count("SELECT count(*)::text AS n FROM core.run_ownership_event WHERE owner_ref=$1", [owner!.ownerRef]),
+      digLinks: await count("SELECT count(*)::text AS n FROM identity.dig_link WHERE parent_run_id=$1", [parent]),
+      admissions: await count("SELECT count(*)::text AS n FROM billing.run_charge_scope WHERE run_id=$1", [dig]),
+      workItems: await count("SELECT count(*)::text AS n FROM core.work_item WHERE run_id=$1", [dig]),
+      charges: await count("SELECT count(*)::text AS n FROM ledger.model_spend WHERE run_id=$1", [dig])
+    });
+    const [before, spentBefore] = [await shape(), await spent()];
+    expect(before).toMatchObject({ digLinks: 1, admissions: 1, workItems: 1, charges: 2 });
+    expect(await personOf(dig)).toBe(12);
+
+    // The dig's read says it can continue, and the press continues THAT dig.
+    const store = storeOn(billing);
+    expect(failedRunContinuable(await store.readContinue(owner!.ownerRef, dig))).toBe(true);
+    const { dispatched, wake } = wakeLog();
+    await expect(continueFailedRun({ ownerRef: owner!.ownerRef, runId: dig, now: new Date() }, { store, wake })).resolves.toEqual({ kind: "CONTINUING" });
+    expect(dispatched).toEqual([{ runId: dig, workItemId: item }]);
+    expect(await itemRow(item)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "continue" });
+    expect(await reopens(item)).toEqual([{ reopen_no: 1, run_id: dig }]);
+    // Nothing was started, recorded, admitted or charged by the press itself: no second dig share, nothing on the bar.
+    expect(await shape()).toEqual(before);
+    expect(await spent()).toBe(spentBefore);
+    expect(await personOf(dig)).toBe(12);
+
+    // The resumed copy replays the answered call (never bought again) and buys the spoiled one again: the new purchase is the person's, the
+    // earlier charge for it the site's. In total the person pays what an unbroken dig of the same calls costs: 7 + 5, never 7 + 5 + 5.
+    await charge(dig, 5);
+    expect(await waiveRedoneCalls(runner, dig, [spoiled])).toBe(1);
+    expect(await personOf(dig)).toBe(12);
+    expect(await spent()).toBe(spentBefore);
+    expect(await count("SELECT coalesce(sum(charge_micros),0)::text AS n FROM ledger.model_spend WHERE run_id=$1", [dig])).toBe(17);
   });
 });
 

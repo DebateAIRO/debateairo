@@ -169,7 +169,7 @@ describe("POST /v1/runs/{id}/continue on a FAILED debate (Task 57f)", () => {
   const FAILED_RUN = "66666666-6666-4666-8666-666666666666";
   type Facts = import("../../apps/api/src/run-continue.js").RunContinueFacts;
   const STOPPED: Facts = Object.freeze({ state: "FAILED", terminal_reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED", content_live: true,
-    waived: false, settled: false, paused: false, reopened: false });
+    waived: false, settled: false, paused: false, reopened: false, failed_continues: 0 });
 
   function failedApi(facts: Facts, options: Readonly<{ room?: boolean; pause?: "NONE" | "PAUSED" | "RESUMED"; untilMs?: number }> = {}) {
     let current = facts;
@@ -265,6 +265,20 @@ describe("POST /v1/runs/{id}/continue on a FAILED debate (Task 57f)", () => {
       expect(wake, reason).not.toHaveBeenCalled();
       await api.close();
     }
+  });
+
+  // Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"): the same refusal as any debate that cannot continue.
+  it("Task 57m: after two continues that fail: 409 RUN_NOT_CONTINUABLE, nothing re-opened or woken; after one it still continues", async () => {
+    const { api, reopen, wake } = failedApi({ ...STOPPED, reopened: true, failed_continues: 2 });
+    const response = await pressFailed(api, OWNER);
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: "RUN_NOT_CONTINUABLE", message: "RUN_NOT_CONTINUABLE" });
+    expect(reopen).not.toHaveBeenCalled();
+    expect(wake).not.toHaveBeenCalled();
+    await api.close();
+    const once = failedApi({ ...STOPPED, reopened: true, failed_continues: 1 });
+    expect((await pressFailed(once.api, OWNER)).statusCode).toBe(200);
+    await once.api.close();
   });
 
   it("no room left for the rest: 409 RUN_CONTINUE_NO_ROOM, nothing re-opened", async () => {
