@@ -1,4 +1,5 @@
 import { mailAlternatives } from "../support/accountMail.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,7 +26,7 @@ async function captured(): Promise<readonly string[]> {
 }
 
 function sender(): SendmailEmailChangeMailSender {
-  return new SendmailEmailChangeMailSender({
+  return new SendmailEmailChangeMailSender({ gate: testOutboundMailGate(),
     executable: capture, from: "noreply@debate.test", publicAppUrl: "https://debate.test", timeoutMs: 10_000
   });
 }

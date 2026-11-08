@@ -78,15 +78,17 @@ const PUBLIC_REPORT_TEAM_MONTH = "0149_public_report_team_month.sql";
 const PUBLIC_REVIEW = "0150_public_review.sql";
 /** The Report button and the sealed originals' six months (R22 decisions 35 and 36): drained, keeping 0130's verifier. */
 const PUBLIC_FLAG = "0151_public_flag.sql";
-/** This code's chain head since the moderation statements keep the ground of each review step and the answer to each person who reports (0157): expand, keeping 0130's verifier. */
-const HEAD_STEP = "0157_moderation_statements.sql";
-const AFTER_RLS = [V4, WEB, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", HEAD_STEP] as const;
-// A newer release's steps come after this code's chain head (0157 since the moderation statements keep the ground of each review step and the answer to each person who reports).
-const FIRST = "0158_probe_ahead.sql";
-const SECOND = "0159_probe_ahead.sql";
+/** The moderation statements keep the ground of each review step and the answer to each person who reports (0157): expand, keeping 0130's verifier. */
+const MODERATION_STATEMENTS = "0157_moderation_statements.sql";
+/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234): this code's chain head since 0170, expand, keeping 0130's verifier. */
+const HEAD_STEP = "0170_outbound_mail_limit.sql";
+const AFTER_RLS = [V4, WEB, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", MODERATION_STATEMENTS, HEAD_STEP] as const;
+// A newer release's steps come after this code's chain head (0170 since the daily outbound mail limit).
+const FIRST = "0171_probe_ahead.sql";
+const SECOND = "0172_probe_ahead.sql";
 /** 0111's effective-capability verifier, which 0112 to 0129 keep in force. */
 const VERIFIER = "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a";
-/** 0130's verifier, which supersedes 0111's (SPEC-v4 R34): the one in force at this code's head (0131 to 0157 keep it),
+/** 0130's verifier, which supersedes 0111's (SPEC-v4 R34): the one in force at this code's head (0131 to 0157 and 0170 keep it),
  *  which extra steps keep. */
 const IN_FORCE_VERIFIER = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const HEAD = "e".repeat(64);
@@ -138,12 +140,12 @@ describe("an older release on a database a newer release moved forward (Review F
     db = await startTestDatabase();
     await migrate(db.pool);
     plan = await loadMigrationPlan();
-    expect(plan.forwardChain.slice(-DECLARED.length - 28, -28).map((step) => step.name)).toEqual(DECLARED.map(([name]) => name));
-    expect(plan.forwardChain.at(-29)!.verifierSha256).toBe(VERIFIER);
-    expect(plan.forwardChain.at(-28)!.name).toBe(RLS);
-    expect(plan.forwardChain.at(-28)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
-    expect(plan.forwardChain.slice(-27).map((step) => step.name)).toEqual([...AFTER_RLS]);
-    for (const step of plan.forwardChain.slice(-27)) expect(step.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.slice(-DECLARED.length - 29, -29).map((step) => step.name)).toEqual(DECLARED.map(([name]) => name));
+    expect(plan.forwardChain.at(-30)!.verifierSha256).toBe(VERIFIER);
+    expect(plan.forwardChain.at(-29)!.name).toBe(RLS);
+    expect(plan.forwardChain.at(-29)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.slice(-28).map((step) => step.name)).toEqual([...AFTER_RLS]);
+    for (const step of plan.forwardChain.slice(-28)) expect(step.verifierSha256).toBe(IN_FORCE_VERIFIER);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
   afterEach(async () => {
@@ -198,7 +200,7 @@ describe("an older release on a database a newer release moved forward (Review F
   it("a database one release ahead is accepted", async () => {
     await seed(first());
     expect(await migrate(db.pool)).toEqual({ appliedSteps: [], extraSteps: [FIRST] });
-    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "AHEAD", knownSteps: 47, extraSteps: [FIRST] });
+    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "AHEAD", knownSteps: 48, extraSteps: [FIRST] });
     // Two steps of the same newer release, chained one after the other.
     await seed(second());
     expect(await migrate(db.pool)).toEqual({ appliedSteps: [], extraSteps: [FIRST, SECOND] });
@@ -206,33 +208,33 @@ describe("an older release on a database a newer release moved forward (Review F
   });
 
   it("exactly current reports CURRENT", async () => {
-    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "CURRENT", knownSteps: 47, extraSteps: [] });
+    expect(await verifyDatabaseAhead(db.pool)).toEqual({ mode: "CURRENT", knownSteps: 48, extraSteps: [] });
     expect(await migrate(db.pool)).toEqual({ appliedSteps: [], extraSteps: [] });
   });
 
   it("describeForwardSteps describes this code's whole chain with its n1 headers", async () => {
     const steps = await describeForwardSteps();
     expect(steps.map((step) => step.name)).toEqual(plan.forwardChain.map((step) => step.name));
-    expect(steps.at(-28)).toEqual({ name: RLS, manifestSha256: plan.forwardChain.at(-28)!.manifestSha256,
-      sourceSha256: plan.forwardChain.at(-28)!.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
+    expect(steps.at(-29)).toEqual({ name: RLS, manifestSha256: plan.forwardChain.at(-29)!.manifestSha256,
+      sourceSha256: plan.forwardChain.at(-29)!.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
     // 0130 is drained and supersedes the verifier, so its header omits keeps-verifier (SPEC-v4 R26, R34); 0131 to 0139
-    // and 0141, 0143, 0152 and 0153 are expand steps that keep 0130's verifier, and 0140, 0142, 0144, 0146, 0148, 0149, 0150 and 0151 are drained (they keep the verifier too).
-    expect(steps.slice(-27)).toEqual(plan.forwardChain.slice(-27).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
+    // and 0141, 0143, 0152, 0153 to 0157 and 0170 are expand steps that keep 0130's verifier, and 0140, 0142, 0144, 0146, 0148, 0149, 0150 and 0151 are drained (they keep the verifier too).
+    expect(steps.slice(-28)).toEqual(plan.forwardChain.slice(-28).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
       sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: step.name !== SPEND_KINDS && step.name !== TEAM_LIMIT && step.name !== ASK_CLARIFY_CHARGE && step.name !== TEAM_ALLOWANCES && step.name !== ERASURE_KEEPS_PUBLIC && step.name !== PUBLIC_REPORT_TEAM_MONTH && step.name !== PUBLIC_REVIEW && step.name !== PUBLIC_FLAG, keepsVerifier: true, outsideTransaction: false })));
-    expect(steps.slice(-27).map((step) => step.name)).toEqual([...AFTER_RLS]);
-    const tail = plan.forwardChain.slice(-DECLARED.length - 28, -28);
-    expect(steps.slice(-DECLARED.length - 28, -28)).toEqual(DECLARED.map(([name, n1Expand], index) => ({ name,
+    expect(steps.slice(-28).map((step) => step.name)).toEqual([...AFTER_RLS]);
+    const tail = plan.forwardChain.slice(-DECLARED.length - 29, -29);
+    expect(steps.slice(-DECLARED.length - 29, -29)).toEqual(DECLARED.map(([name, n1Expand], index) => ({ name,
       manifestSha256: tail[index]!.manifestSha256, sourceSha256: tail[index]!.sourceSha256, verifierSha256: VERIFIER,
       n1Expand, keepsVerifier: true, outsideTransaction: false })));
     // 0122 and earlier declare nothing (all false).
-    expect(steps.slice(0, -DECLARED.length - 28).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
+    expect(steps.slice(0, -DECLARED.length - 29).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
   });
 
   it("half a newer release is accepted", async () => {
     await seed(first());
     const newerChain = [...await describeForwardSteps(), declaration(first()), declaration(second())];
     expect(await migrate(db.pool, { newerChain })).toEqual({ appliedSteps: [], extraSteps: [FIRST] });
-    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 47, extraSteps: [FIRST] });
+    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 48, extraSteps: [FIRST] });
   });
 
   it("refuses NOT_DECLARED: an extra step with no declaration row", async () => {
@@ -278,21 +280,21 @@ describe("an older release on a database a newer release moved forward (Review F
     await refused("MORE_THAN_ONE_RELEASE", SECOND);
   });
 
-  // Final review A1: T+1 applied 0153 and was rolled back; its fix release T+1b keeps 0153 byte for byte and adds 0154
-  // (this code's own chain ends at 0153 since a finished dig stopped counting in the estimate).
+  // Final review A1: T+1 applied 0171 and was rolled back; its fix release T+1b keeps 0171 byte for byte and adds 0172
+  // (this code's own chain ends at 0170 since the daily outbound mail limit).
   // Each migrate() records its own chain head, so the two extra steps carry two heads. With the newer release's own list
   // (the preview always passes it), rules 3 and 7 prove one linear chain of that one release, so the heads are not
   // compared; without the list, the heads are the only proof of one release, and two heads still refuse.
   it("an aborted release's step then its fix release's step: accepted with the fix release's list only (final review A1)", async () => {
-    await seed(first({ head: hex("1") })); // T+1's chain ends at 0153
-    await seed(second({ head: hex("2") })); // T+1b's chain ends at 0154
+    await seed(first({ head: hex("1") })); // T+1's chain ends at 0171
+    await seed(second({ head: hex("2") })); // T+1b's chain ends at 0172
     const own = await describeForwardSteps();
     const newerChain = [...own, declaration(first()), declaration(second())];
     expect(await migrate(db.pool, { newerChain })).toEqual({ appliedSteps: [], extraSteps: [FIRST, SECOND] });
-    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 47, extraSteps: [FIRST, SECOND] });
+    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 48, extraSteps: [FIRST, SECOND] });
     await refused("MORE_THAN_ONE_RELEASE", SECOND);
     // Rule 7 still binds without rule 6: the fix release's step must be in its list as the database recorded it, and
-    // the aborted release's own list (which ends at 0153) does not reach 0154.
+    // the aborted release's own list (which ends at 0171) does not reach 0172.
     await refused("NEWER_CHAIN_MISMATCH", SECOND, { newerChain: [...own, declaration(first()), declaration(second({ manifest: hex("7") }))] });
     await refused("NEWER_CHAIN_MISMATCH", SECOND, { newerChain: [...own, declaration(first())] });
   });
@@ -306,18 +308,18 @@ describe("an older release on a database a newer release moved forward (Review F
     await refused("NEWER_CHAIN_MISMATCH", SIDE_BY_SIDE, { newerChain: [...own.filter((step) => step.name !== SIDE_BY_SIDE), declaration(first())] });
     // A list that is missing this code's step before last (0130).
     await refused("NEWER_CHAIN_MISMATCH", RLS, { newerChain: [...own.filter((step) => step.name !== RLS), declaration(first())] });
-    // A list that is missing this code's last step (0153).
+    // A list that is missing this code's last step (0170).
     await refused("NEWER_CHAIN_MISMATCH", HEAD_STEP, { newerChain: [...own.slice(0, -1), declaration(first())] });
     // A list that declares the extra step drained.
     await refused("NEWER_CHAIN_MISMATCH", FIRST, { newerChain: [...own, declaration(first({ expand: false }))] });
   });
 
   it("refuses PENDING_KNOWN_STEP: one of this code's own steps is not applied while a newer step is", async () => {
-    // This code's last step (0153 since a finished dig stopped counting in the estimate) is the one left unapplied, on a database the release
-    // before 0153 left (0152 applied): a step before the last one missing is a gap in the chain
+    // This code's last step (0170 since the daily outbound mail limit) is the one left unapplied, on a database the release
+    // before 0170 left (0157 applied): a step before the last one missing is a gap in the chain
     // (MIGRATION_FORWARD_CHAIN_ORDER), and a step's rows removed from a database it changed may be refused by a replay
     // before any ahead check (as 0130's are, BILLING_NETOPIA_111_TABLE_PRIVILEGE), so the case builds that database.
-    // The database every step of this code reached holds 0153's ledger row and receipt; the one below holds neither.
+    // The database every step of this code reached holds 0170's ledger row and receipt; the one below holds neither.
     const ledgerRow = (await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name=$1", [HEAD_STEP])).rows[0];
     const receiptRow = (await db.pool.query("SELECT * FROM public.debateai_schema_migration_step WHERE source_name=$1", [HEAD_STEP])).rows[0];
     expect(ledgerRow).toBeDefined();
@@ -341,7 +343,7 @@ describe("an older release on a database a newer release moved forward (Review F
   }, 300_000);
 
   it("an unknown name before this code's last step still refuses UNKNOWN_APPLIED_NAME", async () => {
-    // 0100_stray.sql sorts before 0153; 0199_Stray.sql sorts after it but is not shaped like a step name
+    // 0100_stray.sql sorts before 0170; 0199_Stray.sql sorts after it but is not shaped like a step name
     // (FORWARD_STEP_NAME).
     for (const name of ["0100_stray.sql", "0199_Stray.sql"]) {
       await db.pool.query("INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())", [name]);
@@ -359,7 +361,7 @@ describe("the newer code's view of a database a release behind", () => {
   let behind: TestDatabase;
   beforeAll(async () => {
     behind = await startTestDatabase();
-    // The database the release before this code leaves: the chain minus its last step (0157).
+    // The database the release before this code leaves: the chain minus its last step (0170).
     chain.shape = (steps) => steps.slice(0, -1);
     try { await migrate(behind.pool); } finally { chain.shape = undefined; }
   }, 300_000);
@@ -370,11 +372,11 @@ describe("the newer code's view of a database a release behind", () => {
     const step = real.forwardChain.at(-1)!;
     expect(await readPendingForwardSteps(behind.pool)).toEqual([{ name: HEAD_STEP, manifestSha256: step.manifestSha256,
       sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: true, keepsVerifier: true, outsideTransaction: false }]);
-    // Steps up to 0122 record no declaration row; 0123 to 0156 record the rows that release leaves.
+    // Steps up to 0122 record no declaration row; 0123 to 0157 record the rows that release leaves.
     expect((await behind.pool.query("SELECT source_name FROM public.debateai_schema_migration_step_n1 ORDER BY source_name")).rows)
       .toEqual([...DECLARED.map(([source_name]) => ({ source_name })), { source_name: RLS }, { source_name: V4 }, { source_name: WEB }, { source_name: INVESTIGATIONS }, { source_name: DIG_MODEL },
         { source_name: DIG_PICKS }, { source_name: REPORTS }, { source_name: PUBLIC_DEBATES },
-        { source_name: TREE_UPDATES }, { source_name: PASSAGE_RETENTION }, { source_name: SPEND_KINDS }, { source_name: PATH_SUGGESTIONS }, { source_name: TEAM_LIMIT }, { source_name: RUN_HANDOVER }, { source_name: ASK_CLARIFY_CHARGE }, { source_name: WEB_RESEARCHED_UNSETTLED }, { source_name: TEAM_ALLOWANCES }, { source_name: PUBLIC_TREE }, { source_name: ERASURE_KEEPS_PUBLIC }, { source_name: PUBLIC_REPORT_TEAM_MONTH }, { source_name: PUBLIC_REVIEW }, { source_name: PUBLIC_FLAG }, { source_name: "0152_report_export_and_check_usage.sql" }, { source_name: "0153_dig_tree_settled.sql" }, { source_name: "0154_region_iceland_liechtenstein.sql" }, { source_name: "0155_owner_answer_writes.sql" }, { source_name: "0156_moderation_notice.sql" }]);
+        { source_name: TREE_UPDATES }, { source_name: PASSAGE_RETENTION }, { source_name: SPEND_KINDS }, { source_name: PATH_SUGGESTIONS }, { source_name: TEAM_LIMIT }, { source_name: RUN_HANDOVER }, { source_name: ASK_CLARIFY_CHARGE }, { source_name: WEB_RESEARCHED_UNSETTLED }, { source_name: TEAM_ALLOWANCES }, { source_name: PUBLIC_TREE }, { source_name: ERASURE_KEEPS_PUBLIC }, { source_name: PUBLIC_REPORT_TEAM_MONTH }, { source_name: PUBLIC_REVIEW }, { source_name: PUBLIC_FLAG }, { source_name: "0152_report_export_and_check_usage.sql" }, { source_name: "0153_dig_tree_settled.sql" }, { source_name: "0154_region_iceland_liechtenstein.sql" }, { source_name: "0155_owner_answer_writes.sql" }, { source_name: "0156_moderation_notice.sql" }, { source_name: MODERATION_STATEMENTS }]);
     // Read-only: nothing was applied.
     expect((await behind.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration WHERE name=$1", [HEAD_STEP])).rows[0].n).toBe(0);
   });

@@ -22,6 +22,16 @@ const MLV = [
   "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "ga", "it", "lv", "lt", "mt", "pl", "pt", "ro",
   "ru", "sk", "sl", "es", "sv", "uk", "zh", "hi", "id", "ja", "ko", "vi", "ar", "he", "tr", "en-US", "en-GB"
 ] as const;
+/**
+ * The two moderation-mail tables (0156 moderation_notice, 0157 moderation_statement) allow exactly the 35 site locales, not
+ * en-US or en-GB. Owner, 2026-11-08: widening them to the 37 values changes what 0156 and 0157's completion checks recorded,
+ * which only an amendment row can carry, and a release that is already out refuses an amendment from a step it does not know
+ * (AMENDMENT_BINDING_DRIFT, migration-forward-chain.ts) — so the widening needs a stop-first upload, and is to be done with an
+ * upload that has to stop the site anyway. Their only writers store one of these 35 or English
+ * (tests/unit/moderation-mail-locale-writers.test.ts). Every other table keeps the 37-value rule.
+ */
+const SITE_LOCALE_ONLY_CHECKS = ["moderation_notice_mail_locale_check", "moderation_statement_mail_locale_check"] as const;
+const SITE_LOCALES = MLV.filter((value) => value !== "en-US" && value !== "en-GB");
 const hash = (seed: string): string => `sha256:${seed.repeat(64).slice(0, 64)}`;
 
 let db: TestDatabase;
@@ -40,12 +50,14 @@ it("A-9: the five queued-mail tables have mail_locale NOT NULL with no default, 
     { table_name: "backup_email_notice", is_nullable: "NO", column_default: null },
     { table_name: "consumer_security_notice", is_nullable: "NO", column_default: null },
     { table_name: "mfa_recovery_notice", is_nullable: "NO", column_default: null },
+    { table_name: "moderation_notice", is_nullable: "NO", column_default: null },
+    { table_name: "moderation_statement", is_nullable: "NO", column_default: null },
     { table_name: "password_reset_notice", is_nullable: "NO", column_default: null },
     { table_name: "social_flow", is_nullable: "YES", column_default: null }
   ]);
 });
 
-it("the CHECKs name the 37 values on every table, and a LINK flow must carry one (C05.1, C05.2)", async () => {
+it("the CHECKs name the 37 values on every table but the two moderation-mail tables (35, owner 2026-11-08), and a LINK flow must carry one (C05.1, C05.2)", async () => {
   const checks = (await db.pool.query<{ conname: string; def: string }>(`
     SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint
     WHERE conname LIKE '%mail_locale%' AND contype = 'c' ORDER BY conname`)).rows;
@@ -54,13 +66,19 @@ it("the CHECKs name the 37 values on every table, and a LINK flow must carry one
     "backup_email_notice_mail_locale_check",
     "consumer_security_notice_mail_locale_check",
     "mfa_recovery_notice_mail_locale_check",
+    "moderation_notice_mail_locale_check",
+    "moderation_statement_mail_locale_check",
     "password_reset_notice_mail_locale_check",
     "social_flow_mail_locale_check",
     "social_flow_mail_locale_link_check"
   ]);
   for (const row of checks.filter((check) => check.conname.endsWith("_mail_locale_check"))) {
-    for (const value of MLV) expect(row.def, `${row.conname} ${value}`).toContain(`'${value}'`);
     expect(row.def, row.conname).not.toContain("'en-us'");
+    if ((SITE_LOCALE_ONLY_CHECKS as readonly string[]).includes(row.conname)) {
+      expect([...row.def.matchAll(/'([^']+)'/gu)].map((match) => match[1]).sort(), row.conname).toEqual([...SITE_LOCALES].sort());
+      continue;
+    }
+    for (const value of MLV) expect(row.def, `${row.conname} ${value}`).toContain(`'${value}'`);
   }
   const link = checks.find((row) => row.conname === "social_flow_mail_locale_link_check")!;
   expect(link.def).toContain("mail_locale IS NOT NULL");

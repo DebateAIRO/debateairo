@@ -27,6 +27,9 @@ const HOST_REFUND_DONE = "systemd-run --pipe --wait --collect --uid=debateai-api
   + " /usr/bin/pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10";
 
 const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
+  day: "2026-11-01",
+  total: "1000",
+  limit: "2000",
   plan: "PLUS",
   totalAmount: "24.20",
   refundAmount: "12.10",

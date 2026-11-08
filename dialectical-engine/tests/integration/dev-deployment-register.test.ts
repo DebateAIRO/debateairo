@@ -26,6 +26,7 @@ import {
   readLivenessPolicy,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readOutboundMailPolicy,
   readPublicationCheckPolicy,
   readCostEstimateStartPolicy,
   readRecoveryPolicy,
@@ -462,6 +463,8 @@ describe("DEV-05 complete development deployment register", () => {
     ]);
     expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
     expect(publicationCheck).toEqual({ deadlineMs: 60_000 });
+    // The daily outbound mail limit: the API's "outbound-mail-policy" boot stage reads the sealed row back (the preview's 2000).
+    await expect(readOutboundMailPolicy(database.pool, registerVersion)).resolves.toEqual({ dailyLimit: 2000, reservedForSecurityPct: 20, alertAtPct: 50 });
     // Fresh-site estimate (owner rulings 2026-10-22): a hosted-only row (only a hosted API estimates); the local seed has none.
     await expect(readCostEstimateStartPolicy(database.pool, registerVersion)).resolves.toBeNull();
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);

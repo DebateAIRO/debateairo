@@ -214,7 +214,7 @@ describe('publish kit v3: composing from the current version', () => {
 
   it.each([
     ['a base whose billing row is malformed', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.enabled = 'yes'; }), 'BILLING_POLICY_INVALID'],
-    ['a base with a row the source no longer builds', (rows: Row[]) => sorted([...rows, { rowKey: 'outboundMailPolicy', valueJsonText: '{}', sourceRef: 'x' }]), 'base-row-dropped'],
+    ['a base with a row the source no longer builds', (rows: Row[]) => sorted([...rows, { rowKey: 'keyOutsideTheReviewedList', valueJsonText: '{}', sourceRef: 'x' }]), 'base-row-dropped'],
     ['a base without the staff policy', (rows: Row[]) => rows.filter(row => row.rowKey !== 'staffAccessPolicy'), 'base-owned-row-missing'],
     ['a base with a scorecard row', (rows: Row[]) => sorted([...rows, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'x' }]), 'support-or-scorecard-row']
   ])('refuses %s', async (_name, tamper, code) => {

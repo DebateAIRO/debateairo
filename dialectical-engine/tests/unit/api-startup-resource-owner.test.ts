@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -134,5 +135,43 @@ describe("API pre-listen startup resource ownership", () => {
 
     expect(flow.supportKeys.close).toHaveBeenCalledTimes(1);
     expect(flow.ordinaryDatabasePools.every(({ end }) => end.mock.calls.length === 1)).toBe(true);
+  });
+});
+
+describe("apps/api main.ts shutdown list", () => {
+  const main = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+  const list = main.slice(
+    main.indexOf("databasePools: [", main.indexOf("installStartupResourceOwner({")),
+    main.indexOf("kekHandles: [", main.indexOf("installStartupResourceOwner({"))
+  );
+  // Every pool the boot ledger holds is handed to the shutdown lifecycle at boot.release(), which forgets the ledger's list:
+  // a pool missing here is never closed, and its idle connections keep the process alive after SIGTERM (2026-11-08).
+  const heldPools = [...main.matchAll(/const (\w+)\s*=[^;]*?boot\.hold\(createPool\(/gu)].map((match) => match[1]!);
+  const at = (entry: string) => {
+    const index = list.indexOf(entry);
+    expect(index, entry).toBeGreaterThan(-1);
+    return index;
+  };
+  // Where a pool is closed: its own line ("    name,") or a guarded spread ("[name]"), never a mention in a comment or guard.
+  const closedAt = (name: string) => {
+    const index = Math.max(list.indexOf(`\n    ${name},`), list.indexOf(`[${name}]`));
+    expect(index, name).toBeGreaterThan(-1);
+    return index;
+  };
+
+  it("closes every pool the boot ledger holds", () => {
+    expect(list.length).toBeGreaterThan(0);
+    expect(heldPools).toEqual(expect.arrayContaining(["pool", "systemPool", "authorizationSystemPool", "supportPool"]));
+    for (const name of heldPools) closedAt(name);
+  });
+
+  it("closes the system pools after every pool that routes to them, and before the keys are closed or zeroed", () => {
+    for (const [user, target] of [...main.matchAll(/setCrossAccountTarget\((\w+), (\w+)\);/gu)].map((match) => [match[1]!, match[2]!] as const)) {
+      expect(closedAt(target), `${user} -> ${target}`).toBeGreaterThan(closedAt(user));
+    }
+    for (const name of ["systemPool", "authorizationSystemPool"]) {
+      expect(closedAt(name), name).toBeLessThan(at("supportKeys.close()"));
+      expect(closedAt(name), name).toBeLessThan(at("recordsKey.fill(0)"));
+    }
   });
 });
