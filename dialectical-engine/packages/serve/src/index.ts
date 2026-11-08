@@ -28,6 +28,7 @@ import {
   PostgresWebEvidenceRepository,
   MAIN_ANSWER_UPDATE_CARRIER,
   PATH_UPDATE_CARRIER,
+  PUBLIC_REPORT_CARRIER_MARK,
   RUN_PURPOSE_LINES_CARRIER,
   readMapRootsInForce,
   RunRepository,
@@ -2077,6 +2078,13 @@ const READMISSION_ORPHANS = `waiting_in_line AS MATERIALIZED (
  * RUN_SETUP_FAILED:READMISSION (the waker's record, packages/battery recordSetupFailure), and not one of
  * READMISSION_ORPHANS. A clause on `run`, for the open-run list and the count (an orphan never has an answer).
  */
+/**
+ * V4 start step, Task 56h-port: the listed run is no report run, a run made only to carry its owner's report of a public debate (its depth_params name the
+ * debate under PUBLIC_REPORT_CARRIER_MARK). No debate ever runs on it, so it would read as a debate waiting to start for ever; the report is on the public
+ * page. A clause on `run`, for the open-run list and the count (a report run never has an answer).
+ */
+const NOT_A_REPORT_RUN = `AND NOT (run.depth_params ? '${PUBLIC_REPORT_CARRIER_MARK}')`;
+
 const NOT_A_READMISSION_ORPHAN = `AND NOT EXISTS (
                SELECT 1 FROM core.work_item AS failed
                WHERE failed.run_id = run.run_id AND failed.state = 'FAILED'
@@ -3368,6 +3376,7 @@ export class ServeRepository {
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
              AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
              ${NOT_A_READMISSION_ORPHAN}
+             ${NOT_A_REPORT_RUN}
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
          FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
@@ -3383,7 +3392,8 @@ export class ServeRepository {
            AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
            -- S01-R37 (t_9931dbe1): a debate the check removed is deleted for its owner before its keys are destroyed.
            AND NOT serve.run_removed_by_synthesis_check(run.run_id)
-           ${NOT_A_READMISSION_ORPHAN}`,
+           ${NOT_A_READMISSION_ORPHAN}
+           ${NOT_A_REPORT_RUN}`,
         [access.ownerRef, access.legacyAskerId]
       )
     ]);

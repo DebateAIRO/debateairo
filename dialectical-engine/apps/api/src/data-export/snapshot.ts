@@ -1,6 +1,7 @@
 import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry, WebSourceEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 import { TypedDomainError } from "@debateai/kernel";
+import { PUBLIC_REPORT_CARRIER_MARK } from "@debateai/db";
 import { SavedQuestionDocSchema, savedQuestionOwnWords } from "@debateai/contract";
 
 export type ExportClaim = Readonly<{
@@ -277,6 +278,8 @@ async function newestRunOf(ownerView: OwnerViewPort, runId: string): Promise<str
   }
 }
 
+const isReportRun = (depth: unknown): boolean => typeof depth === "object" && depth !== null && !Array.isArray(depth) && Object.hasOwn(depth, PUBLIC_REPORT_CARRIER_MARK);
+
 async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, ownerRef: string): Promise<DebateEntry[]> {
   const tombstones = new Map(rows(raw.erasure_tombstones).map((item) => [string(item.run_id), string(item.completed_at)]));
   const visibility = rows(raw.visibility_events);
@@ -292,6 +295,8 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       tier: run.composition_budget_tier, depth: run.depth_params, plan_tier: run.plan_tier,
       state: null as unknown, visibility_history: history,
       role_rotation: roleRotation(Object.hasOwn(run, "role_rotation") ? run.role_rotation : undefined),
+      // Task 56h-port: a run made to carry the person's report of a public debate says so (its depth_params carry the mark naming the debate).
+      ...(isReportRun(run.depth_params) ? { kind: "PUBLIC_REPORT_RUN" as const } : {}),
     };
     if (deletedAt !== null || await ownerView.runRemovedByCheck(reference) || !await ownerView.runKeyPresent(reference)) {
       entries.push({ ...base, content_status: "UNRECOVERABLE" });

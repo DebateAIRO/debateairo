@@ -36,6 +36,8 @@ export type DebateEntry = Readonly<{
   state: unknown;
   visibility_history: Readonly<{ state: string; at: string }>[];
   role_rotation: RoleRotation | null;
+  /** V4 start step, Task 56h-port: present only on a run made to carry the person's report of a public debate (never a debate of theirs). */
+  kind?: "PUBLIC_REPORT_RUN";
   question?: string;
   run?: unknown;
   run_answer?: unknown | null;

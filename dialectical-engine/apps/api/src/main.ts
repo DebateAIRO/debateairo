@@ -41,6 +41,7 @@ import { createStartStep, startStepRouteOf } from "./start-step/step.js";
 import { PostgresStartPathsStore } from "@debateai/db";
 // V4 start step, Task 56b: Task 53a's counts of a public debate's report versions, for the person's own closings of it.
 import { PostgresOwnClosingsReader } from "@debateai/db";
+import { RunRepository as ReportRunRepository, withOwnerAskAdmissionLease as withReportRunAdmissionLease } from "@debateai/db";
 import { createStartTransport } from "./start-step/transport.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 // V4 start step, Task 57f: Continue on a failed debate, and the room for the rest.
@@ -180,7 +181,7 @@ import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
 import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
-import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
@@ -1927,7 +1928,15 @@ const api = buildApi({
     withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
-    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
+    // Task 56h-port (owner, 7 Nov; coordinator, 8 Nov option A): a report nothing else can carry goes on a run of the presser's own, made for it as an
+    // ask's run is made (the content provision login, under the owner's ask admission lease on the server ask admission login), never a debate of theirs.
+    ownReportCarrier: publicReportCarrierMaker({
+      readOwn: (ownerRef, publicationRef) => new PostgresPublicTreeRepository(pool).readOwnReportCarrier(ownerRef, publicationRef),
+      startRun: (input, admissionClient) => new ReportRunRepository(pool, contentProvisionPool).startRun(input, admissionClient),
+      withAdmissionLease: (ownerRef, use) => withReportRunAdmissionLease(serverAskAdmissionPool, { ownerRef, legacyAskerId: null }, (lease) => use(lease.client)),
+      site: { releaseKey: environment.RELEASE_KEY, batteryVersion: environment.BATTERY_VERSION }
+    })
   } }),
   askClarify,
   // V4 start step, Task 31: the step and the key it signs with, together (Task 30: the merge verifies with this key before its

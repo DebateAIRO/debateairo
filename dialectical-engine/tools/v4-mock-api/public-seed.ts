@@ -3,7 +3,7 @@
  * PUBLIC_DEBATE: a story with four paths, one contribution with its dig's own paths, a changed main answer and one report. Its tree is published
  * (public-d1 A, owner review 3 Nov): every point carries a second AI's review, so the page shows each path's trust word and bar and the strongest point
  * For and Against; one point is still argued (an open question under its path, with the star) and one rests on a checked page ("Sure").
- * PUBLIC_AUTHOR_GONE: the author's account is gone and no dig is on it (a report is refused NO_CARRIER; a dig is allowed).
+ * PUBLIC_AUTHOR_GONE: the author's account is gone and no dig is on it (a report is written from what the page holds, Task 56h; a dig is allowed).
  * Run ids never appear here: only the page's own references.
  */
 export const PUBLIC_REF = "f1000000-0000-4000-8000-000000000001";

@@ -5,11 +5,12 @@ import {
 } from "@debateai/contract";
 import type { CryptoEnvelope, PreparedPublicationCipher } from "@debateai/crypto";
 import {
-  DIG_PICK_CARRIER, PATH_UPDATE_CARRIER, PostgresPublicTreeRunnerRepository, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, crossAccount, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool,
+  DIG_PICK_CARRIER, PATH_UPDATE_CARRIER, PostgresPublicTreeRunnerRepository, PUBLIC_MATERIAL_CARRIER, PUBLIC_REPORT_CARRIER, PUBLIC_REPORT_CARRIER_MARK, crossAccount, type StartRunInput, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool,
   type PostgresPublicDebateRepository, type PostgresPublicDebateRunnerRepository, type PostgresPublicPageRepository, type PostgresPublicTreeRepository, type PublicPageOwed, type PublicPageUpdateRead,
   type PublicReportCopyRead, type WebSealed
 } from "@debateai/db";
-import { exhaustive } from "@debateai/kernel";
+import { exhaustive, parseReleaseKey } from "@debateai/kernel";
+import type { PoolClient } from "pg";
 import { digAnchorOf, digPathIndexOf, digPicksOnOnePath, digPickAuthorOf, type DigPathIndex } from "./dig-admission.js";
 import type { PublicationCheckResult, PublicationContentCheck } from "./publication-check/check.js";
 
@@ -255,12 +256,70 @@ export type PublicReportPress =
   | Readonly<{ kind: "NO_CARRIER" }>
   | Readonly<{ kind: "NOT_FOUND" }>;
 
-/** "Write a report" on a public debate: the writer's own press; the copy is sealed under the carrier so the runner can read it. A second press answers the same version. */
+/** Task 56h-port: the question line a report run keeps (sealed under its own key, as every run's): no person's words, and no ask it could match. */
+export const PUBLIC_REPORT_RUN_QUESTION = "A report on a public debate";
+
+/**
+ * V4 start step, Task 56h-port (coordinator ruling of 8 Nov, option A; the owner's card: "The visitor's own report press keeps the material under the
+ * visitor's run"): the port that gives a presser a run of their own to carry their report of a public debate nothing else can carry. Under the owner's
+ * ask admission lease (one at a time per person): their report run of this debate if one is there (one a press that lost its race left unused, or the
+ * one that carried their earlier report), else a new one, made through the one writer of encrypted runs on the presser's session. It is marked
+ * (PUBLIC_REPORT_CARRIER_MARK, naming the debate) and has no battery row, so no work item is ever made for it and no debate ever runs on it: its envelope
+ * basis is the mark alone, which no envelope parses from. Its settings version is the site's (the release key's number), so the runner charges its calls
+ * to that version's guard. One per person and debate: one report at a time per debate, so two reports never share its spend.
+ */
+export function publicReportCarrierMaker(ports: Readonly<{
+  readOwn: (ownerRef: string, publicationRef: string) => Promise<string | null>;
+  startRun: (input: StartRunInput, admissionClient: PoolClient) => Promise<string>;
+  withAdmissionLease: <T>(ownerRef: string, use: (admissionClient: PoolClient) => Promise<T>) => Promise<T>;
+  site: Readonly<{ releaseKey: string; batteryVersion: string }>;
+  now?: () => Date;
+}>): (presser: Readonly<{ ownerRef: string; userId: string; sessionId: string; free: boolean }>, publicationRef: string) => Promise<string> {
+  const registerVersion = parseReleaseKey(ports.site.releaseKey).siteVersion;
+  return (presser, publicationRef) => ports.withAdmissionLease(presser.ownerRef, async (admissionClient) => {
+    const kept = await ports.readOwn(presser.ownerRef, publicationRef);
+    if (kept !== null) return kept;
+    const mark = Object.freeze({ [PUBLIC_REPORT_CARRIER_MARK]: publicationRef });
+    return ports.startRun({
+      questionLine: PUBLIC_REPORT_RUN_QUESTION, principal: { kind: "server", userId: presser.userId, ownerRef: presser.ownerRef }, sessionId: presser.sessionId,
+      callerScope: "ASKER", asOf: (ports.now ?? (() => new Date()))(), askerRiskTier: "casual", effectiveRiskTier: "casual", tierSource: "ASKER",
+      tierProvenanceRef: "public-report-run", compositionBudgetTier: "low", depthParams: mark,
+      // Budget spec §2.7: every production run start carries a plan tier: the presser's (the report row keeps its own free flag, 0147).
+      planTier: presser.free ? "free" : "premium",
+      // agent_count must be at least one; the run calls no maker of its own (the report's calls are the runner's public report lane's).
+      discoveredPanel: [{ provider_ref: "public-report-run", maker: "none", model_id: "none", probe_evidence_ref: "00000000-0000-4000-8000-000000000000", probed_at: "1970-01-01T00:00:00.000Z" }],
+      strangerSampleRate: 0, envelopeBasis: mark, registerVersion, releaseKey: ports.site.releaseKey, batteryVersion: ports.site.batteryVersion, batteryRows: [],
+      askContract: mark
+    }, admissionClient);
+  });
+}
+
+/**
+ * V4 start step, Task 56h: the copy holds nothing a report could be written from (no answer, no main answer, no path, no dig, no earlier report: a
+ * debate published before its story was written). The owner, 7 Nov: "If nothing is investigated yet, then of course they need to spend money".
+ */
+export function nothingToWriteFrom(debate: PublicDebate, now: Date): boolean {
+  const material = publicMaterialOf(debate, { now });
+  return material.answer === null && material.main_answer === null && material.paths.length === 0 && material.digs.length === 0 && material.earlier_report === null;
+}
+
+/**
+ * "Write a report" on a public debate: the writer's own press; the copy is sealed under the carrier so the runner can read it. A second press answers the same version.
+ * V4 start step, Task 56h (owner, 7 Nov afternoon: "Yes, from what is there"): when no run of the debate's or of a dig's can carry it (its author left and nobody's dig
+ * is here) and the copy holds something to write from, `ownCarrier` gives a run of the writer's own, made for this report; the database takes it only when it is
+ * theirs, live, not the debate's, and no debate ever ran on it (0167). Absent, or nothing to write from: NO_CARRIER, as before.
+ */
 export async function pressPublicReport(input: Readonly<{ ownerRef: string; publicationRef: string; reportId: string; free: boolean; now: Date; pool: Pool;
-  tree: Pick<PostgresPublicTreeRepository, "openReport" | "recordMaterial">; readPublicDebate: (publicationRef: string) => Promise<PublicDebate | null> }>): Promise<PublicReportPress> {
+  tree: Pick<PostgresPublicTreeRepository, "openReport" | "recordMaterial">; readPublicDebate: (publicationRef: string) => Promise<PublicDebate | null>;
+  ownCarrier?: () => Promise<string | null> }>): Promise<PublicReportPress> {
   const debate = await input.readPublicDebate(input.publicationRef);
   if (debate === null) return Object.freeze({ kind: "NOT_FOUND" });
-  const opened = await input.tree.openReport(input.ownerRef, input.publicationRef, input.reportId, input.free);
+  const openWith = (ownRunId: string | null) => input.tree.openReport(input.ownerRef, input.publicationRef, input.reportId, input.free, ownRunId);
+  let opened = await openWith(null);
+  if (opened.outcome === "NO_CARRIER" && input.ownCarrier !== undefined && !nothingToWriteFrom(debate, input.now)) {
+    const own = await input.ownCarrier();
+    if (own !== null) opened = await openWith(own);
+  }
   switch (opened.outcome) {
     case "NOT_PUBLIC": return Object.freeze({ kind: "NOT_FOUND" });
     case "ONGOING": return Object.freeze({ kind: "ONGOING" });
@@ -268,7 +327,8 @@ export async function pressPublicReport(input: Readonly<{ ownerRef: string; publ
     case "WRITING": return Object.freeze({ kind: "WRITING", reportVersion: opened.reportVersion! });
     case "OPENED": {
       // Row-level security X29: a stranger's report of a public debate is sealed under the debate's own run key so the runner can read it, and that run is the
-      // author's, which the runtime login does not see inside the stranger's request. The public check is open_public_report, above; only this seal crosses.
+      // author's (or a digger's), which the runtime login does not see inside the stranger's request. The public check is open_public_report, above; only this seal
+      // crosses. A carrier of the writer's own (Task 56h) needs no crossing; it takes the same one seal.
       const sealed = await crossAccount("X29", () => sealFor(input.pool, opened.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened.reportId!, publicMaterialOf(debate, { now: input.now })));
       if (sealed === null) return Object.freeze({ kind: "NO_CARRIER" });
       await input.tree.recordMaterial(opened.reportId!, opened.carrierRunId!, input.publicationRef, "REPORT", sealed);
