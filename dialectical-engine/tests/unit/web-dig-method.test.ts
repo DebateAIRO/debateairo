@@ -10,7 +10,7 @@ import {
 import { createPerplexitySearchPort, previewThinkingStepOf, readPromptFrame, type PromptPacket, type ProviderCallRequest } from "@debateai/providers";
 import { addressKey, selectPathPages } from "../../packages/evidence/src/host-filter.js";
 import { digSuggestionIdOf, refreshPathSuggestions, writeDigSuggestions, writeFirstDebateSuggestions, type DigSuggestionsJob, type PathSuggestionsStore } from "../../apps/runner/src/dig-suggestions-step.js";
-import { DIG_INVESTIGATED_MAX_BYTES, digDebateTextOf, investigatedText, type InvestigatedDebate } from "../../apps/runner/src/investigation-digest.js";
+import { DIG_INVESTIGATED_MAX_BYTES, digDebateTextOf, investigatedText, storyPathPointIds, type InvestigatedDebate } from "../../apps/runner/src/investigation-digest.js";
 import { isPathRewriteCallSite, pathRewriteCallSiteRole } from "../../apps/runner/src/path-rewrite-scope.js";
 import { ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
 import { createReplayBook, recordedCalls, replayingGateway } from "../../apps/runner/src/run-replay.js";
@@ -324,6 +324,16 @@ describe("what the whole debate already investigated: AI text only", () => {
 
   it("a dig whose rewrite is not written yet is known by its own statements", () => {
     expect(digDebateTextOf(storedInput, null).paths[0]!.line).toBe("Rent takes most of the gap.");
+  });
+
+  it("V4 start step, Task 55d: a path debate's story path b<n> is known without that path's own root among its points; an R22 path without its position", () => {
+    const roots = [{ ref: "b1", rootNodeId: "root-1" }, { ref: "b2", rootNodeId: "root-2" }];
+    // The story names the path by its id and every point under it, the path's own root (its answer) among them, as a storyteller may.
+    expect(storyPathPointIds({ position_ref: "b2", node_refs: ["n1", "ROOT-2", "n2", "root-1"] }, roots)).toEqual(["n1", "n2", "root-1"]);
+    // A path with no root in force read: only its id is left out, as before.
+    expect(storyPathPointIds({ position_ref: "b3", node_refs: ["n1", "n2"] }, roots)).toEqual(["n1", "n2"]);
+    // R22: the story path's position is its own answer.
+    expect(storyPathPointIds({ position_ref: "pos-1", node_refs: ["POS-1", "n1"] }, roots)).toEqual(["n1"]);
   });
 
   const big = (at: number, nearness: number | null): InvestigatedDebate => ({ nearness, changed: [`Changed ${String(at)}.`],

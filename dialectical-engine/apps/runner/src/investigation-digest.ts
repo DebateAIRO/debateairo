@@ -1,9 +1,10 @@
 // apps/runner/src/investigation-digest.ts
-import { StoryBodySchema, type PublicMaterial, type PublicMaterialPath } from "@debateai/contract";
+import { PATH_ID_PATTERN, StoryBodySchema, type PublicMaterial, type PublicMaterialPath } from "@debateai/contract";
 import {
   PATH_REWRITE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresInvestigationRunnerRepository,
-  PostgresWebEvidenceRepository, RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun, decryptLeasedContentForRun,
-  prepareLeasedContentEncryptionForRun, withRunContentLease, type CryptoEnvelope, type Pool
+  PostgresPathResultsRepository, PostgresWebEvidenceRepository, RunRepository, WEB_EVIDENCE_CARRIERS, decryptContentForRun,
+  decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun, withOwnRunContentLease, withRunContentLease, type CryptoEnvelope,
+  type Pool
 } from "@debateai/db";
 import { pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { openPublicMaterial } from "./public-tree-sources.js";
@@ -24,6 +25,11 @@ import { addedPagesOf } from "./web-researched-read.js";
  * - Same bytes on a re-claim: only what was stored before `cutAt` is read (the dig's joining the investigation for its
  *   planners, its stored paths for its suggestions), in a fixed order, so a sibling that settles meanwhile changes nothing.
  *   A member with no key, or erased, is left out; nothing here stops the dig.
+ * - V4 start step, Task 55d: the runner reads this inside the dig's own content lease, which may never widen to another debate.
+ *   Each other debate is read under a short lease of its own, outside the dig's (`withOwnRunContentLease`); one whose lease cannot
+ *   be had in time (an erasure holds it) is left out like an erased one.
+ * - A path debate's story names a path by its id b<n> (Task 55d, as Task 55's parentPathOf): the point left out of that path's
+ *   points is its root in force (0160), its own answer (`storyPathPointIds`).
  * - The size: at most DIG_INVESTIGATED_MAX_BYTES, cut by code. Every line first (the dig's own line of parents, nearest first,
  *   then the others in the order they joined), then what the digs changed, then the points, then the notes and searches,
  *   each kept while the whole still fits (`investigatedText`).
@@ -95,6 +101,18 @@ const lower = (id: string): string => id.toLowerCase();
 const asPoint = (point: Readonly<{ text: string; side: "for" | "against" | null; disputed: boolean }>): InvestigatedPoint =>
   Object.freeze({ text: point.text, side: point.side, disputed: point.disputed });
 
+/**
+ * The ids of a story path's points: the nodes it names, without the path's own answer. On R22 that answer is the story path's
+ * position (its `position_ref`). On a path debate (V4 start step, Task 55d; Task 55's rule in parentPathOf) the path is named by its
+ * id b<n>, and its answer is that path's root in force (0160), which `roots` names; with none read, only the id is left out. Pure.
+ */
+export function storyPathPointIds(path: Readonly<{ position_ref: string; node_refs: readonly string[] }>,
+  roots: readonly Readonly<{ ref: string; rootNodeId: string }>[]): readonly string[] {
+  const ownAnswer = PATH_ID_PATTERN.test(path.position_ref)
+    ? roots.find((root) => root.ref === path.position_ref)?.rootNodeId ?? path.position_ref : path.position_ref;
+  return Object.freeze(path.node_refs.filter((id) => lower(id) !== lower(ownAnswer)));
+}
+
 /** The newest story of a debate as of `cutAt`, its paths with their points; none when it has no story by then. */
 async function storyPathsOf(pool: Pool, runId: string, cutAt: string): Promise<readonly InvestigatedPath[]> {
   const row = (await pool.query<{ story_id: string; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
@@ -108,9 +126,14 @@ async function storyPathsOf(pool: Pool, runId: string, cutAt: string): Promise<r
     decryptContentForRun<unknown>(pool, runId, "serve.answer_story", row.story_id, row.content_ciphertext, row.content));
   const body = StoryBodySchema.nullable().safeParse(isRecord(content) ? content.body : undefined);
   if (!body.success || body.data === null) return [];
+  // A path debate's roots in force (ids only), read only when its story names a path by its id b<n>: an R22 story reads nothing more.
+  const roots = body.data.short.paths.some((path) => PATH_ID_PATTERN.test(path.position_ref))
+    ? (await new PostgresPathResultsRepository(pool).readPathRoots(runId)).filter((root) => !root.stale)
+      .map((root) => Object.freeze({ ref: root.pathId, rootNodeId: root.rootNodeId }))
+    : [];
   const paths: InvestigatedPath[] = [];
   for (const path of body.data.short.paths) {
-    const points = await pointsOf(pool, runId, path.node_refs.filter((id) => lower(id) !== lower(path.position_ref)));
+    const points = await pointsOf(pool, runId, storyPathPointIds(path, roots));
     paths.push(Object.freeze({ line: path.line, fate: path.fate, points: Object.freeze(points.map(asPoint)) }));
   }
   return Object.freeze(paths);
@@ -212,14 +235,18 @@ export async function readAlreadyInvestigated(pool: Pool, runId: string, cutAt: 
   for (const member of investigation.members) {
     if (lower(member.run_id) === lower(runId) || !before(member.joined_at, cutAt)) continue;
     try {
-      const isDig = (await picks.read(member.run_id)) !== null;
-      const text = isDig ? await digTextOf(pool, member.run_id, cutAt)
-        : { changed: Object.freeze([]), paths: await storyPathsOf(pool, member.run_id, cutAt) };
-      // A dig still running at the cut has stored nothing yet: nothing of it is known.
-      if (text === null) continue;
-      const web = await webTextOf(pool, member.run_id, cutAt);
-      if (text.paths.length === 0 && web.notes.length === 0 && web.searched.length === 0) continue;
-      debates.push(Object.freeze({ nearness: nearness.get(lower(member.run_id)) ?? null, ...text, ...web }));
+      // Task 55d: under the member's own short lease, outside this run's (which the runner holds here and which may not widen).
+      const debate = await withOwnRunContentLease(pool, member.run_id, async (): Promise<InvestigatedDebate | null> => {
+        const isDig = (await picks.read(member.run_id)) !== null;
+        const text = isDig ? await digTextOf(pool, member.run_id, cutAt)
+          : { changed: Object.freeze([]), paths: await storyPathsOf(pool, member.run_id, cutAt) };
+        // A dig still running at the cut has stored nothing yet: nothing of it is known.
+        if (text === null) return null;
+        const web = await webTextOf(pool, member.run_id, cutAt);
+        if (text.paths.length === 0 && web.notes.length === 0 && web.searched.length === 0) return null;
+        return Object.freeze({ nearness: nearness.get(lower(member.run_id)) ?? null, ...text, ...web });
+      });
+      if (debate !== null) debates.push(debate);
     } catch {
       // A member that is erased or cannot be opened is left out: the digest is what can be read, and it never stops the dig.
     }

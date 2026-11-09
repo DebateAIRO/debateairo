@@ -11,7 +11,7 @@ export * from "./team-limit.js";
 export * from "./team-spend.js";
 export * from "./path-suggestions.js";
 import type { InvestigationRead } from "./investigations.js";
-import type { WebSealed } from "./web-evidence.js";
+import type { PieceSettingsVersion, WebSealed } from "./web-evidence.js";
 
 /**
  * The final report over an investigation (migration 0136; plan task W5-1; owner answer F7 A), through 0136's definers
@@ -76,18 +76,21 @@ export class PostgresInvestigationReportRunnerRepository {
       "SELECT identity.read_investigation_waiting_of_run($1) AS waiting", [runId])).rows[0]?.waiting ?? null;
   }
 
-  /** The report of one closing, set once; it is also recorded on the closing (0133's report_ref) in the same transaction. */
-  async record(record: InvestigationReportRecord): Promise<InvestigationReportWriteOutcome> {
+  /**
+   * The report of one closing, set once; it is also recorded on the closing (0133's report_ref) in the same transaction. Task 57p: 0169's
+   * writer, the report's settings version (the root's, whose run its calls were charged to) last.
+   */
+  async record(record: InvestigationReportRecord & PieceSettingsVersion): Promise<InvestigationReportWriteOutcome> {
     return (await this.pool.query<{ outcome: InvestigationReportWriteOutcome }>(
-      `SELECT identity.record_investigation_report_version($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,
-        $16::jsonb,$17,$18::jsonb,$19) AS outcome`,
+      `SELECT identity.record_investigation_report_version_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,
+        $16::jsonb,$17,$18::jsonb,$19,$20) AS outcome`,
       [record.investigationId, record.reportVersion, record.reportId, record.outcome, record.storyOutcome, record.failureCode,
         record.coveredRewrite?.rewriteId ?? null, record.coveredRewrite?.recordedAt ?? null, record.dossierFingerprint,
         record.ladderStep, record.leftOut, record.answerRounds, record.storyRounds,
         record.writerLineage === null ? null : JSON.stringify(record.writerLineage),
         record.checkerLineage === null ? null : JSON.stringify(record.checkerLineage),
         JSON.stringify(record.artifactRefs), record.spentMicros,
-        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!.outcome;
+        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 
   /** The reports of the debate's investigation, oldest version first; null when it is not live or in no investigation. */

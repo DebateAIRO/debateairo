@@ -113,3 +113,66 @@ export function createOrderedRecorder(size: number): OrderedRecorder {
     }
   };
 }
+
+/**
+ * V4 start step, Task 53b (spec 2026-11-03 §4.3, the owner's "First round" answer: each path fills in as soon as its own arguing
+ * and checks end, and "does not wait for the other paths") — ONE ORDERED RECORDER PER PART. The positions [0, size) fall into
+ * parts (`partOf`; on a path debate, the path a plan position argues under). Each part's positions are written in their plan
+ * order, as `createOrderedRecorder` writes all of them: a write runs once every EARLIER position OF ITS PART has been committed
+ * (its write settled) or skipped, so the writes of one part never overlap. No part waits on another, and two parts' writes may
+ * run side by side. A position whose part is null orders with nothing. `partOf` is asked only when a position is committed, for
+ * that position and the ones below it, so a part may be known late (a scrutiny slot's path, once scrutiny chose its node); it
+ * must not change once asked. A write that rejects settles only the `commit` call that requested it, as there. With one part
+ * for every position, this writes in plan order.
+ */
+export function createPartedOrderedRecorder(size: number, partOf: (position: number) => number | null): OrderedRecorder {
+  if (!Number.isInteger(size) || size < 0) {
+    throw new TypeError("ORDERED_RECORDER_SIZE_INVALID");
+  }
+
+  const claimed = new Set<number>();
+  const skipped = new Set<number>();
+  /** Each position's turn, over: its write has settled, or it was skipped. */
+  const settled = Array.from({ length: size }, () => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((settle) => { resolve = settle; });
+    return { promise, resolve };
+  });
+
+  const checkRange = (position: number): void => {
+    if (!Number.isInteger(position) || position < 0 || position >= size) {
+      throw new TypeError("ORDERED_RECORDER_POSITION_OUT_OF_RANGE");
+    }
+  };
+
+  // As createOrderedRecorder: a position is claimed by its first commit or skip, and claiming it again throws, except that a
+  // repeated skip of a skipped position is a no-op.
+  const claim = (position: number): void => {
+    checkRange(position);
+    if (claimed.has(position)) {
+      throw new TypeError("ORDERED_RECORDER_POSITION_REUSED");
+    }
+    claimed.add(position);
+  };
+
+  return {
+    commit<T>(position: number, write: () => Promise<T>): Promise<T> {
+      claim(position);
+      const part = partOf(position);
+      const earlier = part === null ? [] : settled.slice(0, position).filter((_turn, below) => partOf(below) === part);
+      const written = Promise.all(earlier.map((turn) => turn.promise)).then(() => write());
+      written.then(() => settled[position]!.resolve(), () => settled[position]!.resolve());
+      return written;
+    },
+    skip(position: number): void {
+      checkRange(position);
+      if (skipped.has(position)) return;
+      claim(position);
+      skipped.add(position);
+      settled[position]!.resolve();
+    },
+    done(): Promise<void> {
+      return Promise.all(settled.map((turn) => turn.promise)).then(() => undefined);
+    }
+  };
+}

@@ -195,6 +195,23 @@
 .v4RepPath[data-level="3"] { margin-inline-start: 42px; }
 .v4RepPath[data-level="4"] { margin-inline-start: 56px; }
 .v4RepBar { max-width: 360px; }
+/* V4 start step, Task 55c (report-f4): a version's list holds one item per first-level path: its row, then the paths dug later
+   in one fold under it ("Updated by your dig", closed by default). The item, not its row, closes the list with the bottom rule. */
+.v4RepPathGroup { display: flex; flex-direction: column; }
+.v4RepPathGroup > .v4RepPath:last-child, .v4RepDugPaths > .v4RepPath:last-child { border-bottom: 0; }
+.v4RepPathGroup:last-child { border-bottom: 1px solid var(--line-2); }
+.v4RepDug { padding-bottom: 10px; }
+.v4RepDugSummary {
+  display: flex; align-items: center; min-height: 44px; margin-inline-start: 14px; cursor: pointer; color: var(--link);
+  font-size: var(--t-ui); text-decoration: underline; text-underline-offset: 3px;
+}
+/* What a dig changed, and "Your point of view": one look whether the view helped or not ("the same care"). */
+.v4RepChanged, .v4RepView { display: flex; flex-direction: column; gap: 6px; }
+.v4RepView { padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); }
+.v4RepChanged .v4RepSmallHead, .v4RepView .v4RepSmallHead { margin: 0; }
+.v4RepViewWords { padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; line-height: 1.55; }
+.v4RepViewVerdict { font-weight: 600; }
+.v4RepViewWhy { color: var(--text-2); font-size: 15px; line-height: 1.55; }
 
 .v4RepPoints { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .v4RepPoint { display: flex; gap: 12px; font-size: 15px; line-height: 1.55; }
@@ -306,5 +323,8 @@
   .v4RepFirst:not([open]) { display: none; }
   .v4RepFirst { border: 0; padding: 0; }
   .v4RepFirstSummary { color: var(--qr-ink); text-decoration: none; font-weight: 600; }
+  /* Task 55c: a closed fold of paths dug later prints nothing either; an opened one prints its words plainly. */
+  .v4RepDug:not([open]) { display: none; }
+  .v4RepDugSummary { color: var(--qr-ink); text-decoration: none; font-weight: 600; }
   .v4RepDoc .v4Source { background: none; border-color: var(--qr-ink); break-inside: avoid; }
 }

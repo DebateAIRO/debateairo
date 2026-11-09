@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "A síntese de um debate concluído — para a verificar quanto a quatro categorias",
   "legal.providers.purpose.reportCheck": "Uma denúncia feita com o botão Denunciar e o texto público do debate — para verificar a denúncia",
   "legal.providers.purpose.questionCheck": "Uma pergunta antes de um debate começar — para verificar se o debate pode começar",
+  "legal.providers.purpose.clarifyQuestions": "Antes de um debate começar: sugerir perguntas de clarificação",
+  "legal.providers.purpose.suggestPaths": "Antes de um debate começar: sugerir o que vale a pena investigar",
   "legal.providers.purpose.search": "Consultas de pesquisa que os modelos redigem a partir do debate — para encontrar provas na web",
   "legal.providers.purpose.support": "O que escreve no chat de apoio — para lhe responder",
   "legal.providers.purposesUnconfirmed": "[a confirmar: quais destas tarefas lhe são confiadas]",

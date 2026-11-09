@@ -3,7 +3,7 @@
  * PUBLIC_DEBATE: a story with four paths, one contribution with its dig's own paths, a changed main answer and one report. Its tree is published
  * (public-d1 A, owner review 3 Nov): every point carries a second AI's review, so the page shows each path's trust word and bar and the strongest point
  * For and Against; one point is still argued (an open question under its path, with the star) and one rests on a checked page ("Sure").
- * PUBLIC_AUTHOR_GONE: the author's account is gone and no dig is on it (a report is refused NO_CARRIER; a dig is allowed).
+ * PUBLIC_AUTHOR_GONE: the author's account is gone and no dig is on it (a report is written from what the page holds, Task 56h; a dig is allowed).
  * Run ids never appear here: only the page's own references.
  */
 export const PUBLIC_REF = "f1000000-0000-4000-8000-000000000001";
@@ -107,7 +107,10 @@ export function seedPublicDebates(): readonly Record<string, unknown>[] {
         dig_paths: [{ position_ref: "p-towns", line: "Small towns behave like large cities here: partly held.", fate: "PARTLY_HELD", points: ["Only a few towns were studied."] }]
       }],
       main_answer_update: { updated_at: "2026-10-28T16:00:00.000Z", segments: [{ text: "Better service first, and free fares for those who need them, also in small towns, though the studies there are few." }] },
-      reports: [REPORT]
+      reports: [REPORT],
+      // V4 start step, Task 75d: the level the debate was asked at, last, as the API copies it at publish time. The page below was
+      // published before the level was copied: it names none and reads as Plain words.
+      reading_level: "background"
     },
     {
       public_ref: PUBLIC_REF_AUTHOR_GONE, author_pseudonym: "a contributor", author_name_gone: true, question: "Should schools start an hour later?",
@@ -186,4 +189,14 @@ export function contributionOf(positionRef: string, onRef: string | null, update
 /** Decision 35's pretend check: "hide" in the claim hides, "#person" goes to a person, anything else is the one refusal every refusal shares (the DSA notices, D5). */
 export function mockFlagStateOf(claim: string): "WITH_A_PERSON" | "HIDDEN" | "NOT_FOUND" {
   return claim.includes("#person") ? "WITH_A_PERSON" : claim.includes("hide") ? "HIDDEN" : "NOT_FOUND";
+}
+
+/**
+ * V4 start step, Task 79c (owner answer Q33 A, 5 Nov): what a row of GET /v1/answers says of a dig made on someone else's public page, for
+ * its own card on "Your maps" ("Dig: {its pick}"): `dug_on_public`, and its first pick's words (`dig_pick`) when it had a pick. Every other
+ * row says false. Contract members (AnswerSummarySchema, OpenRunSummarySchema), so the website's view carries them too.
+ */
+export function publicDigRowPart(dig: Readonly<{ pick: string | null }> | undefined): { dug_on_public: boolean; dig_pick?: string } {
+  if (dig === undefined) return { dug_on_public: false };
+  return dig.pick === null ? { dug_on_public: true } : { dug_on_public: true, dig_pick: dig.pick };
 }

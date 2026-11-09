@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Синтез завершених дебатів — щоб перевірити його за чотирма категоріями",
   "legal.providers.purpose.reportCheck": "Повідомлення, зроблене кнопкою «Повідомити», і загальнодоступний текст дебатів — щоб перевірити повідомлення",
   "legal.providers.purpose.questionCheck": "Запитання до початку дебатів — щоб перевірити, чи можуть дебати початися",
+  "legal.providers.purpose.clarifyQuestions": "До початку дебатів: пропозиції уточнювальних питань",
+  "legal.providers.purpose.suggestPaths": "До початку дебатів: пропозиції щодо того, що варто дослідити",
   "legal.providers.purpose.search": "Пошукові запити, які моделі складають на основі дебатів, — щоб знайти докази в інтернеті",
   "legal.providers.purpose.support": "Ваші повідомлення в розмові зі службою підтримки — щоб відповісти вам",
   "legal.providers.purposesUnconfirmed": "[уточнити: які з цих завдань йому доручено]",

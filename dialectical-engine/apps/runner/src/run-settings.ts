@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, QueryConfig } from "pg";
 import { EntitlementRepository, PostgresInternalAllowanceRepository, settingsRefusalCode } from "@debateai/db";
 import { LEGACY_RELEASE_KEY, TypedDomainError } from "@debateai/kernel";
 import {
@@ -50,6 +50,7 @@ import {
   previewPlanTierRosters,
   previewRunnerPolicy,
   resolvePreviewLineUp,
+  type PreviewFinalWriterPlan,
   type PreviewGateSettings,
   type PreviewLineUp,
   type PreviewProviderTestConfig,
@@ -665,8 +666,8 @@ export type RunnerSettingsPreloadSources = Readonly<{
  * Side-by-side spec §13 runner point 3 (S8) — WHAT THE BOOT PRELOADS. The sorted, distinct union of the site version,
  * the versions of this release's open debates (READY or CLAIMED work, `listOpenRunSettingsVersions`) and every version
  * this release has a PASS verdict for (`register.read_passed_settings_versions`, which also names the key's own number).
- * Never the activation pointer: the runner runs what it was stamped with or has passed, and the pointer is the API's
- * alone (S16 pins that no runner file names its reader). A `legacy` process (development and tests: no release key
+ * Never the activation pointer: the runner runs what it was stamped with or has passed (the pointer is read only by a
+ * background lane's fallback, Task 57o-fix, `createSwitchedOnSettingsReader`). A `legacy` process (development and tests: no release key
  * is ever legacy on a server) preloads its site version only, asking neither source — legacy runs are never listed
  * and a legacy key has no verdicts. A database failure propagates: the boot refuses (the S8 ruling: at boot the
  * database must work). Two reads, one after the other: the open debates', then the verdicts'.
@@ -751,32 +752,229 @@ export function runnerSettingsLine(preload: RunnerSettingsPreload): string {
 
 /**
  * Side-by-side spec §13 (S6) — THE RUN → VERSION MAP, for the life of the process (a few bytes per run; a runner lives
- * one release). `execute()` sets it right after the claim, before any call; the money seams and (addition D17) the
- * preview's thinking table read it by run id, synchronously. A run's version is never re-pointed: a second, different
- * value refuses RUN_SETTINGS_VERSION_DRIFT (the same value again — a re-claim — is fine).
+ * one release). `execute()` sets it right after the claim (`set`), before any call; the money seams and (addition D17) the
+ * preview's thinking table read it by run id, synchronously. V4 start step, Tasks 57o-fix and 57o-fix2 (owner, 8 Nov: "For sure we
+ * shouldn't wait or stop anything, this is unacceptable"). The map's rule in plain words: A CLAIM WINS OVER ANY LANE'S MAPPING; TWO
+ * CLAIMS THAT DISAGREE REFUSE.
+ *  - A background lane (`setByLane`, through `runVersionMapper`: the run's own version, or today's settings when this runner refuses it)
+ *    maps a run only while nothing maps it; it never replaces any mapping.
+ *  - A claim (`set`) replaces a lane's mapping, whichever version the lane used, with one content-free
+ *    DEBATEAI_RUNNER_RUN_SETTINGS_CLAIMED line when the two differ; from then on the mapping is the claim's. E.g. "Add to researched"
+ *    mapped debate D to its own 22, then the person pressed Continue, which moved D to 26: the claim maps D to 26 and the debate runs.
+ *  - A claim at another version than an earlier claim's refuses RUN_SETTINGS_VERSION_DRIFT (the same value again — a re-claim — is fine).
  */
 export type RunSettingsVersions = Readonly<{
   set(runId: string, version: number): void;
+  setByLane(runId: string, version: number): void;
   versionOf(runId: string): number | undefined;
 }>;
 
-export function createRunSettingsVersions(): RunSettingsVersions {
+export function createRunSettingsVersions(input: Readonly<{ log?: (line: Readonly<Record<string, unknown>>) => void }> = {}): RunSettingsVersions {
   const versions = new Map<string, number>();
+  /** The runs whose mapping a background lane set (Tasks 57o-fix, 57o-fix2), until a claim's `set` makes it the claim's. */
+  const byLane = new Set<string>();
+  // Printed as the cache's lines are (main.ts and the practice composition build the map the same way, with no port).
+  const log = input.log ?? ((line: Readonly<Record<string, unknown>>) => { console.warn(JSON.stringify(line)); });
   return Object.freeze({
     set(runId: string, version: number): void {
       const known = versions.get(runId);
       if (known !== undefined && known !== version) {
-        throw new TypedDomainError(
-          "RUN_SETTINGS_VERSION_DRIFT",
-          `RUN_SETTINGS_VERSION_DRIFT:${String(known)}:${String(version)}`
-        );
+        if (!byLane.has(runId)) {
+          throw new TypedDomainError(
+            "RUN_SETTINGS_VERSION_DRIFT",
+            `RUN_SETTINGS_VERSION_DRIFT:${String(known)}:${String(version)}`
+          );
+        }
+        log({ kind: "DEBATEAI_RUNNER_RUN_SETTINGS_CLAIMED", runId, laneVersion: String(known), version: String(version) });
       }
+      byLane.delete(runId);
       versions.set(runId, version);
+    },
+    setByLane(runId: string, version: number): void {
+      if (versions.has(runId)) return;
+      versions.set(runId, version);
+      byLane.add(runId);
     },
     versionOf(runId: string): number | undefined {
       return versions.get(runId);
     }
   });
+}
+
+/**
+ * V4 start step, Task 57o-fix (owner, 8 Nov, "Your switched-on one (Recommended)": "The report uses 25, exactly as Continue and new debates
+ * do. Needs one small permission: the runner may read which settings are switched on (a number, nothing private) ... (0169)") — THE
+ * RUNNER'S READER OF THE SWITCHED-ON VERSION: 0124's activation pointer, through 0124's one reader (the SQL below), which 0169
+ * grants the runner's role (side-by-side spec §13 D8 had kept it the API's alone). An empty pointer is this release's own site version
+ * (D1), exactly as the API reads it (apps/api/src/active-settings-version.ts, unchanged). Read only when a background lane meets a run whose
+ * own version this runner refuses (`runVersionMapper`), at most once a second per process: a value (or a failure) under `maxAgeMs` old is
+ * answered without a read, and concurrent callers share one read. Each read carries pg's per-query `query_timeout` (the pool destroys the
+ * connection it ended). A failed read rejects (never a guessed version): the lane tries again on its next pass. The SQL text is written
+ * here once.
+ */
+export const RUNNER_SWITCHED_ON_SETTINGS = Object.freeze({ maxAgeMs: 1000, queryTimeoutMs: 5000 });
+const SWITCHED_ON_SETTINGS_SQL = "SELECT register.read_active_settings_version() AS version";
+const SWITCHED_ON_SETTINGS_INVALID = "RUNNER_SWITCHED_ON_SETTINGS_INVALID";
+
+export function createSwitchedOnSettingsReader(input: Readonly<{
+  pool: Pick<Pool, "query">;
+  siteVersion: number;
+  clock?: () => number;
+}>): () => Promise<number> {
+  const { pool, siteVersion } = input;
+  if (!Number.isSafeInteger(siteVersion) || siteVersion < 1) {
+    throw new TypedDomainError(SWITCHED_ON_SETTINGS_INVALID, SWITCHED_ON_SETTINGS_INVALID);
+  }
+  const clock = input.clock ?? (() => performance.now());
+  let settled: Readonly<{ at: number; outcome: Readonly<{ version: number }> | Readonly<{ error: unknown }> }> | null = null;
+  let reading: Promise<number> | null = null;
+  const versionOf = (value: unknown): number => {
+    if (value === null || value === undefined) return siteVersion;
+    // node-postgres hands a bigint back as text; anything that is not a positive whole number is refused, never guessed.
+    const parsed = typeof value === "number" ? value
+      : typeof value === "string" && /^[1-9][0-9]{0,15}$/u.test(value) ? Number(value) : Number.NaN;
+    if (!Number.isSafeInteger(parsed) || parsed < 1) throw new TypedDomainError(SWITCHED_ON_SETTINGS_INVALID, SWITCHED_ON_SETTINGS_INVALID);
+    return parsed;
+  };
+  const read = async (): Promise<number> => {
+    // A FRESH config per read: pg writes its callback onto the object it is handed. @types/pg does not list query_timeout.
+    const config: QueryConfig & { query_timeout: number } = { text: SWITCHED_ON_SETTINGS_SQL, query_timeout: RUNNER_SWITCHED_ON_SETTINGS.queryTimeoutMs };
+    const result = await pool.query<{ version: unknown }>(config);
+    return versionOf(result.rows[0]?.version ?? null);
+  };
+  return (): Promise<number> => {
+    const now = clock();
+    if (settled !== null && now >= settled.at && now - settled.at < RUNNER_SWITCHED_ON_SETTINGS.maxAgeMs) {
+      return "version" in settled.outcome ? Promise.resolve(settled.outcome.version) : Promise.reject(settled.outcome.error);
+    }
+    if (reading !== null) return reading;
+    const attempt = read().then(
+      (version) => { settled = Object.freeze({ at: clock(), outcome: Object.freeze({ version }) }); return version; },
+      (error: unknown) => { settled = Object.freeze({ at: clock(), outcome: Object.freeze({ error }) }); throw error; }
+    ).finally(() => { reading = null; });
+    reading = attempt;
+    return attempt;
+  };
+}
+
+/**
+ * V4 start step, Task 57o-fix (review finding 1) — THE VERSION A RUN OWNS NOW: `identity.run_settings_version_now` (0143, granted to the
+ * runner's role), the version a Continue moved it to (a hand-over), else its stamp `core.run.register_version`; the claim reads the same
+ * (packages/battery peekRunSettingsVersion). No such run refuses RUN_NOT_FOUND.
+ */
+export async function readRunSettingsVersionNow(pool: Pick<Pool, "query">, runId: string): Promise<number> {
+  const result = await pool.query<{ register_version: number | null }>(
+    // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+    "SELECT identity.run_settings_version_now($1::uuid)::integer AS register_version", [runId]);
+  const version = result.rows[0]?.register_version ?? null;
+  if (version === null) throw new TypedDomainError("RUN_NOT_FOUND", "RUN_NOT_FOUND");
+  return version;
+}
+
+/**
+ * V4 start step, Tasks 56h and 57l — A RUN THIS PROCESS NEVER CLAIMED, MAPPED BEFORE A BACKGROUND LANE'S CALLS. Only a claim (`execute()`)
+ * fills the map, so a background lane (the closing's sweep and poke, the path-rewrite sweep, the tree sweep, the public tree's sweep, "Add to
+ * researched") charging a run after a restart, or one another process claimed, refused RUN_SETTINGS_VERSION_UNKNOWN:UNMAPPED (hosted money
+ * seams; on the preview, the thinking table too). Before such a lane's calls the run is mapped, once the version's settings are loaded, by
+ * today's rule (owner, 8 Nov: "Use today's settings"; nothing waits, nothing stops; Task 57o-fix: "Your switched-on one"):
+ *  1. the version the run owns NOW (`readRunSettingsVersionNow`: after a Continue moved it, the one it was moved to);
+ *  2. if this runner refuses that (a typed settings refusal, `settingsRefusalCode`, which the cache keeps as UNSUPPORTED for the life of the
+ *     process: e.g. an upload changed one of its AIs' instructions), the owners' switched-on version (0124's pointer; an empty pointer is
+ *     this release's own), exactly as Continue and new debates use it;
+ *  3. if this runner refuses that too, the release's own version (its boot REGISTER_VERSION).
+ * Every mapping it makes is a lane's (`setByLane`, Task 57o-fix2: a later claim's version replaces it, whichever it is). A 2 or 3 also writes
+ * one content-free DEBATEAI_RUNNER_RUN_SETTINGS_TODAY line (the run, its own version, the version used, the switched-on version and the refusal's code; the switched-on version's own refusal
+ * code when it was refused), so only the new piece is written with today's instructions and AIs; nothing in the database is changed. A
+ * database failure (or an untyped error) on the run's version, a failed read of the pointer, a database failure loading the switched-on
+ * version, or the release's own version refused as well maps nothing and rejects: the lane skips that run this pass and logs its own code.
+ * A run already mapped is left as it is, and nothing is read. Absent in local mode (no money seams, no preview gate): every lane runs as before.
+ */
+export type RunVersionMapper = (runId: string) => Promise<void>;
+export function runVersionMapper(ports: Readonly<{
+  readVersion: (runId: string) => Promise<number>;
+  requireSettings: (version: number) => Promise<unknown>;
+  versions: Pick<RunSettingsVersions, "setByLane" | "versionOf">;
+  /** Task 57o-fix: the owners' switched-on version (`createSwitchedOnSettingsReader`); rejects when it cannot be read. */
+  switchedOnVersion: () => Promise<number>;
+  /** Task 57o: the runner's own site version (main.ts REGISTER_VERSION), used when the switched-on version is refused too. */
+  siteVersion: number;
+  /** Task 57o: one content-free line when a run is mapped to today's settings. */
+  log: (line: Readonly<Record<string, unknown>>) => void;
+}>): RunVersionMapper {
+  /** The version's settings loaded: null; refused by this runner: the refusal (its code and error); anything else rejects. */
+  const refusalOf = async (version: number): Promise<Readonly<{ code: string; error: unknown }> | null> => {
+    try {
+      await ports.requireSettings(version);
+      return null;
+    } catch (error) {
+      const code = settingsRefusalCode(error);
+      if (code === null) throw error;
+      return Object.freeze({ code, error });
+    }
+  };
+  return async (runId: string): Promise<void> => {
+    if (ports.versions.versionOf(runId) !== undefined) return;
+    const version = await ports.readVersion(runId);
+    const own = await refusalOf(version);
+    if (own === null) {
+      // A lane's mapping too (Task 57o-fix2): a claim at the version a Continue moved the run to replaces it, never refuses.
+      ports.versions.setByLane(runId, version);
+      return;
+    }
+    const switchedOn = await ports.switchedOnVersion();
+    const switchedOnRefusal = switchedOn === version ? own : await refusalOf(switchedOn);
+    let used = switchedOn;
+    if (switchedOnRefusal !== null) {
+      // The release's own version, unless it is the one just refused (the boot never allows it): then that refusal stands.
+      if (ports.siteVersion === version) throw own.error;
+      if (ports.siteVersion === switchedOn) throw switchedOnRefusal.error;
+      await ports.requireSettings(ports.siteVersion);
+      used = ports.siteVersion;
+    }
+    // Another lane may have mapped this run in the meantime: its mapping stands, and it wrote its own line.
+    if (ports.versions.versionOf(runId) !== undefined) return;
+    ports.versions.setByLane(runId, used);
+    ports.log({ kind: "DEBATEAI_RUNNER_RUN_SETTINGS_TODAY", runId, ownVersion: String(version), usedVersion: String(used),
+      switchedOnVersion: String(switchedOn), code: settingsJournalCode(own.code),
+      ...(switchedOnRefusal === null ? {} : { switchedOnCode: settingsJournalCode(switchedOnRefusal.code) }) });
+  };
+}
+
+/**
+ * V4 start step, Task 53 (spec 2026-11-03 §5; plan Review Focus 2) — THE RUN → FINAL-WRITER TERMS MAP, for the life of the
+ * process, beside the run → version map. `execute()` sets it at the claim, from the claimed run's own receipt, before any call: a
+ * v2 run (shape receipt v2) its plan, Free or paid; a v1 run null. The preview call policy reads it by run id, synchronously
+ * (`finalWriterTermsOf`, Task 3), so a v2 run's four final writers ask the shared rule and a v1 run's ask R22's, byte for byte. A
+ * run this process never claimed is undefined.
+ */
+export type RunFinalWriterTermsValue = Readonly<{ plan: PreviewFinalWriterPlan }>;
+export type RunFinalWriterTerms = Readonly<{
+  set(runId: string, terms: RunFinalWriterTermsValue | null): void;
+  termsOf(runId: string): RunFinalWriterTermsValue | null | undefined;
+}>;
+
+export function createRunFinalWriterTerms(): RunFinalWriterTerms {
+  const terms = new Map<string, RunFinalWriterTermsValue | null>();
+  return Object.freeze({
+    set(runId: string, value: RunFinalWriterTermsValue | null): void {
+      terms.set(runId, value === null ? null : Object.freeze({ plan: value.plan }));
+    },
+    termsOf(runId: string): RunFinalWriterTermsValue | null | undefined {
+      return terms.get(runId);
+    }
+  });
+}
+
+/** A receipt's terms: a v2 shape's plan (Free, else paid); no v2 shape (a v1 run), none. */
+export function finalWriterTermsOfShape(shapeV2: Readonly<{ plan: string }> | null | undefined): RunFinalWriterTermsValue | null {
+  if (shapeV2 === null || shapeV2 === undefined) return null;
+  return Object.freeze({ plan: shapeV2.plan === "free" ? "free" as const : "paid" as const });
+}
+
+/** The call policy's `finalWriterTermsOf` (Task 3) over the map: a v2 run's terms; a v1 run, an unknown run and no run, undefined. */
+export function finalWriterTermsResolver(terms: Pick<RunFinalWriterTerms, "termsOf">):
+  (runId: string | null) => RunFinalWriterTermsValue | undefined {
+  return (runId) => runId === null ? undefined : terms.termsOf(runId) ?? undefined;
 }
 
 /**

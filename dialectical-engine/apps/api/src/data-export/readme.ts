@@ -24,7 +24,7 @@ export function renderReadme(): string {
     "README.txt — this guide and the exclusion notes.",
     "manifest.json — size, SHA-256 and record count for each other entry.",
     "your-data.html — a readable, offline summary of your account and debates.",
-    "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate, the reports you made with the Report button with how each was closed and which emails we sent you about it, and your moderation notices: each statement of reasons in full, and the earlier notices we emailed.",
+    "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, the reports you made with the Report button with how each was closed and which emails we sent you about it, and your moderation notices: each statement of reasons in full, and the earlier notices we emailed. It also holds the questions you have not started yet, with your answers and paths.",
     "security.json — sign-in factors, sessions, identities and recovery history.",
     "consents.json — legal acceptances and sensitive-data consent.",
     "debates.json — owned debates, their content status, answer versions, each debate's model rotation record and its web sources: searches, pages found, readers' lines, short quotes and pages added to researched.",

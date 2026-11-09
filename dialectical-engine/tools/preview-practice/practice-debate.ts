@@ -15,13 +15,17 @@ import type { Pool } from "pg";
 import { QuestionLanguageChoiceNeeded } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
-import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
+import {
+  configureContentEncryption, decryptContentForRun, migrate, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationRepository,
+  readCallPrompt
+} from "@debateai/db";
 import { TEXT_NOT_IN_QUESTION_LANGUAGE } from "@debateai/kernel";
 import type { Session } from "@debateai/contract";
 import {
   DEBATE_SHAPE_POLICY_ROW_KEY,
   debateShapeInForce,
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
+  readBillingPlans,
   readDebateShapePolicy,
   readEngineVersionPolicy,
   readLengthGuidancePolicy,
@@ -38,6 +42,7 @@ import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
 import { previewCallNanoUsd } from "../../apps/api/src/preview-budget-estimate.js";
 import type { QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
+import type { AskStartHandOver } from "../../apps/api/src/start-paths-at-ask.js";
 import { composePracticeAsk, practiceRemainingPorts } from "./practice-ask-composition.js";
 import type { PracticeGateName, PracticeGateObserver } from "./practice-gate-observer.js";
 import {
@@ -70,7 +75,7 @@ import {
 import { readPracticeInvestigations, type PracticeInvestigationBlock } from "./practice-investigations.js";
 import { readPracticeRewrites, type PracticeRewriteBlock } from "./practice-rewrites.js";
 import { practiceWithSearchStandIn, type PracticeSearchStandIn } from "./practice-search-stand-in.js";
-import { readPracticeWeb, type PracticeWebBlock } from "./practice-web.js";
+import { readPracticeLedgerCalls, readPracticeWeb, type PracticeWebBlock } from "./practice-web.js";
 import { practiceJudgesBlocks, readPracticeJudges, type PracticeJudgesBlocks } from "./practice-judges.js";
 import { practiceLengthBlock, readPracticeFrozenLength, type PracticeLengthBlock } from "./practice-length.js";
 import type { PracticeParallelBlock } from "./practice-parallel.js";
@@ -107,6 +112,10 @@ import {
   type PracticeShapeRowChange,
   type PracticeShapeSource
 } from "./practice-shape.js";
+import {
+  appendPracticeStartMonth, assertPracticeStartInForce, practiceFreeGaugesOf, practicePathFillSpread, practiceStartAtNext, practiceStartDigs,
+  practiceStartFreeAsk, PRACTICE_START_READING_LEVEL, readPracticeStartMonth, type PracticeStartStep
+} from "./practice-start-step.js";
 import { collectPracticeStoryLength, type PracticeStoryLengthBlock } from "./practice-story-length.js";
 import { collectPracticeStoryEngine, type PracticeStoryEngineBlock } from "./practice-story-rounds.js";
 import { startPracticeDatabase, type PracticeDatabase } from "./practice-throwaway-db.js";
@@ -130,6 +139,7 @@ import {
   type PracticeModelCalls,
   type PracticeRepairKinds,
   type PracticeReplyForm,
+  type PracticeStartMonthLine,
   type PracticeStructureRescues
 } from "./practice-verdict.js";
 
@@ -288,6 +298,11 @@ export type PracticeDebateResult = Readonly<{
       billingPlansSealed: boolean }> | null;
     setAsideSettings: readonly string[];
   }>;
+  /**
+   * V4 start step, Task 91b (`--start-step`): the month's lines (practice-verdict.ts), also appended to start-month.jsonl in the --out
+   * folder; absent without the flag. Not part of report.json (`debateReport` picks its members): its figures stay in that file.
+   */
+  startMonth?: readonly PracticeStartMonthLine[];
 }>;
 
 /** The per-AI table's order: the steps in debate order (R2: the investigations after the reviews, then the comparing judges). */
@@ -711,6 +726,17 @@ export function assertPracticeLineUpPublished(lineUp: PreviewLineUp | null, vers
   }
 }
 
+/**
+ * V4 start step, Task 91e (the 91d review): the roster the practice's ask seats its panel from, the plan's own. A Free start
+ * (`--start-step free:N`) asks on the Free plan, so admission seats the Free roster; every other practice asks on premium, as today.
+ * The sat-out list is this roster less the admitted panel: a model the plan does not seat is never "not exercised", and one it seats
+ * that the panel left out (so the run never called it) still is.
+ */
+export function practiceSeatedRoster(config: Readonly<{ free_model_ids: readonly string[]; premium_model_ids: readonly string[] }>,
+  start: PracticeStartStep | undefined): readonly string[] {
+  return start?.plan === "free" ? config.free_model_ids : config.premium_model_ids;
+}
+
 export async function runPracticeDebate(input: Readonly<{
   settings: PracticeSettings;
   sockets: PracticeSockets;
@@ -757,6 +783,13 @@ export async function runPracticeDebate(input: Readonly<{
    * nothing is paid for a search. Absent: the practice's own gate ports, as today.
    */
   searchStandIn?: PracticeSearchStandIn;
+  /**
+   * V4 start step, Task 91b (`--start-step`, `--digs`; practice-start-step.ts): the step before Start on the composed step, Start with
+   * the menu's top paths, then the digs, and the month's lines. Absent: today's debate command, byte for byte.
+   */
+  start?: PracticeStartStep;
+  /** With `start`: the --out folder start-month.jsonl is appended to (the month's figures go nowhere else); null or absent: none. */
+  startMonthDirectory?: string | null;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -899,6 +932,10 @@ export async function runPracticeDebate(input: Readonly<{
       throw new PracticeRefusal("PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW",
         "--site-language and --language-choice need a debate-shape row (--shape-policy)");
     }
+    if (shapeRow === null && input.start !== undefined) {
+      // V4 start step, Task 91b: the step before Start is the row's (its startStep member): refused before any AI is asked.
+      throw new PracticeRefusal("PRACTICE_START_STEP_NOT_IN_FORCE", "--start-step needs a debate-shape row carrying startStep (--shape-policy)");
+    }
     // Every lock or offer the ask's question-language decider makes (P2L Task 12's onQuestionLanguage).
     const languageOutcomes: (QuestionLanguageLock | QuestionLanguageChoiceNeeded)[] = [];
     const shapeSource = input.shape !== undefined && input.shape.policy !== null ? "FLAG" as const
@@ -950,22 +987,61 @@ export async function runPracticeDebate(input: Readonly<{
     const question = practiceDebateQuestion(input.questionId);
     // The site language goes with the question only when the ask reads it (a debate-shape row); else the ask is today's.
     const siteLanguage = shapeRow === null ? null : practiceDebateSiteLanguage(question, input.language?.siteLanguage);
+    // V4 start step, Task 91b: --start-step free asks on the Free plan (else today's premium ask, byte for byte). Billing is off, so
+    // the practice applies Free's own gauges itself, as billing decides them for a Free person.
+    const freeAsk = practiceStartFreeAsk(input.start, input.start?.plan === "free"
+      ? practiceFreeGaugesOf(await readBillingPlans(pool, settings.runner.REGISTER_VERSION)) : null, { depth: input.depth, ...asked });
     const request = {
       question_line: question.questionLine, ...(siteLanguage === null ? {} : { site_language: siteLanguage }),
       risk_tier: "casual", tier_source: "ASKER",
       tier_provenance_ref: "asker-declaration:preview-practice", composition_budget_tier: "high", plan_tier: "premium",
       depth_params: { depth: input.depth, ...asked }, decision_scope: "preview practice", as_of: input.asOf ?? new Date().toISOString(),
-      steering_presets: [], steering_annotations: []
+      steering_presets: [], steering_annotations: [], ...freeAsk
     } as unknown as AskRequest;
     const session = { asker_id: `owner:${ownerRef}`, session_id: sessionId, caller_scope: "ASKER",
       ownership_provenance: "server_session", provisional_identity_model: false } as Session;
+    /**
+     * V4 start step, Task 91b: this question's month (practice-start-step.ts), read from the throwaway ledger and appended to the
+     * --out folder's start-month.jsonl. Only how many lines and where are told to the log; a reading that breaks costs only the month.
+     */
+    const startMonthOf = async (start: PracticeStartStep, parentRunId: string | null, digRunIds: readonly string[]) => {
+      try {
+        const lines = await readPracticeStartMonth(pool, { parentRunId, digRunIds, searchFeesPaid: input.searchStandIn === undefined });
+        if (input.startMonthDirectory !== undefined && input.startMonthDirectory !== null) {
+          const path = appendPracticeStartMonth(input.startMonthDirectory, { plan: start.plan, paths: start.paths, digs: start.digs,
+            questionId: question.id }, lines);
+          progress(`start month: ${String(lines.length)} lines in ${path}`);
+        }
+        return lines;
+      } catch (error) {
+        progress(`start month: could not be read (${codeOf(error)})`);
+        return undefined;
+      }
+    };
+    // V4 start step, Task 91b: the step before Start (the lists, the merge, one combine) on the composed step, then the ask Start
+    // sends and its hand-over, as POST /v1/asks gives them to `submit`. With no menu no debate is asked; the calls made stay charged.
+    let startRequest: AskRequest = request;
+    let handOver: readonly [] | readonly [AskStartHandOver] = [];
+    let startRefusal: string | null = null;
+    if (input.start !== undefined) {
+      assertPracticeStartInForce(input.start, ask.startView);
+      const atNext = await practiceStartAtNext({ start: input.start, step: ask.startStep, key: ask.startStepKey, view: ask.startView, ownerRef,
+        settingsVersion: settings.runner.REGISTER_VERSION, request, readingLevel: PRACTICE_START_READING_LEVEL, progress });
+      if ("refused" in atNext) startRefusal = atNext.refused;
+      else {
+        startRequest = atNext.request;
+        handOver = [atNext.handOver];
+      }
+    }
     const admissionStarted = performance.now();
     let refusalCode: string | null = null;
     let languageChoice: "USE_REWRITE" | "KEEP_MINE" | null = null;
     try {
       let accepted: Awaited<ReturnType<typeof ask.application.submit>>;
       try {
-        accepted = await ask.application.submit(request, session, { kind: "server", userId, ownerRef });
+        // V4 start step, Task 91b: a step before Start that found no menu asks no debate (its code is the refusal).
+        if (startRefusal !== null) throw Object.assign(new Error(startRefusal), { code: startRefusal });
+        accepted = await ask.application.submit(startRequest, session, { kind: "server", userId, ownerRef }, ...handOver);
       } catch (error) {
         if (!(error instanceof QuestionLanguageChoiceNeeded)) throw error;
         // The site's one-language pop-up (P2L): answered as the operator asked (--language-choice, default keep:
@@ -974,8 +1050,8 @@ export async function runPracticeDebate(input: Readonly<{
         const choice = input.language?.choice ?? "keep";
         languageChoice = choice === "use" ? "USE_REWRITE" : "KEEP_MINE";
         progress(`the ask answered with a one-language offer; answering ${languageChoice} as the site's pop-up would`);
-        accepted = await ask.application.submit(practiceLanguageResubmission(request, error.offer, choice), session,
-          { kind: "server", userId, ownerRef });
+        accepted = await ask.application.submit(practiceLanguageResubmission(startRequest, error.offer, choice), session,
+          { kind: "server", userId, ownerRef }, ...handOver);
       }
       // Hosted with the band: the room may put the ask in line instead of starting it. The practice starts no waker,
       // so a waiting ask is reported as not admitted, naming the limit it waits for.
@@ -993,7 +1069,8 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const admissionSeconds = (performance.now() - admissionStarted) / 1000;
     const job = dispatched[0];
-    const premium = settings.previewConfig.premium_model_ids;
+    // V4 start step, Task 91e: the plan's own roster (a Free start seats the Free one), never the premium roster for every ask.
+    const seated = practiceSeatedRoster(settings.previewConfig, input.start);
     const probeRows = (await pool.query<{ provider_ref: string; state: string; failure_code: string | null; n: number }>(
       `SELECT provider_ref, state, failure_code, count(*)::int AS n FROM core.provider_probe
         GROUP BY provider_ref, state, failure_code ORDER BY provider_ref, state`)).rows;
@@ -1001,9 +1078,12 @@ export async function runPracticeDebate(input: Readonly<{
     if (job === undefined) {
       progress(`the practice ask was refused: ${refusalCode ?? "NOT_DISPATCHED"}`);
       if (input.transcriptDirectory !== undefined && input.transcriptDirectory !== null) progress("transcript: not written (no debate was admitted)");
+      // V4 start step, Task 91b: no debate, but the calls before Start were made and charged: the month's line before Start.
+      const refusedMonth = input.start === undefined ? undefined : await startMonthOf(input.start, null, []);
       remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
       remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
       return Object.freeze({
+        ...(refusedMonth === undefined ? {} : { startMonth: refusedMonth }),
         register: reportedRegister, questionId: question.id, depth: input.depth,
         admission: { admitted: false, refusalCode: refusalCode ?? "NOT_DISPATCHED", panel: [], satOut: [], rotation: null },
         run: { runId: null, workItemOutcome: null, failureCode: null, answer: null, story: null },
@@ -1021,7 +1101,7 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const runRow = (await pool.query<{ discovered_panel: unknown }>("SELECT discovered_panel FROM core.run WHERE run_id=$1", [job.runId])).rows[0];
     const panel = (Array.isArray(runRow?.discovered_panel) ? runRow.discovered_panel : []) as { provider_ref: string; model_id: string; maker: string }[];
-    const satOut = premium.filter((model) => !panel.some((member) => member.model_id === model)).map((model) => {
+    const satOut = seated.filter((model) => !panel.some((member) => member.model_id === model)).map((model) => {
       const refs = Object.entries(PREVIEW_PROVIDER_REF_MODELS).filter(([, id]) => id === model).map(([ref]) => ref);
       const failure = probeRows.find((row) => refs.includes(row.provider_ref) && row.state !== "HEALTHY")?.failure_code ?? null;
       return Object.freeze({ model, providerRefs: Object.freeze(refs), failureCode: failure });
@@ -1197,9 +1277,57 @@ export async function runPracticeDebate(input: Readonly<{
       }
       language = practiceDebateLanguageBlock({ siteLanguage, outcomes: languageOutcomes, choice: languageChoice, planner, storedLanguage });
     }
+    // V4 start step, Task 91b: after the debate's own readings (a dig may rewrite one of its paths), how far apart its paths filled
+    // in (Task 54's re-read: seconds only, never money), then the digs, each settled, then this question's month.
+    let startMonth: readonly PracticeStartMonthLine[] | undefined;
+    if (input.start !== undefined) {
+      const start = input.start;
+      try {
+        const spread = practicePathFillSpread(await readPracticeLedgerCalls(pool, job.runId, ""));
+        progress(spread === null ? "paths filled in: no path's answer so far was written"
+          : `paths filled in: ${String(spread.paths)} paths, the first to the last ${String(spread.spreadSeconds)} s apart`);
+      } catch (error) {
+        progress(`paths filled in: could not be read (${codeOf(error)})`);
+      }
+      // Each dig's run, kept as it starts, so a dig that breaks midway still has its calls in the month.
+      const digRuns: string[] = [];
+      if (start.digs > 0 && workItemOutcome === "COMPLETED") {
+        const digModel = new PostgresDigModelRepository(pool);
+        const principal = Object.freeze({ kind: "server" as const, userId, ownerRef });
+        try {
+          await practiceStartDigs({ start, key: ask.startStepKey, view: ask.startView, ownerRef, settingsVersion: settings.runner.REGISTER_VERSION,
+            parent: { runId: job.runId, questionLine: startRequest.question_line }, request: startRequest,
+            readAnswer: (runId) => ask.application.readRunAnswer(runId, session, { ownerRef, legacyAskerId: null }),
+            ports: { admission: { readDigLevel: (owner, runId) => digModel.readDigLevel(owner, runId) },
+              join: new PostgresInvestigationRepository(pool), picks: new PostgresDigPicksRepository(pool) },
+            submit: async (digAsk, digHandOver) => {
+              const before = dispatched.length;
+              const digHand: readonly [] | readonly [AskStartHandOver] = digHandOver === null ? [] : [digHandOver];
+              try {
+                const accepted = await ask.application.submit(digAsk, session, principal, ...digHand);
+                if (accepted.status === "WAITING") return Object.freeze({ refused: `ASK_WAITING_IN_LINE:${accepted.waiting_scope ?? "UNKNOWN"}` });
+              } catch (error) {
+                return Object.freeze({ refused: codeOf(error) });
+              }
+              return dispatched[before] ?? Object.freeze({ refused: "NOT_DISPATCHED" });
+            },
+            settle: async (run) => {
+              digRuns.push(run.runId);
+              try { return (await runner.runner.executeWorkItem(run.workItemId)).kind; } catch (error) { return `THREW:${codeOf(error)}`; }
+            },
+            progress });
+        } catch (error) {
+          progress(`digs: stopped (${codeOf(error)})`);
+        }
+      } else if (start.digs > 0) {
+        progress(`digs: none (the debate ended ${workItemOutcome})`);
+      }
+      startMonth = await startMonthOf(start, job.runId, digRuns);
+    }
     remaining.deepinfra.after = await readRemaining(remainingPorts.deepinfra);
     remaining.anthropic.after = await readRemaining(remainingPorts.anthropic);
     return Object.freeze({
+      ...(startMonth === undefined ? {} : { startMonth }),
       register: reportedRegister, questionId: question.id, depth: input.depth,
       admission: Object.freeze({
         admitted: true, refusalCode: null,

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DigLinkRecord, DigLinks } from "@debateai/contract";
+import * as accountMemory from "../../apps/ui/lib/v4/accountMemory.js";
 import {
-  mergeDigLinks, questionsAtPlaces, readAccountLevel, readDigRecords, readLastVisit, recordDig, recordLastVisit, saveAccountLevel,
-  storableItems
+  mergeDigLinks, questionsAtPlaces, readDigRecords, readLastVisit, recordDig, recordLastVisit, storableItems
 } from "../../apps/ui/lib/v4/accountMemory.js";
 import type { DigLink, V4Map, V4OpenQuestion, V4Path } from "../../apps/ui/lib/v4/types.js";
 
@@ -33,19 +33,14 @@ const record = (child: string, places: readonly string[], mode: "quick" | "thoro
 const textLink = (child: string, questions: readonly string[], ids: readonly string[] = []): DigLink =>
   ({ parentRunId: PARENT, childRunId: child, openQuestionIds: ids, questions, mode: null, startedAt: null });
 
-describe("the reading level in the account", () => {
-  it("reads the account's level (null before a choice) and throws when it cannot be read", async () => {
-    expect(await readAccountLevel({ readReadingLevel: async () => ({ reading_level: "expert" }), saveReadingLevel: vi.fn() })).toBe("expert");
-    expect(await readAccountLevel({ readReadingLevel: async () => ({ reading_level: null }), saveReadingLevel: vi.fn() })).toBeNull();
-    await expect(readAccountLevel({ readReadingLevel: async () => { throw new Error("offline"); }, saveReadingLevel: vi.fn() })).rejects.toThrow("offline");
-  });
-
-  it("saves best-effort: true when saved, false on any failure, never a throw (even one thrown at once)", async () => {
-    const saveReadingLevel = vi.fn(async () => ({ reading_level: "plain" as const }));
-    expect(await saveAccountLevel("plain", { readReadingLevel: vi.fn(), saveReadingLevel })).toBe(true);
-    expect(saveReadingLevel).toHaveBeenCalledWith("plain");
-    expect(await saveAccountLevel("plain", { readReadingLevel: vi.fn(), saveReadingLevel: async () => { throw new Error("503"); } })).toBe(false);
-    expect(await saveAccountLevel("plain", { readReadingLevel: vi.fn(), saveReadingLevel: () => { throw new Error("sync"); } })).toBe(false);
+/*
+ * V4 start step, Task 75d (owner, 5 Nov, second round): the account stops remembering a reading level. The level belongs to each
+ * question (chosen on its first screen, which always starts on Plain words); the V4 pages neither read nor save the account's.
+ * The account's level routes stay on the server for older pages.
+ */
+describe("the reading level is no longer kept in the account (Task 75d)", () => {
+  it("the page side offers no read or save of the account's level", () => {
+    expect(Object.keys(accountMemory).filter((name) => /level/iu.test(name))).toEqual([]);
   });
 });
 

@@ -25,22 +25,23 @@ import { PostgresModelSpendStore } from "@debateai/budget";
 import { WorkItemRepository } from "@debateai/battery";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
-  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, PublicationCipher, generateDek, loadKek
+  ContentCipher, FileRunContentKeyStore, FileUserDekStore, MemoryPublicationKeyStore, MemorySavedQuestionKeyStore, PublicationCipher, generateDek, loadKek
 } from "../../packages/crypto/src/index.js";
 import {
   EntitlementRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInternalAllowanceRepository, PostgresInvestigationReportRepository,
-  PostgresInvestigationRepository, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicFlagRepository, PostgresPublicPageRepository,
-  PostgresPublicReviewRepository, PostgresPublicTreeRepository, PostgresPublicationRepository, PostgresWebResearchedRepository, ProviderProbeRepository, RunWaitRepository,
-  ServeDisclosureRepository, configureContentEncryption, contentCipherFor, createPool, migrate, type Pool
+  PostgresInvestigationRepository, PostgresOwnClosingsReader, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicFlagRepository, PostgresPublicPageRepository,
+  PostgresPublicReviewRepository, PostgresPublicTreeRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresWebResearchedRepository, ProviderProbeRepository,
+  RunWaitRepository, ServeDisclosureRepository, configureContentEncryption, contentCipherFor, createPool, migrate, type Pool
 } from "@debateai/db";
 import { MapChoiceRepository } from "@debateai/map";
 import {
-  createPreviewBudgetRpcPort, createPreviewGuardedFetch, PREVIEW_GLM_DEADLINE_MS, PREVIEW_REVIEWED_PROVIDER_REFS, previewProbeControls, previewProviderSocket, previewTargetJsonRow,
-  resolveProviderTargetCredentials
+  createPreviewBudgetRpcPort, createPreviewGuardedFetch, PREVIEW_GLM_DEADLINE_MS, PREVIEW_REVIEWED_PROVIDER_REFS, previewProbeControls, previewProviderSocket, previewTargetChargePrice,
+  previewTargetJsonRow, providerTargetPrice, resolveProviderTargetCredentials
 } from "@debateai/providers";
 import {
-  canonicalRegisterJson, createPostgresRegisterPublicationPort, debateShapePolicyStartValues, engineVersionPolicyStartValues, lengthGuidancePolicyStartValues,
-  loadBootstrapRegister, parseRegisterVersionText, readPanelDiscoveryPolicy, readPreviewLineUpPolicy, registerVersionToSafeLegacyNumber
+  canonicalRegisterJson, createPostgresRegisterPublicationPort, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, debateShapeStartStepStartValues, engineVersionPolicyStartValues,
+  lengthGuidancePolicyStartValues, loadBootstrapRegister, parseDebateShapePolicy, parseRegisterVersionText, readPanelDiscoveryPolicy, readPreviewLineUpPolicy, registerVersionToSafeLegacyNumber,
+  type DebateShapePolicy
 } from "@debateai/register";
 import { buildProviderPriceMap } from "@debateai/runner";
 import { StoryRepository, loadStoryPack, resolveStoryPackDir } from "@debateai/story";
@@ -48,6 +49,8 @@ import { PostgresAskApplication, buildApi, type Dispatcher, type RunCreationSett
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import { accountMemoryStoreFrom } from "../../apps/api/src/account-memory.js";
+import { savedQuestionStoreFrom } from "../../apps/api/src/saved-questions/store.js";
+import { createSavedQuestionService } from "../../apps/api/src/saved-questions/service.js";
 import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "../../apps/api/src/active-settings-version.js";
 import {
   admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, createAdmissionView, loadAdmissionSettings
@@ -68,7 +71,11 @@ import { questionLanguageSiteRoute } from "../../apps/api/src/question-language/
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import { PostgresAskAdmissionGate, settingsVersionPassed } from "../../apps/api/src/release-state.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
-import { questionCheckSpendWriterPresent, recordAskClarifyCharge, recordQuestionCheckSpend } from "@debateai/budget";
+import { createStartCharges } from "../../apps/api/src/start-step/charge.js";
+import { startStepKeyFrom } from "../../apps/api/src/start-step/signing.js";
+import { createStartStep, startStepRouteOf } from "../../apps/api/src/start-step/step.js";
+import { createStartTransport } from "../../apps/api/src/start-step/transport.js";
+import { preStartChargeWriterPresent, questionCheckSpendWriterPresent, recordAskClarifyCharge, recordPreStartCharge, recordQuestionCheckSpend } from "@debateai/budget";
 import { closingReservesOf, readAbuseLimits, readQuestionCheckPolicy } from "@debateai/register";
 import { sweepInvestigationClosings } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
@@ -79,7 +86,8 @@ import { composePublicReport, sweepPublicTree } from "../../apps/runner/src/publ
 import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { composePracticeAskMoney, practiceRemainingPorts } from "../../tools/preview-practice/practice-ask-composition.js";
 import {
-  composePracticeHostedNextRegisterVersion, importPracticeRegister, parsePracticeNextRegisterInputs, parsePracticeRegisterExport
+  composePracticeHostedNextRegisterVersion, importPracticeRegister, parsePracticeNextRegisterInputs, parsePracticeRegisterExport, practiceVersionRows,
+  type PracticeRegisterExport
 } from "../../tools/preview-practice/practice-register-import.js";
 import { composePracticeRunner } from "../../tools/preview-practice/practice-runner-composition.js";
 import { practiceMadeUpSearchReplies, practiceSearchStandIn, practiceWithSearchStandIn } from "../../tools/preview-practice/practice-search-stand-in.js";
@@ -90,7 +98,9 @@ import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects
 import { seedNetopiaSubscription } from "./billingSubscriptionFixtures.js";
 import { TEST_OWNER_LIMIT_ROWS } from "./hostedRegisterRows.js";
 import { TEST_APP_ORIGIN, persistLiveSession, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
-import { startPreviewGateStubs, type GateOverride, type GateRequest } from "./preview-gate-stubs.js";
+import { startPreviewGateStubs, type GateOverride, type GateProvider, type GateRequest, type StubRemainingFigures } from "./preview-gate-stubs.js";
+import { readPrivateGateFigures, readPrivateRegisterExport, type PrivateGateFigures } from "./private-figures.js";
+import { LEAN_FREE_MODEL_IDS, leanFreeShape } from "./start-step-cases.js";
 import { currentTestFile } from "./master-key-guard.js";
 import { apiTestPools, endProvisionedRlsLogins, runnerTestPool, type ApiTestPools } from "./rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
@@ -126,10 +136,12 @@ async function exportedRegister(): Promise<string> {
   }
 }
 
-function settingsText(): string {
+/** The settings text; the start step switched on also runs the lean Free line-up (GLM, DeepSeek, Qwen, Haiku), else today's. */
+function settingsText(startStep: "ON" | "OFF"): string {
   const claimMs = 2 * (DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms + PREVIEW_GLM_DEADLINE_MS) + PREVIEW_GLM_DEADLINE_MS + 60_000;
+  const freeModelIds = startStep === "ON" ? [...LEAN_FREE_MODEL_IDS] : FIVE.slice(0, 2);
   const gate = { deployment: "v3-preview", requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock",
-    anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "r22-world", free_model_ids: FIVE.slice(0, 2), premium_model_ids: FIVE };
+    anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "r22-world", free_model_ids: freeModelIds, premium_model_ids: FIVE };
   return [`PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(gate)}`,
     `PROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow))}`,
     "REGISTER_VERSION=5", "DEBATEAI_DEPLOYMENT_MODE=hosted", "NODE_ENV=production", `CLAIM_MS=${String(claimMs)}`, "CLAIM_MARGIN_MS=60000", "MAX_RECOMPOSE=1",
@@ -143,23 +155,91 @@ export type R22Script = (contractId: string | null, request: GateRequest, chat: 
 
 export type R22World = Awaited<ReturnType<typeof startR22World>>;
 
-export async function startR22World(options: Readonly<{ log?: (line: string) => void }> = {}) {
+/**
+ * V4 start step, Task 86: the world's options (each absent: today's world, byte for byte).
+ *  - `startStep`: "ON" switches the step before Start on (the register's shape row gets `startStep`, Free runs lean on the lean
+ *    Free line-up, tests/support/start-step-cases.ts); absent or "OFF": today's shape row and line-up, so the step answers none OFF.
+ *  - `register`: "MADE_UP" (the default) builds the register from the publish kits with made-up hosted billing; "PRIVATE" runs on
+ *    the owner's own files (tests/support/private-figures.ts): the release's register export with its own shape row switched on
+ *    (lean Free too with `startStep: "ON"`), the private hosted billing and each gate's /remaining figures; without both files it
+ *    refuses PRIVATE_FILES_ABSENT before anything starts. It never runs with the step "OFF".
+ *  - `spendLowersRemaining`, `refuseOverConcurrency`: the gate doubles' (tests/support/preview-gate-stubs.ts, Task 85).
+ */
+export type R22WorldOptions = Readonly<{
+  log?: (line: string) => void;
+  startStep?: "ON" | "OFF";
+  register?: "MADE_UP" | "PRIVATE";
+  spendLowersRemaining?: boolean;
+  refuseOverConcurrency?: boolean;
+}>;
+
+/** The owner's two private files, both named, else PRIVATE_FILES_ABSENT (a file that is named but unreadable throws its own code). */
+function privateWorldFiles(): Readonly<{ registerExport: string; figures: PrivateGateFigures }> {
+  const figures = readPrivateGateFigures();
+  const registerExport = readPrivateRegisterExport();
+  if (figures === null || registerExport === null) throw new TypeError("PRIVATE_FILES_ABSENT");
+  return Object.freeze({ registerExport, figures });
+}
+
+/**
+ * What the doubles' /remaining answers for one gate, from its private figures, as on a fresh day: the whole pot and every paid post
+ * left. A largest reservation the file leaves out is answered as the doubles answer it without figures; the final-writer room
+ * goes over as the file holds it (the doubles refuse half a pair).
+ */
+function stubRemainingOf(gate: PrivateGateFigures["gates"][GateProvider]): StubRemainingFigures {
+  return Object.freeze({
+    usd: gate.daily_budget_usd, calls: gate.max_paid_posts_per_day, maxConcurrentCalls: gate.max_concurrent_calls,
+    largestReservationUsd: gate.largest_reservation_usd ?? STUB_LARGEST_RESERVATION_USD, dailyPotUsd: gate.daily_budget_usd, enabledModels: gate.enabled_models,
+    ...(gate.final_writer_max_in_flight === undefined ? {} : { finalWriterMaxInFlight: gate.final_writer_max_in_flight }),
+    ...(gate.largest_final_writer_reservation_usd === undefined ? {} : { largestFinalWriterReservationUsd: gate.largest_final_writer_reservation_usd })
+  });
+}
+/** The doubles' own largest reservation when a gate has no figures (preview-gate-stubs.ts, remainingAnswer). */
+const STUB_LARGEST_RESERVATION_USD = "0.214016000";
+
+/** The shape row the world's register carries: today's, or switched on (lean Free with "ON"); PRIVATE: the release's own row, switched on. */
+function worldDebateShape(startStep: "ON" | "OFF", release: DebateShapePolicy | null): DebateShapePolicy {
+  if (release !== null) return { ...(startStep === "ON" ? leanFreeShape(release) : release), startStep: debateShapeStartStepStartValues() };
+  return startStep === "ON" ? { ...leanFreeShape(debateShapePolicyStartValues()), startStep: debateShapeStartStepStartValues() } : debateShapePolicyStartValues();
+}
+
+/** The release's own debate-shape row (its newest version's); a missing or unreadable row names no value. */
+function releaseDebateShape(document: PracticeRegisterExport): DebateShapePolicy {
+  const newest = document.versions[document.versions.length - 1]!;
+  const row = practiceVersionRows(document, newest.register_version).find((each) => each.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY);
+  if (row === undefined) throw new TypeError("PRIVATE_REGISTER_EXPORT_DEBATE_SHAPE_ABSENT");
+  try {
+    return parseDebateShapePolicy(JSON.parse(row.valueJsonText));
+  } catch {
+    throw new TypeError("PRIVATE_REGISTER_EXPORT_DEBATE_SHAPE_INVALID");
+  }
+}
+
+export async function startR22World(options: R22WorldOptions = {}) {
   const log = options.log ?? (() => undefined);
   // The test file that builds this world (read before the first wait): apiTestPools keys the login mode on it.
   const testFile = currentTestFile();
   if (testFile === undefined) throw new TypeError("R22_WORLD_OUTSIDE_A_TEST_FILE");
-  const document = parsePracticeRegisterExport(await exportedRegister());
+  // V4 start step, Task 86: the switch and the register, settled before anything starts (the private files first: absent, nothing runs).
+  if (options.register === "PRIVATE" && options.startStep === "OFF") throw new TypeError("R22_WORLD_PRIVATE_RUNS_THE_START_STEP");
+  const startStepSwitch = options.startStep ?? "OFF";
+  const privateFiles = options.register === "PRIVATE" ? privateWorldFiles() : null;
+  const document = parsePracticeRegisterExport(privateFiles === null ? await exportedRegister() : privateFiles.registerExport);
   const database: TestDatabase = await startTestDatabase();
   await migrate(database.pool);
   const pools: Pool[] = [];
   const open = (): Pool => { const pool = createPool(database.connectionString); pools.push(pool); return pool; };
   // The register: kit v3's next version on the export, hosted with billing on, with the engine, length and shape rows the code starts from.
-  const inputs = await parsePracticeNextRegisterInputs({ hostedBilling: JSON.stringify(HOSTED_BILLING), debateShape: debateShapePolicyStartValues(), lengthGuidance: lengthGuidancePolicyStartValues(),
-    engineVersion: engineVersionPolicyStartValues() } as never);
+  // PRIVATE (Task 86): on the release's own export, its own shape row switched on and the owner's hosted billing; its length and
+  // engine rows are the release's own (the kit carries a row it is not given).
+  const inputs = await parsePracticeNextRegisterInputs((privateFiles === null
+    ? { hostedBilling: JSON.stringify(HOSTED_BILLING), debateShape: worldDebateShape(startStepSwitch, null), lengthGuidance: lengthGuidancePolicyStartValues(),
+      engineVersion: engineVersionPolicyStartValues() }
+    : { hostedBilling: JSON.stringify(privateFiles.figures.hosted_billing), debateShape: worldDebateShape(startStepSwitch, releaseDebateShape(document)) }) as never);
   const next = await composePracticeHostedNextRegisterVersion(document, inputs.hostedBilling!, inputs.choices);
   const receipt = await importPracticeRegister(database.pool, document, next);
   const nextVersion = registerVersionToSafeLegacyNumber(parseRegisterVersionText(receipt.registerVersion));
-  const parsed = parsePracticeSettings(settingsText(), { sourceRevision: SOURCE_REVISION });
+  const parsed = parsePracticeSettings(settingsText(startStepSwitch), { sourceRevision: SOURCE_REVISION });
   const versioned = Object.freeze({ ...parsed, runner: Object.freeze({ ...parsed.runner, REGISTER_VERSION: nextVersion, RELEASE_KEY: practiceReleaseKeyAt(parsed.runner.RELEASE_KEY, nextVersion, "hosted"), DEPLOYMENT_MODE: "hosted" as const }) });
   const settings = practiceSettingsWithLineUp(versioned, await readPreviewLineUpPolicy(database.pool, nextVersion), { trial: false });
   const environment = settings.runner;
@@ -203,14 +283,22 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   // The gates: AIs scripted, nothing leaves this computer.
   const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
   let script: R22Script | null = null;
+  /** Task 86: how long the doubles hold each request (`setDelays`); null (the default) or 0 answers at once, as before. */
+  let delays: ((request: GateRequest) => number) | null = null;
   const contractOf = (chat: string) => { try { return readFramedMaterial(wirePacket(chat)); } catch { return null; } };
   const stubs = await startPreviewGateStubs({ storyDefaultShape: PACK.defaultShape, override: (request, chat) => {
     if (script === null) return null;
     const frame = contractOf(chat);
     return script(frame?.contractId ?? null, request, chat, (name) => frame?.fields.find((field) => field.name === name)?.content);
-  } });
-  const gate = environment.PREVIEW_GATE_SETTINGS;
-  const budgetPorts = { deepinfra: createPreviewBudgetRpcPort(gate, stubs.sockets.deepinfra), anthropic: createPreviewBudgetRpcPort(gate, stubs.sockets.anthropic) };
+  },
+    delayMs: (request) => delays === null ? 0 : delays(request),
+    // Task 86: the private figures' /remaining (PRIVATE), the falling pot and the concurrency refusal (each absent: as before).
+    ...(privateFiles === null ? {} : { remaining: { deepinfra: stubRemainingOf(privateFiles.figures.gates.deepinfra), anthropic: stubRemainingOf(privateFiles.figures.gates.anthropic) } }),
+    ...(options.spendLowersRemaining === undefined ? {} : { spendLowersRemaining: options.spendLowersRemaining }),
+    ...(options.refuseOverConcurrency === undefined ? {} : { refuseOverConcurrency: options.refuseOverConcurrency }) });
+  // Keyed on the env's gate part, under main.ts's name (Task 86: the start step's route reads it).
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
+  const budgetPorts = { deepinfra: createPreviewBudgetRpcPort(previewGate, stubs.sockets.deepinfra), anthropic: createPreviewBudgetRpcPort(previewGate, stubs.sockets.anthropic) };
   const remaining = practiceRemainingPorts(settings, stubs.sockets);
   const previewFetch = createPreviewGuardedFetch(budgetPorts);
   const search = practiceSearchStandIn(practiceMadeUpSearchReplies());
@@ -232,6 +320,11 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
       hosted: () => { throw new TypeError("R22_QUESTION_LANGUAGE_HOSTED_ROUTE"); } }), referenceKey: newQuestionLanguageReferenceKey() }),
     previewRemaining: remaining, log });
   const siteAdmission = await loadAdmissionSettings(apiPool, nextVersion, admissionSite);
+  // V4 start step, Task 86, as main.ts (Task 31): the calls before Start go out where a preview gate AND 0158's writer answer for
+  // the API's own login; the references are signed with a key from a throwaway root (main.ts derives it from the blind-index key).
+  const preStartWriter = await preStartChargeWriterPresent(apiPool);
+  const startStepKey = startStepKeyFrom(randomBytes(32));
+  const startStepRoute = startStepRouteOf({ previewGate, writerPresent: preStartWriter });
   const admissionCache = createAdmissionSettingsCache({ load: (version) => loadAdmissionSettings(apiPool, version, admissionSite), seed: siteAdmission });
   const activeSettings = createActiveSettingsVersionReader({ pool: apiPool, siteVersion: nextVersion, log: () => undefined });
   await activeSettings.current();
@@ -250,9 +343,14 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   /** What the API handed the job system: the runner's work, in order. `settle` takes it. */
   const queue: { runId: string; workItemId: string }[] = [];
   const dispatcher: Dispatcher = { dispatch: async (job) => { queue.push({ ...job }); } };
+  // Task 86, as main.ts (Task 36): THE ONE chosen paths store on the API's runtime pool, which the AskApplication and buildApi share.
+  const startPaths = new PostgresStartPathsStore(apiPool);
   const runSettings = { ...admissionSettingsOfVersion(siteAdmission), previewTeamUserIds, strangerSampleRate: settings.strangerSampleRate, releaseKey: environment.RELEASE_KEY,
     batteryVersion: settings.batteryVersion, settlementWatchHandle: settings.settlementWatchHandle, room: askRoom, waitingLine: askRoom, billing: askBilling, resolveDiscoveredPanel: resolveProviderPanel,
-    admissionSettings: { activeSettingsVersion: () => activeSettings.current(), admissionSettingsFor: async (version: number) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)) } } as unknown as RunCreationSettings;
+    admissionSettings: { activeSettingsVersion: () => activeSettings.current(), admissionSettingsFor: async (version: number) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)) },
+    // Task 86: the chosen paths (sealed at the START_PATHS setup step) and the purpose lines it records with them; without them every
+    // v2 ask is refused START_PATHS_STORE_UNAVAILABLE.
+    startPaths, purposeLines: postgresPurposeLines(apiPool) } as unknown as RunCreationSettings;
   const application = new PostgresAskApplication(apiPool, dispatcher, runSettings, undefined, apiPoolOf("contentProvision"),
     Object.freeze({ server: apiPoolOf("serverAskAdmission"), legacy: apiPoolOf("legacyAskAdmission") }));
   const storyRepository = new StoryRepository(apiPool);
@@ -276,12 +374,18 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     complete: async (input: Readonly<{ packet: unknown }>) => ({ text: flag.reply(JSON.stringify(input.packet)), usage: { input_tokens: 10, output_tokens: 5, cost_usd: 0 } }) } as never;
   const investigations = new PostgresInvestigationRepository(apiPool);
   const accountMemory = accountMemoryStoreFrom((text, values) => apiPool.query(text, values));
+  // V4 start step, Task 39e, as main.ts (tests/architecture/saved-question-keys-wiring.test.ts): the questions not started yet through
+  // 0162's store on the API's pool, each under its own key in a question-key store over the world's user-key store, kept only for a
+  // reading the step's key signed.
+  const savedQuestionKeys = new MemorySavedQuestionKeyStore(userDeks);
+  const savedQuestions = createSavedQuestionService({ store: savedQuestionStoreFrom((text, values) => apiPool.query(text, values)),
+    keys: savedQuestionKeys, key: startStepKey, report: (code, id) => { log(`saved-question ${code}${id === undefined ? "" : ` ${id}`}`); } });
   const identities: TestHttpIdentity[] = [];
   const sessions = testSessionApplication(identities);
   const abuseLimits = await readAbuseLimits(apiPool, nextVersion);
   const askClarify = createAskClarify({ limits: abuseLimits.askClarify,
     transportFor: askClarifyTransportFor(await questionLanguageSiteRoute({ mode: environment.DEPLOYMENT_MODE, policy: ASK_CLARIFY_ROUTE_POLICY, dayCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros,
-      previewGate: gate, previewFetch, readCredential: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, spend: { writerPresent: async () => true, record: async () => undefined },
+      previewGate, previewFetch, readCredential: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, spend: { writerPresent: async () => true, record: async () => undefined },
       daySpentMicros: (day: string) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day), report: () => undefined } as never)),
     record: (entry) => recordAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
   // 2026-11-02: the question check exactly as main.ts composes it on the preview, through the Anthropic gate's stand-in (it was a stub
@@ -293,8 +397,30 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     spend: { writerPresent: () => questionCheckSpendWriterPresent(apiPool), record: (entry) => recordQuestionCheckSpend(apiPool, entry) },
     dayPot: { ceilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros, spentMicros: (day) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day) },
     clock: () => new Date(), report: (line) => { if (line.event === "api.question_check.not_configured") questionCheckOff.push(line.code); },
-    preview: { fetch: previewFetch, anthropicSocket: previewProviderSocket(gate, "anthropic") } });
+    preview: { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") } });
   if (questionCheckOff.length > 0) throw new Error("R22_WORLD_QUESTION_CHECK_OFF");
+  // V4 start step, Task 86: THE STEP BEFORE START, as main.ts composes it (tests/unit/r22-world-api-drift.test.ts keeps the two
+  // equal): each call on its version's settings from the one admission cache, Start's own question check, the gate's guarded fetch
+  // on the preview route, and each call charged to the person through 0158's writer at the price the runner charges the same target.
+  // The register's switch decides the rest: with the step "OFF" (no `startStep` member) the four calls answer none OFF.
+  const startStep = createStartStep({
+    route: startStepRoute,
+    key: startStepKey,
+    settingsFor: (version) => admissionCache.admissionSettingsFor(version),
+    questionCheck,
+    transport: startStepRoute === "PREVIEW" && previewFetch !== undefined
+      ? createStartTransport({ fetch: previewFetch, targets: declaredProviderTargets }) : null,
+    charges: createStartCharges({
+      record: (entry) => recordPreStartCharge(apiPool, entry),
+      priceOf: (providerRef) => {
+        const target = declaredProviderTargets.find((declared) => declared.providerRef === providerRef);
+        return target === undefined ? null : previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
+      },
+      clock: () => new Date(),
+      report: (line) => { log(`start-step ${JSON.stringify(line)}`); }
+    }),
+    report: (line) => { log(`start-step ${JSON.stringify(line)}`); }
+  });
   const api: FastifyInstance = buildApi({
     questionCheck, previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds, application, sessions, allowedOrigin: TEST_APP_ORIGIN,
     stories: new RepositoryAnswerStoryApplication(storyRepository), disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(apiPool)), mapViews, accountMemory,
@@ -308,6 +434,15 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
       seal: (ref: string, runId: string, value: unknown) => publications.withReviewKey(ref, runId, (each) => each.encrypt(value)), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     publicTree: { pool: apiPool, tree: new PostgresPublicTreeRepository(apiPool), contributions: new PostgresPublicDebateRepository(apiPool), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     askClarify, monthRoom: askRoom,
+    // Task 86, as main.ts: the step and the key it signs with, together, and the same chosen paths store the AskApplication holds.
+    startStep, startStepKey, startPaths,
+    // Task 56b, as main.ts: a public debate's report counts on the API's own pool (the owner's first report uses the kept reserve).
+    ownClosings: new PostgresOwnClosingsReader(apiPool),
+    // Task 39e, as main.ts: the questions not started yet, their five routes and the removal at Start.
+    savedQuestions,
+    // Task 56, as main.ts: the carry-on marks on the same chosen paths store, and the world's one room for the look before each dig
+    // (a test calls `world.api.carryOnTick()` where main.ts ticks every whole minute).
+    carryOn: startPaths, carryOnRoom: askRoom,
     continuedRunWake: continuedRunWake({ claimableWorkItemOf: (runId) => new WorkItemRepository(apiPool).claimableWorkItemOfRun(runId), dispatch: (job) => dispatcher.dispatch(job) }),
     runHandover: runHandoverOf({ ownReleaseKey: environment.RELEASE_KEY, readRunReleaseNow: (runId) => new PostgresDigModelRepository(apiPool).readRunReleaseNow(runId),
       versionPassed: (version) => settingsVersionPassed(apiPool, environment.RELEASE_KEY, version), activeVersion: () => readActiveSettingsVersionOn(apiPool, nextVersion),
@@ -416,6 +551,10 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   return {
     base, database, fixtureSuperuserPool: fixturePool, runtimePool: apiPool, runnerPool, stubs, search, queue, content, flag, account, signedIn, stranger, settle, composed, askRoom, publications, nextVersion, environment, withReviewKey, api, identities,
     setScript: (next: R22Script | null) => { script = next; },
+    /** Task 86: the key the step signs with (a test signs or verifies a reference with it). */
+    startStepKey,
+    /** Task 86: how long the doubles hold each request, in ms (a slow seat; 0 or null: answered at once). */
+    setDelays: (ms: ((request: GateRequest) => number) | null) => { delays = ms; },
     async stop(): Promise<void> {
       await api.close();
       await stubs.close();

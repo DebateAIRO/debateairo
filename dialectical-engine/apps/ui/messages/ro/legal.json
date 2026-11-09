@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Sinteza unei dezbateri finalizate — pentru verificarea ei cu privire la patru categorii",
   "legal.providers.purpose.reportCheck": "O raportare făcută cu butonul Raportare și textul public al dezbaterii — pentru verificarea raportării",
   "legal.providers.purpose.questionCheck": "O întrebare înainte de începerea unei dezbateri — pentru a verifica dacă dezbaterea poate începe",
+  "legal.providers.purpose.clarifyQuestions": "Înainte de începerea unei dezbateri: sugerarea de întrebări de clarificare",
+  "legal.providers.purpose.suggestPaths": "Înainte de începerea unei dezbateri: sugerarea a ceea ce merită cercetat",
   "legal.providers.purpose.search": "Întrebările de căutare pe care modelele le formulează pornind de la dezbatere — pentru găsirea de dovezi pe web",
   "legal.providers.purpose.support": "Ceea ce scrieți în chatul de asistență — pentru a vă răspunde",
   "legal.providers.purposesUnconfirmed": "[de confirmat: care dintre aceste sarcini îi sunt încredințate]",

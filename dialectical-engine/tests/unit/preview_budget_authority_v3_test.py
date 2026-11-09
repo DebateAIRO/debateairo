@@ -721,6 +721,46 @@ class RemainingTests(GateTest):
                      {'scope_id': 7}, [SCOPE], SCOPE, None):
             with self.subTest(data=data), self.refused('REMAINING_REQUEST_INVALID'):
                 self.report(gate, data)
+
+    # V4 start step, Task 6: the day's pot is answered only to a request that asks for it by name, exactly true.
+    def test_the_daily_pot_is_answered_only_when_asked(self):
+        gate = self.gate().ready()
+        plain = self.report(gate)
+        self.assertNotIn('daily_pot_usd', plain)
+        self.assertEqual(self.report(gate, {'scope_id': SCOPE, 'daily_pot': True}), plain | {'daily_pot_usd': '5.50'})
+
+    def test_a_pot_request_must_say_true_exactly(self):
+        gate = self.gate().ready()
+        for data in ({'scope_id': SCOPE, 'daily_pot': False}, {'scope_id': SCOPE, 'daily_pot': 1},
+                     {'scope_id': SCOPE, 'daily_pot': 'true'}, {'scope_id': SCOPE, 'daily_pot': None},
+                     {'scope_id': SCOPE, 'daily_pot': True, 'extra': 1}):
+            with self.subTest(data=data), self.refused('REMAINING_REQUEST_INVALID'):
+                self.report(gate, data)
+
+    def test_with_the_final_writer_room_the_pot_reply_has_ten_sorted_keys(self):
+        gate = self.gate(enabled_models=ALL, max_final_writer_calls=1).ready()
+        slots = bridge.CallSlots(gate.go['max_concurrent_calls'], 1)
+        report = self.report(gate, {'scope_id': SCOPE, 'daily_pot': True}, slots=slots)
+        self.assertEqual(sorted(report), ['daily_pot_usd', 'enabled_models', 'final_writer_max_in_flight',
+                                          'largest_final_writer_reservation_usd', 'largest_reservation_usd', 'max_concurrent_calls',
+                                          'remaining_calls', 'remaining_usd', 'state', 'window_open'])
+        self.assertEqual(report['daily_pot_usd'], '5.50')
+
+    def test_one_cached_read_answers_a_plain_and_a_pot_request_each_in_its_own_shape(self):
+        gate = self.gate().ready()
+        reads = []
+        real = bridge.remaining_snapshot
+
+        def counted(*args):
+            reads.append(1)
+            return real(*args)
+        answers = bridge.RemainingAnswers(gate.private, gate.go_path, gate.slots, clock=lambda: 100.0, now=gate.clock)
+        with patch.object(bridge, 'remaining_snapshot', counted):
+            plain = answers({'scope_id': SCOPE})
+            pot = answers({'scope_id': SCOPE, 'daily_pot': True})
+        self.assertEqual(reads, [1])
+        self.assertEqual(len(plain), 7)
+        self.assertEqual(pot, plain | {'daily_pot_usd': '5.50'})
         with self.refused('STATE_MISSING'):
             self.report(self.gate())
 

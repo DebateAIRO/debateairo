@@ -107,7 +107,8 @@ export const MAP_NOTES = Object.freeze(["LIST_REASSIGNED", "LIST_DROPPED", "MERG
   "INTERNAL_WORDS_SKIPPED"] as const);
 export type MapNote = typeof MAP_NOTES[number];
 
-export const MAP_STEPS = Object.freeze(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE", "CHECK"] as const);
+/** The debate map's steps (CHECK stays its last), then the step before Start's (V4 start step: the list writers, the merge, late ones included, the combine and the fit). */
+export const MAP_STEPS = Object.freeze(["ANGLES", "LIST", "SNOWBALL", "MERGE", "GAP", "CHOOSE", "CHECK", "START_LIST", "START_MERGE", "START_COMBINE", "START_FIT"] as const);
 export type MapStep = typeof MAP_STEPS[number];
 
 /** A: snowball from the first AI. B: blind lists with no angle. C: the angle map (the spec's opening, ruling S1). */

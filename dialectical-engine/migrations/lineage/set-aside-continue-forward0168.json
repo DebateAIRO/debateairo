@@ -1,0 +1,56 @@
+{
+  "version": "set-aside-continue-forward0168-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0167_public_report_own_carrier.sql",
+    "manifestSha256": "ce9e80ad56b76f8954b497de3c18a245b356a1c7a3448c2ff1ed94dd0e5dc4bc",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0168_set_aside_continue.sql",
+    "sha256": "dbe06b1bcdddb9081e912f7527015eaeba618c87f94bf5d9f166b20a531ac3db"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0140_internal_spend_kinds.sql",
+      "functions": [
+        "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ],
+      "field": "function_definition"
+    },
+    {
+      "step": "0144_ask_clarify_charge.sql",
+      "functions": [
+        "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ],
+      "field": "function_definition"
+    },
+    {
+      "step": "0158_pre_start_charge.sql",
+      "functions": [
+        "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)",
+        "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ],
+      "field": "function_definition"
+    },
+    {
+      "step": "0165_pre_start_release.sql",
+      "functions": [
+        "identity.read_pre_start_spent(uuid,timestamptz,timestamptz)",
+        "billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)",
+        "staff.read_team_internal_spent(timestamptz,timestamptz)",
+        "identity.read_run_quota_used(uuid,uuid)",
+        "core.continue_failed_run(uuid,uuid,text,bigint)",
+        "core.read_run_continue(uuid,uuid)"
+      ],
+      "field": "function_definition"
+    }
+  ]
+}

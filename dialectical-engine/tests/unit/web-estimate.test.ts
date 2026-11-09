@@ -266,7 +266,7 @@ describe("the owner's ruling, 31 Oct: what follows a dig in its share", () => {
 });
 
 describe("R22 · the web part reaches the receipt, so the run's attempt ceiling counts the web calls", () => {
-  const BASE = { searchGate: true, shape: { plan: "plus", answers: 4 }, engine: {}, depth: 1, parent: undefined };
+  const BASE = { searchGate: true, shape: { plan: "plus", answers: 4 }, shapeV2: null, engine: {}, depth: 1, parent: undefined };
   it("a paid engine-2 debate that can search carries it: Thorough from depth 2; a dig counts its picks in its own mode", () => {
     expect(webSitesForAsk(BASE)).toMatchObject({ kind: "START", depth: "QUICK", packs: 4 });
     expect(webSitesForAsk({ ...BASE, depth: 2 })).toMatchObject({ kind: "START", depth: "THOROUGH", topCount: 5 });

@@ -16,6 +16,7 @@ import {
 } from "@/lib/v4/suggestions";
 import type { V4DigDraft, V4DigPick, V4OpenQuestion, V4Path } from "@/lib/v4/types";
 import type { TypedWords } from "@/lib/v4/useLeaveGuard";
+import { V4DigPaths, type V4DigPathsProps } from "./V4DigPaths";
 
 /*
  * Perplexity plan W3-4 and the dig model revision (2026-10-30/31): choosing what to dig on the map. A path's dig
@@ -29,6 +30,12 @@ import type { TypedWords } from "@/lib/v4/useLeaveGuard";
  * first box greyed for it (dig-f22); Cancel on a wording puts the tick back as it was (dig-f14); the boxes and the
  * person's own words follow the direction of what is typed (dig-f21); on Free a line under the own-view box says the
  * view may be shown publicly (dig-f26); a picked open question and the person's own view are labelled (dig-f34).
+ * V4 start step, Task 62 (spec §2.5, "it is offered first when you dig"): on a path debate the main question's dig list
+ * starts with the menu paths the person left out before Start ("+ N more to explore"), each a pick box of its own
+ * (V4MorePickRows), before its open questions; an R22 debate's list is unchanged.
+ * V4 start step, Task 79 (spec §4.4, dig-f35): on a path debate, with two picks or more that make paths, the dig's path rows
+ * (V4DigPaths, the choosing step's own rows) are drawn under the picks; a pick box that would make one path too many is closed
+ * with its line ("A dig looks into up to 7 paths. …"), and words past a path's 1,000 characters say so.
  */
 
 /** What the page lends the map pieces and the panel for choosing what to dig. */
@@ -39,8 +46,11 @@ export type V4DigChoice = Readonly<{
   canDig: boolean;
   /** Owner: "Dig here too" on a path that already has a dig, and on every path of a dig's own map. */
   digHereToo: (pathId: string) => boolean;
-  /** Why a pick of this group cannot join the draft now (null: it can). */
-  refusalFor: (group: string | null) => PickRefusal | null;
+  /**
+   * Why a pick of this group cannot join the draft now (null: it can). Task 79: `makesPath`, a pick that would be a path of a
+   * path debate's dig (a suggestion, an own view, a "+ N more" item; never an open question), which PATHS_FULL can refuse.
+   */
+  refusalFor: (group: string | null, makesPath?: boolean) => PickRefusal | null;
   onToggleSuggestion: (pathId: string, suggestion: DigSuggestion) => void;
   /** Returns why the new text was refused (null: kept). */
   onEditPick: (key: string, text: string) => PickRefusal | null;
@@ -63,6 +73,17 @@ export type V4DigChoice = Readonly<{
    * page does not know).
    */
   publicLine?: string;
+  /**
+   * V4 start step, Task 62: what the main question offers to dig before its open questions (lib/v4/suggestions.ts
+   * digSuggestionsWithMore: on a path debate the menu paths left out, as MORE picks). Absent or empty: nothing more.
+   */
+  mainQuestionPicks?: readonly V4DigPick[];
+  /** Task 62: ticks or unticks one of `mainQuestionPicks` (a pick of the main question). */
+  onToggleMainPick?: (pick: V4DigPick) => void;
+  /** V4 start step, Task 79: a path debate's dig (each pick a path: its words at most 1,000 characters). Absent: today's dig. */
+  pathsParent?: boolean;
+  /** Task 79: the dig's path rows, drawn under the picks (two picks or more that make paths). Absent: no rows. */
+  digPaths?: Omit<V4DigPathsProps, "catalog">;
 }>;
 
 /** On the tree and the outline, at most this many suggestions per path; the panel lists them all. */
@@ -78,8 +99,11 @@ function shortLine(text: string, max = 70): string {
   return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:.\-–—]+$/u, "")}…`;
 }
 
-/** The plain sentence for a refusal the page shows beside the picks. */
-export function refusalLine(refusal: PickRefusal, planTier: V4PlanTier, catalog: MessageCatalog): string {
+/**
+ * The plain sentence for a refusal the page shows beside the picks. Task 79: `pathsParent`, a path debate's dig, whose words are
+ * a path's question (TOO_LONG says its 1,000 characters).
+ */
+export function refusalLine(refusal: PickRefusal, planTier: V4PlanTier, catalog: MessageCatalog, pathsParent = false): string {
   // A table, one line per refusal (the source audit wants no switch without an exhaustive fall-through).
   const lines: Readonly<Record<PickRefusal, () => string>> = {
     OTHER_PATH: () => t(catalog, "v4.suggest.otherPath"),
@@ -87,7 +111,8 @@ export function refusalLine(refusal: PickRefusal, planTier: V4PlanTier, catalog:
       ? t(catalog, "v4.suggest.freeCap", { count: picksMax("free") })
       : t(catalog, "v4.suggest.full")),
     EMPTY: () => t(catalog, "v4.suggest.empty"),
-    TOO_LONG: () => t(catalog, "v4.suggest.tooLong", { count: PICK_TEXT_MAX })
+    TOO_LONG: () => (pathsParent ? t(catalog, "v4.digPaths.ownTooLong") : t(catalog, "v4.suggest.tooLong", { count: PICK_TEXT_MAX })),
+    PATHS_FULL: () => t(catalog, "v4.digPaths.full")
   };
   return lines[refusal]();
 }
@@ -103,7 +128,7 @@ const PATH_SLOT = "\u0000path\u0000";
 export function V4PickReason(props: Readonly<{ reason: PickRefusal; choice: V4DigChoice; paths: readonly V4Path[]; catalog: MessageCatalog }>) {
   const { reason, choice, catalog } = props;
   if (reason !== "OTHER_PATH") {
-    return <p className="v4PickReason v4Highlight" role="note">{refusalLine(reason, choice.planTier, catalog)}</p>;
+    return <p className="v4PickReason v4Highlight" role="note">{refusalLine(reason, choice.planTier, catalog, choice.pathsParent === true)}</p>;
   }
   const path = choice.draft.group === null ? undefined : props.paths.find((candidate) => candidate.id === choice.draft.group);
   const label = path === undefined ? "" : shortLine(cardLabel(path.line), 40);
@@ -116,6 +141,49 @@ export function V4PickReason(props: Readonly<{ reason: PickRefusal; choice: V4Di
         : t(catalog, path === undefined ? "v4.panel.crumbRoot" : "v4.map.pathUntitled")}
       {after}
     </p>
+  );
+}
+
+/**
+ * V4 start step, Task 62 (spec §2.5): the main question's "+ N more" picks, first in its "Where to dig from here", as rows of
+ * that list: a pick box (closed with its reason read aloud when it cannot join the picks), the path's title (AI text), "New"
+ * when the AIs found it after the person had looked, and its question. Null when nothing can be dug or none is offered.
+ */
+export function V4MorePickRows(props: Readonly<{ picks: readonly V4DigPick[]; choice: V4DigChoice; catalog: MessageCatalog }>) {
+  const { choice, catalog } = props;
+  const toggle = choice.onToggleMainPick;
+  const more = props.picks.filter((pick): pick is Extract<V4DigPick, { kind: "MORE" }> => pick.kind === "MORE");
+  if (!choice.canDig || toggle === undefined || more.length === 0) return null;
+  const picked = new Set(choice.draft.picks.map((pick) => pick.key));
+  return (
+    <>
+      {more.map((pick) => {
+        const isPicked = picked.has(pick.key);
+        const refusal = isPicked ? null : choice.refusalFor(null, true);
+        return (
+          <li key={pick.key} className="v4PanelOpenRow v4MorePick">
+            <label className="v4PanelPick">
+              <input type="checkbox" checked={isPicked} disabled={refusal !== null} onChange={() => toggle(pick)} />
+              <span className="v4SrOnly">
+                {t(catalog, "v4.map.pick", { question: shortLine(pick.more.title) })}
+                {refusal === null ? null : ` ${refusalLine(refusal, choice.planTier, catalog, choice.pathsParent === true)}`}
+              </span>
+            </label>
+            <span className="v4MorePickBody">
+              <span className="v4PanelRowTitle" data-ai-generated="true">{pick.more.title}</span>
+              {pick.more.isNew ? <span className="v4MoreNew">{t(catalog, "v4.paths.moreNew")}</span> : null}
+              <span className="v4MapNote" data-ai-generated="true">{shortLine(pick.more.question, 120)}</span>
+            </span>
+          </li>
+        );
+      })}
+      {/* Task 79: the main question's picks as path rows, right under them. */}
+      {choice.digPaths !== undefined && choice.draft.group === null && choice.draft.picks.some((pick) => pick.kind === "MORE") ? (
+        <li className="v4PanelOpenRow v4DigPathsRow">
+          <V4DigPaths {...choice.digPaths} catalog={catalog} />
+        </li>
+      ) : null}
+    </>
   );
 }
 
@@ -145,7 +213,7 @@ export function pickReasonPlaces(groups: readonly PickGroup[], picked: ReadonlyS
       }
     }
     if (found === null && group.suggestions && group.path !== null && shownSuggestions(group.path, choice).closed > 0) {
-      const reason = choice.refusalFor(group.path.id);
+      const reason = choice.refusalFor(group.path.id, true);
       if (reason !== null) found = { reason, before: "suggestions" };
     }
     if (found !== null && !placed.has(found.reason)) {
@@ -166,7 +234,7 @@ export function shownSuggestions(path: V4Path, choice: V4DigChoice): Readonly<{ 
   const picked = pickedSuggestionIds(choice.draft);
   const mine = all.filter((item) => picked.has(item.suggestion_id));
   const shown = [...mine, ...all.filter((item) => !picked.has(item.suggestion_id))].slice(0, Math.max(SHOWN_ON_MAP, mine.length));
-  const closed = choice.refusalFor(path.id) === null ? 0 : shown.filter((item) => !picked.has(item.suggestion_id)).length;
+  const closed = choice.refusalFor(path.id, true) === null ? 0 : shown.filter((item) => !picked.has(item.suggestion_id)).length;
   return { shown, more: all.length - shown.length, closed };
 }
 
@@ -176,7 +244,7 @@ function SuggestionBox(props: Readonly<{
 }>) {
   const { path, suggestion, choice, catalog } = props;
   const picked = pickedSuggestionIds(choice.draft).has(suggestion.suggestion_id);
-  const refusal = picked ? null : choice.canDig ? choice.refusalFor(path.id) : null;
+  const refusal = picked ? null : choice.canDig ? choice.refusalFor(path.id, true) : null;
   const closed = !choice.canDig || refusal !== null;
   return (
     <label className={props.className}>
@@ -188,7 +256,7 @@ function SuggestionBox(props: Readonly<{
       />
       <span className="v4SrOnly">
         {t(catalog, "v4.suggest.pick", { text: shortLine(suggestion.text) })}
-        {refusal !== null ? ` ${refusalLine(refusal, choice.planTier, catalog)}` : null}
+        {refusal !== null ? ` ${refusalLine(refusal, choice.planTier, catalog, choice.pathsParent === true)}` : null}
       </span>
     </label>
   );
@@ -339,7 +407,7 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
   const typedKey = `edit:${suggestion.suggestion_id}`;
   const [editing, setEditingNow] = useState<string | null>(() => choice.typed?.get(typedKey) ?? null);
   const [problem, setProblem] = useState<PickRefusal | null>(null);
-  const refusal = pick !== undefined ? null : choice.refusalFor(path.id);
+  const refusal = pick !== undefined ? null : choice.refusalFor(path.id, true);
   const editedText = pick?.kind === "SUGGESTION" && isEdited(pick) ? pick.text : null;
   const startText = pick?.kind === "SUGGESTION" ? pick.text : suggestion.text;
   // The wording the box starts with is not "typed words": only a change is kept as worth asking about.
@@ -417,7 +485,7 @@ function PanelSuggestion(props: Readonly<{ path: V4Path; suggestion: DigSuggesti
             rows={3}
             onChange={(event) => setEditing(event.target.value)}
           />
-          {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
+          {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog, choice.pathsParent === true)}</p> : null}
           <div className="v4SugEditorActions">
             <button type="button" className="v4Btn" onClick={saveEdit}>{t(catalog, "v4.suggest.editDone")}</button>
             <button type="button" className="v4Link" onClick={cancelEdit}>{t(catalog, "v4.suggest.cancel")}</button>
@@ -440,7 +508,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; section: R
     choice.typed?.set(typedKey, next);
   };
   const [problem, setProblem] = useState<PickRefusal | null>(null);
-  const refusal = choice.refusalFor(path.id);
+  const refusal = choice.refusalFor(path.id, true);
   const focus = useBoxFocus(undefined, section);
   if (text === null) {
     return refusal === null ? (
@@ -474,7 +542,7 @@ function OwnView(props: Readonly<{ path: V4Path; choice: V4DigChoice; section: R
         {...(shownPublicly ? { "aria-describedby": `${id}-public` } : {})}
       />
       {shownPublicly ? <p id={`${id}-public`} className="v4PanelHint v4Muted v4SugPublic" data-public-will-be>{choice.publicLine}</p> : null}
-      {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog)}</p> : null}
+      {problem !== null ? <p className="v4SugProblem" role="alert">{refusalLine(problem, choice.planTier, catalog, choice.pathsParent === true)}</p> : null}
       <div className="v4SugEditorActions">
         <button type="button" className="v4Btn" onClick={add}>{t(catalog, "v4.suggest.ownViewAdd")}</button>
         <button type="button" className="v4Link" onClick={() => { setText(null); focus.focusOpener(); }}>{t(catalog, "v4.suggest.cancel")}</button>
@@ -562,6 +630,8 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
   const mine = choice.draft.group === path.id ? choice.draft.picks : [];
   const elsewhere = choice.draft.picks.length > 0 && choice.draft.group !== path.id;
   const full = !elsewhere && choice.refusalFor(path.id) === "FULL";
+  // Task 79: one more pick would give the dig more paths than it may look into.
+  const pathsFull = !elsewhere && choice.refusalFor(path.id, true) === "PATHS_FULL";
   return (
     <section ref={section} className="v4PanelSection v4Sugs" aria-labelledby={`v4-sug-${path.id}`}>
       <h3 className="v4PanelH3" id={`v4-sug-${path.id}`}>{t(catalog, "v4.suggest.heading")}</h3>
@@ -589,6 +659,7 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
       ) : null}
       {/* dig-f22: the reason sits right above the boxes it greys (Free's cap is said above already). */}
       {full && choice.planTier !== "free" ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.suggest.full")}</p> : null}
+      {pathsFull ? <p className="v4PanelHint v4Muted">{refusalLine("PATHS_FULL", choice.planTier, catalog)}</p> : null}
       {suggestions.length === 0
         ? <p className="v4Muted">{t(catalog, "v4.suggest.none")}</p>
         : suggestionsByKind(suggestions).map((group) => (
@@ -608,6 +679,8 @@ export function V4DigCompose(props: Readonly<{ path: V4Path; choice: V4DigChoice
           </div>
         ))}
       <OtherPicks picks={mine} choice={choice} section={section} catalog={catalog} />
+      {/* Task 79 (dig-f35): the picks as path rows, under the picks. */}
+      {choice.digPaths !== undefined && mine.length > 0 ? <V4DigPaths {...choice.digPaths} catalog={catalog} /> : null}
       {elsewhere ? null : <OwnView key={`own/${path.id}`} path={path} choice={choice} section={section} catalog={catalog} />}
       {/* journey-f23 (owner's screen review): no "N picked" count; the picks are marked above and shown as chips in the tray. */}
     </section>

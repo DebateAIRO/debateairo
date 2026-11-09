@@ -241,6 +241,12 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // withRunContentLease and opened through prepareLeasedContentEncryptionForRun, both under the dig's own run key.
       "packages/db/src/dig-picks.ts",
       "packages/db/src/index.ts",
+      // V4 start step (0160, Task 21): each path's answer so far and the gap round are sealed inside withRunContentLease and opened through
+      // prepareLeasedContentEncryptionForRun, both under the debate's own run key.
+      "packages/db/src/path-results.ts",
+      // V4 start step (0159, Task 20): the chosen paths and their menu are sealed inside withRunContentLease and opened through
+      // prepareLeasedContentEncryptionForRun, both under the debate's own run key.
+      "packages/db/src/start-paths.ts",
       "packages/evaluator/src/index.ts",
       "packages/evidence/src/index.ts",
       "packages/graph/src/index.ts",
@@ -253,6 +259,9 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Debate shape (0117): the map repository seals and reads core.map_item / core.map_choice inside withRunContentLease.
       "packages/map/src/repository.ts",
       "packages/memory/src/index.ts",
+      // V4 start step (Task 57): a path's findings show each found point's own words, opened under the debate's run key inside
+      // withRunContentLease (prepareLeasedContentEncryptionForRun), as the served answer opens its nodes; nothing else is opened.
+      "packages/serve/src/branches.ts",
       "packages/serve/src/index.ts",
       // The publication review (0127) seals the review copy and the decision reason.
       "packages/serve/src/publication-review.ts",
@@ -303,7 +312,15 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // R22 decisions 2 and 3: the climb and the answer update send their calls as the rewrite does, naming the dig's run; they read no
       // content themselves: their sources and seals open and seal under the lease.
       "apps/runner/src/path-climb.ts",
+      // V4 start step, Task 49: each path's answer so far sends its writer and checker calls through the gateway its job
+      // hands it (Task 54: the run's lane-wrapped, leased gateway), naming the run. It opens no lease and reads no content
+      // of its own; the outcome is stored through the path results store (0160).
+      "apps/runner/src/path-outcomes.ts",
       "apps/runner/src/path-rewrite.ts",
+      // V4 start step, Task 50: the main answer of a path run sends its writer and checker calls through the gateway its
+      // job hands it (Task 54: the run's leased gateway) on the served lane, naming the run. It opens no lease and reads no
+      // content of its own; its dossier is built by code from the paths' stored outcomes.
+      "apps/runner/src/paths-main-answer.ts",
       // The public tree (0147): the AI check on a contribution goes through the gateway the settled dig's snapshot hands it, naming the dig's run.
       "apps/runner/src/public-contribution.ts",
       // L4-F9 repair: the keep-alive hands each runner call, unchanged, to the

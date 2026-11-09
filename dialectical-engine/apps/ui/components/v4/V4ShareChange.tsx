@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { shareChangeText } from "@/lib/v4/digQuota";
+import { SHARE_DELTA_SHOW_MS } from "@/lib/v4/money";
 
 /*
  * journey-f8 (owner's screen review, 3 Nov 2026): when the share on a button changes (another mode, more picks), its
@@ -11,8 +12,11 @@ import { shareChangeText } from "@/lib/v4/digQuota";
  * A share that appears or goes (none known before or after) shows no change.
  */
 
-/** How long a change mark stays (journey-f8). */
-export const SHARE_CHANGE_MS = 2_000;
+/**
+ * How long a change mark stays (journey-f8). V4 start step, Task 79b: the one time of lib/v4/money.ts (Task 69's
+ * SHARE_DELTA_SHOW_MS), so the dig buttons and the start step's shares can never drift apart.
+ */
+export const SHARE_CHANGE_MS = SHARE_DELTA_SHOW_MS;
 
 /**
  * `subject` (the wave-2 review, 4 Nov): what the button digs, as a place ("path:…", "open:…"). A share of another place

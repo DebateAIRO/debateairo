@@ -44,11 +44,12 @@ export type ModelStrength = typeof MODEL_STRENGTHS[number];
 export const SEAT_SUFFIX = /:seat:(?:main|runnerUp)$/u;
 /**
  * Engine redesign R2 (spec 2026-10-15 §4.9): a comparing judge (`VERDICT:judge:<1-5>`) and a point investigation
- * (`VERDICT:investigate:<1-5>`; the kernel's engine.ts mints both). Exact keys, so any other `VERDICT:` text stays no role.
- * Read on the key without its seat suffix; the one definition length-guidance.ts also reads.
+ * (`VERDICT:investigate:<1-8>`; the kernel's engine.ts mints both; V4 start step, Task 54e: up to one investigation per stored
+ * path on a paid path debate). Exact keys, so any other `VERDICT:` text stays no role. Read on the key without its seat suffix;
+ * the one definition length-guidance.ts also reads.
  */
 export const COMPARING_JUDGE_KEY = /^VERDICT:judge:[1-5]$/u;
-export const POINT_INVESTIGATION_KEY = /^VERDICT:investigate:[1-5]$/u;
+export const POINT_INVESTIGATION_KEY = /^VERDICT:investigate:[1-8]$/u;
 
 /**
  * The role of a call, read from its call_site_key (the only source for LEGACY rows written before

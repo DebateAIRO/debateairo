@@ -58,6 +58,8 @@ function Probe({ waiting, waitState, map = null }: ProbeProps) {
     hideNews: () => undefined,
     focusHeading: () => undefined,
     reportHref: `/v4/debate/${RUN}/report`,
+    // The start step's Task 62 (merged 7 Nov): no short answer came late on this probe.
+    shortAnswerLate: 0,
     catalog: V4,
     locale: "en"
   });

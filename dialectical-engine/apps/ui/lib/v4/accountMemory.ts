@@ -10,41 +10,26 @@ import {
 } from "@debateai/contract";
 import { contractClient } from "../api.js";
 import { findOpenQuestion, findPath } from "./mapModel.js";
-import { READING_LEVELS, type DigLink, type ReadingLevel, type SeenSnapshot, type V4Map } from "./types.js";
+import type { DigLink, SeenSnapshot, V4Map } from "./types.js";
 
 /*
  * V4 account memory (owner rulings N7 and N11, 2026-10-29; migration 0131): what the V4 pages keep in the person's
- * ACCOUNT, never in the browser — the reading level, the last visit of each debate ("since your last visit") and the link
- * of each dig to the debate it came from. Reads throw, so a page can tell "nothing saved yet" from "could not read" and
- * fall back to what it did before this memory existed; writes are best-effort and never throw (a page never waits on
- * one, and a failed write only means the next visit remembers less).
+ * ACCOUNT, never in the browser — the last visit of each debate ("since your last visit") and the link of each dig to the
+ * debate it came from. Reads throw, so a page can tell "nothing saved yet" from "could not read" and fall back to what it
+ * did before this memory existed; writes are best-effort and never throw (a page never waits on one, and a failed write
+ * only means the next visit remembers less).
+ *
+ * V4 start step, Task 75d (owner, 5 Nov, second round): the account stops remembering a reading level. Each question's level is
+ * chosen on its first screen, which always starts on Plain words, and kept by that debate; the V4 pages neither read nor save the
+ * account's level (its routes stay on the server for older pages).
  */
 
-type LevelClient = Pick<ContractClient, "readReadingLevel" | "saveReadingLevel">;
 type VisitClient = Pick<ContractClient, "readLastVisit" | "recordLastVisit">;
 type DigClient = Pick<ContractClient, "readDigLinks" | "recordDigLink">;
 
 /** Runs a client call so that one throwing at once (a body the contract refuses) is a failed promise, never a crash. */
 function attempt<T>(call: () => Promise<T>): Promise<T> {
   return Promise.resolve().then(call);
-}
-
-/** The account's reading level, or null before the person first chooses. Throws when it cannot be read. */
-export async function readAccountLevel(client: LevelClient = contractClient): Promise<ReadingLevel | null> {
-  const state = await attempt(() => client.readReadingLevel());
-  // Checked here rather than through storage.ts, which re-exports the hook that imports this module.
-  const level = state.reading_level;
-  return level !== null && (READING_LEVELS as readonly string[]).includes(level) ? level : null;
-}
-
-/** Saves the level to the account. Best-effort: true when saved, false otherwise; never throws. */
-export async function saveAccountLevel(level: ReadingLevel, client: LevelClient = contractClient): Promise<boolean> {
-  try {
-    await attempt(() => client.saveReadingLevel(level));
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

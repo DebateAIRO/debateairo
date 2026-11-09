@@ -14,6 +14,9 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  * Every locale: the same rows at the same places, the section 7 row named as the section 2 row, section 4's first row
  * naming it, and the deletion with the debate pointing at section 6. English and Romanian, the texts counsel reviews,
  * are pinned word for word.
+ *
+ * Privacy 3.12 (plan Task 83c, saved questions): sections 2 and 7 gain the row "Questions not started yet" right after
+ * this one, and section 4's first row lists it after this one.
  */
 
 const markdown = (locale: string): string =>
@@ -39,13 +42,13 @@ const retainRowNamed = (locale: string, label: string): string | undefined => ta
 const PINNED = {
   en: {
     collect: "| **Page settings and visits** | The reading level you choose on the debate pages; for each of your debates, when you last opened its map and a short list of what the map showed then (the ids of its points, paths, open questions and follow-up debates, each with one state word, no text); for each follow-up debate you start from a map, which debate and which place on its map it came from, and whether it was a quick look or a thorough one | You, as you use the debate pages |",
-    purpose: "Account, sessions, debate content, page settings and visits",
+    purpose: "Account, sessions, debate content, page settings and visits, questions not started yet",
     retain: "| Page settings and visits | While the account exists | Deleted with the account. A debate's last visit, and its links to the debate it was started from and to the follow-up debates started from it, are also deleted when that debate is deleted, by you or by our check (section 6) |",
     log: "Version 3.8 also says what the debate pages keep in your account, and for how long: the reading level you choose, when you last opened each debate's map and what it showed, and where each follow-up debate came from (sections 2, 4 and 7)."
   },
   ro: {
     collect: "| **Setările paginilor și vizitele** | Nivelul de lectură pe care îl alegeți în paginile dezbaterilor; pentru fiecare dezbatere a dumneavoastră, când i-ați deschis ultima dată harta și o listă scurtă cu ce arăta atunci harta (identificatorii punctelor, căilor, întrebărilor deschise și dezbaterilor ulterioare, fiecare cu un singur cuvânt pentru starea sa, fără text); pentru fiecare dezbatere ulterioară pe care o porniți de pe o hartă, din ce dezbatere și din ce loc al hărții ei provine și dacă a fost o privire rapidă sau una amănunțită | Dumneavoastră, pe măsură ce folosiți paginile dezbaterilor |",
-    purpose: "Cont, sesiuni, conținutul dezbaterilor, setările paginilor și vizitele",
+    purpose: "Cont, sesiuni, conținutul dezbaterilor, setările paginilor și vizitele, întrebările încă nepornite",
     retain: "| Setările paginilor și vizitele | Cât timp există contul | Șterse odată cu contul. Ultima vizită a unei dezbateri și legăturile ei cu dezbaterea din care a pornit și cu dezbaterile ulterioare pornite din ea sunt șterse și atunci când este ștearsă acea dezbatere, de dumneavoastră sau de verificarea noastră (secțiunea 6) |",
     log: "Versiunea 3.8 spune și ce păstrează paginile dezbaterilor în contul dumneavoastră și cât timp: nivelul de lectură ales, când ați deschis ultima dată harta fiecărei dezbateri și ce arăta ea, și de unde provine fiecare dezbatere ulterioară (secțiunile 2, 4 și 7)."
   }
@@ -56,10 +59,11 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
   const englishRetain = tableRows("en", 7).length;
 
   it("English has the new rows where the owner placed them", () => {
-    // 0157: the moderation notices row in section 2, and its two rows in section 7.
-    expect(englishCollect).toBe(16);
+    // 0157: the moderation notices row in section 2, and its two rows in section 7; Privacy 3.12: the questions not started yet,
+    // one row in each.
+    expect(englishCollect).toBe(17);
     expect(cells(tableRows("en", 2)[COLLECT_AT - 1]!)[0]).toBe("**Debate content**");
-    expect(englishRetain).toBe(29);
+    expect(englishRetain).toBe(30);
     const names = tableRows("en", 7).map((row) => cells(row)[0]);
     expect(names.indexOf("Page settings and visits")).toBeGreaterThan(names.indexOf("Provider return records and retrieval references"));
     expect(names.indexOf("Provider return records and retrieval references")).toBeGreaterThanOrEqual(0);
@@ -81,7 +85,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     expect(kept[2], `${code}: deletion with the debate points at section 6`).toMatch(/6/u);
     const purpose = cells(tableRows(code, 4)[0]!)[1]!;
     expect(purpose.toLocaleLowerCase(code), `${code}: section 4's first row lists it`).toContain(label.toLocaleLowerCase(code));
-    expect(markdown(code), `${code}: still version 3.11`).toMatch(/v3\.11 /u);
+    expect(markdown(code), `${code}: still version 3.12`).toMatch(/v3\.12 /u);
   });
 
   it.each(Object.entries(PINNED))("%s: the rows and the change-log sentence read exactly as approved", (code, pinned) => {

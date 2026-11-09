@@ -24,7 +24,9 @@ function afterLease(source: string): string {
  * still compared with the base byte for byte.
  */
 function withoutPathRewrite(source: string): string {
-  const added = /          \/\/ Dig-model revision W3-5 \(owner Q-D13\)[^\n]*\n          \/\/[^\n]*\n          \/\/[^\n]*\n          if \(!\(await runDigPathRewrite\(settings\.pathRewrite, settled\.input\)\)\) \{\n((?:            [^\n]*\n){3})          \}\n/u;
+  // V4 start step, Task 56: the carry-on's first-debate flag (one comment, its declaration, and its set inside the branch) is
+  // part of the same addition, folded back with it.
+  const added = /          \/\/ Dig-model revision W3-5 \(owner Q-D13\)[^\n]*\n          \/\/[^\n]*\n          \/\/[^\n]*\n(?:          \/\/ V4 start step, Task 56:[^\n]*\n          let firstDebate = false;\n)?          if \(!\(await runDigPathRewrite\(settings\.pathRewrite, settled\.input\)\)\) \{\n(?:            firstDebate = true;\n)?((?:            [^\n]*\n){3})          \}\n/u;
   const match = added.exec(source);
   if (match === null) return source;
   return source.replace(match[0], match[1]!.split("\n").map((line) => line.slice(2)).join("\n"));

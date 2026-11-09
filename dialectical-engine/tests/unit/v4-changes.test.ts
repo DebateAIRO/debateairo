@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STORY_FIXTURE_ANSWER, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
-import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
+import { buildV4Map, buildV4PendingMap } from "../../apps/ui/lib/v4/mapModel.js";
 import { diffSnapshots, selectionForChange, snapshotItems } from "../../apps/ui/lib/v4/changes.js";
 import type { DigLink, DigView, V4Change } from "../../apps/ui/lib/v4/types.js";
 
@@ -47,9 +47,11 @@ describe("snapshotItems", () => {
     expect(snapshotItems(MAP, [dig("child-1", "FAILED", ["w"]), dig("child-3", "WAITING", ["w"])])["open:w"]).toBe("dug");
   });
 
-  it("writes 'none' for the stand-in path's missing fate", () => {
-    const standIn = buildV4Map({ runId: "run-1", answer: STORY_FIXTURE_ANSWER, story: null });
-    expect(snapshotItems(standIn, [])["path:all"]).toBe("none");
+  it("writes 'none' for a path whose fate is not known yet, and no path when there is no story (Task 60, map-f4)", () => {
+    const looking = buildV4PendingMap({ questionLine: "Q", paths: [{ title: "A made-up path", question: "Q?", tag: null }] });
+    expect(snapshotItems(looking, [])["path:b1"]).toBe("none");
+    const noStory = buildV4Map({ runId: "run-1", answer: STORY_FIXTURE_ANSWER, story: null });
+    expect(Object.keys(snapshotItems(noStory, [])).filter((id) => id.startsWith("path:"))).toEqual([]);
   });
 });
 
@@ -94,8 +96,8 @@ describe("selectionForChange", () => {
     expect(selectionForChange(MAP, change("strange"))).toBe("root");
   });
 
-  it("sends a point to the stand-in path when there is no story", () => {
-    const standIn = buildV4Map({ runId: "run-1", answer: STORY_FIXTURE_ANSWER, story: null });
-    expect(selectionForChange(standIn, change("point:n-hybrid-forum"))).toBe("path:all");
+  it("sends a point to the question itself when there is no story (Task 60: no made-up path, map-f4)", () => {
+    const noStory = buildV4Map({ runId: "run-1", answer: STORY_FIXTURE_ANSWER, story: null });
+    expect(selectionForChange(noStory, change("point:n-hybrid-forum"))).toBe("root");
   });
 });

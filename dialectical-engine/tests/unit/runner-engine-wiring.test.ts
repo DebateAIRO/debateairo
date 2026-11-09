@@ -18,7 +18,8 @@ describe("the runner reads the engine from the receipt only", () => {
   });
 
   it("per run: engineOfRun over the parsed receipt, after the shape's per-run check, and an engine-2 run on an unconfigured runner is refused", () => {
-    const shapeAt = RUNNER.indexOf("const shapeShape = envelopeBasis.shape ?? null;");
+    // V4 start step, Task 53: a path debate's v2 sizes are read as a shape (`shapeViewOfV2`); every other run as before.
+    const shapeAt = RUNNER.indexOf("const shapeShape = envelopeBasis.shape ?? (shapeV2 === null ? null : shapeViewOfV2(shapeV2));");
     const engineAt = RUNNER.indexOf("const engine = engineOfRun(envelopeBasis);");
     expect(shapeAt).toBeGreaterThan(0);
     expect(engineAt).toBeGreaterThan(shapeAt);
@@ -52,7 +53,12 @@ describe("the runner reads the engine from the receipt only", () => {
     // The runner's call keeps them by default; only a fixture hands in its own (`stepPorts`, W4-2's test seam).
     expect(step.split("recordPlanPathStatuses: stepPorts?.recordPlanPathStatuses ?? postgresWebPlanStatusRecorder(pool),")).toHaveLength(2);
     expect(step.split("prepare: stepPorts?.prepare ?? (() => postgresWebStepPorts(pool, rest.runId))")).toHaveLength(2);
-    expect(RUNNER).not.toContain("stepPorts");
+    // V4 start step, Task 53 (item wait-d1): the one runner call that hands ports in is a path debate's, and they are the pool's own
+    // (0132's store, 0134's recorder), the recorder only followed by the FINDING_SOURCES marks of the paths it recorded as planned.
+    expect(RUNNER.split("stepPorts")).toHaveLength(2);
+    expect(RUNNER).toContain("prepare: () => postgresWebStepPorts(this.pool, run.runId),");
+    expect(RUNNER).toContain("await postgresWebPlanStatusRecorder(this.pool)(runId, statuses, cipher);\n"
+      + "            for (const entry of statuses) if (entry.status === \"PLANNED\") pathMarks.step(entry.pathId as PathId, \"FINDING_SOURCES\");");
     // No second lease: the recorder seals with the cipher the step's own `prepare` opened, and opens none itself.
     expect(step.split("await keepDecision(ports.cipher);")).toHaveLength(2);
     expect(step.split("prepareLeasedContentEncryptionForRun(")).toHaveLength(2);
@@ -68,8 +74,10 @@ describe("the runner reads the engine from the receipt only", () => {
       .toHaveLength(2);
     expect(RUNNER.indexOf("if (webStep.paths.some((path) => path.packId !== null)) {"))
       .toBeLessThan(RUNNER.indexOf("webPacks = await readDebateWebPacks("));
-    // The case writer, the defenders and critics, and the cross-replies (own path, then the rival's).
-    expect(RUNNER.split("legWithWebSources(")).toHaveLength(4);
+    // The case writer, the defenders and critics, and the cross-replies (own path, then the rival's); V4 start step, Task 53: a path
+    // debate's root writer, under its own path.
+    expect(RUNNER.split("legWithWebSources(")).toHaveLength(5);
+    expect(RUNNER).toContain("return legWithWebSources({ kind: \"path-root\", ...pathRootLegMaterial(path), readingLevel }, webPacks, { own: path.pathId });");
     expect(RUNNER).toContain("{ own: webPathOfRoot(shapeLeg.rootIndex), rival: webPathOfRoot(target) }");
     // The locator check rides every authoring call; the reviewer, judges, writer and storyteller read the cited extract.
     expect(RUNNER.split("...webLocatorInput(),")).toHaveLength(3);

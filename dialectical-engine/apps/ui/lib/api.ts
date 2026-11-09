@@ -1,6 +1,10 @@
 import {
   AskParentSchema,
+  AskRequestSchema,
   PublicDigParentSchema,
+  SavedQuestionIdSchema,
+  StartCheckSchema,
+  StartPathsSchema,
   ContractHttpError,
   createContractClient,
   DepthParamsSchema,
@@ -15,7 +19,9 @@ import {
   type DepthParams,
   type QuestionLanguageChoice,
   type RunProjection,
-  type SiteLanguage
+  type SiteLanguage,
+  type StartCheck,
+  type StartPaths
 } from "@debateai/contract";
 import type {
   DebateAdaptiveDepthApprovalRequest,
@@ -506,7 +512,13 @@ export async function createDebate(
   /** Decision 5 of 31 Oct: the debate's place, time and purpose lines, structured, whatever the page's language. */
   purposeLines?: PurposeLines,
   /** Decision 13: a dig on someone's public debate instead of `parent`, and that this Free ask showed the notice. */
-  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }>
+  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }>,
+  /**
+   * V4 start step, Task 68 (read-d2, choose-d2): Start's hand-over: the check of Next, the chosen paths and the carry-on box,
+   * each only when present (none: today's ask, byte for byte). Each is parsed by its contract schema first, so a lane that
+   * does not parse is refused before anything is sent.
+   */
+  startLane?: Readonly<{ startCheck?: StartCheck; startPaths?: StartPaths; carryOnToReport?: true; savedQuestionId?: string }>
 ): Promise<{ id: string; public_dig_not_joined?: boolean }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
@@ -549,7 +561,12 @@ export async function createDebate(
     ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion }),
     ...(parent === undefined ? {} : { parent: AskParentSchema.parse(parent) }),
     ...(publicLane?.publicParent === undefined ? {} : { public_parent: PublicDigParentSchema.parse(publicLane.publicParent) }),
-    ...(publicLane?.freePublicNotice === true ? { free_public_notice: true as const } : {})
+    ...(publicLane?.freePublicNotice === true ? { free_public_notice: true as const } : {}),
+    ...(startLane?.startCheck === undefined ? {} : { start_check: StartCheckSchema.parse(startLane.startCheck) }),
+    ...(startLane?.startPaths === undefined ? {} : { start_paths: StartPathsSchema.parse(startLane.startPaths) }),
+    ...(startLane?.carryOnToReport === undefined ? {} : { carry_on_to_report: AskRequestSchema.shape.carry_on_to_report.parse(startLane.carryOnToReport) }),
+    // V4 start step, Task 76f (saved-questions spec §3.7): the question not started yet this ask starts from, last (absent: today's bytes).
+    ...(startLane?.savedQuestionId === undefined ? {} : { saved_question_id: SavedQuestionIdSchema.parse(startLane.savedQuestionId) })
   };
   requireToken(token);
   if (language === undefined) {                                   // today's call, unchanged

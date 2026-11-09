@@ -57,6 +57,33 @@ export function saySomeUsed(reason: string | null | undefined, some: boolean): b
 }
 
 /**
+ * Owner 7 Nov, question 42 A (relayed by the review session): with "Continue where it stopped" offered, the reason sentence above it drops
+ * its "ask again" ending. Each cut line is a V4 line of its own (STOPPED is the owner's words, the others drafted); the shared runFailure.*
+ * sentences (35 languages) are untouched. A reason whose sentence has no such ending keeps it (`null` here: the shared sentence).
+ */
+const CONTINUE_REASON_KEYS: Readonly<Partial<Record<ReturnType<typeof runFailureKind>, string>>> = Object.freeze({
+  STOPPED: "v4.failed.continueReason.STOPPED",
+  NOT_STARTED: "v4.failed.continueReason.NOT_STARTED",
+  SET_ASIDE: "v4.failed.continueReason.SET_ASIDE"
+});
+
+/** Question 42 A: the reason sentence of a question whose stopped page offers Continue, or null for the shared sentence as it is. */
+export function continuingReason(reason: string | null | undefined, catalog: MessageCatalog): string | null {
+  const key = CONTINUE_REASON_KEYS[runFailureKind(reason)];
+  return key === undefined ? null : t(catalog, key);
+}
+
+/**
+ * V4 start step, Task 57n (owner 8 Nov, "Drop it, like digs"): the reason sentence of a question that keeps failing (its read's
+ * `keeps_failing`). No ending promises another try: AIs unavailable drops "Please try again in a while." (a drafted line), and the
+ * our-side reasons drop their "ask again" ending as with Continue (continuingReason). Null: the shared sentence as it is.
+ */
+export function keepsFailingReason(reason: string | null | undefined, catalog: MessageCatalog): string | null {
+  if (runFailureKind(reason) === "MODELS_UNAVAILABLE") return t(catalog, "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE");
+  return continuingReason(reason, catalog);
+}
+
+/**
  * Question 20 A: the one quota line under a failed run's reason, as its catalogue key, or null when nothing is said. A
  * question: "Nothing was taken for the failed try." (NONE) or "The part that ran used some of your quota." (SOME). A dig:
  * "Nothing was taken from your quota for this." (NONE) only; a dig that used some says nothing about it (dig-f12).
@@ -102,4 +129,44 @@ export function askAgainQuestion(run: Pick<RunProjection, "question_line">, cata
   if (parseDigQuestion(run.question_line, catalog) !== null) return null;
   const words = ownWords(run.question_line);
   return words.length > 0 ? words : null;
+}
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers, replacing Task 57e's re-use link: "if it stays the same, we need to use whatever was
+ * already generated and paid for ... if they change the question, then it's a new question"): whether the person's own FAILED question can
+ * continue where it stopped, as its run read says (`continuable`, Task 57f: exactly when POST /v1/runs/{id}/continue would continue it).
+ * Never a dig (its question is the site's text for the AIs), nor a run with no words to fill in.
+ */
+export function askAgainContinuable(run: Pick<RunProjection, "question_line" | "state" | "continuable">, catalog: MessageCatalog): boolean {
+  return run.state === "FAILED" && run.continuable === true && askAgainQuestion(run, catalog) !== null;
+}
+
+/** Task 57g: the words on the ask page are the stopped question's own once both are trimmed (any other change is a new question). */
+export function sameStoppedWords(typed: string, stopped: string | null): boolean {
+  return stopped !== null && typed.trim() === stopped.trim();
+}
+
+/*
+ * Task 57g: "Change the question" with the words left as they were goes back to the stopped debate's map, which starts the same Continue
+ * there, with its 10-second Undo. The ask page hands that over in one module variable, as Start's hand-off (startHandOff.ts): it lives
+ * while this tab's scripts run, so the client-side move to the map finds it; a reload or another tab does not. Never in the browser's
+ * storage, never in the address. Used once, and never after CONTINUE_HAND_OFF_MS.
+ */
+
+/** How long the map may take the hand-off after the ask page made it. */
+export const CONTINUE_HAND_OFF_MS = 60_000;
+
+let continueHeld: Readonly<{ runId: string; at: number }> | null = null;
+
+/** The ask page: the map of `runId` starts its Continue on arrival (replacing any earlier hand-off). */
+export function handOffContinue(runId: string, now: number): void {
+  continueHeld = Object.freeze({ runId, at: now });
+}
+
+/** The map page, once its first read answered: true once for a fresh hand-off of this run (it is used up either way); never another run's. */
+export function takeContinueHandOff(runId: string, now: number): boolean {
+  if (continueHeld === null || continueHeld.runId !== runId) return false;
+  const fresh = now - continueHeld.at < CONTINUE_HAND_OFF_MS;
+  continueHeld = null;
+  return fresh;
 }

@@ -127,7 +127,7 @@ async function rewrite(digged: Debate, parent: Debate, input: Readonly<{ outcome
     outcome: input.outcome, failureCode: ready ? null : "PATH_REWRITE_ALL_WRITERS_FAILED", fateBefore: input.fateBefore,
     fateAfter: ready ? input.fateAfter! : null, verdict: input.verdict === true ? { outcome: "HELPED", scope: "MAIN_QUESTION" } : null,
     writerLineage: ready ? LINEAGE : null, checkerLineage: ready ? LINEAGE : null, rounds: ready ? 2 : 0,
-    artifactRefs: [randomUUID()], content })).toBe("RECORDED");
+    artifactRefs: [randomUUID()], content, settingsVersion: 4 })).toBe("RECORDED");
   return rewriteId;
 }
 

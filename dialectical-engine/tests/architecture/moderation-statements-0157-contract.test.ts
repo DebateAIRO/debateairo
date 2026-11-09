@@ -22,9 +22,10 @@ const bodyOf = (name: string): string => {
 };
 
 describe("0157: the moderation statements", () => {
+  // A step of the chain, found by name: the V4 start step's steps (0158 to 0165) come after it.
   it("follows 0156 in the chain, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0156,loadForward0157,loadForward0170]");
+    expect(chain).toContain("loadForward0156,loadForward0157,");
     expect(chain).toContain("import { loadForward0157 } from './migration-forward0157.js';");
     const loader = read("packages/db/src/migration-forward0157.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);

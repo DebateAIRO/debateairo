@@ -10,7 +10,8 @@ const RUNNER = new URL("../../apps/runner/src/index.ts", import.meta.url);
 const SERVE_DISCLOSURE = new URL("../../packages/db/src/serve-disclosure.ts", import.meta.url);
 
 const judgesBlock = (source: string): string => {
-  const start = source.indexOf("const comparingJudges = engineTwo === null ? null : await (async () => {");
+  // V4 start step, Task 53: a path debate's paths are not rivals, so no comparing judge runs on one.
+  const start = source.indexOf("const comparingJudges = engineTwo === null || pathsRunPaths !== null ? null : await (async () => {");
   return source.slice(start, source.indexOf("const makerPositionServe = decideMakerPositionServe({", start));
 };
 
@@ -20,14 +21,15 @@ describe("R2b: the comparing judges in the run body", () => {
     const anchors = [
       "const serveDecisionInput = Object.freeze({",
       "const engineTwo = engine.engine === 2 ? engine : null;",
-      "const comparingJudges = engineTwo === null ? null : await (async () => {",
+      "const comparingJudges = engineTwo === null || pathsRunPaths !== null ? null : await (async () => {",
       "const strengthDecision = decideMakerPositionServe(serveDecisionInput);",
       "const makerPositionServe = decideMakerPositionServe({",
       // A14's investigation rows are written only after the serve decision (Ruling PF-R2a8.10), so the judges read
       // this copy's outcomes from memory (pre-flight PF-R2b3.6).
       "await recordPointInvestigationRows({",
       "const ladderLabel = deriveVerdictLabel(verdictLabelBasis);",
-      "const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);"
+      // V4 start step, Task 54: a path debate's label is its main trust word's (it has no comparing judge); every other run's as before.
+      "const verdictLabel = pathOutcomes !== null ? verdictDerivationOfPaths(pathsMainTrust)\n      : comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);"
     ].map((anchor) => [anchor, source.indexOf(anchor)] as const);
     for (const [anchor, index] of anchors) expect([anchor, index >= 0]).toEqual([anchor, true]);
     const indices = anchors.map(([, index]) => index);

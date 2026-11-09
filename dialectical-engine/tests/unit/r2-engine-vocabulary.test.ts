@@ -26,16 +26,20 @@ describe("engine 2's vocabulary", () => {
     expect(ENGINE_QUESTION_KINDS).toContain(pack.defaultShape);
   });
 
-  it("mints the judges' and the investigations' keys for 1 to 5 only", () => {
+  it("mints the judges' keys for 1 to 5 only, and the investigations' for 1 to 8 (Task 54e: one per stored path at most)", () => {
     expect([1, 2, 3, 4, 5].map(comparingJudgeCallSiteKey))
       .toEqual(["VERDICT:judge:1", "VERDICT:judge:2", "VERDICT:judge:3", "VERDICT:judge:4", "VERDICT:judge:5"]);
     expect(pointInvestigationCallSiteKey(2)).toBe("VERDICT:investigate:2");
+    // V4 start step, Task 54e (owner, 5 Nov, "One per path"): a paid path debate investigates max(cap, paths), up to b8's.
+    expect([6, 7, 8].map(pointInvestigationCallSiteKey)).toEqual(["VERDICT:investigate:6", "VERDICT:investigate:7", "VERDICT:investigate:8"]);
     // Pre-flight PF-R2a1.17: the kernel cannot import the register, so tie the key range to R1d's row bounds here.
     expect(ENGINE_CALL_SITE_INDEX.max).toBe(ENGINE_VERSION_LIMITS.judgesMax);
     expect(ENGINE_CALL_SITE_INDEX.max).toBe(ENGINE_VERSION_LIMITS.investigationsMax);
     for (const bad of [0, 6, 1.5, Number.NaN, -1]) {
       expect(() => comparingJudgeCallSiteKey(bad)).toThrow(RangeError);
       expect(() => comparingJudgeCallSiteKey(bad)).toThrow(`ENGINE_CALL_SITE_INDEX_INVALID:${String(bad)}`);
+    }
+    for (const bad of [0, 9, 1.5, Number.NaN, -1]) {
       expect(() => pointInvestigationCallSiteKey(bad)).toThrow(RangeError);
       expect(() => pointInvestigationCallSiteKey(bad)).toThrow(`ENGINE_CALL_SITE_INDEX_INVALID:${String(bad)}`);
     }
@@ -46,6 +50,10 @@ describe("engine 2's vocabulary", () => {
     ["VERDICT:judge:5", "JUDGE", "comparing_judge", "judge_panel"],
     ["VERDICT:investigate:1", "REVIEWER", "investigator", "reviewer"],
     ["VERDICT:investigate:2", "REVIEWER", "investigator", "reviewer"],
+    // Task 54e: a seven- or eight-path paid debate's later investigations read the same way.
+    ["VERDICT:investigate:7", "REVIEWER", "investigator", "reviewer"],
+    ["VERDICT:investigate:8:seat:main", "REVIEWER", "investigator", "reviewer"],
+    ["VERDICT:investigate:9", null, null, null],
     // On an assigned run every key carries `:seat:<main|runnerUp>` (apps/runner/src/run-seats.ts:32): same step.
     ["VERDICT:judge:3:seat:main", "JUDGE", "comparing_judge", "judge_panel"],
     ["VERDICT:investigate:1:seat:runnerUp", "REVIEWER", "investigator", "reviewer"],

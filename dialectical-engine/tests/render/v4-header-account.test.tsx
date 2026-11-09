@@ -14,8 +14,9 @@ import { setPathname } from "next/navigation";
  *               "Light or dark", "Settings", "Sign out". Signed out: "Sign in" in place of the round button.
  *   ask-f5      only one header row on the V4 pages: the site's old top bar steps back there.
  *   journey-f19 / ask-f6  "Open in the classic view" moves into the account menu, once; the header shows no classic link.
- *               The menu shows it whenever the page gives its classic address. Question 12 B (5 Nov: in the menu only)
- *               is not done on the map yet: its waiting, paused and failed screens still show it in their body.
+ *               The menu shows it whenever the page gives its classic address. Question 12 B (5 Nov: in the menu only):
+ *               the map hands it to the header on its waiting, paused and failed screens too, and to no body screen
+ *               (Task 76j; tests/render/v4-map-wiring.test.tsx).
  *   The reading-level ruling (5 Nov): the menu's links and its way back carry no level, whatever the page hands it.
  */
 const server = vi.hoisted(() => ({

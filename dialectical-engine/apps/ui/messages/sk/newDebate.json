@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Iná odpoveď…",
   "newDebate.askText.otherLabel": "Vaše vlastné dodatočné spresnenie",
   "newDebate.askText.matters": "Ak odpovede vedú rôznymi smermi, pre mňa je najdôležitejšie: {matters}",
-  "newDebate.askText.angles": "Prosím, pozrite sa aj na: {list}.",
   "newDebate.freePublicNotice": "V bezplatnom programe sú vaša otázka a jej debata verejné. Neuvádzajte osobné údaje."
 }

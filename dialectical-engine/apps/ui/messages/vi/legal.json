@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Phần tổng hợp của cuộc tranh luận đã hoàn tất — để kiểm tra theo bốn loại",
   "legal.providers.purpose.reportCheck": "Báo cáo gửi bằng nút Báo cáo, và văn bản công khai của cuộc tranh luận — để kiểm tra báo cáo",
   "legal.providers.purpose.questionCheck": "Một câu hỏi trước khi cuộc tranh luận bắt đầu — để kiểm tra xem cuộc tranh luận có thể bắt đầu hay không",
+  "legal.providers.purpose.clarifyQuestions": "Trước khi cuộc tranh luận bắt đầu: gợi ý các câu hỏi làm rõ",
+  "legal.providers.purpose.suggestPaths": "Trước khi cuộc tranh luận bắt đầu: gợi ý những điều nên tìm hiểu",
   "legal.providers.purpose.search": "Truy vấn tìm kiếm mà mô hình viết ra từ cuộc tranh luận — để tìm bằng chứng trên web",
   "legal.providers.purpose.support": "Nội dung bạn nhập trong kênh trò chuyện hỗ trợ — để trả lời bạn",
   "legal.providers.purposesUnconfirmed": "[cần xác nhận: nhà cung cấp được giao những việc nào trong số này]",

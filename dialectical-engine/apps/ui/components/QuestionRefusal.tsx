@@ -19,10 +19,15 @@ export function questionRefusalOf(failure: unknown): RefusalScreen | null {
   return failure.serverCode === "QUESTION_CHECK_UNAVAILABLE" ? "UNAVAILABLE" : null;
 }
 
-export function useQuestionRefusal({ catalog, locale, countryHint = null }: Readonly<{
+export function useQuestionRefusal({ catalog, locale, countryHint = null, backLabel }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   countryHint?: string | null;
+  /**
+   * V4 start step, Task 76 (ask-f7): the way back's words when the screen opens before the question's page step is done
+   * (V4's step 2: "Edit my question"); absent, today's label for every other caller.
+   */
+  backLabel?: string;
 }>): Readonly<{ offer(failure: unknown, about?: React.ReactNode): boolean; dialog: React.ReactNode }> {
   const [screen, setScreen] = React.useState<RefusalScreen | null>(null);
   const [about, setAbout] = React.useState<React.ReactNode>(null);
@@ -39,7 +44,7 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null }: Read
   };
   const dialog = helpOpen ? <CrisisSupportDialog catalog={catalog} locale={locale} countryHint={countryHint} onBack={() => setHelpOpen(false)} />
     : screen !== null ? <QuestionRefusalDialog
-      catalog={catalog} locale={locale} countryHint={countryHint} screen={screen} about={about}
+      catalog={catalog} locale={locale} countryHint={countryHint} screen={screen} about={about} backLabel={backLabel}
       onBack={() => setScreen(null)} onHelpNumbers={() => { setScreen(null); setHelpOpen(true); }}
     /> : null;
   return { offer, dialog };
@@ -53,13 +58,15 @@ function browserLanguages(): readonly string[] {
   return navigator.languages?.length ? navigator.languages : [navigator.language].filter(Boolean);
 }
 
-function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = null, onBack, onHelpNumbers }: Readonly<{
+function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = null, backLabel, onBack, onHelpNumbers }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   countryHint: string | null;
   screen: RefusalScreen;
   /** What the screen is about, said first (null: nothing, as before). */
   about?: React.ReactNode;
+  /** The way back's words (absent: today's "Back to my question"). */
+  backLabel?: string | undefined;
   onBack: () => void;
   onHelpNumbers: () => void;
 }>): React.ReactElement {
@@ -108,7 +115,7 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = n
         <div className="policyFoot">
           <span className="policyFootSpacer" />
           <button className="crisisSupportBack" type="button" data-part="back" onClick={onBack}>
-            {t(catalog, "home.questionRefusal.back")}
+            {backLabel ?? t(catalog, "home.questionRefusal.back")}
           </button>
         </div>
       </div>

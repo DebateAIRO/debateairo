@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnswerSchema, type Answer, type WebOtherPage, type WebPath, type WebSource } from "@debateai/contract";
 import { STORY_FIXTURE_ANSWER, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
-import { t } from "../../apps/ui/lib/i18n/translate.js";
+import { formatDate, t } from "../../apps/ui/lib/i18n/translate.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { ReadingLevel, V4Map, V4Selection } from "../../apps/ui/lib/v4/types.js";
 import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
@@ -157,9 +157,10 @@ describe("sources under a point (V4SourceList)", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer nofollow");
     expect(item.querySelector(".v4SourceSite")!.textContent).toBe("grid-costs.example");
     expect(item.querySelector("time")!.getAttribute("dateTime")).toBe("2025-06-12");
-    // Day first on English pages (question 5). TEMPORARY short form: question 4 A gives a point's evidence date the long form
-    // with the year ("12 June 2025"), which comes with the map's dates item (V4Sources, coordinated).
-    expect(item.querySelector("time")!.textContent).toBe("12 Jun 2025");
+    // Day first on English pages (question 5 B), in the long form with the year (question 4 A; Task 76k, wiring item 9):
+    // the calendar day the page gives, read in UTC so it never moves a day.
+    expect(item.querySelector("time")!.textContent).toBe(formatDate("en", "2025-06-12T00:00:00Z", { dateStyle: "long", timeZone: "UTC" }));
+    expect(item.querySelector("time")!.textContent).toBe("12 June 2025");
   });
 
   it("marks preview-only and abstract-only pages, and a page fewer AIs read, and nothing on a whole page", () => {

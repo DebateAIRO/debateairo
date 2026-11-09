@@ -1,0 +1,18 @@
+{
+  "version": "path-results-forward0160-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0159_start_paths.sql",
+    "manifestSha256": "78cb53026eec89007b2169eb4a8e228840e9a4cefd25036a3da38ea77da17600",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0160_path_results.sql",
+    "sha256": "632e333c05d8063e95981805e1832af090189d4d5e55424d659db40347180613"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

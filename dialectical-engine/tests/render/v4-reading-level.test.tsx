@@ -28,13 +28,14 @@ let seen: { level: ReadingLevel | null; choose: (level: ReadingLevel) => void; s
 /** An account with nothing saved, answering at once; the account tests below pass their own. */
 const NOTHING_SAVED: LevelMemory = { read: async () => null, save: async () => true };
 
-function Probe({ initial, memory }: { initial: ReadingLevel | null; memory: LevelMemory }) {
+function Probe({ initial, memory }: { initial: ReadingLevel | null; memory: LevelMemory | undefined }) {
+  // Undefined: the hook's own default (Task 75d: no memory).
   const [level, choose, settled] = useReadingLevel(initial, memory);
   seen = { level, choose, settled };
   return <span>{level ?? "none"}</span>;
 }
 
-async function mount(initial: ReadingLevel | null, memory: LevelMemory = NOTHING_SAVED): Promise<void> {
+async function mount(initial: ReadingLevel | null, memory: LevelMemory | undefined = NOTHING_SAVED): Promise<void> {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -173,5 +174,20 @@ describe("useReadingLevel and the account (N7)", () => {
     await mount(null, failingSave);
     await act(async () => seen?.choose("plain"));
     expect(seen?.level).toBe("plain");
+  });
+});
+
+/*
+ * V4 start step, Task 75d (owner, 5 Nov, second round): the account stops remembering a level, so the hook remembers nothing by
+ * default: no read, no save, and the level (the address's or the server's reading) is known at once.
+ */
+describe("useReadingLevel without a memory (Task 75d: the default)", () => {
+  it("reads nothing and is known at once; a choice still follows the address", async () => {
+    await mount(null, undefined);
+    expect(seen?.level).toBeNull();
+    expect(seen?.settled).toBe(true);
+    await act(async () => seen?.choose("expert"));
+    expect(seen?.level).toBe("expert");
+    expect(window.location.search).toBe("?x=1&level=expert");
   });
 });

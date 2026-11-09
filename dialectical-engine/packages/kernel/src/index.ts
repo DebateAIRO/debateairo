@@ -14,6 +14,10 @@ export * from "./payment-regions.js";
 export * from "./engine.js";
 export * from "./engine-material.js";
 export * from "./release-key.js";
+// V4 start step, Task 9: the step before Start's plain limits and ids (the contract re-exports them).
+export * from "./start-step-limits.js";
+// V4 start step, Task 33b: the one join of viewpoints no AI wrote as one (the page writes it, the server checks it).
+export * from "./path-join.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 

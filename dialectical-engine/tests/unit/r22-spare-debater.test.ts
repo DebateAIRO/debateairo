@@ -138,7 +138,11 @@ describe("R22 · the runner hands a refused position to a spare", () => {
     // A spend refusal of the spare's own call spent nothing on it: the debate ends on the refusal, as today.
     expect(rootZero).toContain("if (next instanceof TypedDomainError && next.code === \"RUN_CEILING_BELOW_FIRST_CALL\") throw refusal;");
     const root = between("const rootChain = async (", "if (authoredRoot.kind === \"HALTED\") {");
-    expect(root).toContain("if (!(await handRefusedRootToSpare(rootIndex, refused))) throw refused;");
+    // V4 start step, Task 53: with no spare left, a path debate's refused root drops (its path ends without a root) and the
+    // debate goes on; every other run's refusal travels on as before.
+    expect(root).toContain("if (!(await handRefusedRootToSpare(rootIndex, refused))) {");
+    expect(root).toContain("if (pathsRunPaths !== null && refused instanceof JudgeContentRefusedError) {\n"
+      + "                satOutDuringRun.add(rootIndex);\n                return;\n              }\n              throw refused;");
     expect(root).toContain("authoredRoot = await authorAndPanel({ ...input, seat: rootSeats[rootIndex]!,");
     // Its leg's receipt was written for the refused call: the spare's call writes none of its own.
     expect(root).toContain("receiptWritten: true }, told);");

@@ -439,6 +439,24 @@ export class PostgresPublicationRepository {
   }
 
   /**
+   * V4 start step, Task 75d: the reading level a run the active user owns was asked at (its stored `readingLevel`), for the public
+   * snapshot, so the public page shows the debate at that level. A level, not private content, read like the language tag above:
+   * no content lease. Null for a run that is not theirs or was asked without one; the caller checks the value.
+   */
+  async readRunReadingLevel(runId: string, userId: string, ownerRef: string): Promise<string | null> {
+    const result = await this.pool.query<{ reading_level: string | null }>(`
+      SELECT run.depth_params->>'readingLevel' AS reading_level
+      FROM core.run AS run
+      JOIN identity."user" AS identity_user
+        ON identity_user.user_id=$2 AND identity_user.owner_ref=$3
+          AND identity_user.state='active'
+      WHERE run.run_id=$1
+        AND core.run_is_owned_by($1,$3,NULL)
+    `, [runId, userId, ownerRef]);
+    return result.rows[0]?.reading_level ?? null;
+  }
+
+  /**
    * Engine money rule, Task M5 (spec 2026-09-26 §14.4.4): the FLOOR of an
    * answer of a run the active user owns, for the public snapshot — the label
    * and the leading position from the answer's latest disclosure record

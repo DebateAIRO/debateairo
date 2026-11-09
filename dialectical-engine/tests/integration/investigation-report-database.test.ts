@@ -7,6 +7,7 @@ import {
   PostgresInvestigationReportRunnerRepository,
   PostgresInvestigationRepository,
   type InvestigationReportRecord,
+  type PieceSettingsVersion,
   type Pool,
   type WebSealed
 } from "@debateai/db";
@@ -123,18 +124,21 @@ async function investigation(owner: Account, digs = 0, close = true): Promise<Re
   if (close) expect(await investigations.close(owner.ownerRef, id)).toMatchObject({ outcome: "CLOSED" });
   return { id, root, digs: joined };
 }
-const written = async (id: string, version: number, root: string): Promise<InvestigationReportRecord> => {
+/** Task 57p (0169): made-up settings versions a written and a FAILED report note (each the version of the run its calls were charged to). */
+const WROTE_UNDER = 22;
+const FAILED_UNDER = 25;
+const written = async (id: string, version: number, root: string): Promise<InvestigationReportRecord & PieceSettingsVersion> => {
   const reportId = randomUUID();
   return { investigationId: id, reportVersion: version, reportId, outcome: "READY", storyOutcome: "READY_WITH_RESERVATION",
     failureCode: null, coveredRewrite: { rewriteId: randomUUID(), recordedAt: new Date().toISOString() },
     dossierFingerprint: "a".repeat(64), ladderStep: 2, leftOut: 3, answerRounds: 1, storyRounds: 2,
     writerLineage: LINEAGE, checkerLineage: { ...LINEAGE, maker: "maker-b" }, artifactRefs: [randomUUID()], spentMicros: 120_000,
-    content: await sealed(root, reportId) };
+    content: await sealed(root, reportId), settingsVersion: WROTE_UNDER };
 };
-const failed = (id: string, version: number): InvestigationReportRecord => ({ investigationId: id, reportVersion: version,
+const failed = (id: string, version: number): InvestigationReportRecord & PieceSettingsVersion => ({ investigationId: id, reportVersion: version,
   reportId: randomUUID(), outcome: "FAILED", storyOutcome: null, failureCode: "REPORT_WRITER_FAILED", coveredRewrite: null,
   dossierFingerprint: "b".repeat(64), ladderStep: 5, leftOut: 0, answerRounds: 0, storyRounds: 0, writerLineage: null,
-  checkerLineage: null, artifactRefs: [], spentMicros: 0, content: null });
+  checkerLineage: null, artifactRefs: [], spentMicros: 0, content: null, settingsVersion: FAILED_UNDER });
 const reportRows = async (id: string): Promise<number> =>
   Number((await database.pool.query("SELECT count(*) AS n FROM identity.investigation_report WHERE investigation_id=$1", [id])).rows[0].n);
 
@@ -252,6 +256,28 @@ describe("0136 the runner's side", () => {
       spent_micros: 120_000, content: ENVELOPE });
     expect(read!.reports[1]!.content).toBeNull();
     expect(await reports.readOfRun(randomUUID())).toBeNull();
+    // Task 57p (0169): each report notes the settings version that wrote it, the FAILED one too; no reader names it.
+    expect((await database.pool.query("SELECT report_version, settings_version FROM identity.investigation_report WHERE investigation_id=$1 ORDER BY report_version",
+      [id])).rows.map((row) => [row.report_version, Number(row.settings_version)])).toEqual([[1, WROTE_UNDER], [3, FAILED_UNDER]]);
+    expect(JSON.stringify(read)).not.toContain("settings_version");
+  });
+
+  it("U5 (Task 57p, 0169) the earlier writer still stores NULL (the release before writes through it); a version must be positive", async () => {
+    const person = await account();
+    const { id, root } = await investigation(person);
+    const record = await written(id, 1, root);
+    // A version that is not positive breaks the column's CHECK, nothing written.
+    expect(await sqlError(() => new PostgresInvestigationReportRunnerRepository(runner).record({ ...record, settingsVersion: 0 })))
+      .toMatchObject({ code: "23514" });
+    expect(await reportRows(id)).toBe(0);
+    // The earlier writer, as the release before calls it on the runner's role: written, the version unknown.
+    expect((await runner.query(`SELECT identity.record_investigation_report_version($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,
+        $16::jsonb,$17,$18::jsonb,$19) AS outcome`, [id, 1, record.reportId, record.outcome, record.storyOutcome, record.failureCode, record.coveredRewrite!.rewriteId,
+      record.coveredRewrite!.recordedAt, record.dossierFingerprint, record.ladderStep, record.leftOut, record.answerRounds, record.storyRounds,
+      JSON.stringify(record.writerLineage), JSON.stringify(record.checkerLineage), JSON.stringify(record.artifactRefs), record.spentMicros,
+      JSON.stringify(record.content!.envelope), record.content!.attestation])).rows[0].outcome).toBe("RECORDED");
+    expect((await database.pool.query("SELECT settings_version FROM identity.investigation_report WHERE investigation_id=$1", [id])).rows)
+      .toEqual([{ settings_version: null }]);
   });
 
   it("U4 the content is bound to the root's run and the report id; the table's shape rules and the refusals hold", async () => {

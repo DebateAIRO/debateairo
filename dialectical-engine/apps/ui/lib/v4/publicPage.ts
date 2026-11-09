@@ -5,7 +5,7 @@ import {
 import { contractClient } from "../api.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import { digQuestion } from "./askText.js";
-import { limitLine } from "./money.js";
+import { limitLine, limitLineWhileReportWaits, reportWaitLine, type MoneyLine } from "./money.js";
 import { ownViewPick, publicParentOf, suggestionPick } from "./suggestions.js";
 import { TRUST_WORDS, type DigMode, type DigTarget, type TrustCounts, type V4Path } from "./types.js";
 import type { AskRoom } from "../billing/room.js";
@@ -26,6 +26,13 @@ export type PublicPathView = {
   canDig: boolean;
   line: string;
   fate: StoryFate;
+  /** V4 start step (Task 63): a path debate's path name, the title chosen before Start; null on every other path (an R22 debate's, a dig's). */
+  title: string | null;
+  /**
+   * Task 63: the person's own words on this path, each once, never shown as AI text: a path they added or rewrote is theirs whole (its title,
+   * then its question), and every view they wrote into a path is theirs (the API's rule, apps/api/src/start-paths-at-ask.ts storedPathOf).
+   */
+  ownWords: readonly string[];
   /** The newest contribution's own text about the path; null while none changed it. */
   summary: string | null;
   points: readonly string[];
@@ -38,13 +45,24 @@ export type PublicPathView = {
 export type PublicDigView = { ref: string | null; paths: PublicPathView[] };
 
 function digPathView(path: NonNullable<PublicContribution["dig_paths"]>[number], digRef: string | null): PublicPathView {
-  return { ref: path.position_ref, digRef, canDig: digRef !== null, line: path.line, fate: path.fate, summary: null, points: path.points, additions: [], digs: [] };
+  return { ref: path.position_ref, digRef, canDig: digRef !== null, line: path.line, fate: path.fate, title: null, ownWords: [], summary: null, points: path.points,
+    additions: [], digs: [] };
+}
+
+/** Task 63: a chosen path's title and the person's own words in it; none for a story path that is no chosen path. */
+function branchWordsOf(debate: PublicDebate, ref: string): Pick<PublicPathView, "title" | "ownWords"> {
+  const branch = debate.branches?.paths.find((path) => path.path_id === ref);
+  if (branch === undefined) return { title: null, ownWords: [] };
+  const theirs = branch.author === "PERSON_EDITED" || branch.author === "PERSON_OWN_VIEW" ? [branch.title, branch.question] : [];
+  const views = branch.viewpoints.filter((viewpoint) => viewpoint.own).map((viewpoint) => viewpoint.question);
+  return { title: branch.title, ownWords: [...new Set([...theirs, ...views])] };
 }
 
 /** The debate's paths at their newest text, each with who added to it, and the digs under it with their own paths. Empty for a snapshot with no story. */
 export function publicPathViews(debate: PublicDebate): readonly PublicPathView[] {
   const paths: PublicPathView[] = (debate.story_short?.paths ?? []).map((path) => ({
-    ref: path.position_ref, digRef: null, canDig: true, line: path.line, fate: path.fate, summary: null, points: [], additions: [], digs: []
+    ref: path.position_ref, digRef: null, canDig: true, line: path.line, fate: path.fate, ...branchWordsOf(debate, path.position_ref), summary: null, points: [],
+    additions: [], digs: []
   }));
   const digs: PublicDigView[] = [];
   const pathOf = (ref: string): PublicPathView | null => paths.find((path) => path.ref === ref)
@@ -120,6 +138,27 @@ export function usedUpWords(catalog: MessageCatalog, room: AskRoom | null, local
   return line === null ? t(catalog, "v4.public.refusal.waitsForReset") : t(catalog, line.key, line.values);
 }
 
+/**
+ * V4 start step, Task 56c (item public-f25; owner answer Q20 B): "Write a report" says when it can start, only once the debate already
+ * shows a report version (then any further report waits for the reset, the owner's too) and new starts wait. With no report shown it
+ * says nothing before a press: the press may be the owner's first report, which goes ahead, and the page does not know who owns it (a
+ * refused press then names the time, usedUpWords). Null otherwise.
+ */
+export function publicReportWaitLine(room: AskRoom | null, debate: PublicDebate, locale: string): MoneyLine | null {
+  return (debate.reports ?? []).length === 0 ? null : reportWaitLine({ room, isPublic: true, firstReportLeft: false, locale });
+}
+
+/**
+ * Review of Task 56c: a report press refused until the reset names the time as today's line does (usedUpWords), but the month's line goes
+ * without "You can still write your report.", which this very refusal makes untrue (lib/v4/money.ts limitLineWhileReportWaits, as on the map).
+ */
+function reportRefusedWords(catalog: MessageCatalog, room: AskRoom | null, locale: string): string {
+  const line = limitLine(room, locale);
+  if (line === null) return t(catalog, "v4.public.refusal.waitsForReset");
+  const shown = limitLineWhileReportWaits(line, true);
+  return t(catalog, shown.key, shown.values);
+}
+
 export type PublicReportPress = Readonly<{ kind: "WRITING"; version: number }> | Readonly<{ kind: "REFUSED"; message: string }>;
 
 /** "Write a report": what the API said, in the page's words. */
@@ -134,7 +173,7 @@ export async function pressPublicReport(publicRef: string, input: Readonly<{ cat
       case "PUBLIC_DEBATE_ONGOING": return refused("v4.public.report.ongoing");
       case "PUBLIC_DEBATE_NO_CARRIER": return refused("v4.public.report.noCarrier");
       case "PUBLIC_DEBATE_REPORT_WRITING": return refused("v4.public.refusal.reportWriting");
-      case "PUBLIC_DEBATE_WAITS_FOR_RESET": return { kind: "REFUSED", message: usedUpWords(catalog, room, locale) };
+      case "PUBLIC_DEBATE_WAITS_FOR_RESET": return { kind: "REFUSED", message: reportRefusedWords(catalog, room, locale) };
       default: return refused("v4.public.report.failed");
     }
   } catch {

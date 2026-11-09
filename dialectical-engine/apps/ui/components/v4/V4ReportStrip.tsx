@@ -1,11 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { contractClient } from "@/lib/api";
+import { readAskRoom, type AskRoom } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { v4RoomQuery } from "@/lib/v4/askConfig";
 import { waitForDigs } from "@/lib/v4/digUndo";
+import { replayHighlight } from "@/lib/v4/highlight";
 import { writeReport } from "@/lib/v4/load";
 import { loadRunPublished, REPORT_SLOW_MS, reportWaitLineOf, type ReportStage } from "@/lib/v4/reportWriting";
-import { quotaChanged } from "@/lib/v4/quotaPulse";
+import { quotaChanged, useQuotaRefresh } from "@/lib/v4/quotaPulse";
 import type { WaitState } from "@/lib/v4/stateWords";
 import { useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 import type { ReportWatch } from "@/lib/v4/useReportVersions";
@@ -31,12 +35,21 @@ import { V4WaitCard } from "./V4WaitCard";
  * reason "Digging opens again when your report is written."; after 15 minutes the report page's "This is taking longer
  * than usual. We keep checking." with Check again (report-f8). A version that could not be written says so; the top
  * button then reads "Write it again". The ready moment is the map's (useV4Ready). Nothing here is kept in the browser.
+ *
+ * V4 start step, Task 56c (item public-f25; owner answer Q20 B: only a debate's very first report uses the kept reserve): a further
+ * report on a public debate waits for the reset like digs. While the page is sure of it (lib/v4/money.ts reportWaitLine), Write it
+ * waits as the dig button does (journey-f14): greyed but focusable, with "This report can start after 08:00." above it; a press shows
+ * that line again and sends nothing. A press refused anyway (WAITS_FOR_RESET: the room changed since it was read) shows the same line,
+ * never "We couldn't confirm your report started." and never Try again, and reads the room and the versions again.
  */
 
 /** Where the strip shows: by the button that opened it (the top bar, or the phone's pinned bar). */
 export type ReportStripPlace = "top" | "bottom";
-/** report-f6: a press whose answer was lost: being checked, or checked and nothing started (Try again). */
-export type ReportPressNote = "CHECKING" | "TRY_AGAIN";
+/**
+ * report-f6: a press whose answer was lost: being checked, or checked and nothing started (Try again). Task 56c: WAITS, the press was
+ * refused until the reset (nothing started; the strip says when it can start).
+ */
+export type ReportPressNote = "CHECKING" | "TRY_AGAIN" | "WAITS";
 
 export type V4ReportStripProps = Readonly<{
   id: string;
@@ -51,6 +64,11 @@ export type V4ReportStripProps = Readonly<{
   rootRunId: string;
   busy: boolean;
   note: ReportPressNote | null;
+  /**
+   * Task 56c: the report waits for the reset: the words that say when it can start (shown, and Write it waits). Null or absent: none,
+   * except after a press refused until the reset (note WAITS), which says the site's plain reset line until the room is read again.
+   */
+  waitLine?: string | null;
   onWrite: () => void;
   onNotYet: () => void;
   catalog: MessageCatalog;
@@ -59,6 +77,9 @@ export type V4ReportStripProps = Readonly<{
 export function V4ReportStrip(props: V4ReportStripProps) {
   const { catalog, id } = props;
   const writeRef = useRef<HTMLButtonElement | null>(null);
+  // Task 56c: the line that says when the report can start, while it waits (a refused press too).
+  const waits = props.waitLine ?? (props.note === "WAITS" ? t(catalog, "v4.public.refusal.waitsForReset") : null);
+  const waitsId = `${id}-waits`;
   // Focus goes to Write it as the strip opens; the lines above it describe the group, so a screen reader reads them first.
   useEffect(() => {
     writeRef.current?.focus();
@@ -73,7 +94,7 @@ export function V4ReportStrip(props: V4ReportStripProps) {
     props.onNotYet();
   };
   const described = [`${id}-covers`, props.sharePercent === null ? null : `${id}-share`, `${id}-rest`,
-    props.publicLine ? `${id}-public` : null].filter((part): part is string => part !== null).join(" ");
+    props.publicLine ? `${id}-public` : null, waits === null ? null : waitsId].filter((part): part is string => part !== null).join(" ");
   return (
     <div
       id={id}
@@ -94,7 +115,10 @@ export function V4ReportStrip(props: V4ReportStripProps) {
       )}
       <p id={`${id}-rest`} className="v4RepStripLine v4Muted">{t(catalog, "v4.reportStrip.digsWait")}</p>
       <V4ReportDigWait runId={props.rootRunId} catalog={catalog} />
-      {props.note === null ? null : (
+      {/* Task 56c: while the report waits for the reset, when it can start, in place of "We couldn't confirm" (never with it). */}
+      {waits !== null ? (
+        <p id={waitsId} className="v4RepStripLine v4RepStripNote" role={props.note === "WAITS" ? "alert" : undefined} data-report-waits="">{waits}</p>
+      ) : props.note === null ? null : (
         <p className="v4RepStripLine v4RepStripNote" role="alert">{t(catalog, "v4.investigation.startUnconfirmed")}</p>
       )}
       {/* report-f15 / ACCESS-1: right above Write it, so it is in view where focus lands (the phone's stack is short). */}
@@ -104,13 +128,21 @@ export function V4ReportStrip(props: V4ReportStripProps) {
       <div className="v4RepStripActions">
         {/* ACCESS-6: both stay focusable while the press is on its way (up to a dig's 10 seconds), so Esc still reaches the
             strip and focus is never lost; a press meanwhile does nothing. */}
+        {/* Task 56c: while the report waits, Write it stays here, greyed (journey-f14); a press shows the line again and sends nothing. */}
         <button
           ref={writeRef}
           type="button"
-          className="v4Btn v4BtnPrimary v4RepStripWrite"
-          aria-disabled={props.busy ? "true" : undefined}
+          className={`v4Btn v4BtnPrimary v4RepStripWrite${waits === null ? "" : " v4DigWaiting"}`}
+          aria-disabled={props.busy || waits !== null ? "true" : undefined}
           aria-busy={props.busy}
-          onClick={() => { if (!props.busy) props.onWrite(); }}
+          aria-describedby={waits === null ? undefined : waitsId}
+          onClick={() => {
+            if (waits !== null) {
+              replayHighlight(document.getElementById(waitsId));
+              return;
+            }
+            if (!props.busy) props.onWrite();
+          }}
         >
           {t(catalog, props.note === "TRY_AGAIN" ? "v4.common.retry" : "v4.reportStrip.write")}
         </button>
@@ -147,6 +179,8 @@ export function useReportStart(input: Readonly<{
   canAsk: boolean;
   /** The person asked at the start step to let the AIs carry on to the report: no strip (report-d1). Absent: false. */
   carryOn?: boolean;
+  /** Task 56c: the report waits for the reset (its line shows): a press opens nothing and sends nothing. Absent: false. */
+  waits?: boolean;
   /** Not yet (or Esc): focus goes back to the button that opened the strip, once it is drawn again. */
   focusOpener: (at: ReportStripPlace) => void;
 }>): ReportStart {
@@ -179,7 +213,7 @@ export function useReportStart(input: Readonly<{
   }, [at, input.canAsk]);
 
   const send = useCallback((place: ReportStripPlace): void => {
-    if (flight.current) return;
+    if (flight.current || live.current.waits === true) return;
     flight.current = true;
     setBusy(true);
     setNote(null);
@@ -192,6 +226,18 @@ export function useReportStart(input: Readonly<{
       watch.notePress();
       const result = await writeReport(root);
       if (!alive.current) return;
+      if (result.kind === "WAITS_FOR_RESET") {
+        // Task 56c (public-f25): refused before anything started, since the room changed after the page read it. The strip says when
+        // the report can start, never "We couldn't confirm" and never Try again; the room and the versions are read again, so the
+        // line names the reset and the button waits from now on.
+        setNote("WAITS");
+        setAt(place);
+        flight.current = false;
+        setBusy(false);
+        quotaChanged();
+        void live.current.watch.reread();
+        return;
+      }
       let asked = true;
       if (result.kind === "FAILED") {
         // report-f6: the reply may have been lost after the server started, so the page never says nothing was used.
@@ -219,7 +265,7 @@ export function useReportStart(input: Readonly<{
   }, []);
 
   const open = useCallback((place: ReportStripPlace): void => {
-    if (flight.current) return;
+    if (flight.current || live.current.waits === true) return;
     if (live.current.carryOn === true) {
       send(place);
       return;
@@ -272,6 +318,34 @@ export function useQuestionPublic(runId: string | null, free: boolean): boolean 
     };
   }, [runId, free]);
   return free && runId !== null && published?.runId === runId && published.value;
+}
+
+/**
+ * V4 start step, Task 56c (public-f25): the person's room read for the report page, which has no ask of its own: whether new starts
+ * wait for a reset, and until when (the windows are the person's, whatever question the read names; a new question's quick look is
+ * named). Read only while `wanted` (a public debate whose next report is not its first, or after a press refused until the reset), and
+ * again after each quota moment and when the tab comes back. Null while not wanted, before it answers, and when it cannot be read.
+ */
+export function useReportRoom(wanted: boolean, free: boolean): AskRoom | null {
+  const [room, setRoom] = useState<Readonly<{ free: boolean; room: AskRoom | null }> | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const read = useCallback((): void => {
+    void readAskRoom(contractClient, v4RoomQuery("quick", "plain", { planTier: free ? "free" : "premium", shapeSettings: false, lengthSettings: false }))
+      .then((next) => {
+        if (alive.current) setRoom({ free, room: next });
+      });
+  }, [free]);
+  useEffect(() => {
+    if (wanted) read();
+  }, [wanted, read]);
+  useQuotaRefresh(read, wanted);
+  return wanted && room?.free === free ? room.room : null;
 }
 
 /** The shared waiting card's state for the report (report-d2), or null when nothing waits. */

@@ -64,6 +64,14 @@ import {
   mapSnowballReplySchema,
   type MapReplySalvage
 } from "@debateai/map";
+// V4 start step (Task 23): the step before Start's reply forms, for the START family's re-check.
+import {
+  START_CALL_SITE_PREFIX, START_CALL_SITES, startCombineReplySchema, startFitReplySchema, startListReplySchema, startMergeLateReplySchema,
+  startMergeReplySchema
+} from "@debateai/map";
+// V4 start step (Task 52): the path steps after Start: the gap round's form (a map step) and each path's answer so far (a family of its own).
+import { pathGapReplySchema } from "@debateai/map";
+import { PATH_OUTCOME_CALL_SITE_PREFIX, PathOutcomeCheckerReplySchema, PathOutcomeReplySchema } from "@debateai/story";
 import {
   PREVIEW_PROVIDER_REF_MODELS,
   decodedRepairsOf,
@@ -199,7 +207,11 @@ export type PracticeCallFamily = "MAP" | "JUDGE" | "PANEL" | "REVIEW" | "INVESTI
   | "STORYTELLER" | "STORY_CHECKER" | PracticeLaterFamily | "STRUCTURE_REPAIR" | "UNMAPPED";
 /** The calls beyond the arguing and the story: the web step, the story's charts, a dig's and a report's, the public debate's check. */
 export type PracticeLaterFamily = "WEB" | "WEB_RESEARCHED" | "STORY_CHARTS" | "SUGGESTIONS" | "PATH_REWRITE" | "PATH_CLIMB" | "REPORT" | "ANSWER_UPDATE"
-  | "PUBLIC_REPORT" | "CONTRIBUTION_CHECK";
+  | "PUBLIC_REPORT" | "CONTRIBUTION_CHECK"
+  // V4 start step (Task 23): the step before Start (START:*), run by the API, not by a debate.
+  | "START"
+  // V4 start step (Task 52): each path's answer so far (PATH_OUTCOME:<WRITER|CHECKER>:<path>:<round>), its writer and its checker.
+  | "PATH_OUTCOME";
 
 /** R2 (INTERFACE §15.4): the engine-2 verdict calls' key prefixes (A2's `pointInvestigationCallSiteKey`, `comparingJudgeCallSiteKey`). */
 const PRACTICE_VERDICT_KEY_PREFIXES = Object.freeze({ investigate: "VERDICT:investigate:", judge: "VERDICT:judge:" } as const);
@@ -212,6 +224,10 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   if (callSiteKey.startsWith(PRACTICE_VERDICT_KEY_PREFIXES.investigate)) return "INVESTIGATOR";
   if (callSiteKey.startsWith(PRACTICE_VERDICT_KEY_PREFIXES.judge)) return "VERDICT_JUDGE";
   if (callSiteKey.startsWith("MAP:")) return "MAP";
+  // V4 start step (Task 23).
+  if (callSiteKey.startsWith(START_CALL_SITE_PREFIX)) return "START";
+  // V4 start step (Task 52).
+  if (callSiteKey.startsWith(PATH_OUTCOME_CALL_SITE_PREFIX)) return "PATH_OUTCOME";
   if (callSiteKey.startsWith("STORY:STORYTELLER:")) return "STORYTELLER";
   if (callSiteKey.startsWith("STORY:CHECKER:")) return "STORY_CHECKER";
   if (callSiteKey.startsWith("STORY:CHARTS:")) return "STORY_CHARTS";
@@ -233,8 +249,14 @@ export function callFamilyOf(callSiteKey: string): PracticeCallFamily {
   return "UNMAPPED";
 }
 
-/** The map's steps as their call-site keys name them (spec 2026-10-12 §3.4). */
-export const PRACTICE_MAP_STEPS = Object.freeze(["angles", "list", "merge", "gap", "choose", "check"] as const);
+/**
+ * The map's steps as their call-site keys name them (spec 2026-10-12 §3.4). An ordered list (the shape block prints the steps in this
+ * order), so a new step goes where it runs, not at the end.
+ */
+export const PRACTICE_MAP_STEPS = Object.freeze(["angles", "list", "merge", "gap",
+  // V4 start step (Task 52): the gap round after Start (MAP:gap-paths:<round>, packages/map path-gap.ts), right after the debate's gap.
+  "gap-paths",
+  "choose", "check"] as const);
 export type PracticeMapStep = typeof PRACTICE_MAP_STEPS[number];
 
 /**
@@ -250,7 +272,11 @@ export function practiceMapStepOf(callSiteKey: string): PracticeMapStep | null {
 /** LG-A (INTERFACE §1.3): a call's step, in the thinking table's words; finer than the family (positions, pros/cons and cross-replies apart). */
 export type PracticeStep = LengthCallStep | Lowercase<PracticeLaterFamily> | "UNMAPPED";
 const PRACTICE_LATER_FAMILIES: ReadonlySet<PracticeCallFamily> = new Set<PracticeLaterFamily>(["WEB", "WEB_RESEARCHED", "STORY_CHARTS", "SUGGESTIONS",
-  "PATH_REWRITE", "PATH_CLIMB", "REPORT", "ANSWER_UPDATE", "PUBLIC_REPORT", "CONTRIBUTION_CHECK"]);
+  "PATH_REWRITE", "PATH_CLIMB", "REPORT", "ANSWER_UPDATE", "PUBLIC_REPORT", "CONTRIBUTION_CHECK",
+  // V4 start step (Task 23).
+  "START",
+  // V4 start step (Task 52).
+  "PATH_OUTCOME"]);
 export function practiceStepOf(callSiteKey: string): PracticeStep {
   const step = lengthCallStepOf(callSiteKey);
   if (step !== null) return step;
@@ -260,6 +286,12 @@ export function practiceStepOf(callSiteKey: string): PracticeStep {
 
 /** One way a map step's reply is read: its schema and the code salvage its step makes (ruling MAP-SALVAGE). */
 type PracticeMapReading = Readonly<{ schema: Parameters<typeof mapClassifyReply>[2]; salvage: (keyPointIds: ReadonlySet<string> | null) => MapReplySalvage<unknown> }>;
+/**
+ * V4 start step (Task 52): the gap round after Start, one form whatever the run's engine (map.gap-paths.v1). Its salvage needs the call's
+ * paths and the points raised so far (a point for a path it was not given becomes the question's, a repeat is left out), so it is not
+ * re-run here, as the start step's are not: the schema re-check is the diagnosis, the call-time check is the verdict.
+ */
+const GAP_PATHS_READINGS: readonly PracticeMapReading[] = Object.freeze([{ schema: pathGapReplySchema, salvage: () => ({}) }]);
 
 /**
  * The readings a map step's reply may have. The list key carries both the list and (in a snowball opening) the
@@ -273,6 +305,8 @@ const MAP_RECHECK_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMa
   list: [{ schema: mapListReplySchema, salvage: () => mapListSalvage }, { schema: mapSnowballReplySchema, salvage: () => mapListSalvage }],
   merge: [{ schema: mapMergeReplySchema, salvage: () => mapMergeSalvage }],
   gap: [{ schema: mapGapReplySchema, salvage: () => mapGapSalvage }],
+  // V4 start step (Task 52).
+  "gap-paths": GAP_PATHS_READINGS,
   choose: [{ schema: mapChooseReplySchema, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }],
   // Engine redesign R3: engine 1 has no check step, so a MAP:check reply read here is UNMAPPED (pre-flight PF-R35.15).
   check: []
@@ -285,6 +319,8 @@ const MAP_RECHECK_READINGS_LENGTHED: Readonly<Record<PracticeMapStep, readonly P
     { schema: MAP_LENGTHED_REPLY_SCHEMAS.snowball, salvage: () => mapListSalvageLengthed }],
   merge: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.merge, salvage: () => mapMergeSalvage }],
   gap: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.gap, salvage: () => mapGapSalvageLengthed }],
+  // V4 start step (Task 52).
+  "gap-paths": GAP_PATHS_READINGS,
   choose: [{ schema: MAP_LENGTHED_REPLY_SCHEMAS.choose, salvage: (keyPointIds) => mapChooseSalvage(keyPointIds) as MapReplySalvage<unknown> }],
   // Engine redesign R3: engine 1 has no check step, so a MAP:check reply read here is UNMAPPED (pre-flight PF-R35.15).
   check: []
@@ -297,6 +333,8 @@ const ENGINE_MAP_READINGS: Readonly<Record<PracticeMapStep, readonly PracticeMap
   list: [{ schema: ENGINE_READING.list, salvage: () => mapListSalvageLengthed }, { schema: ENGINE_READING.snowball, salvage: () => mapListSalvageLengthed }],
   merge: [{ schema: ENGINE_READING.merge, salvage: () => mapMergeSalvage }],
   gap: [{ schema: ENGINE_READING.gap, salvage: () => mapGapSalvageLengthed }],
+  // V4 start step (Task 52).
+  "gap-paths": GAP_PATHS_READINGS,
   choose: [{ schema: ENGINE_READING.choose, salvage: (keyPointIds) => mapChooseSalvageV2(keyPointIds) as MapReplySalvage<unknown> }],
   check: [{ schema: ENGINE_READING.check, salvage: () => mapCheckSalvage }]
 });
@@ -327,6 +365,21 @@ function readMapReply(callSiteKey: string, content: string, ending: ModelReplyFa
 function recheckMapReply(callSiteKey: string, content: string, lengthed: boolean, engine = false): readonly string[] {
   const read = readMapReply(callSiteKey, content, undefined, null, lengthed, engine);
   return read === null ? Object.freeze(["UNMAPPED"]) : fromClassification(read.classification);
+}
+
+/**
+ * V4 start step (Task 23): a call of the step before Start, re-checked by its own reply form. The angle planner asks the map's engine-2
+ * planner (map.angles.v2), so it is read by engine 2's angles reading; the others by their schema with exact limits, as the step reads
+ * them. Their salvages and content checks need the call's ids (its angles, its suggestions, its keys) and are not re-run here: the schema
+ * re-check is the diagnosis, the call-time check is the verdict. Null for a START key that is no call of the step.
+ */
+function readStartReply(callSiteKey: string, content: string): ReturnType<typeof mapClassifyReply<unknown>> | null {
+  const none = () => [];
+  if (callSiteKey === START_CALL_SITES.angles) return mapClassifyReply(content, undefined, ENGINE_READING.angles, none, mapAnglesSalvageEngine);
+  const schema = /^START:list:[1-9]$/u.test(callSiteKey) ? startListReplySchema : callSiteKey === START_CALL_SITES.merge ? startMergeReplySchema
+    : callSiteKey === START_CALL_SITES.mergeLate ? startMergeLateReplySchema : callSiteKey === START_CALL_SITES.combine ? startCombineReplySchema
+      : callSiteKey === START_CALL_SITES.fit ? startFitReplySchema : null;
+  return schema === null ? null : mapClassifyReply<unknown>(content, undefined, schema, none, {}, { exactLimits: true });
 }
 
 /**
@@ -549,6 +602,9 @@ function practiceLaterReplySchema(key: string): z.ZodType | null {
   if (site.startsWith("PATH_REWRITE:SUGGEST:")) return webSuggestDigReplySchema;
   const rewrite = /^(?:PATH_REWRITE|PATH_CLIMB):(WRITER|CHECKER):/u.exec(site);
   if (rewrite !== null) return rewrite[1] === "WRITER" ? PathRewriteReplySchema : PathRewriteCheckerReplySchema;
+  // V4 start step (Task 52): each path's answer so far, its writer's form and its checker's (the refs and the person's words are the call's).
+  const outcome = /^PATH_OUTCOME:(WRITER|CHECKER):/u.exec(site);
+  if (outcome !== null) return outcome[1] === "WRITER" ? PathOutcomeReplySchema : PathOutcomeCheckerReplySchema;
   const report = /^(?:INVESTIGATION_REPORT|ANSWER_UPDATE|PUBLIC_REPORT):(ANSWER|ANSWER_ASKED|ANSWER_CHECK|STORY|STORY_CHECK):/u.exec(site);
   if (report !== null) {
     return report[1] === "ANSWER_CHECK" ? ReportAnswerCheckReplySchema : report[1] === "STORY" ? ReportStoryReplySchema
@@ -604,6 +660,11 @@ export function recheckReply(callSiteKey: string, content: string, reviewEdgeCou
       return { family, issues: fromZod(read) };
     }
     case "MAP": return { family, issues: recheckMapReply(key, content, mapLengthed, mapEngine) };
+    // V4 start step (Task 23).
+    case "START": {
+      const read = readStartReply(key, content);
+      return { family, issues: read === null ? Object.freeze(["UNMAPPED"]) : fromClassification(read.classification) };
+    }
     // R2 (B11; A17 review Minor 4): the investigator and the comparing judges, through their step's own schema and
     // reading. The investigator's one content rule needs nothing but the reply; the judges' letter and group checks need
     // the letters that judge was shown, and the language check the question: not re-run here (the stored detail names them).

@@ -11,12 +11,15 @@ import {
   lengthGuideForBounds,
   questionLanguageForBounds,
   questionLanguageSentence,
+  READER_FIELD,
+  readerField,
   replyLanguageCheckFor,
   withQuestionLanguageField,
   type DebateRole,
   type LengthGuide,
   type PointInvestigationMaterial,
   type QuestionLanguage,
+  type ReadingLevel,
   type ReviewOutcome,
   type WayOfKnowing
 } from "@debateai/kernel";
@@ -63,6 +66,13 @@ import {
   reviewSourcesPromptContract,
   PANEL_SOURCES_PROMPT_CONTRACT
 } from "./web-prompts.js";
+import {
+  JUDGE_PATH_ROOT_MATERIAL_FIELDS,
+  JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS,
+  judgePathRootContractForReader,
+  judgePathRootPromptContract,
+  judgePathRootSourcesPromptContract
+} from "./path-root-prompts.js";
 import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
@@ -98,6 +108,8 @@ import {
 export * from "./s04.js";
 export * from "./prompts.js";
 export * from "./web-prompts.js";
+// V4 start step, Task 46: the path root writer's drafts.
+export * from "./path-root-prompts.js";
 export * from "./ask-clarify-prompt.js";
 export * from "./public-contribution-prompt.js";
 export * from "./public-report-check-prompt.js";
@@ -316,6 +328,22 @@ export type JudgeLeg =
       readonly otherMakersPosition: string;
       /** W4-1: the own path's pack, then the rival's (lengthed legs only); absent = today's leg, byte for byte. */
       readonly sources?: string | undefined;
+    }
+  /**
+   * V4 start step, Task 46 (spec 2026-11-03 §4.3): a path debate's root — what the path's angle shows about the question
+   * and where it comes out (`judge.path-root.*`, drafts, always lengthed). Its title, question, viewpoint lines and the
+   * gap round's points raised for it are material, fenced like every other statement. `sources`: the path's pack (the
+   * sources variant). `readingLevel`: the person's level (the story's rule: with a level, the reader sentence and the
+   * `reader` field; null, neither).
+   */
+  | {
+      readonly kind: "path-root";
+      readonly pathTitle: string;
+      readonly pathQuestion: string;
+      readonly viewpoints: string;
+      readonly pointsRaised: string;
+      readonly sources?: string | undefined;
+      readonly readingLevel: ReadingLevel | null;
     };
 
 /**
@@ -526,6 +554,18 @@ export function judgeLegFrameSpec(
   claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   lengthed = false
 ): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
+  // V4 start step, Task 46: a path's root is always lengthed; with its pack, the sources variant. The person's reading
+  // level adds the reader sentence and the `reader` field (the story's rule); without one the table has no `reader`.
+  if (leg.kind === "path-root") {
+    if (!lengthed) throw new TypedDomainError("JUDGE_PATH_ROOT_UNLENGTHED", "A path's root is always told its length");
+    const sourced = leg.sources !== undefined;
+    const table: readonly string[] = sourced ? JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS : JUDGE_PATH_ROOT_MATERIAL_FIELDS;
+    return Object.freeze({
+      contract: judgePathRootContractForReader(sourced ? judgePathRootSourcesPromptContract(claim) : judgePathRootPromptContract(claim),
+        leg.readingLevel),
+      materialFields: leg.readingLevel === null ? Object.freeze(table.filter((name) => name !== READER_FIELD)) : table
+    });
+  }
   // W4-1: a leg that reads a sources pack takes its sources variant (web-prompts.ts), which is lengthed only, as engine 2's
   // legs are; an assigned root only with engine 2's fixed words. Anything else is a wiring defect, never sent.
   if ((leg.kind === "assigned-root" || leg.kind === "support" || leg.kind === "attack" || leg.kind === "cross-root")
@@ -596,13 +636,24 @@ function judgeLegMaterial(
             { name: "position_under_debate", content: leg.positionUnderDebate },
             ...(leg.consideration === undefined ? [] : [{ name: "consideration", content: leg.consideration }])
           ]
-        : [{ name: "question_line", content: questionLine }];
+        : leg.kind === "path-root"
+          ? [
+              { name: "question_line", content: questionLine },
+              { name: "path_title", content: leg.pathTitle },
+              { name: "path_question", content: leg.pathQuestion },
+              { name: "viewpoints", content: leg.viewpoints },
+              { name: "points_raised", content: leg.pointsRaised }
+            ]
+          : [{ name: "question_line", content: questionLine }];
   // W4-1: a leg's sources pack rides right before `length` (its variant's table says so); none, today's fields.
   const sources = "sources" in leg && leg.sources !== undefined ? [{ name: "sources", content: leg.sources }] : [];
+  // V4 start step, Task 46: a path's root with the person's reading level is told its reader right after `length`
+  // (withReaderField's rule: no level, no field).
+  const reader = leg.kind === "path-root" && leg.readingLevel !== null ? [readerField(leg.readingLevel)] : [];
   // Length guidance (spec 2026-10-15 §3.2): the variant's table ends with `length`, the call's target.
   const all = length === null
-    ? [...fields, ...sources]
-    : [...fields, ...sources, lengthGuidanceField(length.words, length.languageCode, length.charactersPerWord)];
+    ? [...fields, ...sources, ...reader]
+    : [...fields, ...sources, lengthGuidanceField(length.words, length.languageCode, length.charactersPerWord), ...reader];
   if (all.length !== declared.length || all.some((field, index) => field.name !== declared[index])) {
     throw new TypedDomainError(
       "JUDGE_LEG_MATERIAL_UNDECLARED",
@@ -845,6 +896,7 @@ export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
     case "primary-root":
     case "independent-root":
     case "assigned-root":
+    case "path-root":
       return "POSITION";
     case "support":
     case "attack":
@@ -862,6 +914,7 @@ export function judgeLegLengthStep(leg: JudgeLeg): "opening" | "pros_cons" | "cr
     case "primary-root":
     case "independent-root":
     case "assigned-root":
+    case "path-root":
       return "opening";
     case "support":
     case "attack":

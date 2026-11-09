@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Outra resposta…",
   "newDebate.askText.otherLabel": "Sua própria explicação adicional",
   "newDebate.askText.matters": "Se as respostas apontarem para lados diferentes, o que mais importa para mim é: {matters}",
-  "newDebate.askText.angles": "Por favor, dê uma olhada também em: {list}.",
   "newDebate.freePublicNotice": "No plano Gratuito, a sua pergunta e o respetivo debate são públicos. Não inclua dados pessoais."
 }

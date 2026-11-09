@@ -64,7 +64,8 @@ describe("a shaped root or cross-reply never lands on a maker arguing another po
 
   it("is wired on the shaped path only: shaped roots and cross-replies pass a bar, registered for a moved call", () => {
     const root = slice("const rootChain = async (", "let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;");
-    expect(root).toContain("...(shapePlan === null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,");
+    // V4 start step, Task 53: a path debate's roots pass none (a company may write roots in more than one path).
+    expect(root).toContain("...(shapePlan === null || pathsRunPaths !== null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,");
     const cross = slice("const argueShapeCross = async (", "let authored: Awaited<ReturnType<typeof authorAndPanel>>;");
     expect(cross).toContain("const crossBar = shapeMakerBar([answeredMakers[target]]);");
     expect(cross).toContain("...(crossBar === undefined ? {} : { makerBar: crossBar }),");

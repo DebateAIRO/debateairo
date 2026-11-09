@@ -7,6 +7,8 @@
  *
  * The kinds equal the story pack's shape ids (tests/unit/story-pack.test.ts holds them equal).
  */
+import { START_STEP_LIMITS } from "./start-step-limits.js";
+
 export const ENGINE_QUESTION_KINDS = Object.freeze(["general", "factual", "health", "legal", "money-decision", "personal-choice"] as const);
 export type EngineQuestionKind = typeof ENGINE_QUESTION_KINDS[number];
 
@@ -20,8 +22,15 @@ export type EngineAnswerLetter = typeof ENGINE_ANSWER_LETTERS[number];
 /** The numbers a comparing judge's seat and a point investigation's place run through (judges.count, investigate.maxPerDebate). */
 export const ENGINE_CALL_SITE_INDEX = Object.freeze({ min: 1, max: 5 });
 
-function engineCallSiteKey(prefix: string, index: number): string {
-  if (!Number.isInteger(index) || index < ENGINE_CALL_SITE_INDEX.min || index > ENGINE_CALL_SITE_INDEX.max) {
+/**
+ * V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): a paid path debate investigates max(cap, paths), so a
+ * point investigation's place runs up to one per stored path (b8) when that is above the row's cap; a comparing judge's seat
+ * keeps 1 to 5. tests/unit/r2-engine-vocabulary.test.ts pins both ranges.
+ */
+const POINT_INVESTIGATION_INDEX_MAX = Math.max(ENGINE_CALL_SITE_INDEX.max, START_STEP_LIMITS.storedPathsMax);
+
+function engineCallSiteKey(prefix: string, index: number, max: number = ENGINE_CALL_SITE_INDEX.max): string {
+  if (!Number.isInteger(index) || index < ENGINE_CALL_SITE_INDEX.min || index > max) {
     throw new RangeError(`ENGINE_CALL_SITE_INDEX_INVALID:${String(index)}`);
   }
   return `${prefix}${String(index)}`;
@@ -32,9 +41,12 @@ export function comparingJudgeCallSiteKey(seat: number): string {
   return engineCallSiteKey("VERDICT:judge:", seat);
 }
 
-/** Spec §4.9: one point investigation's call key, `VERDICT:investigate:<n>` in investigation order; role REVIEWER. */
+/**
+ * Spec §4.9: one point investigation's call key, `VERDICT:investigate:<n>` in investigation order; role REVIEWER. Task 54e: n runs
+ * to 8 (one per stored path on a paid path debate).
+ */
 export function pointInvestigationCallSiteKey(n: number): string {
-  return engineCallSiteKey("VERDICT:investigate:", n);
+  return engineCallSiteKey("VERDICT:investigate:", n, POINT_INVESTIGATION_INDEX_MAX);
 }
 
 /** INTERFACE §9.1: the map's answer check (R3); a `MAP:` key, so it is the map's step and the `opening` thinking level. */

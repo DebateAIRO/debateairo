@@ -54,7 +54,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // browser.
       "digDock.ts", "useDigQueue.tsx",
       // The wave-2 review fixes (4 Nov): the one click-time check a map dig and a public page's dig share keeps nothing either.
-      "useDigClickCheck.ts"]) {
+      "useDigClickCheck.ts",
+      // V4 start step, Task 79: a dig's path plan (its picks as paths) keeps nothing in the browser.
+      "digPathPlan.ts"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/lib/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|document\.cookie/);
     }
@@ -72,7 +74,9 @@ describe("no browser storage (Decision A, S01-R17)", () => {
       // by the site's own LanguageSwitcher and ModeToggle) and the one step marker.
       "V4AccountMenu.tsx", "V4Steps.tsx",
       // Wave 2 (dig-f4): the docked tray and the phone's list of picks.
-      "V4DigTray.tsx"]) {
+      "V4DigTray.tsx",
+      // V4 start step, Task 79: a dig's path rows and their combine calls.
+      "V4DigPaths.tsx"]) {
       const source = readFileSync(resolve(here, "../../apps/ui/components/v4", file), "utf8");
       expect(source, file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }
@@ -87,5 +91,61 @@ describe("no browser storage (Decision A, S01-R17)", () => {
     for (const file of files) {
       expect(readFileSync(file, "utf8"), file).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/);
     }
+  });
+});
+
+/**
+ * V4 start step, Task 82 (owner answer Q3 A: the words, and after Start the debate's id, live in this tab's history entry, never in a
+ * cookie or site storage): every shipped file the start step added to the V4 pages, the saved questions' included.
+ * apps/ui/scripts/no-hardcoded-english.test.mjs scans the same files for hard-coded English.
+ */
+const START_STEP_FILES: readonly string[] = [
+  // Tasks 72-75: the choosing card's seven V4Start* pieces.
+  "components/v4/V4StartBar.tsx", "components/v4/V4StartCard.tsx", "components/v4/V4StartCombineBar.tsx", "components/v4/V4StartMore.tsx",
+  "components/v4/V4StartRow.tsx", "components/v4/V4StartSuggest.tsx", "components/v4/V4StartWays.tsx",
+  // Task 62: the paths under the map's first card. Task 79: a dig's paths and their plan.
+  "components/v4/V4RunPaths.tsx", "components/v4/V4DigPaths.tsx", "lib/v4/digPathPlan.ts",
+  // Tasks 64, 70, 76g, 76c and 76b, and Task 76e's update banner (owner answer Q8).
+  "lib/v4/pathPlan.ts", "lib/v4/useStartPaths.ts", "lib/v4/questionBox.ts", "lib/v4/askHistory.ts", "lib/v4/startUndo.ts",
+  "lib/v4/siteVersion.ts",
+  // 4 Nov night: the saved questions and the kept step 2 (Tasks 76f and 76e), the clarifying questions (Task 76h), the map before the
+  // first read and the hand-over (Tasks 76b and 76i), the fold (Task 76b) and the report's paths (Task 55c).
+  "lib/v4/savedQuestion.ts", "lib/v4/useSavedQuestion.ts", "lib/v4/startKept.ts", "components/v4/V4NotStarted.tsx",
+  "components/v4/V4AskQuestions.tsx", "lib/v4/clarifyWait.ts", "components/v4/V4PendingMap.tsx", "lib/v4/startHandOff.ts",
+  "lib/v4/foldMove.ts", "lib/v4/reportPaths.ts",
+  // Found by Task 82 among the files this branch added: the carry-on switch (Task 56), the site's country first (Task 76d), a dig's
+  // failed page reading its map (Task 76j) and the stopped page's "Continue where it stopped" (Task 57g).
+  "lib/v4/carryOn.ts", "lib/v4/clarifyPlace.ts", "lib/v4/useParentDigRetry.ts", "components/v4/useStoppedContinue.tsx"
+];
+const ui = resolve(here, "../../apps/ui");
+const BROWSER_STORAGE = /\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie/u;
+/** A write to this tab's history entry, and one that keeps something in the entry's state (anything but `null`). */
+const HISTORY_WRITE = /\bhistory\.(?:pushState|replaceState)\s*\(/u;
+const HISTORY_STATE_WRITE = /\bhistory\.(?:pushState|replaceState)\s*\(\s*(?!null\s*,)/u;
+/** The two files that keep the ask page's words, a saved question's id and a started question's debate in the entry. */
+const HISTORY_KEEPERS: readonly string[] = ["lib/v4/askHistory.ts", "components/v4/V4AskClient.tsx"];
+
+describe("V4 start step, Task 82: the start step keeps nothing in the browser but this tab's history entry", () => {
+  const source = (path: string): string => readFileSync(resolve(ui, path), "utf8");
+
+  it("none of the start step's files writes browser storage or cookies, the saved questions' included", () => {
+    expect(START_STEP_FILES.filter((path) => BROWSER_STORAGE.test(source(path)))).toEqual([]);
+  });
+
+  it("among the start step's files, only askHistory.ts and V4AskClient.tsx write this tab's history", () => {
+    const writers = [...START_STEP_FILES, "components/v4/V4AskClient.tsx"].filter((path) => HISTORY_WRITE.test(source(path)));
+    // The ask page does write its entry (step 2, a started question), so the check reads real calls.
+    expect(writers).toContain("components/v4/V4AskClient.tsx");
+    expect(writers.filter((path) => !HISTORY_KEEPERS.includes(path))).toEqual([]);
+  });
+
+  it("no other V4 file keeps anything in the tab's history entry: elsewhere a write changes the address alone (state null)", () => {
+    // The reading level, a question's address, the report page and a public page write their address with a null state.
+    const files = ["lib/v4", "components/v4", "app/v4"].flatMap((folder) => readdirSync(resolve(ui, folder), { recursive: true, encoding: "utf8" })
+      .filter((name) => /\.(ts|tsx|js|mjs)$/u.test(name))
+      .map((name) => `${folder}/${name}`));
+    const keepers = files.filter((path) => HISTORY_STATE_WRITE.test(source(path)));
+    expect(keepers).toContain("components/v4/V4AskClient.tsx");
+    expect(keepers.filter((path) => !HISTORY_KEEPERS.includes(path))).toEqual([]);
   });
 });

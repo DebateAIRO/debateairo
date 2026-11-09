@@ -70,9 +70,12 @@
 .v4BtnPrimary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .v4BtnPrimary:hover { background: var(--ink-hover); }
 .v4Link { color: var(--link); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+/* read-f16 (start step, Task 77): a chip may hold a long word (an AI's answer in German or Finnish on a 320 px phone); it wraps
+   inside the screen instead of pushing past it. A short word is unchanged. */
 .v4Chip {
   display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border-radius: var(--r-pill);
   border: 1.5px solid var(--line-strong); background: var(--surface); cursor: pointer; font-weight: 600; font-size: var(--t-ui);
+  min-width: 0; max-width: 100%; overflow-wrap: anywhere;
 }
 .v4Chip[aria-pressed="true"], .v4Chip[aria-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
 .v4Card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); padding: 16px; }

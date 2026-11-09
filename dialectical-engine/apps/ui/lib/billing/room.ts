@@ -39,24 +39,37 @@ export async function readAskRoom(
   }
 }
 
-/** The room for `query`, re-read whenever the query changes; `refresh` re-reads on demand. */
+/**
+ * V4 start step, Task 70b (ask-f2): how the latest read went. LOADING until the first read answers; then READ or FAILED
+ * from the latest read that answered (the page's own read or a `refresh`), kept while a new query is read.
+ */
+export type AskRoomRead = "LOADING" | "READ" | "FAILED";
+
+/**
+ * The room for `query`, re-read whenever the query changes; `refresh` re-reads on demand. The fourth item says how the
+ * latest read went (a failed read is `null` like no read, so the room alone cannot say).
+ */
 export function useAskRoom(
   client: Pick<ContractClient, "getAskRoom"> | undefined,
   query: AskRoomQuery
-): readonly [AskRoom | null, (room: AskRoom | null) => void, () => Promise<AskRoom | null>] {
+): readonly [AskRoom | null, (room: AskRoom | null) => void, () => Promise<AskRoom | null>, AskRoomRead] {
   const [room, setRoom] = useState<AskRoom | null>(null);
+  const [read, setRead] = useState<AskRoomRead>("LOADING");
   const key = JSON.stringify(query);
   useEffect(() => {
     let active = true;
     void readAskRoom(client, JSON.parse(key) as AskRoomQuery).then((value) => {
-      if (active) setRoom(value);
+      if (!active) return;
+      setRoom(value);
+      setRead(value === null ? "FAILED" : "READ");
     });
     return () => { active = false; };
   }, [client, key]);
   const refresh = useCallback(async () => {
     const value = await readAskRoom(client, JSON.parse(key) as AskRoomQuery);
     setRoom(value);
+    setRead(value === null ? "FAILED" : "READ");
     return value;
   }, [client, key]);
-  return [room, setRoom, refresh] as const;
+  return [room, setRoom, refresh, read] as const;
 }

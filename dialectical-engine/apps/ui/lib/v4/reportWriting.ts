@@ -107,6 +107,15 @@ export function reportWaitLineOf(waitingForDigs: number, digQuestion: string | n
   return { kind: "PLAIN", text: tPlural(catalog, "v4.investigation.waitingDigs", Math.max(1, waitingForDigs), locale) };
 }
 
+/**
+ * V4 start step, Task 56c (item public-f25; Task 56b's `first_closing_left`, owner answer Q20 B): whether the owner's next "Write my
+ * report" would be the debate's first report (true: it goes ahead while new starts wait) or a further one (false: on a public debate
+ * it waits for the reset). Null when there is no read or the read does not say it: the page then never says the report waits.
+ */
+export function firstReportLeftOf(read: InvestigationReports | null): boolean | null {
+  return read?.first_closing_left ?? null;
+}
+
 /** "Write my report" (or "Write it again") opens the short check: nothing is being written, and no report stands. */
 export function canAskForReport(stage: ReportStage): boolean {
   return stage.kind === "NONE" || stage.kind === "FAILED";

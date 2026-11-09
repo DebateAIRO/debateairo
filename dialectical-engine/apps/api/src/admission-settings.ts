@@ -514,6 +514,8 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
       backupSequencesProvisioned: input.backupSequencesProvisioned,
       // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
       ...(input.shape === null ? {} : { shape: input.shape }),
+      // V4 start step, Task 34: a path debate's sizes (shape receipt v2), never with `shape`; absent = today's receipt.
+      ...(input.shapeV2 == null ? {} : { shapeV2: input.shapeV2 }),
       // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
       ...(input.length === null ? {} : { length: input.length }),
       // Engine redesign (R1d): engine 2's settings admission resolved for this panel, or none (today's receipt).
@@ -630,13 +632,14 @@ export function createAdmissionSettingsCache(input: Readonly<{
 /**
  * Side-by-side spec §13 (Task S10): what one version says to the pages (`AdmissionView`, buildApi's `admissionView`):
  * its number, its shape and length rows in force, whether its picker's scorecard is VALID, and (addition D16) its
- * composed preview configuration.
+ * composed preview configuration. V4 start step, Task 34: its engine-2 row in force too (the start step runs only under it).
  */
 export function admissionViewOf(version: AdmissionVersionSettings): AdmissionView {
   return Object.freeze({
     registerVersion: version.registerVersion,
     ...(version.debateShapePolicy === null ? {} : { debateShapePolicy: version.debateShapePolicy }),
     ...(version.lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy: version.lengthGuidancePolicy }),
+    ...(version.engineVersionPolicy == null ? {} : { engineVersionPolicy: version.engineVersionPolicy }),
     modelScorecardInForce: version.modelPicker.scorecard.state === "VALID",
     ...(version.previewConfig === undefined ? {} : { previewProviderTestConfig: version.previewConfig })
   });

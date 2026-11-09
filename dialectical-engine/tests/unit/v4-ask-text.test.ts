@@ -17,6 +17,7 @@ import {
   ownWords,
   parseDigDetail,
   parseDigQuestion,
+  RETIRED_ANGLES_SENTENCE_EN,
   ROOT_QUESTION_KEEP,
   sameItemText,
   sameParentText,
@@ -43,9 +44,7 @@ const CATALOG: Record<string, string> = Object.freeze({
   "v4.askText.purpose.UNDERSTAND": "I want to understand it.",
   "v4.askText.purpose.WRITE": "I am writing about it.",
   "newDebate.askText.matters": "If the answers pull in different directions, what matters most to me: {matters}",
-  "newDebate.askText.angles": "Please also look at: {list}.",
   "v4.askText.matters": "If the answers pull in different directions, what matters most to me: {matters}",
-  "v4.askText.angles": "Please also look at: {list}.",
   "v4.digText.path": "Look deeper into this part of the answer: {line}",
   "v4.digText.kind.STILL_ARGUED": "Does this hold up, and when? {text}",
   "v4.digText.kind.OBJECTION": "How strong is this objection, and does it change the answer? {text}",
@@ -74,16 +73,15 @@ describe("composeQuestion", () => {
     expect(composeQuestion(QUESTION, EMPTY_GOAL, CATALOG)).toBe("Should Romania build more nuclear plants?");
   });
 
-  it("adds one sentence per set part, after a blank line: the answers, what matters, angles", () => {
-    const text = composeQuestion(QUESTION, { answers: [WHERE, WHEN, WHY], matters: "  keeping prices low  ", angles: ["jobs", "  waste  "] }, CATALOG);
+  it("adds one sentence per set part, after a blank line: the answers, then what matters", () => {
+    const text = composeQuestion(QUESTION, { answers: [WHERE, WHEN, WHY], matters: "  keeping prices low  " }, CATALOG);
     expect(text).toBe([
       "Should Romania build more nuclear plants?",
       "",
       "Where? Bucharest.",
       "Over what time? The next 5 years.",
       "What is it for? To decide.",
-      "If the answers pull in different directions, what matters most to me: keeping prices low",
-      "Please also look at: jobs; waste."
+      "If the answers pull in different directions, what matters most to me: keeping prices low"
     ].join("\n"));
   });
 
@@ -94,8 +92,8 @@ describe("composeQuestion", () => {
     expect(one("Why?", "Not sure!")).toBe("Why? Not sure!");
   });
 
-  it("adds nothing for an Other left empty, blank matters or blank angles", () => {
-    expect(composeQuestion(QUESTION, { answers: [{ question: "Where?", answer: "   ", other: true }], matters: " \n ", angles: ["", "  "] }, CATALOG))
+  it("adds nothing for an Other left empty or blank matters", () => {
+    expect(composeQuestion(QUESTION, { answers: [{ question: "Where?", answer: "   ", other: true }], matters: " \n " }, CATALOG))
       .toBe("Should Romania build more nuclear plants?");
   });
 
@@ -105,11 +103,6 @@ describe("composeQuestion", () => {
     expect(ownWords(text)).toBe("Q?");
   });
 
-  it("drops repeated angles and keeps at most five", () => {
-    const text = composeQuestion("Q?", { ...EMPTY_GOAL, angles: ["a1", "A1", "b2", "c3", "d4", "e5", "f6"] }, CATALOG);
-    expect(text).toBe("Q?\n\nPlease also look at: a1; b2; c3; d4; e5.");
-  });
-
   it("never reads the person's words as placeholders", () => {
     expect(composeQuestion("Q?", { ...EMPTY_GOAL, matters: "{list} and {place}" }, CATALOG))
       .toBe("Q?\n\nIf the answers pull in different directions, what matters most to me: {list} and {place}");
@@ -117,29 +110,42 @@ describe("composeQuestion", () => {
 });
 
 describe("the step-2 choices on Free (owner 2026-10-29: capped at 3)", () => {
-  const FULL = Object.freeze({ answers: Object.freeze([WHERE, WHEN]), matters: "prices", angles: Object.freeze(["jobs", "waste"]) });
+  const FULL = Object.freeze({ answers: Object.freeze([WHERE, WHEN]), matters: "prices" });
+  const OVER = Object.freeze({ answers: Object.freeze([WHERE, WHEN, WHY]), matters: "prices" });
 
-  it("counts each set choice once: each question answered, what matters, and each angle as sent", () => {
+  it("counts each set choice once: each question answered and what matters", () => {
     expect(FREE_GOAL_CHOICES_MAX).toBe(3);
     expect(goalChoiceCount(EMPTY_GOAL)).toBe(0);
-    expect(goalChoiceCount(FULL)).toBe(5);
-    // A pressed "Other" chip is a choice; blank matters, blank and repeated angles are not.
-    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "", other: true }], matters: "  ", angles: ["a", " A ", "", "  "] })).toBe(2);
+    expect(goalChoiceCount(FULL)).toBe(3);
+    // V4 start step, Task 76h (read-f8): only real answers count. A pressed "Other" with nothing typed in it is not a choice
+    // (it says nothing), and neither is blank matters; an "Other" with words is.
+    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "", other: true }], matters: "  " })).toBe(0);
+    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "   ", other: true }, WHEN], matters: "" })).toBe(1);
+    expect(goalChoiceCount({ answers: [{ question: "Where?", answer: "Cluj", other: true }], matters: "" })).toBe(1);
+    // So Free keeps the first three real answers, whatever empty "Other" lies between them.
+    const BLANK = { question: "Whose?", answer: "", other: true };
+    const PAST_THE_CAP = { answers: [WHERE, BLANK, WHEN, WHY, { question: "How much?", answer: "A lot", other: false }], matters: "" };
+    expect(goalChoiceCount(PAST_THE_CAP)).toBe(4);
+    expect(goalWithinPlan(PAST_THE_CAP, "free").answers.filter((given) => given.answer.trim().length > 0)).toEqual([WHERE, WHEN, WHY]);
   });
 
   it("Free keeps the first 3 choices in the order they are sent and drops the rest from the end", () => {
-    expect(goalWithinPlan(FULL, "free")).toEqual({ answers: [WHERE, WHEN], matters: "prices", angles: [] });
-    expect(goalWithinPlan({ ...EMPTY_GOAL, answers: [WHY], angles: ["a", "b", "c", "d"] }, "free")).toEqual({ answers: [WHY], matters: "", angles: ["a", "b"] });
-    expect(goalWithinPlan({ answers: [WHERE, WHEN, WHY, { question: "Whose?", answer: "Mine", other: false }], matters: "x", angles: ["a"] }, "free"))
-      .toEqual({ answers: [WHERE, WHEN, WHY], matters: "", angles: [] });
-    const three = { ...EMPTY_GOAL, answers: [WHERE], angles: ["a", "b"] };
-    expect(goalWithinPlan(three, "free")).toBe(three);
-    const sent = composeQuestion(QUESTION, goalWithinPlan(FULL, "free"), CATALOG);
-    expect(sent.split("\n\n")[1]!.split("\n")).toHaveLength(3);
+    expect(goalWithinPlan(FULL, "free")).toBe(FULL);
+    // Decision 2: no angles left to drop, so the cap drops what matters first.
+    expect(goalWithinPlan(OVER, "free")).toEqual({ answers: [WHERE, WHEN, WHY], matters: "" });
+    expect(goalWithinPlan({ answers: [WHERE, WHEN, WHY, { question: "Whose?", answer: "Mine", other: false }], matters: "x" }, "free"))
+      .toEqual({ answers: [WHERE, WHEN, WHY], matters: "" });
+    const sent = composeQuestion(QUESTION, goalWithinPlan(OVER, "free"), CATALOG);
+    expect(sent.split("\n\n")[1]!.split("\n")).toEqual(["Where? Bucharest.", "Over what time? The next 5 years.", "What is it for? To decide."]);
+  });
+
+  it("decision 2: a goal holds the answers and what matters, and no angles", () => {
+    expect(Object.keys(EMPTY_GOAL).sort()).toEqual(["answers", "matters"]);
+    expect(Object.keys(goalWithinPlan(OVER, "free")).sort()).toEqual(["answers", "matters"]);
   });
 
   it("a paid plan keeps every choice, the same object", () => {
-    expect(goalWithinPlan(FULL, "premium")).toBe(FULL);
+    expect(goalWithinPlan(OVER, "premium")).toBe(OVER);
   });
 });
 
@@ -218,22 +224,17 @@ describe("ownWords and addedLines (fix wave 1: titles show the person's words on
 });
 
 describe("composeQuestion on every language (decision 29)", () => {
-  const goal = { ...EMPTY_GOAL, answers: [{ question: "Unde?", answer: "În București", other: false }], angles: ["locuri de muncă"] };
+  const goal = { answers: [{ question: "Unde?", answer: "În București", other: false }], matters: "locuri de muncă" };
 
   it("adds the same sentences whatever the page's language: the catalogue given holds that language's lead-ins", () => {
-    const romanian = { ...CATALOG, "newDebate.askText.angles": "Vă rog să vă uitați și la: {list}." };
-    expect(composeQuestion("Q?", goal, romanian)).toBe("Q?\n\nUnde? În București.\nVă rog să vă uitați și la: locuri de muncă.");
+    const romanian = { ...CATALOG, "newDebate.askText.matters": "Cel mai important pentru mine este: {matters}" };
+    expect(composeQuestion("Q?", goal, romanian)).toBe("Q?\n\nUnde? În București.\nCel mai important pentru mine este: locuri de muncă");
   });
 
   it("closes up a blank line inside the person's own words, so ownWords gets all of them back", () => {
     const text = composeQuestion("First part.\n\n  \nSecond part?", goal, CATALOG);
     expect(ownWords(text)).toBe("First part.\nSecond part?");
     expect(composeQuestion("First part.\n\nSecond part?", EMPTY_GOAL, CATALOG)).toBe("First part.\nSecond part?");
-  });
-
-  it("does not double the closing mark of the last angle (ASK-6)", () => {
-    expect(composeQuestion("Q?", { ...EMPTY_GOAL, angles: ["jobs", "waste."] }, CATALOG))
-      .toBe("Q?\n\nPlease also look at: jobs; waste.");
   });
 });
 
@@ -424,6 +425,12 @@ describe("digQuestion off English carries no English (R2DIG-9)", () => {
     expect(digQuestion({ kind: "open", questions: [open("OBJECTION", "B.", "o:0")] }, roDig, CATALOG, "ro"))
       .toBe("B.\n\n“A.”\n“Întrebare?”");
   });
+
+  it("decision 2: an old debate's English angle line is dropped from a Romanian dig, with no catalogue key left for it", () => {
+    expect(RETIRED_ANGLES_SENTENCE_EN).toBe("Please also look at: {list}.");
+    expect(digQuestion({ kind: "open", questions: [open("STILL_ARGUED", "Cheaper storage")] }, "Q?\n\nPlease also look at: jobs; waste.", CATALOG, "ro"))
+      .toBe("Cheaper storage\n\n“Q?”");
+  });
 });
 
 describe("matching cut texts (R2DIG-8)", () => {
@@ -501,11 +508,24 @@ describe("decisions 5 and 29: the goal goes as its own field too", () => {
     expect(purposeLinesOfGoal(EMPTY_GOAL)).toBeUndefined();
     expect(purposeLinesOfGoal({ ...EMPTY_GOAL, answers: [{ question: "Where?", answer: "  ", other: true }], matters: " " })).toBeUndefined();
   });
-  it("the answers as asked and answered, what matters and the angles in the person's words, within the contract's length", () => {
-    expect(purposeLinesOfGoal({ answers: [WHERE, { question: "What for?", answer: " My \n own ", other: true }], matters: " cost ", angles: ["jobs", "JOBS", "waste"] }))
-      .toEqual({ answers: [{ question: "Where?", answer: "Bucharest" }, { question: "What for?", answer: "My own" }], matters: "cost", angles: ["jobs", "waste"] });
+  it("the answers as asked and answered and what matters in the person's words, within the contract's length (decision 2: no angles)", () => {
+    expect(purposeLinesOfGoal({ answers: [WHERE, { question: "What for?", answer: " My \n own ", other: true }], matters: " cost " }))
+      .toEqual({ answers: [{ question: "Where?", answer: "Bucharest" }, { question: "What for?", answer: "My own" }], matters: "cost" });
     const long = purposeLinesOfGoal({ ...EMPTY_GOAL, answers: [{ question: "Where?", answer: "x".repeat(900), other: true }] })!;
     expect(long.answers![0]!.answer).toHaveLength(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
     expect(PurposeLinesSchema.safeParse(long).success).toBe(true);
+  });
+  // V4 start step, Task 50b (owner answer Q4; "Goal in answer": "Always say it"): the answer to "What do you care about most?",
+  // offered or typed, goes marked, so the run knows the person stated a goal without reading the words.
+  it("an answer to a care question the page was given goes marked `cares: true`; every other answer, and a goal sent without the list, as before", () => {
+    const CARES = "What do you care about most?";
+    const goal = { answers: [WHERE, { question: CARES, answer: "Keeping bills low", other: false }], matters: "" };
+    const marked = purposeLinesOfGoal(goal, [CARES])!;
+    expect(marked).toEqual({ answers: [{ question: "Where?", answer: "Bucharest" }, { question: CARES, answer: "Keeping bills low", cares: true }] });
+    expect(PurposeLinesSchema.safeParse(marked).success).toBe(true);
+    expect(purposeLinesOfGoal({ ...goal, answers: [{ question: CARES, answer: " Lower \n bills ", other: true }] }, [CARES]))
+      .toEqual({ answers: [{ question: CARES, answer: "Lower bills", cares: true }] });
+    expect(purposeLinesOfGoal(goal)).toEqual({ answers: [{ question: "Where?", answer: "Bucharest" }, { question: CARES, answer: "Keeping bills low" }] });
+    expect(purposeLinesOfGoal(goal, [])).toEqual(purposeLinesOfGoal(goal));
   });
 });

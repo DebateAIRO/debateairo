@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WriteReportResult } from "../../apps/ui/lib/v4/load.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
-import { InvestigationReportsSchema, type InvestigationReports, type InvestigationReportVersion } from "../../packages/contract/src/index.js";
+import {
+  AnswerSchema, InvestigationReportsSchema, type Answer, type InvestigationReports, type InvestigationReportVersion
+} from "../../packages/contract/src/index.js";
 import {
   advance, buttonNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer, seededStory, settle,
   unmountMap
@@ -90,6 +92,28 @@ const finished = (version: number): InvestigationReportVersion => ({
 } as InvestigationReportVersion);
 const failedVersion = (version: number): InvestigationReportVersion =>
   ({ report_version: version, closed_at: "2026-11-04T10:00:00.000Z", state: "FAILED", written_at: "2026-11-04T10:20:00.000Z" });
+
+/**
+ * V4 start step (review of Tasks 60-62): a served path debate whose "carry on to the report" box was ticked, as the contract
+ * serves it (`Answer.branches` is whole: at least one path; Task 60's map reads its paths). One made-up path on the seeded
+ * answer's first position.
+ */
+function carryOnAnswer(runId: string): Answer {
+  return AnswerSchema.parse({
+    ...seededAnswer(runId),
+    branches: {
+      source: "MENU", width: 1,
+      paths: [{
+        path_id: "b1", order: 1, title: "A made-up path", question: "A made-up question about the mix?", author: "AI_SUGGESTION",
+        viewpoints: [{ title: "A made-up path", question: "A made-up question about the mix?", own: false }], state: "ARGUED",
+        root_node_id: "n-mix",
+        outcome: { state: "READY", text: { line: "A made-up line.", summary: "A made-up summary.", fate: "HELD_UP" }, what_changed: [],
+          view: null, trust: "SURE", rests_on: [] }
+      }],
+      more: [], also_raised: [], main_trust: "SURE", carry_on_to_report: true
+    }
+  });
+}
 
 const header = (): HTMLElement => page().querySelector<HTMLElement>(".v4StandInHeader")!;
 const topButton = (): HTMLButtonElement | null => header().querySelector<HTMLButtonElement>("button.v4DebReportLink");
@@ -236,7 +260,8 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(flat(railStep())).toBe(`${CATALOG["v4.state.BEING_WRITTEN"]} · ${word("v4.wait.started", { time: clock(Date.parse(closedAt)) })}`);
     expect(railStep()!.querySelector(".v4WaitDot-PULSE")).not.toBeNull();
     expect(topButton()).toBeNull();
-    expect(header().querySelector("a.v4DebReportLink")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    // Task 76l (owner, 5 Nov: no level from the address on V4 pages): the report page reads the debate's level itself.
+    expect(header().querySelector("a.v4DebReportLink")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
     // The owner's answers of 5 Nov (question 2 A): once asked for, the link reads "See my report".
     expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
     // Dig buttons rest, with the reason under them. journey-f14 (the wave-2 review): one pattern with the quota wait, so the
@@ -391,7 +416,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
 
   it("with the start step's \"carry on to the report\" box there is no strip: the press asks for the report at once", async () => {
     const runId = crypto.randomUUID();
-    harness.answer = { ...seededAnswer(runId), branches: { carry_on_to_report: true } } as unknown as typeof harness.answer;
+    harness.answer = carryOnAnswer(runId);
     reports.load = async () => investigation(runId, "OPEN", [], 1);
     reports.write = async () => {
       reports.load = async () => investigation(runId, "CLOSED", [writing(1, new Date().toISOString())], 1);
@@ -406,7 +431,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
 
   it("with the carry-on box, the pressed header button keeps its focus while the press waits, and a second press sends nothing", async () => {
     const runId = crypto.randomUUID();
-    harness.answer = { ...seededAnswer(runId), branches: { carry_on_to_report: true } } as unknown as typeof harness.answer;
+    harness.answer = carryOnAnswer(runId);
     reports.load = async () => investigation(runId, "OPEN", [], 1);
     let finish: (value: { kind: "WRITING"; reportVersion: number; waitingForDigs: number }) => void = () => undefined;
     reports.write = () => new Promise((resolve) => { finish = resolve; });
@@ -430,7 +455,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
 
   it("with the carry-on box, the map keeps watching while nothing is written: the report the AIs start shows being written", async () => {
     const runId = crypto.randomUUID();
-    harness.answer = { ...seededAnswer(runId), branches: { carry_on_to_report: true } } as unknown as typeof harness.answer;
+    harness.answer = carryOnAnswer(runId);
     reports.load = async () => investigation(runId, "OPEN", [], 1);
     await mountMap(1600, runId);
     expect(waitCard()).toBeNull();
@@ -599,12 +624,21 @@ describe("report-d2: waiting for the report on the map", () => {
     const runId = crypto.randomUUID();
     // Every open question was dug (dig-f29's good time), so only the wait keeps the good-time note away.
     digEverythingOpen(runId);
+    // The owner's answer 23 A (5 Nov; Task 76j's wiring): the map has read its one dig, still running, so the line names it as
+    // the report page does.
+    const done = harness.digView!;
+    let named: string | null = null;
+    harness.digView = (link) => {
+      named = link.questions[0] ?? null;
+      return { ...done(link), state: "RUNNING" };
+    };
     reports.load = async () => investigation(runId, "CLOSED", [writing(1, "2026-11-04T10:00:00.000Z", 1)], 1);
     await mountMap(1600, runId);
     const card = waitCard()!;
     expect(card.dataset.reportWait).toBe("WAITING_DIGS");
     expect(flat(card.querySelector("[data-wait-word]"))).toBe(CATALOG["v4.state.WAITING.noTime"]);
-    expect(flat(card)).toContain(CATALOG["v4.investigation.waitingDigs.one"]);
+    expect(named).not.toBeNull();
+    expect(flat(card)).toContain(`Your report starts when your dig on “${named!}” finishes.`);
     expect(flat(card)).toContain(CATALOG["v4.reportWait.digsRest"]);
     expect(card.querySelector("[data-wait-started]")).toBeNull();
     // No "Good time to write your report" while it waits, and no mark on the button.
@@ -612,6 +646,18 @@ describe("report-d2: waiting for the report on the map", () => {
     expect(header().querySelector(".v4DebReportGood")).toBeNull();
     // The owner's answers of 5 Nov (question 2 A): while it waits for a dig, the header's link reads "See my report".
     expect(flat(header().querySelector("a.v4DebReportLink"))).toBe(CATALOG["v4.rail.seeReport"]);
+  });
+
+  it("while it waits for a dig the map could not read (its stand-in), the line names no dig: the report page's plain line", async () => {
+    const runId = crypto.randomUUID();
+    digEverythingOpen(runId);
+    harness.digView = () => { throw new Error("made-up failed read"); };
+    reports.load = async () => investigation(runId, "CLOSED", [writing(1, "2026-11-04T10:00:00.000Z", 1)], 1);
+    await mountMap(1600, runId);
+    const card = waitCard()!;
+    expect(card.dataset.reportWait).toBe("WAITING_DIGS");
+    expect(flat(card)).toContain(CATALOG["v4.investigation.waitingDigs.one"]);
+    expect(card.querySelector(".v4DebReportWaitLine [data-ai-generated]")).toBeNull();
   });
 
   it("opened on a version already being written, with digs and no press here: no start time; 15 minutes on, the report page's line", async () => {
@@ -684,7 +730,7 @@ describe("the owner's answers of 5 Nov 2026, question 2 A: \"See my report\" unt
     expect(hold()).toBeNull();
     const link = header().querySelector<HTMLAnchorElement>("a.v4DebReportLink")!;
     expect(flat(link)).toBe(CATALOG["v4.rail.writeReport"]);
-    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
   });
 
   it("a dig that reopens the investigation turns it back into \"Write my report\", which asks again", async () => {

@@ -278,6 +278,53 @@ export type ClaimRenewal =
  */
 export type WorkItemFence = Readonly<{ releaseKey: string; workerId?: string }>;
 
+/**
+ * V4 start step, Task 57e (the owner's 6 Nov rule for a failed question: one automatic retry after a few minutes, from where it stopped) —
+ * how long a debate that stopped on our side waits before it is claimed again: its copy's claim is kept until then, so nothing else takes it
+ * early and it still reads as running; then the lapsed re-send (every five minutes, runner-lapsed-resend.ts) hands it to a runner again,
+ * which resumes it from what it saved (0119's true resume). A retry happens three to eight minutes after the stop.
+ */
+export const WORK_ITEM_RETRY = Object.freeze({ delaySeconds: 180 });
+
+/**
+ * V4 start step, Tasks 57e and 57f — THE STOPS THAT ARE NOT OURS: the person's own act (a debate or account they erased while it ran), a limit
+ * the debate reached (its own ceiling, a step's tries used up) and every spending wall (the person's quota, the site's day, the debate's money
+ * ceiling, a team grant that is gone). The runner never gives one its automatic retry (apps/runner runFailureRetriesOnce), and Continue never
+ * continues a debate that stopped on one (apps/api/src/run-continue.ts stopIsOurs): one list for both, so the two never disagree.
+ * Task 57h: the debate's own call budget used up (RUN_COST_ENVELOPE_EXHAUSTED, its attempt ceiling, beside its money ceiling) is a limit it
+ * reached too: a retry or a Continue would meet it again at its first new call.
+ */
+export const RUN_STOPS_NOT_OURS: ReadonlySet<string> = new Set([
+  "PRIVATE_CONTENT_ERASED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
+  "CALL_BUDGET_EXHAUSTED",
+  "PERSON_ALLOWANCE_REACHED",
+  "DAILY_COST_ENVELOPE_REACHED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "INTERNAL_FUNDING_UNAVAILABLE",
+  "RUN_COST_ENVELOPE_EXHAUSTED"
+]);
+
+/**
+ * V4 start step, Task 57h (the 57f/57g review; the owner's 7 Nov words "Only if we can't re-use, then we need to pay for this ourselves") —
+ * THE CLAIM-TIME REFUSALS A PATH DEBATE'S STORED SET MAKES FINAL: its set missing (PATHS_SET_MISSING), the menu it built refused by the
+ * contract (START_MENU_INVALID), more paths than its receipt priced (PATHS_OVER_RECEIPT). The runner records each, as it is, as the work
+ * item's terminal reason before any root (apps/runner paths-run.ts PATHS_RUN_CODES); every copy would meet the same. So Continue never
+ * offers such a debate (apps/api/src/run-continue.ts stopIsOurs), and 0165's core.run_pre_start_kept gives its path-list charge back and
+ * core.continue_failed_run refuses it, as for a debate never queued: the same codes there.
+ */
+export const RUN_PATH_SET_REFUSALS: ReadonlySet<string> = new Set([
+  "PATHS_SET_MISSING",
+  "START_MENU_INVALID",
+  "PATHS_OVER_RECEIPT"
+]);
+
+/**
+ * What a park for the one retry did: PARKED (this copy's claim kept until the delay, the retry recorded), RETRIED (the work item had its
+ * one retry already: nothing written), NOT_HELD (not this copy's claim of this release's open item: nothing written).
+ */
+export type WorkItemRetryPark = "PARKED" | "RETRIED" | "NOT_HELD";
+
 /** The head of every set-aside reason: the run was stopped by an upload, never by its own failure (spec §4, §9). */
 export const RUN_SET_ASIDE = "RUN_SET_ASIDE";
 
@@ -784,6 +831,49 @@ export class WorkItemRepository {
       );
       return result.rowCount === 1;
     });
+  }
+
+  /**
+   * V4 start step, Task 57e — THE ONE AUTOMATIC RETRY. A copy whose debate stopped on our side keeps its own claim of this release's open
+   * item until `delaySeconds` from now (WORK_ITEM_RETRY's few minutes by default), and records the item's one retry (0165's
+   * core.record_work_item_retry), on one transaction: PARKED. The item stays CLAIMED, never FAILED, so the run reads as running and nothing
+   * is given back; once the claim lapses the lapsed re-send hands it to a runner again, which resumes it (0119). An item that had its retry
+   * already is left exactly as it was (RETRIED: the caller records FAILED as today), and so is one this copy does not hold (NOT_HELD: another
+   * worker's claim, another release, settled, FAILED or DONE). A repository told no worker id parks nothing.
+   */
+  async parkForRetry(input: Readonly<{ runId: string; workItemId: string; delaySeconds?: number }>): Promise<WorkItemRetryPark> {
+    const delaySeconds = input.delaySeconds ?? WORK_ITEM_RETRY.delaySeconds;
+    if (!Number.isSafeInteger(delaySeconds) || delaySeconds < 1 || delaySeconds > 3_600) {
+      throw new TypeError("Retry delay must be a whole number of seconds between 1 and 3600");
+    }
+    if (this.#fence.workerId === null) return "NOT_HELD";
+    const retriedBefore = new Error("WORK_ITEM_RETRIED_BEFORE");
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+        const parked = await client.query<{ claim_deadline: Date }>(
+          `UPDATE core.work_item AS item
+           SET claim_deadline = clock_timestamp() + make_interval(secs => $3)
+           FROM core.run AS run
+           WHERE item.work_item_id = $1 AND item.run_id = $2
+             AND item.state = 'CLAIMED' AND item.claimed_by = $5::text AND item.settled_attempt_id IS NULL
+             AND run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $4
+           RETURNING item.claim_deadline`,
+          [input.workItemId, input.runId, delaySeconds, this.#fence.releaseKey, this.#fence.workerId]
+        );
+        const deadline = parked.rows[0]?.claim_deadline;
+        if (parked.rowCount !== 1 || deadline === undefined) return "NOT_HELD";
+        const recorded = await client.query<{ outcome: string }>(
+          "SELECT core.record_work_item_retry($1::uuid, $2::uuid, $3::timestamptz) AS outcome",
+          [input.workItemId, input.runId, deadline]
+        );
+        // Retried before: roll the new deadline back, so the item is left exactly as it was.
+        if (recorded.rows[0]?.outcome !== "RECORDED") throw retriedBefore;
+        return "PARKED";
+      });
+    } catch (error) {
+      if (error === retriedBefore) return "RETRIED";
+      throw error;
+    }
   }
 
   /**

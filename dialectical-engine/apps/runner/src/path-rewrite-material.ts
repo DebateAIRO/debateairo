@@ -278,14 +278,48 @@ export function pathRewriteDigPathsOf(
   extracts: ReadonlyMap<string, readonly PathRewriteExtract[]> = new Map()
 ): readonly PathRewriteDigPath[] {
   const live = snapshot.nodes.filter((node) => node.excludedReason === null);
-  const byId = new Map(live.map((node) => [node.nodeId, node] as const));
   const first = [snapshot.verdictBasis.winner_node_id, snapshot.verdictBasis.runner_up_node_id];
   const rank = (nodeId: string): number => { const at = first.indexOf(nodeId); return at < 0 ? first.length : at; };
   const positions = live.filter((node) => node.isPosition).sort((a, b) => rank(a.nodeId) - rank(b.nodeId)
     || (b.finalStrength ?? Number.NEGATIVE_INFINITY) - (a.finalStrength ?? Number.NEGATIVE_INFINITY)
     || (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0));
-  const claimed = new Set<string>(positions.map((node) => node.nodeId));
-  return Object.freeze(positions.map((position) => {
+  return pathRewriteDigPathsOfRoots(snapshot, enrichment, extracts, positions.map((node) => ({ ref: node.nodeId, rootNodeId: node.nodeId })));
+}
+
+/**
+ * V4 start step, Task 55 (spec 2026-11-03 §4.4): a dig's own paths. A dig that is itself a path debate hands its roots in force (its
+ * paths b<n>, by root index): its own paths are those, each read from its own root and named by its id. An R22 dig hands none: its
+ * positions in the judges' order, by their node ids, exactly as before.
+ */
+export function pathRewriteDigPathsOfDig(
+  snapshot: Pick<StoryWriteInput, "nodes" | "arrows" | "verdictBasis">,
+  enrichment: ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>,
+  extracts: ReadonlyMap<string, readonly PathRewriteExtract[]>,
+  roots: readonly Readonly<{ ref: string; rootNodeId: string }>[]
+): readonly PathRewriteDigPath[] {
+  return roots.length === 0 ? pathRewriteDigPathsOf(snapshot, enrichment, extracts) : pathRewriteDigPathsOfRoots(snapshot, enrichment, extracts, roots);
+}
+
+/**
+ * V4 start step, Task 49: the same walk from the roots given, in their order (a path run's roots, from 0160's `readPathRoots`), each
+ * path named by its own ref (`b<n>`) instead of its root's node id. Each point is still given once across the paths. A root the
+ * snapshot does not hold, or one set aside, is left out. Given the judges' order and each root's own id, it is
+ * `pathRewriteDigPathsOf` exactly.
+ */
+export function pathRewriteDigPathsOfRoots(
+  snapshot: Pick<StoryWriteInput, "nodes" | "arrows">,
+  enrichment: ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>,
+  extracts: ReadonlyMap<string, readonly PathRewriteExtract[]>,
+  roots: readonly Readonly<{ ref: string; rootNodeId: string }>[]
+): readonly PathRewriteDigPath[] {
+  const live = snapshot.nodes.filter((node) => node.excludedReason === null);
+  const byId = new Map(live.map((node) => [node.nodeId, node] as const));
+  const held = roots.flatMap((root) => {
+    const position = byId.get(root.rootNodeId);
+    return position === undefined ? [] : [{ ref: root.ref, position }];
+  });
+  const claimed = new Set<string>(held.map((root) => root.position.nodeId));
+  return Object.freeze(held.map(({ ref, position }) => {
     const points: PathRewritePoint[] = [];
     const visit = (targetId: string) => {
       for (const arrow of snapshot.arrows) {
@@ -307,7 +341,7 @@ export function pathRewriteDigPathsOf(
     visit(position.nodeId);
     const pointIds = new Set(points.map((point) => point.id));
     return Object.freeze({
-      positionRef: position.nodeId,
+      positionRef: ref,
       statement: withoutStoryNodeIds(position.claim),
       points: Object.freeze(points),
       extracts: Object.freeze([...points.flatMap((point) => extracts.get(point.id) ?? [])].filter((entry) => pointIds.has(entry.pointId)))

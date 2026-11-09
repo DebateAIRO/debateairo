@@ -72,7 +72,12 @@ import { contributionOf, seedPublicDebates, PUBLIC_DIG_SUGGESTIONS, PUBLIC_REF, 
 const messages = (name: string) => JSON.parse(readFileSync(resolve(import.meta.dirname, `../../apps/ui/messages/en/${name}.json`), "utf8")) as Record<string, string>;
 const V4 = messages("v4");
 const PUBLIC = messages("public");
-const debate = (at = 0): PublicDebate => PublicDebateSchema.parse(seedPublicDebates()[at]);
+// The mock's first public debate names the level it was asked at (the start-step branch's Task 75d seed); these tests read
+// it as one published before the level was copied, so it names none (Plain words), and `atLevel` below hands a level on.
+const debate = (at = 0): PublicDebate => {
+  const { reading_level: _level, ...rest } = PublicDebateSchema.parse(seedPublicDebates()[at]);
+  return rest;
+};
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -1068,7 +1073,9 @@ describe("Write a report", () => {
 describe("a public debate at its own reading level", () => {
   const atLevel = (level: string): PublicDebate => ({ ...debate(), reading_level: level }) as PublicDebate;
   const firstOpen = (): HTMLButtonElement => buttons(V4["v4.public.dig.open"]!)[0]!;
-  const basisLines = (): number => host!.querySelectorAll(".v4PubFound .v4PanelBasis").length;
+  // A point's open basis line (the start-step branch's question 27 A also gives Plain words a folded own-knowledge line, which
+  // is not one: it sits inside its fold).
+  const basisLines = (): number => host!.querySelectorAll(".v4PubFound .v4PanelPointBody > .v4PanelBasis").length;
 
   it("a dig asked there is asked and priced at the debate's level, and its card opens the dig at that level", async () => {
     vi.useFakeTimers();

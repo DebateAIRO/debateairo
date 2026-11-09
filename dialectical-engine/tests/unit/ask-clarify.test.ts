@@ -377,7 +377,8 @@ describe("the stored lines (decisions 5 and 29)", () => {
 
 describe("every language has what goes into the question", () => {
   const messages = resolve(import.meta.dirname, "../../apps/ui/messages");
-  const KEYS = ["otherAnswer", "otherLabel", "matters", "angles"].map((key) => `newDebate.askText.${key}`);
+  // Decision 2 (V4 start step, Task 67): the angle sentence is retired; an own angle is a path added at the choosing step.
+  const KEYS = ["otherAnswer", "otherLabel", "matters"].map((key) => `newDebate.askText.${key}`);
   const english = JSON.parse(readFileSync(resolve(messages, "en/newDebate.json"), "utf8")) as Record<string, string>;
   const locales = readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   it("35 languages", () => expect(locales).toHaveLength(35));
@@ -385,7 +386,7 @@ describe("every language has what goes into the question", () => {
     expect(english["newDebate.askText.otherAnswer"]).toBe("Other…");
     expect(english["newDebate.askText.otherLabel"]).toBe("Your own extra clarification");
     expect(english["newDebate.askText.matters"]).toBe("If the answers pull in different directions, what matters most to me: {matters}");
-    expect(english["newDebate.askText.angles"]).toBe("Please also look at: {list}.");
+    expect(Object.hasOwn(english, "newDebate.askText.angles")).toBe(false);
     const v4 = JSON.parse(readFileSync(resolve(messages, "en/v4.json"), "utf8")) as Record<string, string>;
     expect(v4["v4.read.honestNote"]).toBe("These would help us better understand your question");
     expect(v4["v4.read.clarifyWaiting"]).toBe("Analyzing your question…");

@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Inna odpowiedź…",
   "newDebate.askText.otherLabel": "Własne dodatkowe wyjaśnienie",
   "newDebate.askText.matters": "Jeśli odpowiedzi idą w różne strony, dla mnie najważniejsze jest: {matters}",
-  "newDebate.askText.angles": "Proszę też przyjrzeć się: {list}.",
   "newDebate.freePublicNotice": "W planie Bezpłatnym Twoje pytanie i debata na jego temat są publiczne. Nie podawaj danych osobowych."
 }

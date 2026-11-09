@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReadingLevel } from "./types.js";
 import { LEVEL_PARAM, levelHref, parseReadingLevel } from "./storage.js";
-import { readAccountLevel, saveAccountLevel } from "./accountMemory.js";
 
 /*
  * Fix wave 1 (Decision A): the reading level lives in React state and in the address (`?level=`), never in browser
@@ -20,21 +19,20 @@ import { readAccountLevel, saveAccountLevel } from "./accountMemory.js";
  * level is read once and used when it arrives (unless the person chose meanwhile); a choice is saved to the account,
  * best-effort. A failed read leaves the page as it was without memory.
  *
+ * V4 start step, Task 75d (owner, 5 Nov, second round): the account stops remembering a level, so by default nothing is read
+ * or saved (no `memory`): the level is the address's or the server's reading, and is known at once. A page that still keeps a
+ * level elsewhere passes its own `memory`.
+ *
  * The address is read from window.location (re-read on every render and on popstate) rather than through Next's
  * useSearchParams, so this module needs nothing from Next: the repository's root typecheck reads lib/v4/storage.ts
  * (through its tests), which re-exports this hook, and cannot resolve Next's extensionless subpaths.
  */
 
-/** Where the account's level is read from and saved to (lib/v4/accountMemory.ts); tests pass their own. */
+/** Where a remembered level is read from and saved to; none by default since Task 75d (tests pass their own). */
 export type LevelMemory = Readonly<{
   read(): Promise<ReadingLevel | null>;
   save(level: ReadingLevel): Promise<unknown>;
 }>;
-
-const ACCOUNT_LEVEL: LevelMemory = Object.freeze({
-  read: () => readAccountLevel(),
-  save: (level: ReadingLevel) => saveAccountLevel(level)
-});
 
 /** The level in the current address, or null (no address on the server, or no valid level in it). */
 function levelInAddress(): ReadingLevel | null {
@@ -66,14 +64,14 @@ function writeLevelToAddress(level: ReadingLevel): void {
 
 /**
  * The reading level for this page: starts from the address (`?level=`), else from the server's reading of it (`initial`,
- * null when absent), else from the account once read; lives in React state, follows the address when it changes, and on
- * change rewrites `?level=` (so a reload or a shared link keeps it) and saves it to the account. The third value says
- * whether the account's level is known (read, failed, or not needed because the address names one), so a page can wait
- * for it before offering a first choice.
+ * null when absent), else from `memory` once read (none by default); lives in React state, follows the address when it
+ * changes, and on change rewrites `?level=` (so a reload or a shared link keeps it) and saves it to `memory`. The third value
+ * says whether the remembered level is known (read, failed, or not needed because the address names one or there is no
+ * memory), so a page can wait for it before offering a first choice.
  */
 export function useReadingLevel(
   initial: ReadingLevel | null,
-  memory: LevelMemory = ACCOUNT_LEVEL
+  memory: LevelMemory | null = null
 ): readonly [ReadingLevel | null, (level: ReadingLevel) => void, boolean] {
   const fallback = parseReadingLevel(initial);
   // While hydrating, React uses the server's reading (the same address), then the browser's.
@@ -89,10 +87,12 @@ export function useReadingLevel(
     if (fromAddress !== null) setLevel(fromAddress);
   }, [fromAddress]);
   useEffect(() => {
-    // Read once per page: with a level in the address there is nothing to look up (that level wins for this view).
-    if (addressNamesOne) return;
+    // Read once per page: with a level in the address there is nothing to look up (that level wins for this view), and with no
+    // memory there is nothing to read.
+    const remembered = memoryRef.current;
+    if (addressNamesOne || remembered === null) return;
     let active = true;
-    memoryRef.current.read().then(
+    remembered.read().then(
       (saved) => {
         if (!active) return;
         if (saved !== null && !chosen.current && levelInAddress() === null) setLevel(saved);
@@ -112,7 +112,7 @@ export function useReadingLevel(
     chosen.current = true;
     setLevel(checked);
     writeLevelToAddress(checked);
-    void memoryRef.current.save(checked).catch(() => undefined);
+    void memoryRef.current?.save(checked).catch(() => undefined);
   }, []);
-  return [level, choose, addressNamesOne || accountSettled || chosen.current] as const;
+  return [level, choose, addressNamesOne || memory === null || accountSettled || chosen.current] as const;
 }

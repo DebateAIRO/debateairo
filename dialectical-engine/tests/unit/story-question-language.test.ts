@@ -59,6 +59,8 @@ describe("the run read carries the question's language", () => {
         return { rows: [{ applied: columnsApplied }] };
       }
       if (text.includes("information_schema.columns")) return { rows: [{ applied: false }] };
+      // V4 start step, Task 75c: the run read's level (this debate was asked without one, so the read names none).
+      if (text.includes("depth_params->>'readingLevel'")) return { rows: [] };
       if (text.includes("core.run_is_owned_by")) {
         return {
           rows: [{

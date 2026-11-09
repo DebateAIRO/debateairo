@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import type { CryptoEnvelope } from "@debateai/crypto";
 import type { MainAnswerUpdateRecord, MainAnswerUpdateRead, PathClimbNext, PathLineEntry, PathUpdateCauseKind, PathUpdateKind, PathUpdateRecord, PathUpdateTurnRead } from "./tree-updates.js";
-import type { WebSealed } from "./web-evidence.js";
+import type { PieceSettingsVersion, WebSealed } from "./web-evidence.js";
 
 /**
  * The public tree (migration 0147; plan 2026-10-31-r22-owner-changes decisions 13 and 22), through 0147's definers only. Every dig on a public debate, the
@@ -17,6 +17,12 @@ export const PUBLIC_MATERIAL_CARRIER = "identity.public_material" as const;
 export const PUBLIC_DIG_INPUT_CARRIER = "identity.public_dig_input" as const;
 export const PUBLIC_ANSWER_UPDATE_CARRIER = "identity.public_answer_update" as const;
 export const PUBLIC_REPORT_CARRIER = "identity.public_report" as const;
+/**
+ * V4 start step, Task 56h-port: the mark of a run made only to carry its owner's report of a public debate (0167's fourth carrier), in its
+ * core.run.depth_params and envelope_basis: { public_report_carrier: <the debate's public reference> }. No debate is ever run on it (no work item; no
+ * envelope parses from the mark), the person's debate list leaves it out (packages/serve), and their data export lists it as a report run.
+ */
+export const PUBLIC_REPORT_CARRIER_MARK = "public_report_carrier" as const;
 
 export type PublicDigParentRead = Readonly<{ root_run_id: string; parent_run_id: string; level: number; writing: boolean }>;
 export type PublicTreeJoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "NOT_PUBLIC" | "PARENT_PRIVATE" | "CONFLICT" | "TOO_DEEP";
@@ -48,10 +54,28 @@ export class PostgresPublicTreeRepository {
       [materialId, runId, publicationRef, kind, JSON.stringify(sealed.envelope), sealed.attestation])).rows[0]!.outcome;
   }
 
-  async openReport(ownerRef: string, publicationRef: string, reportId: string, free: boolean): Promise<PublicReportOpened> {
+  /**
+   * 0167 (V4 start step, Task 56h): 0147's press with two more carriers after the dig, both the presser's own: their earlier report's carrier of this
+   * debate, else `ownRunId`, a run of theirs made for this report on which no debate ever ran (the database checks both). Null: none handed over.
+   */
+  async openReport(ownerRef: string, publicationRef: string, reportId: string, free: boolean, ownRunId: string | null = null): Promise<PublicReportOpened> {
     const row = (await this.pool.query<{ outcome: PublicReportOpened["outcome"]; report_id: string | null; report_version: number | null; carrier_run_id: string | null }>(
-      "SELECT outcome,report_id,report_version,carrier_run_id FROM identity.open_public_report($1,$2,$3,$4)", [ownerRef, publicationRef, reportId, free])).rows[0]!;
+      "SELECT outcome,report_id,report_version,carrier_run_id FROM identity.open_public_report_own_carrier($1,$2,$3,$4,$5)", [ownerRef, publicationRef, reportId, free, ownRunId])).rows[0]!;
     return Object.freeze({ outcome: row.outcome, reportId: row.report_id, reportVersion: row.report_version, carrierRunId: row.carrier_run_id });
+  }
+
+  /**
+   * Task 56h-port: the person's own report run of this debate, still theirs and live, on which nothing ran or waits (one a press that lost its race left
+   * unused, or the one that carried their earlier report): null when there is none. Read on the API's own login, as the person's debate list is.
+   */
+  async readOwnReportCarrier(ownerRef: string, publicationRef: string): Promise<string | null> {
+    return (await this.pool.query<{ run_id: string }>(
+      `SELECT run.run_id FROM core.run AS run
+       WHERE core.run_is_owned_by(run.run_id,$1,NULL::text) AND run.depth_params->>'${PUBLIC_REPORT_CARRIER_MARK}' = $2::text
+         AND core.run_private_content_is_live(run.run_id)
+         AND NOT EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = run.run_id)
+         AND NOT EXISTS (SELECT 1 FROM core.run_wait AS wait WHERE wait.run_id = run.run_id)
+       ORDER BY run.created_at_seq DESC LIMIT 1`, [ownerRef, publicationRef])).rows[0]?.run_id ?? null;
   }
 
   async readTreeOfRun(runId: string): Promise<PublicTreeOfRun | null> {
@@ -61,6 +85,8 @@ export class PostgresPublicTreeRepository {
 
 export type PublicMaterialRead = Readonly<{ run_id: string; publication_ref: string; kind: "DIG" | "REPORT"; recorded_at: string; content: CryptoEnvelope }>;
 export type PublicDigUnsettled = Readonly<{ dig_run_id: string; finished: boolean }>;
+/** 0166: a finished main-answer version 0147 does not hold (0138's, or the page's copy of one an erasure took): ids and a time, never content. */
+export type MainAnswerTimeRead = Readonly<{ update_id: string; recorded_at: string; trigger_run_id: string }>;
 export type PublicReportUnwritten = Readonly<{
   report_id: string; publication_ref: string; report_version: number; carrier_run_id: string; writer_ref: string | null; free: boolean; requested_at: string;
 }>;
@@ -103,13 +129,14 @@ export class PostgresPublicTreeRunnerRepository {
     return (await this.pool.query<{ turn: PathUpdateTurnRead | null }>("SELECT identity.read_path_update_turn($1) AS turn", [updateId])).rows[0]?.turn ?? null;
   }
 
-  async record(record: PathUpdateRecord): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
+  /** Task 57p: 0169's writer, the update's settings version last. */
+  async record(record: PathUpdateRecord & PieceSettingsVersion): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED" }>(
-      "SELECT identity.record_public_path_update($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13::jsonb,$14) AS outcome",
+      "SELECT identity.record_public_path_update_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13::jsonb,$14,$15) AS outcome",
       [record.updateId, record.basedOn?.kind ?? null, record.basedOn?.id ?? null, record.outcome, record.failureCode, record.changed,
         record.fateBefore, record.fateAfter, lineage(record.writerLineage), lineage(record.checkerLineage), record.rounds,
         JSON.stringify(record.artifactRefs), record.content === null ? null : JSON.stringify(record.content.envelope),
-        record.content?.attestation ?? null])).rows[0]!.outcome;
+        record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 
   /** Every turn of a debate on a public tree, hidden ones marked, whether or not its own key still lives; null off a live publication's tree. */
@@ -121,8 +148,10 @@ export class PostgresPublicTreeRunnerRepository {
     return (await this.pool.query<{ next: PathClimbNext | null }>("SELECT identity.read_public_climb_next($1) AS next", [runId])).rows[0]?.next ?? null;
   }
 
-  async recordCheckPassed(runId: string, checkRef: string): Promise<"RECORDED" | "ALREADY" | "NOT_FOUND"> {
-    return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_FOUND" }>("SELECT identity.record_public_check_passed($1,$2) AS outcome", [runId, checkRef])).rows[0]!.outcome;
+  /** Task 57p: 0169's writer, the check's settings version (the dig's, whose run the check was charged to) last. */
+  async recordCheckPassed(runId: string, checkRef: string, settingsVersion: number | null): Promise<"RECORDED" | "ALREADY" | "NOT_FOUND"> {
+    return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_FOUND" }>("SELECT identity.record_public_check_passed_with_settings($1,$2,$3) AS outcome",
+      [runId, checkRef, settingsVersion])).rows[0]!.outcome;
   }
 
   async readDigsUnsettled(before: Date, limit = 50): Promise<readonly PublicDigUnsettled[]> {
@@ -142,12 +171,21 @@ export class PostgresPublicTreeRunnerRepository {
     return (await this.pool.query<{ updates: MainAnswerUpdateRead[] }>("SELECT identity.read_public_answer_updates($1) AS updates", [rootRunId])).rows[0]!.updates;
   }
 
-  async recordGoneAnswer(record: MainAnswerUpdateRecord): Promise<Readonly<{ outcome: "RECORDED" | "ALREADY" | "NOT_PUBLIC" | "BASE_MOVED"; answerSeq: number | null }>> {
+  /**
+   * V4 start step, Task 56g (0166): the root's finished main-answer versions 0147 does not hold, oldest first, whatever the root's state: 0138's,
+   * each at its own time, and the page's copies of those an erasure took, each at its copy's time (never earlier than the version's own).
+   */
+  async readMainAnswerTimes(rootRunId: string): Promise<readonly MainAnswerTimeRead[]> {
+    return (await this.pool.query<{ times: MainAnswerTimeRead[] }>("SELECT identity.read_main_answer_times($1) AS times", [rootRunId])).rows[0]!.times;
+  }
+
+  /** Task 57p: 0169's writer, the version's settings version last. */
+  async recordGoneAnswer(record: MainAnswerUpdateRecord & PieceSettingsVersion): Promise<Readonly<{ outcome: "RECORDED" | "ALREADY" | "NOT_PUBLIC" | "BASE_MOVED"; answerSeq: number | null }>> {
     const row = (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_PUBLIC" | "BASE_MOVED"; answer_seq: number | null }>(
-      "SELECT outcome,answer_seq FROM identity.record_public_answer_update($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14::jsonb,$15)",
+      "SELECT outcome,answer_seq FROM identity.record_public_answer_update_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14::jsonb,$15,$16)",
       [record.updateId, record.triggerRunId, record.rootRunId, record.basedOnUpdateId, record.triggerKind, record.triggerId, record.outcome, record.failureCode,
         lineage(record.writerLineage), lineage(record.checkerLineage), record.rounds, JSON.stringify(record.artifactRefs), record.spentMicros,
-        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!;
+        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null, record.settingsVersion])).rows[0]!;
     return Object.freeze({ outcome: row.outcome, answerSeq: row.answer_seq });
   }
 
@@ -155,12 +193,13 @@ export class PostgresPublicTreeRunnerRepository {
     return (await this.pool.query<{ waiting: PublicReportUnwritten[] }>("SELECT identity.read_public_reports_unwritten($1) AS waiting", [limit])).rows[0]!.waiting;
   }
 
-  async recordReport(record: PublicReportRecord): Promise<"RECORDED" | "ALREADY" | "NOT_FOUND"> {
+  /** Task 57p: 0169's writer, the report's settings version (its carrier's, whose run its calls were charged to) last. */
+  async recordReport(record: PublicReportRecord & PieceSettingsVersion): Promise<"RECORDED" | "ALREADY" | "NOT_FOUND"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_FOUND" }>(
-      "SELECT identity.record_public_report($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14::jsonb,$15) AS outcome",
+      "SELECT identity.record_public_report_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14::jsonb,$15,$16) AS outcome",
       [record.reportId, record.outcome, record.storyOutcome, record.failureCode, record.fingerprint, record.ladderStep, record.leftOut, record.answerRounds, record.storyRounds,
         lineage(record.writerLineage), lineage(record.checkerLineage), JSON.stringify(record.artifactRefs), record.spentMicros,
-        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!.outcome;
+        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 }
 

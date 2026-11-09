@@ -28,6 +28,7 @@ import {
   PostgresWebEvidenceRepository,
   MAIN_ANSWER_UPDATE_CARRIER,
   PATH_UPDATE_CARRIER,
+  PUBLIC_REPORT_CARRIER_MARK,
   RUN_PURPOSE_LINES_CARRIER,
   readMapRootsInForce,
   RunRepository,
@@ -44,6 +45,10 @@ import {
   type RunOwnershipInput
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, PurposeLinesSchema, RunFoundPageSchema, isDigPickPathRef, type RunFoundPage, type Answer, type AnswerIndex, type ConditionMark, type DigSuggestion, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState, webRanOnFree } from "@debateai/contract";
+import type { AnswerBranches, RunPathProgress } from "@debateai/contract";
+import {
+  postgresBranchReadPorts, postgresPathProgressReadPorts, readAnswerBranches, readRunPathProgress as readPathProgressOfRun, webPathRootsOfBranches
+} from "./branches.js";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
@@ -59,6 +64,7 @@ import {
   servePathRewrites, storyPathLinesOf, turnsOnTheLine, storyPathPointsOf, type DebatePoints, type PathTrustSources, type RewriteTurn,
   type StoryPathPoints
 } from "./path-rewrites.js";
+import { inPathOrder, pathNodePlacesOf } from "./path-order.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
   judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
@@ -106,6 +112,8 @@ export * from "./web-sources.js";
 export * from "./dig-suggestions.js";
 // Dig-model revision W4-5: each path's rewrites by digs, and a dig's own `dig`, as the answer serves them.
 export * from "./path-rewrites.js";
+// V4 start step, Task 57: a path debate's paths and each path's progress, read from the stored paths, roots, outcomes and marks.
+export * from "./branches.js";
 
 /**
  * T6 r4 / codex r2 B1 — the value `ledger.node_review.outcome` can hold.
@@ -1380,13 +1388,17 @@ export type VerdictLabelTrigger =
   | "DISAGREEMENT_AT_THRESHOLD"
   | "AT_OR_ABOVE_HIGH_CUT"
   | "MID_BAND"
-  // Engine 2 (R2b): the comparing judges decided (rung 5).
+  // Engine 2 (R2b): the comparing judges decided (rung 5); on a path run (V4 start step, Task 44), the main answer's
+  // trust word decided (rung 5 too).
   | EngineVerdictTrigger;
 
 export interface VerdictLabelDerivation {
   /** SPLIT ("Contested", owner ruling E8) only from the comparing judges; the ladder never gives it. */
   readonly label: "SUPPORTED" | "CONTESTED" | "UNSUPPORTED" | "SPLIT";
-  /** The ladder rung that decided, 0-4 as goal lines 199-207 number them; 5: the comparing judges (engine 2). */
+  /**
+   * The ladder rung that decided, 0-4 as goal lines 199-207 number them; 5: the comparing judges (engine 2), or on a
+   * path run the main answer's trust word (V4 start step, Task 44).
+   */
   readonly rung: 0 | 1 | 2 | 3 | 4 | 5;
   readonly trigger: VerdictLabelTrigger;
   /** Which basis limbs were ABSENT; empty unless rung 0 fired. */
@@ -2066,6 +2078,13 @@ const READMISSION_ORPHANS = `waiting_in_line AS MATERIALIZED (
  * RUN_SETUP_FAILED:READMISSION (the waker's record, packages/battery recordSetupFailure), and not one of
  * READMISSION_ORPHANS. A clause on `run`, for the open-run list and the count (an orphan never has an answer).
  */
+/**
+ * V4 start step, Task 56h-port: the listed run is no report run, a run made only to carry its owner's report of a public debate (its depth_params name the
+ * debate under PUBLIC_REPORT_CARRIER_MARK). No debate ever runs on it, so it would read as a debate waiting to start for ever; the report is on the public
+ * page. A clause on `run`, for the open-run list and the count (a report run never has an answer).
+ */
+const NOT_A_REPORT_RUN = `AND NOT (run.depth_params ? '${PUBLIC_REPORT_CARRIER_MARK}')`;
+
 const NOT_A_READMISSION_ORPHAN = `AND NOT EXISTS (
                SELECT 1 FROM core.work_item AS failed
                WHERE failed.run_id = run.run_id AND failed.state = 'FAILED'
@@ -3017,11 +3036,16 @@ export class ServeRepository {
       subjectRef: row.answer_id,
       relevantAsOf: row.relevant_as_of
     });
+    // V4 start step, Task 58b: a path debate's nodes and edges in one order, read once for both under this lease; null on R22 and v1.
+    const pathPlaces = await this.#pathPlacesOf(row.run_id);
     const [nodes, edges, servedWeb] = await Promise.all([
-      this.readNodesForRun(row.run_id, row.answer_id, row.answer_version),
-      this.readEdgesForRun(row.run_id),
+      this.readNodesForRun(row.run_id, row.answer_id, row.answer_version, pathPlaces),
+      this.readEdgesForRun(row.run_id, pathPlaces),
       this.#readServedWeb(row.run_id)
     ]);
+    // V4 start step, Task 58 (Task 16's Answer.branches): a path debate's paths, each with its answer so far, opened under this lease; an
+    // R22 debate reads its paths' ids only (none). Read inside a caller's lease too: the publication publishes them (Task 63).
+    const branches = await readAnswerBranches(postgresBranchReadPorts(this.pool), row.run_id, "ANSWER");
     const numbers = await this.pool.query<{
       value: number;
       number_kind: string;
@@ -3281,9 +3305,14 @@ export class ServeRepository {
       ...(judgesComparison === undefined ? {} : { judges_comparison: judgesComparison }),
       // Plan 2026-10-30 W3-3: each path's web search and other pages; absent when the debate kept no web rows.
       // W4-3: the kinds code finds on each path joined the AI's (`#readServedWeb`); none at level 10, which cannot be dug.
-      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions) }),
+      // V4 start step, Task 55b (owner F14): a path debate's web paths are its path ids, so code reads the points under each path's root in
+      // force (0160's, as the branches name them); an R22 answer hands none (today's bytes).
+      ...(servedWeb === null ? {} : { web: webWithDigSuggestions(servedWeb.web, nodes, edges, digModel.dig?.level ?? null, pathSuggestions,
+        branches === null ? undefined : new Map(branches.paths.flatMap((path) => path.root_node_id === null ? [] : [[path.path_id, path.root_node_id] as const]))) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
-      ...digModel
+      ...digModel,
+      // V4 start step, Task 58: a path debate's paths (each its own branch); absent on every R22 answer.
+      ...(branches === null ? {} : { branches })
     };
     });
   }
@@ -3347,6 +3376,7 @@ export class ServeRepository {
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
              AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
              ${NOT_A_READMISSION_ORPHAN}
+             ${NOT_A_REPORT_RUN}
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
          FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
@@ -3362,7 +3392,8 @@ export class ServeRepository {
            AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
            -- S01-R37 (t_9931dbe1): a debate the check removed is deleted for its owner before its keys are destroyed.
            AND NOT serve.run_removed_by_synthesis_check(run.run_id)
-           ${NOT_A_READMISSION_ORPHAN}`,
+           ${NOT_A_READMISSION_ORPHAN}
+           ${NOT_A_REPORT_RUN}`,
         [access.ownerRef, access.legacyAskerId]
       )
     ]);
@@ -3466,6 +3497,49 @@ export class ServeRepository {
     );
     const answerId = result.rows[0]?.answer_id;
     return answerId === undefined ? null : this.readAnswerProjection(answerId, access);
+  }
+
+  /**
+   * V4 start step, Task 58 (spec 2026-11-03 §2 item 7; items map-d2, journey-f1, wait-d1): a path debate's paths as they stand while it
+   * runs, for the owner's run read: each path LOOKING until its own answer so far is stored, while the others keep working (Task 57's
+   * reader, phase RUN), opened inside the debate's content lease. The ids are read first, codes only, so an R22 debate, or a path debate
+   * whose paths are not named yet, takes no lease and reads null. Another person's debate, and one erased meanwhile, read null too.
+   */
+  async readRunBranches(runId: string, ownership: RunOwnershipInput): Promise<AnswerBranches | null> {
+    if (!await this.#ownsRun(runId, ownership)) return null;
+    const ports = postgresBranchReadPorts(this.pool);
+    if (await ports.readStartPathIds(runId) === null) return null;
+    try {
+      return await withRunContentLease(this.pool, [runId], () => readAnswerBranches(ports, runId, "RUN"));
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return null;
+      throw error;
+    }
+  }
+
+  /**
+   * V4 start step, Task 58 (items wait-d1, journey-f1, wait-f16): each path's step line, dots and findings while a path debate runs, for
+   * the owner's run read (Task 57's reader): null for an R22 debate and for another person's, [] while the paths are being chosen. Only
+   * the found points' words are opened; a debate erased meanwhile reads null, as the other served reads do.
+   */
+  async readRunPathProgress(runId: string, ownership: RunOwnershipInput): Promise<readonly RunPathProgress[] | null> {
+    if (!await this.#ownsRun(runId, ownership)) return null;
+    try {
+      return await readPathProgressOfRun(postgresPathProgressReadPorts(this.pool), runId);
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED") return null;
+      throw error;
+    }
+  }
+
+  /** Whether the debate is this person's (core.run_is_owned_by, the rule every served read applies first). */
+  async #ownsRun(runId: string, ownership: RunOwnershipInput): Promise<boolean> {
+    const access = normalizeRunOwnership(ownership);
+    const owned = await this.pool.query(
+      "SELECT 1 FROM core.run AS run WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)",
+      [runId, access.ownerRef, access.legacyAskerId]
+    );
+    return (owned.rowCount ?? 0) > 0;
   }
 
   async recordInvestigationRequest(input: {
@@ -3916,7 +3990,10 @@ export class ServeRepository {
     const [stored, plan, shownQuotes] = await Promise.all([repository.read(runId), repository.readPlanStatuses(runId),
       new PostgresPassageRetentionRepository(this.pool).readShownQuotes(runId)]);
     if ((stored === null || stored.searches.length === 0) && (plan === null || plan.length === 0)) return null;
-    const roots = webPathRootsOf(await readMapRootsInForce(this.pool, runId));
+    // V4 start step, Task 58: a path debate stores and serves its web paths by path id ("b1", …), the position everywhere on it; the map's
+    // roots in force name an R22 debate's.
+    const pathIds = await postgresBranchReadPorts(this.pool).readStartPathIds(runId);
+    const roots = pathIds !== null ? webPathRootsOfBranches(pathIds) : webPathRootsOf(await readMapRootsInForce(this.pool, runId));
     const cipher = await prepareLeasedContentEncryptionForRun(this.pool, runId);
     try {
       const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_PLAN_CARRIER | typeof WEB_SHOWN_QUOTE_CARRIER, id: string,
@@ -3961,8 +4038,32 @@ export class ServeRepository {
     }
   }
 
-  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
-  private async readEdgesForRun(runId: string): Promise<Edge[]> {
+  /**
+   * V4 start step, Task 58b (Task 53b's rule, spec §4.3: the served answer is the same whichever path finishes first). Each path of a path
+   * debate saves in its own order, so created_at_seq across paths follows which path finished first: its nodes are served path by path in
+   * the order its branches list them, and its edges after their source nodes (./path-order.ts). Ids and codes only (0159's path ids,
+   * 0160's roots in force, each live node's parent), read under the caller's lease. Null on every R22 and v1 debate (no paths: one read
+   * of the ids), and on a path debate with no root in force: their nodes and edges keep the SQL's created_at_seq order.
+   */
+  async #pathPlacesOf(runId: string): Promise<ReadonlyMap<string, number> | null> {
+    const ports = postgresBranchReadPorts(this.pool);
+    const pathIds = await ports.readStartPathIds(runId);
+    if (pathIds === null) return null;
+    const rootOf = new Map((await ports.readPathRoots(runId)).filter((root) => !root.stale)
+      .map((root) => [root.pathId as string, root.rootNodeId] as const));
+    const roots = pathIds.flatMap((pathId) => rootOf.get(pathId) ?? []);
+    if (roots.length === 0) return null;
+    const nodes = await this.pool.query<{ node_id: string; parent_node_id: string | null }>(
+      `SELECT node_id::text AS node_id, parent_node_id::text AS parent_node_id FROM core.node
+        WHERE run_id = $1 AND generation_status <> 'stale' ORDER BY created_at_seq`, [runId]);
+    return pathNodePlacesOf(nodes.rows.map((row) => ({ nodeId: row.node_id, parentNodeId: row.parent_node_id })), roots);
+  }
+
+  /**
+   * Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's.
+   * Task 58b: `pathPlaces` is the caller's read of #pathPlacesOf (absent: read here).
+   */
+  private async readEdgesForRun(runId: string, pathPlaces?: ReadonlyMap<string, number> | null): Promise<Edge[]> {
     const result = await this.pool.query<{
       edge_id: string;
       source_node_id: string;
@@ -3988,7 +4089,10 @@ export class ServeRepository {
        ORDER BY edge.created_at_seq`,
       [runId]
     );
-    return result.rows.map((edge) => projectServeEdge({
+    // Task 58b: a path debate's edges after their source nodes, in the nodes' served order; R22 and v1 keep the SQL's order.
+    const places = pathPlaces === undefined ? await this.#pathPlacesOf(runId) : pathPlaces;
+    const rows = places === null ? result.rows : inPathOrder(result.rows, (edge) => edge.source_node_id, places);
+    return rows.map((edge) => projectServeEdge({
       edgeId: edge.edge_id,
       sourceNodeId: edge.source_node_id,
       sourceChildKind: edge.source_child_kind,
@@ -4002,8 +4106,12 @@ export class ServeRepository {
     }));
   }
 
-  /** Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's. */
-  private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number): Promise<Node[]> {
+  /**
+   * Reclaim resume (migration 0119): nodes a later copy set aside ('stale'), and their edges, are not the answer's.
+   * Task 58b: `pathPlaces` is the caller's read of #pathPlacesOf (absent: read here, under this lease).
+   */
+  private async readNodesForRun(runId: string, answerId?: string, answerVersion?: number,
+    pathPlaces?: ReadonlyMap<string, number> | null): Promise<Node[]> {
     return withRunContentLease(this.pool,[runId],async () => {
     const result = await this.pool.query<{
       node_id: string;
@@ -4103,6 +4211,9 @@ export class ServeRepository {
        WHERE node.run_id = $1 AND node.generation_status <> 'stale' ORDER BY node.created_at_seq`,
       [runId]
     );
+    // Task 58b: a path debate's nodes path by path (./path-order.ts); R22 and v1 keep the SQL's created_at_seq order.
+    const places = pathPlaces === undefined ? await this.#pathPlacesOf(runId) : pathPlaces;
+    const rows = places === null ? result.rows : inPathOrder(result.rows, (row) => row.node_id, places);
     const markLinks = answerId === undefined || answerVersion === undefined
       ? []
       : (await this.pool.query<{ node_id: string; mark: string }>(
@@ -4115,10 +4226,10 @@ export class ServeRepository {
         [answerId, answerVersion]
       )).rows;
     const marksByNode = projectConditionMarksByNode(
-      result.rows.map((row) => row.node_id),
+      rows.map((row) => row.node_id),
       markLinks.map((link) => ({ nodeId: link.node_id, mark: link.mark }))
     );
-    return Promise.all(result.rows.map(async (row) => {
+    return Promise.all(rows.map(async (row) => {
       const [staleness, nodeContent, reviewContent] = await Promise.all([
         this.#liveness.readSubjectStaleness({
           runId,

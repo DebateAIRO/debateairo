@@ -6,7 +6,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway, TokenCounter } from "@debateai/providers";
 import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
 import { firstDebateSuggestionFacts } from "./investigation-digest.js";
-import { advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
+import { advanceAfterStory, advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
 import { postgresTreeUpdatePorts, readRecentTreeDigs } from "./path-climb-sources.js";
 import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { publicDigOnSettle, type PublicTreeRunnerSettings } from "./public-contribution.js";
@@ -26,7 +26,8 @@ import { readReplayBook } from "./run-replay.js";
  *    it on the never-walled PATH_REWRITE seam (`buildPathRewriteCostEnvelopeSeam`, W3-2's `pathRewriteSeam`);
  *  - the sweep's list (0135) and the shared in-flight set, so the sweep never runs a second copy beside a live rewrite;
  *  - R22 decisions 2 and 3 (0138): each dig's turn held to its path's whole line, and once its row is stored the climb and the main
- *    answer (path-climb.ts), with the configured members, on the same in-flight set, with their own sweep.
+ *    answer (path-climb.ts), with the configured members, on the same in-flight set, with their own sweep; V4 start step, Task 55e: and
+ *    once a dig under the main question of a path debate has its story, that main-answer update (`afterStory`), on the same set and sweep.
  * Absent (undefined) when the configured targets hold no Haiku or no GLM: every settled run then writes its story as
  * before, rather than every dig ending FAILED for want of its two roles.
  */
@@ -43,6 +44,11 @@ export function composePathRewrite(input: Readonly<{
   members: readonly Readonly<{ provider: ProviderGateway; providerRef: string; maker: string }>[];
   /** Decision 28: Anthropic's free token count (main.ts). */
   tokenCount?: TokenCounter;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the runner's run → version map's reader
+   * (main.ts `pieceSettingsVersionOf`); the rewrite, the tree's levels and main-answer versions and a public dig's passed check each note the version of the run its calls were charged to. Absent: none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>): PathRewriteComposed | undefined {
   const writerRoleRef = input.targets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL)?.providerRef;
@@ -61,7 +67,9 @@ export function composePathRewrite(input: Readonly<{
   const inFlight = createPathRewriteInFlight();
   const refreshSuggestions = refreshPathSuggestionsOnPool(pool);
   const tokenCount = input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount };
-  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount,
+  // Task 57p: one reader of the run → version map for the rewrite, the tree and the public tree alike.
+  const versionOf = input.settingsVersionOf === undefined ? {} : { settingsVersionOf: input.settingsVersionOf };
+  const tree: TreeUpdateSettings = Object.freeze({ ports: postgresTreeUpdatePorts(pool), roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount, ...versionOf,
     // Owner Q-D8: a level a climb really changed gets its suggestions worked out again, each level its own set and call site.
     afterLevel: async (level, written) => {
       if (written === null) return;
@@ -70,9 +78,10 @@ export function composePathRewrite(input: Readonly<{
         step: written.step, writer: written.writer, send: written.send, log: written.log }));
     } });
   // Decision 13: a dig on a public debate is a contribution, on its own pipeline (public-contribution.ts), read only from the public copy.
-  const publicTree: PublicTreeRunnerSettings = Object.freeze({ pool, roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount });
+  const publicTree: PublicTreeRunnerSettings = Object.freeze({ pool, roles, writerRoleRef, checkerRoleRef, inFlight, log: input.log, ...tokenCount, ...versionOf });
   const settings: PathRewriteRunnerSettings = Object.freeze({
     ...tokenCount,
+    ...versionOf,
     publicDig: publicDigOnSettle(publicTree, () => settings),
     isPublicDig: async (runId: string) => (await new PostgresPublicDebateRunnerRepository(pool).readContribution(runId)) !== null,
     sources: postgresPathRewriteSources(pool),
@@ -93,7 +102,9 @@ export function composePathRewrite(input: Readonly<{
     refreshSuggestions,
     firstDebateSuggestions: Object.freeze({ store: postgresPathSuggestionsStore(pool), read: firstDebateSuggestionFacts(pool) }),
     line: new PostgresTreeUpdateRunnerRepository(pool),
-    afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease)
+    afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease),
+    // V4 start step, Task 55e: a dig under the main question of a path debate updates the main answer once its story is written.
+    afterStory: (runId, lease) => advanceAfterStory(tree, runId, lease)
   });
   const picks = new PostgresDigPicksRunnerRepository(pool);
   return Object.freeze({

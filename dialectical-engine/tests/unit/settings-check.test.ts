@@ -16,6 +16,9 @@ import {
 import {
   SETTINGS_CHECKER,
   SETTINGS_CHECK_DETAIL_UNPRINTABLE,
+  debateShapePolicyStartValues,
+  debateShapeStartStepStartValues,
+  engineVersionPolicyStartValues,
   isSettingsCheckCode,
   parseSettingsCheckArguments,
   previewLineUpPolicyFromValue,
@@ -44,8 +47,14 @@ import {
   type RunnerCheckReaders
 } from "../../apps/runner/src/settings-check.js";
 import {
+  ADMISSION_CHECK_READERS,
+  SETTINGS_WARNING_LINE,
+  START_STEP_UNREACHABLE,
   checkAdmissionSettingsVersion,
   checkQuestionLanguage,
+  readGatePotFindings,
+  settingsWarningLine,
+  startStepUnreachableCodes,
   type AdmissionCheckReaders,
   type ApiCheckEnvironment
 } from "../../apps/api/src/settings-check.js";
@@ -520,6 +529,113 @@ describe("check-version, the API half (side-by-side §13)", () => {
     await expect(checkApi(apiReaders({
       readComparisonRows: async () => { throw new TypedDomainError("DATABASE_POOL_FAILED", "PostgreSQL pool operation failed"); }
     }).readers)).rejects.toMatchObject({ code: "DATABASE_POOL_FAILED" });
+  });
+});
+
+/**
+ * V4 start step, Task 42 (spec 2026-11-03 §5 "Money", "Before upload"; plan call 6): the start step never switches itself
+ * off unseen, and the pot guard runs in check-version. Its refusals are report codes; its notes reach the operator through
+ * `onWarning` only, never the report.
+ */
+describe("V4 start step, Task 42: a start step that would never run, and the pot guard in check-version", () => {
+  const ON = Object.freeze({ ...debateShapePolicyStartValues(), startStep: debateShapeStartStepStartValues() });
+  const SORTED_PLANS = ["free", "max", "plus", "premium", "pro"] as const;
+  const unreachable = (reason: string, plans: readonly string[] = SORTED_PLANS) => plans.map((plan) => `START_STEP_UNREACHABLE:${plan}:${reason}`);
+  const facts = (change: Partial<Parameters<typeof startStepUnreachableCodes>[0]> = {}): Parameters<typeof startStepUnreachableCodes>[0] =>
+    ({ policy: ON, engineInForce: true, scorecardInForce: false, makersOf: () => 3, ...change });
+  /** A loaded version, as the guard reads it: the switch on, engine 2 in force, no VALID scorecard. */
+  const loadedWith = (change: Readonly<Record<string, unknown>> = {}) => Object.freeze({ registerVersion: VERSION, debateShapePolicy: ON,
+    engineVersionPolicy: engineVersionPolicyStartValues(), modelPicker: { scorecard: { state: "ABSENT" } }, ...change });
+  const previewEnv = apiEnvironment({ PREVIEW_GATE_SETTINGS: PREVIEW_GATE, PREVIEW_ENV_LINE_UP: null });
+  const site = { declaredProviderTargets: reviewedTargets() } as unknown as AdmissionSiteContext;
+  const TWO_MAKERS = lineUp([GLM, DEEPSEEK]);
+  const onPreview = (loaded: unknown, roster: SealedPreviewLineUp = TWO_MAKERS, change: Partial<AdmissionCheckReaders> = {}) =>
+    apiReaders({ readSite: async () => site, loadVersion: async () => loaded, readLineUp: vi.fn(async () => roster), ...change });
+
+  it("the rule: the first reason Task 34's rule is off, for every switched-on plan; nothing without the switch", () => {
+    expect(START_STEP_UNREACHABLE).toBe("START_STEP_UNREACHABLE");
+    // The register's switch carries every plan's widths, so a VALID scorecard keeps it off for each of them, plus among them.
+    expect(startStepUnreachableCodes(facts({ scorecardInForce: true }))).toEqual(unreachable("SCORECARD"));
+    expect(startStepUnreachableCodes(facts({ scorecardInForce: true }))).toContain("START_STEP_UNREACHABLE:plus:SCORECARD");
+    expect(startStepUnreachableCodes(facts({ engineInForce: false }))).toEqual(unreachable("ENGINE_OFF"));
+    expect(startStepUnreachableCodes(facts({ makersOf: (plan) => (plan === "plus" ? 1 : 2) }))).toEqual(["START_STEP_UNREACHABLE:plus:ONE_MAKER"]);
+    // Only the first reason: the scorecard, then engine 2, then the makers.
+    expect(startStepUnreachableCodes(facts({ scorecardInForce: true, engineInForce: false, makersOf: () => 1 }))).toEqual(unreachable("SCORECARD"));
+    expect(startStepUnreachableCodes(facts({ engineInForce: false, makersOf: () => 1 }))).toEqual(unreachable("ENGINE_OFF"));
+    expect(startStepUnreachableCodes(facts())).toEqual([]);
+    for (const policy of [null, debateShapePolicyStartValues(), { ...ON, enabled: false }]) {
+      expect(startStepUnreachableCodes(facts({ policy, scorecardInForce: true, engineInForce: false, makersOf: () => 1 }))).toEqual([]);
+    }
+  });
+
+  it("check-version on the preview refuses START_STEP_UNREACHABLE:<plan>:<reason> from the loaded version and its line-up", async () => {
+    const scorecard = await checkApi(onPreview(loadedWith({ modelPicker: { scorecard: { state: "VALID" } } })).readers, previewEnv);
+    expect(scorecard).toMatchObject({ verdict: "FAIL", codes: unreachable("SCORECARD") });
+    expect(scorecard.codes).toContain("START_STEP_UNREACHABLE:plus:SCORECARD");
+    // Engine 2 off: one code per switched-on plan.
+    expect((await checkApi(onPreview(loadedWith({ engineVersionPolicy: null })).readers, previewEnv)).codes).toEqual(unreachable("ENGINE_OFF"));
+    // A plus line-up of one maker (the paid plans share the premium roster; Free keeps its two makers).
+    expect((await checkApi(onPreview(loadedWith(), lineUp([GLM, DEEPSEEK], [GLM])).readers, previewEnv)).codes)
+      .toEqual(unreachable("ONE_MAKER", ["max", "plus", "premium", "pro"]));
+  });
+
+  it("a clean version, and a version without the switch, raise no code; off the preview nothing is checked", async () => {
+    const clean = onPreview(loadedWith());
+    expect(await checkApi(clean.readers, previewEnv)).toMatchObject({ verdict: "PASS", codes: [] });
+    expect(clean.readers.readLineUp).toHaveBeenCalledTimes(1);
+    const noSwitch = loadedWith({ debateShapePolicy: debateShapePolicyStartValues(), engineVersionPolicy: null, modelPicker: { scorecard: { state: "VALID" } } });
+    expect(await checkApi(onPreview(noSwitch, lineUp()).readers, previewEnv)).toMatchObject({ verdict: "PASS", codes: [] });
+    expect(await checkApi(onPreview(loadedWith({ debateShapePolicy: null, engineVersionPolicy: null })).readers, previewEnv)).toMatchObject({ codes: [] });
+    expect(await checkApi(apiReaders({ loadVersion: async () => loadedWith({ engineVersionPolicy: null }) }).readers)).toMatchObject({ codes: [] });
+  });
+
+  it("the pot guard runs on the preview with the loaded version: its refusals are report codes, its notes go to onWarning only", async () => {
+    const loaded = loadedWith();
+    const checkGatePots = vi.fn(async () => ({ refusals: ["GATE_POT_BELOW_ONE_DEBATE:anthropic:plus:question:d2:p7:web"],
+      warnings: ["GATE_POT_SPENT_TODAY:deepinfra"] }));
+    const { readers } = onPreview(loaded, TWO_MAKERS, { checkGatePots });
+    const warnings: string[] = [];
+    const report = await checkAdmissionSettingsVersion({ pool: POOL, environment: previewEnv, version: VERSION, readers,
+      onWarning: (code) => { warnings.push(code); } });
+    expect(report).toMatchObject({ verdict: "FAIL", codes: ["GATE_POT_BELOW_ONE_DEBATE:anthropic:plus:question:d2:p7:web"] });
+    expect(warnings).toEqual(["GATE_POT_SPENT_TODAY:deepinfra"]);
+    expect(checkGatePots).toHaveBeenCalledTimes(1);
+    const [handed] = checkGatePots.mock.calls[0] as unknown as [Readonly<Record<string, unknown>>];
+    expect(handed.loaded).toBe(loaded);
+    expect(handed.site).toBe(site);
+    expect(handed.environment).toBe(previewEnv);
+    expect(handed.lineUp).toEqual(TWO_MAKERS);
+    expect(Object.keys(handed).sort()).toEqual(["environment", "lineUp", "loaded", "site"]);
+    // The line-up is still read once for every preview step.
+    expect(readers.readLineUp).toHaveBeenCalledTimes(1);
+    // A note alone is never a failure.
+    const noted: string[] = [];
+    const noteOnly = onPreview(loaded, TWO_MAKERS, { checkGatePots: async () => ({ refusals: [], warnings: ["GATE_POT_SPENT_TODAY:anthropic"] }) });
+    expect(await checkAdmissionSettingsVersion({ pool: POOL, environment: previewEnv, version: VERSION, readers: noteOnly.readers,
+      onWarning: (code) => { noted.push(code); } })).toMatchObject({ verdict: "PASS", codes: [] });
+    expect(noted).toEqual(["GATE_POT_SPENT_TODAY:anthropic"]);
+  });
+
+  it("nothing is asked off the preview, nor when the loader refused the version", async () => {
+    const offPreview = vi.fn(async () => ({ refusals: ["GATE_POT_UNANSWERED:deepinfra"], warnings: [] }));
+    expect(await checkApi(apiReaders({ loadVersion: async () => loadedWith(), checkGatePots: offPreview }).readers)).toMatchObject({ verdict: "PASS", codes: [] });
+    expect(offPreview).not.toHaveBeenCalled();
+    const refused = vi.fn(async () => ({ refusals: ["GATE_POT_UNANSWERED:deepinfra"], warnings: [] }));
+    const loader = onPreview(undefined, TWO_MAKERS, { loadVersion: async () => { throw typed("RUN_CEILING_BELOW_ONE_CALL"); }, checkGatePots: refused });
+    expect((await checkApi(loader.readers, previewEnv)).codes).toEqual(["RUN_CEILING_BELOW_ONE_CALL"]);
+    expect(refused).not.toHaveBeenCalled();
+  });
+
+  it("one exact note line; the boot's readers carry the guard; the command prints each note before its report line", () => {
+    expect(SETTINGS_WARNING_LINE).toBe("DEBATEAI_SETTINGS_WARNING ");
+    expect(settingsWarningLine("api", "GATE_POT_SPENT_TODAY:deepinfra"))
+      .toBe("DEBATEAI_SETTINGS_WARNING {\"half\":\"api\",\"code\":\"GATE_POT_SPENT_TODAY:deepinfra\"}\n");
+    expect(() => settingsWarningLine("api", "not a code")).toThrow("SETTINGS_WARNING_CODE_INVALID");
+    expect(ADMISSION_CHECK_READERS.checkGatePots).toBe(readGatePotFindings);
+    const cli = readFileSync(new URL("../../apps/api/src/settings-check-cli.ts", import.meta.url), "utf8").replace(/\s+/gu, " ");
+    expect(cli).toContain("onWarning: (code) => { warnings.push(code); }");
+    expect(cli).toContain("for (const code of warnings) output.stdout(settingsWarningLine(\"api\", code));");
+    expect(cli.indexOf("checkAdmissionSettingsVersion({")).toBeLessThan(cli.indexOf("for (const code of warnings)"));
   });
 });
 

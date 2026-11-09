@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { basisKey, OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
-import { DIG_LEVEL_MAX, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
+import { DIG_LEVEL_MAX, MAIN_ANSWER_TRIGGERS, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
 import { RUN_FAILURE_KINDS } from "../../apps/ui/lib/v3/runFailure.js";
 
 /*
@@ -87,7 +87,7 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // The owner's third round (5 Nov afternoon): a dig that keeps failing because the AIs were unavailable says its reason
   // without "You can try it again in a while.", so it does not disagree with "This keeps failing. Write your report; ...".
   "v4.digFailed.unavailableKeepsFailing",
-  "v4.debate.failedSomeTaken",
+  // v4.debate.failedSomeTaken left this list: approved as built (owner 7 Nov, question 43 A; QUESTIONS_42_43_ANSWER_LINES below).
   // ACCESS-13 (the wave-2 checks): "Light or dark"'s name also says what a press does. Owner question.
   "v4.header.menu.themeToDark",
   "v4.header.menu.themeToLight",
@@ -453,7 +453,321 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.debate.state.HOLDING.noTime",
   "v4.panel.found",
   "v4.digLive.found",
-  "v4.digLive.pathNow"
+  "v4.digLive.pathNow",
+  // V4 start step, Task 63 (draft wording): the label over the person's own words in a public path debate's row.
+  "v4.public.pathOwnWords",
+  // V4 start step, Task 61 (P6): the map's chosen paths, their wait and their panel; wait-d1 C's, wait-f16's and the plan's
+  // words, and draft wording; every v4.paths.* key waits for the click-test. Then r2-1 A's five rewordings ("path" on the map).
+  "v4.paths.looking",
+  "v4.paths.failed",
+  "v4.paths.answerSoFar",
+  "v4.paths.asks",
+  "v4.paths.viewpoints",
+  "v4.paths.yourWords",
+  "v4.paths.whatChanged",
+  "v4.paths.more.one",
+  "v4.paths.more.other",
+  "v4.paths.moreHeading",
+  "v4.paths.moreHint",
+  "v4.paths.moreNew",
+  "v4.paths.digThis",
+  "v4.paths.alsoRaised",
+  "v4.paths.tag.TOGETHER",
+  "v4.paths.tag.COMBINED",
+  "v4.paths.tag.EDITED",
+  "v4.paths.tag.ADDED",
+  "v4.paths.trustWord",
+  "v4.paths.mainTrust",
+  "v4.paths.running",
+  "v4.paths.step.FINDING_SOURCES",
+  "v4.paths.step.ARGUING",
+  "v4.paths.step.CHECKING",
+  "v4.paths.dots",
+  "v4.paths.dotsNote",
+  "v4.paths.lookingPanel",
+  "v4.paths.moreLater",
+  "v4.paths.choosing",
+  "v4.paths.carryOn.ANSWER",
+  "v4.paths.carryOn.DIGS",
+  "v4.paths.carryOn.DIGS_FREE",
+  "v4.paths.carryOn.REPORT",
+  "v4.paths.carryOn.nothingToDo",
+  "v4.map.pathUntitled",
+  "v4.panel.kind.path",
+  "v4.map.noPaths",
+  "v4.panel.pathNoMore",
+  "v4.panel.noOpenPath",
+  // V4 start step, Task 62 (wait-d1, map-f4, answer Q15, wait-f10): drafts until the click-test.
+  "v4.paths.filled",
+  "v4.paths.movedUp",
+  "v4.paths.yourPaths",
+  "v4.paths.writingAnswer",
+  "v4.ready.shortAnswer",
+  // V4 start step, Task 68 (draft wording): a plan change since Next (splice ruling), and fewer allowed paths after a site
+  // update (owner answer Q8). There is no out-of-date key: suggestions never go out of date by time.
+  "v4.start.readAgainNeeded",
+  "v4.start.narrowed.one",
+  "v4.start.narrowed.other",
+  // V4 start step, Task 69 (choose-f14, choose-f7, journey-f8, r2-2; draft wording, combine's share owner answer Q7): the
+  // one share line per path count, its grey change, and the shares beside combine and look wider (no period named there).
+  "v4.start.share.day",
+  "v4.start.share.month",
+  "v4.start.shareUp",
+  "v4.start.shareDown",
+  "v4.start.combineFrees.one",
+  "v4.start.combineFrees.other",
+  "v4.start.lookWider",
+  // V4 start step, Task 70b (read-f13, ask-f2, r2-4, ask-f8; the spec's and the record's words, shown at the click-test): Next's
+  // "Reading…" after the consent, "Getting ready…" while the plan is read, the grey quota line under Next, and the line under
+  // Next after a declined consent with its link.
+  "v4.ask.reading",
+  "v4.ask.gettingReady",
+  "v4.ask.readingUsesQuota",
+  "v4.ask.consentDeclined",
+  "v4.ask.consentShowAgain",
+  // V4 start step, Task 75 (read-d5, choose-f16, read-f24, choose-f4, choose-f10, r2-3; the spec's words, shown at the
+  // click-test): the bottom bar's "You'll get", its path count, How wide, Start's words, the carry-on box, the ready note
+  // and the phone's Options sheet.
+  "v4.start.youGet.one",
+  "v4.start.youGet.other",
+  "v4.start.youGetExpert.one",
+  "v4.start.youGetExpert.other",
+  "v4.start.pathCount.one",
+  "v4.start.pathCount.other",
+  "v4.start.howWide",
+  "v4.start.pathsComing",
+  "v4.start.start",
+  "v4.start.writingWait",
+  "v4.start.carryOn",
+  "v4.start.readyNote",
+  "v4.start.options",
+  "v4.start.optionsDone",
+  // V4 start step, Task 75b (ask-d2; the owner's words, record :168, shown at the click-test): the level block's button that
+  // opens the honest note. Its grey line v4.ask.levelKept is not here: the owner approved it on 5 Nov (answer Q15).
+  "v4.ask.levelWhat",
+  // V4 start step, Task 72 (choose-d3, choose-f6, choose-f7, choose-d4; the spec's words and draft wording, shown at the
+  // click-test): the path rows, their chips, tags and ⋯ menus, Rewrite and its question, and the combine line.
+  "v4.start.row.a11y",
+  "v4.start.row.viewpoints.one",
+  "v4.start.row.viewpoints.other",
+  "v4.start.row.notSelected",
+  "v4.start.row.picked",
+  "v4.start.row.together.other",
+  "v4.start.row.more",
+  "v4.start.chip.a11y",
+  "v4.start.tag.PUT_TOGETHER_BY_US",
+  "v4.start.tag.COMBINED_BY_YOU",
+  "v4.start.tag.ADDED_BY_YOU",
+  "v4.start.tag.ADDED_WHEN_WIDENED",
+  "v4.start.tag.new",
+  "v4.start.tag.split",
+  "v4.start.menu.rewrite",
+  "v4.start.menu.combineWith",
+  "v4.start.menu.split",
+  "v4.start.menu.moveUp",
+  "v4.start.menu.moveDown",
+  "v4.start.menu.remove",
+  "v4.start.chipMenu.label",
+  "v4.start.chipMenu.moveTo",
+  "v4.start.chipMenu.ownPath",
+  "v4.start.chipMenu.remove",
+  "v4.start.rewrite.open",
+  "v4.start.rewrite.title",
+  "v4.start.rewrite.wording",
+  "v4.start.rewrite.save",
+  "v4.start.rewrite.cancel",
+  "v4.start.writing",
+  "v4.start.reword.changed",
+  "v4.start.reword.rewrite",
+  "v4.start.reword.keep",
+  "v4.start.combineWith.pick",
+  "v4.start.combineWith.rowA11y",
+  "v4.start.combineWith.cancel",
+  // V4 start step, Task 55e (spec §4.4; draft wording, shown at the click-test): the main answer updated because a dig of a path
+  // left out before Start added it to the question.
+  "v4.mainAnswer.trigger.PATH_ADDED",
+  "v4.answerCard.updated.PATH_ADDED",
+  // V4 start step, Task 73 (read-d4, choose-d1, choose-f2, choose-f4, choose-f5, choose-f7, choose-f8, choose-f11, choose-f15,
+  // choose-f16; the spec's words and draft wording, shown at the click-test; the refusals in the owner's answer "Four per path"
+  // A words): the card's title and lines, the waiting band, why a list is missing, the notices, your own path, the full-list
+  // choice and the refusals.
+  "v4.start.title",
+  "v4.start.freeLine.one",
+  "v4.start.freeLine.other",
+  "v4.start.reloadLine",
+  "v4.start.phase.CHECKING",
+  "v4.start.phase.LANGUAGE_CHOICE",
+  "v4.start.phase.READING",
+  "v4.start.phase.MERGING",
+  "v4.start.answered",
+  "v4.start.morePlaces",
+  "v4.start.readyAnnounce.one",
+  "v4.start.readyAnnounce.other",
+  "v4.start.lateIdeas",
+  "v4.start.lateIdeasAnnounce",
+  "v4.start.none.PASSING",
+  "v4.start.none.NOT_OFFERED",
+  "v4.start.none.TOO_SLOW",
+  "v4.start.none.OFFLINE",
+  "v4.start.none.SIGNED_OUT",
+  "v4.start.none.QUOTA",
+  "v4.start.refused",
+  "v4.start.answersFolded",
+  "v4.start.showQuestions",
+  "v4.start.undo",
+  "v4.start.combinedAnnounce.one",
+  "v4.start.combinedAnnounce.other",
+  "v4.start.combinedAnnounceMonth.one",
+  "v4.start.combinedAnnounceMonth.other",
+  "v4.start.combinedAnnounceNoShare.one",
+  "v4.start.combinedAnnounceNoShare.other",
+  "v4.start.notice.combined",
+  "v4.start.notice.combineFailed",
+  "v4.start.notice.madeRoom.one",
+  "v4.start.notice.madeRoom.other",
+  "v4.start.notice.narrowed.one",
+  "v4.start.notice.narrowed.other",
+  "v4.start.own.label",
+  "v4.start.own.hint",
+  "v4.start.own.add",
+  "v4.start.own.finding",
+  "v4.start.own.fits",
+  "v4.start.own.addThere",
+  "v4.start.own.ownPath",
+  "v4.start.full.wider",
+  "v4.start.full.widest",
+  "v4.start.full.free",
+  "v4.start.full.addTo",
+  "v4.start.full.swap",
+  "v4.start.full.path",
+  "v4.start.full.cancel",
+  "v4.start.refusal.VIEWPOINTS_FULL",
+  "v4.start.refusal.OWN_WORDS_FULL",
+  "v4.start.refusal.EMPTY",
+  "v4.start.refusal.TOO_LONG",
+  "v4.start.refusal.LAST_PATH",
+  // V4 start step, Task 74 (choose-f18, choose-f6, choose-f7; the spec's words and draft wording, shown at the click-test):
+  // "+ N more to explore" and its drawer, "Another way to see it" with its kinds and "Make this my question", the one-tap
+  // suggestions, and the lines that say where a new path went.
+  "v4.start.more.open",
+  "v4.start.more.title",
+  "v4.start.more.done",
+  "v4.start.more.useful",
+  "v4.start.more.directions",
+  "v4.start.more.byArea",
+  "v4.start.more.addedByYou",
+  "v4.start.lookInto",
+  "v4.start.added.to",
+  "v4.start.added.asPath",
+  "v4.start.ways.title",
+  "v4.start.ways.kind.CHOICE_NOT_WEIGHED",
+  "v4.start.ways.kind.EITHER_OR",
+  "v4.start.ways.kind.WHAT_WOULD_CHANGE_IT",
+  "v4.start.ways.kind.OTHER_READING",
+  "v4.start.ways.addTo",
+  "v4.start.ways.addAsPath",
+  "v4.start.ways.makeMine",
+  "v4.start.ways.swapped",
+  "v4.start.ways.swappedNow",
+  "v4.start.ways.noRoom",
+  "v4.start.suggest.label",
+  "v4.start.suggest.combine",
+  "v4.start.suggest.combineButton",
+  "v4.start.suggest.keepApart",
+  "v4.start.suggest.fits",
+  "v4.start.suggest.addTo",
+  "v4.start.suggest.notNow",
+  // V4 start step, Task 76 (r2-6, choose-f15, ask-f7; 4 Nov night ask-f13, the owner's words of record :239): step 2's calm
+  // no-questions line, Free's one joined line, the screens' way back and "Use my words instead", shown at the click-test.
+  "v4.read.noQuestions",
+  "v4.read.freeJoined",
+  "v4.ask.editMyQuestion",
+  "v4.ask.useMyWords",
+  // V4 start step, Task 76b (answers Q11 and Q13; 4 Nov night read-f3: the record's example words and the coordinator's):
+  // Start's Undo note, its line read out once and its confirmation, and the two lines of a plan read at the press.
+  "v4.start.undo.note",
+  "v4.start.undo.noteNoShare",
+  "v4.start.undo.announce",
+  "v4.start.undo.done",
+  "v4.ask.checkingPlan",
+  "v4.ask.planUnknown",
+  // V4 start step, Task 76c (read-f2, choose-f2, choose-f21; the spec's words for answers Q2 and Q3): step 1's line after Back,
+  // the logo's question, and a started question's line with its map, shown at the click-test.
+  "v4.ask.pathsKept",
+  "v4.ask.leavePaths",
+  "v4.ask.started",
+  "v4.ask.openItsMap",
+  // V4 start step, Task 76h (ask-d3: the owner's words of 4 Nov night; read-f8: the record's example, approved at the
+  // click-test): the clarifying call's slow-wait lines, its "Try again", and Free's cap line.
+  "v4.read.clarifyStill",
+  "v4.read.clarifyLonger",
+  "v4.read.clarifyTryAgain",
+  "v4.read.capReached",
+  // V4 start step, Task 76g (read-f1, the owner's words of record :303): a new reading's line for an answer it set aside, and
+  // its button, shown at the click-test.
+  "v4.read.setAside",
+  "v4.read.putBack",
+  // V4 start step, Task 76e (owner answer Q8, the spec's draft words): the site-update banner and its Reload, shown at the
+  // click-test.
+  "v4.ask.siteUpdated",
+  "v4.ask.siteUpdatedReload",
+  // V4 start step, Task 76k (owner answer Q27 A of 5 Nov: the drawn words of map-d4, "new words"): at Plain words, the folded
+  // line under a point a second AI checked that has no sources, shown at the click-test.
+  "v4.web.ownKnowledge",
+  // V4 start step, Task 76f (saved-questions spec 2026-11-04 §3.4-§3.6; owner answers S2 A and S3 A): "Not started yet" with
+  // Pick up and Delete (the owner's words), and the draft lines of saved questions, shown at the click-test.
+  "v4.saved.title",
+  "v4.saved.pickUp",
+  "v4.saved.delete",
+  "v4.saved.showAll",
+  "v4.saved.full",
+  "v4.saved.deleted",
+  "v4.saved.elsewhere",
+  "v4.start.none.leftEarly",
+  "v4.ask.leaveUnsaved",
+  // The Delete note's own still line and spoken line (the shared note's are about starting), drafted by Task 76f.
+  "v4.saved.deleteStill",
+  "v4.saved.deleteAnnounce",
+  // V4 start step, Task 77 (choose-f6, the spec's draft words): what the drop spot says while a mouse drags a path or a chip,
+  // shown at the click-test.
+  "v4.start.drop.add",
+  "v4.start.drop.combine",
+  "v4.start.drop.ownPath",
+  // V4 start step, Task 79 (spec 2026-11-03 §4.4; dig-f35, owner answer Q18 A): a dig's overlap suggestion (row D's tested
+  // words), its two buttons, the 7-path line and the path-length line (draft wording), shown at the click-test.
+  "v4.digPaths.overlap",
+  "v4.digPaths.overlapCombine",
+  "v4.digPaths.keepApart",
+  "v4.digPaths.full",
+  "v4.digPaths.ownTooLong",
+  // V4 start step, Task 57g (the owner's 7 Nov answers, his card "Button on the stopped page"): the stopped page's "Continue where it
+  // stopped", its line when some quota was used, and "Ask this again" as "Change the question" (draft wording), shown at the click-test.
+  // The line when some quota was used (v4.failed.continueLine) is approved as built (owner 7 Nov, question 43 A).
+  "v4.failed.continue",
+  "v4.failed.changeQuestion",
+  // V4 start step, Task 55c (report-f4, the owner's words, record OWNER-PICKS-2026-11-03.md:954): the report page's fold of the paths
+  // dug later under their first-level path, shown at the click-test.
+  "v4.investigation.updatedByDig",
+  // V4 start step, Task 56c (public-f25, owner answer Q20 B): a further report's button says when it can start, and the month line
+  // without "You can still write your report." while this debate's report waits (draft wording), shown at the click-test.
+  "v4.report.waits.PERSON_DAY",
+  "v4.report.waits.PERSON_WEEK",
+  "v4.report.waits.PERSON_MONTH",
+  "v4.money.startsWait.PERSON_MONTH_NO_REPORT",
+  // V4 start step, Task 55f (the coordinator's ruling on Task 55c's open point 3): the report page's own fold for the digs on the main
+  // question, after the paths (draft wording), shown at the click-test.
+  "v4.investigation.updatedByQuestionDig",
+  // V4 start step, Task 57k (owner 7 Nov, question 42 A, relayed by the review session): with Continue offered, the other our-side reasons
+  // without their "ask again" ending (CONTINUE_REASON_DRAFTS below; STOPPED's cut line is the owner's), shown at the click-test.
+  "v4.failed.continueReason.NOT_STARTED",
+  "v4.failed.continueReason.SET_ASIDE",
+  // V4 start step, Task 57m (owner 8 Nov, "Use these drafts"): after two continues that fail, the dig's and the debate's lines
+  // (KEEPS_FAILING_DRAFTS below), shown at the click-test.
+  "v4.digFailed.keepsFailingContinues",
+  "v4.failed.keepsFailing",
+  // V4 start step, Task 57n (owner 8 Nov, "Drop it, like digs"): a question that keeps failing because the AIs were unavailable gives its
+  // reason without "Please try again in a while." (the home sentence cut), shown at the click-test.
+  "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -499,7 +813,9 @@ describe("V4 catalogue keys", () => {
       ...TRUST_BASES.map(basisKey),
       ...["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"].map((fate) => `v4.fate.${fate}`),
       ...READING_LEVELS.map((level) => `v4.readingLevel.${level}`),
-      ...DIG_MODES.map((mode) => `v4.digMode.${mode}`)
+      ...DIG_MODES.map((mode) => `v4.digMode.${mode}`),
+      // V4 start step, Task 55e: the main answer's line and the answer card's line for every trigger, PATH_ADDED's included.
+      ...MAIN_ANSWER_TRIGGERS.flatMap((trigger) => [`v4.mainAnswer.trigger.${trigger}`, `v4.answerCard.updated.${trigger}`])
     ];
     expect(built.filter((key) => !(key in catalog))).toEqual([]);
     // Every key built at run time from a literal stem ("v4.x.${…}") has at least one catalogue key under that stem, and a
@@ -706,7 +1022,7 @@ const HEADER_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
  * top, and the longer explanation drops its last sentence (no level can be changed later).
  */
 const ASK_LEVEL_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
-  "v4.ask.levelNote": "You choose it for this question. Its map, digs and report all keep it.",
+  "v4.ask.levelKept": "You choose it for this question. Its map, digs and report all keep it.",
   "v4.ask.levelHonest": "The AIs that write your answer and its story write for this level. It also changes how much detail we show you, and sometimes how long the answer is."
 });
 
@@ -772,6 +1088,94 @@ const YOUR_QUESTION_RECORD_LINES: Readonly<Record<string, string>> = Object.free
 const PUBLIC_DIG_CARD_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.maps.dig": "Dig: {pick}",
   "v4.maps.digWholePath": "Dig: a closer look at a path"
+});
+
+/**
+ * Owner 7 Nov, question 41 A ("say both ways"; OPEN-OWNER-QUESTIONS-2026-11-04.md, sixth round), word for word: when the stopped page
+ * offers "Continue where it stopped", the grey line under "Change the question" says what each way does, for the question alone and
+ * with the picks kept. Without Continue the page keeps v4.debate.askAgainNote and v4.debate.askAgainNoteQuestion as they are.
+ */
+const SIXTH_ROUND_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.failed.changeQuestionNote":
+    "Your question is kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped.",
+  "v4.failed.changeQuestionNotePicks":
+    "Your question and your picks are kept. Change it and it becomes a new question, which uses a little of your quota. Leave it as it is and this debate continues where it stopped."
+});
+
+/**
+ * Owner 7 Nov ~15:00 EET, questions 42 A and 43 A (cards in the review session, relayed to the start-step session; both recommended):
+ * 42: when the stopped page offers "Continue where it stopped", the reason sentence above it drops its "ask again" ending. The STOPPED
+ * line is the owner's own words; the other cut lines (CONTINUE_REASON_DRAFTS) are drafts until the click-test. The shared runFailure.*
+ * sentences (35 languages) are untouched. 43: the three quota lines are approved as built.
+ */
+const QUESTIONS_42_43_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.failed.continueReason.STOPPED": "This debate stopped partway because of a problem on our side.",
+  "v4.debate.failedSomeTaken": "The part that ran used some of your quota.",
+  "v4.debate.failedNothingTaken": "Nothing was taken for the failed try.",
+  "v4.failed.continueLine": "What already ran is kept. Continuing pays only for what has not run yet."
+});
+/** Question 42 A's other our-side sentences, each the shared sentence without its "ask again" ending (drafted). */
+const CONTINUE_REASON_DRAFTS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.failed.continueReason.NOT_STARTED": "runFailure.NOT_STARTED",
+  "v4.failed.continueReason.SET_ASIDE": "runFailure.SET_ASIDE"
+});
+
+describe("the owner's questions 42 A and 43 A (7 Nov): the stopped page's reason with Continue, and its quota lines", () => {
+  const home = JSON.parse(readFileSync(join(ui, "messages/en/home.json"), "utf8")) as Record<string, string>;
+
+  it("are the owner's words, pinned here, and wait on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(QUESTIONS_42_43_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(QUESTIONS_42_43_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in QUESTIONS_42_43_ANSWER_LINES)).toEqual([]);
+    // The STOPPED line is the shared sentence without its last sentence, which stays as it was.
+    expect(home["runFailure.STOPPED"]).toBe(`${catalog["v4.failed.continueReason.STOPPED"]} Please ask your question again.`);
+  });
+
+  it("the other cut lines drop only the shared sentence's ask-again ending, and are drafts until the click-test", () => {
+    for (const [key, shared] of Object.entries(CONTINUE_REASON_DRAFTS)) {
+      expect(catalog[key], key).toBeDefined();
+      expect(home[shared]!.startsWith(`${catalog[key]} `), key).toBe(true);
+      expect(home[shared]!.slice(catalog[key]!.length).trim(), key).toMatch(/^Please ask (your question )?again\.$/u);
+      expect(catalog[key], key).not.toMatch(/again/iu);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+    // SET_ASIDE keeps its "It did not use your quota." (the page shows no second quota line beside it).
+    expect(catalog["v4.failed.continueReason.SET_ASIDE"]).toMatch(/It did not use your quota\.$/u);
+  });
+
+  it("Task 57n (owner 8 Nov, 'Drop it, like digs'): a question that keeps failing, AIs unavailable, drops 'Please try again in a while.' (drafted)", () => {
+    const key = "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE";
+    expect(home["runFailure.MODELS_UNAVAILABLE"]).toBe(`${catalog[key]} Please try again in a while.`);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain(key);
+  });
+});
+
+/**
+ * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail, and say that we're investigating this and a future fix
+ * will solve this. Of course we should let him Write the report if he wants"; card "Use these drafts"): the dig's and the debate's lines,
+ * word for word, drafts until the click-test.
+ */
+const KEEPS_FAILING_DRAFTS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.digFailed.keepsFailingContinues":
+    "This keeps failing. We're looking into it, and a future fix will solve it. You can still write your report; it uses everything that finished.",
+  "v4.failed.keepsFailing": "This keeps failing. We're looking into it, and a future fix will solve it."
+});
+
+describe("Task 57m (owner 8 Nov): after two continues that fail, the dig's and the debate's lines", () => {
+  it("are the owner's drafts, pinned here, and wait on the drafted list; today's 'keeps failing' line is unchanged", () => {
+    expect(Object.fromEntries(Object.keys(KEEPS_FAILING_DRAFTS).map((key) => [key, catalog[key]]))).toEqual(KEEPS_FAILING_DRAFTS);
+    for (const key of Object.keys(KEEPS_FAILING_DRAFTS)) expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    expect(catalog["v4.digFailed.keepsFailing"]).toBe("This keeps failing. Write your report; it uses everything that finished.");
+  });
+});
+
+describe("the owner's sixth round (7 Nov, question 41 A): the grey line under \"Change the question\" says both ways", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(SIXTH_ROUND_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(SIXTH_ROUND_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in SIXTH_ROUND_ANSWER_LINES)).toEqual([]);
+    // The lines without Continue stay as they were.
+    expect(catalog["v4.debate.askAgainNoteQuestion"]).toBe("Your question is kept. The list of paths is made again, which uses a little of your quota, like any new question.");
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.askAgainNoteQuestion");
+  });
 });
 
 describe("the owner's answer to question 33 and the fifth round (7 Nov): the public dig's card on \"My questions\"", () => {
@@ -908,9 +1312,9 @@ describe("the owner's 5 Nov answers: failed digs and questions, one pick, the pu
     expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.digFailedTitle");
   });
 
-  it("question 20 A: the failed question's 'used some' line is the answer's words, a draft until the click-test", () => {
+  it("question 20 A: the failed question's 'used some' line is the answer's words, approved as built (question 43 A, 7 Nov)", () => {
     expect(catalog["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
-    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.failedSomeTaken");
+    expect(DRAFTED_UNTIL_CLICK_TEST).not.toContain("v4.debate.failedSomeTaken");
     // The two "nothing taken" lines are the record's (map-f30, wait-f18), not drafts.
     expect([catalog["v4.debate.failedNothingTaken"], catalog["v4.digFailed.nothingTaken"]])
       .toEqual(["Nothing was taken for the failed try.", "Nothing was taken from your quota for this."]);
@@ -974,5 +1378,96 @@ describe("the owner's 3 Nov screen review", () => {
       "v4.rail.digsPaused.other", "v4.rewrite.digCard.PAUSED", "v4.state.PAUSED", "v4.state.PAUSED.noDate"
     ].sort());
     expect(catalog["v4.state.SHORT_BREAK"]).not.toMatch(/\bpaused\b/iu);
+  });
+});
+
+/**
+ * V4 start step, Task 61 (spec 2026-11-03 §2 items 7 and 8): the map's chosen paths. Every v4.paths.* key is a draft until
+ * the click-test; r2-1 A says "path" on the map in five existing lines. Not here: v4.paths.lookedInto (it waits for the
+ * owner's wait-f9 (b) card, Task 62), v4.paths.carryOn (wait-f16's line replaces it) and a "Dig deeper here" key (journey-f13:
+ * one dig button everywhere, in the record's words).
+ */
+describe("V4 start step, Task 61: the map's paths", () => {
+  const paths = Object.keys(catalog).filter((key) => key.startsWith("v4.paths."));
+
+  it("every v4.paths.* key is drafted until the click-test", () => {
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+    for (const key of ["v4.paths.lookedInto", "v4.paths.carryOn", "v4.paths.digDeeper"]) expect(key in catalog, key).toBe(false);
+  });
+
+  it("r2-1 A: the map says 'path' in its five lines, each drafted", () => {
+    const lines: Readonly<Record<string, string>> = {
+      "v4.map.pathUntitled": "A path the AIs looked into",
+      "v4.panel.kind.path": "A path the AIs looked into",
+      "v4.map.noPaths": "No paths to show yet.",
+      "v4.panel.pathNoMore": "Nothing more is written about this path yet.",
+      "v4.panel.noOpenPath": "Nothing is open here. You can still dig deeper into this path."
+    };
+    expect(Object.fromEntries(Object.keys(lines).map((key) => [key, catalog[key]]))).toEqual(lines);
+    expect(Object.keys(lines).filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+  });
+
+  it("the path words name no engine word, no figure, no time and no quota left; the share word is never 'allowance'", () => {
+    const words = paths.map((key) => catalog[key]!);
+    expect(words.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|LOOKING|ARGUED|checker|judge|GLM|Haiku|Luna|branch|node)\b/u.test(line)))
+      .toEqual([]);
+    // ("What you left out before Start." is what the person chose not to look into, never a quota left. Task 62: the phone's
+    // "Your paths" heading over the rows is spec §2 item 7's words, not a mark on a card, so only "Your path" alone is refused.)
+    expect(words.filter((line) => /allowance|usually|minute|\bleft\b(?! out)|You picked|Your path(?!s)/iu.test(line))).toEqual([]);
+    expect(words.filter((line) => /\d/u.test(line.replace("+ 1 more", "")))).toEqual([]);
+  });
+});
+
+/**
+ * V4 start step, Task 82 (items chat-quota-word-on-choosing-card, r2-2, chat-start-waits-for-paths, wait-d1 and dig-f35; 4 Nov night:
+ * the saved questions and the 21 review items; Task 92c's answer A): the choosing card's drafts use plain words. The full path's two
+ * refusals and "Paths coming…" are their drafted words exactly, and no line of the start step's families says "allowance", what is
+ * "left after", "let the AIs choose", "starting as soon as" or "usually". The families are the brief's, then each one a later task of
+ * the start step drafted: a dig's paths, the stopped page's Continue and "Change the question", the report's fold and its waits, the
+ * month line while the report waits (waves 15-17), and the lines of a path a dig added, the short answer, a person's own path and the
+ * AIs' own knowledge.
+ */
+const START_STEP_EXACT_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.start.refusal.VIEWPOINTS_FULL": "This path is full. Start a new path, or move one out.",
+  "v4.start.refusal.OWN_WORDS_FULL": "A path holds up to four of your own points. Start a new path for this one.",
+  "v4.start.pathsComing": "Paths coming…"
+});
+const START_STEP_FAMILIES: readonly string[] = [
+  "v4.start.", "v4.ask.", "v4.paths.", "v4.saved.", "v4.read.", "v4.report.", "v4.investigation.updatedByDig",
+  "v4.digPaths.", "v4.failed.continue", "v4.failed.changeQuestion", "v4.money.startsWait.PERSON_MONTH_NO_REPORT",
+  "v4.answerCard.updated.PATH_ADDED", "v4.mainAnswer.trigger.PATH_ADDED", "v4.ready.shortAnswer", "v4.public.pathOwnWords",
+  "v4.web.ownKnowledge"
+];
+const START_STEP_ENGINE_WORDS = /\b(?:score|strength|threshold|Haiku|GLM|DeepSeek|checker|raised by|votes?)\b/iu;
+const START_STEP_NOT_PLAIN = /allowance|left after|let the ais choose|starting as soon as|usually/iu;
+
+describe("V4 start step, Task 82: the choosing card's drafts use plain words", () => {
+  const startDrafts = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.start."));
+  const covered = Object.keys(catalog).filter((key) => START_STEP_FAMILIES.some((family) => key.startsWith(family)));
+
+  it("more than 60 v4.start.* lines are drafts, and none names a score, a model, a checker or a vote", () => {
+    expect(startDrafts.length).toBeGreaterThan(60);
+    expect(startDrafts.filter((key) => START_STEP_ENGINE_WORDS.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
+  });
+
+  it("the full path's two refusals and 'Paths coming…' are their drafted words exactly, drafts until the click-test", () => {
+    expect(Object.fromEntries(Object.keys(START_STEP_EXACT_LINES).map((key) => [key, catalog[key]]))).toEqual(START_STEP_EXACT_LINES);
+    expect(Object.keys(START_STEP_EXACT_LINES).filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key))).toEqual([]);
+  });
+
+  it("no line of the start step's families says allowance, what is left after, 'let the AIs choose', 'starting as soon as' or 'usually'", () => {
+    // Every family has lines, so the check reads real words.
+    expect(START_STEP_FAMILIES.filter((family) => !covered.some((key) => key.startsWith(family)))).toEqual([]);
+    expect(covered.filter((key) => START_STEP_NOT_PLAIN.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
+  });
+
+  it("the drafts of the later families (waves 15-17 among them) name no score, model, checker or vote either", () => {
+    const later = DRAFTED_UNTIL_CLICK_TEST.filter((key) => !key.startsWith("v4.start.") && covered.includes(key));
+    expect(later).toEqual(expect.arrayContaining([
+      "v4.digPaths.overlap", "v4.failed.continue", "v4.investigation.updatedByDig", "v4.report.waits.PERSON_MONTH",
+      "v4.money.startsWait.PERSON_MONTH_NO_REPORT"
+    ]));
+    expect(later.filter((key) => START_STEP_ENGINE_WORDS.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
   });
 });

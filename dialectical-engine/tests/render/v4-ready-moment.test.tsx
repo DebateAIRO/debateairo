@@ -383,7 +383,8 @@ describe("the report's ready moment (journey-f17)", () => {
     expect(note()!.textContent).toContain(CATALOG["v4.ready.report"]);
     const link = note()!.querySelector<HTMLAnchorElement>("a")!;
     expect(link.textContent).toBe(CATALOG["v4.ready.seeIt"]);
-    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report?level=background`);
+    // Task 76l (owner, 5 Nov: no level from the address on V4 pages): the report page reads the debate's level itself.
+    expect(link.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
     expect(tabPrefix()).toBe(CATALOG["v4.ready.tab.ready"]);
     expect(page().querySelector(".v4DebRail .v4MapNew")).not.toBeNull();
     // The answer above the map is the report's now (map-d1, map-f2: the newest version is the current one).

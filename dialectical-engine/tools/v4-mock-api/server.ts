@@ -39,12 +39,24 @@ import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, priceCurr
 import { quadernoPricingFromKeyFile, type QuadernoPriced } from "./quaderno-tax.js";
 import {
   contributionOf, contributionRewriteOf, mockFlagStateOf, PUBLIC_DIG_SUGGESTIONS, PUBLIC_MODES, PUBLIC_REF, PUBLIC_STATES, seedPublicDebates, visibilityOf, writtenReport,
-  type PublicMode, type PublicState
+  publicDigRowPart, type PublicMode, type PublicState
 } from "./public-seed.js";
 import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, type LiveMode } from "./live-seed.js";
 import { climbAt, CLIMB_MODES, CLIMB_STEP_MS, type ClimbParts } from "./climb-seed.js";
-import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "./failed-seed.js";
+import { FAILED_DIGS, FAILED_DIGS_PARENT, mockContinueStep, RUN_FAILED_KEEPS_FAILING, RUN_FAILED_SET_ASIDE, RUN_FAILED_SOME } from "./failed-seed.js";
 import { windowsForPlan } from "./plan-windows.js";
+import {
+  routeStartStep, setStartRoomScene, setStartStepLogging, startAskRefusal, startRoomReadOutcome, startRoomScene, startSettingsVersion, startStepCounters,
+  startStepRoomPart, startStepSelfCheck, startStepUsedPercent, START_ROOM_SCENES
+} from "./start-step.js";
+import {
+  MOCK_SAVED_SWITCH, removeSavedQuestionAtStart, routeSavedQuestions, savedQuestionCounters, savedQuestionSamples, savedQuestionsKept,
+  savedQuestionsScene, setSavedQuestionsLogging, setSavedQuestionsScene
+} from "./saved-questions.js";
+import {
+  mockAnswerCarryOn, mockAnswerPathsPart, mockFirstClosingLeft, mockPathRunMs, mockPathRunOf, mockPathRunSamples, mockPathRunSelfCheck,
+  mockReportRefusal, mockRunPathsPart, type MockPathRun
+} from "./branches.js";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Find the repository (no machine path is written here): MOCK_ENGINE_DIR, else the dialectical-engine folder this file
@@ -140,6 +152,9 @@ const POSTED_STORY_SECONDS = seconds("MOCK_POSTED_STORY_SECONDS", 10);
 /** dig-f1 (V4 screen review, 3 Nov 2026): how long the first debate's main answer is still being rewritten after the mock starts. */
 const MAIN_ANSWER_SECONDS = seconds("MOCK_MAIN_ANSWER_SECONDS", 45);
 const QUIET = process.env.MOCK_QUIET === "1";
+// The step before Start and the saved questions log their requests as this file does (they never read the environment themselves).
+setStartStepLogging(!QUIET);
+setSavedQuestionsLogging(!QUIET);
 let roomMode: RoomMode = choice("MOCK_ROOM", process.env.MOCK_ROOM, ROOM_MODES, "FITS");
 let askMode: AskMode = choice("MOCK_ASK", process.env.MOCK_ASK, ASK_MODES, "AUTO");
 let planMode: PlanMode = choice("MOCK_PLAN", process.env.MOCK_PLAN, PLAN_MODES, "PLUS");
@@ -227,6 +242,17 @@ const REPORT_MODES = ["OK", "FAIL"] as const;
 type ReportMode = (typeof REPORT_MODES)[number];
 let reportMode: ReportMode = choice("MOCK_REPORT", process.env.MOCK_REPORT, REPORT_MODES, "OK");
 const REPORT_WRITING_MS = seconds("MOCK_REPORT_SECONDS", 8) * 1000;
+/**
+ * V4 start step, Task 80 (owner answer Q8, read-f3; start-step.ts): the room scene. SITEUPDATED names the next settings version 30 s
+ * after the first room read; PLANFAILS fails the first two room reads; PLANFAILSALL every one. A room read comes before any question
+ * is typed, so these are a switch, `roomscene=`, not words in the question.
+ */
+setStartRoomScene(choice("MOCK_ROOM_SCENE", process.env.MOCK_ROOM_SCENE, START_ROOM_SCENES, "NONE"));
+/**
+ * V4 start step, Task 80b (saved-questions.ts): the questions not started yet. PICKUP seeds the #pickup scene's two; NONE keeps none.
+ * The list is read on step 1, before any question is typed, so this is a switch, `saved=`, not words in the question.
+ */
+setSavedQuestionsScene(choice("MOCK_SAVED", process.env.MOCK_SAVED, MOCK_SAVED_SWITCH, "NONE"));
 
 // ---------------------------------------------------------------------------------------------------------------
 // The seeded world
@@ -250,6 +276,8 @@ const ANSWER_SEARCH_FAILED = "aaaa7777-7777-4777-8777-777777777777";
 const ANSWER_DIG = "aaaa8888-8888-4888-8888-888888888888";
 /** A code lib/v3/runFailure.ts knows: "the AIs chosen were not available" (MODELS_UNAVAILABLE). */
 const FAILED_REASON = "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM";
+/** V4 start step, Task 81 (branches.ts): the seeded answer's four positions, the roots of a path debate's b1..b4 once argued. */
+const POSITION_NODE_IDS = Object.freeze(["n-mix", "n-renew", "n-nuclear", "n-smr"]);
 
 const SESSION = Object.freeze({
   asker_id: "owner:0f6c2b1e-3a4d-4c5e-9f70-112233445566",
@@ -289,12 +317,22 @@ type MockRun = {
   startedAt?: number;
   /** Owner review 3 Nov: a run with `failedReason` fails only from this moment (a new dig under `dig=FAIL`); absent: failed from the start. */
   failsAt?: number;
-  /** Owner review 3 Nov (draft field): what a FAILED run took from the person's quota, on its draft view only. */
+  /** Owner review 3 Nov: what a FAILED run took from the person's quota (the contract's `quota_used` since Task 57c, so both views send it). */
   quotaUsed?: "NONE" | "SOME";
+  /** V4 start step, Task 57g: a FAILED run that Continue would continue where it stopped (the contract's `continuable`, Task 57e's `reusable`). */
+  continuable?: true;
+  /** V4 start step, Task 57m: a FAILED run whose two continues failed again (the contract's `keeps_failing`): never continued. */
+  keepsFailing?: true;
+  /** Task 57g: a failed run Continue continued; while it runs again a second press is CONTINUING too, as on the API. */
+  continued?: boolean;
   /** Owner review 3 Nov: a dig paused under `dig=PAUSE` finishes its run time once Continue is pressed. */
   settlesAfterContinue?: boolean;
   /** dig-f1: its main answer is still being rewritten until this moment, then has its newest version (rewrite-seed.ts mainAnswerAt). */
   mainAnswerReadyAt?: number;
+  /** Task 79c (owner answer Q33 A): a dig made on someone else's public page, with its first pick's words (null: it had none). */
+  publicDig?: Readonly<{ pick: string | null }>;
+  /** V4 start step, Task 81 (branches.ts): a new question argued as a path debate (the paths sent at Start, or none: the AIs choose). */
+  paths?: MockPathRun;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   answer?: any;
 };
@@ -302,6 +340,11 @@ type MockRun = {
 const runs = new Map<string, MockRun>();
 const runsByAnswer = new Map<string, MockRun>();
 let nextSeq = 100;
+/**
+ * V4 start step, Task 75d (owner, 5 Nov): the reading level each run was asked at, kept when POST /v1/asks accepts it, as the API
+ * keeps it (a new question its own, a dig its debate's, a dig on a public page the page's). The seeded runs have none.
+ */
+const askedLevels = new Map<string, string>();
 
 function addRun(run: MockRun): MockRun {
   runs.set(run.runRef, run);
@@ -312,7 +355,9 @@ function addRun(run: MockRun): MockRun {
 /** A run's answer as it stands now: dig-f1, the first debate's main answer is rewritten a little after the mock starts. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function answerNow(run: MockRun, now = Date.now(), playedAt: number | null = climbPlayedAt): any {
-  const answer = run.mainAnswerReadyAt === undefined ? run.answer : { ...run.answer, main_answer: mainAnswerAt(now, run.mainAnswerReadyAt) };
+  const main = run.mainAnswerReadyAt === undefined ? run.answer : { ...run.answer, main_answer: mainAnswerAt(now, run.mainAnswerReadyAt) };
+  // V4 start step, Task 81 (branches.ts): a carry-on debate's answer names the part it is running now (the digs, then the report).
+  const answer = run.paths === undefined ? main : { ...main, ...mockAnswerCarryOn({ run: run.paths, sinceAnswerMs: now - (run.settleAt ?? now) }) };
   return playedAt === null ? answer : withClimb(answer, run.runRef, climbAt(now, playedAt));
 }
 
@@ -332,8 +377,18 @@ function settledRun(input: Readonly<{
   /** W3-4: a dig's own part (its parent, places, level, picks); else the seeded one, if any. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dig?: any;
+  /** V4 start step, Task 81 (branches.ts): a new question argued as a path debate. */
+  paths?: MockPathRun;
 }>): MockRun {
   const dig = input.dig ?? DIG_ANSWERS[input.runRef];
+  const base = seed.answer({
+    answerId: input.answerId,
+    runRef: input.runRef,
+    question: input.question,
+    askedAt: iso(input.askedAt),
+    servedAt: iso(input.settleAt),
+    web: input.web
+  });
   return addRun({
     runRef: input.runRef,
     question: input.question,
@@ -343,18 +398,15 @@ function settledRun(input: Readonly<{
     answerId: input.answerId,
     storyReadyAt: input.storyReadyAt,
     web: input.web,
+    ...(input.paths === undefined ? {} : { paths: input.paths }),
     answer: {
-      ...seed.answer({
-        answerId: input.answerId,
-        runRef: input.runRef,
-        question: input.question,
-        askedAt: iso(input.askedAt),
-        servedAt: iso(input.settleAt),
-        web: input.web
-      }),
+      ...base,
       // W2-7: the seeded digs' rewrites of their parents' paths, and a dig's own part (rewrite-seed.ts).
       ...(PATH_REWRITES[input.runRef] === undefined ? {} : { path_rewrites: PATH_REWRITES[input.runRef] }),
-      ...(dig === undefined ? {} : { dig })
+      ...(dig === undefined ? {} : { dig }),
+      // V4 start step, Task 81 (branches.ts): a path debate's answer: every path done ("+ N more" from the menu), and its web part named
+      // by path id, as on the API (the path id is the position everywhere).
+      ...(input.paths === undefined ? {} : mockAnswerPathsPart({ run: input.paths, positionNodeIds: POSITION_NODE_IDS, web: base.web }))
     }
   });
 }
@@ -366,12 +418,23 @@ settledRun({
 }).mainAnswerReadyAt = T0 + MAIN_ANSWER_SECONDS * 1000;
 addRun({ runRef: RUN_RUNNING, seq: 5, startedAt: T0 - 4 * 60_000, question: "Is a four-day work week good for productivity and for workers?" });
 addRun({ runRef: RUN_WAITING, seq: 3, waiting: true, question: "Should my town close the old centre to cars at weekends?" });
-addRun({
-  runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
-  // Owner review 3 Nov (draft): the models were gone when it was claimed, so it never began and nothing was taken.
-  quotaUsed: "NONE",
-  question: "Will AI tutors replace homework help from teachers within five years?"
-});
+/**
+ * The first failed question, as seeded. V4 start step, independent review of Task 57g: its stop is ours (the API's rule,
+ * apps/api/src/run-continue.ts stopIsOurs), so its read says `continuable` and its Continue continues it, as the API's do; it is the
+ * click-test's "continuable, nothing used" page. The switch `failed=RESET` seeds it again.
+ */
+function seedFailed(): void {
+  const before = runs.get(RUN_FAILED);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({
+    runRef: RUN_FAILED, seq: 1, failedReason: FAILED_REASON,
+    // Owner review 3 Nov (draft): the models were gone when it was claimed, so it never began and nothing was taken.
+    quotaUsed: "NONE",
+    question: "Will AI tutors replace homework help from teachers within five years?",
+    continuable: true
+  });
+}
+seedFailed();
 settledRun({
   runRef: RUN_STORY_WRITING, answerId: ANSWER_STORY_WRITING, seq: 4,
   question: "Should Romania build two new reactors at Cernavodă, or spend the money on wind, solar and batteries?",
@@ -419,28 +482,94 @@ settledRun({
   runRef: FAILED_DIGS_PARENT.runRef, answerId: FAILED_DIGS_PARENT.answerId, seq: FAILED_DIGS_PARENT.seq, web: "PAID", question: FAILED_DIGS_PARENT.question,
   askedAt: Date.parse(FAILED_DIGS_PARENT.askedAt), settleAt: Date.parse(FAILED_DIGS_PARENT.settledAt), storyReadyAt: 0
 });
-for (const dig of FAILED_DIGS) {
-  addRun({ runRef: dig.runRef, seq: dig.seq, question: dig.question, failedReason: dig.reason, quotaUsed: dig.quotaUsed });
+/**
+ * The seven failed digs, as seeded. V4 start step, Task 57i: the two whose stop is ours read `continuable` (failed-seed.ts), so their
+ * "Try this dig again" continues the same dig (continueStoppedRun: it runs again, then finishes); `failed=RESET` seeds them again.
+ */
+function seedFailedDigs(): void {
+  for (const dig of FAILED_DIGS) {
+    const before = runs.get(dig.runRef);
+    if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+    addRun({ runRef: dig.runRef, seq: dig.seq, question: dig.question, failedReason: dig.reason, quotaUsed: dig.quotaUsed,
+      ...(dig.continuable === true ? { continuable: true as const } : {}),
+      // Task 57m: the dig whose two continues failed again (failed-seed.ts: dig 1).
+      ...(dig.keepsFailing === true ? { keepsFailing: true as const } : {}) });
+  }
 }
-addRun({ runRef: RUN_FAILED_SOME.runRef, seq: RUN_FAILED_SOME.seq, question: RUN_FAILED_SOME.question, failedReason: RUN_FAILED_SOME.reason, quotaUsed: RUN_FAILED_SOME.quotaUsed });
+seedFailedDigs();
+/**
+ * The failed question that used some of the quota and can continue (failed-seed.ts RUN_FAILED_SOME), as seeded. V4 start step, Task 57g:
+ * its Continue replaces it with a run that runs again and finishes (continueStoppedRun); the switch `failed=RESET` seeds it again.
+ */
+function seedFailedSome(): void {
+  const before = runs.get(RUN_FAILED_SOME.runRef);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({ runRef: RUN_FAILED_SOME.runRef, seq: RUN_FAILED_SOME.seq, question: RUN_FAILED_SOME.question, failedReason: RUN_FAILED_SOME.reason,
+    quotaUsed: RUN_FAILED_SOME.quotaUsed, continuable: RUN_FAILED_SOME.continuable });
+}
+seedFailedSome();
+/**
+ * V4 start step, Task 57j: the failed question an update set aside that can continue (failed-seed.ts RUN_FAILED_SET_ASIDE), as seeded; its
+ * Continue runs it again and it finishes (continueStoppedRun); the switch `failed=RESET` seeds it again.
+ */
+function seedFailedSetAside(): void {
+  const before = runs.get(RUN_FAILED_SET_ASIDE.runRef);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({ runRef: RUN_FAILED_SET_ASIDE.runRef, seq: RUN_FAILED_SET_ASIDE.seq, question: RUN_FAILED_SET_ASIDE.question,
+    failedReason: RUN_FAILED_SET_ASIDE.reason, quotaUsed: RUN_FAILED_SET_ASIDE.quotaUsed, continuable: RUN_FAILED_SET_ASIDE.continuable });
+}
+seedFailedSetAside();
+/**
+ * V4 start step, Task 57m: the failed question whose two continues failed again (failed-seed.ts RUN_FAILED_KEEPS_FAILING): its read says
+ * `keeps_failing`, its Continue is refused; the switch `failed=RESET` seeds it again.
+ */
+function seedFailedKeepsFailing(): void {
+  const before = runs.get(RUN_FAILED_KEEPS_FAILING.runRef);
+  if (before?.answerId !== undefined) runsByAnswer.delete(before.answerId);
+  addRun({ runRef: RUN_FAILED_KEEPS_FAILING.runRef, seq: RUN_FAILED_KEEPS_FAILING.seq, question: RUN_FAILED_KEEPS_FAILING.question,
+    failedReason: RUN_FAILED_KEEPS_FAILING.reason, quotaUsed: RUN_FAILED_KEEPS_FAILING.quotaUsed, keepsFailing: RUN_FAILED_KEEPS_FAILING.keepsFailing });
+}
+seedFailedKeepsFailing();
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers): Continue on a failed question that can continue. It runs again for the stand-in's run
+ * time (the API runs only what never ran) and finishes with today's answer, its report's investigation opened as a new question's is; while
+ * it runs, a second press is CONTINUING too (failed-seed.ts mockContinueStep).
+ */
+function continueStoppedRun(run: MockRun, now = Date.now()): void {
+  const settleAt = now + RUN_SECONDS * 1000;
+  settledRun({
+    runRef: run.runRef, answerId: randomUUID(), question: run.question, seq: run.seq, askedAt: now, settleAt,
+    storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web: "PAID"
+  }).continued = true;
+  // Task 57i: a dig continued in place belongs to its debate's investigation; only a question opens its own.
+  const dig = digLinks.some((record) => record.child_run_id === run.runRef);
+  if (!dig && investigationOf(run.runRef) === undefined) openInvestigation(run.runRef);
+}
 
 // Decision 13: the public debates, and a digger's three digs on one, each in one state of its check (seeded under the first public debate's path).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const publicDebates = new Map<string, any>(seedPublicDebates().map((debate) => [debate.public_ref as string, structuredClone(debate)]));
+/** Task 75d: the level a public page was asked at, as its public read says (none: a page published without one). */
+const publicLevelOf = (publicRef: string): string | undefined => publicDebates.get(publicRef)?.reading_level;
 const SEEDED_CONTRIBUTION_DIGS = [
   { state: "CHECKING", runRef: "c1000000-0000-4000-8000-000000000001", answerId: "aaaac100-0000-4000-8000-000000000001" },
   { state: "ON_THE_PAGE", runRef: "c1000000-0000-4000-8000-000000000002", answerId: "aaaac100-0000-4000-8000-000000000002" },
   { state: "KEPT_PRIVATE", runRef: "c1000000-0000-4000-8000-000000000003", answerId: "aaaac100-0000-4000-8000-000000000003" },
   { state: "REMOVED_AFTER_REVIEW", runRef: "c1000000-0000-4000-8000-000000000004", answerId: "aaaac100-0000-4000-8000-000000000004" }
 ] as const;
+/** Task 79c: the seeded digs' one pick; "Your maps" shows each as its own card, "Dig: Small towns behave differently." */
+const SEEDED_CONTRIBUTION_PICK = "Small towns behave differently.";
 for (const [at, seeded] of SEEDED_CONTRIBUTION_DIGS.entries()) {
   const run = settledRun({
     runRef: seeded.runRef, answerId: seeded.answerId, seq: 30 + at, web: "PAID",
     question: `Look deeper into this part of the answer: free fares for everyone. (a dig on a public debate, ${seeded.state})`,
     askedAt: Date.parse("2026-10-29T08:00:00.000Z"), settleAt: Date.parse("2026-10-29T08:12:00.000Z"), storyReadyAt: 0,
     dig: { parent_run_id: RUN_SETTLED, position_ref: "n-mix", places: ["path:n-mix"], level: 1,
-      picks: [{ kind: "OWN_VIEW", place: "path:n-mix", text: "Small towns behave differently.", by: "PERSON_OWN_VIEW" }], rewrite: null }
+      picks: [{ kind: "OWN_VIEW", place: "path:n-mix", text: SEEDED_CONTRIBUTION_PICK, by: "PERSON_OWN_VIEW" }], rewrite: null }
   });
+  // Task 79c (owner answer Q33 A): the public debate is someone else's, so each is a dig made on someone else's public page.
+  run.publicDig = Object.freeze({ pick: SEEDED_CONTRIBUTION_PICK });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (run.answer as any).contribution = { public_ref: PUBLIC_REF, state: seeded.state, rewrite: seeded.state === "CHECKING" || seeded.state === "REMOVED_AFTER_REVIEW" ? null
     : { line: "Free fares for everyone: partly held, by this dig's own reading.", summary: "The dig looked at small towns, and the picture stayed the same.", fate: "PARTLY_HELD", what_changed: ["Small towns are now covered."] } };
@@ -598,6 +727,7 @@ function digPartOf(parent: DraftAskParent, level: number) {
 
 function runProjection(run: MockRun, now = Date.now()) {
   const state = stateOf(run, now);
+  const level = askedLevels.get(run.runRef);
   return {
     run_ref: run.runRef,
     question_line: run.question,
@@ -607,10 +737,20 @@ function runProjection(run: MockRun, now = Date.now()) {
     argument_language: run.language ?? ENGLISH,
     waits_until: state === "WAITING" ? waitsUntil(now) : null,
     waits_for: null,
+    // V4 start step, Task 75d: the level the debate was asked at, as the API's run read says it (none: a seeded run, read as Plain words).
+    ...(level === undefined ? {} : { reading_level: level }),
     // W2-7 (money rule, draft): paused at the month wall until the next month; Continue once it has started.
     ...(run.monthPaused === true && state === "RUNNING" ? { month_pause: monthPause(nextUtcMonth(now), pauseMode === "CAN_CONTINUE") } : {}),
-    // Owner review 3 Nov (draft, web-draft.ts DraftRunQuotaUsedSchema): what a failed run took from the quota.
-    ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {})
+    // V4 start step, Task 81 (branches.ts): a path debate's paths, each one's step line, dots or findings (each fills in the moment it is
+    // argued, while the others still work), and the carry-on part; [] while the AIs still choose the paths.
+    ...(run.paths === undefined ? {} : mockRunPathsPart({ run: run.paths, positionNodeIds: POSITION_NODE_IDS, state,
+      elapsedMs: now - (run.startedAt ?? now), sinceAnswerMs: now - (run.settleAt ?? now) })),
+    // Owner review 3 Nov; V4 start step, Task 57c (the contract's RunProjectionSchema.quota_used, last): what a failed run took from the quota.
+    ...(state === "FAILED" && run.quotaUsed !== undefined ? { quota_used: run.quotaUsed } : {}),
+    // V4 start step, Task 57g (the contract's RunProjectionSchema.continuable, last; Task 57e's `reusable`): Continue would continue it.
+    ...(state === "FAILED" && run.continuable === true ? { continuable: true } : {}),
+    // V4 start step, Task 57m (the contract's RunProjectionSchema.keeps_failing, last): two continues of it failed again.
+    ...(state === "FAILED" && run.keepsFailing === true ? { keeps_failing: true } : {})
   };
 }
 
@@ -654,14 +794,16 @@ function storyRead(run: MockRun, now = Date.now()) {
 /**
  * The shelf's draft parts of a row (web-draft.ts DraftShelfRowPartSchema, owner's screen review 3 Nov): the debate it was
  * dug from (the account's dig link; null for a first question), and for an answer the seeded map's four-shade bar and
- * whether its map changed since the person last opened it (here: no last visit recorded yet).
+ * whether its map changed since the person last opened it (here: no last visit recorded yet). Last, Task 79c's two CONTRACT members
+ * (owner answer Q33 A): whether the row is a dig made on someone else's public page, and its first pick (public-seed.ts publicDigRowPart),
+ * which the website's view keeps when the draft parts are held back.
  */
 const SEEDED_MAP_BAR = Object.freeze({ sure: 4, sure_for_case: 5, still_argued: 2, didnt_hold: 1 });
 function shelfPart(run: MockRun, served: boolean, now: number) {
   const dugFrom = digLinks.find((record) => record.child_run_id === run.runRef)?.parent_run_id ?? null;
-  if (served) return { map_bar: { ...SEEDED_MAP_BAR }, changed_since_visit: !lastVisits.has(run.runRef), dug_from: dugFrom };
+  if (served) return { map_bar: { ...SEEDED_MAP_BAR }, changed_since_visit: !lastVisits.has(run.runRef), dug_from: dugFrom, ...publicDigRowPart(run.publicDig) };
   const working = !["WAITING", "FAILED"].includes(stateOf(run, now));
-  return { ...(working && run.startedAt !== undefined ? { started_at: iso(run.startedAt) } : {}), dug_from: dugFrom };
+  return { ...(working && run.startedAt !== undefined ? { started_at: iso(run.startedAt) } : {}), dug_from: dugFrom, ...publicDigRowPart(run.publicDig) };
 }
 
 function answerIndex(limit: number, offset: number, now = Date.now()) {
@@ -726,7 +868,7 @@ function withShareScope(body: any, draftView: boolean) {
 
 function roomRead(
   mode: RoomMode, now = Date.now(), plan_id: PlanMode = planMode, reserveKept = anyInvestigationOpen(),
-  digMode: "quick" | "thorough" | null = null
+  digMode: "quick" | "thorough" | null = null, depth = 1
 ) {
   // Draft words: the person's one reserve is KEPT while an investigation is open; BLOCKED is a FULL day until its reset.
   const reserve = mode === "BLOCKED" ? { reserve: "BLOCKED" as const } : reserveKept ? { reserve: "KEPT" as const } : {};
@@ -738,9 +880,13 @@ function roomRead(
     // shape_settings is left out on purpose: the contract allows only `true` or absent, and absent means "off".
     answer_words: { short: 300, standard: 700, detailed: 1500 },
     length_settings: true,
-    settings_version: 20,
+    // V4 start step, Task 80 (owner answer Q8): 20, or the next version 30 s into the room scene SITEUPDATED (start-step.ts).
+    settings_version: startSettingsVersion(now),
     ...reserve,
-    ...share
+    ...share,
+    // V4 start step, Task 80: the step before Start (How wide and each path count's share at this depth), on a new question's read
+    // only; a dig's read carries its own share instead (the contract allows one estimate per read).
+    ...("start_share_percent" in share ? { start_step: startStepRoomPart(plan_id, depth, now) } : {})
   };
   // One builder per room word (a table: the source law wants a default and an exhaustive fall-through in any switch).
   const rooms: Readonly<Record<RoomMode, () => Record<string, unknown>>> = {
@@ -783,12 +929,16 @@ function billingUsage(now = Date.now(), plan_id: PlanMode = planMode, usage: Usa
   // W2-7 (money rule, draft): BORROWED is the day after the running debate went past it: 104% used, 4% of tomorrow's taken.
   // Only a paid plan's day and week borrow (the money rule); Free counts the month alone (plan-windows.ts).
   const borrowed = usage === "BORROWED" && plan_id !== "FREE";
+  // V4 start step, Task 80: the calls before Start count in the quota even without Start, so the usage moves with them
+  // (start-step.ts startStepUsedPercent: made-up steps; a replayed reading moves nothing). The contract's read stops at 110%.
+  const moved = startStepUsedPercent();
+  const at = (percent: number): number => Math.min(110, percent + moved);
   return {
     plan_id,
     windows: windowsForPlan(plan_id, [
-      { scope: "PERSON_DAY", percent: borrowed ? 104 : 14, resets_at: nextUtcMidnight(now) },
-      { scope: "PERSON_WEEK", percent: borrowed ? 47 : 31, resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday)) },
-      { scope: "PERSON_MONTH", percent: borrowed ? 16 : 9, resets_at: nextUtcMonth(now) }
+      { scope: "PERSON_DAY", percent: at(borrowed ? 104 : 14), resets_at: nextUtcMidnight(now) },
+      { scope: "PERSON_WEEK", percent: at(borrowed ? 47 : 31), resets_at: iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday)) },
+      { scope: "PERSON_MONTH", percent: at(borrowed ? 16 : 9), resets_at: nextUtcMonth(now) }
     ]),
     ...(borrowed ? { borrowed: [borrowNotice(RUN_RUNNING, nextUtcMidnight(now))] } : {})
   };
@@ -1019,7 +1169,11 @@ function investigationReports(investigation: Investigation) {
   const finished = investigation.closings.filter((closing) => closing.report === "READY").at(-1);
   return {
     investigation_id: investigation.investigation_id, root_run_id: investigation.root_run_id, state: investigation.state, digs: investigation.digs.length,
-    versions, current: finished?.report_version ?? null, ...reportSharePart(investigation)
+    versions, current: finished?.report_version ?? null,
+    // V4 start step, Task 81 (public-f25; branches.ts): whether the person's next "Write my report" would be the debate's first report
+    // (Task 56b's flag, the owner's read): false under `#reportwaits` in the debate's question, else true until a report version exists.
+    first_closing_left: mockFirstClosingLeft({ question: root?.question ?? "", versions: versions.length }),
+    ...reportSharePart(investigation)
   };
 }
 
@@ -1097,7 +1251,7 @@ function startupCheck(): number {
   check("GET /v1/answers", C.AnswerIndexSchema, contractOrDraft(C.AnswerIndexSchema, index, stripAnswerIndex).body);
   for (const run of runs.values()) {
     checkDraft(`GET /v1/runs/${run.runRef}`, C.RunProjectionSchema, withQuestionShare(runProjection(run), run, true), stripRun, runDraftSchema);
-    // The normal view as its route sends it: a draft-only part (a failed run's quota_used) is held back there, and the
+    // The normal view as its route sends it: a failed run's quota_used is the contract's own since Task 57c, so it stays; the
     // question's share never makes the read fall back and lose its month pause.
     const normalRun = contractOrDraft(C.RunProjectionSchema, withQuestionShare(withStartedAt(runProjection(run), run, false), run, false), stripRun).body;
     check(`GET /v1/runs/${run.runRef} (normal view)`, C.RunProjectionSchema, normalRun);
@@ -1151,12 +1305,37 @@ function startupCheck(): number {
   check("POST /v1/asks 422 ASK_ALREADY_WAITING", C.AskAlreadyWaitingSchema, alreadyWaiting());
   check("POST /v1/asks 409 QUESTION_LANGUAGE_CHOICE_NEEDED", C.QuestionLanguageChoiceNeededSchema, languageOffer("A #mix question"));
   check("GET /v1/account/reading-level", C.ReadingLevelStateSchema, { reading_level: readingLevel });
+  // V4 start step, Task 80b (saved-questions.ts): the saved-question routes' answers over the #pickup scene, on Plus and on Free.
+  const saved = savedQuestionSamples();
+  check("GET /v1/account/saved-questions", C.SavedQuestionListSchema, saved.list);
+  check("POST and PUT /v1/account/saved-questions", C.SavedQuestionWrittenSchema, saved.written);
+  for (const read of saved.reads) {
+    check(`GET /v1/account/saved-questions/${read.id} (${read.state})`, C.SavedQuestionReadSchema, read);
+    check(`GET /v1/account/saved-questions/${read.id} (${read.state}, its document)`, C.SavedQuestionDocSchema, read.doc);
+  }
   for (const type of ["run.accepted", "run.running", "run.terminal"]) {
     check(`event ${type}`, C.RunEventSchema, runEvent(RUN_RUNNING, 1, type, { state: "SETTLED" }));
   }
   // The seed must still hold every node the README promises.
   const nodeIds = new Set(runs.get(RUN_SETTLED)!.answer.nodes.map((node: { node_id: string }) => node.node_id));
   for (const id of SEED_NODE_IDS) if (!nodeIds.has(id)) throw new Error(`MOCK_SEED_INVALID: node ${id} missing`);
+  // V4 start step, Task 80: every scene's lists, the menus, combine, fit, the clarify replies and the room's start step (start-step.ts).
+  count += startStepSelfCheck();
+  // V4 start step, Task 81 (branches.ts): every kind of path debate's run read, each second from the ask to 40 s after its answer; and its
+  // answer (its web part named by path id), during the carry-on's digs, its report and after.
+  count += mockPathRunSelfCheck();
+  for (const id of POSITION_NODE_IDS) if (!nodeIds.has(id)) throw new Error(`MOCK_SEED_INVALID: a path's root ${id} is missing`);
+  for (const sample of mockPathRunSamples()) {
+    const base = seed.answer({ answerId: ANSWER_SETTLED, runRef: RUN_SETTLED, question: "A path debate", askedAt: iso(T0), servedAt: iso(T0),
+      web: sample.free ? "FREE" : "PAID" });
+    const answer = { ...base, ...mockAnswerPathsPart({ run: sample, positionNodeIds: POSITION_NODE_IDS, web: base.web }) };
+    const label = `GET /v1/answers/{id} (a path debate, ${sample.startPaths?.source ?? "RUN_BUILT"}, ${String(sample.scene)})`;
+    const problems = checkAnswerDraft(answer);
+    if (problems.length > 0) throw new Error(`MOCK_SEED_INVALID: ${label} draft fields:\n${problems.join("\n")}`);
+    for (const since of [0, 25_000, 35_000]) {
+      check(`${label} ${String(since)} ms after it`, C.AnswerSchema, { ...answer, ...mockAnswerCarryOn({ run: sample, sinceAnswerMs: since }) });
+    }
+  }
   return count;
 }
 
@@ -1308,26 +1487,8 @@ function effectiveAskMode(): Exclude<AskMode, "AUTO"> {
   return "ACCEPT";
 }
 
-/**
- * Decisions 29 and 31, dynamic step 2. The question decides the scene, so a click-test can see each: words ending "#none" get no questions (the AI could
- * not help), "#fail" a server failure (no questions either), "#slow" no answer for 15 seconds (past the page's limit), "#purposeonly" only the purpose
- * question, "#nopurpose" no purpose question; anything else two questions and the purpose question. Waits a little, so "Analyzing your question…" can be seen.
- */
-async function postClarify(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = C.AskClarifyRequestSchema.safeParse(await readJsonBody(req).catch(() => undefined));
-  if (!body.success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
-  const question = body.data.question_line;
-  await new Promise((done) => setTimeout(done, question.endsWith("#slow") ? 15_000 : 900));
-  if (res.destroyed) return;
-  if (question.endsWith("#fail")) return sendJson(req, res, 503, { error: "MOCK_FAILURE", message: "MOCK_FAILURE" });
-  if (question.endsWith("#none")) return sendJson(req, res, 200, { source: "NONE" }, C.AskClarifyResponseSchema);
-  const purpose = { text: "What do you want the answer for?", answers: ["To decide how to vote", "To explain it to someone", "To write about it"] };
-  const questions = question.endsWith("#purposeonly") ? [] : [
-    { text: "Which country or region is this about?", answers: ["Romania", "The EU as a whole", "Anywhere in general"] },
-    { text: "Over what time?", answers: ["The next 5 years", "The next 25 years"] }
-  ];
-  return sendJson(req, res, 200, { source: "AI", questions, ...(question.endsWith("#nopurpose") ? {} : { purpose }) }, C.AskClarifyResponseSchema);
-}
+// Decisions 29 and 31, dynamic step 2 (POST /v1/asks/clarify): since V4 start step Task 80 in start-step.ts (mockClarify), with version 2's
+// members, the scenes #none, #fail, #slow, #late, #purposeonly and #nopurpose, and read-f1's reworded second reading.
 
 const publicReportsWriting = new Map<string, number>();
 /** Decision 13: the Free notices the asks said they showed, for the click-test to read in `/__mock/state`. */
@@ -1435,6 +1596,18 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
       return;
     }
   }
+  // Task 79c (owner answer Q33 A): the mock's public debates are someone else's, so a dig sent with `public_parent` is a dig made on
+  // someone else's public page; "Your maps" shows it as its own card with its first pick (none: a dig of the whole path).
+  const publicDig = publicParent === undefined ? undefined : Object.freeze({ pick: publicParent.picks?.[0]?.text ?? null });
+  // V4 start step, Task 80 (ask-f2 and owner answer Q14; choose-d2 and owner answer Q8; start-step.ts): a Free new question without the
+  // notice is held for it (403), and the paths chosen before Start are read back (another plan's STALE, more than the room's widest
+  // after a site update NARROWED, an edited question line goes on), before anything starts.
+  const startRefusal = startAskRefusal({ ask: parsed.data, newQuestion: parent === null && publicParent === undefined, plan: planMode });
+  if (startRefusal !== null) {
+    log(`REFUSED_${startRefusal.error}`, null);
+    sendJson(req, res, startRefusal.status, { error: startRefusal.error, message: startRefusal.error });
+    return;
+  }
   if (parsed.data.free_public_notice === true && parent === null && publicParent === undefined) freeNotices += 1;
   if (parent !== null && !runs.has(parent.parent_run_id)) {
     log("PARENT_NOT_FOUND", null);
@@ -1452,6 +1625,10 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
   }
   const ask = parsed.data;
   const question: string = ask.question_line.trim();
+  // Task 75d (owner, 5 Nov): the level the run is kept at, as POST /v1/asks keeps it: a dig on a public page the page's, a dig its
+  // debate's, a new question the level it was asked at.
+  const askedLevel = publicParent !== undefined ? publicLevelOf(publicParent.public_ref)
+    : parent !== null ? askedLevels.get(parent.parent_run_id) : ask.depth_params.readingLevel;
   const wantsLanguageChoice = mode === "LANGUAGE_CHOICE" || /#mix/iu.test(question);
   if (wantsLanguageChoice && ask.question_language_choice === undefined) {
     log("LANGUAGE_CHOICE_NEEDED", null);
@@ -1463,8 +1640,12 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     sendJson(req, res, 422, alreadyWaiting(), C.AskAlreadyWaitingSchema);
     return;
   }
+  // V4 start step, Task 80b (saved-questions.ts): the ask is accepted (every way on from here answers 202), so the question kept as
+  // not started yet leaves the list, as the API removes it right after the ask is accepted; a refused ask keeps it.
+  if (ask.saved_question_id !== undefined) removeSavedQuestionAtStart(ask.saved_question_id);
   const now = Date.now();
   const runRef = randomUUID();
+  if (askedLevel !== undefined) askedLevels.set(runRef, askedLevel);
   const seq = nextSeq++;
   // A new question opens its own investigation; a dig with a parent joins (and reopens) its parent's, as the server
   // will once W3-2 lands. The page's after-start link (POST /v1/runs/{id}/dig-links) does the same.
@@ -1473,7 +1654,7 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     else linkDig(parent.parent_run_id, { child_run_id: child, places: parent.places, mode: parent.mode }, now);
   };
   if (mode === "WAITING") {
-    const run = addRun({ runRef, question, seq, waiting: true });
+    const run = addRun({ runRef, question, seq, waiting: true, ...(publicDig === undefined ? {} : { publicDig }) });
     join(runRef);
     log(parent === null ? "WAITING" : "WAITING_DIG", runRef);
     sendJson(req, res, 202, askAccepted(run, true), C.AskAcceptedSchema);
@@ -1488,17 +1669,23 @@ async function postAsk(req: IncomingMessage, res: ServerResponse): Promise<void>
     sendJson(req, res, 202, askAccepted(run, false), C.AskAcceptedSchema);
     return;
   }
-  const settleAt = now + RUN_SECONDS * 1000;
+  // V4 start step, Task 81 (branches.ts): a new question is a path debate, as on the API with the start step on: one path per path sent at
+  // Start, or, with none sent, the AIs choose for 8 s and name their own. Its paths fill in one by one; the answer comes 6 s after the last.
+  // A dig keeps its MOCK_RUN_SECONDS and today's answer.
+  const pathRun = parent === null && publicParent === undefined ? mockPathRunOf(ask) : undefined;
+  const settleAt = now + (pathRun === undefined ? RUN_SECONDS * 1000 : mockPathRunMs(pathRun));
   // Free never searches; "#webfail" in the question plays a debate whose search failed.
   const web: WebCase = ask.plan_tier === "free" ? "FREE" : /#webfail/iu.test(question) ? "FAILED" : "PAID";
   const run = settledRun({
     runRef, answerId: randomUUID(), question, seq, askedAt: now, settleAt,
     storyReadyAt: settleAt + POSTED_STORY_SECONDS * 1000, web,
+    ...(pathRun === undefined ? {} : { paths: pathRun }),
     // W3-4: a dig's answer says its level and its picks, so its own map knows how deep it is.
     ...(parent === null ? {} : { dig: digPartOf(parent, digLevel) }),
     // A stranger's dig names no run; the answer still needs a parent, so it hangs under the mock's first debate. The page never reads it.
     ...(publicParent === undefined ? {} : { dig: digPartOf({ parent_run_id: RUN_SETTLED, places: publicParent.places, mode: publicParent.mode, picks: publicParent.picks } as DraftAskParent, 1) })
   });
+  if (publicDig !== undefined) run.publicDig = publicDig;
   if (publicParent !== undefined) startPublicCheck(run, publicParent, question, settleAt);
   // Owner review 3 Nov (dig=PAUSE): a new dig reaches the month wall at once; Continue (once pause=CAN_CONTINUE) lets it finish.
   if (parent !== null && digEndMode === "PAUSE") {
@@ -1554,6 +1741,11 @@ function mockState() {
     report: reportMode,
     session: sessionOut ? "OUT" : "IN",
     free_notices: freeNotices,
+    // V4 start step, Task 80: the calls before Start so far (a replayed reading counts none), what they add to the usage read,
+    // the room scene and the settings version the room names now.
+    start_step: { ...startStepCounters(), used_percent: startStepUsedPercent(), room_scene: startRoomScene(), settings_version: startSettingsVersion(now) },
+    // V4 start step, Task 80b: the saved-question calls so far (first saves, later saves, Pick ups, Deletes), how many are kept, the scene.
+    savedQuestions: { ...savedQuestionCounters(), kept: savedQuestionsKept(), scene: savedQuestionsScene() },
     ask_effective: effectiveAskMode(),
     now: iso(now),
     reading_level: readingLevel,
@@ -1638,6 +1830,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         // Setting climb=PLAY again plays the climb again from now, so a click-test can be repeated.
         const climbSetting = url.searchParams.get("climb");
         if (climbSetting !== null) climbPlayedAt = choice("climb", climbSetting, CLIMB_MODES, "SEED") === "PLAY" ? Date.now() : null;
+        // V4 start step, Task 80: the room scene (start-step.ts); setting it again starts it afresh (its reads and its 30 s).
+        const roomSceneSetting = url.searchParams.get("roomscene");
+        if (roomSceneSetting !== null) setStartRoomScene(choice("roomscene", roomSceneSetting, START_ROOM_SCENES, startRoomScene()));
+        // V4 start step, Task 80b: the questions not started yet (saved-questions.ts); saved=PICKUP again puts the #pickup scene back as it was.
+        const savedSetting = url.searchParams.get("saved");
+        if (savedSetting !== null) setSavedQuestionsScene(choice("saved", savedSetting, MOCK_SAVED_SWITCH, savedQuestionsScene()));
         if (reportSetting !== null) reportMode = choice("report", reportSetting, REPORT_MODES, reportMode);
         if (digSetting !== null) digEndMode = choice("dig", digSetting, DIG_END_MODES, digEndMode);
         if (room !== null) roomMode = choice("room", room, ROOM_MODES, roomMode);
@@ -1646,6 +1844,18 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (usage !== null) usageMode = choice("usage", usage, USAGE_MODES, usageMode);
         // The withdrawal can be clicked again: subscription=RESET puts the Plus subscription back inside its 14 days.
         if (url.searchParams.get("subscription") === "RESET") withdrawnAt = null;
+        // V4 start step, Task 57g: Continue can be clicked again: failed=RESET puts the failed questions 4444 and 4500…45 back as seeded (failed, continuable).
+        // Task 57i: and the seven failed digs (two of them continuable).
+        const failedSetting = url.searchParams.get("failed");
+        if (failedSetting !== null && choice("failed", failedSetting, ["RESET"] as const, "RESET") === "RESET") {
+          seedFailed();
+          seedFailedSome();
+          seedFailedDigs();
+          // Task 57j: and the question an update set aside that can continue (4600…46).
+          seedFailedSetAside();
+          // Task 57m: and the question that keeps failing after two continues (4700…47).
+          seedFailedKeepsFailing();
+        }
         if (publicSetting !== null) publicMode = choice("public", publicSetting, PUBLIC_MODES, publicMode);
         if (publicStateSetting !== null) publicState = choice("publicstate", publicStateSetting, PUBLIC_STATES, publicState);
         const publicDigShareSetting = url.searchParams.get("publicdigshare");
@@ -1662,7 +1872,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       } catch (failure) {
         // The detail goes to the mock's log, never into the reply (CodeQL js/stack-trace-exposure, PR #224).
         process.stderr.write(`[mock] setting refused: ${failure instanceof Error ? failure.message : String(failure)}\n`);
-        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate, publicdigshare or session; see the mock's log." });
+        return sendJson(req, res, 400, { error: "MOCK_SETTING_INVALID", message: "Unknown value for room, ask, plan, usage, pause, report, dig, live, climb, public, publicstate, publicdigshare, roomscene, saved, failed or session; see the mock's log." });
       }
       return sendJson(req, res, 200, mockState());
     }
@@ -1672,7 +1882,7 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (parts[1] === "sign-out" && isGet) {
       return sendJson(req, res, 200, { signed_in: false }, undefined, { "set-cookie": clearedSessionCookies() });
     }
-    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&publicdigshare=&live=&climb=&session=&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
+    return notFound(req, res, "MOCK_CONTROL_NOT_FOUND", "Known: /__mock/state, /__mock/set?room=&ask=&plan=&usage=&pause=&report=&dig=&public=&publicstate=&publicdigshare=&live=&climb=&roomscene=&saved=&session=&failed=RESET&subscription=RESET, /__mock/draft/v1/..., /__mock/sign-in, /__mock/sign-out");
   }
 
   // ---- the website edge's readiness probe (server.mjs /readyz forwards to <API>/readyz) ----
@@ -1717,6 +1927,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!body.success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     readingLevel = body.data.reading_level;
     return sendJson(req, res, 200, { reading_level: readingLevel }, C.ReadingLevelStateSchema);
+  }
+  // V4 start step, Task 80b (saved-questions.ts): the questions not started yet, the five routes of the API; a stranger has none (401).
+  if (path.startsWith("/v1/account/saved-questions")) {
+    if (sessionOut) return sendJson(req, res, 401, { error: "SESSION_REQUIRED" });
+    if (await routeSavedQuestions(req, res, path, method, { plan: planMode })) return;
   }
   if (path === "/v1/auth/logout" && method === "POST") return sendEmpty(req, res, 204, { "set-cookie": clearedSessionCookies() });
   if (path === "/v1/geo/availability" && isGet) {
@@ -1782,7 +1997,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const refuse = (error: string) => sendJson(req, res, 409, { error, message: error }, C.PublicDebateRefusedSchema);
     if (roomMode === "FULL" || roomMode === "BLOCKED" || roomMode === "WAIT_RESET") return refuse("PUBLIC_DEBATE_WAITS_FOR_RESET");
     if (publicMode === "ONGOING") return refuse("PUBLIC_DEBATE_ONGOING");
-    if (debate.author_name_gone === true && (debate.contributions ?? []).length === 0) return refuse("PUBLIC_DEBATE_NO_CARRIER");
+    // Task 56h (owner, 7 Nov afternoon): with the author gone and no dig, the report is written from what the page holds, on the presser's own run;
+    // only a page holding nothing to write from (no story, no main answer, no report) still asks for a dig first.
+    if (debate.author_name_gone === true && (debate.contributions ?? []).length === 0 && debate.story_short === undefined && debate.main_answer_update === undefined
+      && (debate.reports ?? []).length === 0) return refuse("PUBLIC_DEBATE_NO_CARRIER");
     const version = (debate.reports ?? []).length + 1 + (publicReportsWriting.get(parts[3]!) ?? 0);
     publicReportsWriting.set(parts[3]!, (publicReportsWriting.get(parts[3]!) ?? 0) + 1);
     // public-f9: with `public=REPORT_STUCK` the version is accepted and never arrives (the page's "taking longer" and "Check again").
@@ -1797,7 +2015,12 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (path === "/v1/deployment" && isGet) return sendJson(req, res, 200, DEPLOYMENT, C.DeploymentSchema);
 
   // ---- asking ----
+  // V4 start step, Task 80 (start-step.ts): the clarifying questions and the step before Start, its lists as they come, the merge,
+  // combine and fit, for the mock's person on its plan.
+  if (await routeStartStep(req, res, path, method, { plan: planMode })) return;
   if (path === "/v1/asks/room" && isGet) {
+    // V4 start step, Task 80 (read-f3): under the room scenes PLANFAILS and PLANFAILSALL the read fails, so "Checking your plan…" can be seen.
+    if (startRoomReadOutcome() === "FAIL") return sendJson(req, res, 503, { error: "MOCK_FAILURE", message: "MOCK_FAILURE" });
     // A read for a dig names its parent, mode and picks (DRAFT query part); today's query rules read the rest.
     const all = Object.fromEntries(url.searchParams);
     const whole = C.AskRoomQuerySchema.safeParse(all);
@@ -1811,11 +2034,11 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       });
     }
     const digMode = dig.data.dig_parent === undefined ? null : dig.data.dig_mode ?? "quick";
-    return sendDraftable(withShareScope(roomRead(roomMode, Date.now(), planMode, anyInvestigationOpen(), digMode), draftView),
+    // V4 start step, Task 80: the read's depth sets each path count's share in its start step.
+    return sendDraftable(withShareScope(roomRead(roomMode, Date.now(), planMode, anyInvestigationOpen(), digMode, query.data.depth), draftView),
       C.AskRoomResponseSchema, stripRoom, issuesOf(DraftRoomPartSchema));
   }
   if (path === "/v1/asks" && method === "POST") return postAsk(req, res);
-  if (path === "/v1/asks/clarify" && method === "POST") return postClarify(req, res);
 
   // ---- billing ----
   if (path === "/v1/billing/usage" && isGet) {
@@ -1890,6 +2113,18 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
       return sendJson(req, res, 200, { seen_at: seenAt }, C.LastVisitRecordedSchema);
     }
     if (parts[3] === "continue") {
+      // V4 start step, Task 57g (the owner's 7 Nov answers; failed-seed.ts mockContinueStep): first the person's own FAILED question, as the
+      // API's route tries it first; everything else falls through to the month pause's Continue below, unchanged.
+      const stoppedStep = mockContinueStep({ failed: stateOf(run) === "FAILED", running: stateOf(run) === "RUNNING",
+        continuable: run.continuable === true, continued: run.continued === true });
+      if (stoppedStep !== "MONTH") {
+        if (!DraftRunContinueRequestSchema.safeParse(body ?? {}).success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+        if (stoppedStep === "NOT_CONTINUABLE") {
+          return sendJson(req, res, 409, { error: "RUN_NOT_CONTINUABLE", message: "RUN_NOT_CONTINUABLE" }, C.RunNotContinuedSchema);
+        }
+        if (stoppedStep === "CONTINUE") continueStoppedRun(run);
+        return sendJson(req, res, 200, { state: "CONTINUING" }, DraftRunContinuedSchema);
+      }
       // Draft route (W2-7, money rule): Continue on a debate paused at the month wall, once the new month has started.
       if (run.monthPaused !== true || stateOf(run) !== "RUNNING") return sendJson(req, res, 409, { error: "RUN_NOT_PAUSED", message: "RUN_NOT_PAUSED" });
       if (!DraftRunContinueRequestSchema.safeParse(body ?? {}).success) return sendJson(req, res, 400, { error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
@@ -1943,6 +2178,10 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (parts[1] === "runs" && parts.length === 4 && parts[3] === "report" && method === "POST") {
     const investigation = investigationOf(parts[2]!);
     if (investigation === undefined) return notFound(req, res, "RUN_NOT_FOUND", "No run with this id.");
+    // V4 start step, Task 81 (public-f25; branches.ts): under `#reportwaits` in the debate's question its next report is not its first, so
+    // the press waits for the reset (409, nothing closes or starts), as the API answers the owner of a public debate (Task 56b).
+    const waits = mockReportRefusal(runs.get(investigation.root_run_id)?.question ?? "");
+    if (waits !== null) return sendJson(req, res, waits.status, waits.body, C.PublicDebateRefusedSchema);
     const newest = investigation.closings.at(-1);
     if (investigation.state === "CLOSED" && newest?.report !== "FAILED") return sendJson(req, res, 409, { error: "INVESTIGATION_CLOSED", message: "INVESTIGATION_CLOSED" });
     investigation.state = "CLOSED";

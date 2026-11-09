@@ -43,12 +43,17 @@ export function V4ChoiceChips(props: Readonly<{
 
 /** The words a dig pick shows on its chip: the suggestion as the person left it, their own view, or the open question. */
 export function digPickWords(pick: V4DigPick): string {
+  // V4 start step, Task 60: a "+ N more" item shows its question, the words a dig of it asks.
+  if (pick.kind === "MORE") return shortText(pick.more.question, CHIP_TEXT_MAX);
   return shortText(pick.kind === "OPEN" ? pick.question.text : pick.text, CHIP_TEXT_MAX);
 }
 
-/** Whether the AIs wrote a pick's words: an open question, or a suggestion as they worded it (never an own view or an edit). */
+/**
+ * Whether the AIs wrote a pick's words: an open question, a suggestion as they worded it, or a "+ N more" item (never an own
+ * view or an edit).
+ */
 export function pickIsAi(pick: V4DigPick): boolean {
-  return pick.kind === "OPEN" || (pick.kind === "SUGGESTION" && !isEdited(pick));
+  return pick.kind === "OPEN" || pick.kind === "MORE" || (pick.kind === "SUGGESTION" && !isEdited(pick));
 }
 
 /** The dig tray's picks as chips (journey-f23: "Picks show as chips, not as '2 picked'"). */

@@ -5,9 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { Answer, AnswerStory, DigLinks, InvestigationReports, InvestigationReportVersion } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { V4ReportDigWait } from "@/components/v4/V4DigUndo";
-import { V4PublicMarkFor } from "@/components/v4/V4PublicMark";
+import { V4PublicMark } from "@/components/v4/V4PublicMark";
 import { V4ReportHeader, type ReportShareItem } from "@/components/v4/V4ReportHeader";
-import { useQuestionPublic } from "@/components/v4/V4ReportStrip";
+import { useQuestionPublic, useReportRoom } from "@/components/v4/V4ReportStrip";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { isNotFound } from "@/lib/api";
@@ -15,7 +15,8 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pathTrustWord } from "@/lib/report/pathTrust";
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
 import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
-import { mayBeWaitedFor, reportWaitLineOf, waitingDigQuestionOf } from "@/lib/v4/reportWriting";
+import { firstReportLeftOf, mayBeWaitedFor, reportWaitLineOf, waitingDigQuestionOf } from "@/lib/v4/reportWriting";
+import { ownViewLineKey, ownViewOf, versionPathGroups, versionPathWord, type OwnView, type VersionPath } from "@/lib/v4/reportPaths";
 import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import {
   loadDigView, loadInvestigation, loadStory, loadV4, reopenInvestigation, storyReadFailed, writeReport, type FinishedReportVersion
@@ -26,6 +27,10 @@ import { waitForDigs } from "@/lib/v4/digUndo";
 import { whenText } from "@/lib/v4/stateWords";
 import { loadedLevelOf } from "@/lib/v4/debateLevel";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
+import { replayHighlight } from "@/lib/v4/highlight";
+import { reportWaitLine } from "@/lib/v4/money";
+import { usePublicStage } from "@/lib/v4/publicState";
+import { quotaChanged } from "@/lib/v4/quotaPulse";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
 } from "@/lib/v4/types";
@@ -515,6 +520,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     window.history.replaceState(null, "", levelHref(`/v4/debate/${encodeURIComponent(rootRunId)}/report`, chosenLevel));
     setTarget(rootRunId);
   }, [elsewhere, rootRunId, chosenLevel]);
+  // journey-f20: the debate's public stage, for the mark under its question. V4 start step, Task 56c (public-f25): read once here, so
+  // the write button also knows the debate is public (a further report on a public debate waits for the reset).
+  const publicStage = usePublicStage(elsewhere ? null : runId);
 
   // Decision A: digs are found again from the account's question list (lib/v4/digIndex.ts); read once — the report is a
   // snapshot. Digs are newer than their parent, so the list is paged only until this run has been seen (FIXES2,
@@ -764,7 +772,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           </h1>
         </header>
         {/* journey-f20: a debate with a public page says so under its question, with its link (not on paper). */}
-        <V4PublicMarkFor runId={elsewhere ? null : load.runId} catalog={catalog} />
+        <V4PublicMark stage={publicStage} catalog={catalog} />
 
         {/* dig-d3 A, ruling F7: a dig still in its 10 seconds (pressed on the map just before) is waited for. */}
         <V4ReportDigWait runId={load.runId} catalog={catalog} />
@@ -774,6 +782,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           runningDig={runningDig}
           webNote={map.webNote}
           publicToo={publicToo}
+          isPublic={publicStage?.kind === "PUBLIC"}
+          free={free}
           pdfRefused={pdfCheck === "REFUSED"}
           mapHref={mapHref}
           locale={locale}
@@ -1067,20 +1077,35 @@ function clockTime(locale: string, at: number): string {
 }
 
 type PressKind = "write" | "reopen";
-/** report-f6: a press whose answer was lost: `checking` while the versions are read again. */
-type PressNote = Readonly<{ kind: PressKind; checking: boolean }>;
+/**
+ * report-f6: a press whose answer was lost: `checking` while the versions are read again. V4 start step, Task 56c: `waits`, the press
+ * was refused until the reset (nothing started): the note says when the report can start, with no Try again.
+ */
+type PressNote = Readonly<{ kind: PressKind; checking: boolean; waits?: boolean }>;
+
+/** Task 56c: the id of the line that says when a report waiting for the reset can start (beside the write button, or the note). */
+const REPORT_WAITS_LINE = "v4-report-waits";
 
 /**
  * R22 W5-1: the report over the investigation: its versions, the one shown, and "Write my report" / "Keep digging".
  * report-f2: a read that fails says so in this place, with Try again, and keeps Write my report.
+ * V4 start step, Task 56c (item public-f25; owner answer Q20 B: only a debate's very first report uses the kept reserve): a further
+ * report on a public debate waits for the reset like digs. While the page is sure of it (the debate is public, the investigation read
+ * says the next report is not its first, and the person's room holds new starts: lib/v4/money.ts reportWaitLine), the write button
+ * stays where it is, greyed but focusable, with "This report can start after 08:00." beside it; a press shows the line again and sends
+ * nothing (journey-f14). A press refused anyway says the same line, never "We couldn't confirm your report started." and never Try again.
  */
-function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfRefused, mapHref, locale, language, catalog }: Readonly<{
+function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPublic, free, pdfRefused, mapHref, locale, language, catalog }: Readonly<{
   runId: string;
   investigation: Investigation;
   runningDig: string | null;
   webNote: V4WebNote | null | undefined;
   /** report-f15: a Free question that is public: said before writing. */
   publicToo: boolean;
+  /** Task 56c: the debate is public now (its public stage is PUBLIC). */
+  isPublic: boolean;
+  /** Task 56c: the debate ran on Free (the room read is asked as Free's). */
+  free: boolean;
   pdfRefused: boolean;
   mapHref: string;
   locale: string;
@@ -1102,6 +1127,19 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfR
     return () => { alive.current = false; };
   }, []);
 
+  // Task 56c: the room is read only where a report can wait (a public debate whose next report is not its first), or after a press
+  // refused until the reset; the line shows before a press only when the page is sure.
+  const readNow = investigation.state.kind === "READ" ? investigation.state.read : null;
+  const firstReportLeft = firstReportLeftOf(readNow);
+  const refusedWait = note?.waits === true;
+  const room = useReportRoom((isPublic && firstReportLeft === false) || refusedWait, free);
+  const sure = reportWaitLine({ room, isPublic, firstReportLeft, locale });
+  const waitLine = sure === null ? null : t(catalog, sure.key, sure.values);
+  // After a refusal the server has said this report is not the debate's first, on a public debate; until the room is read again, the
+  // site's plain reset line.
+  const refused = refusedWait ? reportWaitLine({ room, isPublic: true, firstReportLeft: false, locale }) : null;
+  const refusedText = waitLine ?? (refused === null ? t(catalog, "v4.public.refusal.waitsForReset") : t(catalog, refused.key, refused.values));
+
   // report-f6: a press that fails may still have reached the server (its reply was lost), so the page never says nothing
   // was used: it says it could not confirm, reads the versions again at once, and offers Try again only when nothing started.
   const press = async (kind: PressKind): Promise<void> => {
@@ -1116,7 +1154,14 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfR
     if (kind === "write") investigation.notePress();
     const result = kind === "write" ? await writeReport(runId) : await reopenInvestigation(runId);
     if (!alive.current) return;
-    if (result.kind === "FAILED") {
+    if (result.kind === "WAITS_FOR_RESET") {
+      // Task 56c: refused before anything started (the room changed since it was read): the note says when the report can start, with
+      // no Try again; the room and the versions are read again, so the line names the reset and the button waits from now on.
+      setNote({ kind, checking: false, waits: true });
+      quotaChanged();
+      await investigation.reread();
+      if (!alive.current) return;
+    } else if (result.kind === "FAILED") {
       setNote({ kind, checking: true });
       const next = await investigation.reread();
       if (!alive.current) return;
@@ -1132,7 +1177,12 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfR
     setFocusAsked((value) => value + 1);
   };
 
-  const noteLine = note === null ? null : (
+  const noteLine = note === null ? null : note.waits === true ? (
+    // Task 56c: refused until the reset: when it can start, never "We couldn't confirm" and never Try again.
+    <div className="v4RepPressNote">
+      <p id={REPORT_WAITS_LINE} className="v4RepNote" role="alert" data-report-waits="">{refusedText}</p>
+    </div>
+  ) : (
     <div className="v4RepPressNote">
       <p className="v4RepNote" role="alert">
         {t(catalog, note.kind === "write" ? "v4.investigation.startUnconfirmed" : "v4.investigation.reopenUnconfirmed")}
@@ -1144,8 +1194,23 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, pdfR
       )}
     </div>
   );
+  // Task 56c: while the report waits for the reset, the button stays, greyed but focusable, pointing at the line beside it (or at the
+  // refused press's note, which says the same); a press shows the line again and sends nothing.
+  const waiting = waitLine !== null;
+  const lineShown = waiting || refusedWait;
   const writeButton = (label: string) => (
-    <button type="button" className="v4Btn v4BtnPrimary v4RepWrite" disabled={busy} onClick={() => void press("write")}>{label}</button>
+    <>
+      <button type="button" className={`v4Btn v4BtnPrimary v4RepWrite${waiting ? " v4DigWaiting" : ""}`} disabled={busy}
+        aria-disabled={waiting ? "true" : undefined} aria-describedby={lineShown ? REPORT_WAITS_LINE : undefined}
+        onClick={() => {
+          if (waiting) {
+            replayHighlight(document.getElementById(REPORT_WAITS_LINE));
+            return;
+          }
+          void press("write");
+        }}>{label}</button>
+      {waiting && !refusedWait ? <p id={REPORT_WAITS_LINE} className="v4RepNote v4DigWaitLine" data-report-waits="">{waitLine}</p> : null}
+    </>
   );
   // report-f15: said before writing, right above the button.
   const publicLine = publicToo
@@ -1298,18 +1363,85 @@ function VersionStatus({ version, investigation, runningDig, locale, language, c
   );
 }
 
-/** The pieces a stored version's path keeps (an earlier version keeps only its line, summary, fate and level). */
-type VersionPath = NonNullable<FinishedReportVersion["paths"]>[number];
-
 function countsOf(words: readonly (TrustWord | null)[]): TrustCounts {
   const counts: Record<TrustWord, number> = { SURE: 0, SURE_FOR_CASE: 0, STILL_ARGUED: 0, DIDNT_HOLD: 0 };
   for (const word of words) if (word !== null) counts[word] += 1;
   return counts;
 }
 
+/** A sign no AI text or person's words can hold, so "Why: {reason}" splits around the reason and the reason alone is marked. */
+const REASON_SLOT = "⁣⁣";
+
+/**
+ * Task 55c (report-f4): "Your point of view" under a path that holds the person's own words, in the approved lines: the heading,
+ * their words (theirs, never marked as AI text), the verdict line, the AI's reason, and that it stayed theirs. One look whatever
+ * the verdict ("the same care"); with no verdict stored yet, the words and the last line only (no verdict is ever guessed).
+ */
+function VersionPathView({ view, language, catalog }: Readonly<{ view: OwnView; language: string | null; catalog: MessageCatalog }>) {
+  const key = ownViewLineKey(view);
+  const [before = "", after = ""] = t(catalog, "v4.view.why", { reason: REASON_SLOT }).split(REASON_SLOT);
+  return (
+    <div className="v4RepView">
+      <h4 className="v4RepSmallHead">{t(catalog, "v4.view.heading")}</h4>
+      <ul className="v4RepViewWords" dir="auto">
+        {view.words.map((words, at) => <li key={at}><q>{words}</q></li>)}
+      </ul>
+      {key === null ? null : <p className="v4RepViewVerdict">{t(catalog, key)}</p>}
+      {view.reason === null ? null : <p className="v4RepViewWhy">{before}<span {...aiProps(language)}>{view.reason}</span>{after}</p>}
+      <p className="v4RepNote">{t(catalog, "v4.view.asYours")}</p>
+    </div>
+  );
+}
+
+/**
+ * One stored path's row: its one trust word (r2-20), line, summary and, when the version keeps its points, its bar (no counts).
+ * Task 55c: on a dig's first path, what the dig changed (AI text); on a path that holds the person's own words, their point of view.
+ */
+function VersionPathRow({ path, as: Row, language, catalog }: Readonly<{
+  path: VersionPath;
+  /** A first-level row is its group's first part; a path dug later is an item of the group's fold. */
+  as: "div" | "li";
+  language: string | null;
+  catalog: MessageCatalog;
+}>) {
+  const ai = aiProps(language);
+  const words = (path.points ?? []).map((point) => point.trust);
+  const counts = countsOf(words);
+  const checked = TRUST_WORDS.some((word) => counts[word] > 0);
+  const changed = path.dig?.changed ?? [];
+  const view = ownViewOf(path);
+  return (
+    <Row className="v4RepPath" data-level={Math.min(path.level, PATH_LEVEL_STEPS)}>
+      <PathWord word={versionPathWord(path)} catalog={catalog} />
+      <p className="v4RepPathLine" {...ai}>{path.line}</p>
+      {path.summary !== null ? <p className="v4RepPathSummary" {...ai}>{path.summary}</p> : null}
+      {checked ? (
+        <div className="v4RepBar">
+          <V4TrustBar counts={counts} unchecked={words.filter((word) => word === null).length} catalog={catalog} size="small" />
+        </div>
+      ) : null}
+      {changed.length > 0 ? (
+        <div className="v4RepChanged">
+          <h4 className="v4RepSmallHead">{t(catalog, "v4.paths.whatChanged")}</h4>
+          <ul className="v4RepList" {...aiListProps(language)}>
+            {changed.map((line, at) => <li key={at} {...aiItemProps(language)}>{line}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {view !== null ? <VersionPathView view={view} language={language} catalog={catalog} /> : null}
+    </Row>
+  );
+}
+
 /**
  * report-f3: a version's own paths as it was written over them, each with its one trust word (r2-20) and, when the version
  * keeps its points (the current one), its bar. A version written before R22 keeps no paths.
+ * V4 start step, Task 55c (report-f4, the owner's "All in this build"): one item per first-level path, its row as before, with
+ * "Your point of view" under it when the path holds the person's own words. The paths dug later sit under their first-level row
+ * in one fold, "Updated by your dig", closed by default so the row stays one glance long, as the map's rows are (the brief's
+ * ruling); each keeps its level's indent, and a dig's first path says what the dig changed. The PDF already prints all of it.
+ * Task 55f: the digs on the main question, with the paths dug from them, are the last item: no row of their own (the question is
+ * the page's title), their own closed fold, "Dug from your question".
  */
 function VersionPaths({ paths, isCurrent, language, catalog }: Readonly<{
   paths: readonly VersionPath[] | undefined;
@@ -1319,28 +1451,25 @@ function VersionPaths({ paths, isCurrent, language, catalog }: Readonly<{
 }>) {
   if (paths === undefined) return isCurrent ? null : <p className="v4RepNote">{t(catalog, "v4.investigation.onlyAnswer")}</p>;
   if (paths.length === 0) return null;
-  const ai = aiProps(language);
   return (
     <>
       <h3 className="v4RepH3">{t(catalog, "v4.investigation.heading.paths")}</h3>
       <ol className="v4RepPaths">
-        {paths.map((path, at) => {
-          const words = (path.points ?? []).map((point) => point.trust);
-          const counts = countsOf(words);
-          const checked = TRUST_WORDS.some((word) => counts[word] > 0);
-          return (
-            <li key={at} className="v4RepPath" data-level={Math.min(path.level, PATH_LEVEL_STEPS)}>
-              <PathWord word={pathTrustWord(path.fate, words)} catalog={catalog} />
-              <p className="v4RepPathLine" {...ai}>{path.line}</p>
-              {path.summary !== null ? <p className="v4RepPathSummary" {...ai}>{path.summary}</p> : null}
-              {checked ? (
-                <div className="v4RepBar">
-                  <V4TrustBar counts={counts} unchecked={words.filter((word) => word === null).length} catalog={catalog} size="small" />
-                </div>
-              ) : null}
-            </li>
-          );
-        })}
+        {versionPathGroups(paths).map((group, at) => (
+          <li key={at} className="v4RepPathGroup">
+            {group.first === null ? null : <VersionPathRow path={group.first} as="div" language={language} catalog={catalog} />}
+            {group.dug.length === 0 ? null : (
+              <details className="v4RepDug">
+                <summary className="v4RepDugSummary">
+                  {t(catalog, group.first === null ? "v4.investigation.updatedByQuestionDig" : "v4.investigation.updatedByDig")}
+                </summary>
+                <ol className="v4RepPaths v4RepDugPaths">
+                  {group.dug.map((path, place) => <VersionPathRow key={place} path={path} as="li" language={language} catalog={catalog} />)}
+                </ol>
+              </details>
+            )}
+          </li>
+        ))}
       </ol>
     </>
   );
@@ -1366,7 +1495,8 @@ function ReportVersion({ version, isCurrent, webNote, locale, language, catalog 
         state={version.state}
         catalog={catalog}
         language={language}
-        pathsPart={<VersionPaths paths={version.paths} isCurrent={isCurrent} language={language} catalog={catalog} />}
+        // Keyed by the version (the review session's ruling): a fold opened on one version is closed again on the next one pressed.
+        pathsPart={<VersionPaths key={version.report_version} paths={version.paths} isCurrent={isCurrent} language={language} catalog={catalog} />}
       />
     </div>
   );

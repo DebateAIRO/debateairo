@@ -114,7 +114,7 @@
 .v4PubRowBody { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 16px; min-width: 0; overflow-wrap: anywhere; }
 .v4PubRowBody[hidden] { display: none; }
 .v4PubRowLine { margin: 0; color: var(--text); }
-.v4PubFound, .v4PubDeeper { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4PubFound, .v4PubDeeper, .v4PubOwnWords { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .v4PubRowFoot { display: flex; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
 
 /* Open questions: the own map's open ground (dashed gold), each with its kind; the one star in words. */

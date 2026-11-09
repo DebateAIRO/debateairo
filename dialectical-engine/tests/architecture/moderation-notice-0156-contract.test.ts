@@ -19,9 +19,10 @@ const bodyOf = (name: string): string => {
 };
 
 describe("0156: the moderation notice", () => {
+  // A step of the chain, found by name: the V4 start step's steps (0158 to 0165) come after it.
   it("follows 0155 in the chain, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0155,loadForward0156,loadForward0157,loadForward0170]");
+    expect(chain).toContain("loadForward0155,loadForward0156,loadForward0157,");
     expect(chain).toContain("import { loadForward0156 } from './migration-forward0156.js';");
     const loader = read("packages/db/src/migration-forward0156.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);

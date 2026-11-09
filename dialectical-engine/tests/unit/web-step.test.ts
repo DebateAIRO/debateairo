@@ -275,3 +275,17 @@ describe("W3-1 the web step's own rules", () => {
     expect(readPromptFrame(sent).fence).toBe(readPromptFrame(recorded).fence);
   });
 });
+
+describe("Task 57p: each reading notes the settings version of the debate it was written for (owner, 8 Nov: \"On each piece's record\")", () => {
+  it("every reading of a searching debate carries the claimed run's version; a run with none known (local mode) notes NULL", async () => {
+    for (const [given, noted] of [[22, 22], [undefined, null]] as const) {
+      const store = memoryStore();
+      const input = stepInput({ members: membersOf(team().all), search: perplexity().port, prepare: store.prepare, searchSeam: searchMoney().seam,
+        ...(given === undefined ? {} : { settingsVersion: given }) });
+      expect(statusOf(await runWebStep(input))).toEqual([["a1", "SEARCHED", null], ["a2", "SEARCHED", null]]);
+      const readings = [...store.readings.values()];
+      expect(readings.length).toBeGreaterThan(0);
+      expect(readings.every((row) => row.settingsVersion === noted)).toBe(true);
+    }
+  });
+});

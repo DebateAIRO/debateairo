@@ -86,6 +86,12 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
   { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
   { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
+  // V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04 §3.14).
+  { route: "GET /v1/account/saved-questions", auth: "user", resource: "identity", action: "list-saved-questions" },
+  { route: "POST /v1/account/saved-questions", auth: "user", resource: "identity", action: "create-saved-question" },
+  { route: "PUT /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "save-saved-question" },
+  { route: "GET /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "read-saved-question" },
+  { route: "DELETE /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "delete-saved-question" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "GET /v1/account/moderation-statements", auth: "user", resource: "identity", action: "read-moderation-statements" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
@@ -150,6 +156,11 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
   { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
   { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
+  // V4 start step, Task 30: the four calls before Start.
+  { route: "POST /v1/asks/paths/lists", auth: "user", resource: "run-owner", action: "read-start-lists" },
+  { route: "POST /v1/asks/paths/merge", auth: "user", resource: "run-owner", action: "read-start-menu" },
+  { route: "POST /v1/asks/paths/combine", auth: "user", resource: "run-owner", action: "read-start-combine" },
+  { route: "POST /v1/asks/paths/fit", auth: "user", resource: "run-owner", action: "read-start-fit" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -358,7 +369,7 @@ describe("S7 deny-by-default authorization", () => {
     await api.ready();
     for (const route of contractInventory.routes) {
       const [method, path] = route.split(" ");
-      expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
+      expect(api.hasRoute({method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
@@ -382,8 +393,11 @@ describe("S7 deny-by-default authorization", () => {
     // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
     // Decision 33 adds the four staff routes of a public debate under review. Decision 35 adds the Report button's three.
-    // 0157 adds the statements of reasons (GET /v1/account/moderation-statements).
-    expect(contractInventory.routes).toHaveLength(202);
+    // V4 start step, Task 30 adds the four calls before Start (POST /v1/asks/paths/lists, …/merge, …/combine and …/fit): 205.
+    // V4 start step, Task 39e adds the five of the questions not started yet (GET and POST /v1/account/saved-questions, PUT, GET and
+    // DELETE …/{id}): 210.
+    // 0157 adds the statements of reasons (GET /v1/account/moderation-statements): 211 with the union.
+    expect(contractInventory.routes).toHaveLength(211);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
@@ -406,7 +420,8 @@ describe("S7 deny-by-default authorization", () => {
     });
     for (const policy of EXPECTED_AUTHORIZATION_MATRIX) {
       const [method, template] = policy.route.split(" ") as [string, string];
-      const httpMethod = method as "GET" | "POST" | "PATCH" | "DELETE";
+      // V4 start step, Task 39e: the API's first PUT routes (a later save of a question not started yet).
+      const httpMethod = method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
       const registeredUrl = template.replace(/\{([^}]+)\}/g, ":$1");
       expect(api.hasRoute({ method: httpMethod, url: registeredUrl }), policy.route).toBe(true);
       if (policy.auth === "public") continue;

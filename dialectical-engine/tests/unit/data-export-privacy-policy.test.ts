@@ -82,6 +82,11 @@ describe("data export privacy policy", () => {
     expect(access).toContain(
       "In Settings, choose Export data: we prepare a ZIP file of JSON files plus one page you can open in any browser, and email you a download link that works for 24 hours and only while you are signed in to your account.",
     );
+    // Privacy 3.12 (plan Task 83c, saved-questions spec §4): the export also holds the questions not started yet, after what V4's
+    // 0157 (Privacy 3.11 amended in place) says of the moderation notices and the answers to reports.
+    expect(access).toContain(
+      "which emails we sent you about it. It also holds each question you have not started yet, with your answers and paths. |",
+    );
     expect(portability).toContain(
       "Use Export data in Settings: the ZIP holds your data as machine-readable JSON files plus one readable page, sent as an emailed link that works for 24 hours and only while you are signed in.",
     );
@@ -118,7 +123,7 @@ describe("data export privacy policy", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, "packages/legal-manifest/src/manifest.json"), "utf8"),
     ) as { reacceptance: { PRIVACY: string } };
-    expect(PRIVACY_POLICY.version).toBe("3.11");
+    expect(PRIVACY_POLICY.version).toBe("3.12");
     expect(manifest.reacceptance.PRIVACY).toBe("3.2");
   });
 });

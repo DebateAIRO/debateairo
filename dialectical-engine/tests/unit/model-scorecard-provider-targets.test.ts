@@ -92,7 +92,7 @@ describe("model scorecard — a provider target declares its thinking levels and
       main.indexOf("const runRepository = new RunRepository(pool);")
     );
     expect(factory).toContain("...providerTargetGatewayControls(target),");
-    expect(factory).toContain("return previewGate === undefined ? gateway : withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)\n  });");
+    expect(factory).toContain("return previewGate === undefined ? gateway : withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),\n    // V4 start step, Task 53: a v2 run's terms (its plan); a v1 run and a call of no run, none (R22's asks).\n    finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms)\n  });");
   });
 });
 

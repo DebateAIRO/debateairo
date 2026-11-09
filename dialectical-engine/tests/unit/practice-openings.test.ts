@@ -367,12 +367,12 @@ describe("practice openings: arms C2 and C2N, wording N's comparison (Task 17a, 
     expect(openingsArmsFromFlag(undefined)).toEqual(["T", "A", "B", "C"]);
     expect(openingsArmsFromFlag("C2N,T,C2")).toEqual(["T", "C2", "C2N"]);
     for (const bad of ["C3", "C2,C2", "c2"]) {
-      expect(() => openingsArmsFromFlag(bad)).toThrow("--arms (only T, A, B, C, C2, C2N, comma-separated, each once)");
+      expect(() => openingsArmsFromFlag(bad)).toThrow("--arms (only T, A, B, C, C2, C2N, S, Q, comma-separated, each once)");
     }
     const dry = openingsDryPorts();
     await expect(runPracticeOpenings({ config, targets, ports: dry.ports, observer: new PracticeGateObserver({ now: () => 0 }),
       questions: openingsQuestionsFromFlag("en-nuclear"), arms: ["C2", "C2"], bound: policy.bounds.JUDGE, contractHashes: sealed,
-      sleep: dry.sleep, busyWaitMs: 0 })).rejects.toThrow("--arms (only T, A, B, C, C2, C2N, each once)");
+      sleep: dry.sleep, busyWaitMs: 0 })).rejects.toThrow("--arms (only T, A, B, C, C2, C2N, S, Q, each once)");
     expect(dry.script.requests).toBe(0);
     // The dry script answers engine 1's forms only: the command refuses the engine-2 arms with --dry, before anything runs.
     for (const arms of ["C2", "T,C2N"]) {

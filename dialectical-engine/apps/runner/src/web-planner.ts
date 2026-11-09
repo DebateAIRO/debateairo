@@ -41,7 +41,7 @@ import {
   type PlannedWebSearch,
   type WebPace
 } from "@debateai/evidence";
-import { digPickPathRef } from "@debateai/contract";
+import { WEB_CONTRACT_LIMITS, digPickPathRef } from "@debateai/contract";
 import type { PlanId } from "@debateai/register";
 
 /**
@@ -625,6 +625,14 @@ export async function planDigWebSearches(input: WebDigPlannerInput): Promise<Web
   if (input.placeCountry !== null && !oneCountry(input.placeCountry)) {
     throw new TypedDomainError("WEB_PLACE_COUNTRY_INVALID", "A place country must be one ISO 3166-1 country code");
   }
+  return everyPickPlanned(input, WEB_PLAN_SEARCH_CAP_BY_MODE[input.mode], (pickId) => digPickPathRef(Number(pickId)));
+}
+
+/**
+ * Every pick's planner at once, then code's freeze of all their searches together under `cap`, each pick kept under `pathIdOf`.
+ * A dig's and a path debate's planners share it. FAILED only when every pick's planners failed.
+ */
+async function everyPickPlanned(input: WebDigPlannerInput, cap: number, pathIdOf: (pickId: string) => string): Promise<WebDigPlanOutcome> {
   const settled = await Promise.allSettled(input.picks.map((pick) => planOneDigPick(input, pick)));
   const rejected = settled.find((entry): entry is PromiseRejectedResult => entry.status === "rejected");
   if (rejected !== undefined) throw rejected.reason;
@@ -633,12 +641,66 @@ export async function planDigWebSearches(input: WebDigPlannerInput): Promise<Web
   if (picks.every((pick) => pick.status === "FAILED")) {
     return Object.freeze({ kind: "FAILED", code: picks.at(-1)?.code ?? "WEB_PLANNER_NO_SEAT", attempts: Object.freeze(picks.flatMap((pick) => pick.attempts)) });
   }
-  const cap = WEB_PLAN_SEARCH_CAP_BY_MODE[input.mode];
   const capped = cappedDigPicks(done.flatMap((entry) => entry.planned === null ? [] : [entry.planned]), cap);
   const querySet = freezeDigQuerySet(capped.picks, { pickIds: input.picks.map((pick) => String(pick.pickNo)),
-    pathIdOf: (pickId) => digPickPathRef(Number(pickId)), asOf: input.asOf, questionLanguage: input.questionLanguage?.code ?? null });
+    pathIdOf, asOf: input.asOf, questionLanguage: input.questionLanguage?.code ?? null });
   return Object.freeze({ kind: "PLANNED", querySet, searchesToSend: querySet.distinctSends, cap,
     picks, picksOverCap: Object.freeze(capped.over.map(Number)) });
+}
+
+/* ----------------------------------------------------------------- a path debate's planners (V4 start step, Task 48) */
+
+/** One chosen path as its planner reads it: its number (b<n>'s n, the call-site key's), its path_ref, and its words (`pathChosenText`). */
+export type WebPathsPlannerPath = Readonly<{ pathNo: number; pathRef: string; chosen: string }>;
+
+/** The most characters of a path's words its planner reads: a dig pick's (WEB_CONTRACT_LIMITS.pickTextMaxChars). */
+export const WEB_PATH_CHOSEN_MAX_CHARS = WEB_CONTRACT_LIMITS.pickTextMaxChars;
+
+/**
+ * A chosen path's words for its planner (the dig planner's `chosen`): its question, then the title of each viewpoint it brings together,
+ * each once, one per line (an own view has none). Past WEB_PATH_CHOSEN_MAX_CHARS UTF-16 code units it is cut on a whole character and
+ * ends with "…". Same path, same bytes.
+ */
+export function pathChosenText(path: Readonly<{ question: string; viewpoints: readonly Readonly<{ title: string | null }>[] }>): string {
+  const titles = [...new Set(path.viewpoints.flatMap((viewpoint) => viewpoint.title === null || viewpoint.title.trim() === "" ? []
+    : [viewpoint.title.trim()]))];
+  const text = [path.question.trim(), ...titles].join("\n");
+  if (text.length <= WEB_PATH_CHOSEN_MAX_CHARS) return text;
+  let end = WEB_PATH_CHOSEN_MAX_CHARS - 1;
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return `${text.slice(0, end)}…`;
+}
+
+/**
+ * A PATH DEBATE'S PLANNERS (spec 2026-11-03 §4.3, decided 30 and 31 Oct): one planner per chosen path, the approved dig planner word for
+ * word (web.plan-dig.v3), every path's at once, each at its own call site (`webDigPlanCallSiteKey(pathNo)`) with its backup of another
+ * company and the slip order. A path may plan none, with its reason; a path whose planners fail sends none and the others go on. Code
+ * freezes every path's searches together, each path under its own path_ref, under the caller's `cap` (4 a path on Quick look, twice
+ * that on Thorough: the cap rises with the paths). Free and the off switch make no call. The country is the run's step-2 code when it
+ * has one, else the one each planner read (salvage keeps it). `question` is the caller's (web-step.ts: the line with the stored lines
+ * it does not already say).
+ */
+export async function planPathWebSearches(input: Omit<WebPlannerInput, "paths"> & Readonly<{
+  paths: readonly WebPathsPlannerPath[]; alreadyInvestigated: string; cap: number;
+}>): Promise<WebDigPlanOutcome> {
+  if (input.planId === "FREE") return Object.freeze({ kind: "NOT_ON_PLAN" });
+  if (!input.webSwitchedOn) return Object.freeze({ kind: "SWITCHED_OFF" });
+  const { paths, cap, ...rest } = input;
+  const numbers = paths.map((path) => path.pathNo);
+  const refs = paths.map((path) => path.pathRef);
+  if (paths.length === 0 || paths.length > WEB_PLANNER_PATHS_MAX || new Set(numbers).size !== numbers.length || new Set(refs).size !== refs.length
+    || numbers.some((no) => !Number.isSafeInteger(no) || no < 1) || refs.some((ref) => typeof ref !== "string" || ref.trim() === "")
+    || !Number.isSafeInteger(cap) || cap < 0) {
+    throw new TypedDomainError("WEB_PATHS_PLANNER_INPUT_INVALID",
+      `A path debate's planners read 1 to ${String(WEB_PLANNER_PATHS_MAX)} distinct paths under a whole cap`);
+  }
+  if (input.placeCountry !== null && !oneCountry(input.placeCountry)) {
+    throw new TypedDomainError("WEB_PLACE_COUNTRY_INVALID", "A place country must be one ISO 3166-1 country code");
+  }
+  const refOf = new Map(paths.map((path) => [String(path.pathNo), path.pathRef] as const));
+  return everyPickPlanned({ ...rest, picks: paths.map((path) => Object.freeze({ pickNo: path.pathNo, text: path.chosen })) }, cap,
+    (pickId) => refOf.get(pickId)!);
 }
 
 /* ----------------------------------------------------------------- per path, for the page and the web step */

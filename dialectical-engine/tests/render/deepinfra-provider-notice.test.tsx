@@ -22,7 +22,8 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
     expect(entry?.basisKey).toBe("legal.providers.unconfirmed");
     expect(entry?.locationKey).toBe("legal.providers.unconfirmed");
     expect(entry?.zeroRetention).toBe("unconfirmed");
-    expect(entry?.purposes).toEqual(["arguments", "judging", "story"]);
+    // Privacy 3.12: its models also write lists of what to look into before a debate starts.
+    expect(entry?.purposes).toEqual(["arguments", "judging", "story", "suggestPaths"]);
     expect(entry?.purposesConfirmed).toBe(true);
     // The support chat's model stays last, after Perplexity.
     expect(register.at(-1)?.key).toBe("support");

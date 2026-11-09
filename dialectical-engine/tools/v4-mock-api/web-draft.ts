@@ -121,8 +121,8 @@ export const DraftUsageBorrowsSchema = UsageBorrowsSchema;
 export const DraftRunStartedAtSchema = z.iso.datetime();
 /**
  * Owner review 3 Nov 2026 (wait-f11, map-f30, wait-f18): a FAILED run's `quota_used` ("NONE": nothing was taken from the
- * person's quota for it; "SOME": some was). NOT in the contract yet: the mock shows it only on its draft view, and the
- * website says "Nothing was taken" only once the run read carries it (apps/ui/lib/v4/failedRun.ts).
+ * person's quota for it; "SOME": some was). In the contract since V4 start step Task 57c (RunProjectionSchema.quota_used), so the
+ * normal view sends it too; this draft schema stays for the draft view's own check (apps/ui/lib/v4/failedRun.ts reads the field).
  */
 export const DraftRunQuotaUsedSchema = z.enum(["NONE", "SOME"]);
 export type DraftRunQuotaUsed = z.infer<typeof DraftRunQuotaUsedSchema>;
@@ -211,10 +211,13 @@ export function stripRoom<T extends Json>(room: T): T {
 
 /**
  * W2-7: without its month pause, a paused debate reads as today's RUNNING; the draft start time (journey-d2) goes too; without
- * `quota_used`, a failed run says nothing of the quota; without `question_share` (map-f9), the map shows no "This question".
+ * `quota_used`, a failed run says nothing of the quota; without `question_share` (map-f9), the map shows no "This question". V4 start step,
+ * Task 57g: without `continuable` (Task 57e's `reusable`), a failed run offers no "Continue where it stopped". Task 57m: without
+ * `keeps_failing`, a failed run reads as one that cannot continue, as before.
  */
 export function stripRun<T extends Json>(run: T): T {
-  const { month_pause: _pause, started_at: _started, quota_used: _quota, question_share: _share, ...rest } = run;
+  const { month_pause: _pause, started_at: _started, quota_used: _quota, question_share: _share, continuable: _continuable,
+    keeps_failing: _keepsFailing, ...rest } = run;
   return rest as unknown as T;
 }
 

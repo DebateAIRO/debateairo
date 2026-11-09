@@ -19,7 +19,8 @@ const server = vi.hoisted(() => ({
   usageReads: 0
 }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
-vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
+// V4 start step, Task 70b: no notice shows, so it never says one question already waits (sentence D).
+vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 vi.mock("@/lib/v4/useV4Ask", () => ({
   useV4Ask: () => ({
     planTier: "premium", freePublicNotice: false, room: null, submitting: false, dialogs: null,

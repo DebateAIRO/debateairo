@@ -761,6 +761,29 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
     expect(script).toMatch(/find "\$WORK\/custody" "\$WORK\/keys" -type f -exec chmod 0600 \{\} \+/);
   });
 
+  /**
+   * Task 39f, owner answer S8 A (5 Nov 2026): the keys of questions not started yet (the user-DEK store's own
+   * saved-questions/ folder) stay out of every backup that copies the custody tree, so a question deleted or started
+   * after a backup can never be read from it (tests/unit/backup-script.test.ts runs the script on a real tree). The
+   * drill reads no question key and stays as it was.
+   */
+  it("backup.sh and §9 leave the keys of questions not started yet out of the custody tree (S8 A)", () => {
+    const script = read("deploy/vps/backup.sh");
+    const custody = script.split("\n").filter((line) => /^tar -[cr]f "\$WORK\/custody\.tar"/u.test(line));
+    expect(custody).toHaveLength(3);
+    // Only the user-DEK store's own tar leaves the folder out; the publication and audit stores keep theirs.
+    expect(custody[0]).toBe('tar -cf "$WORK/custody.tar" --exclude="$dek_name/saved-questions" -C "$(dirname "$USER_DEK_STORE_PATH")" "$dek_name"');
+    expect(custody.slice(1).filter((line) => line.includes("--exclude"))).toEqual([]);
+    expect(script.slice(0, script.indexOf("set -euo pipefail"))).toContain("saved-questions/");
+    const readme = read("deploy/vps/README.md");
+    const section = readme.slice(readme.indexOf("## 9. Backups and the restore drill"), readme.indexOf("## 10. What is deliberately absent"));
+    const dataRecipient = section.slice(section.indexOf("1. **Data recipient**"), section.indexOf("2. **Escrow recipient**"));
+    expect(dataRecipient).toContain("`saved-questions/`");
+    expect(dataRecipient).toContain("S8 A");
+    expect(section.slice(section.indexOf("### Restore drill")).replace(/\s+/gu, " ")).toContain("brings back no question not started yet");
+    expect(read("deploy/vps/restore-drill.sh")).not.toContain("saved-questions");
+  });
+
   it("drill-decrypt-sample.ts proves one run row decrypts with the restored keys and never prints plaintext", () => {
     const script = read("deploy/vps/drill-decrypt-sample.ts");
     for (const needle of ["@debateai/crypto", "ContentCipher", "FileRunContentKeyStore", "FileUserDekStore", "loadKek", "RESTORE_DRILL_DECRYPT_OK", "content_encryption_version = 1"]) {
@@ -1446,6 +1469,8 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
       "tar -cf -", "age -r \"$BACKUP_DATA_RECIPIENT\"", "sha256sum", "ONLINE_BACKUP_OK"
     ]) expect(block, needle).toContain(needle);
     expect(block.indexOf("pg_dump --format=custom")).toBeLessThan(block.indexOf("tar -cf -"));
+    // Task 39f (S8 A): the online backup leaves out the user-DEK store's saved-questions/ too, before any store is named.
+    expect(block).toContain('tar -cf - --exclude="$(basename "$USER_DEK_STORE_PATH")/saved-questions" -C "$(dirname "$USER_DEK_STORE_PATH")"');
     for (const forbidden of ["rclone", "scp", "BACKUP_ESCROW_RECIPIENT"]) expect(block, forbidden).not.toContain(forbidden);
     expect(section).toContain("`backup.sh`");
     // restore-drill.sh takes one *.tar.age; these three parts are restored by hand, in order.

@@ -218,12 +218,13 @@ describe("RoomNotice picks exactly one sentence", () => {
     expect(container.querySelector('a[href="/debate/run%3Awaiting"]')?.textContent).toBe(en["newDebate.room.openWaiting"]);
   });
 
-  // V4 review ask-f11, read-f4, public-f21: on a V4 page the link opens the waiting debate's V4 map, at the reading level
-  // the address carries; the classic pages keep the classic debate page.
+  // V4 review ask-f11, read-f4, public-f21: on a V4 page the link opens the waiting debate's V4 map; the classic pages keep
+  // the classic debate page. V4 start step, Task 75d (owner, 5 Nov): the map shows the waiting debate at its own level, so
+  // the link carries no `?level=`, whatever the address says.
   it.each([
-    ["/v4?level=expert", "/v4/debate/run%3Awaiting?level=expert"],
+    ["/v4?level=expert", "/v4/debate/run%3Awaiting"],
     ["/v4", "/v4/debate/run%3Awaiting"],
-    ["/v4/debate/run-1?path=p1&level=background", "/v4/debate/run%3Awaiting?level=background"],
+    ["/v4/debate/run-1?path=p1&level=background", "/v4/debate/run%3Awaiting"],
     ["/v4/debate/run-1?level=nonsense", "/v4/debate/run%3Awaiting"],
     ["/v4x?level=plain", "/debate/run%3Awaiting"],
     ["/new?level=plain", "/debate/run%3Awaiting"]

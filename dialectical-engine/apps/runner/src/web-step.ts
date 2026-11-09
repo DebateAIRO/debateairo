@@ -48,6 +48,10 @@
  *   text kept from the investigation, or, once wiped there, the one this dig's search just brought back (the fetch
  *   again, for that search's 0.1¢);
  * - a search that fails pays nothing for it, and no reader is called for it.
+ * THE PATH DEBATE (V4 start step, Task 48; spec 2026-11-03 §4.3): each chosen path has its own planner (`planPathWebSearches`, the
+ * dig planner word for word, at WEB:plan:<n>), all at once, under a cap that rises with the paths; each path that searches is its own
+ * group under its own path_ref b<n>, serving itself (`pathsMode`); every leg reads every path's pack, labelled by its path's title
+ * (web-packs.ts `pathsPackShares`). Without `pathsMode`, today's first debate and dig, byte for byte.
  * THE MONTH PAUSE (W3-8's money rule, wired here): a search refused at the month wall records the pause and stops this
  * copy (RUN_MONTH_PAUSED), for first debates and digs alike; the search is not stored, so the copy that resumes after
  * Continue sends it, and every stored search and replayed reader is never paid twice.
@@ -59,7 +63,7 @@ import {
   WEB_EVIDENCE_CARRIERS, WEB_PLAN_CARRIER, WEB_REPLY_TEXT_CARRIER, WEB_SHOWN_QUOTE_CARRIER, decryptLeasedContentForRun, webReplyTextRef, encryptAttestedLeasedContentForRun,
   prepareLeasedContentEncryptionForRun, type CryptoEnvelope, type WebEvidenceRead, type WebPlanPathRecord, type WebSealed
 } from "@debateai/db";
-import { cutQuoteAtWordEdge } from "@debateai/contract";
+import { cutQuoteAtWordEdge, questionWithPurposeLines, type PurposeLines } from "@debateai/contract";
 import { addressKey, digSearchSameAs, findVerbatim, selectPathPages, siteOf } from "@debateai/evidence";
 import {
   WEB_TOP_COUNT_BY_MODE, type WebMode, type WebPlannerPoint
@@ -78,8 +82,8 @@ import { readAlreadyInvestigated } from "./investigation-digest.js";
 import { isMonthPausedStop } from "./month-pause.js";
 import { runWebPageTextDigest, storedWebPageTextsSentForm, type WebPageTextDigestKey } from "./web-page-text-gateway.js";
 import {
-  planDigWebSearches, planWebSearches, webPlannerSeats, webPlanPathStatuses, type WebDigPlannerInputPick, type WebPlanOutcome,
-  type WebPlanPathStatus
+  planDigWebSearches, planPathWebSearches, planWebSearches, webPlannerSeats, webPlanPathStatuses, type WebDigPlannerInputPick,
+  type WebPathsPlannerPath, type WebPlanOutcome, type WebPlanPathStatus
 } from "./web-planner.js";
 import { WEB_READER_ONE_LIMITS, readAllPages, type ReaderOneCall, type ReaderOnePage, type ReaderOnePageRead } from "./web-reader-all.js";
 import { runWebTopReaders, webMaterialWithPageTexts, type WebTopReaderCall, type WebTopReadersResult } from "./web-readers-top.js";
@@ -135,6 +139,12 @@ export type RecordPlanPathStatuses = (runId: string, statuses: readonly WebPlanP
 
 export type WebStepInput = Readonly<{
   runId: string;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version the run's calls are charged
+   * under (the claimed run's, from the runner's run → version map, index.ts); each reading notes it. Absent or null (none held: local mode,
+   * tests): none (NULL).
+   */
+  settingsVersion?: number | null;
   /** The claimed work item: the replay book is read by it, so a re-claim of the same item replays these calls. */
   subjectItemId: string;
   /** The run's plan as billing pinned it; null when none is known (local mode, a team grant): no search. */
@@ -156,7 +166,10 @@ export type WebStepInput = Readonly<{
   bound: CallBound;
   /** Root 0's room, which no web call and no search may cut into. */
   keepRoomMicros?: number;
-  /** A dig's: root 0's room with every pick's packs at their cut (web-packs.ts); absent: `keepRoomMicros`. */
+  /**
+   * A dig's: root 0's room with every pick's packs at their cut (web-packs.ts); absent: `keepRoomMicros`. A path debate's too (Task 48):
+   * every leg reads every path's pack, under the same cut.
+   */
   digKeepRoomMicros?: number;
   search: PerplexitySearchPort;
   /** A fresh money seam for one search (W2-2), or null where nothing is charged (local mode). */
@@ -170,7 +183,21 @@ export type WebStepInput = Readonly<{
   log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
   /** W4-2: the run is a dig: its picks and its investigation's read pages. Absent or null: a first debate. */
   dig?: WebStepDig | null;
+  /**
+   * V4 start step, Task 48: the run is a path debate (spec 2026-11-03 §4.3): one planner per chosen path. When given, its paths are
+   * the step's paths (`paths` above is not read) and `dig` is not read. Absent or null: today's first debate or dig, byte for byte.
+   */
+  pathsMode?: WebStepPathsMode | null;
 }>;
+
+/**
+ * A path debate's web input (V4 start step, Task 48): where it started (START: a first debate, 10 results a search; DIG: a dig of a
+ * path debate, 5 results a search, its investigation's read pages reused), the search cap (it rises with the paths), each chosen path,
+ * what the whole debate already investigated (empty at START), and the run's own stored step-2 lines (Task 53 reads them; a dig of a
+ * v2 parent has its parent's copy, Task 35), or null when it has none.
+ */
+export type WebStepPathsMode = Readonly<{ origin: "START" | "DIG"; cap: number; paths: readonly WebPathsPlannerPath[]; alreadyInvestigated: string;
+  reuse: WebReuseSource | null; purposeLines: PurposeLines | null }>;
 
 /**
  * A dig's web input (W4-2, R22 decision 9): its picks in order (0135: a suggestion, the person's edit of one, or their own
@@ -340,10 +367,17 @@ type StepPlan = Readonly<{
   failedCode: string | null;
   statuses: readonly WebPlanPathStatus[];
   groups: readonly StepGroup[];
+  /** A path debate's (Task 48): each path that searches nothing for a failure of its own (its planners, or the cap), with its code. */
+  pathFailures?: ReadonlyMap<string, string>;
 }>;
 
 /** A month-pause stop (W3-8) always stops the step, as the caller's own stops do. */
 const stopperOf = (input: WebStepInput) => (error: unknown): boolean => isMonthPausedStop(error) || input.abandon?.(error) === true;
+
+/** The step's paths, in order: a path debate's chosen paths (Task 48), else the map's. */
+const stepPathRefsOf = (input: Readonly<{ paths: readonly WebStepPath[]; pathsMode?: WebStepPathsMode | null }>): readonly string[] =>
+  input.pathsMode === undefined || input.pathsMode === null ? input.paths.map((path) => path.pathRef)
+    : input.pathsMode.paths.map((path) => path.pathRef);
 
 /** A first debate: the planner v2 per path, each planned path its own group. */
 async function planFirstDebate(input: WebStepInput, keepRoom: Readonly<{ keepRoomMicros?: number }>): Promise<StepPlan> {
@@ -411,20 +445,77 @@ async function planDig(input: WebStepInput, dig: WebStepDig, keepRoom: Readonly<
 }
 
 /**
+ * A path debate (V4 start step, Task 48; spec 2026-11-03 §4.3): every chosen path's planner (`planPathWebSearches`), each path its own
+ * decision and, when it searches, its own group under its own path_ref b<n> serving itself, read against its own words. Each planner
+ * reads the question with the run's stored lines it does not already say, the answers counted as said (read-d3: the page writes them
+ * into the line as sentences, so none reaches a planner twice): the same text the question check reads (Task 36). START asks Perplexity
+ * for 10 results a search; DIG for 5, reusing its investigation's read pages. The same words from two paths are one search, as in a dig.
+ */
+async function planPaths(input: WebStepInput, paths: WebStepPathsMode, keepRoom: Readonly<{ keepRoomMicros?: number }>): Promise<StepPlan> {
+  const plan = await planPathWebSearches({
+    planId: input.planId ?? "FREE", webSwitchedOn: input.webSwitchedOn, mode: input.mode, runId: input.runId,
+    subjectItemId: input.subjectItemId, question: questionWithPurposeLines(input.question, paths.purposeLines, { answersSaid: true }),
+    questionLanguage: input.questionLanguage, placeCountry: input.placeCountry, asOf: input.asOf, paths: paths.paths,
+    alreadyInvestigated: paths.alreadyInvestigated, cap: paths.cap, seats: webPlannerSeats(input.members), contractHash: input.contractHash,
+    bound: input.bound, ...keepRoom, abandon: stopperOf(input), ...(input.stopsHere === undefined ? {} : { stopsHere: input.stopsHere })
+  });
+  if (plan.kind !== "PLANNED") {
+    return Object.freeze({ kind: plan.kind, failedCode: plan.kind === "FAILED" ? plan.code : null, groups: Object.freeze([]),
+      statuses: Object.freeze(paths.paths.map((path) => Object.freeze({ pathId: path.pathRef, status: plan.kind, reason: null, searchesToSend: 0 }))) });
+  }
+  const failures = new Map<string, string>();
+  const groups: StepGroup[] = [];
+  // A path counts the searches it sends: words an earlier path already sends are counted there (sent once, charged once).
+  const counted = new Set<string>();
+  const statuses = paths.paths.map((path, index): WebPlanPathStatus => {
+    const decided = plan.picks.find((pick) => pick.pickNo === path.pathNo)!;
+    if (decided.status === "FAILED") {
+      failures.set(path.pathRef, decided.code ?? "WEB_PLANNER_NO_SEAT");
+      return Object.freeze({ pathId: path.pathRef, status: "FAILED", reason: null, searchesToSend: 0 });
+    }
+    if (decided.status === "NO_SEARCH_PLANNED") {
+      return Object.freeze({ pathId: path.pathRef, status: "NO_SEARCH_PLANNED", reason: decided.reason, searchesToSend: 0 });
+    }
+    const own = plan.querySet.searches.filter((search) => search.pickId === String(path.pathNo));
+    const sends = own.flatMap((search) => {
+      const same = search.status === "SEND" ? digSearchSameAs(search) : null;
+      if (same === null || counted.has(same)) return [];
+      counted.add(same);
+      return [same];
+    });
+    if (own.length === 0) failures.set(path.pathRef, "WEB_PLAN_OVER_CAP");
+    else {
+      groups.push(Object.freeze({ pathRef: path.pathRef, index, answer: path.chosen,
+        searches: own.map((search): StepSearch => Object.freeze({
+          key: search.searchId, status: search.status, text: search.text, side: "dig", scope: search.scope, language: search.language,
+          country: search.country, afterDate: search.afterDate, lookBack: LOOK_BACK[search.pace], sameAs: digSearchSameAs(search) })),
+        searchMode: paths.origin, reuse: paths.origin === "DIG" ? paths.reuse : null, serves: Object.freeze([path.pathRef]), chosen: null }));
+    }
+    return Object.freeze({ pathId: path.pathRef, status: "PLANNED", reason: null, searchesToSend: sends.length });
+  });
+  return Object.freeze({ kind: plan.kind, failedCode: null, statuses: Object.freeze(statuses), groups: Object.freeze(groups), pathFailures: failures });
+}
+
+/**
  * The web step. Never throws for anything a search, a reader or the store did: each path ends with its status. Throws
  * only an error `abandon` names, or the month pause's planned stop (after every path has settled), or a wiring defect in
  * its input.
  */
 export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
   const log = input.log ?? defaultLog;
-  if (input.paths.length === 0) return Object.freeze({ plan: "NO_PATHS", paths: Object.freeze([]) });
-  const dig = input.dig !== undefined && input.dig !== null && input.dig.picks.length > 0 ? input.dig : null;
-  const roomMicros = dig === null ? input.keepRoomMicros : input.digKeepRoomMicros ?? input.keepRoomMicros;
+  const pathsMode = input.pathsMode ?? null;
+  const stepRefs = stepPathRefsOf(input);
+  if (stepRefs.length === 0) return Object.freeze({ plan: "NO_PATHS", paths: Object.freeze([]) });
+  const dig = pathsMode === null && input.dig !== undefined && input.dig !== null && input.dig.picks.length > 0 ? input.dig : null;
+  const roomMicros = dig === null && pathsMode === null ? input.keepRoomMicros : input.digKeepRoomMicros ?? input.keepRoomMicros;
   const keepRoom = roomMicros !== undefined && roomMicros > 0 ? { keepRoomMicros: roomMicros } : {};
   const stops = stopperOf(input);
 
-  const plan = dig === null ? await planFirstDebate(input, keepRoom) : await planDig(input, dig, keepRoom);
+  const plan = pathsMode !== null ? await planPaths(input, pathsMode, keepRoom)
+    : dig === null ? await planFirstDebate(input, keepRoom) : await planDig(input, dig, keepRoom);
   const statuses = plan.statuses;
+  // A path debate's path that searches nothing for a failure of its own keeps FAILED with its code (Task 48); none on today's runs.
+  const failedOwn = (pathRef: string): string | undefined => plan.pathFailures?.get(pathRef);
   // The decision, once, before any search. A failure to keep it (NOT_LIVE included, WEB_EVIDENCE_NOT_LIVE) is logged:
   // the debate goes on, the web too.
   const keepDecision = async (cipher: WebStepCipher | null): Promise<void> => {
@@ -440,8 +531,13 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
   });
   const result = (paths: readonly WebStepPathOutcome[], digSummary?: WebStepDigSummary): WebStepResult => Object.freeze({
     plan: plan.kind, paths: Object.freeze([...paths]), ...(digSummary === undefined ? {} : { dig: digSummary }) });
+  /** A path that sends no search of its own: FAILED with its own code when it failed by itself, else NO_SEARCH_PLANNED. */
+  const unplanned = (pathRef: string): WebStepPathOutcome => {
+    const own = failedOwn(pathRef);
+    return own === undefined ? bare(pathRef, "NO_SEARCH_PLANNED", null) : bare(pathRef, "FAILED", own);
+  };
   const unsearched = (code: string): WebStepResult => result(statuses.map((entry) =>
-    entry.status === "PLANNED" ? bare(entry.pathId, "FAILED", code) : bare(entry.pathId, "NO_SEARCH_PLANNED", null)));
+    entry.status === "PLANNED" && failedOwn(entry.pathId) === undefined ? bare(entry.pathId, "FAILED", code) : unplanned(entry.pathId)));
   if (plan.kind !== "PLANNED") {
     // Free, the setting off, or no planner answered: no reason to seal, so no key is opened.
     await keepDecision(null);
@@ -463,7 +559,7 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
   try {
     await keepDecision(ports.cipher);
     if (plan.groups.length === 0) {
-      return result(statuses.map((entry) => bare(entry.pathId, "NO_SEARCH_PLANNED", null)), dig === null ? undefined
+      return result(statuses.map((entry) => unplanned(entry.pathId)), dig === null ? undefined
         : Object.freeze({ picks: dig.picks.length, searchesSent: 0, reusedPageIds: Object.freeze([]), refetchedPageIds: Object.freeze([]) }));
     }
     let stored: WebEvidenceRead | null;
@@ -493,11 +589,12 @@ export async function runWebStep(input: WebStepInput): Promise<WebStepResult> {
       for (const pathRef of group.serves) outcomes.set(pathRef, done);
     });
     if (dig === null) {
-      return result(input.paths.map((path) => {
-        const done = outcomes.get(path.pathRef);
-        if (done === undefined) return bare(path.pathRef, "NO_SEARCH_PLANNED", null);
-        if (done.outcome === null) return bare(path.pathRef, "FAILED", done.code);
-        return Object.freeze({ ...done.outcome.path, pathRef: path.pathRef });
+      // A first debate's paths, or a path debate's (each its own group, serving itself).
+      return result(stepRefs.map((pathRef) => {
+        const done = outcomes.get(pathRef);
+        if (done === undefined) return unplanned(pathRef);
+        if (done.outcome === null) return bare(pathRef, "FAILED", done.code);
+        return Object.freeze({ ...done.outcome.path, pathRef });
       }));
     }
     // A dig: each map path names every pick's pack, in pick order. The searches are counted once, on the first path.
@@ -689,6 +786,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
     if (reusedFrom !== null) {
       const readingId = webStepRowId(runId, "reading", pageId, "1");
       written(await store.recordReading({ runId, readingId, pageId, reader: 1, maker: reusedFrom.readerOneMaker, outcome: "READ",
+        settingsVersion: input.settingsVersion ?? null,
         grade: reusedFrom.grade, line: cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, reusedReadingContent(reusedFrom)) }));
       known.set(pageId, reusedFrom);
     }
@@ -801,6 +899,7 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
   for (const reading of readings) {
     const readingId = webStepRowId(runId, "reading", reading.pageId, String(reading.reader));
     const answer = await store.recordReading({ runId, readingId, pageId: reading.pageId, reader: reading.reader, maker: reading.maker,
+      settingsVersion: input.settingsVersion ?? null,
       outcome: reading.outcome, grade: reading.grade,
       line: reading.line === null ? null : cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, reading.line) });
     // Two readers of one company on a page is refused by 0132; the reading is left out, the group goes on.
@@ -982,7 +1081,8 @@ export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "web
   stepPorts?: Readonly<{ prepare: WebStepInput["prepare"]; recordPlanPathStatuses: RecordPlanPathStatuses }>;
 }>): Promise<WebStepResult> {
   const { pool, settings, lane, readers, stepPorts, ...rest } = input;
-  if (rest.paths.length === 0) return Object.freeze({ plan: "NO_PATHS", paths: Object.freeze([]) });
+  const stepRefs = stepPathRefsOf(rest);
+  if (stepRefs.length === 0) return Object.freeze({ plan: "NO_PATHS", paths: Object.freeze([]) });
   const log = rest.log ?? defaultLog;
   const stops = (error: unknown): boolean => isMonthPausedStop(error) || rest.abandon?.(error) === true;
   let planId: PlanId | null = null;
@@ -1015,7 +1115,7 @@ export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "web
       if (stops(error)) throw error;
       // Whether the run is a dig is unknown: no search is planned on a guess; the debate goes on without the web.
       log("WEB_DIG_UNREAD", { runId: rest.runId, code: codeOf(error) });
-      return Object.freeze({ plan: "FAILED", paths: Object.freeze(rest.paths.map((path) => Object.freeze({ pathRef: path.pathRef,
+      return Object.freeze({ plan: "FAILED", paths: Object.freeze(stepRefs.map((pathRef) => Object.freeze({ pathRef,
         status: "FAILED" as const, code: "WEB_DIG_UNREAD", searchesSent: 0, pageIds: Object.freeze([]), top: Object.freeze([]),
         packId: null, extractLabels: Object.freeze([]) }))) });
     }
@@ -1024,8 +1124,14 @@ export async function runRunnerWebStep(input: Omit<WebStepInput, "planId" | "web
     search: async () => Object.freeze({ outcome: "FAILED" as const, failure: "NOT_CONFIGURED" as const, chargeMicros: 0 as const, resultCount: 0 as const })
   });
   const port = settings.search ?? unconfigured;
+  // Review of Task 53 (spec 2026-11-03 §4.4): a dig of a path debate is a dig. Its planners are told what its investigation already
+  // looked into, and its read pages are reused, from the dig read above; the runner's path mode carries neither (it never reads the
+  // dig). A first path debate reads no dig, and its mode is sent as given.
+  const pathsMode = rest.pathsMode !== undefined && rest.pathsMode !== null && rest.pathsMode.origin === "DIG" && dig !== null
+    ? Object.freeze({ ...rest.pathsMode, alreadyInvestigated: dig.alreadyInvestigated, reuse: dig.reuse }) : rest.pathsMode;
   return runWebStep({
     ...rest,
+    ...(pathsMode === undefined ? {} : { pathsMode }),
     siteLanguage,
     mode,
     dig,
