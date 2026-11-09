@@ -10,7 +10,9 @@ const reports = vi.hoisted(() => ({
   load: (async () => null) as (runId: string) => Promise<unknown>,
   /** What the question's visibility read says (null: it cannot be read). */
   published: false as boolean | null,
-  visibilityReads: [] as string[]
+  visibilityReads: [] as string[],
+  /** The debate's public stage (the visibility read's, lib/v4/publicState.ts); null: private or not read. */
+  stage: null as null | { kind: "PUBLIC"; publicRef: string } | { kind: "KEPT_PRIVATE" }
 }));
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
 vi.mock("@/components/v4/V4Header", async () => (await import("./v4-debate-harness.js")).headerMock);
@@ -26,6 +28,10 @@ vi.mock("@/lib/v4/reportWriting", async (original) => ({
     reports.visibilityReads.push(runId);
     return reports.published;
   }
+}));
+vi.mock("@/lib/v4/publicState", async (original) => ({
+  ...(await original<typeof import("../../apps/ui/lib/v4/publicState.js")>()),
+  usePublicStage: (runId: string | null) => (runId === null ? null : reports.stage)
 }));
 vi.mock("@/lib/v4/digIndex", async (original) => (await import("./v4-debate-harness.js")).digIndexMock(await original()));
 vi.mock("@/lib/v4/accountMemory", async (original) => (await import("./v4-debate-harness.js")).accountMemoryMock(await original()));
@@ -74,6 +80,7 @@ beforeEach(() => {
   resetHarness();
   reports.published = false;
   reports.visibilityReads = [];
+  reports.stage = null;
   window.history.replaceState(null, "", "/");
 });
 afterEach(async () => {
@@ -150,5 +157,62 @@ describe("report-f15 on the report page", () => {
     reports.load = async () => investigation(done, "CLOSED", [finished(1)]);
     const standing = await mountReport(done);
     expect(standing.querySelector("[data-report-public]")).toBeNull();
+  });
+});
+
+describe("report-d5 A (owner, 3 Nov; built 9 Nov): Share › Copy link on a Free debate that is public copies its public page", () => {
+  const PUBLIC_REF = "7e000000-0000-4000-8000-0000000000d5";
+  const writeText = vi.fn(async (_url: string) => undefined);
+  beforeEach(() => {
+    writeText.mockClear();
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  });
+  afterEach(() => { Reflect.deleteProperty(navigator, "clipboard"); });
+  async function press(button: HTMLElement): Promise<void> {
+    await act(async () => button.click());
+    await settle();
+  }
+  async function copyItem(node: ParentNode): Promise<HTMLButtonElement> {
+    const share = node.querySelector<HTMLButtonElement>(`.v4RepShare button[aria-label="${CATALOG["v4.report.shareButton"]}"]`)!;
+    if (share.getAttribute("aria-expanded") !== "true") await press(share);
+    return node.querySelector<HTMLButtonElement>(".v4RepShare .v4RepMenuItem[data-share='copy']")!;
+  }
+
+  it("copies the public page's address, with the public mark's own words, never \"only you can open it\"", async () => {
+    const runId = crypto.randomUUID();
+    harness.answer = freeAnswer(runId);
+    reports.stage = { kind: "PUBLIC", publicRef: PUBLIC_REF };
+    reports.load = async () => investigation(runId, "OPEN", []);
+    const node = await mountReport(runId);
+    const copy = await copyItem(node);
+    expect(flat(copy)).toBe(CATALOG["v4.publicMark.copyLink"]);
+    expect(flat(copy)).not.toContain(CATALOG["v4.report.copyLink"]);
+    await press(copy);
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/public/debate/${PUBLIC_REF}`);
+    expect(flat(node.querySelector(".v4RepHdrStatus"))).toBe(CATALOG["v4.report.linkCopied"]);
+  });
+
+  it("keeps the owner-only link and its words when the check kept the question private, before it is public, and on a paid debate", async () => {
+    const cases: readonly [string, boolean, typeof reports.stage][] = [
+      ["kept private", true, { kind: "KEPT_PRIVATE" }],
+      ["not public yet", true, null],
+      ["paid", false, { kind: "PUBLIC", publicRef: PUBLIC_REF }]
+    ];
+    for (const [name, free, stage] of cases) {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+        host?.remove();
+      }
+      writeText.mockClear();
+      const runId = crypto.randomUUID();
+      harness.answer = free ? freeAnswer(runId) : seededAnswer(runId);
+      reports.stage = stage;
+      reports.load = async () => investigation(runId, "OPEN", []);
+      const node = await mountReport(runId);
+      const copy = await copyItem(node);
+      expect(flat(copy), name).toBe(CATALOG["v4.report.copyLink"]);
+      await press(copy);
+      expect(writeText, name).toHaveBeenCalledWith(`${window.location.origin}/v4/debate/${runId}/report`);
+    }
   });
 });

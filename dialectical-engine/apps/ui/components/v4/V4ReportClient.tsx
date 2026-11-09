@@ -10,6 +10,7 @@ import { V4ReportHeader, type ReportShareItem } from "@/components/v4/V4ReportHe
 import { useQuestionPublic, useReportRoom } from "@/components/v4/V4ReportStrip";
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/components/v4/V4Sources";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
+import { V4WaitCard } from "@/components/v4/V4WaitCard";
 import { isNotFound } from "@/lib/api";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pathTrustWord } from "@/lib/report/pathTrust";
@@ -24,12 +25,10 @@ import {
 import { buildV4Map } from "@/lib/v4/mapModel";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { waitForDigs } from "@/lib/v4/digUndo";
-import { whenText } from "@/lib/v4/stateWords";
 import { loadedLevelOf } from "@/lib/v4/debateLevel";
-import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import { replayHighlight } from "@/lib/v4/highlight";
 import { reportWaitLine } from "@/lib/v4/money";
-import { usePublicStage } from "@/lib/v4/publicState";
+import { publicPageHref, usePublicStage } from "@/lib/v4/publicState";
 import { quotaChanged } from "@/lib/v4/quotaPulse";
 import {
   basisKey, TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type TrustCounts, type TrustWord, type V4Map, type V4Path, type V4WebNote
@@ -73,9 +72,10 @@ import {
  *    did). Each choice first clears the line, so a second "Link copied." is read out again.
  *  - The level ruling: a debate keeps the level it was asked at, and the line above the title says "Report" with no level.
  *    The details are shown at the level the run read names (reading_level), and at Plain words when it names none; never
- *    at a level from the address (7 Nov). The links to this debate's map and its digs' maps, and the address moves, still
- *    carry the address's ?level= until they drop it together with the map's own links into this page. "Ask a new
- *    question" carries none: a new question picks its own level.
+ *    at a level from the address (7 Nov). Since 9 Nov no link of this page carries a ?level= (the map's links into it
+ *    dropped theirs in the start step's Task 76l): the ways back to this debate's map, its digs' maps and the address
+ *    moves carry none, and every page reads the debate's own level. "Ask a new question" carries none either: a new
+ *    question picks its own level.
  *  - 4 A: the version list in the long form with the year, clocks in 24 hours. The third round (5 Nov afternoon): the start
  *    of writing on another day in the long form too ("Started 4 November 2026, 14:02"), through the same helper as the
  *    map's report line, the waiting card and the list of your questions (lib/v4/stateWords.ts whenText).
@@ -84,7 +84,8 @@ import {
 type Props = Readonly<{
   id: string;
   locale: string;
-  initialLevel: ReadingLevel | null;
+  /** Accepted and unused since 9 Nov: the report never reads a level from its address (the 5 Nov level ruling). */
+  initialLevel?: ReadingLevel | null;
   catalog: MessageCatalog;
   newDebateCatalog: MessageCatalog;
 }>;
@@ -163,11 +164,11 @@ function aiItemProps(language: string | null): AiItemProps {
   return language === null ? { "data-ai-generated": "true" } : { "data-ai-generated": "true", lang: language };
 }
 
-export function V4ReportClient({ id, locale, initialLevel, catalog, newDebateCatalog }: Props) {
+export function V4ReportClient({ id, locale, catalog, newDebateCatalog }: Props) {
   // AuthGate reads newDebate.* keys (checking session / sign-in redirect), so it gets that namespace.
   return (
     <AuthGate catalog={newDebateCatalog}>
-      {() => <ReportBody id={id} locale={locale} initialLevel={initialLevel} catalog={catalog} />}
+      {() => <ReportBody id={id} locale={locale} catalog={catalog} />}
     </AuthGate>
   );
 }
@@ -366,18 +367,15 @@ function useInvestigation(runId: string | null): Investigation {
 
 type ShareNote = "MAKING" | "PDF_FAILED" | "COPIED" | "COPY_FAILED";
 
-function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
+function ReportBody({ id, locale, catalog }: Readonly<{
   id: string;
   locale: string;
-  initialLevel: ReadingLevel | null;
   catalog: MessageCatalog;
 }>) {
   // Owner's level ruling (5 Nov): the report shows its details at the level its debate was asked at, as the run read names
   // it (`reading_level`, which the map's loader hands on as `level`: the start-step session's Task 75c), and Plain words
-  // when it names none (`level` below); never a level from the address or the account (7 Nov). The address's `?level=` is
-  // still read only for the links back to this debate's map and its digs, and the address moves below, which keep carrying
-  // it until they drop it with the map's own links into this page (the map no longer reads it on the start-step branch).
-  const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
+  // when it names none (`level` below); never a level from the address or the account (7 Nov). Since 9 Nov the address's
+  // `?level=` is not read at all: no link of this page, and no address move, carries one.
 
   // report-f9: the debate this page reads. A dig's report address moves to the first question's (the investigation's root).
   const [target, setTarget] = useState(id);
@@ -420,8 +418,6 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // names the first question: its report address moves there as well. Its own line shows only once that read has answered.
   const notReady = load.kind === "NOT_READY";
   const [rootChecked, setRootChecked] = useState<string | null>(null);
-  const levelForMove = useRef(chosenLevel);
-  levelForMove.current = chosenLevel;
   useEffect(() => {
     if (!notReady) return;
     let active = true;
@@ -430,7 +426,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       if (!active) return;
       const root = read?.root_run_id ?? null;
       if (root !== null && root.toLowerCase() !== target.toLowerCase()) {
-        window.history.replaceState(null, "", levelHref(`/v4/debate/${encodeURIComponent(root)}/report`, levelForMove.current));
+        window.history.replaceState(null, "", `/v4/debate/${encodeURIComponent(root)}/report`);
         setTarget(root);
         return;
       }
@@ -517,9 +513,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const elsewhere = runId !== null && rootRunId !== null && rootRunId.toLowerCase() !== runId.toLowerCase();
   useEffect(() => {
     if (!elsewhere || rootRunId === null) return;
-    window.history.replaceState(null, "", levelHref(`/v4/debate/${encodeURIComponent(rootRunId)}/report`, chosenLevel));
+    window.history.replaceState(null, "", `/v4/debate/${encodeURIComponent(rootRunId)}/report`);
     setTarget(rootRunId);
-  }, [elsewhere, rootRunId, chosenLevel]);
+  }, [elsewhere, rootRunId]);
   // journey-f20: the debate's public stage, for the mark under its question. V4 start step, Task 56c (public-f25): read once here, so
   // the write button also knows the debate is public (a further report on a public debate waits for the reset).
   const publicStage = usePublicStage(elsewhere ? null : runId);
@@ -615,7 +611,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   const language = load.kind === "SERVED" ? load.language : null;
   const ai = aiProps(language);
 
-  const mapHref = levelHref(`/v4/debate/${encodeURIComponent(target)}`, chosenLevel);
+  const mapHref = `/v4/debate/${encodeURIComponent(target)}`;
   const classicHref = `/debate/${encodeURIComponent(target)}`;
   // A new question picks its own level on the first screen (owner, 5 Nov: it starts on "Plain words"), so no ?level= here.
   const askHref = "/v4";
@@ -649,11 +645,16 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     const saved = await savePdf(pdfHref, `report-version-${current}.pdf`);
     if (alive.current) setShareNote(saved ? null : "PDF_FAILED");
   };
+  // report-d5 A (owner, 3 Nov; built 9 Nov): on a Free debate that is public, Copy link copies its public page, under the public
+  // mark's own words ("Copy link"), never "only you can open it". Kept private by its check, not public yet, or paid: the
+  // owner-only report address, as before.
+  const publicRef = free && publicStage?.kind === "PUBLIC" ? publicStage.publicRef : null;
   const copyLink = async () => {
     if (runId === null) return;
     setShareNote(null);
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/v4/debate/${encodeURIComponent(runId)}/report`);
+      await navigator.clipboard.writeText(publicRef !== null ? `${window.location.origin}${publicPageHref(publicRef)}`
+        : `${window.location.origin}/v4/debate/${encodeURIComponent(runId)}/report`);
       if (alive.current) setShareNote("COPIED");
     } catch {
       if (alive.current) setShareNote("COPY_FAILED");
@@ -676,7 +677,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       setShareNote(null);
       window.print();
     } });
-    share.push({ id: "copy", label: t(catalog, "v4.report.copyLink"), onSelect: () => void copyLink() });
+    share.push({ id: "copy", label: t(catalog, publicRef !== null ? "v4.publicMark.copyLink" : "v4.report.copyLink"), onSelect: () => void copyLink() });
   }
   const status = shareNote === null ? null : shareNote === "PDF_FAILED" ? (
     <span className="v4RepHdrStatusLine">
@@ -694,7 +695,6 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
       backHref={load.kind === "NOT_FOUND" ? null : mapHref}
       backKey={failed ? "v4.report.backToQuestion" : "v4.report.backToMap"}
       level={level}
-      onLevel={chooseLevel}
       share={share}
       status={status}
       classicHref={load.kind === "NOT_FOUND" ? null : classicHref}
@@ -755,7 +755,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   // A read that failed cannot say whether a report exists, so the first answer waits behind the same closed row.
   const firstFolded = hasReport || investigation.state.kind === "FAILED";
   const first = (
-    <FirstAnswer map={map} level={level} chosenLevel={chosenLevel} locale={locale} catalog={catalog} language={language}
+    <FirstAnswer map={map} level={level} locale={locale} catalog={catalog} language={language}
       digs={digs} digsReady={digsReady} storyPending={storyPending} retrying={retrying} />
   );
 
@@ -812,10 +812,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
 }
 
 /** The first debate's own answer and parts: open before any report exists, behind a closed row once one does (report-f3). */
-function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs, digsReady, storyPending, retrying }: Readonly<{
+function FirstAnswer({ map, level, locale, catalog, language, digs, digsReady, storyPending, retrying }: Readonly<{
   map: V4Map;
   level: ReadingLevel;
-  chosenLevel: ReadingLevel | null;
   locale: string;
   catalog: MessageCatalog;
   language: string | null;
@@ -914,7 +913,7 @@ function FirstAnswer({ map, level, chosenLevel, locale, catalog, language, digs,
           <h2 id="v4-report-digs" className="v4RepH2">{t(catalog, "v4.report.digsHeading")}</h2>
           {digsReady ? (
             <ul className="v4RepDigs">
-              {digs.map((dig) => <ReportDigItem key={dig.link.childRunId} dig={dig} level={chosenLevel} catalog={catalog} language={language} />)}
+              {digs.map((dig) => <ReportDigItem key={dig.link.childRunId} dig={dig} catalog={catalog} language={language} />)}
             </ul>
           ) : <p className="v4RepNote" role="status">{t(catalog, "v4.common.loading")}</p>}
         </section>
@@ -1022,9 +1021,8 @@ function ReportPath({ path, level, catalog, locale, language, debateNote }: Read
   );
 }
 
-function ReportDigItem({ dig, level, catalog, language }: Readonly<{
+function ReportDigItem({ dig, catalog, language }: Readonly<{
   dig: ReportDig;
-  level: ReadingLevel | null;
   catalog: MessageCatalog;
   language: string | null;
 }>) {
@@ -1050,7 +1048,7 @@ function ReportDigItem({ dig, level, catalog, language }: Readonly<{
         <div className="v4RepBar"><V4TrustBar counts={view.counts} catalog={catalog} size="small" /></div>
       ) : null}
       {view?.state === "DONE" ? (
-        <Link className="v4Link v4RepDigLink" href={levelHref(`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`, level)}>
+        <Link className="v4Link v4RepDigLink" href={`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`}>
           {t(catalog, "v4.report.digOpenMap")}
         </Link>
       ) : null}
@@ -1066,15 +1064,6 @@ const versionDate = (version: Exclude<InvestigationReportVersion, { state: "WRIT
 
 /** Question 4 A (owner, 5 Nov): a report's dates in the long form with the year ("4 November 2026", report-f13). */
 const LONG_DATE: Intl.DateTimeFormatOptions = { dateStyle: "long" };
-
-/**
- * report-f7: a clock time ("Started 14:02"); on another day the long date with the year before it ("Started 4 November
- * 2026, 14:02", the owner's third round, 5 Nov). The one shared helper (lib/v4/stateWords.ts whenText), so the report
- * page, the map's report line, the waiting card and the list of your questions always agree. Nothing ticks.
- */
-function clockTime(locale: string, at: number): string {
-  return whenText(at, locale) ?? "";
-}
 
 type PressKind = "write" | "reopen";
 /**
@@ -1320,7 +1309,13 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
   );
 }
 
-/** The line for a version that is not written: waiting for a dig, being written (since when), taking longer, or failed. */
+/**
+ * A version that is not written. Failed: its line. Waiting for digs or being written: journey-d2 A (owner, 3 Nov; built 9 Nov
+ * after the start step), the shared waiting card, as the map's report wait (V4ReportStrip V4ReportWait): "Waiting" with the
+ * line that names the dig (report-f7, question 23 A), or "Being written" with "Started 14:02" when this visit knows it
+ * (review F1), the "taking longer" part with Check again after 15 minutes (report-f8), and "You can leave this page. It
+ * keeps going.".
+ */
 function VersionStatus({ version, investigation, runningDig, locale, language, catalog }: Readonly<{
   version: Exclude<InvestigationReportVersion, FinishedReportVersion>;
   investigation: Investigation;
@@ -1331,35 +1326,34 @@ function VersionStatus({ version, investigation, runningDig, locale, language, c
 }>) {
   if (version.state === "FAILED") return <p className="v4RepNote" role="status">{t(catalog, "v4.investigation.failed")}</p>;
   const waiting = version.waiting_for_digs;
-  if (waiting > 0) {
-    // report-f7: while a dig runs, only the line that says the report waits for it, by its question when it is the one. The
-    // owner's 5 Nov answer 23 A: the same line as the map's (lib/v4/reportWriting.ts), and several digs carry no number.
-    const line = reportWaitLineOf(waiting, runningDig, catalog, locale);
-    return (
-      <p className="v4RepNote" role="status">
-        {line.kind === "NAMED" ? <>{line.before}<span {...aiProps(language)}>{line.dig}</span>{line.after}</> : line.text}
-      </p>
-    );
-  }
-  if (investigation.slow) {
-    // report-f8: never "we're still writing it", which the page cannot know.
-    return (
-      <div className="v4RepSlow" role="status">
-        <p className="v4RepNote">{t(catalog, "v4.investigation.slow")}</p>
-        <div className="v4RepActions">
-          <button type="button" className="v4Btn" onClick={investigation.checkNow}>{t(catalog, "v4.investigation.checkAgain")}</button>
-        </div>
-      </div>
-    );
-  }
+  // report-f7: while a dig runs, only the line that says the report waits for it, by its question when it is the one. The
+  // owner's 5 Nov answer 23 A: the same line as the map's (lib/v4/reportWriting.ts), and several digs carry no number.
+  const line = waiting > 0 ? reportWaitLineOf(waiting, runningDig, catalog, locale) : null;
   // Review F1: the time only when this visit knows when writing started (`closed_at` is when the button was pressed).
-  const since = investigation.writingSince;
+  const since = waiting > 0 ? null : investigation.writingSince;
   return (
-    <p className="v4RepNote" role="status">
-      {since === null
-        ? t(catalog, "v4.investigation.writing")
-        : t(catalog, "v4.investigation.writingSince", { time: clockTime(locale, since) })}
-    </p>
+    <V4WaitCard
+      variant="inline"
+      state={waiting > 0 ? { kind: "WAITING", startsAfter: null } : { kind: "BEING_WRITTEN" }}
+      startedAt={since === null ? null : new Date(since).toISOString()}
+      catalog={catalog}
+      locale={locale}
+    >
+      {line === null ? null : (
+        <p className="v4RepNote" data-report-wait-line="">
+          {line.kind === "NAMED" ? <>{line.before}<span {...aiProps(language)}>{line.dig}</span>{line.after}</> : line.text}
+        </p>
+      )}
+      {line === null && investigation.slow ? (
+        // report-f8: never "we're still writing it", which the page cannot know.
+        <div className="v4RepSlow" role="status">
+          <p className="v4RepNote">{t(catalog, "v4.investigation.slow")}</p>
+          <div className="v4RepActions">
+            <button type="button" className="v4Btn" onClick={investigation.checkNow}>{t(catalog, "v4.investigation.checkAgain")}</button>
+          </div>
+        </div>
+      ) : null}
+    </V4WaitCard>
   );
 }
 
