@@ -25,6 +25,8 @@ const PREVIOUS_MANIFEST_PATH = "migrations/lineage/path-results-forward0160.json
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
+/** Every regular-expression metacharacter escaped, the backslash included (CodeQL js/incomplete-sanitization). */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const TABLES = ["core.path_step", "core.path_point_mark"] as const;
@@ -196,7 +198,7 @@ describe("0161: each path's step and points, the carry-on mark and the public re
     expect(sql.match(/ TO debateai_runtime;$/gmu)).toHaveLength(4);
     expect(sql.match(/ TO debateai_billing_runtime;$/gmu)).toHaveLength(1);
     for (const signature of DEFINERS) {
-      expect(sql, signature).toMatch(new RegExp(`^REVOKE ALL ON FUNCTION ${signature.replace(/[.()]/gu, "\\$&")} FROM PUBLIC,`, "mu"));
+      expect(sql, signature).toMatch(new RegExp(`^REVOKE ALL ON FUNCTION ${escapeRegExp(signature)} FROM PUBLIC,`, "mu"));
     }
     const manifest = JSON.parse(read("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json")) as {
       privilegeDisclosures: Array<{ roleName: string; source: string; grants: string[] }> };

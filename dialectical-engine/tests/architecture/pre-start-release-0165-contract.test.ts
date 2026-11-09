@@ -19,6 +19,8 @@ const PREVIOUS_MANIFEST_PATH = "migrations/lineage/main-answer-path-added-forwar
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
+/** Every regular-expression metacharacter escaped, the backslash included (CodeQL js/incomplete-sanitization). */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const TABLE = "identity.pre_start_try";
@@ -50,7 +52,7 @@ const NOT_CALL_WAIVED = "NOT EXISTS (SELECT 1 FROM ledger.model_spend_call_waive
  * the same set as the API's rule (packages/battery RUN_PATH_SET_REFUSALS), so the database and the read never disagree.
  */
 const pathSetRefusalsIn = (body: string, column: string): readonly string[] | null => {
-  const listed = body.match(new RegExp(`${column.replace(/\./gu, "\\.")} IN \\(([^)]*)\\)`, "u"))?.[1];
+  const listed = body.match(new RegExp(`${escapeRegExp(column)} IN \\(([^)]*)\\)`, "u"))?.[1];
   return listed === undefined ? null : listed.split(",").map((value) => value.trim().replace(/^'|'$/gu, "")).sort();
 };
 const nameOf = (signature: string): string => signature.slice(0, signature.indexOf("(")).toLowerCase();
