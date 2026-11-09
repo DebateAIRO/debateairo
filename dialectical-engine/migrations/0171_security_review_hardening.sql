@@ -1,4 +1,4 @@
--- 0171 · The security review's fixes in the database (test-site release R22; the security review of 3 Nov 2026).
+-- 0171 · The security review's fixes in the database (the security review of 3 Nov 2026).
 --
 -- Plain words. One drained step for every fix of the review that the database must make, F2 to F5. Each fix is named by its letter in every section
 -- below, and the contract at the end checks each one's end state as the step applies. Once applied, this file is fixed: any later change is a step of its own.
@@ -334,7 +334,7 @@
 --                   overload of 0085's verification delivery that the API calls in its place, redefines in place functions of 0040, 0077, 0078,
 --                   0079, 0085, 0089, 0092, 0095, 0107, 0115, 0123, 0125, 0126, 0127 and of 0131 to 0151 the API, the runner and the erasure
 --                   worker call (0123's writer of every owner's run, the billing functions keyed by a run or an owner and the account functions
---                   keyed by a user id among them), and marks the digs already there; R22 is a drained upload.
+--                   keyed by a user id among them), and marks the digs already there; the release that carries it must be a drained upload.
 --   keeps-verifier  it adds no effective-capability verifier: it creates no billing relation or billing function, and changes no billing relation's
 --                   or function's grants, owner, definer flag or settings, which lineage/verify-effective-capabilities-130.sql pins (it pins no
 --                   billing body), so that verifier stays in force as it is. It adds the connection's question inside seven billing bodies

@@ -4,7 +4,7 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0171, the security review's fixes in the database (R22, the review of 3 Nov 2026; drained): the tables and helpers its patched bodies use, the earlier bodies it
+ * 0171, the security review's fixes in the database (the review of 3 Nov 2026; drained): the tables and helpers its patched bodies use, the earlier bodies it
  * patches in place and the grants it takes back or moves, each declared as an amendment of the step whose postcondition digests it (a grant taken back or
  * moved too: the chain re-measures that step's whole digest, its grants included). Its own postcondition digests what it adds and the earlier functions
  * it changes that no step's postcondition digests: 0040's lock of a request's own runs, 0085's key provision, the billing functions keyed by a run or an
