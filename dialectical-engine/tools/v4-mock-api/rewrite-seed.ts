@@ -184,16 +184,17 @@ const REWRITE_LEVEL_THREE: PathRewrite = {
 
 /** `Answer.path_rewrites` per seeded run (absent: no dig has touched that debate's paths). */
 export const PATH_REWRITES: Readonly<Record<string, AnswerPathRewrites>> = Object.freeze({
-  // The first debate: two paths rewritten since its report (version 1, closed 28 Oct); n-renew also changed further down.
+  // The first debate: three paths rewritten since its report (version 1, closed 28 Oct), two of them changed; n-renew also changed further down.
   [DIG_RUNS.root]: {
     paths: [
       { position_ref: "n-mix", current: REWRITE_OWN_VIEW.text, history: [REWRITE_OWN_VIEW] },
       { position_ref: "n-renew", current: REWRITE_LEVEL_ONE.text, history: [REWRITE_LEVEL_ONE], changed_below: true },
-      // Task W4-6: a failed rewrite (no text: the path keeps its own) and one that changed nothing; neither is counted.
+      // Task W4-6: a failed rewrite (no text: the path keeps its own), which is not counted, and one that changed nothing, which is:
+      // the server counts every finished rewrite since the report (packages/serve path-rewrites.ts), a confirmation too.
       { position_ref: "n-nuclear", current: null, history: [REWRITE_FAILED] },
       { position_ref: "n-smr", current: REWRITE_NO_CHANGE.text, history: [REWRITE_NO_CHANGE] }
     ],
-    changed_since: { count: 2, since_report_version: 1 }
+    changed_since: { count: 3, since_report_version: 1 }
   },
   [DIG_RUNS.levelOne]: {
     paths: [{ position_ref: "n-renew", current: REWRITE_LEVEL_TWO.text, history: [REWRITE_LEVEL_TWO] }],

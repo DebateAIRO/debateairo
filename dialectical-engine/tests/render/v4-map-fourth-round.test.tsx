@@ -195,10 +195,38 @@ describe("the older-than-the-map box waits for the report (fourth round; wiring 
     await land(answerWith(runId, { paths: [...OTHERS, smrDone], changed_since: { count: 1, since_report_version: 2 } }));
     expect(box()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
     expect(box()!.querySelector("a")!.getAttribute("href")).toBe(`/v4/debate/${runId}/report`);
+    // Item 21 (the start step's hand-over, 9 Nov): the box names that path, though its rewrite (10:02) is older than version 2 (10:08):
+    // the names come from the same read as the server's count, which is cut at the newest rewrite the version read.
+    expect([...box()!.querySelectorAll(".v4ChangedSinceList li")].map((item) => item.textContent)).toEqual(["Wait for a cheaper tram"]);
     // Once: nothing else reads the answer again.
     await advance(60_000);
     await settle();
     expect(harness.loadAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it("is held until the page's first report check answers, as the report button's place is: a page opened while version 2 is written never flashes it", async () => {
+    const runId = crypto.randomUUID();
+    harness.answer = answerWith(runId, { paths: [...OTHERS, smrDone], changed_since: { count: 3, since_report_version: 1 } });
+    harness.investigation = investigation(runId, false);
+    let answerCheck: () => void = () => undefined;
+    harness.investigationGate = new Promise<void>((resolve) => { answerCheck = resolve; });
+    await mountMap(1600, runId);
+    expect(page().querySelector("[data-report-hold]")).not.toBeNull();
+    expect(box()).toBeNull();
+    await act(async () => answerCheck());
+    await settle();
+    // Version 2 is being written: it takes these changes in.
+    expect(box()).toBeNull();
+    expect(page().textContent).not.toContain(CATALOG["v4.rewrite.reportOlder"]);
+  });
+
+  it("after a report check that could not be read, the box shows as before", async () => {
+    const runId = crypto.randomUUID();
+    harness.answer = answerWith(runId, { paths: [...OTHERS, smrDone], changed_since: { count: 3, since_report_version: 1 } });
+    harness.investigation = null;
+    await mountMap(1600, runId);
+    await settle();
+    expect(box()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
   });
 
   it("reads the answer again once when a version this visit saw being written is done, and not for one done when the page opened", async () => {

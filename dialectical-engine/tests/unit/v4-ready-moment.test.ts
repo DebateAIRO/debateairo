@@ -147,14 +147,47 @@ describe("seen, kept with the account (journey-f17)", () => {
 });
 
 describe("the report is older than the map (dig-f19, map-f17)", () => {
-  it("names the paths a dig changed after the report (never one it only confirmed), in the map's order", () => {
-    // The seed's report is version 1, written before every seeded dig: two paths changed, one was only confirmed.
-    expect(pathsChangedSinceReport(MAP, "2026-10-28T12:00:00.000Z").map((path) => path.id)).toEqual(["n-mix", "n-renew"]);
-    // Written between the two changes: only the later one is named.
-    expect(pathsChangedSinceReport(MAP, "2026-10-29T09:00:00.000Z").map((path) => path.id)).toEqual(["n-mix"]);
-    // Not known when the report was written: the paths a dig changed last, as many as the server counts.
-    const one = buildV4Map({ runId: DIG_RUNS.root, answer: answerOf({ path_rewrites: { ...ROOT, changed_since: { count: 1, since_report_version: 1 } } }), story });
-    expect(pathsChangedSinceReport(one).map((path) => path.id)).toEqual(["n-mix"]);
+  const own = ROOT.paths.find((path) => path.position_ref === "n-mix")!.history[0]! as Extract<PathRewrite, { state: "READY" }>;
+  let digs = 0;
+  const ready = (id: string, at: string, changed: boolean) => ({ ...own, rewrite_id: `rw-${id}`,
+    dig_run_id: `d7000000-0000-4000-8000-${String(++digs).padStart(12, "0")}`, dig_finished_at: "2026-10-29T07:00:00.000Z", rewritten_at: at, changed });
+  const mapOf = (paths: { position_ref: string; history: ReturnType<typeof ready>[] }[], count: number) => buildV4Map({
+    runId: DIG_RUNS.root, story,
+    answer: answerOf({ path_rewrites: { paths: paths.map((path) => ({ ...path, current: own.text })), changed_since: { count, since_report_version: 1 } } })
+  });
+  const ids = (paths: readonly { id: string }[]) => paths.map((path) => path.id);
+
+  it("names the paths a dig changed among those the server counts (never one it only confirmed), in the map's order", () => {
+    // The seed's report is version 1, written before every seeded dig. The server counts every finished rewrite since the report, a
+    // confirmation too (packages/serve path-rewrites.ts), so three paths moved on; two of them were changed.
+    expect(MAP.changedSince).toEqual({ count: 3, since_report_version: 1 });
+    expect(ids(pathsChangedSinceReport(MAP))).toEqual(["n-mix", "n-renew"]);
+    // Counting two: the two newest finished rewrites (n-smr's confirmation, n-mix's change) came after the report; n-renew's did not.
+    const two = buildV4Map({ runId: DIG_RUNS.root, answer: answerOf({ path_rewrites: { ...ROOT, changed_since: { count: 2, since_report_version: 1 } } }), story });
+    expect(ids(pathsChangedSinceReport(two))).toEqual(["n-mix"]);
+  });
+
+  it("item 21: a rewrite that finished while the new version was being written is named, though it is older than the version", () => {
+    // The version read every rewrite up to 10:00 when it started and was written at 10:40. n-mix's rewrite (10:20) came in between: the
+    // server counts it (its cut is the newest rewrite the version read), so the box names it; a cut at 10:40 named nothing.
+    const map = mapOf([
+      { position_ref: "n-renew", history: [ready("renew", "2026-10-29T10:00:00.000Z", true)] },
+      { position_ref: "n-mix", history: [ready("mix", "2026-10-29T10:20:00.000Z", true)] }
+    ], 1);
+    expect(ids(pathsChangedSinceReport(map))).toEqual(["n-mix"]);
+  });
+
+  it("a path counted for a later confirmation is not named for an older change the report already has", () => {
+    const map = mapOf([
+      { position_ref: "n-renew", history: [ready("renew", "2026-10-29T09:00:00.000Z", true)] },
+      { position_ref: "n-mix", history: [ready("mix-1", "2026-10-29T08:00:00.000Z", true), ready("mix-2", "2026-10-29T11:00:00.000Z", false)] }
+    ], 1);
+    expect(ids(pathsChangedSinceReport(map))).toEqual([]);
+    // Counting both: every change is newer than the report.
+    expect(ids(pathsChangedSinceReport(mapOf([
+      { position_ref: "n-renew", history: [ready("renew", "2026-10-29T09:00:00.000Z", true)] },
+      { position_ref: "n-mix", history: [ready("mix-1", "2026-10-29T08:00:00.000Z", true), ready("mix-2", "2026-10-29T11:00:00.000Z", false)] }
+    ], 2)))).toEqual(["n-mix", "n-renew"]);
   });
 
   it("names nothing before any report, or when nothing changed since it", () => {

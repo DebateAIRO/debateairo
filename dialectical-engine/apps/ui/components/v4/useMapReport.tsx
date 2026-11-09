@@ -105,6 +105,11 @@ export type MapReport = Readonly<{
   /** The first question's report page (report-f9). */
   href: string;
   stage: ReportStage;
+  /**
+   * Question 2 A: the first report check has answered (a read, or a check that failed). Until then the top bar's report button
+   * holds its place with no words, and the "older than the map" box draws nothing (V4ChangedSince's `reportRead`).
+   */
+  firstCheckAnswered: boolean;
   /** The top bar's report button (with dig-f29's mark when `good`); nothing while the strip is open there. */
   headerItem: (good: boolean) => ReactNode;
   /**
@@ -316,6 +321,7 @@ export function useMapReport(input: MapReportInput): MapReport {
     answer: watch.answer,
     href,
     stage,
+    firstCheckAnswered,
     headerItem,
     headerStrip: start.at === "top" ? strip("top") : null,
     bottomStrip: start.at === "bottom" ? strip("bottom") : null,

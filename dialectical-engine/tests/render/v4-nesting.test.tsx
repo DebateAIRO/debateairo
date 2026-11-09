@@ -174,7 +174,9 @@ describe("changed further down (owner Q-D5: marked, never rewritten)", () => {
 
   it("three levels up, the path shows the mark on the tree, the outline and the panel", async () => {
     const root = PATH_REWRITES[DIG_RUNS.root]!;
-    harness.answer = marked(DIG_RUNS.root, { ...root, paths: [...root.paths.filter((path) => path.position_ref !== "n-smr"), BELOW_ONLY] });
+    // n-smr's confirmation goes, so two finished rewrites are left to count (the seed counts three, as the server does).
+    harness.answer = marked(DIG_RUNS.root, { paths: [...root.paths.filter((path) => path.position_ref !== "n-smr"), BELOW_ONLY],
+      changed_since: { ...root.changed_since, count: 2 } });
     await mountMap(1600, DIG_RUNS.root);
     // n-renew: rewritten by 8888 and marked; n-smr: only marked (no dig rewrote it).
     expect(branch(PATHS.renew).querySelector(".v4RewriteNoteBelow")!.textContent).toBe(CATALOG["v4.rewrite.changedBelow"]);

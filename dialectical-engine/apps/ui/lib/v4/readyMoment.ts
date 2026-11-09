@@ -194,36 +194,48 @@ export function visitItemsToKeep(
 
 // ── The report is older than the map ────────────────────────────────────────────────────────────────────────────
 
-/** When a dig last changed this path (its newest finished rewrite that changed it), or null when none did. */
-function lastChangedAt(path: V4Path): number | null {
-  const times = (path.rewrites?.history ?? [])
-    .filter((rewrite): rewrite is FinishedRewrite => isFinished(rewrite) && rewrite.changed)
-    .map((rewrite) => Date.parse(rewrite.rewritten_at))
-    .filter((time) => !Number.isNaN(time));
-  return times.length === 0 ? null : Math.max(...times);
+/** The times of a path's finished rewrites (changed or not), and of those that changed it. */
+function rewriteTimes(path: V4Path): Readonly<{ finished: readonly number[]; changed: readonly number[] }> {
+  const finished: number[] = [];
+  const changed: number[] = [];
+  for (const rewrite of path.rewrites?.history ?? []) {
+    if (!isFinished(rewrite)) continue;
+    const time = Date.parse(rewrite.rewritten_at);
+    if (Number.isNaN(time)) continue;
+    finished.push(time);
+    if (rewrite.changed) changed.push(time);
+  }
+  return { finished, changed };
 }
 
 /**
  * dig-f19 / map-f17: the paths a dig changed since the latest report, named, in the map's order. The server says whether
- * the map moved on since that report (`changed_since`, with its count, which is never shown); the names are the paths a
- * dig changed after the report was written. When the page does not know when that was, they are the `count` paths a dig
- * changed last. None before any report: since the 31 Oct ruling the main answer updates itself after each change.
+ * the map moved on since that report (`changed_since`, with its count, which is never shown). None before any report:
+ * since the 31 Oct ruling the main answer updates itself after each change.
+ *
+ * Which paths, from the same read as the count (item 21, the start step's hand-over of 9 Nov). The server counts the paths
+ * with a finished rewrite (a confirmation too) after its cut: the newest rewrite the report read when it started (0136),
+ * which can be before the version was written, so a rewrite that finished while the version was being written counts.
+ * Those are the `count` paths whose newest finished rewrite is newest, and the cut lies after the next path's. Of them,
+ * the box names the ones a dig changed after that point (never one it only confirmed). A cut at the version's
+ * written time named none of them in that case; one at its `closed_at` would name a path the report waited for and read.
  */
-export function pathsChangedSinceReport(map: V4Map, reportWrittenAt: string | null = null): readonly V4Path[] {
+export function pathsChangedSinceReport(map: V4Map): readonly V4Path[] {
   const since = map.changedSince ?? null;
   if (since === null || since.since_report_version === null || since.count === 0) return [];
   const seen = new Set<string>();
-  const changed: { path: V4Path; at: number; order: number }[] = [];
+  const rewritten: { path: V4Path; newest: number; changed: readonly number[]; order: number }[] = [];
   for (const [order, path] of map.paths.entries()) {
     const key = path.positionRef ?? path.id;
-    const at = lastChangedAt(path);
-    if (at === null || seen.has(key)) continue;
+    const times = rewriteTimes(path);
+    if (times.finished.length === 0 || seen.has(key)) continue;
     seen.add(key);
-    changed.push({ path, at, order });
+    rewritten.push({ path, newest: Math.max(...times.finished), changed: times.changed, order });
   }
-  const cut = reportWrittenAt === null ? Number.NaN : Date.parse(reportWrittenAt);
-  const named = Number.isNaN(cut)
-    ? changed.sort((a, b) => b.at - a.at).slice(0, since.count)
-    : changed.filter((entry) => entry.at > cut);
-  return named.sort((a, b) => a.order - b.order).map((entry) => entry.path);
+  rewritten.sort((a, b) => b.newest - a.newest);
+  const cut = rewritten[since.count]?.newest ?? Number.NEGATIVE_INFINITY;
+  return rewritten.slice(0, since.count)
+    .filter((entry) => entry.changed.some((time) => time > cut))
+    .sort((a, b) => a.order - b.order)
+    .map((entry) => entry.path);
 }

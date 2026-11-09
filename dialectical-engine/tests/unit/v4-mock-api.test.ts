@@ -286,7 +286,7 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     const renew = root.paths.find((path) => path.position_ref === "n-renew")!;
     expect((renew.history.at(-1) as Loose).view).toBeNull();
     expect(renew.changed_below).toBe(true);
-    expect(root.changed_since).toEqual({ count: 2, since_report_version: 1 });
+    expect(root.changed_since).toEqual({ count: 3, since_report_version: 1 });
   });
 
   it("the dig trail goes three levels down, each dig under its parent, the deepest one still rewriting", () => {
@@ -312,7 +312,8 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(newest["n-smr"]).toMatchObject({ state: "READY", changed: false, dig_run_id: DIG_RUNS.noChange });
     expect(newest["n-smr"].what_changed.length).toBeGreaterThan(0);
     expect(PATH_REWRITES[DIG_RUNS.levelTwo]!.paths[0]!.history.at(-1)!.state).toBe("WRITING");
-    expect(root.changed_since.count).toBe(2);
+    // The server counts the confirmation as a finished rewrite since the report; the failed rewrite is not counted.
+    expect(root.changed_since.count).toBe(3);
     // Both digs are seeded runs of the first debate, so "Open the dig's map" opens a real page.
     for (const run of [DIG_RUNS.failed, DIG_RUNS.noChange]) {
       expect(SEEDED_NEW_DIGS.some((dig) => dig.runRef === run), run).toBe(true);
