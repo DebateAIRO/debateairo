@@ -7,11 +7,14 @@ import type { ProviderDiscoveryTarget } from "@debateai/providers";
  * model; the transport strips the mark before anything is sent (`startModelOfSeat`), so a gate, a ledger row and a charge
  * only ever see the model.
  *
- * The order the seats are taken in: the earlier single-call speeds (public figures, plan Task 87), fastest first. It is
- * reordered only by plan Task 91 Step 4 (the Mac measurement, with the owner's yes), so a reorder is a visible pin change.
+ * The order the seats are taken in, fastest first: the order measured on real AIs (plan Task 91 Step 4, the sitting of
+ * 9 Nov 2026, 48 cards; set by the owner's card "Apply measured order"). Typical list times: Haiku 4.8 s, DeepSeek 5.0 s,
+ * Qwen 5.8 s, GLM 8.2 s, MiMo 16 s. (Before it: the earlier single-call speeds of plan Task 87, Haiku, GLM, Qwen, DeepSeek,
+ * MiMo.) So Free's two list seats are Haiku and DeepSeek. Reordered only by a new measurement with the owner's yes, so a
+ * reorder is a visible pin change.
  */
 export const START_SEAT_SPEED_ORDER: readonly string[] = Object.freeze([
-  "claude-haiku-5-5", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro"
+  "claude-haiku-5-5", "deepseek-ai/DeepSeek-V4.1-Flash", "Qwen/Qwen3.8-Flash", "zai-org/GLM-5.3-Flash", "XiaomiMiMo/MiMo-V2.6-Pro"
 ]);
 
 /** Models the vendor refused as busy (unbilled), sitting out for a while; one book per API process. */
