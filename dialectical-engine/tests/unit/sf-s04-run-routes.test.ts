@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const api = readFileSync("apps/api/src/index.ts", "utf8");
 const db = readFileSync("packages/db/src/index.ts", "utf8");
+/** Every regular-expression metacharacter escaped, the backslash included (`#` needs none: it is plain in a pattern). */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 /** Mask comments and literals so call and scope checks read TypeScript code, not prose or SQL. */
 function codeMask(source: string): string {
@@ -72,7 +74,7 @@ function scope(source: string, open: number): { start: number; end: number } {
 
 function method(source: string, name: string): { start: number; end: number } {
   const masked = codeMask(source);
-  const hits = allIndices(masked, new RegExp(`\\basync\\s+${name.replace("#", "#")}\\s*\\(`, "u"));
+  const hits = allIndices(masked, new RegExp(`\\basync\\s+${escapeRegExp(name)}\\s*\\(`, "u"));
   expect(hits).toHaveLength(1);
   // The body opens after the parameter list closes: a parameter's type may hold braces of its own.
   let depth = 0;
