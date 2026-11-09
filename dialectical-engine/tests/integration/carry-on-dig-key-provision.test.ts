@@ -130,7 +130,7 @@ describe("0163: a carry-on dig's key provision, without a live sign-in", () => {
     expect(await leftBy(debate)).toEqual({ bindings: 2, intents: 0, runs: 2 });
   });
 
-  it("the security review's F2 (0171's patch of this body): a carry-on dig marked as the API marks every dig has its own dig row, written by the statement that creates it, its Start session revoked; an unmarked document writes none", async () => {
+  it("the security review's F2 (0171's patch of this body): a carry-on dig marked as the API marks every dig has its own dig row, written by the statement that creates it, its Start session revoked; an unmarked document writes none but is still a dig by its binding", async () => {
     const pool = fixture.database.pool;
     const debate = await parent("premium");
     const start = (pathId: string, marked: boolean): Promise<string> => runs().startRun({
@@ -142,7 +142,8 @@ describe("0163: a carry-on dig's key provision, without a live sign-in", () => {
     expect(await rowsOf(marked)).toEqual([{ owner_ref: fixture.ownerRef }]);
     expect(await rowsOf(unmarked)).toEqual([]);
     const isDig = async (runId: string): Promise<boolean> => (await pool.query<{ dig: boolean }>("SELECT identity.run_is_dig($1) AS dig", [runId])).rows[0]!.dig;
-    expect([await isDig(marked), await isDig(unmarked), await isDig(debate)]).toEqual([true, false, false]);
+    // Its binding names the debate it carries on from, so even an unmarked carry-on run reads as a dig: a carry-on dig made before 0171 is known the same way.
+    expect([await isDig(marked), await isDig(unmarked), await isDig(debate)]).toEqual([true, true, false]);
   });
 
   it("a path the debate did not choose (b4 of b1..b3) is INVALID, and nothing is written", async () => {

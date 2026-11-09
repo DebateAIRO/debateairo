@@ -1276,14 +1276,17 @@ describe("0171: the security review's fixes in the database", () => {
     // their sites, the day's tables and the counter), and what stays open of it.
     const flat = header.replace(/\n-- */gu, " ");
     // And why the totals may stay open: a funded debate's basis, a refusal left alone, names its grant and configured event to any request by its run
-    // id, so only the member's owner ref stands between a request and the totals, and the hardening test finds none a request may read. The round-5
+    // id, so only the member's owner ref stands between a request and the totals, and the hardening test finds none a request may read but through
+    // 0159's two carry-on definers, which hand it for an account with a carry-on due or begun, so the header says those totals are open. The round-5
     // wording, which said no request could read the grant and event either, is gone.
     for (const needle of ["can be read by its run id through 0092's funding basis", "only the member's owner ref, which 0130's row rule keeps from every request",
-      "hands back an owner ref for the ids a request can read"]) expect(flat, needle).toContain(needle);
+      "hands back an owner ref for the ids a request can read", "core.claim_carry_on_due and core.read_carry_on_begun",
+      "since 0159 a request login can read the owner ref of any account with a carry-on due or begun"]) expect(flat, needle).toContain(needle);
     expect(flat).not.toContain("and configured event to read one, which no request may read");
     for (const needle of ["billing.internal_grant", "configured event", "was running when the call was reserved", "an hour", "8-second deadline",
       "ASK_CLARIFY_CHARGE_TAKEN", "identity.delete_ask_clarify_reservations_due", "So the reservation is what names the person",
-      "The site's day of spend is the system's to write", "0118's ledger.record_language_check_spend", "0128's ledger.record_question_check_spend",
+      "The site's day of spend is the system's to write", "section 5 finds two a request login may call", "0158's charge of a call before Start",
+      "0118's ledger.record_language_check_spend", "0128's ledger.record_question_check_spend",
       "any amount", "X30", "X31", "X32", "X33", "ledger.allocate_sequence()", "0130's rule holds it to the connection's own debates",
       "may write the day at any size", "spend waiver"]) expect(flat, needle).toContain(needle);
     for (const stale of ["Still open, a known exposure older than this step", "closing 0144's alone would leave the two doors beside it",
@@ -1627,7 +1630,7 @@ describe("0171: the security review's fixes in the database", () => {
     expect(provision.indexOf(REFUSING[0].old)).toBeLessThan(provision.indexOf("INSERT INTO serve.publication_key_provision_intent"));
     const transition = bodyOf(read("migrations/0085_staff_access_foundation.sql"), "core.transition_run_publication");
     expect(transition).toContain("AND provision.cleanup_state='PREPARED' AND provision.expires_at>v_now");
-    // The helper: the dig's own row, or any one of the four other records a dig may leave; the owner's reader asks 0131's rule (and so, since F5,
+    // The helper: the dig's own row, or any one of the six other records a dig may leave; the owner's reader asks 0131's rule (and so, since F5,
     // the session's owner) first.
     const helper = bodyOf(sql, "identity.run_is_dig");
     expect(helper).toContain("LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$");
@@ -1635,7 +1638,9 @@ describe("0171: the security review's fixes in the database", () => {
       "FROM identity.dig_pick_set AS picks WHERE picks.run_id = chain.run_id",
       "FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = chain.run_id",
       "FROM identity.investigation_member AS member WHERE member.run_id = chain.run_id AND member.parent_run_id IS NOT NULL",
-      "FROM identity.dig_link AS link WHERE link.child_run_id = chain.run_id"]) expect(helper, record).toContain(record);
+      "FROM identity.dig_link AS link WHERE link.child_run_id = chain.run_id",
+      "FROM identity.run_execution_binding AS binding WHERE binding.run_id = chain.run_id AND binding.carry_on_parent_run_id IS NOT NULL",
+      "FROM core.start_path_set AS path_set WHERE path_set.run_id = chain.run_id AND path_set.source = 'DIG_PICKS'"]) expect(helper, record).toContain(record);
     // The debate itself and every run it re-admits, back along 0123's edges (old run to new), at most 16, as core.resolve_run_ref goes forward.
     expect(helper).toContain("SELECT p_run_id, 0 WHERE p_run_id IS NOT NULL");
     expect(helper).toContain("SELECT edge.old_run_id, chain.hops + 1 FROM core.run_supersession AS edge JOIN chain ON edge.new_run_id = chain.run_id WHERE chain.hops < 16");
@@ -1774,11 +1779,13 @@ describe("0171: the security review's fixes in the database", () => {
     expect(forget).toContain(`${links}${FORGETTING.patches[1].old}`);
     expect(forget.indexOf("pg_advisory_xact_lock")).toBeLessThan(forget.indexOf(links));
     expect(FORGETTING.patches[1].new).not.toMatch(/parent/u);
-    // A dig made before the step is marked as it applies, from the four records it left and its run's owner now, unless the run was erased or the
+    // A dig made before the step is marked as it applies, from the six records it may have left and its run's owner now, unless the run was erased or the
     // owner is gone; nothing published is touched (the README says what the operator does about those).
     const backfill = sql.slice(sql.indexOf("INSERT INTO identity.dig_run (run_id, owner_ref)\n  SELECT"), sql.indexOf("ON CONFLICT (run_id) DO NOTHING;", sql.indexOf("INSERT INTO identity.dig_run (run_id, owner_ref)\n  SELECT")));
     for (const record of ["SELECT picks.run_id FROM identity.dig_pick_set AS picks", "SELECT contribution.dig_run_id FROM identity.public_contribution AS contribution",
       "SELECT member.run_id FROM identity.investigation_member AS member WHERE member.parent_run_id IS NOT NULL", "SELECT link.child_run_id FROM identity.dig_link AS link",
+      "SELECT binding.run_id FROM identity.run_execution_binding AS binding WHERE binding.carry_on_parent_run_id IS NOT NULL",
+      "SELECT path_set.run_id FROM core.start_path_set AS path_set WHERE path_set.source = 'DIG_PICKS'",
       "FROM core.run_ownership_event AS event WHERE event.run_id = dig.run_id ORDER BY event.at_seq DESC LIMIT 1",
       "EXISTS (SELECT 1 FROM identity.\"user\" AS account WHERE account.owner_ref = owner_now.owner_ref)",
       "NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS erased WHERE erased.run_id = dig.run_id)"]) expect(backfill, record).toContain(record);
@@ -1789,6 +1796,12 @@ describe("0171: the security review's fixes in the database", () => {
     expect(contract).toContain("'identity.dig_run'::regclass");
     expect(contract).toContain("pg_catalog.has_table_privilege(v_proowner, 'identity.dig_run', 'INSERT')");
     expect(contract).toContain("pg_catalog.has_function_privilege(v_proowner, 'identity.run_is_dig(uuid)', 'EXECUTE')");
+    // The helper's owner may read the two records older steps wrote, and each of them stands in the live body and in the backfill's check.
+    for (const table of ["identity.run_execution_binding", "core.start_path_set"]) expect(contract).toContain(`pg_catalog.has_table_privilege(v_owner, '${table}', 'SELECT')`);
+    expect(contract).toContain("FROM identity.run_execution_binding AS binding WHERE binding.run_id = chain.run_id AND binding.carry_on_parent_run_id IS NOT NULL");
+    expect(contract).toContain("path_set.source = ''DIG_PICKS''");
+    for (const arm of ["SELECT binding.run_id FROM identity.run_execution_binding AS binding WHERE binding.carry_on_parent_run_id IS NOT NULL",
+      "SELECT path_set.run_id FROM core.start_path_set AS path_set WHERE path_set.source = 'DIG_PICKS'"]) expect(contract).toContain(arm);
     expect(contract).toContain("'identity.forget_erased_debate_page_memory(uuid)'::regprocedure");
     expect(contract).toContain("RAISE NOTICE 'SECURITY_REVIEW_0171 F2 % digs published before this step stay published");
   });
@@ -1897,10 +1910,13 @@ describe("0171: the security review's fixes in the database", () => {
     // definer, the work queue stays row-bound, and what stays open of it.
     for (const needle of ["The site's day of spend is the system's to write", "`ledger.model_spend_hold`", "`ledger.model_spend_reservation`", "X30", "X31", "X32", "X33",
       "`readSiteCountedHoldsMicros`", "`ledger.allocate_sequence()`", "`ledger.sequence_allocator`", "`core.work_item`", "`settle_internal_provider_call`",
+      "`identity.record_pre_start_charge`",
       "at any size", "spend waiver"]) expect(section, needle).toContain(needle);
     expect(section).not.toContain("a known exposure older than this step");
     // A member's grant totals need only the member's owner ref, as the funding basis names a funded debate's grant and event to any request.
     expect(section).toContain("so only the member's owner ref, which 0130's row rule keeps from every request");
+    // Which since 0159 two definers of the fifth list hand a request for an account with a carry-on due or begun.
+    expect(section).toContain("since 0159 a request login can read the owner ref of any account with a carry-on due or begun");
     expect(section).not.toContain("configured event, which no request may read");
     // The helper's staff grant serves the billing definers that ask too; the step redefines no 0091 function (0091's erasure question is left
     // alone); and its postcondition's counts are the loader's: eleven functions of its own, twelve account functions, sixty-two in all.

@@ -184,7 +184,7 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 /**
  * Security review F2 (0171): a dig is known by its own row (identity.dig_run), which every dig's run is created with from 0171 on. A dig made before
  * the step has only the records it left (its link to its parent, its place in an investigation under its parent, its picks, its public
- * contribution), and its parent's erasure takes the first two, so the step marks each such dig as it applies, by its run's owner now, leaving out a
+ * contribution, a carry-on dig's binding, its start paths made from its picks), and its parent's erasure takes the first two, so the step marks each such dig as it applies, by its run's owner now, leaving out a
  * run that was erased and an owner that is gone. Nothing published is touched (the operator's step, migrations/lineage/README.md).
  */
 describe("0171's backfill: a dig made before the step has its own row after it, and stays a dig when its parent is erased", () => {
@@ -232,12 +232,18 @@ describe("0171's backfill: a dig made before the step has its own row after it, 
   const isDig = async (runId: string): Promise<boolean> =>
     (await db.pool.query<{ dig: boolean }>("SELECT identity.run_is_dig($1) AS dig", [runId])).rows[0]!.dig;
 
-  it("marks the link-only, member-only, picks and public digs by their run's owner now, leaves out an erased run and a gone owner, and the marks outlive the parent", async () => {
+  it("marks the link-only, member-only, picks, public, carry-on and pick-path digs by their run's owner now, leaves out an erased run, a gone owner, a binding with no run and a debate that is no dig, and the marks outlive the parent", async () => {
     const owner = await account();
     const heir = await account();
     const parent = await debate(owner);
-    const [linked, member, picked, contributed, erased, handedOver] = await Promise.all([debate(owner), debate(owner), debate(owner), debate(owner),
-      debate(owner), debate(owner)]);
+    const [linked, member, picked, contributed, erased, handedOver, carried, pathsOfPicks, plainStart] = await Promise.all([debate(owner), debate(owner), debate(owner),
+      debate(owner), debate(owner), debate(owner), debate(owner), debate(owner), debate(owner)]);
+    const userOf = (await db.pool.query<{ user_id: string }>('SELECT user_id FROM identity."user" WHERE owner_ref=$1', [owner])).rows[0]!.user_id;
+    const neverMade = randomUUID();
+    const bound = (runId: string, parentRunId: string | null, pathId: string | null) => ["INSERT INTO identity.run_execution_binding (execution_ref,user_id,identity_session_id,run_id,created_at,carry_on_parent_run_id,carry_on_path_id) VALUES ($1,$2,$3,$4,clock_timestamp(),$5,$6)",
+      [randomUUID(), userOf, randomUUID(), runId, parentRunId, pathId]] as const;
+    const paths = (runId: string, source: "DIG_PICKS" | "MENU") => ["INSERT INTO core.start_path_set (run_id,source,width,path_count,chosen_by,carry_on_to_report,content_ciphertext,content_attestation) VALUES ($1,$2,1,1,'PERSON',false,'{}'::jsonb,'\\x00'::bytea)",
+      [runId, source]] as const;
     const orphaned = await debate(randomUUID());
     const investigationId = randomUUID();
     const publicationRef = randomUUID();
@@ -256,15 +262,19 @@ describe("0171's backfill: a dig made before the step has its own row after it, 
       ["INSERT INTO core.run_ownership_event(run_id,owner_ref,at_seq) VALUES ($1,$2,$3)", [handedOver, heir, seq]],
       // A public dig whose contribution was written, and one whose account was erased since (0137 sets the contribution's owner to none).
       ["INSERT INTO identity.public_contribution (dig_run_id,owner_ref,publication_ref,root_run_id,parent_run_id) VALUES ($1,$2,$3,$4,$4)", [contributed, owner, publicationRef, parent]],
-      ["INSERT INTO identity.public_contribution (dig_run_id,owner_ref,publication_ref,root_run_id,parent_run_id) VALUES ($1,NULL,$2,$3,$3)", [orphaned, publicationRef, parent]]
+      ["INSERT INTO identity.public_contribution (dig_run_id,owner_ref,publication_ref,root_run_id,parent_run_id) VALUES ($1,NULL,$2,$3,$3)", [orphaned, publicationRef, parent]],
+      // A carry-on dig whose join did not land, its binding all it left (0163), and a page dig whose start paths from its picks were sealed before a join that did not land.
+      bound(carried, parent, "b1"), paths(pathsOfPicks, "DIG_PICKS"),
+      // A carry-on prepare whose run was never made, and a debate with an ordinary binding and start paths from a menu: none of them is a dig's row.
+      bound(neverMade, parent, "b2"), bound(plainStart, null, null), paths(plainStart, "MENU")
     ]);
     // The step applies over them.
     await migrate(db.pool);
     expect(await ledger()).toContain(SECURITY_REVIEW);
-    const expected = [...[linked, member, picked, contributed].map((run_id) => ({ run_id, owner_ref: owner })), { run_id: handedOver, owner_ref: heir }]
+    const expected = [...[linked, member, picked, contributed, carried, pathsOfPicks].map((run_id) => ({ run_id, owner_ref: owner })), { run_id: handedOver, owner_ref: heir }]
       .sort((left, right) => left.run_id.localeCompare(right.run_id));
     expect(await marks()).toEqual(expected);
-    expect([await isDig(parent), await isDig(orphaned)]).toEqual([false, true]);
+    expect([await isDig(parent), await isDig(orphaned), await isDig(plainStart)]).toEqual([false, true, false]);
     // The parent erased as a deletion finishes it: its tombstone, then its per-debate forgets, which take its links and its investigation.
     await seeded([["INSERT INTO serve.private_run_erasure_tombstone (run_id,completed_at,destroyed_key_count,already_absent_key_count) VALUES ($1,clock_timestamp(),1,0)", [parent]]]);
     const client = await db.pool.connect();
@@ -275,7 +285,7 @@ describe("0171's backfill: a dig made before the step has its own row after it, 
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     expect(Number((await db.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.dig_link WHERE parent_run_id=$1", [parent])).rows[0]!.n)).toBe(0);
     expect(Number((await db.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.investigation_member WHERE run_id=$1", [member])).rows[0]!.n)).toBe(0);
-    for (const dig of [linked, member, picked, contributed, handedOver]) expect(await isDig(dig), dig).toBe(true);
+    for (const dig of [linked, member, picked, contributed, handedOver, carried, pathsOfPicks]) expect(await isDig(dig), dig).toBe(true);
     // Applied again (the next migrate()), nothing moves.
     await migrate(db.pool);
     expect(await marks()).toEqual(expected);

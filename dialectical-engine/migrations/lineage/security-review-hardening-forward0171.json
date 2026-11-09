@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0171_security_review_hardening.sql",
-    "sha256": "bfcbc263f9860f2f48446fb1e310850827ee1d81bd021f896235dc6300c5cc5b"
+    "sha256": "b3bb31e114a10c5d2cc8d11d5016a27e514e9b0b74e0d4516888e4060da38af2"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

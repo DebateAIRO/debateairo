@@ -2,7 +2,8 @@
 --
 -- Plain words. One drained step for every fix of the review that the database must make, F2 to F5. Each fix is named by its letter in every section
 -- below, and the contract at the end checks each one's end state as the step applies. Once applied, this file is fixed: any later change is a step of its own.
--- It comes last in the chain, after 0170: it was built as 0154 and took this number at the merge of feat/2026-10-28-v4-initial (2026-11-09), whose 0154 to 0157 and 0170 came first.
+-- It comes last in the chain, after 0170: it was built as 0154 and took this number at the merge of feat/2026-10-28-v4-initial (2026-11-09), whose 0154 to 0170 came first:
+-- 0154 to 0157 and 0170 at the first merge, 0158 to 0169 at the second.
 -- F3. 0137's identity.join_public_investigation, the first public join, has had no caller in the code since 0147's join_public_tree took its place, yet the API's
 --   billing role could still call it, and it writes an investigation in the first author's name. Its one grant is taken back. The function stays: 0137's
 --   postcondition digests it, so a DROP would fail that step's receipt on every later migrate().
@@ -50,7 +51,8 @@
 --   within a minute of its reservation (its 8-second deadline aborts the call, a pool waits 5 s at most for a connection, production ends a statement at
 --   30 s), so a reservation made with a token stolen and then revoked names no one past the hour. A reservation no charge takes goes once an hour old
 --   with the next reservations anyone makes, or with the API's hourly sweep (the new identity.delete_ask_clarify_reservations_due, the cross-account
---   marker's alone, run outside any request), so none outlives about two hours. The site's day of spend is the system's to write. The three ledger
+--   marker's alone, run outside any request), so none outlives about two hours. The site's day of spend is the system's to write, but for the two
+--   definers section 5 finds a request login may still call (named below). The three ledger
 --   writers that name no debate, 0118's ledger.record_language_check_spend, 0128's ledger.record_question_check_spend and 0144's charge writer, took
 --   any caller of debateai_runtime and any amount, so a request login with no session could fill today or tomorrow with one row and stop every paid
 --   call on the site until that day ended, and a member's own session could charge their own running grant any amount. They move to the marker
@@ -60,8 +62,10 @@
 --   write directly (a charge of any size on a debate of its own, a hold, a reservation of any day that never expires, where row security never
 --   reached): their writers in a request were the system login's already (the room's hold on its decision pool, the daily guard's reservation in its
 --   X23 frame), the synthesis check's charge goes through its site (X33), and the runner, the scheduler and the waker hold the marker. The definers
---   that write them do so as their owners, and section 5 finds one a request login may call: 0107's settlement of a funded debate's admitted call,
---   which asks the run's owner (below) and writes only the call its admission reserved. The room's count of the holds on the site's day reads every
+--   that write them do so as their owners, and section 5 finds two a request login may call: 0107's settlement of a funded debate's admitted call,
+--   which asks the run's owner (below) and writes only the call its admission reserved; and 0158's charge of a call before Start, which arrived with
+--   the second merge of the V4 line and writes the day for any owner it is handed (0165's try charge calls it), which this step does not change and
+--   a step of its own is to move to the marker, as the clarify charge's was. The room's count of the holds on the site's day reads every
 --   account's (its X23 frame), as its day's spend does, where a request login counted its own alone. 0000's sequence counter, the one row every
 --   event's position is drawn from, which debateai_runtime could set back with no row security so that every event appended next collided with one
 --   already written, is written only through 0000's ledger.allocate_sequence(), a definer of the table's own owner now, with 0056's search path;
@@ -120,7 +124,10 @@
 --   alone, as a refusal, below), so only the member's owner ref, which 0130's row rule keeps from every request (the ownership events, 0092's charge
 --   scopes and the account rows show a request its own alone, and 0092's billing.internal_grant is no request role's), stands between a request and
 --   that member's totals: the census's test (below) finds no definer either request login may call that hands back an owner ref for the ids a
---   request can read, and no row of a relation it may read that holds one. A billing step of its own may split them. Left out too: the three
+--   request can read, and no row of a relation it may read that holds one, but for 0159's two carry-on definers of the fifth list (below),
+--   core.claim_carry_on_due and core.read_carry_on_begun, which take only a limit. So since 0159 a request login can read the owner ref of any
+--   account with a carry-on due or begun, and those members' totals are open until the step that hardens them. A billing step of its own may
+--   split them. Left out too: the three
 --   public readers left (core.run_is_published, read_public_dig_parent and read_public_tree_of_run), which answer only
 --   for a debate public now, or a dig allowed on one, and hand back no content (whether it is public, its link, the ids of its runs); the deployment
 --   metadata (a debate's release, its settings version, the newest run a re-admission made); staff's step-up, the sign-in challenge and the session
@@ -297,18 +304,20 @@
 --   handed; left alone: the refusal audits and the prune of a dead TOTP addition, F5 above), and 0085's hold question (above) stays open too.
 -- F2. The owner decided that a dig, a debate dug from another, is never published: its question quotes its parent's and carries its parent's place,
 --   time and purpose lines, which may be another person's or private. Nothing refused it: the owner's Publish took a dig like any debate. A dig is now
---   known by its own row of the new identity.dig_run, written by the statement that creates the dig's run: 0123's core.create_encrypted_run, the one
---   writer of every owner's run (a new ask's, direct or the room's START and WAIT, and a re-admission's), is patched below to take one more key of its
+--   known by its own row of the new identity.dig_run, written by the statement that creates the dig's run: 0123's core.create_encrypted_run (in the
+--   body 0163 restated), the one writer of every owner's run (a new ask's, direct or the room's START and WAIT, and a re-admission's), is patched below to take one more key of its
 --   closed document, digRun (JSON true only; any other value refuses the document and writes nothing, as any other key does), which the API sends for
 --   an ask with a parent or a public parent, and to write the row right after the run's ownership event; a run that re-admits a dig gets its own row
 --   the same way. So no sign-out, step-up, failure or crash after the creation can leave a dig unmarked: a creation that fails writes neither. The row
 --   names the dig's run alone, never its parent, so it stays when the parent is erased or changes hands; only the dig's own erasure (0131's
 --   per-debate forget, patched below) or its account's (the cascade) takes it. The digs already there when this step applies are marked as it applies,
---   from the records they left (section 1). Still open: a dig made before this step that left no record at all cannot be told from any other debate,
---   as no run names its parent, so it stays unmarked; and the digs already published stay published (section 5 counts them as the step applies;
+--   from the records they left (section 1). Still open: a dig made before this step that left none of those records cannot be told from any other
+--   debate, as a run itself names no parent, so it stays unmarked (a carry-on dig is told by its binding, which 0163's key provision writes before the
+--   run exists, so it always leaves one); and the digs already published stay published (section 5 counts them as the step applies;
 --   migrations/lineage/README.md says what the operator does about each), as unpublishing one here would write visibility events and destroy keys
---   outside the definers that own them. The new identity.run_is_dig(run) knows a dig by that row or by any of the four other records a dig may leave
---   (0135's picks, 0137's public contribution, 0133's place in an investigation under a parent, 0131's link to its parent), on the debate or on any it
+--   outside the definers that own them. The new identity.run_is_dig(run) knows a dig by that row or by any of the six other records a dig may leave
+--   (0135's picks, 0137's public contribution, 0133's place in an investigation under a parent, 0131's link to its parent, 0163's binding of a carry-on
+--   dig to the debate it carries on from, 0159's start paths made from a dig's picks), on the debate or on any it
 --   re-admits (0123's run_supersession, back at most 16 runs, as core.resolve_run_ref goes forward). Both ways a snapshot is ever written refuse a
 --   dig: 0085's serve.prepare_publication_key_provision (0099 patched it in place for the session's cap, and this patches that live body again) right
 --   after its owner and live-content checks, and the transition publishes only under the PREPARED intent it writes; and 0137's
@@ -328,7 +337,9 @@
 -- found exactly as often as stated, and runs the result, as 0099 does; the function's owner, grants, definer flag, settings and volatility must come out
 -- unchanged. Nothing earlier is dropped. Every earlier step whose postcondition digest this changes is declared in the manifest's amendsPostconditionsOf, with
 -- the field function_definition also for a grant taken back or moved alone (the chain re-measures the step's whole digest, its grants included): 0112, 0115,
--- 0116, 0118, 0120, 0125, 0126, 0128, 0140, 0142, 0143, 0144, 0145, 0146, 0149 and 0153 (F5), 0123, 0127 and 0131 (F5, F2), 0137 (F3, F4a, F5, F2), 0150
+-- 0116, 0118, 0120, 0125, 0126, 0128, 0140, 0142, 0143, 0144, 0145, 0146, 0149 and 0153 (F5), 0158, 0165 and 0168 (F5, a grant taken back: each restates
+-- staff.read_team_internal_spent, whose grants its digest covers), 0123, 0127 and 0131 (F5, F2), 0163 (F2: it restated core.create_encrypted_run and
+-- digests it), 0137 (F3, F4a, F5, F2), 0150
 -- (F4b, F5), and 0132, 0133, 0134, 0135, 0136, 0138, 0139, 0141, 0147 and 0151 (F4a, F5); 0140's entry holds its admission of a funded call too (F5,
 -- billing), 0112's its recovery's proof and the use of a saved code, moved, and 0115's and 0125's the account bodies they digest (F5, accounts). 0040's
 -- lock of a request's own runs (F5), 0085's key provision (F2), the billing bodies that ask now but 0140's (F5: 0089's, 0092's and 0107's,
@@ -344,8 +355,8 @@
 --   drained         it takes back and moves grants of 0000, 0040, 0046, 0048, 0066, 0080, 0083, 0085, 0086, 0088, 0090, 0098, 0100, 0112, 0116,
 --                   0118, 0120, 0126, 0128 and of 0132 to 0153 (the day's tables' and the counter's among them), makes 0000's allocator a definer, adds an
 --                   overload of 0085's verification delivery that the API calls in its place, redefines in place functions of 0040, 0077, 0078,
---                   0079, 0085, 0089, 0092, 0095, 0107, 0115, 0123, 0125, 0126, 0127 and of 0131 to 0151 the API, the runner and the erasure
---                   worker call (0123's writer of every owner's run, the billing functions keyed by a run or an owner and the account functions
+--                   0079, 0085, 0089, 0092, 0095, 0107, 0115, 0123, 0125, 0126, 0127, of 0131 to 0151 and of 0163 the API, the runner and the erasure
+--                   worker call (0123's writer of every owner's run, in the body 0163 restated, the billing functions keyed by a run or an owner and the account functions
 --                   keyed by a user id among them), and marks the digs already there; the release that carries it must be a drained upload.
 --   keeps-verifier  it adds no effective-capability verifier: it creates no billing relation or billing function, and changes no billing relation's
 --                   or function's grants, owner, definer flag or settings, which lineage/verify-effective-capabilities-130.sql pins (it pins no
@@ -544,8 +555,8 @@ BEGIN
   RETURN true;
 END;
 $$;
--- F2: a dig's own row, one per dig, whatever else it leaves. The statement that creates the dig's run writes it (0123's core.create_encrypted_run,
--- patched in section 3), right after the run's ownership event, so a dig is a dig from its first statement, private or public, whatever its join
+-- F2: a dig's own row, one per dig, whatever else it leaves. The statement that creates the dig's run writes it (0123's core.create_encrypted_run, in
+-- the body 0163 restated, patched in section 3), right after the run's ownership event, so a dig is a dig from its first statement, private or public, whatever its join
 -- then answers. Ids and the time only, keyed on the dig's own run and naming no parent: the parent's erasure, or its changing hands, leaves it. The
 -- dig's own erasure takes it (0131's per-debate forget, patched in section 3), and so does its account's (the cascade). No role holds a right on the
 -- table (section 2); only the run's creation, the question below and the forget reach it, each as its owner. Outside 0130's scope rule, as 0131's
@@ -559,26 +570,31 @@ CREATE TABLE IF NOT EXISTS identity.dig_run (
 CREATE INDEX IF NOT EXISTS dig_run_owner ON identity.dig_run (owner_ref);
 SELECT core.install_truncate_guard('identity.dig_run');
 -- F2: the digs already there as this step applies have only the records they left, and their parent's erasure takes two of them (the link, 0131,
--- and the place in an investigation, 0133), so each is marked here, once: every run with one of the four records, by its owner now (its latest
+-- and the place in an investigation, 0133), so each is marked here, once: every run with one of the six records, by its owner now (its latest
 -- ownership event, as the row's cascade goes with that account), but a run already erased and an owner whose account is gone. A dig that left none
--- cannot be told from any other debate, as no run names its parent. Nothing published is touched (section 5 counts what was).
+-- cannot be told from any other debate, as a run itself names no parent. A binding whose run was never made has no ownership event, so the join
+-- below leaves it out. Nothing published is touched (section 5 counts what was).
 INSERT INTO identity.dig_run (run_id, owner_ref)
   SELECT dig.run_id, owner_now.owner_ref
   FROM (SELECT picks.run_id FROM identity.dig_pick_set AS picks
     UNION SELECT contribution.dig_run_id FROM identity.public_contribution AS contribution
     UNION SELECT member.run_id FROM identity.investigation_member AS member WHERE member.parent_run_id IS NOT NULL
-    UNION SELECT link.child_run_id FROM identity.dig_link AS link) AS dig (run_id)
+    UNION SELECT link.child_run_id FROM identity.dig_link AS link
+    UNION SELECT binding.run_id FROM identity.run_execution_binding AS binding WHERE binding.carry_on_parent_run_id IS NOT NULL
+    UNION SELECT path_set.run_id FROM core.start_path_set AS path_set WHERE path_set.source = 'DIG_PICKS') AS dig (run_id)
   CROSS JOIN LATERAL (SELECT event.owner_ref FROM core.run_ownership_event AS event WHERE event.run_id = dig.run_id ORDER BY event.at_seq DESC LIMIT 1) AS owner_now
   WHERE EXISTS (SELECT 1 FROM identity."user" AS account WHERE account.owner_ref = owner_now.owner_ref)
     AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS erased WHERE erased.run_id = dig.run_id)
   ON CONFLICT (run_id) DO NOTHING;
 
--- F2: whether a debate is a dig: by its own row (above), or by any one of the four other records a dig may leave: its picks (0135, recorded for every
+-- F2: whether a debate is a dig: by its own row (above), or by any one of the six other records a dig may leave: its picks (0135, recorded for every
 -- private dig and every public one that joined), its public contribution (0137, written when a public dig's tree join took), its place in an
--- investigation under a parent (0133; an investigation's root has none), its link to its parent (0131). The debate's own records, or those of a run it
--- re-admits: the ask waker's re-admission (0123's core.run_supersession, old run to new) makes a new run and copies none of them, so the question
+-- investigation under a parent (0133; an investigation's root has none), its link to its parent (0131), its binding to the debate it carries on from
+-- (0163: only the carry-on's key provision writes that column, always for a dig, before the run exists and whatever its join then answers), its start
+-- paths made from its picks (0159's source DIG_PICKS, sealed in its setup before the join; a start path set of any other source is no record). The
+-- debate's own records, or those of a run it re-admits: the ask waker's re-admission (0123's core.run_supersession, old run to new) makes a new run and copies none of them, so the question
 -- follows the edges back, at most 16, the bound core.resolve_run_ref keeps going forward. The parent's erasure takes the link and the place but leaves
--- the row and the picks, so a dig stays a dig. Ids only. No role may call it; the definer below, 0123's run writer (for the run a re-admission
+-- the row, the picks, the binding and the start paths, so a dig stays a dig. Ids only. No role may call it; the definer below, 0123's run writer (for the run a re-admission
 -- copies), 0085's key provision, 0127's review ask and 0137's Free reader, claim and notice ask it as their owners.
 CREATE OR REPLACE FUNCTION identity.run_is_dig(p_run_id uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
@@ -591,7 +607,9 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
     OR EXISTS (SELECT 1 FROM identity.dig_pick_set AS picks WHERE picks.run_id = chain.run_id)
     OR EXISTS (SELECT 1 FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = chain.run_id)
     OR EXISTS (SELECT 1 FROM identity.investigation_member AS member WHERE member.run_id = chain.run_id AND member.parent_run_id IS NOT NULL)
-    OR EXISTS (SELECT 1 FROM identity.dig_link AS link WHERE link.child_run_id = chain.run_id))
+    OR EXISTS (SELECT 1 FROM identity.dig_link AS link WHERE link.child_run_id = chain.run_id)
+    OR EXISTS (SELECT 1 FROM identity.run_execution_binding AS binding WHERE binding.run_id = chain.run_id AND binding.carry_on_parent_run_id IS NOT NULL)
+    OR EXISTS (SELECT 1 FROM core.start_path_set AS path_set WHERE path_set.run_id = chain.run_id AND path_set.source = 'DIG_PICKS'))
 $$;
 -- F2: the API's question before it publishes a debate or offers to: is this debate of the owner's a dig? A refusal, so it fails closed: true, for every
 -- debate, when the connection is not the owner's (F5's question, which answers alike for every run); else null when it is not the owner's by 0131's
@@ -651,9 +669,9 @@ BEGIN
   -- the migrator's, that same role (the contract checks that it may).
   EXECUTE pg_catalog.format('ALTER TABLE identity.dig_run OWNER TO %I', v_owner);
   EXECUTE 'REVOKE ALL ON identity.dig_run FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker';
-  -- F2: the same owner, which owns the five tables the helper reads and 0137's Free reader, claim and notice that ask it; 0085's key provision,
-  -- 0123's run writer and supersession edges and 0127's review ask are the migrator's, that same role (the contract checks that each may ask, and
-  -- that the helper may read the edges).
+  -- F2: the same owner, which owns the helper's five dig tables (a dig's row, its picks, its contribution, its place and its link) and 0137's Free reader,
+  -- claim and notice that ask it; 0085's key provision, 0123's run writer and supersession edges, 0040's run binding, 0159's start paths and 0127's review
+  -- ask are the migrator's, that same role (the contract checks that each may ask, and that the helper may read the edges, the binding and the start paths).
   EXECUTE pg_catalog.format('ALTER FUNCTION identity.run_is_dig(uuid) OWNER TO %I', v_owner);
   EXECUTE 'REVOKE ALL ON FUNCTION identity.run_is_dig(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker';
   EXECUTE pg_catalog.format('ALTER FUNCTION identity.read_run_is_dig(uuid,uuid) OWNER TO %I', v_owner);
@@ -1732,7 +1750,8 @@ REVOKE EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid
 GRANT EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text) TO debateai_rls_all_accounts;
 REVOKE EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid) FROM debateai_runtime;
 GRANT EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid) TO debateai_rls_all_accounts;
--- F5: and the site's day of spend, which only the system writes now. The three ledger writers that name no debate, 0118's language check, 0128's
+-- F5: and the site's day of spend, which only the system writes now, but for the two definers section 5 names (0107's settlement of an admitted call
+-- and 0158's charge before Start). The three ledger writers that name no debate, 0118's language check, 0128's
 -- question check and 0144's clarify charge (its ledger row, then its person's), took any caller of debateai_runtime and any amount, so a request
 -- login with no session could fill today or tomorrow with one row and stop every paid call on the site until that day ended. The API calls each
 -- only through its site (apps/api/src/main.ts: X30, X31 and X32), its system login, inside the request that paid for the call, and probes each
@@ -2616,10 +2635,15 @@ BEGIN
       RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 Free path %', v_role;
     END IF;
   END LOOP;
-  -- F2: the helper follows a re-admission back through 0123's edges, which its owner may read, at most 16.
+  -- F2: the helper follows a re-admission back through 0123's edges, which its owner may read, at most 16, and reads 0163's binding of a carry-on dig and
+  -- 0159's start paths made from a dig's picks, which its owner may read too (each older than this step, so no grant is made for either).
   v_definition := pg_catalog.pg_get_functiondef('identity.run_is_dig(uuid)'::regprocedure);
   IF NOT pg_catalog.has_table_privilege(v_owner, 'core.run_supersession', 'SELECT')
-    OR pg_catalog.strpos(v_definition, 'FROM core.run_supersession AS edge JOIN chain ON edge.new_run_id = chain.run_id WHERE chain.hops < 16') = 0 THEN
+    OR NOT pg_catalog.has_table_privilege(v_owner, 'identity.run_execution_binding', 'SELECT')
+    OR NOT pg_catalog.has_table_privilege(v_owner, 'core.start_path_set', 'SELECT')
+    OR pg_catalog.strpos(v_definition, 'FROM core.run_supersession AS edge JOIN chain ON edge.new_run_id = chain.run_id WHERE chain.hops < 16') = 0
+    OR pg_catalog.strpos(v_definition, 'FROM identity.run_execution_binding AS binding WHERE binding.run_id = chain.run_id AND binding.carry_on_parent_run_id IS NOT NULL') = 0
+    OR pg_catalog.strpos(v_definition, 'FROM core.start_path_set AS path_set WHERE path_set.run_id = chain.run_id AND path_set.source = ''DIG_PICKS''') = 0 THEN
     RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 re-admission';
   END IF;
   -- F2: in the key provision, after the owner's and the live content's checks, before the link's tombstone and the intent the transition needs.
@@ -2680,11 +2704,13 @@ BEGIN
     OR v_grantees IS DISTINCT FROM ARRAY['debateai_content_provision'] THEN
     RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 dig row at creation';
   END IF;
-  -- F2: every dig that was there as this step applied, by any of its four records, is marked, but a run erased and an owner gone (section 1).
+  -- F2: every dig that was there as this step applied, by any of its six records, is marked, but a run erased and an owner gone (section 1).
   IF EXISTS (SELECT 1 FROM (SELECT picks.run_id FROM identity.dig_pick_set AS picks
         UNION SELECT contribution.dig_run_id FROM identity.public_contribution AS contribution
         UNION SELECT member.run_id FROM identity.investigation_member AS member WHERE member.parent_run_id IS NOT NULL
-        UNION SELECT link.child_run_id FROM identity.dig_link AS link) AS dig (run_id)
+        UNION SELECT link.child_run_id FROM identity.dig_link AS link
+        UNION SELECT binding.run_id FROM identity.run_execution_binding AS binding WHERE binding.carry_on_parent_run_id IS NOT NULL
+        UNION SELECT path_set.run_id FROM core.start_path_set AS path_set WHERE path_set.source = 'DIG_PICKS') AS dig (run_id)
       CROSS JOIN LATERAL (SELECT event.owner_ref FROM core.run_ownership_event AS event WHERE event.run_id = dig.run_id ORDER BY event.at_seq DESC LIMIT 1) AS owner_now
       WHERE EXISTS (SELECT 1 FROM identity."user" AS account WHERE account.owner_ref = owner_now.owner_ref)
         AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS erased WHERE erased.run_id = dig.run_id)

@@ -1902,11 +1902,14 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
   /**
    * 0093's two totals of a grant are left alone (0171's header): a request must name a member's owner, grant and configured event to read one. The
    * funding basis, a refusal also left alone, hands any connection a funded debate's grant and configured event by its run id (a published debate's
-   * run id can be read), so only the member's owner ref stands between a request and the member's totals. So no definer either request login may
+   * run id can be read), so only the member's owner ref stands between a request and the member's totals. No definer either request login may
    * call hands back an owner ref for the ids a request can read (a published debate's run id and link, the grant and event its basis names, and the
-   * connection's own owner ref, each in every argument that can hold it), and no row of any relation either request login may read holds one.
+   * connection's own owner ref, each in every argument that can hold it), and no row of any relation either request login may read holds one. The
+   * exception, since 0159, is its claim of a carry-on due and its list of those begun, in the census's fifth list: each takes only a limit and hands
+   * any request login the owner ref of any account with a carry-on due or begun, so those members' totals are open until the step that hardens them.
+   * The sweep sees that as soon as such a carry-on exists, so it runs once with none and once with one of each.
    */
-  it("on the production logins (P3-01's memberships): a funded debate's basis hands any request its grant and configured event by run id, so only the member's owner ref, which no definer or relation hands a request, stands between it and the member's grant totals", async () => {
+  it("on the production logins (P3-01's memberships): a funded debate's basis hands any request its grant and configured event by run id, so only the member's owner ref, which no relation holds for a request and no definer hands one but 0159's two carry-on definers (for an account with a carry-on due or begun, whose totals are open), stands between it and the member's grant totals", async () => {
     const production = await logins!.production();
     const opened: Pool[] = [];
     const open = (id: Parameters<typeof production.url>[0], target?: Pool): Pool => {
@@ -1916,6 +1919,7 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
     };
     const names = [production.url("api-runtime"), production.url("api-authorization")].map((url) => decodeURIComponent(new URL(url).username));
     const as = <T>(token: string | null, work: () => Promise<T>): Promise<T> => (token === null ? work() : inAccountRequest(token, work));
+    const carriedOn: string[] = [];
     try {
       // A published debate of ana's, pinned to her grant as the room pins it, with a call the runner admitted and settled on it.
       const published = await fixture.run(ana.ownerRef);
@@ -2024,6 +2028,24 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
       for (const [label, pool, token] of strangers) expect(await sweep(pool, token, ben.ownerRef), label).toEqual([]);
       // The sweep sees an owner ref where one is handed back: the system login, which holds the marker, reads her grant by the debate's run id.
       expect(await sweep(open("api-system"), null, ben.ownerRef)).toContain("billing.read_internal_allowance_for_run(uuid,timestamp with time zone)");
+      // Since 0159 two definers do hand one over, for an account with a carry-on due or begun: the fixture has none, so one of each is seeded on her debates,
+      // past the sealed set's trigger, each with the binding Start writes. The sweep rolls back, so its claim takes nothing, and the rows go again at the end.
+      const due = await fixture.run(ana.ownerRef);
+      carriedOn.push(published, due);
+      await seeded(carriedOn.flatMap((runId) => [
+        ["INSERT INTO core.start_path_set (run_id,source,width,path_count,chosen_by,carry_on_to_report,content_ciphertext,content_attestation) VALUES ($1,'MENU',1,1,'PERSON',true,'{}'::jsonb,$2)", [runId, ATTESTATION]],
+        ["INSERT INTO identity.run_execution_binding (execution_ref,user_id,identity_session_id,run_id,created_at) VALUES ($1,$2,$3,$4,clock_timestamp())", [randomUUID(), ana.userId, randomUUID(), runId]],
+        ["INSERT INTO core.carry_on_mark (run_id,mark) VALUES ($1,'DUE')", [runId]]] as const));
+      await seeded([["INSERT INTO core.carry_on_mark (run_id,mark) VALUES ($1,'BEGUN')", [published]]]);
+      for (const [label, pool, token] of strangers) {
+        expect(await sweep(pool, token, ben.ownerRef), label).toEqual(["core.claim_carry_on_due(integer)", "core.read_carry_on_begun(integer)"]);
+        // And that owner ref is all the totals needed: the begun list names her, and with it this connection reads what she spent.
+        await as(token, async () => {
+          const begun = (await pool.query<{ value: ReadonlyArray<{ run_id: string; owner_ref: string }> }>("SELECT core.read_carry_on_begun(50) AS value")).rows[0]!.value;
+          expect(begun.map(({ run_id: runId, owner_ref: owner }) => [runId, owner]), label).toEqual([[published, ana.ownerRef]]);
+          expect(await totals(pool, begun[0]!.owner_ref), label).toEqual(hers);
+        });
+      }
       // And no row of a relation either request login may read, through the columns it may read, holds her owner ref: 0130's row rule keeps every
       // row that names an owner (her debates' ownership events and charge scopes among them) to the connection's own.
       const relations = (await database.pool.query<{ relation: string; columns: string[] }>(`
@@ -2057,7 +2079,12 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
       for (const [label, pool, token, name] of strangers) expect(await holding(pool, token, name), label).toEqual([]);
       // The scan sees an owner ref where a row holds one: the system login reads every account's ownership events and charge scopes.
       expect(await holding(open("api-system"), null, names[0]!)).toEqual(expect.arrayContaining(["core.run_ownership_event", "billing.run_charge_scope"]));
-    } finally { for (const pool of opened) await pool.end().catch(() => undefined); }
+    } finally {
+      if (carriedOn.length > 0) {
+        await seeded(["core.carry_on_mark", "core.start_path_set", "identity.run_execution_binding"].map((table) => [`DELETE FROM ${table} WHERE run_id = ANY($1::uuid[])`, [carriedOn]] as const));
+      }
+      for (const pool of opened) await pool.end().catch(() => undefined);
+    }
   }, 300_000);
 
   it("0130's effective-capability verifier, which pins every billing function's grants, owner, definer flag and settings, still passes on the patched database", async () => {
@@ -2233,7 +2260,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
   const CREATOR = "a new pending account under the id it is handed; nothing for a taken address, which it knows by the blind index only the API's key makes";
   const ERASING = "a refusal (true refuses a payment, stops each renewal and retry, ends the plan): an owner question would read a mismatch as not";
   const GRANT_TOTALS = "which 0140's admission and staff's allowance page read for other members as their owner; 0130's verifier pins its grants; "
-    + "it needs the member's owner ref, which no request reads (the funding basis names the grant and its event to any)";
+    + "it needs the member's owner ref, which no relation shows a request and only 0159's two carry-on definers of the fifth list hand one, for an account "
+    + "with a carry-on due or begun, so those members' totals are open (the funding basis names the grant and its event to any)";
   const LEFT_ALONE: Readonly<Record<string, string>> = {
     "billing.owner_age_frozen(uuid)": `0089's question whether an owner's account is age-frozen, ${ERASING} frozen; one boolean of an owner ref`,
     "billing.owner_erasure_committed(uuid)": `0091's question whether an owner's erasure committed, ${ERASING} erased; one boolean of an owner ref`,
@@ -3407,7 +3435,7 @@ describe("F2: no dig is published, by the owner's decision", () => {
   const asks = (pool: Pool, owner: string, runId: string) =>
     pool.query<{ dig: boolean | null }>("SELECT identity.read_run_is_dig($1,$2) AS dig", [owner, runId]).then((result) => result.rows[0]!.dig);
   /** A debate of `owner`'s dug from `parent` by one record alone, the way each kind of dig leaves it. */
-  async function dugBy(owner: Account, parent: string, record: "row" | "picks" | "contribution" | "member" | "link"): Promise<string> {
+  async function dugBy(owner: Account, parent: string, record: "row" | "picks" | "contribution" | "member" | "link" | "binding" | "pick-paths"): Promise<string> {
     const dig = await run(owner);
     if (record === "row") {
       await seeded([["INSERT INTO identity.dig_run (run_id,owner_ref) VALUES ($1,$2)", [dig, owner.ownerRef]]]);
@@ -3423,6 +3451,11 @@ describe("F2: no dig is published, by the owner's decision", () => {
         ["INSERT INTO identity.investigation (investigation_id,owner_ref,root_run_id,state) VALUES ($1,$2,$3,'open')", [investigationId, owner.ownerRef, parent]],
         ["INSERT INTO identity.investigation_member (run_id,investigation_id,owner_ref) VALUES ($1,$2,$3)", [parent, investigationId, owner.ownerRef]],
         ["INSERT INTO identity.investigation_member (run_id,investigation_id,owner_ref,parent_run_id,mode) VALUES ($1,$2,$3,$4,'quick')", [dig, investigationId, owner.ownerRef, parent]]]);
+    } else if (record === "binding") {
+      await seeded([["INSERT INTO identity.run_execution_binding (execution_ref,user_id,identity_session_id,run_id,created_at,carry_on_parent_run_id,carry_on_path_id) VALUES ($1,$2,$3,$4,clock_timestamp(),$5,'b1')",
+        [randomUUID(), owner.userId, randomUUID(), dig, parent]]]);
+    } else if (record === "pick-paths") {
+      await seeded([["INSERT INTO core.start_path_set (run_id,source,width,path_count,chosen_by,carry_on_to_report,content_ciphertext,content_attestation) VALUES ($1,'DIG_PICKS',1,1,'PERSON',false,'{}'::jsonb,$2)", [dig, ATTESTATION]]]);
     } else {
       await seeded([["INSERT INTO identity.dig_link (child_run_id,owner_ref,parent_run_id,places,mode) VALUES ($1,$2,$3,'{}','quick')", [dig, owner.ownerRef, parent]]]);
     }
@@ -3435,12 +3468,17 @@ describe("F2: no dig is published, by the owner's decision", () => {
     ben = await seedSessionAccount(database.pool, "f2-ben");
   }, 120_000);
 
-  it("any one of a dig's records makes it a dig, its own row or the four others, its parent and an investigation's root are none, and a connection that is not the owner's reads every debate as a dig", async () => {
-    const records = ["row", "picks", "contribution", "member", "link"] as const;
+  it("any one of a dig's records makes it a dig, its own row or the six others, its parent, an investigation's root and a debate with an ordinary binding and menu paths are none, and a connection that is not the owner's reads every debate as a dig", async () => {
+    const records = ["row", "picks", "contribution", "member", "link", "binding", "pick-paths"] as const;
     const parents = await Promise.all(records.map(() => run(ana)));
     const digs = await Promise.all(records.map((record, index) => dugBy(ana, parents[index]!, record)));
     const bens = await dugBy(ben, await run(ben), "picks");
+    // Neither of the two later records by another name: every debate's own binding names no parent, and paths chosen from a menu make no dig.
+    const ordinary = await run(ana);
+    await seeded([["INSERT INTO identity.run_execution_binding (execution_ref,user_id,identity_session_id,run_id,created_at) VALUES ($1,$2,$3,$4,clock_timestamp())", [randomUUID(), ana.userId, randomUUID(), ordinary]],
+      ["INSERT INTO core.start_path_set (run_id,source,width,path_count,chosen_by,carry_on_to_report,content_ciphertext,content_attestation) VALUES ($1,'MENU',1,1,'PERSON',false,'{}'::jsonb,$2)", [ordinary, ATTESTATION]]]);
     await inAccountRequest(ana.token, async () => {
+      expect(await asks(pools.runtime, ana.ownerRef, ordinary)).toBe(false);
       for (const [index, dig] of digs.entries()) expect(await asks(pools.runtime, ana.ownerRef, dig), records[index]).toBe(true);
       // The parent of each, the investigation's root (a member with no parent) among them, and a debate dug from nothing.
       for (const parent of parents) expect(await asks(pools.runtime, ana.ownerRef, parent), parent).toBe(false);
@@ -3475,22 +3513,29 @@ describe("F2: no dig is published, by the owner's decision", () => {
       const runtime = login("api-runtime");
       const plain = await run(ana);
       const dig = await dugBy(ana, plain, "row");
-      const answers = (pool: Pool) => Promise.all([dig, plain].map((runId) => asks(pool, ana.ownerRef, runId)));
-      expect(await inAccountRequest(ana.token, () => answers(request)), "the owner's own session").toEqual([true, false]);
-      expect(await answers(system), "the system login").toEqual([true, false]);
+      // The two records the helper reads that older steps own, each alone: a carry-on dig's binding (0163) and a page dig's start paths from its picks (0159). Its owner
+      // reads them as a definer, with no grant made and neither table's row security forced on it; the owner's name is the migrator's here as in P3-01.
+      const carried = await dugBy(ana, await run(ana), "binding");
+      const picked = await dugBy(ana, await run(ana), "pick-paths");
+      expect((await database.pool.query<{ reads: boolean; forced: boolean }>(`SELECT has_table_privilege(p.proowner, c.oid, 'SELECT') AS reads, c.relforcerowsecurity AS forced
+        FROM pg_proc AS p CROSS JOIN pg_class AS c WHERE p.oid = 'identity.run_is_dig(uuid)'::regprocedure
+          AND c.oid IN ('identity.run_execution_binding'::regclass, 'core.start_path_set'::regclass)`)).rows).toEqual([{ reads: true, forced: false }, { reads: true, forced: false }]);
+      const answers = (pool: Pool) => Promise.all([dig, carried, picked, plain].map((runId) => asks(pool, ana.ownerRef, runId)));
+      expect(await inAccountRequest(ana.token, () => answers(request)), "the owner's own session").toEqual([true, true, true, false]);
+      expect(await answers(system), "the system login").toEqual([true, true, true, false]);
       for (const [label, by] of [["another account's session", () => inAccountRequest(ben.token, () => answers(request))],
         ["an anonymous request", () => inAccountRequest(null, () => answers(request))],
-        ["api-runtime with no session", () => answers(runtime)]] as const) expect(await by(), label).toEqual([true, true]);
+        ["api-runtime with no session", () => answers(runtime)]] as const) expect(await by(), label).toEqual([true, true, true, true]);
       // The API's repository, as the publish route, the review ask and the staged publication ask it (isDig, === true), and the visibility read's
       // flag: the owner's own session and the system login read the dig as one and the plain debate as none; the owner's own plain debate is
       // never refused as a dig in her own request.
       const repository = (pool: Pool) => new PostgresPublicationRepository(pool, audit);
-      const digOf = (pool: Pool) => Promise.all([dig, plain].map((runId) => repository(pool).readRunIsDig(runId, ana.userId, ana.ownerRef)));
-      const flagOf = (pool: Pool) => Promise.all([dig, plain].map(async (runId) => (await repository(pool).readOwnedVisibility(runId, ana.userId, ana.ownerRef))?.dig));
-      expect(await inAccountRequest(ana.token, () => digOf(request))).toEqual([true, false]);
-      expect(await inAccountRequest(ana.token, () => flagOf(request))).toEqual([true, false]);
-      expect(await digOf(system)).toEqual([true, false]);
-      expect(await flagOf(system)).toEqual([true, false]);
+      const digOf = (pool: Pool) => Promise.all([dig, carried, picked, plain].map((runId) => repository(pool).readRunIsDig(runId, ana.userId, ana.ownerRef)));
+      const flagOf = (pool: Pool) => Promise.all([dig, carried, picked, plain].map(async (runId) => (await repository(pool).readOwnedVisibility(runId, ana.userId, ana.ownerRef))?.dig));
+      expect(await inAccountRequest(ana.token, () => digOf(request))).toEqual([true, true, true, false]);
+      expect(await inAccountRequest(ana.token, () => flagOf(request))).toEqual([true, true, true, false]);
+      expect(await digOf(system)).toEqual([true, true, true, false]);
+      expect(await flagOf(system)).toEqual([true, true, true, false]);
     } finally { for (const pool of opened) await pool.end().catch(() => undefined); }
   }, 300_000);
 
@@ -3562,10 +3607,12 @@ describe("F2: no dig is published, by the owner's decision", () => {
   it("the Free debates' sweep never picks a dig, and still picks the debate it was dug from", async () => {
     const parent = await run(ana);
     const dig = await dugBy(ana, parent, "link");
-    await waitingFree(parent, dig);
+    const carried = await dugBy(ana, parent, "binding");
+    await waitingFree(parent, dig, carried);
     const waiting = await freeWaiting();
     expect(waiting).toContain(parent);
     expect(waiting).not.toContain(dig);
+    expect(waiting).not.toContain(carried);
   });
 
   it("the Free path's own claim refuses a dig: prepared or published straight by a login that may call them, it writes no intent, snapshot or event", async () => {
