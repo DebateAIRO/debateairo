@@ -92,6 +92,7 @@ import {
 import { composePracticeRunner } from "../../tools/preview-practice/practice-runner-composition.js";
 import { practiceMadeUpSearchReplies, practiceSearchStandIn, practiceWithSearchStandIn } from "../../tools/preview-practice/practice-search-stand-in.js";
 import { parsePracticeSettings, practiceReleaseKeyAt, practiceSettingsWithLineUp } from "../../tools/preview-practice/practice-settings.js";
+import { practiceSettingsTextForVersion } from "../../tools/preview-practice/practice-settings-switch.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { composeQuestionCheck } from "../../apps/api/src/question-check/compose.js";
 import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
@@ -99,7 +100,7 @@ import { seedNetopiaSubscription } from "./billingSubscriptionFixtures.js";
 import { TEST_OWNER_LIMIT_ROWS } from "./hostedRegisterRows.js";
 import { TEST_APP_ORIGIN, persistLiveSession, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
 import { startPreviewGateStubs, type GateOverride, type GateProvider, type GateRequest, type StubRemainingFigures } from "./preview-gate-stubs.js";
-import { readPrivateGateFigures, readPrivateRegisterExport, type PrivateGateFigures } from "./private-figures.js";
+import { privateWorldGates, privateWorldHostedBilling, readPrivateGateFigures, readPrivateRegisterExport, type PrivateGateFigures } from "./private-figures.js";
 import { LEAN_FREE_MODEL_IDS, leanFreeShape } from "./start-step-cases.js";
 import { currentTestFile } from "./master-key-guard.js";
 import { apiTestPools, endProvisionedRlsLogins, runnerTestPool, type ApiTestPools } from "./rls-logins.js";
@@ -231,17 +232,21 @@ export async function startR22World(options: R22WorldOptions = {}) {
   const open = (): Pool => { const pool = createPool(database.connectionString); pools.push(pool); return pool; };
   // The register: kit v3's next version on the export, hosted with billing on, with the engine, length and shape rows the code starts from.
   // PRIVATE (Task 86): on the release's own export, its own shape row switched on and the owner's hosted billing; its length and
-  // engine rows are the release's own (the kit carries a row it is not given).
+  // engine rows are the release's own (the kit carries a row it is not given). Task 90c: the owner's plans with billing on
+  // (privateWorldHostedBilling), as the made-up world's: a file carrying the practice copy's billing off left the room without plans.
   const inputs = await parsePracticeNextRegisterInputs((privateFiles === null
     ? { hostedBilling: JSON.stringify(HOSTED_BILLING), debateShape: worldDebateShape(startStepSwitch, null), lengthGuidance: lengthGuidancePolicyStartValues(),
       engineVersion: engineVersionPolicyStartValues() }
-    : { hostedBilling: JSON.stringify(privateFiles.figures.hosted_billing), debateShape: worldDebateShape(startStepSwitch, releaseDebateShape(document)) }) as never);
+    : { hostedBilling: JSON.stringify(privateWorldHostedBilling(privateFiles.figures)), debateShape: worldDebateShape(startStepSwitch, releaseDebateShape(document)) }) as never);
   const next = await composePracticeHostedNextRegisterVersion(document, inputs.hostedBilling!, inputs.choices);
   const receipt = await importPracticeRegister(database.pool, document, next);
   const nextVersion = registerVersionToSafeLegacyNumber(parseRegisterVersionText(receipt.registerVersion));
-  const parsed = parsePracticeSettings(settingsText(startStepSwitch), { sourceRevision: SOURCE_REVISION });
+  // Task 90b (the sitting of 9 Nov): a version that carries the line-up (the release's switched-on one) takes the settings' gate
+  // part alone, as the live boot requires (D15); the made-up exports carry none, so their text is today's, byte for byte.
+  const lineUpRow = await readPreviewLineUpPolicy(database.pool, nextVersion);
+  const parsed = parsePracticeSettings(practiceSettingsTextForVersion(settingsText(startStepSwitch), lineUpRow), { sourceRevision: SOURCE_REVISION });
   const versioned = Object.freeze({ ...parsed, runner: Object.freeze({ ...parsed.runner, REGISTER_VERSION: nextVersion, RELEASE_KEY: practiceReleaseKeyAt(parsed.runner.RELEASE_KEY, nextVersion, "hosted"), DEPLOYMENT_MODE: "hosted" as const }) });
-  const settings = practiceSettingsWithLineUp(versioned, await readPreviewLineUpPolicy(database.pool, nextVersion), { trial: false });
+  const settings = practiceSettingsWithLineUp(versioned, lineUpRow, { trial: false });
   const environment = settings.runner;
   // The keys live in a throwaway folder; content encryption on, as on the site.
   const secretRoot = await mkdtemp(join(tmpdir(), "debateai-r22-world-"));
@@ -293,7 +298,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
   },
     delayMs: (request) => delays === null ? 0 : delays(request),
     // Task 86: the private figures' /remaining (PRIVATE), the falling pot and the concurrency refusal (each absent: as before).
-    ...(privateFiles === null ? {} : { remaining: { deepinfra: stubRemainingOf(privateFiles.figures.gates.deepinfra), anthropic: stubRemainingOf(privateFiles.figures.gates.anthropic) } }),
+    // Task 90c: with the release's GO edit on top (privateWorldGates: the Anthropic gate's four calls at once).
+    ...(privateFiles === null ? {} : { remaining: { deepinfra: stubRemainingOf(privateWorldGates(privateFiles.figures).deepinfra), anthropic: stubRemainingOf(privateWorldGates(privateFiles.figures).anthropic) } }),
     ...(options.spendLowersRemaining === undefined ? {} : { spendLowersRemaining: options.spendLowersRemaining }),
     ...(options.refuseOverConcurrency === undefined ? {} : { refuseOverConcurrency: options.refuseOverConcurrency }) });
   // Keyed on the env's gate part, under main.ts's name (Task 86: the start step's route reads it).
@@ -330,7 +336,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
   await activeSettings.current();
   const spend = new PostgresModelSpendStore(apiPool);
   const entitlements = new EntitlementRepository(apiPool);
-  const billingPlans = readiness.billingPlans!;
+  // Task 90c: the world runs billing on (a register without plans would crash the first room read, not refuse): said at once.
+  const billingPlans = readiness.billingPlans ?? ((): never => { throw new TypeError("R22_WORLD_BILLING_OFF"); })();
   const closeBasisPoints = readiness.band.closeBasisPoints;
   const personAllowance = new FundingAwarePersonAllowanceSource({ allowances: new PostgresInternalAllowanceRepository(apiPool), entitlements, plans: billingPlans, closeBasisPoints });
   const estimator = siteAdmission.estimator!;

@@ -215,6 +215,27 @@ describe("practice openings: repairs and busy AIs", () => {
     expect(reply?.candidate_answers).toHaveLength(1);
   });
 
+  it("item 0 (9 Nov): a repaired call keeps its FIRST refused reply, redacted as every reply is, and what its check said; a clean call keeps none", async () => {
+    const result = await run("en-four-day-week", "B");
+    const repaired = result.calls.find((call) => call.model === HAIKU && call.step === "LIST")!;
+    expect(repaired.status).toBe("REPAIRED");
+    const refused = repaired.firstRefused!;
+    expect(refused).toMatchObject({ attempt: 0, callSiteKey: repaired.attempts[0]!.callSiteKey, parseStatus: "SCHEMA_FAILED",
+      replyForm: "ORIGINAL" });
+    // How the reply ended, as the gateway recorded it (a cut-off one says "length" / "max_tokens": the length retry's cause).
+    expect(["stop", "end_turn"]).toContain(refused.finishReason);
+    // The rule and the field that failed: the slipped claim is longer than its limit.
+    expect(refused.issues).toContain("too_big@points.0.claim");
+    // The first reply itself (the over-long claim's run blanked, as reportableReplyText blanks it), not the merged reply.
+    expect(refused.replyText).not.toBe(repaired.replyText);
+    expect(refused.replyText).toContain("[REDACTED:long-run]");
+    expect(refused.replyText).not.toContain("x".repeat(32));
+    expect(JSON.parse(refused.replyText) as unknown).toMatchObject({ points: [{ claim: expect.stringContaining("[REDACTED:long-run]") as unknown }, {}, {}] });
+    const clean = result.calls.filter((call) => call.status === "ACCEPTED");
+    expect(clean.length).toBeGreaterThan(0);
+    expect(clean.every((call) => call.firstRefused === null)).toBe(true);
+  });
+
   it("a model busy at merge sits out every later arm and question", async () => {
     const result = await run("ro-euro,en-rent-caps", "B,C");
     const firstMerge = result.calls.find((call) => call.step === "MERGE")!;

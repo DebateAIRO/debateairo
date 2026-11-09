@@ -114,7 +114,7 @@ import {
 } from "./practice-shape.js";
 import {
   appendPracticeStartMonth, assertPracticeStartInForce, practiceFreeGaugesOf, practicePathFillSpread, practiceStartAtNext, practiceStartDigs,
-  practiceStartFreeAsk, PRACTICE_START_READING_LEVEL, readPracticeStartMonth, type PracticeStartStep
+  practiceStartFreeAsk, practiceStartWebPlan, PRACTICE_START_READING_LEVEL, readPracticeStartMonth, type PracticeStartStep
 } from "./practice-start-step.js";
 import { collectPracticeStoryLength, type PracticeStoryLengthBlock } from "./practice-story-length.js";
 import { collectPracticeStoryEngine, type PracticeStoryEngineBlock } from "./practice-story-rounds.js";
@@ -983,6 +983,8 @@ export async function runPracticeDebate(input: Readonly<{
     const runner = await composePracticeRunner({ pool, environment: standIn.environment, budgetPorts: standIn.budgetPorts,
       remaining: remainingPorts, keepAlivePool: database.extraPool(),
       ...(input.callConcurrency === undefined ? {} : { callConcurrency: input.callConcurrency }),
+      // V4 start step, Task 91f: the plan its web step reads where billing (off here) pinned none: premium PLUS, free FREE; else none.
+      ...(input.start === undefined ? {} : { webPlan: practiceStartWebPlan(input.start) }),
       ...(input.wait === undefined ? {} : { wait: input.wait }), ...(input.sleep === undefined ? {} : { sleep: input.sleep }) });
     const question = practiceDebateQuestion(input.questionId);
     // The site language goes with the question only when the ask reads it (a debate-shape row); else the ask is today's.

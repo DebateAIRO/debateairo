@@ -4,10 +4,14 @@
 // slow, empty, refusing or halted, a garbled reply, a planner that plans none and a path that fails all leave the debate
 // going with the path's mark; failed searches cost nothing; a page that gives orders stays data; no page text reaches a
 // call record. Made-up pages, scripted vendors behind the real gateway, the scripted Perplexity behind the real adapter.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { webPageTextRef, type WebSealed } from "@debateai/db";
-import { readPromptFrame, type PromptPacket } from "@debateai/providers";
-import { WEB_PACK_EXTRACTS_MAX, runWebStep, webMakerSlug, webStepRowId, webTopRecordedPacket } from "../../apps/runner/src/web-step.js";
+import { ProviderContentUnacceptedError, readPromptFrame, type PromptPacket, type ProviderGateway } from "@debateai/providers";
+import { webReceipt, webReceiptAnySchema, webSitesOf, webSitesOfReceipt } from "@debateai/register";
+import {
+  WEB_PACK_EXTRACTS_MAX, runWebStep, webMakerSlug, webReaderOneCallsReserved, webStepRowId, webTopRecordedPacket
+} from "../../apps/runner/src/web-step.js";
 import {
   CANARY, ORDERS, QUERIES, RUN_ID, digestOf, membersOf, memoryStore, noWeb, openedNonText, openedValue, pageText,
   perplexity, planReply, searchMoney, stepInput, team
@@ -287,5 +291,92 @@ describe("Task 57p: each reading notes the settings version of the debate it was
       expect(readings.length).toBeGreaterThan(0);
       expect(readings.every((row) => row.settingsVersion === noted)).toBe(true);
     }
+  });
+});
+
+/**
+ * Task 91j D (owner, 9 Nov, after the paid Plus test): a reader whose reply is cut off at its output room. The gateway refuses
+ * it as LENGTH_EXCEEDED; the step tells the reader so, and the reader keeps what it can: reader 1 sends the pages again in
+ * smaller pieces within the calls the start estimate reserved for the pack; a top reader keeps its whole entries.
+ */
+describe("Task 91j D: a reader cut off at its output room", () => {
+  const cutOff = (request: Parameters<ProviderGateway["call"]>[0], cut: string): never => {
+    request.classifyContent?.(cut, { finishReason: "length" });
+    throw new ProviderContentUnacceptedError(1, "LENGTH_EXCEEDED", "cut", `artifact-cut-${request.callSiteKey}`, "ledger-cut",
+      { cutOffs: 1, lastAtLowestLevel: true });
+  };
+
+  it("reader 1 cut off with nothing whole: its pages are read in two smaller pieces; a cut top reader keeps its whole entries", async () => {
+    const ais = team();
+    const store = memoryStore();
+    const keys: string[] = [];
+    const members = membersOf(ais.all, (gateway) => ({ call: async (request) => {
+      keys.push(request.callSiteKey);
+      if (request.callSiteKey === "WEB:read1:0:0") return cutOff(request, "{\"pages\": [{\"page_id\": \"p1\", \"grade\"");
+      if (request.callSiteKey === "WEB:read-top:0:3") {
+        return cutOff(request, "{\"pages\": [{\"page_id\": \"p1\", \"grade\": 2, \"extracts\": []}, {\"page_id\": \"p2\", \"gr");
+      }
+      return gateway.call(request);
+    } }));
+    const result = await runWebStep(stepInput({ members, search: perplexity().port, prepare: store.prepare }));
+    expect(keys.filter((key) => key.startsWith("WEB:read1:0:")).sort()).toEqual(["WEB:read1:0:0", "WEB:read1:0:1", "WEB:read1:0:2"]);
+    const one = result.paths[0]!;
+    const readingsOf = (reader: number) => [...store.readings.values()]
+      .filter((row) => row.reader === reader && one.pageIds.includes(row.pageId as string));
+    expect(readingsOf(1).map((row) => row.outcome)).toEqual(["READ", "READ", "READ", "READ"]);
+    // Reader 3 (GLM on path 0) kept its one whole entry: the top page p1 read, the others not by it.
+    expect(readingsOf(3).map((row) => [row.outcome, row.grade])).toEqual([["READ", 2], ["FAILED", null], ["FAILED", null]]);
+    expect(one.code).toBe("WEB_READER_CALL_UNAVAILABLE");
+  });
+
+  /**
+   * Task 91k (owner 9 Nov, "Reserve 9 calls per path"): the reserve is the run's own receipt's (`envelope_basis.web`, read back as the
+   * runner reads it): a debate started before the rise (a version-1 receipt) keeps 7 a pack, one started after it (version 3) 9; a run
+   * with no web member falls back to today's count for the debate's kind.
+   */
+  it("the reserved count is the run's own receipt's reader-1 calls for one pack; without one, today's count for the debate's kind", () => {
+    const fixture = JSON.parse(readFileSync(new URL("../fixtures/receipts/v1-receipts.json", import.meta.url), "utf8")) as Record<string, unknown>;
+    const v1 = webReceiptAnySchema.parse(fixture["web/start-quick-5"]);
+    expect(v1.version).toBe(1);
+    const reserveOf = (receipt: Parameters<typeof webSitesOfReceipt>[0]) => webSitesOfReceipt(receipt).readerOneCallsPerPack;
+    expect(webReaderOneCallsReserved({ mode: "quick", readerOneCallsReserved: reserveOf(v1) })).toBe(7);
+    const v3 = webReceipt(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), 3);
+    expect(v3.version).toBe(3);
+    expect(webReaderOneCallsReserved({ mode: "quick", readerOneCallsReserved: reserveOf(v3) })).toBe(9);
+    expect(webReaderOneCallsReserved({ mode: "thorough", readerOneCallsReserved: reserveOf(webReceipt(webSitesOf({ kind: "START", depth: "THOROUGH", paths: 5 }), 3)) })).toBe(16);
+    // No web member (local mode, fixtures): the debate's kind at today's count.
+    expect(webReaderOneCallsReserved({ mode: "quick" })).toBe(9);
+    expect(webReaderOneCallsReserved({ mode: "quick", readerOneCallsReserved: null })).toBe(9);
+    expect(webReaderOneCallsReserved({ mode: "thorough" })).toBe(16);
+    expect(webReaderOneCallsReserved({ mode: "quick", dig: { picks: new Array(16).fill(null) as never, alreadyInvestigated: "", reuse: null } })).toBe(6);
+    expect(webReaderOneCallsReserved({ mode: "thorough", pathsMode: { origin: "DIG", cap: 16, paths: new Array(2).fill(null) as never,
+      alreadyInvestigated: "", reuse: null, purposeLines: null } })).toBe(16);
+  });
+
+  it("no reader-1 follow-up goes past the run's own reserve; a first round alone past it is logged, never stopped", async () => {
+    const run = async (readerOneCallsReserved: number) => {
+      const store = memoryStore();
+      const keys: string[] = [];
+      const members = membersOf(team().all, (gateway) => ({ call: async (request) => {
+        keys.push(request.callSiteKey);
+        if (request.callSiteKey === "WEB:read1:0:0") return cutOff(request, "{\"pages\": [{\"page_id\": \"p1\", \"grade\"");
+        return gateway.call(request);
+      } }));
+      const input = stepInput({ members, search: perplexity().port, prepare: store.prepare, readerOneCallsReserved });
+      const result = await runWebStep(input);
+      return { keys: keys.filter((key) => key.startsWith("WEB:read1:0:")).sort(), logged: input.logged, result };
+    };
+    // A reserve of 1: the cut batch's halves are not sent; its pages stay unread, the debate goes on.
+    const one = await run(1);
+    expect(one.keys).toEqual(["WEB:read1:0:0"]);
+    expect(one.result.paths[0]!.status).toBe("SEARCHED");
+    expect(one.logged).not.toContain("WEB_READER_ONE_PAST_RESERVE");
+    // A reserve of 3 (more than the follow-ups need): both halves are sent.
+    expect((await run(3)).keys).toEqual(["WEB:read1:0:0", "WEB:read1:0:1", "WEB:read1:0:2"]);
+    // A first round already past the reserve: one line in the log, and every path still read.
+    const none = await run(0);
+    expect(none.keys).toEqual(["WEB:read1:0:0"]);
+    expect(none.logged.filter((event) => event === "WEB_READER_ONE_PAST_RESERVE")).toEqual(["WEB_READER_ONE_PAST_RESERVE", "WEB_READER_ONE_PAST_RESERVE"]);
+    expect(none.result.paths.map((path) => path.status)).toEqual(["SEARCHED", "SEARCHED"]);
   });
 });

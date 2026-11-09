@@ -116,6 +116,15 @@ export function practiceRemainingPorts(settings: PracticeSettings, sockets: Prac
 }
 
 /**
+ * V4 start step, Task 91f: the web-search gate's read-only "what is left today", over its forwarded socket (the same scope), for a
+ * debate that searches (practice.ts checks it is open before anything paid is sent, as the other two).
+ */
+export function practiceSearchRemainingPort(settings: PracticeSettings, socket: string) {
+  const search = createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: settings.runner.PREVIEW_GATE_SETTINGS.scope_id });
+  return (signal?: AbortSignal): Promise<PreviewGateRemaining> => search.remaining(signal);
+}
+
+/**
  * HOSTED only (null in local mode, where main.ts builds none of it): apps/api/src/main.ts's site money stages, in its
  * order and with its statements, BEFORE the admission loader: the sealed-envelope and support-scope boot refusals,
  * "site-cost-envelope-policy" (the site's day and band), then "ask-room"'s boot questions with the register's own

@@ -111,6 +111,32 @@ export function readPrivateRegisterExport(env: NodeJS.ProcessEnv = process.env):
   return path === null ? null : textOf(path, "PRIVATE_REGISTER_EXPORT_UNREADABLE");
 }
 
+/**
+ * Task 90c: the hosted billing the end-to-end world (Task 90) composes its register with: the owner's plans and ceilings as the
+ * file holds them, with billing ON. The sitting's file carries the practice copy's switch (off: the real practice debates run
+ * billing off, tools/preview-practice/README.md S-3b), but the world drives a case per plan, which only billing on tells apart
+ * (with billing off every person reads the premium key and the room has no plans).
+ */
+export function privateWorldHostedBilling(figures: PrivateGateFigures): Readonly<Record<string, unknown>> {
+  return Object.freeze({ ...figures.hosted_billing, billing: "on" });
+}
+
+/**
+ * Task 90c: the Anthropic gate's calls at once after the release's upload (deploy/preview-gate/v3/README-anthropic.md, "four
+ * calls at once": its GO edit sets `max_concurrent_calls` to 4 and no other figure). Not a private figure: the README says it.
+ */
+export const RELEASE_ANTHROPIC_CALLS_AT_ONCE = 4;
+
+/**
+ * Task 90c: the gates the end-to-end world answers from: the owner's figures with the release's GO edit on top. The sitting's file
+ * holds today's GOs, and the step's first moment sends three Haiku calls at once (the planner, the question check, the language
+ * decision), which today's Anthropic GO would hold in line; the release that carries the step gives that gate four.
+ */
+export function privateWorldGates(figures: PrivateGateFigures): PrivateGateFigures["gates"] {
+  return Object.freeze({ deepinfra: figures.gates.deepinfra,
+    anthropic: Object.freeze({ ...figures.gates.anthropic, max_concurrent_calls: RELEASE_ANTHROPIC_CALLS_AT_ONCE }) });
+}
+
 /** A plain decimal dollar figure in micro-dollars; anything else is TypeError("SHARE_OF_POT_INVALID"), with no value. */
 function microsOf(figure: string): bigint {
   const match = DECIMAL_USD.exec(figure);

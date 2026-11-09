@@ -40,22 +40,27 @@ export interface ModelReplyFacts {
  *  · BRACKET_INSERTED — one missing bracket, where only one place fits;
  *  · QUOTE_DELIMITERS_STRAIGHTENED — (practice debate 2026-10-16, GLM-5.3-Flash on a cross-exchange judge leg) a text
  *    VALUE written between typographic double quotes (“…”, „…“, „…”) instead of straight ones, its two delimiters read
- *    as straight quotes (`typographicValueEnd`).
+ *    as straight quotes (`typographicValueEnd`);
+ *  · CLOSING_QUOTE_STRAIGHTENED — (Task 91j E1, paid test 9 Nov: a DeepSeek judge in Romanian) a straight-quoted text
+ *    VALUE closed by the typographic ” (U+201D) at a line end beside the `,` `}` or `]` after it, where its straight
+ *    reading cannot end; that ” read as the straight closing quote (`closesAtLineEnd`).
  */
 const MODEL_JSON_REPAIRS = Object.freeze(["CODE_FENCE", "OUTERMOST_OBJECT", "INNER_QUOTE", "STRAY_QUOTE", "CLOSING_BRACKETS", "TRAILING_OBJECT",
   // LG-A (spec 2026-10-15, L31): made by the syntax pass, tried after the repairs above.
   "TRAILING_COMMA", "RAW_LINE_BREAK", "MODEL_TOKEN_DROPPED", "KEY_COLON_MOVED", "BRACKET_INSERTED",
   // Practice debate 2026-10-16: made by the syntax pass too, appended so no earlier name moves.
-  "QUOTE_DELIMITERS_STRAIGHTENED"] as const);
+  "QUOTE_DELIMITERS_STRAIGHTENED",
+  // Task 91j E1 (paid test, 9 Nov): made by the syntax pass too, appended so no earlier name moves.
+  "CLOSING_QUOTE_STRAIGHTENED"] as const);
 /** A repair the tolerant decode can make (no schema known). */
 export type ModelJsonDecodeRepair = typeof MODEL_JSON_REPAIRS[number];
 /**
- * The six repairs only the syntax pass makes (the decode list's last six). `modelJsonSyntaxRepair` may name CODE_FENCE
+ * The seven repairs only the syntax pass makes (the decode list's last seven). `modelJsonSyntaxRepair` may name CODE_FENCE
  * and CLOSING_BRACKETS beside them, so its result is typed `ModelJsonDecodeRepair`.
  */
 export type ModelJsonSyntaxRepair = Extract<ModelJsonDecodeRepair,
   "TRAILING_COMMA" | "RAW_LINE_BREAK" | "MODEL_TOKEN_DROPPED" | "KEY_COLON_MOVED" | "BRACKET_INSERTED"
-  | "QUOTE_DELIMITERS_STRAIGHTENED">;
+  | "QUOTE_DELIMITERS_STRAIGHTENED" | "CLOSING_QUOTE_STRAIGHTENED">;
 /**
  * The judge's SHAPE repairs (`packages/judgement/src/s04.ts`), each made only after a decoded object failed its step's
  * schema, and each accepted only when the repaired object then passes that full schema:
@@ -541,6 +546,28 @@ function typographicValueEnd(text: string, open: number): number | null {
   return null;
 }
 
+/** CLOSING_QUOTE_STRAIGHTENED (Task 91j E1): the typographic closing quote ” (U+201D). */
+const TYPOGRAPHIC_CLOSING_QUOTE = "”";
+const isLineEnd = (character: string | undefined): boolean => character === "\n" || character === "\r";
+
+/**
+ * Task 91j E1: whether a ” just before `from` stands where a text value's closing quote does, at a line end beside what
+ * follows a value: spaces or tabs, a line end, then `,` `}` or `]` (`…”\n}`); or `,` `}` or `]`, then spaces or tabs and a
+ * line end or the text's end (`…”,\n`). Linear in the blanks it skips.
+ */
+function closesAtLineEnd(text: string, from: number): boolean {
+  let at = from;
+  while (text[at] === " " || text[at] === "\t") at += 1;
+  if (isLineEnd(text[at])) {
+    const next = text[nextSignificant(text, at)];
+    return next === "," || next === "}" || next === "]";
+  }
+  if (text[at] !== "," && text[at] !== "}" && text[at] !== "]") return false;
+  at += 1;
+  while (text[at] === " " || text[at] === "\t") at += 1;
+  return at >= text.length || isLineEnd(text[at]);
+}
+
 /**
  * Fix round 1: the position of the LAST straight quote (not escaped by a backslash) that INNER_QUOTE could take as the
  * end of a list item (`closesValue` inside a list), or -1. A straight list item whose quote stands before it can also be
@@ -593,6 +620,9 @@ function innerQuoteEnd(text: string, from: number): Pick<StringEnd, "inObject" |
  *    escapes it (and named so). No other character changes. With no such closing quote the opening quote is left as it
  *    is (and nothing decodes). A key's place is never repaired, and a typographic quote inside a straight-quoted string
  *    is that string's own.
+ *  · CLOSING_QUOTE_STRAIGHTENED (Task 91j E1) — inside a straight-quoted VALUE, the first ” at a line end beside `,` `}`
+ *    or `]` (`closesAtLineEnd`) closes it, read as a straight quote, only when the text cannot end at its first unescaped
+ *    straight quote (none is left, or `innerQuoteEnd` refuses it there). A key is never read so.
  * An unterminated string is left as it is (that is CLOSING_BRACKETS's or nobody's case). A string ends at its first
  * unescaped quote; `ends` holds, for each string in order, whether INNER_QUOTE would end it there (`innerQuoteEnd`).
  */
@@ -654,6 +684,9 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       const isKey = top?.kind === "object" && top.expectKey;
       let body = "";
       let escaped = false;
+      let rawBreak = false;
+      /** CLOSING_QUOTE_STRAIGHTENED: the first ” that may close this text value, the body before it and its raw breaks. */
+      let closing: Readonly<{ at: number; body: string; rawBreak: boolean }> | null = null;
       let cursor = index + 1;
       for (; cursor < text.length; cursor += 1) {
         const inner = text[cursor]!;
@@ -662,11 +695,27 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
         if (inner === "\"") break;
         if (inner === "\n" || inner === "\r" || inner === "\t") {
           body += inner === "\n" ? "\\n" : inner === "\r" ? "\\r" : "\\t";
-          made.add("RAW_LINE_BREAK");
+          rawBreak = true;
           continue;
+        }
+        if (closing === null && !isKey && inner === TYPOGRAPHIC_CLOSING_QUOTE && closesAtLineEnd(text, cursor + 1)) {
+          closing = { at: cursor, body, rawBreak };
         }
         body += inner;
       }
+      // Task 91j E1: the text cannot end where it would (no straight quote left, or one that cannot end a value here), so
+      // the ” at its line end closes it, made straight. No other character changes.
+      if (closing !== null && (cursor >= text.length
+        || !(top?.kind === "array" ? innerQuoteEnd(text, cursor + 1).inArray : innerQuoteEnd(text, cursor + 1).inObject))) {
+        if (closing.rawBreak) made.add("RAW_LINE_BREAK");
+        made.add("CLOSING_QUOTE_STRAIGHTENED");
+        out += `"${closing.body}"`;
+        // Its end is the rule's own (a closing quote at a line end, beside `,` `}` or `]`), so it passes the word check.
+        ends.push({ inObject: true, inArray: true, scanKey: false, scanInArray: top?.kind === "array" });
+        index = closing.at + 1;
+        continue;
+      }
+      if (rawBreak) made.add("RAW_LINE_BREAK");
       if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
       const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
       ends.push({ ...innerQuoteEnd(text, cursor + 1), scanKey: isKey, scanInArray: top?.kind === "array" });

@@ -269,7 +269,7 @@ describe("the preview transport", () => {
     expect(ends).toEqual([{ callSiteKey: "START:list:6", model: QWEN, outcome: "BUSY", ms: 250 }]);
     const declared = (model: string) => TARGETS.find((target) => target.model === model) ?? null;
     expect(startSeatsFor({ roster: [GLM, QWEN], targetOf: declared, count: 4, busy: new Set() }).seats.map((seat) => seat.aiRef))
-      .toEqual([GLM, QWEN, `${GLM}#2`, `${QWEN}#2`]);
+      .toEqual([QWEN, GLM, `${QWEN}#2`, `${GLM}#2`]);
     expect(startSeatsFor({ roster: [GLM, QWEN], targetOf: declared, count: 4, busy: busy.busy() }).seats.map((seat) => seat.aiRef))
       .toEqual([GLM, `${GLM}#2`]);
   });

@@ -12,7 +12,7 @@ import {
 import { assertFramedPrompt, estimateWindowTokens, type PromptPacket } from "@debateai/providers";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
-  WEB_READER_ONE_LIMITS, classifyPickReply, classifyReadAllReply, readAllPages,
+  WEB_READER_ONE_LIMITS, classifyPickReply, classifyReadAllReply, cutReplyWholeEntries, readAllPages,
   type ReaderOneCallOutcome, type ReaderOneCallRequest, type ReaderOnePage
 } from "../../apps/runner/src/web-reader-all.js";
 
@@ -342,5 +342,102 @@ describe("the top pick, and the other pages", () => {
 
   it("refuses a page list that names a page twice", async () => {
     await expect(read([page(1), page(1)], readEverything()).result).rejects.toMatchObject({ code: "WEB_READER_PAGES_INVALID" });
+  });
+});
+
+/**
+ * Task 91j D (owner, 9 Nov, after the paid Plus test): reader 1 ran out of output room on big batches; the cut-off reply was
+ * lost whole and its pages never sent again. Now the whole entries of a cut-off reply are kept (each still checked word for
+ * word), and the pages it did not reach go out again in the one follow-up round, split in two when nothing was kept, never
+ * past the reader-1 calls the start estimate reserved for the pack (`callsMax`).
+ */
+describe("a cut-off reply (Task 91j D): its whole entries kept, the rest sent again in smaller pieces, within the reserved calls", () => {
+  /** The cut stand-in: the gateway classifies the cut reply (finish "length"), refuses it and the port says it was cut off. */
+  function cutting(cutFor: (request: ReaderOneCallRequest, vendor: PromptPacket, call: number) => string | null) {
+    const seen: Array<{ request: ReaderOneCallRequest; vendor: PromptPacket }> = [];
+    const call = async (request: ReaderOneCallRequest): Promise<ReaderOneCallOutcome> => {
+      const vendor = request.vendorPacketOf(request.packet);
+      seen.push({ request, vendor });
+      const cut = cutFor(request, vendor, seen.length);
+      if (cut !== null) {
+        expect(request.classifyContent(cut, { finishReason: "length" }).parseStatus).toBe("PARSE_FAILED");
+        return { kind: "UNAVAILABLE", cutOff: { maker: "Anthropic", rawArtifactRef: `artifact:cut:${request.callSiteKey}` } };
+      }
+      const content = readEverything()(request, vendor);
+      if (request.classifyContent(content, { finishReason: "stop" }).parseStatus !== "PARSED") return { kind: "UNAVAILABLE" };
+      return { kind: "ANSWERED", content, maker: "Anthropic", rawArtifactRef: `artifact:${request.callSiteKey}` };
+    };
+    return { call, seen };
+  }
+  const entry = (id: string, extract: string) => JSON.stringify({ page_id: id, grade: 2, adds: `Line ${id}.`, extracts: [extract] });
+  const four = [page(1), page(2), page(3), page(4)];
+  const reads = (seen: ReturnType<typeof cutting>["seen"]) => seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_V2_CONTRACT_ID);
+
+  it("keeps the whole entries before the cut, word for word checked, and sends only the pages it did not reach", async () => {
+    const { call, seen } = cutting((_request, _vendor, n) => n !== 1 ? null
+      // Fenced, two whole entries (one with a passage the page does not hold), then the cut inside the third.
+      : `\`\`\`json\n{"pages": [${entry("p1", "Page 1 reports that the ferry carried 1 thousand riders last winter.")},\n`
+        + `${entry("p2", "A passage page 2 never wrote.")},\n{"page_id": "p3", "grade": 1, "adds": "Line p3 is cut of`);
+    const done = await readAllPages({ answerIndex: 2, question: QUESTION, answer: ANSWER, siteLanguage: "English",
+      topCount: WEB_TOP_COUNT_BY_MODE.quick, pages: four, call, callsMax: 7 });
+    expect(reads(seen).map((entry) => entry.request.callSiteKey)).toEqual(["WEB:read1:2:0", "WEB:read1:2:1"]);
+    expect(pagesIn(reads(seen)[1]!.vendor).map((sent) => sent.page_id)).toEqual(["p3", "p4"]);
+    expect(done.pages.slice(0, 2)).toMatchObject([
+      { outcome: "READ", grade: 2, adds: "Line p1.", extractsDropped: 0, maker: "Anthropic", rawArtifactRef: "artifact:cut:WEB:read1:2:0", callSiteKey: "WEB:read1:2:0" },
+      { outcome: "READ", grade: 2, extracts: [], extractsDropped: 1, rawArtifactRef: "artifact:cut:WEB:read1:2:0" }
+    ]);
+    expect(done.pages.slice(2).map((entry) => entry.outcome === "READ" && entry.callSiteKey)).toEqual(["WEB:read1:2:1", "WEB:read1:2:1"]);
+    // The two reader calls, then the pick.
+    expect(done.calls.map((entry) => [entry.callSiteKey, entry.outcome]))
+      .toEqual([["WEB:read1:2:0", "UNAVAILABLE"], ["WEB:read1:2:1", "ANSWERED"], ["WEB:pick:2", "ANSWERED"]]);
+  });
+
+  it("with nothing whole before the cut, sends the batch again in two smaller pieces, each within every cap", async () => {
+    const { call, seen } = cutting((_request, _vendor, n) => n === 1 ? "{\"pages\": [{\"page_id\": \"p1\", \"grade\": 2, \"adds\": \"Cut" : null);
+    const done = await readAllPages({ answerIndex: 2, question: QUESTION, answer: ANSWER, siteLanguage: "English",
+      topCount: WEB_TOP_COUNT_BY_MODE.quick, pages: four, call, callsMax: 7 });
+    const sent = reads(seen);
+    expect(sent.map((entry) => pagesIn(entry.vendor).map((page) => page.page_id))).toEqual([["p1", "p2", "p3", "p4"], ["p1", "p2"], ["p3", "p4"]]);
+    for (const piece of sent.slice(1)) {
+      expect(piece.request.inputTokens).toBeLessThan(sent[0]!.request.inputTokens);
+      expect(piece.request.inputTokens).toBeLessThan(WEB_READER_ONE_LIMITS.callInputTokensBelow);
+    }
+    expect(done.pages.map((entry) => entry.outcome)).toEqual(["READ", "READ", "READ", "READ"]);
+  });
+
+  it("never sends more reader-1 calls than the pack's reserved count: the pieces past it stay unread", async () => {
+    const { call, seen } = cutting((_request, _vendor, n) => n === 1 ? "{\"pages\": [" : null);
+    const done = await readAllPages({ answerIndex: 2, question: QUESTION, answer: ANSWER, siteLanguage: "English",
+      topCount: WEB_TOP_COUNT_BY_MODE.quick, pages: four, call, callsMax: 2 });
+    expect(reads(seen)).toHaveLength(2);
+    expect(done.pages.map((entry) => entry.outcome === "READ" ? "READ" : entry.reason))
+      .toEqual(["READ", "READ", "CALL_UNAVAILABLE", "CALL_UNAVAILABLE"]);
+    // The same count bounds the follow-up for pages a usable reply left out.
+    let first = true;
+    const left = stand((request, vendor) => {
+      if (request.contractId !== WEB_READ_ALL_V2_CONTRACT_ID || !first) return readEverything()(request, vendor);
+      first = false;
+      return JSON.stringify({ pages: [{ page_id: "p1", grade: 2, adds: "One.", extracts: [] }] });
+    });
+    const leftDone = await readAllPages({ answerIndex: 2, question: QUESTION, answer: ANSWER, siteLanguage: "English",
+      topCount: WEB_TOP_COUNT_BY_MODE.quick, pages: [page(1), page(2)], call: left.call, callsMax: 1 });
+    expect(left.seen.filter((entry) => entry.request.contractId === WEB_READ_ALL_V2_CONTRACT_ID)).toHaveLength(1);
+    expect(leftDone.pages[1]).toMatchObject({ outcome: "NOT_READ", reason: "LEFT_OUT_OF_REPLY" });
+  });
+
+  it("a one-page batch cut off with nothing whole is not sent again; an unavailable call without a cut is not either", async () => {
+    const { call, seen } = cutting(() => "{\"pages\": [{\"page_id\": \"p1\"");
+    const done = await readAllPages({ answerIndex: 2, question: QUESTION, answer: ANSWER, siteLanguage: "English",
+      topCount: WEB_TOP_COUNT_BY_MODE.quick, pages: [page(1, 170_000)], call, callsMax: 7 });
+    expect(reads(seen)).toHaveLength(1);
+    expect(done.pages).toEqual([{ pageId: page(1, 170_000).pageId, outcome: "NOT_READ", reason: "CALL_UNAVAILABLE" }]);
+  });
+
+  it("cutReplyWholeEntries: only the whole entries of the named list, braces inside texts ignored, a broken entry dropped", () => {
+    expect(cutReplyWholeEntries("{\"note\": {\"pages\": [{\"a\": 1}]}, \"pages\": [{\"t\": \"a } { ] text\"}, {\"b\": 2}, {\"c\": 3, \"d\": \"cut", "pages"))
+      .toEqual([{ t: "a } { ] text" }, { b: 2 }]);
+    expect(cutReplyWholeEntries("{\"pages\": [{\"a\": \"raw\nline\"}, {\"b\": 1}, {\"c\"", "pages")).toEqual([{ b: 1 }]);
+    expect(cutReplyWholeEntries("Here are the pages: {\"pages\": [{\"a\": 1}", "pages")).toEqual([]);
+    expect(cutReplyWholeEntries("{\"top\": [{\"a\": 1}, {\"b\"", "pages")).toEqual([]);
   });
 });

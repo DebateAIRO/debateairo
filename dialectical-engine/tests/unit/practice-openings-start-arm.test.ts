@@ -127,9 +127,9 @@ describe("practice openings, arm S: the start-step card per plan (Task 91)", () 
       expect(card.cardMs).toBeGreaterThanOrEqual(0);
       for (const seat of card.seatMs) expect(seat.ms).toBeGreaterThanOrEqual(0);
     }
-    // Free seats the Free line-up (the dry one: GLM and DeepSeek); Max takes every company once in today's speed order, then a second seat
-    // of the first two ("#2"), as startSeatsFor does in the API.
-    expect(cards.find((card) => card.plan === "FREE")!.seatMs.map((seat) => seat.model)).toEqual([GLM, DEEPSEEK]);
+    // Free seats the Free line-up (the dry one: GLM and DeepSeek, DeepSeek first in the measured speed order); Max takes every company
+    // once in today's speed order, then a second seat of the first two ("#2"), as startSeatsFor does in the API.
+    expect(cards.find((card) => card.plan === "FREE")!.seatMs.map((seat) => seat.model)).toEqual([DEEPSEEK, GLM]);
     expect(cards.find((card) => card.plan === "MAX")!.seatMs.map((seat) => seat.model))
       .toEqual([...START_SEAT_SPEED_ORDER, `${START_SEAT_SPEED_ORDER[0]!}#2`, `${START_SEAT_SPEED_ORDER[1]!}#2`]);
 
@@ -183,11 +183,11 @@ describe("practice openings, arm S: the start-step card per plan (Task 91)", () 
     const observer = new PracticeGateObserver({ now: () => 0 });
     const dry = openingsDryPorts();
     const held: (() => void)[] = [];
-    // DeepSeek writes a list on every plan (Free's line-up holds it); its list is held until the test lets it go.
+    // GLM writes a list on every plan (Free's line-up holds it) and has no second seat on Max; its list is held until the test lets it go.
     const holding = (port: PreviewBudgetPort): PreviewBudgetPort => Object.freeze({
       execute: async (input: Parameters<PreviewBudgetPort["execute"]>[0], signal?: AbortSignal) => {
         const { model, packet } = openingsDryPacket(input.requestBody);
-        if (model === DEEPSEEK && readPromptFrame(packet).contractId === START_LIST_CONTRACT_ID) {
+        if (model === GLM && readPromptFrame(packet).contractId === START_LIST_CONTRACT_ID) {
           await new Promise<void>((resolve) => { held.push(resolve); });
         }
         return port.execute(input, signal);
@@ -220,8 +220,8 @@ describe("practice openings, arm S: the start-step card per plan (Task 91)", () 
     expect(cards.map((card) => [card.plan, card.cardMs, card.listsIn, card.late]))
       .toEqual(OPENINGS_START_PLANS.map((plan) => [plan, START_STEP_TIMING.cutAtMs, OPENINGS_START_LIST_WRITERS[plan] - 1, 1]));
     for (const card of cards) {
-      expect(card.seatMs.filter((seat) => seat.model === DEEPSEEK)).toEqual([{ model: DEEPSEEK, ms: START_STEP_TIMING.cutAtMs + LATE_BY_MS }]);
-      expect(card.seatMs.filter((seat) => seat.model !== DEEPSEEK).every((seat) => seat.ms === 0)).toBe(true);
+      expect(card.seatMs.filter((seat) => seat.model === GLM)).toEqual([{ model: GLM, ms: START_STEP_TIMING.cutAtMs + LATE_BY_MS }]);
+      expect(card.seatMs.filter((seat) => seat.model !== GLM).every((seat) => seat.ms === 0)).toBe(true);
     }
     expect([...new Set(calls.map((call) => call.callSiteKey.replace(/:\d+$/u, "")))].sort())
       .toEqual(["START:angles", "START:list", "START:merge", "START:merge-late"]);
@@ -246,11 +246,11 @@ describe("practice openings, arm S: the start-step card per plan (Task 91)", () 
       bound: policy.bounds.JUDGE, contractHashes: hashes, sleep: dry.sleep, busyWaitMs: 0 });
     const shape = (card: OpeningsStartCardLine) => [card.plan, card.listsIn, card.seatMs.map((seat) => [seat.model, seat.ms === null ? null : "timed"])];
     expect(cards.map(shape)).toEqual([
-      ["FREE", 2, [[GLM, "timed"], [DEEPSEEK, "timed"]]],
-      ["PLUS", 3, [[HAIKU, "timed"], [GLM, "timed"], [QWEN, null], [DEEPSEEK, "timed"]]],
-      ["PRO", 4, [[HAIKU, "timed"], [GLM, "timed"], [DEEPSEEK, "timed"], [MIMO, null], [`${HAIKU}#2`, "timed"]]],
-      ["MAX", 6, [[HAIKU, "timed"], [GLM, "timed"], [DEEPSEEK, "timed"], [MIMO, null], [`${HAIKU}#2`, "timed"], [`${GLM}#2`, "timed"],
-        [`${DEEPSEEK}#2`, "timed"]]]
+      ["FREE", 2, [[DEEPSEEK, "timed"], [GLM, "timed"]]],
+      ["PLUS", 3, [[HAIKU, "timed"], [DEEPSEEK, "timed"], [QWEN, null], [GLM, "timed"]]],
+      ["PRO", 4, [[HAIKU, "timed"], [DEEPSEEK, "timed"], [GLM, "timed"], [MIMO, null], [`${HAIKU}#2`, "timed"]]],
+      ["MAX", 6, [[HAIKU, "timed"], [DEEPSEEK, "timed"], [GLM, "timed"], [MIMO, null], [`${HAIKU}#2`, "timed"], [`${DEEPSEEK}#2`, "timed"],
+        [`${GLM}#2`, "timed"]]]
     ]);
   }, 30_000);
 });
@@ -280,7 +280,7 @@ describe("practice openings, arm S: the summary, the seat order and the verdict 
   });
 
   it("the seat order the times suggest: fastest p50 first, ties in today's START_SEAT_SPEED_ORDER, a model without a time last", () => {
-    expect(START_SEAT_SPEED_ORDER).toEqual([HAIKU, GLM, QWEN, DEEPSEEK, MIMO]);
+    expect(START_SEAT_SPEED_ORDER).toEqual([HAIKU, DEEPSEEK, QWEN, GLM, MIMO]);
     const made = (seatP50Ms: Readonly<Record<string, number>>) => ({ ...startStepSummary([]), seatP50Ms });
     // GLM's p50 below Haiku's puts GLM first.
     expect(startSeatOrderOf(made({ [HAIKU]: 20_000, [GLM]: 12_000, [QWEN]: 25_000, [DEEPSEEK]: 30_000, [MIMO]: 40_000 })))

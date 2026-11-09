@@ -167,7 +167,7 @@ const INPUT: StartListsInput = Object.freeze({ question_line: Q, site_language: 
   ownerScope: `owner:${OWNER}`, funding: GRANT, planKey: "plus", settingsVersion: 30, country: "RO" });
 const inputOf = (over: Partial<StartListsInput> = {}): StartListsInput => Object.freeze({ ...INPUT, ...over });
 /** The order case: Plus's four seats in the speed order answer at 15 s, 20 s, 40 s and 200 s. */
-const ORDER_TIMES = Object.freeze({ [HAIKU]: 15_000, [GLM]: 20_000, [QWEN]: 40_000, [DEEPSEEK]: 200_000 });
+const ORDER_TIMES = Object.freeze({ [HAIKU]: 15_000, [DEEPSEEK]: 20_000, [QWEN]: 40_000, [GLM]: 200_000 });
 const kinds = (events: readonly StartListsEvent[]): string[] => events.map((event) => event.event);
 const endOf = (events: readonly StartListsEvent[]) => events.at(-1);
 const timingLines = (h: Harness) => h.reports.filter((line) => line.event === "api.start_step.timing");
@@ -210,7 +210,7 @@ describe("the step port at Next: the lists stream", () => {
     // The settings of the version the binding names; the lists written by Plus's seats in the speed order.
     expect(h.versions).toEqual([30]);
     expect(h.requests.map((request) => [request.callSiteKey, request.aiRef])).toEqual([["START:angles", HAIKU], ["START:list:1", HAIKU],
-      ["START:list:2", GLM], ["START:list:3", QWEN], ["START:list:4", DEEPSEEK]]);
+      ["START:list:2", DEEPSEEK], ["START:list:3", QWEN], ["START:list:4", GLM]]);
   });
 
   it("a refused question: exactly refused 422 and end REFUSED, and no list is asked", async () => {
@@ -365,8 +365,8 @@ describe("the step port at Next: the lists stream", () => {
     expect(h.count("START:list:")).toBe(4);
   });
 
-  it("the planner is the first seat (Haiku where the line-up has it, GLM where not), charged ANGLES on that seat's model", async () => {
-    for (const [config, planner] of [[CONFIG, HAIKU], [CONFIG_NO_HAIKU, GLM]] as const) {
+  it("the planner is the first seat (Haiku where the line-up has it, DeepSeek where not), charged ANGLES on that seat's model", async () => {
+    for (const [config, planner] of [[CONFIG, HAIKU], [CONFIG_NO_HAIKU, DEEPSEEK]] as const) {
       const h = harness({ config });
       await readToEnd(h, INPUT);
       expect(h.requests.filter((request) => request.callSiteKey === START_CALL_SITES.angles).map((request) => request.aiRef)).toEqual([planner]);
@@ -446,7 +446,7 @@ describe("the step port at Next: the lists stream", () => {
     for (const line of lines) {
       expect(Object.keys(line).sort()).toEqual(line.step === "SEAT_IN" ? ["event", "model", "ms", "step"] : ["event", "ms", "step"]);
     }
-    expect(lines.filter((line) => line.step === "SEAT_IN").map((line) => [line.model, line.ms])).toEqual([[HAIKU, 15_000], [GLM, 20_000],
+    expect(lines.filter((line) => line.step === "SEAT_IN").map((line) => [line.model, line.ms])).toEqual([[HAIKU, 15_000], [DEEPSEEK, 20_000],
       [QWEN, 40_000]]);
     expect(lines.find((line) => line.step === "CUT")?.ms).toBe(START_STEP_TIMING.cutAtMs);
     // Each call's end is one code line: its site, model, outcome and time.
