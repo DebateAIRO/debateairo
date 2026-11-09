@@ -246,7 +246,8 @@ function reportRunPort() {
     readOwn: (ownerRef, publicationRef) => new PostgresPublicTreeRepository(api).readOwnReportCarrier(ownerRef, publicationRef),
     startRun: (input, client) => new RunRepository(api, admission).startRun(input, client),
     withAdmissionLease: (ownerRef, use) => withOwnerAskAdmissionLease(admission, { ownerRef, legacyAskerId: null }, (lease) => use(lease.client)),
-    site: { releaseKey: "r1-0123456789ab", batteryVersion: "story:integration" }
+    // A made-up release name, built from pieces so the secret scanner never takes it for a key (owner, 2026-11-09).
+    site: { releaseKey: ["r1", "0123456789ab"].join("-"), batteryVersion: "story:integration" }
   });
 }
 // The presses below are a paid person's (free: false), so their report runs carry the paid tier (budget spec §2.7).

@@ -129,3 +129,11 @@ cdef992197a9b6c4d904e9e9269c50cc2a59a915:.gitleaksignore:generic-api-key:121
 # its own key shape and refuses a Perplexity one. Not a key; the test now builds the value from pieces. Owner's ruling of
 # 2026-10-30, as for U5.
 c1ea4d571f6feab2576eea18b0a1546573371a4c:dialectical-engine/tests/unit/preview_budget_authority_perplexity_test.py:generic-api-key:513
+# 2026-11-09 — V4 start-step merge (PR #254 into PR #224): generic-api-key matched a made-up release name (the letter r,
+# one digit, a dash and the twelve characters zero to nine then a, b) given to a public-report test as the site's release.
+# A release name is public (it is printed in the runner's start line), and this one names no release. The tests now build
+# it from pieces. Owner's ruling of 2026-11-09, as for U5.
+7ded31569ff48138c1f94bd11806e82f52df7248:dialectical-engine/tests/integration/public-tree-flow.test.ts:generic-api-key:249
+# 2026-11-09 — the same made-up release name in the unit test of the same carrier (commit a273d069b). Owner's ruling of
+# 2026-11-09, as for U5.
+a273d069b8eadfecc62bab6caecbb2bca3e64654:dialectical-engine/tests/unit/public-report-carrier-maker.test.ts:generic-api-key:24
