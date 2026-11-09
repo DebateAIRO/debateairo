@@ -4741,6 +4741,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * refused (answer Q8): the step verifies with the version not compared and runs on the active one. A step that fails: none TRANSPORT.
    */
   type StartFront = Readonly<{ none: StartStepNoneReason }> | Readonly<{ port: StartStepPort; key: StartStepKey; context: StartStepContext }>;
+  /**
+   * Owner ruling 2026-11-09 (CodeQL js/missing-rate-limiting): each of the four calls before Start that runs a small AI charges the
+   * signed-in person's own `startStepCalls` budget first, before the body is read, when the version in force seals one; a version
+   * that carries none changes nothing. A refusal is 429 ADMISSION_RATE_LIMITED with Retry-After, before a byte of any stream.
+   */
+  const startStepAdmitted = (reply: FastifyReply, route: AuthorizationRoute, asker: AuthenticatedSession): boolean =>
+    options.admission?.configured("startStepCalls") !== true || admitOrRefuse(reply, "startStepCalls", route, asker.ownerRef);
   const startFront = async (request: FastifyRequest, asker: AuthenticatedSession, ownWords: readonly string[]): Promise<StartFront> => {
     const mayAsk = !ownWords.some((words) => detectCrisis(words).crisis)
       && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
@@ -4788,6 +4795,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post("/v1/asks/paths/lists", routePolicy("POST /v1/asks/paths/lists"), async (request, reply) => {
     const asker = request.authenticatedSession;
     if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (!startStepAdmitted(reply, "POST /v1/asks/paths/lists", asker)) return reply;
     const clientGone = startClientGoneOf(reply);
     const body = StartListsRequestSchema.safeParse(request.body);
     if (!body.success || startLineTooLong(body.data.question_line)) return startMalformed(reply);
@@ -4818,6 +4826,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post("/v1/asks/paths/merge", routePolicy("POST /v1/asks/paths/merge"), async (request, reply) => {
     const asker = request.authenticatedSession;
     if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (!startStepAdmitted(reply, "POST /v1/asks/paths/merge", asker)) return reply;
     const clientGone = startClientGoneOf(reply);
     const body = StartMergeRequestSchema.safeParse(request.body);
     if (!body.success || startLineTooLong(body.data.question_line)) return startMalformed(reply);
@@ -4858,6 +4867,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post("/v1/asks/paths/combine", routePolicy("POST /v1/asks/paths/combine"), async (request, reply) => {
     const asker = request.authenticatedSession;
     if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (!startStepAdmitted(reply, "POST /v1/asks/paths/combine", asker)) return reply;
     const clientGone = startClientGoneOf(reply);
     const body = StartCombineRequestSchema.safeParse(request.body);
     const menuLine = body.success && body.data.context.kind === "MENU" ? body.data.context.question_line : null;
@@ -4892,6 +4902,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.post("/v1/asks/paths/fit", routePolicy("POST /v1/asks/paths/fit"), async (request, reply) => {
     const asker = request.authenticatedSession;
     if (asker === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (!startStepAdmitted(reply, "POST /v1/asks/paths/fit", asker)) return reply;
     const clientGone = startClientGoneOf(reply);
     const body = StartFitRequestSchema.safeParse(request.body);
     if (!body.success || startLineTooLong(body.data.question_line)) return startMalformed(reply);

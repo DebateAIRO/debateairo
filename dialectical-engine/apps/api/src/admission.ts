@@ -8,7 +8,8 @@ import type { AdmissionPolicy } from "@debateai/register";
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
   | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote"
-  | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads" | "staffRequests";
+  | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads" | "staffRequests"
+  | "startStepCalls";
 
 export const SUPPORT_SWEPT_SCOPES = Object.freeze([
   "supportReads", "supportSessions", "supportModelCalls", "geoAvailability"
@@ -36,7 +37,7 @@ interface AdmissionBucket {
     | AdmissionPolicy["geoAvailability"] | AdmissionPolicy["billingQuote"]
     | AdmissionPolicy["billingCheckout"] | AdmissionPolicy["billingNotify"]
     | AdmissionPolicy["billingCancelLink"] | AdmissionPolicy["askRoomReads"]
-    | AdmissionPolicy["staffRequests"]>;
+    | AdmissionPolicy["staffRequests"] | AdmissionPolicy["startStepCalls"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -130,6 +131,10 @@ export class AdmissionLimiter {
       // Owner ruling 2026-11-07, the team pages: present only when the resolved register version carries it.
       ...(policy.staffRequests === null ? [] : [[
         "staffRequests", { policy: policy.staffRequests, entries: new Map() }
+      ] as const]),
+      // Owner ruling 2026-11-09, the four calls before Start: present only when the resolved register version carries it.
+      ...(policy.startStepCalls === null ? [] : [[
+        "startStepCalls", { policy: policy.startStepCalls, entries: new Map() }
       ] as const])
     ]);
   }
