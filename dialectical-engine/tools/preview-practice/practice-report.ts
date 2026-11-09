@@ -739,12 +739,13 @@ export function reportMarkdown(report: PracticeReport): string {
     lines.push("", ...bands.map((band) => `- ${band}`), ...(bands.length === 0 ? [] : [""]));
   }
   const failures = report.failures as readonly unknown[] | undefined;
-  // Openings keep reply text in "failures" only for a call whose format never passed; the formats wording is unchanged.
+  // Openings keep reply text in "failures" only for a call whose format never passed, and (item 0, 9 Nov) each listed
+  // call's first refused reply with its issues; the formats wording is unchanged.
   // The language mode keeps no "failures" (a planner's failed call is its case's planner status and code); nor does
   // judge-order (a reading that did not come back is its ask's status and code).
   if (report.mode !== "language" && report.mode !== "judge-order") lines.push(report.mode === "openings"
     ? `Wrong-format or failed calls: ${String(failures?.length ?? 0)} (the exact problems are in report.json; `
-      + "reply text only for calls whose format never passed)."
+      + "reply text only for calls whose format never passed, and each one's first refused reply with its issues)."
     : `Wrong-format replies, fixed by their call or not: ${String(failures?.length ?? 0)} (their text and the exact problems are in report.json, "failures").`, "");
   return lines.join("\n");
 }

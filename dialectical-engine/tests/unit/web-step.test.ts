@@ -6,8 +6,11 @@
 // call record. Made-up pages, scripted vendors behind the real gateway, the scripted Perplexity behind the real adapter.
 import { describe, expect, it } from "vitest";
 import { webPageTextRef, type WebSealed } from "@debateai/db";
-import { readPromptFrame, type PromptPacket } from "@debateai/providers";
-import { WEB_PACK_EXTRACTS_MAX, runWebStep, webMakerSlug, webStepRowId, webTopRecordedPacket } from "../../apps/runner/src/web-step.js";
+import { ProviderContentUnacceptedError, readPromptFrame, type PromptPacket, type ProviderGateway } from "@debateai/providers";
+import { webSitesOf } from "@debateai/register";
+import {
+  WEB_PACK_EXTRACTS_MAX, runWebStep, webMakerSlug, webReaderOneCallsReserved, webStepRowId, webTopRecordedPacket
+} from "../../apps/runner/src/web-step.js";
 import {
   CANARY, ORDERS, QUERIES, RUN_ID, digestOf, membersOf, memoryStore, noWeb, openedNonText, openedValue, pageText,
   perplexity, planReply, searchMoney, stepInput, team
@@ -287,5 +290,51 @@ describe("Task 57p: each reading notes the settings version of the debate it was
       expect(readings.length).toBeGreaterThan(0);
       expect(readings.every((row) => row.settingsVersion === noted)).toBe(true);
     }
+  });
+});
+
+/**
+ * Task 91j D (owner, 9 Nov, after the paid Plus test): a reader whose reply is cut off at its output room. The gateway refuses
+ * it as LENGTH_EXCEEDED; the step tells the reader so, and the reader keeps what it can: reader 1 sends the pages again in
+ * smaller pieces within the calls the start estimate reserved for the pack; a top reader keeps its whole entries.
+ */
+describe("Task 91j D: a reader cut off at its output room", () => {
+  const cutOff = (request: Parameters<ProviderGateway["call"]>[0], cut: string): never => {
+    request.classifyContent?.(cut, { finishReason: "length" });
+    throw new ProviderContentUnacceptedError(1, "LENGTH_EXCEEDED", "cut", `artifact-cut-${request.callSiteKey}`, "ledger-cut",
+      { cutOffs: 1, lastAtLowestLevel: true });
+  };
+
+  it("reader 1 cut off with nothing whole: its pages are read in two smaller pieces; a cut top reader keeps its whole entries", async () => {
+    const ais = team();
+    const store = memoryStore();
+    const keys: string[] = [];
+    const members = membersOf(ais.all, (gateway) => ({ call: async (request) => {
+      keys.push(request.callSiteKey);
+      if (request.callSiteKey === "WEB:read1:0:0") return cutOff(request, "{\"pages\": [{\"page_id\": \"p1\", \"grade\"");
+      if (request.callSiteKey === "WEB:read-top:0:3") {
+        return cutOff(request, "{\"pages\": [{\"page_id\": \"p1\", \"grade\": 2, \"extracts\": []}, {\"page_id\": \"p2\", \"gr");
+      }
+      return gateway.call(request);
+    } }));
+    const result = await runWebStep(stepInput({ members, search: perplexity().port, prepare: store.prepare }));
+    expect(keys.filter((key) => key.startsWith("WEB:read1:0:")).sort()).toEqual(["WEB:read1:0:0", "WEB:read1:0:1", "WEB:read1:0:2"]);
+    const one = result.paths[0]!;
+    const readingsOf = (reader: number) => [...store.readings.values()]
+      .filter((row) => row.reader === reader && one.pageIds.includes(row.pageId as string));
+    expect(readingsOf(1).map((row) => row.outcome)).toEqual(["READ", "READ", "READ", "READ"]);
+    // Reader 3 (GLM on path 0) kept its one whole entry: the top page p1 read, the others not by it.
+    expect(readingsOf(3).map((row) => [row.outcome, row.grade])).toEqual([["READ", 2], ["FAILED", null], ["FAILED", null]]);
+    expect(one.code).toBe("WEB_READER_CALL_UNAVAILABLE");
+  });
+
+  it("the reserved count is the start estimate's reader-1 calls for one pack, for the debate's kind", () => {
+    expect(webReaderOneCallsReserved({ mode: "quick" })).toBe(webSitesOf({ kind: "START", depth: "QUICK", paths: 1 }).readerOneCallsPerPack);
+    expect(webReaderOneCallsReserved({ mode: "thorough" })).toBe(webSitesOf({ kind: "START", depth: "THOROUGH", paths: 1 }).readerOneCallsPerPack);
+    expect(webReaderOneCallsReserved({ mode: "quick", dig: { picks: new Array(16).fill(null) as never, alreadyInvestigated: "", reuse: null } }))
+      .toBe(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 16 }).readerOneCallsPerPack);
+    expect(webReaderOneCallsReserved({ mode: "thorough", pathsMode: { origin: "DIG", cap: 16, paths: new Array(2).fill(null) as never,
+      alreadyInvestigated: "", reuse: null, purposeLines: null } }))
+      .toBe(webSitesOf({ kind: "PATHS", depth: "THOROUGH", paths: 2, origin: "DIG" }).readerOneCallsPerPack);
   });
 });

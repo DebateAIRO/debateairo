@@ -326,3 +326,46 @@ describe("W2-5 the reply classifier: salvage in code first, refuse only an unusa
     expect(none.parseError).toContain("WEB_REPLY_IDS_INCOMPLETE");
   });
 });
+
+/**
+ * Task 91j D (owner, 9 Nov, after the paid Plus test): a top reader ran out of output room and its cut-off reply was lost
+ * whole. Its whole page entries are now kept (their extracts checked word for word as any reader's), with no extra call:
+ * the start estimate reserves one call per top reader per pack. A page past the cut counts as not read by that reader.
+ */
+describe("a cut-off top reader (Task 91j D): its whole entries kept, no extra call", () => {
+  const good = replyOf([{ id: "p1", grade: 2, extracts: [] }, { id: "p2", grade: 1, extracts: [] }, { id: "p3", grade: 3, extracts: [] }]);
+  /** Reader 3 is cut off: the gateway classifies the cut reply (finish "length"), refuses it, and the port says so. */
+  function cutCall(cut: string, seen: WebTopReaderCallInput[]): WebTopReaderCall {
+    return async (input) => {
+      seen.push(input);
+      if (input.reader === 2) return { kind: "ANSWERED", content: good, maker: input.seat.maker, reply: STOP };
+      expect(input.classifyContent(cut, { finishReason: "length" }).parseStatus).toBe("PARSE_FAILED");
+      return { kind: "UNAVAILABLE", cutOff: { maker: input.seat.maker } };
+    };
+  }
+  const runCut = (cut: string) => {
+    const seen: WebTopReaderCallInput[] = [];
+    const result = runWebTopReaders({ pathIndex: 0, mode: "quick", question: "Should the city build a new tram line?",
+      answer: "Yes, build the tram line.", pages: QUICK_PAGES, readerOne: READER_ONE, readerOneMaker: "Anthropic",
+      candidates: CANDIDATES, verbatim, call: cutCall(cut, seen) });
+    return { result, seen };
+  };
+
+  it("keeps the entries before the cut, checks their extracts, and marks the rest not read by that reader", async () => {
+    const { result, seen } = runCut("{\"pages\": [{\"page_id\": \"p1\", \"grade\": 3, \"extracts\": [\"Tram line A carried 41,000 riders a day in 2025.\", \"Not on the page.\"]},\n"
+      + "{\"page_id\": \"p2\", \"grade\": 0, \"extracts\": []}, {\"page_id\": \"p3\", \"grade\": 2, \"extracts\": [\"A council st");
+    const ran = await result;
+    expect(seen).toHaveLength(2);
+    expect(ran.readers[1]).toEqual({ reader: 3, maker: "Z.AI", providerRef: "ref-glm", outcome: "READ", failure: null });
+    expect(ran.readings.filter((entry) => entry.reader === 3).map((entry) => [entry.outcome, entry.grade]))
+      .toEqual([["READ", 3], ["READ", 0], ["FAILED", null]]);
+    expect(ran.droppedExtracts[3]).toBe(1);
+    expect(ran.extracts[0]).toEqual({ pageId: P1.pageId, quote: "Tram line A carried 41,000 riders a day in 2025.", foundBy: [1, 3] });
+    expect(ran.leads).toEqual([]);
+  });
+
+  it("a cut-off reply with no whole entry for a page sent is a failed reader, as before", async () => {
+    const ran = await runCut("{\"pages\": [{\"page_id\": \"p9\", \"grade\": 3, \"extracts\": []}, {\"page_id\": \"p1\"").result;
+    expect(ran.readers[1]).toEqual({ reader: 3, maker: "Z.AI", providerRef: "ref-glm", outcome: "FAILED", failure: "UNAVAILABLE" });
+  });
+});

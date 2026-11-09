@@ -13,7 +13,10 @@
  * - merges the same extract found by several readers (reader 1's checked extracts included) into one, with who found it;
  * - records each page's grades by reader and their spread;
  * - keeps the readers' "still worth looking into" lines as suggestion material (W4-3, kind "needs more web");
- * - when a reader fails, marks the page as read by fewer AIs. The debate goes on.
+ * - when a reader fails, marks the page as read by fewer AIs. The debate goes on;
+ * - when a reader's reply is cut off at its output room (Task 91j D, owner 9 Nov, after the paid Plus test lost two so),
+ *   keeps the whole page entries it wrote before the cut (`cutReplyWholeEntries`, each entry in the answer form), with no
+ *   extra call: the start estimate reserves one call per top reader per pack. Its leads, written after the pages, are lost.
  * Thinking runs low: the call sites are the `web_reader_top` step, which the line-up's thinking table sets to low.
  *
  * The page text never enters the AI call record (0132; packages/db/src/web-evidence.ts): the material names each page by
@@ -32,6 +35,7 @@ import {
   decodeModelJson, decodedRepairsOf, parsedWithRepairs, type ContentClassification, type FramedMaterialField,
   type ModelReplyFacts, type PreviewEffort, type PreviewThinkingStep, type PromptContract
 } from "@debateai/providers";
+import { cutReplyWholeEntries } from "./web-reader-all.js";
 
 /* ----------------------------------------------------------------- the verbatim checker (W2-4's), as a seam */
 
@@ -84,7 +88,8 @@ export type WebTopReaderCallInput = Readonly<{
  */
 export type WebTopReaderCallOutcome =
   | Readonly<{ kind: "ANSWERED"; content: string; maker: string; reply?: ModelReplyFacts }>
-  | Readonly<{ kind: "UNAVAILABLE" }>;
+  /** `cutOff` (Task 91j D): the reply ended at its output room; the maker that wrote it. */
+  | Readonly<{ kind: "UNAVAILABLE"; cutOff?: Readonly<{ maker: string }> }>;
 export type WebTopReaderCall = (input: WebTopReaderCallInput) => Promise<WebTopReaderCallOutcome>;
 
 /** Why a reader is missing: no other company on the line-up, too few top pages, the call failed, or a same-company answer. */
@@ -158,6 +163,9 @@ export function webTopReaderSeats(input: Readonly<{
 
 /* ----------------------------------------------------------------- the material, the texts on the way to the vendor */
 
+/** The normalised finish reason of a reply cut off at its output room (`PROVIDER_FINISH_REASON_LENGTH`). */
+const CUT_OFF_FINISH_REASON = "length";
+
 /** The id a page goes by in the call: p1, p2, ... in pick order (store ids are too long for the sealed table). */
 const promptPageId = (index: number): string => `p${String(index + 1)}`;
 
@@ -205,6 +213,18 @@ function readReply(content: string, reply: ModelReplyFacts | undefined): WebRead
   if (!decoded.ok) return null;
   const parsed = webReadTopReplySchema.safeParse(decoded.value);
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Task 91j D: the whole page entries of a reply cut off at its output room, each in the answer form, read as a reply with
+ * no leads; null when none is whole.
+ */
+function readCutReply(content: string): WebReadTopReply | null {
+  const pages = cutReplyWholeEntries(content, "pages").flatMap((entry) => {
+    const parsed = webReadTopReplySchema.safeParse({ pages: [entry], worth_looking_into: [] });
+    return parsed.success ? parsed.data.pages : [];
+  });
+  return pages.length === 0 ? null : Object.freeze({ pages, worth_looking_into: [] });
 }
 
 /* ----------------------------------------------------------------- the step */
@@ -261,9 +281,14 @@ export async function runWebTopReaders(input: Readonly<{
     });
     input.openReplayStep?.(seats.map(({ reader, seat }) => Object.freeze({
       callSiteKey: webReadTopCallSiteKey(input.pathIndex, reader), providerRef: seat.providerRef })));
+    // Task 91j D: the last reply each reader's call saw cut off at its output room, as the gateway classified it.
+    const cutReplies = new Map<WebTopReader, string>();
     const answered = await Promise.all(seats.map(({ reader, seat }) => input.call({
       reader, seat, callSiteKey: webReadTopCallSiteKey(input.pathIndex, reader), contract: WEB_READ_TOP_V2_PROMPT_CONTRACT,
-      material, pageTexts, classifyContent: (content, reply) => classifyWebReadTopReply(content, reply, promptIds)
+      material, pageTexts, classifyContent: (content, reply) => {
+        if (reply?.finishReason === CUT_OFF_FINISH_REASON) cutReplies.set(reader, content);
+        return classifyWebReadTopReply(content, reply, promptIds);
+      }
     })));
     // In reader order. An answer is kept only from a company that is not reader 1's, not the other reader's planned one
     // and not one already kept, so no two readings of a page ever share a maker (0132 refuses that: SAME_MAKER), a
@@ -276,22 +301,27 @@ export async function runWebTopReaders(input: Readonly<{
         outcomes.set(reader, Object.freeze({ reader, maker: seat.maker, providerRef: seat.providerRef, outcome: "FAILED", failure }));
         for (const page of sent) readings.push(Object.freeze({ pageId: page.pageId, reader, maker: seat.maker, outcome: "FAILED", grade: null }));
       };
-      if (got.kind === "UNAVAILABLE") return failed("UNAVAILABLE");
-      if ([input.readerOneMaker, ...otherPlanned, ...keptMakers].some((maker) => sameMaker(maker, got.maker))) return failed("SAME_MAKER");
-      const reply = readReply(got.content, got.reply);
+      const cutText = got.kind === "UNAVAILABLE" && got.cutOff !== undefined ? cutReplies.get(reader) : undefined;
+      const cut = cutText === undefined ? null : readCutReply(cutText);
+      if (got.kind === "UNAVAILABLE" && (cut === null || !cut.pages.some((entry) => promptIds.includes(entry.page_id)))) {
+        return failed("UNAVAILABLE");
+      }
+      const maker = got.kind === "ANSWERED" ? got.maker : got.cutOff!.maker;
+      if ([input.readerOneMaker, ...otherPlanned, ...keptMakers].some((other) => sameMaker(other, maker))) return failed("SAME_MAKER");
+      const reply = got.kind === "ANSWERED" ? readReply(got.content, got.reply) : cut;
       if (reply === null) return failed("UNREADABLE");
-      keptMakers.push(got.maker);
+      keptMakers.push(maker);
       const pages = new Map<string, Readonly<{ grade: WebGrade; extracts: readonly string[] }>>();
       for (const entry of reply.pages) {
         const storeId = storeIdOf.get(entry.page_id);
         if (storeId === undefined || pages.has(storeId)) continue;
         pages.set(storeId, Object.freeze({ grade: entry.grade as WebGrade, extracts: entry.extracts }));
       }
-      reads.push(Object.freeze({ reader, maker: got.maker, pages, leads: reply.worth_looking_into }));
-      outcomes.set(reader, Object.freeze({ reader, maker: got.maker, providerRef: seat.providerRef, outcome: "READ", failure: null }));
+      reads.push(Object.freeze({ reader, maker, pages, leads: reply.worth_looking_into }));
+      outcomes.set(reader, Object.freeze({ reader, maker, providerRef: seat.providerRef, outcome: "READ", failure: null }));
       for (const page of sent) {
         const read = pages.get(page.pageId);
-        readings.push(Object.freeze({ pageId: page.pageId, reader, maker: got.maker, outcome: read === undefined ? "FAILED" : "READ",
+        readings.push(Object.freeze({ pageId: page.pageId, reader, maker, outcome: read === undefined ? "FAILED" : "READ",
           grade: read?.grade ?? null }));
       }
     });
