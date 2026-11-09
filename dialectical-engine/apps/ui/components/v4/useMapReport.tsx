@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import type { Answer } from "@debateai/contract";
+import type { Answer, InvestigationReportVersion } from "@debateai/contract";
 import type { AskRoom } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { replayHighlight } from "@/lib/v4/highlight";
@@ -105,6 +105,13 @@ export type MapReport = Readonly<{
   /** The first question's report page (report-f9). */
   href: string;
   stage: ReportStage;
+  /**
+   * Question 2 A: the first report check has answered (a read, or a check that failed). Until then the top bar's report button
+   * holds its place with no words, and the "older than the map" box draws nothing (V4ChangedSince's `reportRead`).
+   */
+  firstCheckAnswered: boolean;
+  /** The investigation read's report versions (empty before it is read): the "older than the map" box's floor (pathsChangedSinceReport). */
+  versions: readonly InvestigationReportVersion[];
   /** The top bar's report button (with dig-f29's mark when `good`); nothing while the strip is open there. */
   headerItem: (good: boolean) => ReactNode;
   /**
@@ -134,6 +141,9 @@ export type MapReport = Readonly<{
    */
   waitLine: string | null;
 }>;
+
+/** No investigation read yet: no versions (one frozen list, so the map's memos keep it). */
+const NO_VERSIONS: readonly InvestigationReportVersion[] = Object.freeze([]);
 
 /** Task 56c: the id of the top bar's line beside a "Write my report" that waits for the reset. */
 const REPORT_WAITS_TOP = "v4-report-waits-top";
@@ -316,6 +326,8 @@ export function useMapReport(input: MapReportInput): MapReport {
     answer: watch.answer,
     href,
     stage,
+    firstCheckAnswered,
+    versions: watch.read?.versions ?? NO_VERSIONS,
     headerItem,
     headerStrip: start.at === "top" ? strip("top") : null,
     bottomStrip: start.at === "bottom" ? strip("bottom") : null,

@@ -146,6 +146,17 @@ const buttonOf = (node: ParentNode, name: string) =>
   [...node.querySelectorAll("button")].find((button) => button.textContent?.trim() === name) ?? null;
 const versionSection = (node: ParentNode) => node.querySelector<HTMLElement>(".v4RepInvestigation");
 const text = (node: ParentNode | null) => (node?.textContent ?? "").replace(/\s+/gu, " ");
+/**
+ * journey-d2 A (owner, 3 Nov; built 9 Nov): a version being written, or waiting for digs, is told in the shared waiting card, the
+ * map's own (V4ReportStrip V4ReportWait): its state word, "Started …" when this visit knows it, the page's line, then "You can
+ * leave this page. It keeps going.".
+ */
+const waitCard = (box: ParentNode | null) => ({
+  word: text(box?.querySelector("[data-wait-word]") ?? null),
+  started: box?.querySelector("[data-wait-started]") === null || box === null ? null : text(box.querySelector("[data-wait-started]")),
+  line: text(box?.querySelector("[data-report-wait-line]") ?? null),
+  leaves: text(box?.querySelector("[data-wait-leave]") ?? null) === word("v4.wait.leave")
+});
 /** Opens the header's Share menu; its choices by their ids. */
 async function shareMenu(node: ParentNode): Promise<Record<string, HTMLButtonElement>> {
   const button = node.querySelector<HTMLButtonElement>(`.v4RepShare button[aria-label="${CATALOG["v4.report.shareButton"]}"]`)!;
@@ -305,7 +316,9 @@ describe("the report page's versions", () => {
     const node = versionSection(await mountReport(runId))!;
     expect(node.querySelector(".v4RepVersion")!.textContent).toBe("Version 2 · being written");
     expect(node.querySelectorAll(".v4RepVersion")[1]!.textContent).toContain("(current)");
-    expect(text(node)).toContain(`Your report is being written. Started ${clock(WRITING_AT)}.`);
+    expect(waitCard(node.querySelector(".v4RepStatusBox"))).toEqual({
+      word: word("v4.state.BEING_WRITTEN"), started: word("v4.wait.started", { time: clock(WRITING_AT) }), line: "", leaves: true
+    });
     expect(text(node)).not.toMatch(/minutes|usually/u);
     // Version 1 stays readable beside it.
     expect(node.textContent).toContain(STORY.short_answer);
@@ -315,7 +328,7 @@ describe("the report page's versions", () => {
     load.mockImplementation(async () => after);
     await settle(10_000);
     expect(load.mock.calls.length).toBe(reads + 1);
-    expect(node.textContent).not.toContain("Your report is being written.");
+    expect(node.querySelector("[data-wait-state]")).toBeNull();
     expect(node.querySelector(".v4RepVersion")!.textContent).toContain("(current)");
   });
 
@@ -328,10 +341,10 @@ describe("the report page's versions", () => {
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [{ ...writing(1, 0), closed_at: closed } as InvestigationReportVersion], 0));
     const node = versionSection(await mountReport(runId))!;
-    const status = text(node.querySelector(".v4RepStatusBox"));
-    expect(status).toBe(word("v4.investigation.writingSince", { time: `${date(closed)}, ${clock(closed)}` }));
+    const status = waitCard(node.querySelector(".v4RepStatusBox")).started!;
+    expect(status).toBe(word("v4.wait.started", { time: `${date(closed)}, ${clock(closed)}` }));
     // The parts, whichever order the site's English puts the day and the month in.
-    for (const part of ["November", "2026", ", 23:55."]) expect(status).toContain(part);
+    for (const part of ["November", "2026", ", 23:55"]) expect(status).toContain(part);
     expect(status).not.toMatch(/\b(?:AM|PM)\b/u);
   });
 
@@ -346,9 +359,9 @@ describe("the report page's versions", () => {
       const runId = crypto.randomUUID();
       reports.load = vi.fn(async () => investigation(runId, "CLOSED", [{ ...writing(1, 0), closed_at: closed } as InvestigationReportVersion], 0));
       const node = versionSection(await mountReport(runId, "background", locale))!;
-      const status = text(node.querySelector(".v4RepStatusBox"));
+      const status = waitCard(node.querySelector(".v4RepStatusBox")).started!;
       const joined = formatDate(locale, closed, { dateStyle: "long", timeStyle: "short", hourCycle: "h23" });
-      expect(status, locale).toBe(word("v4.investigation.writingSince", { time: joined }));
+      expect(status, locale).toBe(word("v4.wait.started", { time: joined }));
       expect(status, locale).not.toContain(`${formatDate(locale, closed, { dateStyle: "long" })}, `);
     }
   });
@@ -361,15 +374,19 @@ describe("the report page's versions", () => {
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 1)]));
     const node = versionSection(await mountReport(runId))!;
     const mixLine = buildV4Map({ runId, answer: seededAnswer(runId), story: seededStory() }).paths.find((path) => path.id === "n-mix")!.line;
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(`Your report starts when your dig on “${mixLine}” finishes.`);
-    expect(node.textContent).not.toContain("Your report is being written");
+    expect(waitCard(node.querySelector(".v4RepStatusBox"))).toEqual({
+      word: word("v4.state.WAITING.noTime"), started: null, line: `Your report starts when your dig on “${mixLine}” finishes.`, leaves: true
+    });
+    expect(node.textContent).not.toContain(word("v4.state.BEING_WRITTEN"));
+    // The review of 9 Nov: the line keeps its status role, so a change of the dig it names is read out, as before the card.
+    expect(node.querySelector("[data-report-wait-line]")!.getAttribute("role")).toBe("status");
     expect(node.querySelector(".v4RepVersion")!.textContent).toBe("Version 1 · being written");
 
     await act(async () => root?.unmount());
     host?.remove();
     reports.load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
     const several = versionSection(await mountReport(runId))!;
-    expect(text(several.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the digs in progress finish.");
+    expect(waitCard(several.querySelector(".v4RepStatusBox")).line).toBe("Your report starts when the digs in progress finish.");
   });
 
   it("f8: after 15 minutes it says it is taking longer and keeps checking; Check again, the tab coming back and the network returning read at once", async () => {
@@ -380,7 +397,8 @@ describe("the report page's versions", () => {
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
     expect(text(node.querySelector(".v4RepStatusBox"))).toContain(word("v4.investigation.slow"));
-    expect(node.textContent).not.toContain("Your report is being written");
+    // Still the shared card, with the page's own "taking longer" part in it.
+    expect(waitCard(node.querySelector(".v4RepStatusBox")).word).toBe(word("v4.state.BEING_WRITTEN"));
     const reads = load.mock.calls.length;
     await press(buttonOf(node, "Check again")!);
     expect(load.mock.calls.length).toBe(reads + 1);
@@ -410,11 +428,11 @@ describe("the report page's versions", () => {
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
     const status = () => text(node.querySelector(".v4RepStatusBox"));
-    expect(status()).toBe(word("v4.investigation.writing"));
+    expect(waitCard(node.querySelector(".v4RepStatusBox"))).toEqual({ word: word("v4.state.BEING_WRITTEN"), started: null, line: "", leaves: true });
     expect(status()).not.toContain("Started");
     expect(status()).not.toContain(word("v4.investigation.slow"));
     await settle(14 * 60_000);
-    expect(status()).toBe(word("v4.investigation.writing"));
+    expect(status()).not.toContain(word("v4.investigation.slow"));
     await settle(60_000);
     expect(status()).toContain(word("v4.investigation.slow"));
   });
@@ -426,12 +444,12 @@ describe("the report page's versions", () => {
     const load = vi.fn(async () => investigation(runId, "CLOSED", [waitingEarly(1)]));
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the dig in progress finishes.");
+    expect(waitCard(node.querySelector(".v4RepStatusBox")).line).toBe("Your report starts when the dig in progress finishes.");
     // The dig finishes; the next check (10 s later) sees no dig left to wait for.
     load.mockImplementation(async () => investigation(runId, "CLOSED", [waitingEarly(0)]));
     await settle(10_000);
     const seen = new Date(Date.now()).toISOString();
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(word("v4.investigation.writingSince", { time: clock(seen) }));
+    expect(waitCard(node.querySelector(".v4RepStatusBox")).started).toBe(word("v4.wait.started", { time: clock(seen) }));
     expect(text(node.querySelector(".v4RepStatusBox"))).not.toContain(clock("2026-10-31T08:20:00.000Z"));
   });
 
@@ -444,7 +462,7 @@ describe("the report page's versions", () => {
     const node = await mountReport(runId);
     load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 0)]));
     await press(buttonOf(node, "Write my report")!);
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(word("v4.investigation.writingSince", { time: clock(WRITING_AT) }));
+    expect(waitCard(node.querySelector(".v4RepStatusBox")).started).toBe(word("v4.wait.started", { time: clock(WRITING_AT) }));
   });
 
   it("a FAILED version says so and offers \"Write it again\", which posts and reads the versions again", async () => {
@@ -459,7 +477,7 @@ describe("the report page's versions", () => {
     load.mockImplementation(async () => investigation(runId, "CLOSED", [failed(1), writing(2, 0)]));
     await press(buttonOf(node, "Write it again")!);
     expect(write).toHaveBeenCalledWith(runId);
-    expect(text(node)).toContain(`Your report is being written. Started ${clock(WRITING_AT)}.`);
+    expect(waitCard(node.querySelector(".v4RepStatusBox"))).toMatchObject({ word: word("v4.state.BEING_WRITTEN"), started: word("v4.wait.started", { time: clock(WRITING_AT) }) });
     expect(node.textContent).not.toContain("Your report starts when");
     // report-f16: focus moved to the status line.
     expect(document.activeElement).toBe(node.querySelector(".v4RepStatusBox"));
@@ -492,7 +510,7 @@ describe("the report page's versions", () => {
     load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 0)]));
     await press(buttonOf(node, "Write my report")!);
     expect(node.textContent).not.toContain(word("v4.investigation.startUnconfirmed"));
-    expect(text(node)).toContain(`Your report is being written. Started ${clock(WRITING_AT)}.`);
+    expect(waitCard(node.querySelector(".v4RepStatusBox"))).toMatchObject({ word: word("v4.state.BEING_WRITTEN"), started: word("v4.wait.started", { time: clock(WRITING_AT) }) });
   });
 
   it("f6: when nothing started, the could-not-confirm line stays with Try again, and never says nothing was used", async () => {
@@ -578,10 +596,10 @@ describe("the report page's address and states", () => {
     await settle();
     expect(reports.reads).toEqual([dig, rootRun]);
     expect(window.location.pathname).toBe(`/v4/debate/${rootRun}/report`);
-    // The level ruling (owner, 5 Nov): until the server names the debate's own level, the moved address and the way back
-    // keep the level the report was opened at, so the map and its report agree both ways.
-    expect(window.location.search).toBe("?level=background");
-    expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${rootRun}?level=background`);
+    // The level ruling (owner, 5 Nov; links since 9 Nov): a debate keeps its own level, read from the server, so the moved
+    // address and the way back carry none, whatever level the page was opened at.
+    expect(window.location.search).toBe("");
+    expect(node.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${rootRun}`);
     expect(versionSection(node)).not.toBeNull();
   });
 
@@ -601,7 +619,7 @@ describe("the report page's address and states", () => {
       await settle();
       expect(reports.reads, state).toEqual([dig, rootRun]);
       expect(window.location.pathname, state).toBe(`/v4/debate/${rootRun}/report`);
-      expect(window.location.search, state).toBe("?level=background");
+      expect(window.location.search, state).toBe("");
       expect(node.textContent, state).not.toContain(word("v4.report.notReady"));
       expect(node.textContent, state).not.toContain(word("v4.report.failed"));
       expect(versionSection(node), state).not.toBeNull();
@@ -652,9 +670,8 @@ describe("the report page's address and states", () => {
     // map-f30 first: back to the debate's own page, where "Ask this again" is; then report-f10's Ask a new question.
     expect(links.map((link) => link.textContent)).toEqual([CATALOG["v4.report.backToQuestion"], CATALOG["v4.debate.askNew"]]);
     expect(links[0]!.className).toContain("v4BtnPrimary");
-    // The level ruling: the way back keeps the level the report was opened at (until the server names the debate's own);
-    // a new question picks its own level, so "Ask a new question" carries none.
-    expect(links[0]!.getAttribute("href")).toBe(`/v4/debate/${runId}?level=background`);
+    // The level ruling (links since 9 Nov): neither carries a level; the debate keeps its own, and a new question picks its own.
+    expect(links[0]!.getAttribute("href")).toBe(`/v4/debate/${runId}`);
     expect(links[1]!.getAttribute("href")).toBe("/v4");
     // Owner 5 Nov, question 12 B (journey-f19, "nowhere else"): the small link under it went; the account menu has it.
     expect(node.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
@@ -679,13 +696,12 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     const row = node.querySelector(".v4RepHdr")!;
     // ask-d6 A / journey-f19: the row ends in the V4 header's round account button.
     expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepShare", "v4HdrAccount"]);
-    // The level ruling (owner, 5 Nov): until the server names the debate's own level, only the ways back to this debate's
-    // map keep the level the report was opened at; the account menu gets none.
-    expect(row.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${runId}?level=background`);
+    // The level ruling (owner, 5 Nov; links since 9 Nov): a debate keeps its own level, read from the server, so no link on the
+    // page carries one, though it was opened at ?level=background; the account menu gets none either.
+    expect(row.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${runId}`);
     expect(row.querySelector(".v4HdrAccount")!.getAttribute("data-level")).toBe("none");
     const levelled = [...node.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "").filter((href) => href.includes("level="));
-    expect(levelled.length).toBeGreaterThan(0);
-    expect(new Set(levelled)).toEqual(new Set([`/v4/debate/${runId}?level=background`]));
+    expect(levelled).toEqual([]);
     // ...and the line above the title says only "Report", with no level (a drafted line).
     expect(node.querySelector(".v4RepMeta")!.textContent).toBe(CATALOG["v4.report.eyebrow"]);
     expect(node.querySelector(".v4RepMeta")!.textContent).not.toContain(CATALOG["v4.readingLevel.background"]);
@@ -951,9 +967,9 @@ describe("the report's digs (review F6, F7)", () => {
     const digs = node.querySelector(".v4RepDigs")!;
     expect(digs.querySelectorAll(".v4RepDig")).toHaveLength(1);
     expect(node.textContent).not.toContain(CATALOG["v4.common.loading"]);
-    // The level ruling (owner, 5 Nov): a dig keeps its first question's level; until the server names it, the dig's map
-    // link carries the level the report was opened at.
-    expect(digs.querySelector("a.v4RepDigLink")!.getAttribute("href")).toBe(`/v4/debate/${child}?level=background`);
+    // The level ruling (owner, 5 Nov; links since 9 Nov): a dig keeps its first question's level, read from the server, so the
+    // dig's map link carries none.
+    expect(digs.querySelector("a.v4RepDigLink")!.getAttribute("href")).toBe(`/v4/debate/${child}`);
   });
 
   it("F7: while the report waits, each dig is read again with the versions, so the line names the dig really still going", async () => {
@@ -974,7 +990,7 @@ describe("the report's digs (review F6, F7)", () => {
     const load = vi.fn(async () => investigation(runId, "CLOSED", [writing(1, 2)]));
     reports.load = load;
     const node = versionSection(await mountReport(runId))!;
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe("Your report starts when the digs in progress finish.");
+    expect(waitCard(node.querySelector(".v4RepStatusBox")).line).toBe("Your report starts when the digs in progress finish.");
     // The first dig finishes; the report now waits only for the second one's rewrite.
     now.set(first, { state: "DONE", rewrite: null });
     load.mockImplementation(async () => investigation(runId, "CLOSED", [writing(1, 1)]));
@@ -982,7 +998,7 @@ describe("the report's digs (review F6, F7)", () => {
     await settle();
     const lines = buildV4Map({ runId, answer: seededAnswer(runId), story: seededStory() }).paths;
     const renew = lines.find((path) => path.id === "n-renew")!.line;
-    expect(text(node.querySelector(".v4RepStatusBox"))).toBe(`Your report starts when your dig on “${renew}” finishes.`);
+    expect(waitCard(node.querySelector(".v4RepStatusBox")).line).toBe(`Your report starts when your dig on “${renew}” finishes.`);
     expect(reads.filter((id) => id === first).length).toBeGreaterThan(1);
   });
 });

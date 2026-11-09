@@ -7,8 +7,8 @@ import { READING_LEVELS, type ReadingLevel } from "./types.js";
  * The server says that level as `reading_level` on the run read and on the public debate (the start-step session's Tasks
  * 75c and 75d). Both are optional: a debate asked before the field, or published before it, has none, and a page reads a
  * public debate without one as Plain words (the contract's own rule). The map's loader (lib/v4/load.ts) hands the run's
- * level on as `level`. Until those fields are in this branch's contract these readers see nothing, and every page keeps
- * what it showed before; they read the fields loosely so the pages follow them the moment the server sends them.
+ * level on as `level`. The fields are in V4's contract since the start step's merge (9 Nov), and the stand-in sends them;
+ * these readers take any read that may carry one (a run read, a public debate, a loader's result).
  */
 
 /** A value that is one of the three levels, else null (never a guess). */

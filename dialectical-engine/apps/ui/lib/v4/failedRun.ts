@@ -7,11 +7,10 @@ import { ownWords, parseDigQuestion } from "./askText.js";
  * Owner review 3 Nov 2026 (wait-f11, map-f30, wait-f18): what a debate or a dig that did not finish may say about the
  * person's quota. The rule is the owner's: "Nothing was taken" is said ONLY when the server confirms it.
  *
- * Today's run read does not say it. The server need (written in the track report): the run read of a FAILED run carries
- * `quota_used`, "NONE" (nothing was taken from the person's quota for it) or "SOME". Until the contract carries the field
- * the page never sees it, so it says nothing about the quota; the stand-in API shows the field on its draft view
- * (/__mock/draft/v1/runs/:id). The two failure kinds whose own sentence already says "It did not use your quota"
- * (an upload set the debate aside, or a choice it was asked with is gone) are never told twice.
+ * The run read of a FAILED run says it as `quota_used` (the contract's RunProjection since the start step's Task 57c, in V4
+ * since 9 Nov): "NONE" (nothing was taken from the person's quota for it) or "SOME". Absent (an older read): nothing is
+ * said about the quota. The two failure kinds whose own sentence already says "It did not use your quota" (an upload set
+ * the debate aside, or a choice it was asked with is gone) are never told twice.
  *
  * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md):
  *  - question 20 A: a failed QUESTION says "Nothing was taken for the failed try." when the server confirms nothing was
@@ -22,19 +21,16 @@ import { ownWords, parseDigQuestion } from "./askText.js";
  *    lib/v3/runFailure.ts ("This dig stopped partway because of a problem on our side."), never the question's sentence.
  */
 
-/** The run read's optional field (not in the contract yet): "NONE" or "SOME" on a FAILED run. */
-export const QUOTA_USED_FIELD = "quota_used";
-
 /** Whether the server confirmed that nothing was taken from the person's quota for this failed run. */
 export function quotaUntouched(run: RunProjection): boolean {
   if (run.state !== "FAILED") return false;
-  return (run as RunProjection & Readonly<Record<string, unknown>>)[QUOTA_USED_FIELD] === "NONE";
+  return run.quota_used === "NONE";
 }
 
 /** Whether the server said that some of the person's quota was used for this failed run (question 20 A). */
 export function quotaSomeUsed(run: RunProjection): boolean {
   if (run.state !== "FAILED") return false;
-  return (run as RunProjection & Readonly<Record<string, unknown>>)[QUOTA_USED_FIELD] === "SOME";
+  return run.quota_used === "SOME";
 }
 
 /** The failure kinds whose own plain sentence already says nothing was used (lib/v3/runFailure.ts). */

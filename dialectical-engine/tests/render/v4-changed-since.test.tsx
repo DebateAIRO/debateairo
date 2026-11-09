@@ -155,13 +155,13 @@ describe("the owner's fourth round (6 Nov): the box and the report's stage", () 
   let ownHost: HTMLDivElement | undefined;
   const SINCE_ONE: PathsChangedSince = { count: 2, since_report_version: 1 };
 
-  async function draw(changedSince: PathsChangedSince, reportStage?: ReportStage, digRunning = false): Promise<void> {
+  async function draw(changedSince: PathsChangedSince, reportStage?: ReportStage, digRunning = false, reportRead?: boolean): Promise<void> {
     ownHost ??= document.body.appendChild(document.createElement("div"));
     ownRoot ??= createRoot(ownHost);
     await act(async () => {
       ownRoot!.render(
         <V4ChangedSince changedSince={changedSince} reportHref="/v4/debate/r/report" catalog={CATALOG} locale="en" digRunning={digRunning}
-          {...(reportStage === undefined ? {} : { reportStage })} />
+          {...(reportStage === undefined ? {} : { reportStage })} {...(reportRead === undefined ? {} : { reportRead })} />
       );
     });
   }
@@ -203,6 +203,14 @@ describe("the owner's fourth round (6 Nov): the box and the report's stage", () 
     // The investigation reopened (a dig started): as before.
     await draw({ count: 1, since_report_version: 2 }, { kind: "NONE" });
     expect(box()).not.toBeNull();
+  });
+
+  it("the start step's hand-over (9 Nov): held with nothing drawn until the first report check answers; a check that failed shows it as before", async () => {
+    await draw(SINCE_ONE, { kind: "UNKNOWN" }, false, false);
+    expect(box()).toBeNull();
+    expect(ownHost!.textContent).toBe("");
+    await draw(SINCE_ONE, { kind: "UNKNOWN" }, false, true);
+    expect(box()!.querySelector(".v4ChangedSinceText")!.textContent).toBe(CATALOG["v4.rewrite.reportOlder"]);
   });
 
   it("a version that did not finish hides nothing: the report that stands is older than the map", async () => {

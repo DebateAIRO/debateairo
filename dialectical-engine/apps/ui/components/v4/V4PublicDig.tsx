@@ -10,7 +10,8 @@ import {
   newWordMarks, progressSettled, publicDigAnchor, publicPathAnchor, readPublicDigProgress, stopsReached,
   type PublicDigProgress, type PublicDigStarted, type PublicDigSuggestion
 } from "@/lib/v4/publicDig";
-import { stateWordText } from "@/lib/v4/stateWords";
+import type { WaitState } from "@/lib/v4/stateWords";
+import { V4WaitCard } from "./V4WaitCard";
 import { DIG_MODES, type DigMode } from "@/lib/v4/types";
 
 /*
@@ -24,6 +25,9 @@ import { DIG_MODES, type DigMode } from "@/lib/v4/types";
  *    glows the path once), "Kept with you: the public page is unchanged." in grey, or "Confirmed: the answer holds."
  *  - journey-f2: a dig being looked into has the map's one look for that (hatched paper, one slow pulse ring), never a
  *    dashed card; a settled one is a plain card.
+ *  - Question 47 A (owner, 9 Nov; journey-d2 A, one waiting card everywhere): while the dig runs, the card holds the shared
+ *    waiting card: its state word ("Looking into it", or the wait's own), "Started 14:31", the two stops, "When you come
+ *    back to this page, its result shows here.", "You can leave this page. It keeps going.", then "Open it".
  *  - journey-f21 / dig-f25: the site's one Undo note, bottom-left, as on every V4 page (V4DigUndoHost).
  * No browser storage of any kind.
  */
@@ -144,6 +148,9 @@ function Stops({ progress, catalog }: Readonly<{ progress: PublicDigProgress | n
   );
 }
 
+/** Before the dig's first read: it is being looked into. */
+const LOOKING: WaitState = Object.freeze({ kind: "LOOKING" });
+
 /**
  * public-d2 A: the card under the path for one dig this visit started. It reads the dig's own run when it appears and
  * when the person comes back to the page, until there is an outcome; nothing else moves it.
@@ -181,12 +188,9 @@ export function PublicDigCard({ dig, openHref, catalog, locale }: Readonly<{
     );
   }
   const working = !settled;
-  const outcome = progress === null || progress.kind === "RUNNING" ? (
-    <p className="v4PubHint">
-      {t(catalog, "v4.public.digCard.running")}
-      {progress !== null && progress.wait.kind !== "LOOKING" ? <>{" "}{stateWordText(progress.wait, catalog, locale)}</> : null}
-    </p>
-  ) : progress.kind === "CHECKING" ? (
+  // While it runs (or before its first read): what the shared waiting card says; null once it has moved on.
+  const runningWait: WaitState | null = progress === null ? LOOKING : progress.kind === "RUNNING" ? progress.wait : null;
+  const outcome = progress === null || progress.kind === "RUNNING" ? null : progress.kind === "CHECKING" ? (
     <p className="v4PubHint">{t(catalog, "v4.contribution.CHECKING")}</p>
   ) : progress.kind === "ON_THE_PAGE" ? (
     <>
@@ -221,8 +225,15 @@ export function PublicDigCard({ dig, openHref, catalog, locale }: Readonly<{
         <span className="v4PubLabel">{t(catalog, "v4.seed.yourDig")}</span>{" "}
         <span dir="auto" data-ai-generated={dig.firstIsAi ? "true" : undefined}>{dig.first}</span>
       </p>
-      <Stops progress={progress} catalog={catalog} />
-      <div role="status">{outcome}</div>
+      {runningWait !== null ? (
+        <V4WaitCard variant="inline" state={runningWait} startedAt={dig.startedAt} catalog={catalog} locale={locale}>
+          <Stops progress={progress} catalog={catalog} />
+          <p className="v4PubHint" data-public-dig-result-here="">{t(catalog, "v4.public.digCard.resultShowsHere")}</p>
+        </V4WaitCard>
+      ) : <Stops progress={progress} catalog={catalog} />}
+      {/* The review of 9 Nov: the outcome's status line stays in place from the start, empty while the dig runs, so the outcome is
+          read out when it comes (a status line that appears already filled is often not). */}
+      <div role="status" data-public-dig-outcome="">{outcome}</div>
       <p className="v4PubDigOpen">{openIt}</p>
     </div>
   );

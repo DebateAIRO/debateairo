@@ -56,7 +56,8 @@ describe("the map of a first debate whose paths digs rewrote", () => {
     // A path no dig touched carries no rewrites.
     const untouched = buildV4Map({ runId: "r", answer: answerOf("r"), story });
     expect(untouched.paths.every((path) => path.rewrites === undefined)).toBe(true);
-    expect(map.changedSince).toEqual({ count: 2, since_report_version: 1 });
+    // As the server counts: every finished rewrite since the report, the confirmation of n-smr too (the failed one is not).
+    expect(map.changedSince).toEqual({ count: 3, since_report_version: 1 });
     expect(map.storyState).toBe("READY");
     expect(map.dig).toBeNull();
   });

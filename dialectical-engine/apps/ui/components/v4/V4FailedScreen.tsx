@@ -25,9 +25,8 @@ import { continuingReason, digFailureMessage, failedQuotaKey, keepsFailingReason
  * "Nothing was taken for the failed try." when the server confirms nothing was used, and "The part that ran used some of
  * your quota." when it says some was; a dig says "Nothing was taken from your quota for this." only when nothing was used.
  * The wave-4 browser check (5 Nov): a dig's own page names the dig, not a question: "Your dig" above it and "This dig didn't
- * finish" as its heading (so its tab says it too; a drafted line). Its "Open in the classic view" link stays in the body
- * until the map's header is given the classic address on these screens (question 12 B, the start-step session's wiring);
- * until then it is as small as "Ask a new question" beside it (the w6 browser check).
+ * finish" as its heading (so its tab says it too; a drafted line). It draws no classic-view link: "Open in the classic view"
+ * is in the account menu only (question 12 B, the owner's answers of 5 Nov).
  * The owner's third round (5 Nov afternoon): a dig that keeps failing because the AIs were unavailable drops "You can try
  * it again in a while." here too, as in its panel. The page says what the parent map offers (`digRetry`, worked out by the
  * page from the map's digs: the start-step session's wiring): "You can try this dig again from the map." only when the map
@@ -52,7 +51,7 @@ import { continuingReason, digFailureMessage, failedQuotaKey, keepsFailingReason
  */
 
 export function V4FailedScreen({
-  run, askAgainHref, askHref, classicHref, dig, picksKept = false, digRetry, onContinue, continueNote, catalog, homeCatalog
+  run, askAgainHref, askHref, dig, picksKept = false, digRetry, onContinue, continueNote, catalog, homeCatalog
 }: Readonly<{
   run: RunProjection;
   /**
@@ -62,12 +61,6 @@ export function V4FailedScreen({
   askAgainHref: string;
   /** The empty ask step. */
   askHref: string;
-  /**
-   * "Open in the classic view", small, under "Ask a new question", only when the page hands it here; absent or null: none.
-   * The owner's answers of 5 Nov (question 12 B, journey-f19) put it in the account menu only: the page stops handing it
-   * here when its header carries it (V4DebateClient), so the failed screen is never left without it in between.
-   */
-  classicHref?: string | null;
   /** This debate is a dig: the map it was dug from (null: not known), else null for a first debate. */
   dig: Readonly<{ backHref: string | null }> | null;
   /**
@@ -160,9 +153,6 @@ export function V4FailedScreen({
         <Link className={dig !== null && dig.backHref === null ? "v4Btn v4BtnPrimary" : "v4Link v4DebFailedNew"} href={askHref}>
           {t(catalog, "v4.debate.askNew")}
         </Link>
-        {classicHref === null || classicHref === undefined
-          ? null
-          : <Link className="v4Link v4DebFailedNew" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>}
       </div>
     </section>
   );

@@ -116,8 +116,15 @@ export function publicDigAsk(input: Readonly<{
   return parent === null ? null : { questionLine: digQuestion(target, input.question, input.catalog, input.locale), parent, target };
 }
 
-/** A refusal of a public page's dig in plain words: no level, no count, no code. Null: any other failure, which the ask's own handling says. */
-export function publicDigRefusalWords(failure: unknown, catalog: MessageCatalog, room: AskRoom | null, locale: string): string | null {
+/**
+ * A refusal of a public page's dig in plain words: no level, no count, no code. Null: any other failure, which the ask's own handling says.
+ * `reportWaits`: this debate's report waits for the reset too (publicReportWaitLine is not null, so a report already shows). A used-up
+ * month's line then goes without "You can still write your report.", which would be untrue here (the start step's hand-over, 9 Nov; the
+ * map does the same with limitLineWhileReportWaits). With no report shown the next press may be the debate's first report, which goes
+ * ahead (owner Q20 B), so the line stays whole.
+ */
+export function publicDigRefusalWords(failure: unknown, catalog: MessageCatalog, room: AskRoom | null, locale: string,
+  reportWaits = false): string | null {
   if (!(failure instanceof ContractHttpError)) return null;
   if (failure.status === 404) return t(catalog, "v4.public.refusal.notFound");
   if (failure.status === 400 && failure.serverCode === "PUBLIC_DIG_NEEDS_A_PATH") return t(catalog, "v4.public.refusal.needsAPath");
@@ -125,7 +132,9 @@ export function publicDigRefusalWords(failure: unknown, catalog: MessageCatalog,
   if (failure.status === 400 && failure.serverCode === DIG_FREE_PICKS_MAX) return t(catalog, "v4.public.refusal.freeMax");
   if (failure.status === 409 && failure.serverCode === DIG_TOO_DEEP) return t(catalog, "v4.public.refusal.tooDeep");
   if (failure.status === 409 && failure.serverCode === "PUBLIC_DEBATE_REPORT_WRITING") return t(catalog, "v4.public.refusal.reportWriting");
-  if (failure.status === 409 && failure.serverCode === "PUBLIC_DEBATE_WAITS_FOR_RESET") return usedUpWords(catalog, room, locale);
+  if (failure.status === 409 && failure.serverCode === "PUBLIC_DEBATE_WAITS_FOR_RESET") {
+    return reportWaits ? reportRefusedWords(catalog, room, locale) : usedUpWords(catalog, room, locale);
+  }
   return null;
 }
 

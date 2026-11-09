@@ -2,19 +2,18 @@ import { cookies } from "next/headers";
 import { V4ReportClient } from "@/components/v4/V4ReportClient";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
-import { parseReadingLevel } from "@/lib/v4/storage";
 
 export const dynamic = "force-dynamic";
 
 /**
- * V4 initial (2026-10-28), D5: the report of one debate; `id` is a run id or an answer id, as on the map page. Fix wave
- * 1, Decision A: the reading level comes from the address (`?level=`), never from the browser.
+ * V4 initial (2026-10-28), D5: the report of one debate; `id` is a run id or an answer id, as on the map page. The level
+ * ruling (owner, 5 Nov; links since 9 Nov): the report shows the debate's own level, read from the server, never one from
+ * the address (`?level=`) or the browser.
  */
-export default async function V4ReportPage({ params, searchParams }: {
+export default async function V4ReportPage({ params }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const { id } = await params;
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   // newDebate: AuthGate and its legal-accept screen read newDebate.* keys.
@@ -26,7 +25,6 @@ export default async function V4ReportPage({ params, searchParams }: {
     <V4ReportClient
       id={id}
       locale={locale}
-      initialLevel={parseReadingLevel(query.level)}
       catalog={catalog}
       newDebateCatalog={newDebateCatalog}
     />
