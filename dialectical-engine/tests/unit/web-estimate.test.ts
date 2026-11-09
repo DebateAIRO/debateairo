@@ -62,21 +62,22 @@ const SITE_PRICES = new Map<string, ProviderTargetPrice>([
 const ROLES: WebRolePrices = Object.freeze({ readerOne: HAIKU, pick: HAIKU, topReaders: DEEPSEEK, planner: DEEPSEEK, pack: DEEPSEEK });
 
 describe("W2-2 · the web part's counts at the owner's caps", () => {
-  it("Quick, 5 paths: 20 searches, 7 reader-1 batches a path (400,000 tokens of pages), 5 picks, 10 top reads, 1 planner", () => {
+  // Task 91k (owner 9 Nov): each pack's reader-1 calls are its batches and 2 re-sends.
+  it("Quick, 5 paths: 20 searches, 7 reader-1 batches and 2 re-sends a path (400,000 tokens of pages), 5 picks, 10 top reads, 1 planner", () => {
     const sites = webSitesOf({ kind: "START", depth: "QUICK", paths: 5 });
     expect(sites).toMatchObject({ packs: 5, searchesPerPack: 4, searches: 20, resultsPerSearch: 10, pageTokensPerPack: 400_000,
-      readerOneCallsPerPack: 7, readerOneCalls: 35, pickCalls: 5, topReaderCalls: 10, plannerCalls: 1, topCount: 3 });
-    expect(webModelCalls(sites)).toBe(51);
+      readerOneBatchesPerPack: 7, readerOneCallsPerPack: 9, readerOneCalls: 45, pickCalls: 5, topReaderCalls: 10, plannerCalls: 1, topCount: 3 });
+    expect(webModelCalls(sites)).toBe(61);
   });
 
   it("Thorough doubles the searches (8 a path, 40 at 5 paths) and reads the top 5", () => {
     expect(webSitesOf({ kind: "START", depth: "THOROUGH", paths: 5 })).toMatchObject({ searches: 40, pageTokensPerPack: 800_000,
-      readerOneCallsPerPack: 14, topCount: 5 });
+      readerOneBatchesPerPack: 14, readerOneCallsPerPack: 16, topCount: 5 });
   });
 
   it("a dig (R22): each chosen path a pack of its own: its planner, up to 4 searches, its reader-1 batches, its pick, its readers 2 and 3", () => {
     expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 3 })).toMatchObject({ packs: 3, searches: 12, searchesPerPack: 4, resultsPerSearch: 5,
-      pageTokensPerPack: 400_000, readerOneCalls: 21, pickCalls: 3, topReaderCalls: 6, plannerCalls: 3 });
+      pageTokensPerPack: 400_000, readerOneCalls: 27, pickCalls: 3, topReaderCalls: 6, plannerCalls: 3 });
     // Under the debate's cap: Quick look 20, Thorough 40; a planner per chosen path whatever the cap keeps.
     expect(webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 16 })).toMatchObject({ packs: 16, searches: 20, plannerCalls: 16 });
     expect(webSitesOf({ kind: "DIG", depth: "THOROUGH", digPicks: 16 })).toMatchObject({ packs: 16, searches: 40, plannerCalls: 16, topCount: 5 });
@@ -128,10 +129,11 @@ describe("W2-2 · the web part's counts at the owner's caps", () => {
 });
 
 describe("W2-2 · the web part's money at R22 prices (never under the caps)", () => {
-  it("Quick, 5 paths: 904,986 micro-units (about 90.5 cents), part by part", () => {
+  it("Quick, 5 paths: 1,071,906 micro-units (about $1.07), part by part", () => {
     const estimate = estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), ROLES);
     // One reader-1 call: 4,000 instruction tokens at the 5-minute write 0.125 (500) + 80,000 at 0.10 (8,000) + 16,384 out at 0.50.
-    expect(estimate.readerOneMicros).toBe(35 * (500 + 8_000 + 8_192));
+    // Task 91k: 45 calls (7 batches and 2 re-sends a path).
+    expect(estimate.readerOneMicros).toBe(45 * (500 + 8_000 + 8_192));
     // One pick: 40 pages x 200 + 4,000 = 12,000 in (500 + 800) + 4,096 out (2,048).
     expect(estimate.pickMicros).toBe(5 * 3_348);
     // One top read: 3 x 21,000 + 4,000 = 67,000 in at 0.20 (13,400) + 16,384 out at 0.60 (9,831, rounded up).
@@ -140,13 +142,13 @@ describe("W2-2 · the web part's money at R22 prices (never under the caps)", ()
     expect(estimate.plannerMicros).toBe(11_716);
     expect(estimate.packMicros).toBe(5 * 8_000);
     expect(estimate.searchMicros).toBe(20 * 1_000);
-    expect(estimate.totalMicros).toBe(904_986);
-    expect(estimate.modelCalls).toBe(51);
+    expect(estimate.totalMicros).toBe(1_071_906);
+    expect(estimate.modelCalls).toBe(61);
   });
 
-  it("Quick, 3 paths: 545,278 micro-units (about 54.5 cents); Thorough, 5 paths: 1,597,206 (about $1.60)", () => {
-    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 3 }), ROLES).totalMicros).toBe(545_278);
-    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "THOROUGH", paths: 5 }), ROLES).totalMicros).toBe(1_597_206);
+  it("Quick, 3 paths: 645,430 micro-units (about 64.5 cents); Thorough, 5 paths: 1,764,126 (about $1.76)", () => {
+    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 3 }), ROLES).totalMicros).toBe(645_430);
+    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "THOROUGH", paths: 5 }), ROLES).totalMicros).toBe(1_764_126);
   });
 
   it("is never under a web part that fills every cap with the worst page sizes", () => {
@@ -169,7 +171,7 @@ describe("W2-2 · the web part's money at R22 prices (never under the caps)", ()
     expect(roles.topReaders).toEqual(DEEPSEEK);
     expect(roles.planner).toEqual(DEEPSEEK);
     expect(roles.pack).toEqual(DEEPSEEK);
-    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), roles).totalMicros).toBe(904_986);
+    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), roles).totalMicros).toBe(1_071_906);
     // No Haiku priced: reader 1 cannot run, nothing to price the web part with.
     expect(previewWebRolePrices(new Map([...SITE_PRICES].filter(([ref]) => ref !== "preview:claude-haiku-5-5")))).toBeNull();
   });
@@ -189,11 +191,11 @@ describe("W2-2 · the receipt carries the web part (envelope_basis.web)", () => 
     const { web: member, max_model_attempts: webCeiling, ...rest } = web as Record<string, unknown>;
     const { max_model_attempts: todayCeiling, ...todayRest } = today as Record<string, unknown>;
     expect(JSON.stringify(rest)).toBe(JSON.stringify(todayRest));
-    // 3 paths: 21 reader-1 + 3 picks + 6 top reads + 1 planner = 31 calls x 3 attempts = 93.
-    expect(webCeiling).toBe((todayCeiling as number) + 93);
+    // 3 paths: 27 reader-1 (Task 91k: 9 a path) + 3 picks + 6 top reads + 1 planner = 37 calls x 3 attempts = 111.
+    expect(webCeiling).toBe((todayCeiling as number) + 111);
     expect(member).toEqual(webReceipt(WEB, 3));
-    expect(member).toMatchObject({ version: 1, kind: "START", depth: "QUICK", packs: 3, searches: 12,
-      sites: { planner: 1, reader_one: 21, pick: 3, top_readers: 6, added_model_attempts: 93 } });
+    expect(member).toMatchObject({ version: 3, kind: "START", depth: "QUICK", packs: 3, searches: 12, reader_one_resend_per_pack: 2,
+      sites: { planner: 1, reader_one: 27, pick: 3, top_readers: 6, added_model_attempts: 111 } });
   });
 
   it("parses back to the same counts, and a receipt whose counts disagree with the rule is refused", () => {
@@ -285,7 +287,7 @@ describe("R22 · the web part reaches the receipt, so the run's attempt ceiling 
     const sites = webSitesOf({ kind: "DIG", depth: "QUICK", digPicks: 3 });
     const withWeb = computeStructuralCeilingBasis({ ...TERMS, panelSize: 3, depth: 2, web: sites }) as unknown as { max_model_attempts: number; web: { sites: { added_model_attempts: number } } };
     expect(withWeb.max_model_attempts).toBe(today.max_model_attempts + withWeb.web.sites.added_model_attempts);
-    expect(webModelCalls(sites)).toBe(3 + 21 + 3 + 6);
+    expect(webModelCalls(sites)).toBe(3 + 27 + 3 + 6);
   });
 });
 
@@ -304,7 +306,7 @@ describe("W2-2 · the hosted room's estimate of a web debate", () => {
 
   it("short of samples: the depth's start figure plus the web part at the caps, capped at the maximum", async () => {
     expect(await estimator(ROLES).estimateMicros(BASE)).toBe(300_000);
-    expect(await estimator(ROLES).estimateMicros(WEB_CLASS)).toBe(300_000 + 904_986);
+    expect(await estimator(ROLES).estimateMicros(WEB_CLASS)).toBe(300_000 + 1_071_906);
     expect(await estimator(ROLES, 1_000_000).estimateMicros(WEB_CLASS)).toBe(1_000_000);
     // No web prices: the careful side, the maximum.
     expect(await estimator(null).estimateMicros(WEB_CLASS)).toBe(3_660_000);
@@ -331,8 +333,8 @@ describe("W2-2 · the preview's gate check counts the web calls on their own gat
 
   it("Haiku's reading on the Anthropic gate, the top reads, planner and pack on DeepInfra, each with the 15% margin", () => {
     const shares = previewWebGateShares(SITES, [previewModelRow(GLM)!, previewModelRow(DS)!]);
-    // 35 reader-1 calls x 16,692,000 nano + 5 picks x 3,348,000 + the planner as Haiku 7,596,000, then x 1.15 rounded up.
-    expect(shares.get("anthropic")).toEqual({ calls: 48, nanoUsd: 699_839_400n });
+    // 45 reader-1 calls (Task 91k) x 16,692,000 nano + 5 picks x 3,348,000 + the planner as Haiku 7,596,000, then x 1.15 rounded up.
+    expect(shares.get("anthropic")).toEqual({ calls: 59, nanoUsd: 891_797_400n });
     // 10 top reads at DeepSeek x 23,230,400 + the planner as DeepSeek 11,715,200 + 5 packs x 40,000 x 200, x 1.15.
     expect(shares.get("deepinfra")).toEqual({ calls: 13, nanoUsd: 326_622_080n });
     expect(previewWebSearchNeed(SITES)).toEqual({ searches: 20, nanoUsd: 20_000_000n });
@@ -347,8 +349,8 @@ describe("W2-2 · the preview's gate check counts the web calls on their own gat
     expect(deepinfra(web).callsWithMargin - deepinfra(plain).callsWithMargin).toBe(13);
     expect(deepinfra(web).modelIds).toEqual(deepinfra(plain).modelIds);
     // The Anthropic gate gets its own need, requiring no model (a web call it cannot serve fails the web step only).
-    expect(web.find((need) => need.gate === "anthropic")).toEqual({ gate: "anthropic", modelIds: [], expectedCalls: 48,
-      callsWithMargin: 48, callsNanoUsd: 699_839_400n });
+    expect(web.find((need) => need.gate === "anthropic")).toEqual({ gate: "anthropic", modelIds: [], expectedCalls: 59,
+      callsWithMargin: 59, callsNanoUsd: 891_797_400n });
   });
 
   it("holds an unfinished debate's web part while it debates, and nothing once it only writes its story", () => {
@@ -357,5 +359,64 @@ describe("W2-2 · the preview's gate check counts the web calls on their own gat
     const storyPlain = estimateUnfinishedRunHolds({ registerVersion: 5, basis: BASIS, panel: PANEL, phase: "STORY" }, SETTINGS);
     expect(debating.some((need) => need.gate === "anthropic")).toBe(true);
     expect(story).toEqual(storyPlain);
+  });
+});
+
+/**
+ * Task 91k (owner 9 Nov, "Reserve 9 calls per path"): every web pack reserves two more reader-1 calls (Quick 7 -> 9, Thorough
+ * 14 -> 16). The estimate prices exactly those calls and nothing else moves; a debate already started is held at its own receipt's.
+ */
+describe("Task 91k · two more reader-1 calls per pack in the estimate", () => {
+  const before = (input: Parameters<typeof webSitesOf>[0]) => webSitesOf({ ...input, readerOneResendCallsPerPack: 0 });
+  const READER_CALL = 500 + 8_000 + 8_192;
+
+  it("prices exactly 2 more reader-1 calls a pack; every other part of the web estimate is the same", () => {
+    for (const input of [{ kind: "START", depth: "QUICK", paths: 5 }, { kind: "START", depth: "THOROUGH", paths: 5 },
+      { kind: "DIG", depth: "QUICK", digPicks: 3 }, { kind: "PATHS", depth: "QUICK", paths: 5, origin: "START" }] as const) {
+      const now = estimateWebPartMicros(webSitesOf(input), ROLES);
+      const then = estimateWebPartMicros(before(input), ROLES);
+      const packs = webSitesOf(input).packs;
+      const { readerOneMicros, totalMicros, modelCalls, ...rest } = now;
+      const { readerOneMicros: thenReader, totalMicros: thenTotal, modelCalls: thenCalls, ...thenRest } = then;
+      expect(rest, JSON.stringify(input)).toEqual(thenRest);
+      expect(readerOneMicros - thenReader).toBe(2 * packs * READER_CALL);
+      expect(totalMicros - thenTotal).toBe(2 * packs * READER_CALL);
+      expect(modelCalls - thenCalls).toBe(2 * packs);
+      expect(webCallTokens(webSitesOf(input)).readerOne).toEqual({ ...webCallTokens(before(input)).readerOne, calls: webCallTokens(before(input)).readerOne.calls + 2 * packs });
+    }
+    // Quick, 5 paths: 904,986 -> 1,071,906 micro-units (10 more Haiku calls, 166,920).
+    expect(estimateWebPartMicros(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), ROLES).totalMicros).toBe(1_071_906);
+  });
+
+  it("the preview's Anthropic share for 5 Quick paths rises by exactly those 10 calls with the 15% margin; DeepInfra's does not move", () => {
+    const GLM = "zai-org/GLM-5.3-Flash";
+    const DS = "deepseek-ai/DeepSeek-V4.1-Flash";
+    const rows = [previewModelRow(GLM)!, previewModelRow(DS)!];
+    const now = previewWebGateShares(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), rows);
+    const then = previewWebGateShares(before({ kind: "START", depth: "QUICK", paths: 5 }), rows);
+    expect(then.get("anthropic")).toEqual({ calls: 48, nanoUsd: 699_839_400n });
+    // 45 reader-1 calls x 16,692,000 nano + 5 picks x 3,348,000 + the planner as Haiku 7,596,000 = 775,476,000, x 1.15; 51 calls x 1.15 up.
+    expect(now.get("anthropic")).toEqual({ calls: 59, nanoUsd: 891_797_400n });
+    expect(now.get("anthropic")!.nanoUsd - then.get("anthropic")!.nanoUsd).toBe(10n * 16_692_000n * 115n / 100n);
+    expect(now.get("deepinfra")).toEqual(then.get("deepinfra"));
+    expect([...now.keys()]).toEqual([...then.keys()]);
+  });
+
+  it("a debate already started is held at its own receipt's reserve, one started now at the new one", () => {
+    const PANEL = Object.freeze([{ provider_ref: "preview:fixture-a", model_id: "zai-org/GLM-5.3-Flash" },
+      { provider_ref: "preview:deepseek-v4-1-flash", model_id: "deepseek-ai/DeepSeek-V4.1-Flash" }]);
+    const SETTINGS = { roleModels: Object.freeze({ answerWriter: "zai-org/GLM-5.3-Flash", answerChecker: "zai-org/GLM-5.3-Flash",
+      storyteller: "zai-org/GLM-5.3-Flash", storyChecker: "zai-org/GLM-5.3-Flash" }), roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"],
+    storyRounds: 2, callOutputTokens: Object.freeze({ debate: 8192, storyteller: 32_768, storytellerRetry: 65_536, storyChecker: 8192 }), maxCooldownHoldsPerRun: 2 };
+    const BASIS = Object.freeze({ kind: "COMPUTED_STRUCTURAL_CEILING", panel_size: 2, depth: 1, max_model_attempts: 120, hold_cap: 2,
+      call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 }, serve_leg: { synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" } });
+    // The version-1 member of a debate started before the rise (made-up, as the R22 release minted it).
+    const OLD = Object.freeze({ version: 1, kind: "START", depth: "QUICK", packs: 5, searches_per_pack: 4, searches: 20, results_per_search: 10,
+      page_token_cap: 21_000, search_token_cap: 100_000, reader_batch_tokens: 80_000, top_count: 3,
+      sites: { planner: 1, reader_one: 35, pick: 5, top_readers: 10, added_model_attempts: 153 } });
+    const anthropicHold = (web: unknown) => estimateUnfinishedRunHolds({ registerVersion: 5, basis: { ...BASIS, web }, panel: PANEL }, SETTINGS)
+      .find((need) => need.gate === "anthropic");
+    expect(anthropicHold(OLD)).toMatchObject({ callsWithMargin: 48, callsNanoUsd: 699_839_400n });
+    expect(anthropicHold(webReceipt(webSitesOf({ kind: "START", depth: "QUICK", paths: 5 }), 3))).toMatchObject({ callsWithMargin: 59, callsNanoUsd: 891_797_400n });
   });
 });

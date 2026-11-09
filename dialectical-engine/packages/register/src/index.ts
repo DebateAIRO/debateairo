@@ -1443,6 +1443,9 @@ export {
   webReceiptAnySchema,
   webReceiptV2Schema,
   webSearchCapForPaths,
+  // Task 91k: web receipt v3 (two more reader-1 calls per pack; every kind).
+  webReceiptV3Schema,
+  type WebReceiptV3,
   type WebOrigin,
   type WebReceiptV2,
   type WebDepth,

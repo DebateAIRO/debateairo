@@ -66,7 +66,7 @@ import {
 import { cutQuoteAtWordEdge, questionWithPurposeLines, type PurposeLines } from "@debateai/contract";
 import { addressKey, digSearchSameAs, findVerbatim, selectPathPages, siteOf } from "@debateai/evidence";
 import {
-  WEB_TOP_COUNT_BY_MODE, type WebMode, type WebPlannerPoint
+  WEB_TOP_COUNT_BY_MODE, webPickCallSiteKey, type WebMode, type WebPlannerPoint
 } from "@debateai/judgement";
 import { TypedDomainError, questionLanguageOf, type QuestionLanguage } from "@debateai/kernel";
 import {
@@ -188,6 +188,13 @@ export type WebStepInput = Readonly<{
    * the step's paths (`paths` above is not read) and `dig` is not read. Absent or null: today's first debate or dig, byte for byte.
    */
   pathsMode?: WebStepPathsMode | null;
+  /**
+   * Task 91k (owner 9 Nov, "Reserve 9 calls per path"): the reader-1 calls the run's OWN receipt reserved for one pack
+   * (`envelope_basis.web`, read back by `webSitesOfReceipt`), so a debate started before the rise keeps its 7 and one started
+   * after it gets 9. Absent or null (a run with no web member: local mode, fixtures): `webReaderOneCallsReserved`'s count for
+   * the debate's kind.
+   */
+  readerOneCallsReserved?: number | null;
 }>;
 
 /**
@@ -847,11 +854,18 @@ async function runGroup(context: GroupContext): Promise<GroupOutcome> {
   };
   const asReaderPage = (page: StepPage): ReaderOnePage => Object.freeze({ pageId: page.pageId, title: page.title ?? page.site,
     site: page.site, date: page.date, text: page.text, textDigest: page.textDigest });
+  const readerOneReserve = webReaderOneCallsReserved(input);
   const read = await readAllPages({ answerIndex: index, question: input.question, answer: group.answer,
     siteLanguage: input.siteLanguage.name, topCount: WEB_TOP_COUNT_BY_MODE[input.mode], pages: pages.map(asReaderPage), call: readerOneCall,
-    callsMax: webReaderOneCallsReserved(input),
+    callsMax: readerOneReserve,
     ...(known.size === 0 ? {} : { known: new Map([...known].map(([pageId, page]) => [pageId, Object.freeze({ grade: page.grade,
       adds: page.line, note: page.note, extracts: reusedReaderOneExtracts(page), maker: page.readerOneMaker })])) }) });
+  // Task 91k: follow-ups never pass the reserve, so only a first round larger than it can; one line, never a stop. The pick
+  // is its own call, counted apart (`pickCalls`), never against reader 1's reserve.
+  const readerOneSent = read.calls.filter((entry) => entry.callSiteKey !== webPickCallSiteKey(index)).length;
+  if (readerOneSent > readerOneReserve) {
+    log("WEB_READER_ONE_PAST_RESERVE", { runId, path: index, calls: readerOneSent, reserved: readerOneReserve });
+  }
   const pageOf = new Map(pages.map((page) => [page.pageId, page]));
 
   // Readers 2 and 3 on the top pages they have not read in the investigation; a reused top page they read is carried.
@@ -963,11 +977,16 @@ const cutOffError = (error: unknown): error is ProviderContentUnacceptedError =>
   error instanceof ProviderContentUnacceptedError && error.lastParseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED;
 
 /**
- * Task 91j D: the reader-1 calls the start estimate reserved for one pack (`webSitesOf`'s readerOneCallsPerPack, as the
- * estimate counts this debate's kind: a path debate's PATHS, a dig's DIG with its picks, else a first debate's START). No
- * reader-1 follow-up call is sent past it, so a cut-off batch sent again never spends past what the estimate held.
+ * Task 91j D: the reader-1 calls the start estimate reserved for one pack. No reader-1 follow-up call is sent past it, so a
+ * cut-off batch sent again never spends past what the estimate held. Task 91k: the run's own receipt's count when the runner
+ * hands it in (`readerOneCallsReserved`); only without one (no web member: local mode, fixtures) today's `webSitesOf`
+ * readerOneCallsPerPack, as the estimate counts this debate's kind: a path debate's PATHS, a dig's DIG with its picks, else a
+ * first debate's START.
  */
-export function webReaderOneCallsReserved(input: Pick<WebStepInput, "mode"> & Partial<Pick<WebStepInput, "dig" | "pathsMode">>): number {
+export function webReaderOneCallsReserved(input: Pick<WebStepInput, "mode">
+  & Partial<Pick<WebStepInput, "dig" | "pathsMode" | "readerOneCallsReserved">>): number {
+  const reserved = input.readerOneCallsReserved;
+  if (typeof reserved === "number" && Number.isSafeInteger(reserved) && reserved >= 0) return reserved;
   const depth = input.mode === "thorough" ? "THOROUGH" as const : "QUICK" as const;
   const within = (count: number, max: number) => Math.min(Math.max(count, 1), max);
   if (input.pathsMode !== undefined && input.pathsMode !== null) {
