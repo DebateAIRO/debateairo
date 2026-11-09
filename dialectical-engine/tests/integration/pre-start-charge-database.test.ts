@@ -1,14 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  PostgresModelSpendStore, linkPreStartTry, preStartChargeWriterPresent, preStartSpendRef, readRunQuotaUsed, recordAskClarifyCharge, recordPreStartCharge,
+  PostgresModelSpendStore, linkPreStartTry, preStartChargeWriterPresent, preStartSpendRef, readRunQuotaUsed, recordPreStartCharge,
   type PreStartChargeKind
 } from "@debateai/budget";
 import { RUN_PATH_SET_REFUSALS, WORK_ITEM_RETRY, WorkItemRepository } from "@debateai/battery";
 import { createPool, migrate, type Pool } from "@debateai/db";
-import { ASK_CLARIFY_SPEND_REF } from "../../apps/api/src/ask-clarify.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 
 /**
  * 0158 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 18; spec §5.2): the small AIs before Start count in the person's day, week and month,
@@ -18,6 +18,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 let database: TestDatabase;
 let runner: Pool;
 let billing: Pool;
+/** The API's request pool: the billing login with the cross-account target main.ts gives it, so a request's session reaches the database (0171). */
+let billingRequests: Pool;
 let erasure: Pool;
 let worker: Pool;
 let authorization: Pool;
@@ -33,12 +35,13 @@ async function sqlError(run: () => Promise<unknown>): Promise<SqlError> {
   try { await run(); return { code: undefined, message: undefined }; }
   catch (error) { return error as SqlError; }
 }
-const loginPool = (role: string, password: string): Pool => {
+const loginUrl = (role: string, password: string): string => {
   const url = new URL(database.connectionString);
   url.username = role;
   url.password = password;
-  return createPool(url.toString());
+  return url.toString();
 };
+const loginPool = (role: string, password: string): Pool => createPool(loginUrl(role, password));
 type Account = Readonly<{ userId: string; ownerRef: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
@@ -55,12 +58,14 @@ const total = async (pool: Pool, sql: string, values: readonly unknown[]): Promi
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  for (const [login, role] of [["ps_runner", "debateai_runtime"], ["ps_billing", "debateai_billing_runtime"], ["ps_erasure", "debateai_erasure_runtime"],
+  // The runner's login as production makes it: the runtime role and the cross-account marker, which 0171's question and its moved grants ask for.
+  for (const [login, role] of [["ps_runner", "debateai_runtime, debateai_rls_all_accounts"], ["ps_billing", "debateai_billing_runtime"], ["ps_erasure", "debateai_erasure_runtime"],
     ["ps_worker", "debateai_data_export_worker"], ["ps_authorization", "debateai_authorization_runtime"], ["ps_replay", "debateai_replay"]] as const) {
     await database.pool.query(`CREATE ROLE ${login} LOGIN PASSWORD '${login}-test-only' IN ROLE ${role}`);
   }
   runner = loginPool("ps_runner", "ps_runner-test-only");
   billing = loginPool("ps_billing", "ps_billing-test-only");
+  billingRequests = createPool(loginUrl("ps_billing", "ps_billing-test-only"), { crossAccount: billing });
   erasure = loginPool("ps_erasure", "ps_erasure-test-only");
   worker = loginPool("ps_worker", "ps_worker-test-only");
   authorization = loginPool("ps_authorization", "ps_authorization-test-only");
@@ -69,7 +74,7 @@ beforeAll(async () => {
   system = loginPool("ps_system", "ps_system-test-only");
 }, 600_000);
 afterAll(async () => {
-  await Promise.all([runner?.end(), billing?.end(), erasure?.end(), worker?.end(), authorization?.end(), replay?.end(), system?.end()]);
+  await Promise.all([runner?.end(), billingRequests?.end(), billing?.end(), erasure?.end(), worker?.end(), authorization?.end(), replay?.end(), system?.end()]);
   await database?.stop();
 });
 
@@ -94,7 +99,8 @@ describe("0158: the charge reaches every reader", () => {
     expect(await store.readOwnerSpentMicros(dan.ownerRef, from, to)).toBe(0);
     expect(await store.readOwnerSpentInRangesMicros(ana.ownerRef, [{ from, to }, { from: new Date(Date.now() - 7_200_000), to: from }])).toEqual([5, 0]);
     expect(await site.readDaySpentMicros(today())).toBe(dayBefore + 5);
-    expect(await new PostgresModelSpendStore(billing).readOwnerSpentMicros(ana.ownerRef, from, to)).toBe(5);
+    // On the API's own login a request presents its session (0171): the reader answers only for the session's own owner.
+    expect(await new PostgresModelSpendStore(asRequestOf(billingRequests, await seedLiveSession(database.pool, ana.userId))).readOwnerSpentMicros(ana.ownerRef, from, to)).toBe(5);
     const ledger = (await database.pool.query("SELECT spend_source,run_id,provider_ref,charge_micros::text charge FROM ledger.model_spend WHERE spend_id=$1", [made.spendId])).rows[0];
     expect(ledger).toEqual({ spend_source: "PRE_START", run_id: null, provider_ref: made.providerRef, charge: "3" });
   });
@@ -102,15 +108,17 @@ describe("0158: the charge reaches every reader", () => {
   it("a team member's call is in their grant's window and the team's reader beside step 2's small AI, not in a subscription window", async () => {
     const ana = await account();
     const [from, to] = window();
-    const teamBefore = await total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const teamBefore = await total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
     await recordPreStartCharge(runner, entry(ana.ownerRef, 4, "MERGE_LATE", GRANT));
-    await recordAskClarifyCharge(runner, { spendId: randomUUID(), ownerRef: ana.ownerRef, grant: GRANT, providerRef: ASK_CLARIFY_SPEND_REF,
-      chargedOn: today(), chargeMicros: 3, inputTokens: 1, outputTokens: 1 });
+    // Step 2's call as its writer leaves it for a grant: 0171 keeps a clarify call's grant only when it is the person's own and was running at its
+    // reservation (ask-clarify-charge-database.test.ts proves that), so this reader's input is the row itself.
+    await database.pool.query("INSERT INTO identity.ask_clarify_charge (charge_id,owner_ref,funding_kind,internal_grant_id,internal_grant_event_id,charge_micros) VALUES ($1,$2,'INTERNAL',$3,$4,3)",
+      [randomUUID(), ana.ownerRef, GRANT.grantId, GRANT.grantEventId]);
     const store = new PostgresModelSpendStore(runner);
     expect(await store.readOwnerSpentMicros(ana.ownerRef, from, to)).toBe(0);
     expect(await store.readOwnerSpentMicros(ana.ownerRef, from, to, { kind: "INTERNAL", ...GRANT }, "PERSON_MONTH")).toBe(7);
     expect(await total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total", [ana.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to])).toBe(7);
-    expect(await total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to])).toBe(teamBefore + 7);
+    expect(await total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to])).toBe(teamBefore + 7);
   });
 
   it("the row holds the person, the kind, the cost and the time", async () => {
@@ -306,7 +314,7 @@ describe("0165: a failed question gives back its charges before Start", () => {
     const [from, to] = window();
     const grantSpent = () => total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total",
       [owner.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to]);
-    const teamSpent = () => total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const teamSpent = () => total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
     const [grantBefore, teamBefore] = [await grantSpent(), await teamSpent()];
     await charged(4, "COMBINE", made, GRANT);
     expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBe(1);
@@ -389,7 +397,7 @@ describe("0165: a failed question gives back its charges before Start", () => {
     const [from, to] = window();
     const grantSpent = () => total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total",
       [owner.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to]);
-    const teamSpent = () => total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const teamSpent = () => total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
     const [grantBefore, teamBefore] = [await grantSpent(), await teamSpent()];
     await charged(4, "LIST", made, GRANT);
     expect(await linkPreStartTry(runner, { ownerRef: owner.ownerRef, tryRef: made, runId: run })).toBe(1);
@@ -406,7 +414,7 @@ describe("0165: a failed question gives back its charges before Start", () => {
     const store = new PostgresModelSpendStore(runner);
     const grantSpent = () => total(runner, "SELECT billing.read_internal_grant_spent($1,$2,$3,$4,$5,false) AS total",
       [owner.ownerRef, GRANT.grantId, GRANT.grantEventId, from, to]);
-    const teamSpent = () => total(runner, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
+    const teamSpent = () => total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
     const [before, grantBefore, teamBefore] = [await store.readOwnerSpentMicros(owner.ownerRef, from, to), await grantSpent(), await teamSpent()];
     const refused: (readonly [string, string])[] = [];
     for (const code of RUN_PATH_SET_REFUSALS) {
