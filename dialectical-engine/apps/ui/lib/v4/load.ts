@@ -13,7 +13,7 @@ import { API_BASE, contractClient, createSameOriginFetch, isNotFound } from "../
 import { DIG_PROGRESS_ABSENT, digProgressPath, parseDigProgress, type DigProgressRead } from "./digProgress.js";
 import { quotaUntouched } from "./failedRun.js";
 import { buildV4Map, isFinishedRewrite } from "./mapModel.js";
-import type { DigLink, DigView } from "./types.js";
+import type { DigLink, DigView, ReadingLevel } from "./types.js";
 
 export { storyReadFailed } from "./mapModel.js";
 
@@ -37,6 +37,11 @@ export type V4Load =
      * when unknown: an answer id opened directly, a database without the tag, or "und".
      */
     language?: string;
+    /**
+     * V4 start step, Task 75c (owner answer Q15, 5 Nov): the level the debate was asked at, as its run read says; the map page
+     * shows it whatever the address says. Absent when it was asked without one (or an answer id was opened directly).
+     */
+    level?: ReadingLevel;
   }>;
 
 type StoryClient = Pick<ContractClient, "readAnswerStory">;
@@ -114,7 +119,8 @@ export async function loadV4(id: string, client: LoadClient = contractClient): P
     throw failure;
   }
   const language = argumentLanguage(run);
-  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client), ...(language === null ? {} : { language }) };
+  return { kind: "SERVED", runId: id, answer, story: await storyFor(answer, client), ...(language === null ? {} : { language }),
+    ...(run.reading_level === undefined ? {} : { level: run.reading_level }) };
 }
 
 /** The run's question language as a usable tag: "und" (detection not confident) and a missing tag are unknown. */
@@ -140,9 +146,12 @@ function digView(link: DigLink, state: DigView["state"], run?: RunProjection): D
   // (wait-f2, public-f16): with the server's answer whether it may continue now, so its panel can offer Continue.
   const pause = run?.month_pause;
   // wait-f18: a dig that did not finish keeps its run's reason (the panel shows only its plain sentence) and, when the
-  // server confirmed it, that nothing was taken from the quota for it.
+  // server confirmed it, that nothing was taken from the quota for it. V4 start step, Task 57i: and whether Continue would continue it.
   const failed = state === "FAILED" && run !== undefined
-    ? { terminalReason: run.terminal_reason, questionLine: run.question_line, ...(quotaUntouched(run) ? { quotaUntouched: true as const } : {}) }
+    ? { terminalReason: run.terminal_reason, questionLine: run.question_line, ...(quotaUntouched(run) ? { quotaUntouched: true as const } : {}),
+      ...(run.continuable === true ? { continuable: true as const } : {}),
+      // Task 57m: or that it keeps failing after two continues.
+      ...(run.keeps_failing === true ? { keepsFailing: true as const } : {}) }
     : {};
   return {
     link, state, headline: null, counts: null,
@@ -275,7 +284,15 @@ export type WriteReportResult =
   | Readonly<{ kind: "WRITING"; reportVersion: number; waitingForDigs: number }>
   /** A finished version stands: the page offers "Keep digging", which reopens the investigation. */
   | Readonly<{ kind: "CLOSED" }>
+  /**
+   * V4 start step, Task 56c (item public-f25; owner answer Q20 B): a further report on a public debate waits for the reset (409
+   * PUBLIC_DEBATE_WAITS_FOR_RESET): nothing started, and the page says when it can start, never that it could not confirm.
+   */
+  | Readonly<{ kind: "WAITS_FOR_RESET" }>
   | Readonly<{ kind: "FAILED" }>;
+
+/** Task 56c: the report route's refusal of a further public report while new starts wait (apps/api, Task 56b). */
+const REPORT_WAITS_FOR_RESET = "PUBLIC_DEBATE_WAITS_FOR_RESET";
 
 /** "Write my report": closes the investigation and numbers the version being written (a second press: the same one). */
 export async function writeReport(runId: string, client: Pick<ContractClient, "writeReport"> = contractClient): Promise<WriteReportResult> {
@@ -283,7 +300,8 @@ export async function writeReport(runId: string, client: Pick<ContractClient, "w
     const answer = await Promise.resolve().then(() => client.writeReport(runId));
     if ("state" in answer) return { kind: "WRITING", reportVersion: answer.report_version, waitingForDigs: answer.waiting_for_digs };
     return { kind: "CLOSED" };
-  } catch {
+  } catch (failure) {
+    if (failure instanceof ContractHttpError && failure.status === 409 && failure.serverCode === REPORT_WAITS_FOR_RESET) return { kind: "WAITS_FOR_RESET" };
     return { kind: "FAILED" };
   }
 }

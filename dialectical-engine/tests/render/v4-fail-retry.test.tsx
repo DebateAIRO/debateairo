@@ -101,8 +101,9 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     harness.run = failedRun(runId);
     await mountMap(1600, runId);
     expect(text()).toContain(HOME["runFailure.MODELS_UNAVAILABLE"]);
-    // The ask step is filled from this debate: only its id travels in the address, never the words.
-    expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBe(`/v4?again=${runId}&level=background`);
+    // The ask step is filled from this debate: only its id travels in the address, never the words; Task 75d: nor its level,
+    // which the ask step reads back from the server with the words.
+    expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBe(`/v4?again=${runId}`);
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).not.toContain("tutors");
     expect(text()).toContain(CATALOG["v4.debate.askAgainNoteQuestion"]);
     const askNew = [...page().querySelectorAll("a")].find((link) => link.textContent?.trim() === CATALOG["v4.debate.askNew"])!;
@@ -155,7 +156,7 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
     harness.records = { parent: { parent_run_id: parent, child_run_id: runId, places: ["path:n-mix"], mode: "quick", created_at: "2026-10-29T10:05:00.000Z" }, children: [] };
     await mountMap(1600, runId);
     expect(linkHref(CATALOG["v4.debate.askAgain"]!)).toBeNull();
-    expect(linkHref(CATALOG["v4.report.backToMap"]!)).toBe(`/v4/debate/${parent}?level=background`);
+    expect(linkHref(CATALOG["v4.report.backToMap"]!)).toBe(`/v4/debate/${parent}`);
     expect(text()).toContain(CATALOG["v4.debate.digFailedBackNote"]);
     // Question 3 A: its reason is said about the dig, never in the question's sentence.
     expect(text()).toContain(CATALOG["v4.digFailed.reason.MODELS_UNAVAILABLE"]);

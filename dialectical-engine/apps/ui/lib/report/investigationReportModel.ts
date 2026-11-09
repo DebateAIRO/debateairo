@@ -1,6 +1,7 @@
 import type { InvestigationReportVersion } from "@debateai/contract";
 import { formatDate, formatNumber, t } from "../i18n/translate.js";
 import type { LocaleCode } from "../i18n/locales.js";
+import { apartFromQuestion } from "../v4/reportPaths.js";
 import { pathTrustWord } from "./pathTrust.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
 
@@ -16,6 +17,9 @@ import type { ReportCatalogs } from "./reportLanguage.js";
  * Round 2 (owner, 3 Nov 2026): r2-20, each path prints ONE trust word worked out from its points (lib/report/pathTrust.ts),
  * never an outcome tag ("Held up", "Partly held", "Set aside", "Fell"); r2-13, a Free debate prints "Not checked on the web.",
  * the honest half of the screen's line.
+ * V4 start step, Task 55f: the digs on the main question print after every path, under a row that is the question itself, so they sit
+ * one step in as every follow-up debate does, never under the last path (lib/v4/reportPaths.ts apartFromQuestion, the page's split).
+ * A version written before the mark prints as it always did.
  * Pure data, so it is tested without drawing a PDF; InvestigationReportDocument turns it into pages.
  */
 export type FinishedInvestigationReport = Extract<InvestigationReportVersion, { state: "READY" | "READY_WITH_RESERVATION" }>;
@@ -109,6 +113,10 @@ export function buildInvestigationReportPdfModel(input: Readonly<{
   const { publicCatalog, locale } = catalogs;
   const { story, answer, sources } = version;
   const paths = version.paths ?? [];
+  const { tree, question: onQuestion } = apartFromQuestion(paths);
+  const questionRow: InvestigationReportPdfPath = Object.freeze({ level: 0, trustWords: null, line: question, summary: null, points: Object.freeze([]), dig: null });
+  const items = [...tree.map((path) => pdfPathOf(path, catalogs)),
+    ...(onQuestion.length === 0 ? [] : [questionRow, ...onQuestion.map((path) => pdfPathOf(path, catalogs))])];
   return Object.freeze({
     language: locale,
     documentTitle: t(publicCatalog, "public.report.documentTitle", { question }),
@@ -132,7 +140,7 @@ export function buildInvestigationReportPdfModel(input: Readonly<{
     paths: paths.length === 0 ? null : Object.freeze({
       title: t(publicCatalog, "public.report.investigation.paths"),
       intro: t(publicCatalog, "public.report.investigation.pathsIntro"),
-      items: Object.freeze(paths.map((path) => pdfPathOf(path, catalogs)))
+      items: Object.freeze(items)
     }),
     howItWent: story === null || story.how_it_went.length === 0 ? null
       : Object.freeze({ title: t(publicCatalog, "public.report.investigation.howItWent"), paragraphs: Object.freeze(story.how_it_went.map((entry) => entry.paragraph)) }),

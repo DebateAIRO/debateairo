@@ -102,7 +102,7 @@ async function settledDebate(options: Readonly<{ readerOne?: "READ" | "FAILED" }
     const readingId = webStepRowId(runId, "reading", pageId, "1");
     const read = (options.readerOne ?? "READ") === "READ";
     expect(await store.recordReading({ runId, readingId, pageId, reader: 1, maker: "anthropic", outcome: read ? "READ" : "FAILED", grade: read ? 1 : null,
-      line: read ? cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: "A town survey of queues.", language: "en", note: NOTE }) : null })).toBe("RECORDED");
+      line: read ? cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: "A town survey of queues.", language: "en", note: NOTE }) : null, settingsVersion: 4 })).toBe("RECORDED");
     expect(await store.recordPicks(runId, "a1", [topId])).toBe("RECORDED");
     expect(retention).toBeDefined();
   } finally {
@@ -181,7 +181,11 @@ describe("W4-4 Add to researched", () => {
     expect((await new PostgresPassageRetentionRepository(runner).wipe(runId, "NOTHING_RUNS")).outcome).toBe("STILL_RUNNING");
 
     const ais = readers();
-    expect(await sweepWebResearched(settingsOf(ais.members))).toMatchObject({ listed: 1, settled: 1, skipped: 0 });
+    // Task 57p (0169): the readings note the version the debate's calls are charged under now (made up: 25, today's, not the debate's 4).
+    expect(await sweepWebResearched(settingsOf(ais.members, { settingsVersionOf: (id) => id === runId ? 25 : undefined })))
+      .toMatchObject({ listed: 1, settled: 1, skipped: 0 });
+    expect((await database.pool.query("SELECT reader, settings_version FROM identity.web_reading WHERE page_id=$1 ORDER BY reader", [pageId])).rows
+      .map((row) => [row.reader, Number(row.settings_version)])).toEqual([[1, 4], [2, 25], [3, 25]]);
     // Reader 1 read it when the debate ran: it is not bought again. Readers 2 and 3 were sent the whole text.
     expect(ais.sent.haiku).toEqual([]);
     expect(ais.sent.deepseek).toHaveLength(1);

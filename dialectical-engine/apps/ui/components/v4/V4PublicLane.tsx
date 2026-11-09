@@ -24,8 +24,9 @@ import {
   waitingPublicDig, type PublicDigSuggestion
 } from "@/lib/v4/publicDig";
 import {
-  contributorName, pressPublicReport, publicDigAsk, reportsNewestFirst, type PublicAddition, type PublicPathView, type PublicReportPress
+  contributorName, pressPublicReport, publicDigAsk, publicReportWaitLine, reportsNewestFirst, type PublicAddition, type PublicPathView, type PublicReportPress
 } from "@/lib/v4/publicPage";
+import { replayHighlight } from "@/lib/v4/highlight";
 import { publicReportWriting, reportShown } from "@/lib/v4/publicReport";
 import { focusInPlace, useFocusHandOff, type FocusHandOff } from "@/lib/v4/useFocusHandOff";
 import { useWaitPolling } from "@/lib/v4/useWaitPolling";
@@ -114,6 +115,11 @@ type LaneActions = Readonly<{
    */
   startDig(path: PublicPathView, press: DigPress): Promise<number | DigRefused | null>;
   writeReport(): Promise<PublicReportPress>;
+  /**
+   * V4 start step, Task 56c (public-f25; owner answer Q20 B): once the debate already shows a report and new starts wait for the reset,
+   * the words that say when a further report can start ("This report can start after 08:00."); null otherwise (signed out too).
+   */
+  reportWait: string | null;
 }>;
 
 const LaneContext = createContext<LaneActions | null>(null);
@@ -139,7 +145,10 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
     locale,
     crisisCountryHint: lane.crisisCountryHint,
     mode: "quick",
-    readingLevel: level
+    readingLevel: level,
+    // Once the debate shows a report, a further one waits for the reset like a dig (Task 56c, publicReportWaitLine): a dig refused
+    // in a used-up month then says nothing of writing a report (lib/v4/publicPage.ts publicDigRefusalWords).
+    publicReportWaits: (debate.reports ?? []).length > 0
   });
   const { submit, room, planTier, submitting, dialogs } = ask;
   // The send runs after the 10 seconds, perhaps once the person has left this page: it uses the hook's last submit, which
@@ -228,9 +237,14 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
   }, [publicRef, question, catalog, locale, planTier, share, room, clickCheck]);
   const writeReport = useCallback(() => pressPublicReport(debate.public_ref, { catalog, room, locale }), [debate.public_ref, catalog, room, locale]);
   const suggestionsFor = useCallback((path: PublicPathView) => publicSuggestionsFor(debate, path), [debate]);
+  // Task 56c (public-f25): a further report waits for the reset once a report already shows; the button then says when.
+  const reportWait = useMemo(() => {
+    const line = publicReportWaitLine(room, debate, locale);
+    return line === null ? null : t(catalog, line.key, line.values);
+  }, [room, debate, locale, catalog]);
   const actions = useMemo<LaneActions>(() => ({
-    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: linkLevel, share, periodLine, suggestionsFor, startDig, writeReport
-  }), [returnPath, planTier, submitting, publicRef, linkLevel, share, periodLine, suggestionsFor, startDig, writeReport]);
+    signedIn: true, returnPath, planTier, busy: submitting, publicRef, level: linkLevel, share, periodLine, suggestionsFor, startDig, writeReport, reportWait
+  }), [returnPath, planTier, submitting, publicRef, linkLevel, share, periodLine, suggestionsFor, startDig, writeReport, reportWait]);
   return (
     <LaneContext.Provider value={actions}>
       {children}
@@ -252,7 +266,7 @@ export function V4PublicLaneProvider({ debate, lane, children }: Readonly<{ deba
   }, [debate.contributions]);
   const quiet = useMemo<LaneActions>(() => ({
     signedIn, returnPath, planTier: "free", busy: false, publicRef: debate.public_ref, level: null, share: null, periodLine: null, suggestionsFor: () => [],
-    startDig: async () => ({ kind: "REFUSED", message: "" }), writeReport: async () => ({ kind: "REFUSED", message: "" })
+    startDig: async () => ({ kind: "REFUSED", message: "" }), writeReport: async () => ({ kind: "REFUSED", message: "" }), reportWait: null
   }), [signedIn, returnPath, debate.public_ref]);
   return (
     <DigMakersContext.Provider value={makers}>
@@ -726,9 +740,13 @@ function useReportPress(debate: PublicDebate): Readonly<{ state: ReportPressStat
 /**
  * The press itself: the terms and "Write a report" (it says it is starting while the press is sent; after a failed report it offers to write it again),
  * or the signed-out choice. While a report is written the card at the top says so, and the button waits for it.
+ * V4 start step, Task 56c (public-f25; owner answer Q20 B): signed in, once a report already shows and new starts wait for the reset, the button stays,
+ * greyed but focusable, with "This report can start after 08:00." beside it; a press shows the line again and sends nothing. With no report shown it is
+ * never greyed (the press may be the owner's first report, which goes ahead), and a refused press names the time as today's line does.
  */
 function ReportButton({ state, press, catalog }: Readonly<{ state: ReportPressState; press: () => Promise<void>; catalog: MessageCatalog }>) {
   const actions = useContext(LaneContext);
+  const waitsId = useId();
   if (actions === null) return null;
   if (actions.signedIn === null) return <HeldPlace label={t(catalog, "v4.public.report.write")} />;
   if (!actions.signedIn) {
@@ -736,16 +754,25 @@ function ReportButton({ state, press, catalog }: Readonly<{ state: ReportPressSt
   }
   if (state.kind === "WRITING") return null;
   const pressing = state.kind === "PRESSING";
+  const waits = pressing ? null : actions.reportWait;
   const label = pressing ? "v4.ask.starting" : state.kind === "FAILED" ? "v4.investigation.writeAgain" : "v4.public.report.write";
   return (
     <div className="v4PubReportPress">
       <p className="v4PubHint">{t(catalog, "v4.public.report.terms")}</p>
       {/* ACCESS-3: it stays focusable while it says it is starting (a second press does nothing), so focus is not lost. */}
-      <button type="button" className="v4Btn" aria-disabled={pressing ? "true" : undefined} aria-busy={pressing}
-        onClick={() => { if (!pressing) void press(); }} data-public-report-press>
+      <button type="button" className={`v4Btn${waits === null ? "" : " v4DigWaiting"}`} aria-disabled={pressing || waits !== null ? "true" : undefined}
+        aria-busy={pressing} aria-describedby={waits === null ? undefined : waitsId}
+        onClick={() => {
+          if (waits !== null) {
+            replayHighlight(document.getElementById(waitsId));
+            return;
+          }
+          if (!pressing) void press();
+        }} data-public-report-press>
         {t(catalog, label)}
       </button>
-      {state.kind === "REFUSED" ? <p className="v4AskRefusal" role="alert">{state.message}</p> : null}
+      {waits !== null ? <p id={waitsId} className="v4PubHint v4DigWaitLine" data-public-report-waits="">{waits}</p> : null}
+      {state.kind === "REFUSED" && waits === null ? <p className="v4AskRefusal" role="alert">{state.message}</p> : null}
     </div>
   );
 }

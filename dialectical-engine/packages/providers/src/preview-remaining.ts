@@ -25,6 +25,11 @@ export type PreviewGateRemaining = Readonly<{
    */
   largestFinalWriterReservationNanoUsd?: bigint;
   finalWriterMaxInFlight?: number;
+  /**
+   * V4 start step, Task 5: the day's pot (the gate's daily budget), present only when the app asked for it
+   * (`createPreviewRemainingRpcPort(…, { dailyPot: true })`) and the gate answered it. Absent: not asked.
+   */
+  dailyPotNanoUsd?: bigint;
 }>;
 
 export interface PreviewRemainingPort {
@@ -43,6 +48,13 @@ const REPLY_KEYS = Object.freeze([
 ]);
 /** LG-B: the same answer with the gate's final-writer room (a GO that names max_final_writer_calls). */
 const FINAL_WRITER_REPLY_KEYS = Object.freeze([...REPLY_KEYS, "final_writer_max_in_flight", "largest_final_writer_reservation_usd"].sort());
+/** V4 start step, Task 5: each of the two answers plus the day's pot, when the app asked for it (8 and 10 members). */
+const POT_REPLY_KEYS = Object.freeze([...REPLY_KEYS, "daily_pot_usd"].sort());
+const FINAL_WRITER_POT_REPLY_KEYS = Object.freeze([...FINAL_WRITER_REPLY_KEYS, "daily_pot_usd"].sort());
+/** The four accepted member sets, by size: 7 today's, 8 today's + pot, 9 the final-writer room's, 10 that + pot. */
+const REPLY_KEY_SETS: ReadonlyMap<number, readonly string[]> = new Map([[REPLY_KEYS.length, REPLY_KEYS],
+  [POT_REPLY_KEYS.length, POT_REPLY_KEYS], [FINAL_WRITER_REPLY_KEYS.length, FINAL_WRITER_REPLY_KEYS],
+  [FINAL_WRITER_POT_REPLY_KEYS.length, FINAL_WRITER_POT_REPLY_KEYS]]);
 const STATES = new Set(["active", "initialized", "halted"]);
 
 function unreachable(detail: string): TypedDomainError {
@@ -62,9 +74,12 @@ export function parsePreviewGateRemaining(value: unknown): PreviewGateRemaining 
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
   const row = value as Record<string, unknown>;
   const keys = Object.keys(row).sort();
-  const expected = keys.length === FINAL_WRITER_REPLY_KEYS.length ? FINAL_WRITER_REPLY_KEYS : REPLY_KEYS;
-  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) return undefined;
-  const finalWriter = expected === FINAL_WRITER_REPLY_KEYS;
+  const expected = REPLY_KEY_SETS.get(keys.length);
+  if (expected === undefined || keys.some((key, index) => key !== expected[index])) return undefined;
+  const finalWriter = expected === FINAL_WRITER_REPLY_KEYS || expected === FINAL_WRITER_POT_REPLY_KEYS;
+  const pot = expected === POT_REPLY_KEYS || expected === FINAL_WRITER_POT_REPLY_KEYS;
+  const dailyPotNanoUsd = pot ? previewUsdTextToNano(row.daily_pot_usd) : undefined;
+  if (pot && dailyPotNanoUsd === undefined) return undefined;
   const largestFinalWriterReservationNanoUsd = finalWriter ? previewUsdTextToNano(row.largest_final_writer_reservation_usd) : undefined;
   const finalWriterMaxInFlight = row.final_writer_max_in_flight;
   if (finalWriter && (largestFinalWriterReservationNanoUsd === undefined || typeof finalWriterMaxInFlight !== "number"
@@ -91,6 +106,7 @@ export function parsePreviewGateRemaining(value: unknown): PreviewGateRemaining 
     largestReservationNanoUsd,
     ...(finalWriter ? { largestFinalWriterReservationNanoUsd: largestFinalWriterReservationNanoUsd!,
       finalWriterMaxInFlight: finalWriterMaxInFlight as number } : {}),
+    ...(pot ? { dailyPotNanoUsd: dailyPotNanoUsd! } : {}),
     enabledModels: Object.freeze([...(models as string[])])
   });
 }
@@ -104,13 +120,17 @@ export function previewGateOffersFinalWriterTier(remaining: PreviewGateRemaining
   return remaining !== undefined && remaining.finalWriterMaxInFlight !== undefined;
 }
 
-/** Local IPC only, on the same socket and allow-list as `/complete`. Read-only. */
+/**
+ * Local IPC only, on the same socket and allow-list as `/complete`. Read-only. V4 start step, Task 5: with `dailyPot`
+ * the request also asks for the day's pot (`"daily_pot":true`); without it the body is exactly today's.
+ */
 export function createPreviewRemainingRpcPort(
   config: Readonly<{ budget_socket: string; scope_id: string }>,
-  timeoutMs: number = PREVIEW_REMAINING_TIMEOUT_MS
+  timeoutMs: number = PREVIEW_REMAINING_TIMEOUT_MS,
+  options?: Readonly<{ dailyPot?: true }>
 ): PreviewRemainingPort {
   const socketPath = config.budget_socket;
-  const data = JSON.stringify({ scope_id: config.scope_id });
+  const data = JSON.stringify(options?.dailyPot === true ? { scope_id: config.scope_id, daily_pot: true } : { scope_id: config.scope_id });
   return Object.freeze({ remaining(signal?: AbortSignal) {
     return new Promise<PreviewGateRemaining>((resolve, reject) => {
       const request = httpRequest({ socketPath, path: "/remaining", method: "POST",

@@ -2405,20 +2405,28 @@ BEGIN
       RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 refusal asks %', v_item.signature;
     END IF;
   END LOOP;
-  -- F5: and no other identity definer the API's billing role may call with an owner believes it, the two spend readers of 0144 and 0149 included. But the two
-  -- named here, which arrived with the merge of the V4 line and do believe the owner they are handed (0157's reader of a person's own statements of reasons and of
-  -- their contribution's review state): this step does not change them, and a step of its own is to ask them. A new definer that is not named still refuses.
+  -- F5: and no other identity definer the API's billing role may call with an owner believes it, the two spend readers of 0144 and 0149 included. But the ones
+  -- named here, which arrived with the merges of the V4 line and do believe the owner they are handed (0157's reader of a person's own statements of reasons and of
+  -- their contribution's review state; the second merge's: 0158's and 0165's charges and readers before Start, 0161's report count, 0162's saved questions and 0167's
+  -- report press): this step does not change them, and a step of its own is to ask them. A new definer that is not named still refuses.
   IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
       WHERE n.nspname = 'identity' AND p.prosecdef AND p.proargnames && ARRAY['p_owner_ref','p_owner']::text[]
         AND pg_catalog.has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
-        AND p.oid NOT IN ('identity.read_own_moderation_statements(uuid)'::regprocedure, 'identity.read_own_contribution_review(uuid,uuid)'::regprocedure)
+        AND p.oid NOT IN ('identity.read_own_moderation_statements(uuid)'::regprocedure, 'identity.read_own_contribution_review(uuid,uuid)'::regprocedure,
+          'identity.read_pre_start_spent(uuid,timestamptz,timestamptz)'::regprocedure, 'identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)'::regprocedure,
+          'identity.count_public_reports(uuid,uuid)'::regprocedure, 'identity.create_saved_question(uuid,uuid,jsonb,jsonb)'::regprocedure,
+          'identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)'::regprocedure, 'identity.read_saved_questions(uuid,integer)'::regprocedure,
+          'identity.read_saved_question(uuid,uuid)'::regprocedure, 'identity.delete_saved_question(uuid,uuid)'::regprocedure,
+          'identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)'::regprocedure, 'identity.link_pre_start_try(uuid,text,uuid)'::regprocedure,
+          'identity.read_run_quota_used(uuid,uuid)'::regprocedure, 'identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)'::regprocedure)
         AND p.prosrc !~ 'identity\.(request_owner_matches|page_memory_run_owned)\(') THEN
     RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 owner believed';
   END IF;
   -- F5: the site's day is the system's to write. No role a request may hold inserts into its three tables, the marker does, and the request-facing
   -- roles still read them; and no definer a request login may call writes them, but 0107's settlement of a funded debate's admitted call, which
-  -- asks the run's owner (above) and writes only the call its admission reserved. The language, question and clarify writers are the marker's alone
-  -- (the moved list above).
+  -- asks the run's owner (above) and writes only the call its admission reserved, and 0158's charge of a call before Start, which arrived with the second
+  -- merge of the V4 line and writes the day for any owner it is handed (0165's try charge calls it): this step does not change it, and a step of its own is
+  -- to move it to the marker as the clarify charge's was. The language, question and clarify writers are the marker's alone (the moved list above).
   FOREACH v_role IN ARRAY ARRAY['ledger.model_spend', 'ledger.model_spend_hold', 'ledger.model_spend_reservation'] LOOP
     IF EXISTS (SELECT 1 FROM pg_catalog.unnest(v_roles) AS candidate(role) WHERE pg_catalog.has_table_privilege(candidate.role, v_role, 'INSERT'))
       OR NOT pg_catalog.has_table_privilege('debateai_rls_all_accounts', v_role, 'INSERT')
@@ -2430,7 +2438,8 @@ BEGIN
   WHERE p.prosecdef AND p.prosrc ~ 'INSERT INTO ledger\.model_spend(_hold|_reservation)?\M'
     AND (pg_catalog.has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_authorization_runtime', p.oid, 'EXECUTE'));
-  IF v_grantees IS DISTINCT FROM ARRAY['billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)'] THEN
+  IF v_grantees IS DISTINCT FROM ARRAY['billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)',
+      'identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)'] THEN
     RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 day writers %', v_grantees;
   END IF;
   -- F5: 0000's sequence counter is written only through its allocator, a definer of the table's own owner with 0056's search path, which keeps the

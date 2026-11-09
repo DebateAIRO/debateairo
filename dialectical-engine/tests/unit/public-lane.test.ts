@@ -56,7 +56,6 @@ describe("the public page's words", () => {
     "v4.contribution.ON_THE_PAGE": "This changed the public page.",
     "v4.contribution.KEPT_PRIVATE": "This stayed private: it did not pass the check, so the public page is unchanged. Only you can see it.",
     "v4.public.report.ongoing": "Something is still being added to this debate. Try again when it is finished.",
-    "v4.public.report.noCarrier": "This debate's first author has left and no dig is on it yet, so a report can't be written. Dig into a path first.",
     "v4.public.report.write": "Write a report",
     // journey-f13 (owner's screen review, 3 Nov): "Dig here" on every page, own and public, in place of decision 22's "Dig into this";
     // the box's Start reads as the map's picks button ("Dig into this · up to 3%" for one pick, lib/v4/digQuota.ts).
@@ -203,6 +202,24 @@ describe("refusals in plain words", () => {
     expect(words(409, "DIG_TOO_DEEP")).toBe(CATALOG["v4.public.refusal.tooDeep"]);
     expect(words(409, "PUBLIC_DEBATE_REPORT_WRITING")).toBe(CATALOG["v4.public.refusal.reportWriting"]);
     expect(words(409, "PUBLIC_DEBATE_WAITS_FOR_RESET")).toBe(CATALOG["v4.public.refusal.waitsForReset"]);
+  });
+  it("question 46 A (owner, 8 Nov): a report press on a debate that holds nothing yet says so, and no longer sends the reader to dig first", () => {
+    // Drafted (v4-catalog-keys.test.ts DRAFTED_UNTIL_CLICK_TEST): the owner approves the words at the click-test.
+    expect(CATALOG["v4.public.report.noCarrier"]).toBe("There's nothing in this debate yet to write a report from.");
+  });
+  it("a used-up month: the dig's refusal drops 'You can still write your report.' only while this debate's report waits too", () => {
+    const month = { room: "FULL", scope: "PERSON_MONTH", resets_at: "2026-12-01T00:00:00.000Z", waiting_run_ref: null, plan_id: "FREE", new_starts: "BLOCKED_UNTIL_RESET" } as never;
+    const day = { room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-02T00:00:00.000Z", waiting_run_ref: null, plan_id: "PRO", new_starts: "BLOCKED_UNTIL_RESET" } as never;
+    const usedUp = refusal(409, "PUBLIC_DEBATE_WAITS_FOR_RESET");
+    // No report shows yet: the next press may be the debate's first report, which goes ahead (owner Q20 B), so the line stays whole.
+    expect(publicDigRefusalWords(usedUp, CATALOG, month, "en")).toContain("You can still write your report.");
+    expect(publicDigRefusalWords(usedUp, CATALOG, month, "en", false)).toContain("You can still write your report.");
+    // A report already shows, so a further one waits for the reset as well: the month's line goes without that sentence, with the same date.
+    const waits = publicDigRefusalWords(usedUp, CATALOG, month, "en", true)!;
+    expect(waits).not.toContain("You can still write your report.");
+    expect(waits).toContain("New questions and digs can start on");
+    // A day's line says nothing of the report, so it is the same either way.
+    expect(publicDigRefusalWords(usedUp, CATALOG, day, "en", true)).toBe(publicDigRefusalWords(usedUp, CATALOG, day, "en", false));
   });
   it("a used-up limit says when, when the room read knows; anything else goes on to the ask's own handling", () => {
     const room = { room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-02T00:00:00.000Z", waiting_run_ref: null, plan_id: "FREE", new_starts: "BLOCKED_UNTIL_RESET" } as never;

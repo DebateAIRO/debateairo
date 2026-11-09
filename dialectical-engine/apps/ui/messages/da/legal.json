@@ -130,6 +130,8 @@
   "legal.providers.purpose.synthesisCheck": "Syntesen af en afsluttet debat — til at kontrollere den for fire kategorier",
   "legal.providers.purpose.reportCheck": "En anmeldelse sendt med knappen Anmeld og debattens offentlige tekst — til at kontrollere anmeldelsen",
   "legal.providers.purpose.questionCheck": "Et spørgsmål, før en debat starter — til at kontrollere, om debatten må starte",
+  "legal.providers.purpose.clarifyQuestions": "Før en debat starter: forslag til præciserende spørgsmål",
+  "legal.providers.purpose.suggestPaths": "Før en debat starter: forslag til, hvad der er værd at undersøge",
   "legal.providers.purpose.search": "Søgespørgsmål, som modellerne formulerer ud fra debatten — til at finde belæg på nettet",
   "legal.providers.purpose.support": "Det, du skriver i supportsamtalen — til at svare dig",
   "legal.providers.purposesUnconfirmed": "[skal bekræftes: hvilke af disse opgaver den får]",

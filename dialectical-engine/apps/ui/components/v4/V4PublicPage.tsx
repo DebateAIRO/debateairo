@@ -36,6 +36,8 @@ import { V4TrustBar } from "./V4TrustBar";
  * public-f1: nothing here shows a score, a percentage, a capital-letter measure, a model or maker, a for/against count or the old disclaimer; the scores
  * only choose the strongest point on each side (lib/v4/publicMap.ts) and stay there. public-f3: there is no Challenge and no Regenerate. Every line the
  * AIs wrote is marked as AI text and read in the debate's language (`storyLocale`). Nothing is kept in the browser.
+ * V4 start step, Task 63: on a path debate each row is named by its path's title, and the person's own words (a path they added or rewrote, the views
+ * they wrote into one) show as theirs, never marked as AI text, as the question is.
  */
 
 /** The page address's word for the map view: `?view=map` (journey-d4: each view has its own address). */
@@ -239,7 +241,11 @@ function PathRow({ path, view, open, onToggle, words, props }: Readonly<{
 }>) {
   const { catalog, storyLocale, locale } = props;
   const bodyId = useId();
-  const label = cardLabel(path.line);
+  // Task 63: a path debate's row is named by its path's title; a title the person wrote (a path they added or rewrote) is never marked as AI text.
+  const title = view?.title ?? null;
+  const label = title ?? cardLabel(path.line);
+  const titleTheirs = title !== null && (view?.ownWords.includes(title) ?? false);
+  const ownWords = (view?.ownWords ?? []).filter((words) => words !== title);
   const line = path.line.replace(/\s+/gu, " ").trim();
   const star = path.open.some((question) => question.star);
   const checked = path.points.some((point) => point.trust !== null);
@@ -247,7 +253,7 @@ function PathRow({ path, view, open, onToggle, words, props }: Readonly<{
     <li className={`v4PubRow${open ? " v4PubRowOpen" : ""}`} id={`public-path-${path.id}`} data-public-path={path.id}>
       <h3 className="v4PubRowHeading">
         <button type="button" className="v4PubRowHead" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
-          <span className="v4PubRowTitle" data-ai-generated="true" lang={storyLocale} dir="auto">{label}</span>
+          <span className="v4PubRowTitle" {...(titleTheirs ? {} : { "data-ai-generated": "true" })} lang={storyLocale} dir="auto">{label}</span>
           <span className="v4PubRowMeta">
             {/* r2-20 A: the path's one trust word; a path that fell says "Didn't hold" even when its tree was not published. */}
             <TrustWordTag path={path} catalog={catalog} />
@@ -262,6 +268,15 @@ function PathRow({ path, view, open, onToggle, words, props }: Readonly<{
         {open ? (
           <>
             {line !== label ? <p className="v4PubRowLine" data-ai-generated="true" lang={storyLocale} dir="auto">{line}</p> : null}
+            {ownWords.length > 0 ? (
+              // Task 63 (spec 2026-11-03 §7): what the person wrote into the path, like the question itself, as they wrote it.
+              <div className="v4PubOwnWords" data-public-own-words>
+                <p className="v4PubLabel">{t(catalog, "v4.public.pathOwnWords")}</p>
+                <ul className="v4PubFirstPaths">
+                  {ownWords.map((words, at) => <li key={at} lang={storyLocale} dir="auto">{words}</li>)}
+                </ul>
+              </div>
+            ) : null}
             {checked ? (
               <div className="v4PubFound">
                 <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} size="large" showCounts />

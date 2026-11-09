@@ -358,6 +358,41 @@ export const REPORT_WRITER_V4_SEALED_CONTRACTS: readonly PromptContract[] = Obje
   REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT
 ]);
 
+/**
+ * V4 start step, Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"; owner answer Q4): when the person said what they care about
+ * (the purpose lines' marked answer to "What do you care about most?"), a path debate's main answer says, in one or two plain sentences,
+ * how that goal fares across the paths. The next versions of the writer and the check: v4's writer and v3's check byte for byte, each
+ * with one drafted sentence at its end; the forms as they were. DRAFTS: the owner reads both sentences word for word at Task 92, which
+ * seals them (appended to REPORT_WRITER_V4_SEALED_CONTRACTS); until then they are in no seal. A run without a stated goal asks
+ * report.answer.v4 and report.answer-check.v3, as before.
+ */
+// OWNER WORDING — approve before switch-on (Task 50b's draft of the owner's own sentence, plan 2026-11-03 Task 50b).
+export const REPORT_WRITER_GOAL_SENTENCE =
+  "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";
+// OWNER WORDING — approve before switch-on (Task 50b's draft: the check's one more criterion, that a stated goal is answered).
+export const REPORT_CHECKER_GOAL_CRITERION =
+  "If the question says what the person cares about, the answer must say how that goal fares across the paths.";
+export const REPORT_ANSWER_V5_CONTRACT_ID = "report.answer.v5" as const;
+export const REPORT_ANSWER_CHECK_V4_CONTRACT_ID = "report.answer-check.v4" as const;
+export const REPORT_ANSWER_V5_PROMPT_CONTRACT = contract(REPORT_ANSWER_V5_CONTRACT_ID,
+  [REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+export const REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT = contract(REPORT_ANSWER_CHECK_V4_CONTRACT_ID,
+  [REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction, REPORT_CHECKER_GOAL_CRITERION].join("\n\n"), REPORT_ANSWER_CHECK_FORM);
+/**
+ * V4 start step, Task 50c (the same owner answer; Q4: "the final answer says how the person's goal fares"): the main answer's later
+ * versions (an update after a dig) and the person's report say it too. A later version's writer is the next version of
+ * `report.answer.later.v4`: its words byte for byte with Task 50b's one drafted sentence (REPORT_WRITER_GOAL_SENTENCE, OWNER WORDING
+ * above) at its end, the form as it was; checked by Task 50b's `report.answer-check.v4`. A DRAFT: the owner reads it with Task 50b's two at
+ * Task 92, which seals all three; until then it is in no seal.
+ */
+export const REPORT_ANSWER_LATER_V5_CONTRACT_ID = "report.answer.later.v5" as const;
+export const REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT = contract(REPORT_ANSWER_LATER_V5_CONTRACT_ID,
+  [REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join("\n\n"), REPORT_ANSWER_V3_FORM);
+/** The goal drafts as the sealed groups list theirs: Task 50b's writer, Task 50c's later writer, Task 50b's check; Task 92 seals them. */
+export const REPORT_GOAL_DRAFT_CONTRACTS: readonly PromptContract[] = Object.freeze([
+  REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT
+]);
+
 /* ----------------------------------------------------------------- the call sites */
 
 export type ReportSite = "ANSWER" | "ANSWER_ASKED" | "ANSWER_CHECK" | "STORY" | "STORY_CHECK";
@@ -595,6 +630,11 @@ export type ReportRunCall = Readonly<{
   free: boolean;
   /** Version 2 and later: the writer reads the earlier report's answer (F8 A). */
   later: boolean;
+  /**
+   * V4 start step, Tasks 50b and 50c: the person said what they care about (the ROOT question's purpose lines carry the marked care
+   * answer): the answer's writer and check are the goal drafts. Absent or false: as before, byte for byte. The story is not changed.
+   */
+  goalStated?: boolean;
   /** The call site of each round; absent: the report's own `INVESTIGATION_REPORT:` sites. */
   callSiteOf?: (site: ReportSite, round: number) => string;
   writer: StoryRoleMaker;
@@ -799,22 +839,31 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
   return Object.freeze({ outcome: second, rounds: Object.freeze([...first.rounds, ...second.rounds]), backup });
 }
 
-/** What the overall answer needs: a report call without the story's parts. */
+/**
+ * What the overall answer needs: a report call without the story's parts. V4 start step, Tasks 50b and 50c: `goalStated` (ReportRunCall's),
+ * the person said what they care about: the writer and the check are the goal drafts, a later version's writer too; absent or false, as before.
+ */
 export type OverallAnswerCall = Omit<ReportRunCall, "free" | "storyLanguageCheck">;
 
 /**
  * THE OVERALL ANSWER, the one checked step the final report and every automatic main-answer update share (decisions 3, 4 and 26):
  * the writer and the checker in their approved v3 wording, the later-version writer when `later`. The caller brings the
  * material (`buildInvestigationDossier`), the money (`send`), and, when it is not a report, its own `callSiteOf`.
+ * V4 start step, Task 50b: with `goalStated` (the person said what they care about), the writer and the check are the next versions,
+ * Task 50b's drafts (report.answer.v5, report.answer-check.v4); Task 50c: a later version's writer is the draft report.answer.later.v5,
+ * checked by the same report.answer-check.v4 (the first answer of a path debate, every main-answer update and the report all pass it). The
+ * material is the same.
  * Never throws for a provider or a refused call: it keeps its last checked draft or ends FAILED, as the story loop does.
  */
 export async function writeOverallAnswer(call: OverallAnswerCall): Promise<OverallAnswerWritten> {
+  const goal = call.goalStated === true;
   let material = call.material;
   let askArtifactRef: string | null = null;
   const written = await writeStep<ReportAnswerDraft>(call, {
     writerSite: "ANSWER", checkerSite: "ANSWER_CHECK",
-    writerContract: call.later ? REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
-    checkerContract: REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, rules: ANSWER_RULES,
+    writerContract: call.later ? (goal ? REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT : REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT)
+      : goal ? REPORT_ANSWER_V5_PROMPT_CONTRACT : REPORT_ANSWER_V4_PROMPT_CONTRACT,
+    checkerContract: goal ? REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT : REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, rules: ANSWER_RULES,
     writerMaterial: () => material.answerWriter, checkerMaterialOf: (candidate) => material.answerCheckerOf(candidate), index: () => material.index,
     asking: {
       askable: () => material.deeper?.names ?? null,

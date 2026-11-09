@@ -4,8 +4,9 @@ import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
 /**
- * The daily outbound mail limit (owner's rulings of 2026-11-01): the chain step after the moderation statements' 0157
- * (migrations/lineage/README.md). It was built as 0153 on dev (#234); on the V4 line 0153 is the finished dig's mark, so the
+ * The daily outbound mail limit (owner's rulings of 2026-11-01): the chain step after 0169, the runner reading which settings
+ * are switched on (migrations/lineage/README.md); first chained after the moderation statements' 0157, it was re-chained to
+ * 0169 when the start-step steps 0158 to 0169 merged (2026-11-09). It was built as 0153 on dev (#234); on the V4 line 0153 is the finished dig's mark, so the
  * owner moved it here as 0170 (2026-11-07). A gap is allowed: the chain only asks that each name sorts after the one before.
  * If a step numbered below 0170 merges first, this step's `previous` is re-chained to that step (its number stays), as the
  * README's renumber recipe says. It adds no billing object, so 0130's verifier stays in force; no supplemental verifier, so
@@ -16,7 +17,7 @@ const NAME='0170_outbound_mail_limit.sql';
 const VERSION='outbound-mail-limit-forward0170-v1';
 const MANIFEST_PATH='lineage/outbound-mail-limit-forward0170.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-130.sql';
-const PREVIOUS='0157_moderation_statements.sql';
+const PREVIOUS='0169_piece_settings_version.sql';
 const TABLES=['identity.outbound_mail_daily_count','identity.outbound_mail_suppression'] as const;
 const FUNCTIONS=['identity.claim_outbound_mail_alert(text,date)','identity.outbound_mail_recipient_suppressed(bytea)',
  'identity.outbound_mail_today()','identity.reserve_outbound_mail(text,integer)'] as const;

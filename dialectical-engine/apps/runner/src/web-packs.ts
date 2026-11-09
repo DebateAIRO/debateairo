@@ -15,6 +15,8 @@
  *  - a dig keeps one pack per chosen path (R22), and every path of its own map reads them all, each under the words of the
  *    pick it belongs to and each cut on its own (`webPackShown`'s share), so one pick's pages can't crowd out another's. A
  *    cross-reply reads them once: its rival reads the same packs.
+ *  - a path debate (V4 start step, Task 48) keeps one pack per chosen path, under its b<n>, and every leg reads them all, each under its
+ *    path's title (`pathsPackShares`), cut as a dig's are; a path's root reads them under `path_question`.
  * Nothing here searches the web: the debate reads what the web step stored, and only that.
  *
  * The rules it keeps:
@@ -138,8 +140,8 @@ export function webPackShown(pack: WebPack, limit: number = WEB_PACK_LIMITS.byte
 
 /* ----------------------------------------------------------------- the debate's packs */
 
-/** Which material field a pack backs in a leg (the leg's own field names). */
-export type WebPackFor = "assigned_answer" | "position_under_debate" | "own_position" | "other_makers_position";
+/** Which material field a pack backs in a leg (the leg's own field names; `path_question`: a path's root, V4 start step Task 48). */
+export type WebPackFor = "assigned_answer" | "position_under_debate" | "own_position" | "other_makers_position" | "path_question";
 
 export type DebateWebPacks = Readonly<{
   /** Every extract id of this debate's packs (the locator check's list). */
@@ -158,6 +160,16 @@ export type DebateWebPacks = Readonly<{
 export type WebDigPackRead = Readonly<{ chosen: string; pack: WebPack }>;
 /** R22: a path of a dig's own map and the picks' packs it reads, by the pick's path_ref, in pick order. */
 export type WebPackShare = Readonly<{ pathRef: string; reads: readonly Readonly<{ keptUnder: string; chosen: string }>[] }>;
+
+/**
+ * V4 start step, Task 48 (spec 2026-11-03 §4.3: "every path's arguing sees all chosen paths' pages, each labelled with its path"): a
+ * path debate's shares. Every path reads every path's pack, its own among them, in the paths' order, each under its path's `label`
+ * (its title); `debateWebPacks` leaves out a path that kept none. Cut and shown as a dig's picks are (`webSourcesText`).
+ */
+export function pathsPackShares(paths: readonly Readonly<{ pathRef: string; label: string }>[]): readonly WebPackShare[] {
+  const reads = Object.freeze(paths.map((path) => Object.freeze({ keptUnder: path.pathRef, chosen: path.label })));
+  return Object.freeze(paths.map((path) => Object.freeze({ pathRef: path.pathRef, reads })));
+}
 
 /**
  * The debate's packs, or null when it kept none (then nothing in the debate changes). `shared` names a dig's map paths and the
@@ -220,7 +232,8 @@ export function webSourcesText(packs: DebateWebPacks | null,
 /**
  * WHO READS WHICH PACK: the leg with its `sources`, or the very same leg when it reads none. An engine-2 case writer reads
  * its path's pack; a defender or critic, the pack of the path its chain is under; a cross-reply, its own path's then the
- * rival's. Every other leg (today's openings, an assigned root without engine 2) reads none.
+ * rival's. A path debate's root (V4 start step, Task 48) reads its path's, under `path_question` (with `pathsPackShares`, every path's).
+ * Every other leg (today's openings, an assigned root without engine 2) reads none.
  */
 export function legWithWebSources(leg: JudgeLeg, packs: DebateWebPacks | null,
   paths: Readonly<{ own: string | null; rival?: string | null }>): JudgeLeg {
@@ -231,7 +244,9 @@ export function legWithWebSources(leg: JudgeLeg, packs: DebateWebPacks | null,
       ? webSourcesText(packs, [{ pathRef: paths.own, for: "position_under_debate" }])
       : leg.kind === "cross-root"
         ? webSourcesText(packs, [{ pathRef: paths.own, for: "own_position" }, { pathRef: paths.rival ?? null, for: "other_makers_position" }])
-        : undefined;
+        : leg.kind === "path-root"
+          ? webSourcesText(packs, [{ pathRef: paths.own, for: "path_question" }])
+          : undefined;
   return sources === undefined ? leg : Object.freeze({ ...leg, sources });
 }
 

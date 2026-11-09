@@ -760,10 +760,15 @@ describe("the boot preload: open debates' and passed versions, never the pointer
     expect((await preloadRunnerSettings({ ...sources([18], []), cache: flaky })).loaded).toEqual([17, 18]);
   });
 
-  it("neither run-settings.ts nor main.ts names the activation pointer or its table (S16 pins every runner file)", () => {
-    for (const file of ["apps/runner/src/run-settings.ts", "apps/runner/src/main.ts"]) {
-      const source = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
-      expect(source, file).not.toContain("read_active_settings_version");
+  it("the runner names the activation pointer's reader once, in run-settings.ts; never its table; main.ts neither (S16 pins every runner file)", () => {
+    // Task 57o-fix (owner, 8 Nov, "Your switched-on one"; 0169 grants the runner's role the reader): the one SQL text of the runner's reader
+    // of the switched-on version, for a background lane's fallback. Never the API's reader or its names.
+    const settings = readFileSync(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(settings.match(/read_active_settings_version/gu)).toHaveLength(1);
+    expect(settings).toContain('const SWITCHED_ON_SETTINGS_SQL = "SELECT register.read_active_settings_version() AS version";');
+    const main = readFileSync(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+    expect(main).not.toContain("read_active_settings_version");
+    for (const [file, source] of [["apps/runner/src/run-settings.ts", settings], ["apps/runner/src/main.ts", main]] as const) {
       expect(source, file).not.toContain("settings_activation");
       expect(source, file).not.toMatch(/activeSettingsVersion|readActiveSettings/u);
     }

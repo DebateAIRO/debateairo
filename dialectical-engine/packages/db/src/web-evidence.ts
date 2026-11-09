@@ -82,6 +82,13 @@ export type WebPageRecord = Readonly<{
   /** The whole text, sealed under the page_id (carrier identity.web_page_text), with its size and keyed digest. */
   text: Readonly<{ chars: number; digest: Buffer; sealed: WebSealed }> | null;
 }>;
+/**
+ * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version that wrote a piece, the version of
+ * the run its calls were charged to (the runner's run → version map: its own, or today's when the runner refused its own, Task 57o). Null only
+ * from a runner that holds no version for the run (local mode). Stored on the piece's row by 0169's `<writer>_with_settings`; nothing reads it yet.
+ */
+export type PieceSettingsVersion = Readonly<{ settingsVersion: number | null }>;
+
 export type WebReadingRecord = Readonly<{
   runId: string; readingId: string; pageId: string; reader: 1 | 2 | 3; maker: string;
   outcome: "READ" | "FAILED"; grade: 0 | 1 | 2 | 3 | null;
@@ -140,10 +147,11 @@ export class PostgresWebEvidenceRepository {
       attestation(input.text?.sealed ?? null)]);
   }
 
-  recordReading(input: WebReadingRecord, executor: Executor = this.pool): Promise<WebWriteOutcome | "NO_PAGE" | "SAME_MAKER"> {
-    return outcome(executor, "SELECT identity.record_web_reading($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) AS outcome", [
+  /** Task 57p: 0169's writer, the reading's settings version last. */
+  recordReading(input: WebReadingRecord & PieceSettingsVersion, executor: Executor = this.pool): Promise<WebWriteOutcome | "NO_PAGE" | "SAME_MAKER"> {
+    return outcome(executor, "SELECT identity.record_web_reading_with_settings($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10) AS outcome", [
       input.runId, input.readingId, input.pageId, input.reader, input.maker, input.outcome, input.grade,
-      envelope(input.line), attestation(input.line)]);
+      envelope(input.line), attestation(input.line), input.settingsVersion]);
   }
 
   recordExtract(input: WebExtractRecord, executor: Executor = this.pool): Promise<WebWriteOutcome | "NO_PAGE" | "LABEL_TAKEN"> {

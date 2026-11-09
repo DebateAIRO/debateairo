@@ -294,15 +294,19 @@ describe("buildV4Map", () => {
     expect(storyReadFailed(null)).toBe(false);
   });
 
-  it("uses one stand-in path with every point when there is no story", () => {
+  it("draws no made-up path when there is no story (map-f4, wait-f9)", () => {
     const map = buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: storyFixture("WRITING") });
-    expect(map.paths).toHaveLength(1);
-    expect(map.paths[0]).toMatchObject({ id: "all", fate: null, line: STORY_FIXTURE_ANSWER.composed_text[0]?.text });
-    expect(map.paths[0]?.points.map((point) => point.id)).toEqual(STORY_FIXTURE_ANSWER.nodes.map((n) => n.node_id));
-    expect(map.paths[0]?.open.map((question) => question.id)).toEqual(["p:n-not-now", "p:n-hybrid-school"]);
-    expect(map.paths[0]?.counts).toEqual(map.counts);
+    expect(map.paths).toEqual([]);
+    // Every point is the question's own, and every still-argued point hangs under the question (DATA-6, now for all of them).
+    expect(map.points.map((point) => point.id)).toEqual(STORY_FIXTURE_ANSWER.nodes.map((n) => n.node_id));
+    const ids = map.open.map((question) => question.id);
+    expect(ids).toContain("p:n-not-now");
+    expect(ids).toContain("p:n-hybrid-school");
+    expect(map.open.every((question) => question.pathId === null)).toBe(true);
+    expect(map.counts).toEqual({ SURE: 0, SURE_FOR_CASE: 5, STILL_ARGUED: 2, DIDNT_HOLD: 0 });
+    // Nothing composed and no story: still no path, and no line invented from the question.
     const bare = buildV4Map({ runId: "r", answer: { ...STORY_FIXTURE_ANSWER, composed_text: [] }, story: null });
-    expect(bare.paths[0]?.line).toBe(STORY_FIXTURE_ANSWER.question_line);
+    expect(bare.paths).toEqual([]);
   });
 
   it("suffixes repeated position_refs, skips unknown ids and drops duplicates within a path", () => {

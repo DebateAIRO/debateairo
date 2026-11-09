@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+  PUBLIC_REPORT_CARRIER_MARK,
   allocateSequence,
   decryptContentForRun,
   normalizeRunOwnership,
@@ -150,6 +151,10 @@ export class LivenessRepository {
         -- clause in core.lock_owned_live_runs guards it. Do not "simplify" this back.
         AND (run.content_encryption_version IS DISTINCT FROM 1
              OR core.run_private_content_is_live(run.run_id))
+        -- V4 start step, Task 57l: a report run (Task 56h, marked PUBLIC_REPORT_CARRIER_MARK) is no
+        -- debate of the person's: they can neither see nor delete it, so it never fills this window
+        -- (counted, 128 debates and one report run refused every new ask). As serve's NOT_A_REPORT_RUN.
+        AND NOT (run.depth_params ? '${PUBLIC_REPORT_CARRIER_MARK}')
       ORDER BY run.created_at_seq,run.run_id
       LIMIT $3
     `, [access.ownerRef, access.legacyAskerId,MAX_OWNER_PRIVATE_HISTORY_SCAN+1]);

@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import type { Answer } from "@debateai/contract";
+import type { Answer, InvestigationReportVersion } from "@debateai/contract";
+import type { AskRoom } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { replayHighlight } from "@/lib/v4/highlight";
+import { reportWaitLine } from "@/lib/v4/money";
 import {
-  canAskForReport, carryOnOf, digsRestFor, reportMomentAllowed, reportSeenFor, reportSharePercentOf, type ReportStage
+  canAskForReport, carryOnOf, digsRestFor, firstReportLeftOf, reportMomentAllowed, reportSeenFor, reportSharePercentOf, type ReportStage
 } from "@/lib/v4/reportWriting";
 import { stateWordText, whenText } from "@/lib/v4/stateWords";
 import { quotaChanged } from "@/lib/v4/quotaPulse";
@@ -41,6 +44,13 @@ import { reportWaitStateOf, useQuestionPublic, useReportStart, V4ReportStrip, V4
  *  - question 23 A: the waiting card names the one dig the report waits for (`waitingDigQuestion`, report-f7's rule in
  *    lib/v4/reportWriting.ts waitingDigQuestionOf), its words marked in the debate's language when known
  *    (`waitingDigLanguage`, as the report page does), and says "the digs in progress", with no number, when several wait.
+ *
+ * V4 start step, Task 56c (item public-f25; owner answer Q20 B: only a debate's very first report uses the kept reserve): a further
+ * report on a public debate waits for the reset like digs, and its button says when it can run. While the page is sure of it (the
+ * debate is public, the investigation read says the next report is not its first, and the room holds new starts: lib/v4/money.ts
+ * reportWaitLine), the top bar's "Write my report" stays where it is, greyed but focusable, with "This report can start after 08:00."
+ * beside it; a press shows the line again and opens nothing (journey-f14, as the dig button waits). The rail's report step says the
+ * same line, and the page puts it on the phone bar's report job (`waitLine`). A press refused anyway: the strip's own WAITS note.
  */
 
 
@@ -83,6 +93,10 @@ export type MapReportInput = Readonly<{
    * 768 px; v4-debate.css), so one is on screen. Absent or false: it shows, as before.
    */
   bottomShowsReport?: boolean;
+  /** Task 56c: the person's room read (the map's dig room, read again after each quota moment); absent or null: nothing waits. */
+  room?: AskRoom | null;
+  /** Task 56c: the debate is public now (the map's public stage is PUBLIC); absent: false, so nothing waits. */
+  isPublic?: boolean;
 }>;
 
 export type MapReport = Readonly<{
@@ -91,6 +105,13 @@ export type MapReport = Readonly<{
   /** The first question's report page (report-f9). */
   href: string;
   stage: ReportStage;
+  /**
+   * Question 2 A: the first report check has answered (a read, or a check that failed). Until then the top bar's report button
+   * holds its place with no words, and the "older than the map" box draws nothing (V4ChangedSince's `reportRead`).
+   */
+  firstCheckAnswered: boolean;
+  /** The investigation read's report versions (empty before it is read): the "older than the map" box's floor (pathsChangedSinceReport). */
+  versions: readonly InvestigationReportVersion[];
   /** The top bar's report button (with dig-f29's mark when `good`); nothing while the strip is open there. */
   headerItem: (good: boolean) => ReactNode;
   /**
@@ -113,7 +134,19 @@ export type MapReport = Readonly<{
   restReason: string;
   /** dig-f29's report moment may show. */
   momentAllowed: boolean;
+  /**
+   * Task 56c: while a report could be asked for but waits for the reset, the words that say when it can start ("This report can
+   * start after 08:00."); null otherwise. The page greys the phone bar's report job with it and drops the month line's "You can still
+   * write your report.".
+   */
+  waitLine: string | null;
 }>;
+
+/** No investigation read yet: no versions (one frozen list, so the map's memos keep it). */
+const NO_VERSIONS: readonly InvestigationReportVersion[] = Object.freeze([]);
+
+/** Task 56c: the id of the top bar's line beside a "Write my report" that waits for the reset. */
+const REPORT_WAITS_TOP = "v4-report-waits-top";
 
 /** The rail's (and the phone bar's) words for where the report stands, from the shared state words (journey-f22). */
 function railOf(stage: ReportStage, writingSince: number | null, catalog: MessageCatalog, locale: string): V4RailReport | undefined {
@@ -134,6 +167,10 @@ export function useMapReport(input: MapReportInput): MapReport {
   const watch = useReportWatch(input.servedRunId, input.isDig, input.onReady, carryOn);
   const { stage } = watch;
   const canAsk = canAskForReport(stage);
+  // Task 56c: the report waits for the reset, as far as the page is sure (lib/v4/money.ts reportWaitLine), while it could be asked for.
+  const room = input.room ?? null;
+  const sure = reportWaitLine({ room, isPublic: input.isPublic === true, firstReportLeft: firstReportLeftOf(watch.read), locale });
+  const waitLine = canAsk && sure !== null ? t(catalog, sure.key, sure.values) : null;
   // WHOLE-11 (public-d3 A, public-f15): a report that was being written and is now written (or did not finish) is a quota
   // moment: the figures read again. A report already done when the page opened is not.
   const stageKindBefore = useRef(stage.kind);
@@ -149,8 +186,13 @@ export function useMapReport(input: MapReportInput): MapReport {
     runId: input.servedRunId ?? input.runId,
     canAsk,
     carryOn,
+    waits: waitLine !== null,
     focusOpener: (at: ReportStripPlace) => (at === "top" ? headerRef.current : input.barJobRef.current)?.focus()
   });
+  // Task 56c: after a press refused until the reset, the strip says when (the server said this report is not the debate's first and
+  // the debate is public); before the room is read again, the strip's plain reset line.
+  const refused = start.note === "WAITS" ? reportWaitLine({ room, isPublic: true, firstReportLeft: false, locale }) : null;
+  const stripWaitLine = waitLine ?? (refused === null ? null : t(catalog, refused.key, refused.values));
 
   // A dig started on this map reopens a closed investigation: the versions are read again, so the button asks again.
   const stageNow = useRef(stage);
@@ -181,6 +223,7 @@ export function useMapReport(input: MapReportInput): MapReport {
       rootRunId={root}
       busy={start.busy}
       note={start.note}
+      waitLine={stripWaitLine}
       onWrite={start.write}
       onNotYet={start.notYet}
       catalog={catalog}
@@ -201,8 +244,10 @@ export function useMapReport(input: MapReportInput): MapReport {
     focusInPlace(barJobRef.current);
   }, [bottomShows, barJobRef]);
 
-  const headerItem = (good: boolean): ReactNode => {
+  const headerItem = (goodTime: boolean): ReactNode => {
     if (start.at === "top") return null;
+    // Task 56c: no "Good time to write your report" on a button that waits for the reset.
+    const good = goodTime && waitLine === null;
     // Question 2 A: before the first check answers, the place is held with no words (ask-f16: nothing moves when it comes).
     // The CSS draws "Write my report" and "See my report" from the attributes in one cell, hidden (v4-debate.css), so the
     // place is as wide as the wider of the two and nothing is read out or found as text. The button that comes draws both
@@ -223,23 +268,35 @@ export function useMapReport(input: MapReportInput): MapReport {
     const goodWords = good ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null;
     const className = `v4Btn v4BtnPrimary v4DebReportLink${good ? " v4DebReportGood" : ""}${atBottom}`;
     if (canAsk) {
+      // Task 56c: while the report waits for the reset, the button stays here, greyed, with the line beside it (journey-f14). On a
+      // phone whose bottom bar carries "Write my report" (question 18 A) this button is hidden, and the bar says the line instead.
+      const waiting = waitLine !== null;
+      const lineShown = waiting && !bottomShows;
       return (
-        <button
-          ref={headerRef as RefObject<HTMLButtonElement | null>}
-          type="button"
-          className={className}
-          // The wave-2 checks (ACCESS-6's rule on this button): with the start step's carry-on box a press sends at once and
-          // may wait for a dig's 10 seconds; the button keeps its focus (aria-disabled, never native) and ignores presses.
-          aria-disabled={start.busy ? "true" : undefined}
-          aria-busy={start.busy ? "true" : undefined}
-          onClick={() => {
-            if (!start.busy) start.open("top");
-          }}
-        >
-          {mark}
-          {sized(label)}
-          {goodWords}
-        </button>
+        <>
+          <button
+            ref={headerRef as RefObject<HTMLButtonElement | null>}
+            type="button"
+            className={`${className}${waiting ? " v4DigWaiting" : ""}`}
+            // The wave-2 checks (ACCESS-6's rule on this button): with the start step's carry-on box a press sends at once and
+            // may wait for a dig's 10 seconds; the button keeps its focus (aria-disabled, never native) and ignores presses.
+            aria-disabled={start.busy || waiting ? "true" : undefined}
+            aria-busy={start.busy ? "true" : undefined}
+            aria-describedby={lineShown ? REPORT_WAITS_TOP : undefined}
+            onClick={() => {
+              if (waiting) {
+                replayHighlight(document.getElementById(REPORT_WAITS_TOP));
+                return;
+              }
+              if (!start.busy) start.open("top");
+            }}
+          >
+            {mark}
+            {sized(label)}
+            {goodWords}
+          </button>
+          {lineShown ? <span id={REPORT_WAITS_TOP} className="v4DigWaitLine v4DebReportWaits" data-report-waits="">{waitLine}</span> : null}
+        </>
       );
     }
     // W3-4: always there once the answer is served; while the report waits, is written or stands, it leads to its page
@@ -263,14 +320,19 @@ export function useMapReport(input: MapReportInput): MapReport {
   const barStatus = digsRestFor(stage) && rail !== undefined
     ? { text: `${t(catalog, "v4.rail.stepReport")} · ${rail.text}`, working: rail.working }
     : null;
+  // Task 56c: while the report waits for the reset, the rail's report step says when it can start.
+  const railReport: V4RailReport | undefined = waitLine !== null ? { text: waitLine, working: false } : rail;
   return {
     answer: watch.answer,
     href,
     stage,
+    firstCheckAnswered,
+    versions: watch.read?.versions ?? NO_VERSIONS,
     headerItem,
     headerStrip: start.at === "top" ? strip("top") : null,
     bottomStrip: start.at === "bottom" ? strip("bottom") : null,
-    writeFromBar: canAsk && start.at === null ? () => start.open("bottom") : undefined,
+    // Task 56c: while the report waits, the bar's own greyed job says why and opens nothing.
+    writeFromBar: canAsk && start.at === null && waitLine === null ? () => start.open("bottom") : undefined,
     barStatus,
     waitCard: (
       <V4ReportWait
@@ -289,9 +351,10 @@ export function useMapReport(input: MapReportInput): MapReport {
         locale={locale}
       />
     ),
-    rail,
+    rail: railReport,
     digsRest: digsRestFor(stage) || start.busy,
     restReason: t(catalog, "v4.reportWait.digsRest"),
-    momentAllowed: reportMomentAllowed(stage)
+    momentAllowed: reportMomentAllowed(stage),
+    waitLine
   };
 }

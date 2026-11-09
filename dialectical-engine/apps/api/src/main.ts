@@ -1,4 +1,4 @@
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket, previewTargetChargePrice, providerTargetPrice } from "@debateai/providers";
 import { type QuestionLanguagePolicy } from "@debateai/register";
 import { questionLanguageSiteRoute } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -35,7 +35,19 @@ import { postgresPurposeLines, readPurposeLinesOf } from "./purpose-lines.js";
 import {
   ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS, ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify, sweepAskClarifyReservations
 } from "./ask-clarify.js";
+// V4 start step, Task 31: the step before Start (Tasks 26–30), composed below on the preview route.
+import { createStartCharges } from "./start-step/charge.js";
+import { startStepKeyFrom } from "./start-step/signing.js";
+import { createStartStep, startStepRouteOf } from "./start-step/step.js";
+// V4 start step, Task 36: the one chosen paths store, for the AskApplication and the API.
+import { PostgresStartPathsStore } from "@debateai/db";
+// V4 start step, Task 56b: Task 53a's counts of a public debate's report versions, for the person's own closings of it.
+import { PostgresOwnClosingsReader } from "@debateai/db";
+import { RunRepository as ReportRunRepository, withOwnerAskAdmissionLease as withReportRunAdmissionLease } from "@debateai/db";
+import { createStartTransport } from "./start-step/transport.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
+// V4 start step, Task 57f: Continue on a failed debate, and the room for the rest.
+import { continueRoomOf } from "./run-continue.js";
 import { PostgresOutboundMailStore } from "../../../packages/db/src/outbound-mail.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
@@ -67,6 +79,7 @@ import {
   openRecord,
   FilePublicationKeyStore,
   FileRunContentKeyStore,
+  FileSavedQuestionKeyStore,
   FileUserDekStore,
   loadKekRing,
   loadSecretKey,
@@ -126,7 +139,9 @@ import {
   questionCheckSpendWriterPresent,
   recordLanguageCheckSpend,
   recordQuestionCheckSpend,
-  reserveAskClarifyCharge
+  reserveAskClarifyCharge,
+  preStartChargeWriterPresent,
+  recordPreStartCharge
 } from "@debateai/budget";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
@@ -173,7 +188,7 @@ import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
 import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
-import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
@@ -196,6 +211,9 @@ import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
 import { accountMemoryStoreFrom } from "./account-memory.js";
+// V4 start step, Task 39e: the questions not started yet, 0162's store of rows and the service over it and the question keys.
+import { savedQuestionStoreFrom } from "./saved-questions/store.js";
+import { createSavedQuestionService, savedQuestionOpener } from "./saved-questions/service.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
@@ -738,6 +756,15 @@ const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
   clock: () => new Date(),
   report: (line) => console.error(JSON.stringify(line))
 }));
+/**
+ * V4 start step, Task 31 (spec 2026-11-03 §3 and §4.1): the calls before Start go out only on the preview, and only where every
+ * one of them can be charged to the person: a preview gate AND 0158's writer, asked of this login as step 2's writer is above
+ * (never keyed on the deployment mode: the test site runs in hosted mode). The references are signed with a key derived from
+ * the blind-index key, as the question-language key is, so every API process of this deployment verifies the others'.
+ */
+const preStartWriter = await boot.run("pre-start-writer", () => onOwnConnections(() => preStartChargeWriterPresent(pool)));
+const startStepKey = startStepKeyFrom(blindIndexKey);
+const startStepRoute = startStepRouteOf({ previewGate, writerPresent: preStartWriter });
 // Side-by-side spec §13 API point 2: every other version is loaded once, on first use, and kept (sealed versions never
 // change); the site version is served from the boot's load.
 const admissionCache = createAdmissionSettingsCache({
@@ -981,6 +1008,11 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
       return userId;
     }
   ));
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answer S4 A): each question not started yet has a key of its own,
+// wrapped by the person's user key exactly as a debate's run key is, in its own saved-questions/ folder under the same root. It opens a
+// key only with the caller's own { userId, ownerRef } (the session's, or the export claim's), so it looks no owner up: no cross-account
+// site. The account closing, the saved-question service and the data export all use this one store.
+const savedQuestionKeys = boot.runSync("saved-question-key-store", () => new FileSavedQuestionKeyStore(environment.USER_DEK_STORE_PATH, dekStore));
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
@@ -1167,6 +1199,12 @@ const emailChange = new EmailChangeService({
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
+/**
+ * V4 start step, Task 36: THE ONE chosen paths store, on the runtime pool (its login holds debateai_runtime, the only role granted
+ * core.record_start_paths and core.read_start_paths, 0159): the AskApplication seals a run's chosen paths through it (the START_PATHS
+ * setup step) and reads them when a waiting debate is let in again; buildApi gets the same object.
+ */
+const startPaths = new PostgresStartPathsStore(pool);
 const application = new PostgresAskApplication(pool, dispatcher, {
   /**
    * Side-by-side spec §13: the members a settings version decides (its preview line-up and gate terms, the daily guard
@@ -1192,7 +1230,11 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   admissionSettings: {
     activeSettingsVersion: () => activeSettings.current(),
     admissionSettingsFor: async (version) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version))
-  }
+  },
+  // V4 start step, Task 36: the chosen paths (sealed at the START_PATHS setup step, read at re-admission) and a debate's purpose
+  // lines, which the setup step records with them; without the store a v2 ask with chosen paths fails START_PATHS_STORE_UNAVAILABLE.
+  startPaths,
+  purposeLines: postgresPurposeLines(pool)
 },undefined,contentProvisionPool,Object.freeze({
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
@@ -1284,7 +1326,10 @@ const accountErasure = new AccountErasureCoordinator(
     readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
       'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
     )).rows[0]?.email_ciphertext ?? null,
-    beforeKeyDestruction: threatReportEmailHold(threatReportRepository)
+    beforeKeyDestruction: threatReportEmailHold(threatReportRepository),
+    // V4 start step, Task 39e (owner answer S4 A): closing the account destroys every question key it finds by the owner_ref, then the
+    // account key (Task 39d's step); the same store the service and the export use.
+    savedQuestionKeys
   }
 );
 const threatReportAlertsTimer = startThreatReportAlerts({
@@ -1844,6 +1889,8 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
             return plain.toString("utf8");
           } finally { plain?.fill(0); dek.fill(0); }
         },
+        // V4 start step, Task 39e: a question not started yet, opened with its own key under the claim's account (null: its key is gone).
+        openSavedQuestion: savedQuestionOpener(savedQuestionKeys),
         openRecord: (aad, ciphertext) => {
           const plain = openRecord(recordsKey, aad, ciphertext);
           try { return plain.toString("utf8"); } finally { plain.fill(0); }
@@ -1871,7 +1918,43 @@ const admission = new AdmissionLimiter(admissionPolicy);
 // V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
 // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
 const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answers S3 A, S4 A): the questions not started yet, through 0162's
+// five functions on the same runtime pool (EXECUTE for debateai_billing_runtime only), each sealed and opened with its own key from the
+// one question-key store, and kept only for a reading the start step's key signed (Task 31's, the same the step signs with).
+const savedQuestionStore = savedQuestionStoreFrom((text, values) => pool.query(text, values));
+const savedQuestions = createSavedQuestionService({
+  store: savedQuestionStore,
+  keys: savedQuestionKeys,
+  key: startStepKey,
+  report: (code, id) => { console.error(JSON.stringify({ event: code, ...(id === undefined ? {} : { saved_question_id: id }) })); }
+});
 const investigations = new PostgresInvestigationRepository(pool);
+/**
+ * V4 start step, Task 31 (spec 2026-11-03 §4.1; owner answers Q2 and Q8 of 4 Nov): THE STEP BEFORE START, behind POST
+ * /v1/asks/paths/lists, …/merge, …/combine and …/fit. Each call runs on the settings of the version it is asked under, from the
+ * one admission cache (the switch, the line-up, the language port); the question check is Start's own. On the preview route it
+ * sends through the gate's guarded fetch, which settles the money there, and each call is the person's charge through 0158's
+ * writer, at the price the runner charges the same target at (F4). Off the preview route there is no transport, and every
+ * call answers none OFF. Nothing it logs carries the question, a list or a person.
+ */
+const startStep = createStartStep({
+  route: startStepRoute,
+  key: startStepKey,
+  settingsFor: (version) => admissionCache.admissionSettingsFor(version),
+  questionCheck,
+  transport: startStepRoute === "PREVIEW" && previewFetch !== undefined
+    ? createStartTransport({ fetch: previewFetch, targets: declaredProviderTargets }) : null,
+  charges: createStartCharges({
+    record: (entry) => recordPreStartCharge(pool, entry),
+    priceOf: (providerRef) => {
+      const target = declaredProviderTargets.find((declared) => declared.providerRef === providerRef);
+      return target === undefined ? null : previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
+    },
+    clock: () => new Date(),
+    report: (line) => console.error(JSON.stringify(line))
+  }),
+  report: (line) => console.error(JSON.stringify(line))
+});
 const api = buildApi({
   questionCheck,
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
@@ -1925,9 +2008,32 @@ const api = buildApi({
     withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
-    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
+    // Task 56h-port (owner, 7 Nov; coordinator, 8 Nov option A): a report nothing else can carry goes on a run of the presser's own, made for it as an
+    // ask's run is made (the content provision login, under the owner's ask admission lease on the server ask admission login), never a debate of theirs.
+    ownReportCarrier: publicReportCarrierMaker({
+      readOwn: (ownerRef, publicationRef) => new PostgresPublicTreeRepository(pool).readOwnReportCarrier(ownerRef, publicationRef),
+      startRun: (input, admissionClient) => new ReportRunRepository(pool, contentProvisionPool).startRun(input, admissionClient),
+      withAdmissionLease: (ownerRef, use) => withReportRunAdmissionLease(serverAskAdmissionPool, { ownerRef, legacyAskerId: null }, (lease) => use(lease.client)),
+      site: { releaseKey: environment.RELEASE_KEY, batteryVersion: environment.BATTERY_VERSION }
+    })
   } }),
   askClarify,
+  // V4 start step, Task 31: the step and the key it signs with, together (Task 30: the merge verifies with this key before its
+  // stream opens; without it the four calls answer none OFF). The streams keep START_STEP_TIMING's heartbeat and longest life.
+  startStep,
+  startStepKey,
+  // V4 start step, Task 36: the same chosen paths store the AskApplication holds.
+  startPaths,
+  // V4 start step, Task 56b (owner answer Q20 B): a public debate's report counts, on this pool (0161 grants them to its billing role),
+  // so the owner's first report of their own public debate uses the kept reserve and a further one waits for the reset.
+  ownClosings: new PostgresOwnClosingsReader(pool),
+  // V4 start step, Task 39e: the questions not started yet, their five routes and the removal at Start.
+  savedQuestions,
+  // V4 start step, Task 56 ("Let the AIs carry on to the report"): the carry-on marks on the same chosen paths store, and the one room
+  // (the same object as `askRoom` below) for the look before each dig; the tick below drives them.
+  carryOn: startPaths,
+  ...(askRoom === undefined ? {} : { carryOnRoom: askRoom }),
   ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
   // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
   // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
@@ -1944,6 +2050,21 @@ const api = buildApi({
     resumeInRelease: (ownerRef, runId, releaseKey, registerVersion) =>
       new PostgresDigModelRepository(pool).resumeInRelease(ownerRef, runId, releaseKey, registerVersion)
   }),
+  // V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate, through 0165's read and re-open on
+  // this pool (the API's role); hosted, only while the person's pool (the ask room's) and the site's day have room for the rest. The wake and the
+  // hand-over are the two above.
+  failedRunContinue: {
+    store: {
+      readContinue: (ownerRef, runId) => new PostgresDigModelRepository(pool).readRunContinue(ownerRef, runId),
+      reopen: (ownerRef, runId, destination) => new PostgresDigModelRepository(pool)
+        .continueFailedRun(ownerRef, runId, destination?.releaseKey ?? null, destination?.registerVersion ?? null)
+    },
+    ...(askRoom === undefined || askRoomComposition === undefined || askRoomReadiness === undefined ? {} : { room: continueRoomOf({
+      personPool: (ownerRef, now) => askRoom.readPersonPool(ownerRef, now),
+      daySpentMicros: (day) => askRoomComposition.spend.readDaySpentMicros(day),
+      dailyCeilingMicros: askRoomReadiness.runPolicy.dailyCeilingMicros
+    }) })
+  },
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape
@@ -2049,6 +2170,10 @@ const api = buildApi({
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
 });
+// V4 start step, Task 56 ("Let the AIs carry on to the report"): one carry-on pass at a time (single flight: an overlapping tick is
+// only said, content-free), every whole minute while this release is current (below, beside the ask waker); stopped on close.
+const triggerCarryOn = createSingleFlightErasureReconciler(async () => { await api.carryOnTick(); }, () => console.error("[CARRY_ON_TICK_PENDING]"));
+let carryOnLoop: Readonly<{ stop(): void }> | undefined;
 // Side-by-side spec §4 (plan C7 review): the release listener unsubscribes FIRST on close. Fastify runs onClose hooks
 // last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
 // one-shot pass can start a runtime the hooks below have already stopped.
@@ -2083,6 +2208,7 @@ api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer))
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => clearInterval(askClarifyReservationSweepTimer));
 api.addHook("onClose",async () => askWaker?.stop());
+api.addHook("onClose",async () => carryOnLoop?.stop());
 api.addHook("onClose",async () => staffAlerts?.close());
 api.addHook("onClose",async()=>{
  if(passwordResetTimer)clearInterval(passwordResetTimer);
@@ -2173,6 +2299,8 @@ console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELE
 // Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
 // release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.
 if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));
+// V4 start step, Task 56: the carry-on's whole-minute tick, gated the same way (its claims and DONE marks are single in the database).
+carryOnLoop = everyWholeMinute(gatedTrigger(releaseWatcher, triggerCarryOn));
 // Decision 13: what allowed contributions wrote goes on the public page, and a finished Free debate goes public. Single-flight, gated: rows are claimed by what they already say, so an overlap at a
 // switch copies nothing twice.
 if (publications !== undefined) {

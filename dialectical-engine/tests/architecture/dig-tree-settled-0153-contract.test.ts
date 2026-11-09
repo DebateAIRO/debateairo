@@ -13,7 +13,7 @@ const SQL = read(`migrations/${NAME}`);
 
 describe("0153: a dig's mark, read by the estimate", () => {
   it("follows 0152 in the chain, with its own loader, and is bound to its own bytes", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0170,loadForward0171]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171]");
     const previous = read("migrations/lineage/report-export-forward0152.json");
     const manifest = JSON.parse(read("migrations/lineage/dig-tree-settled-forward0153.json")) as { previous: { manifestSha256: string }; migration: { sha256: string } };
     expect(manifest.previous.manifestSha256).toBe(sha256(previous));

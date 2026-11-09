@@ -1,0 +1,18 @@
+{
+  "version": "public-report-own-carrier-forward0167-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0166_main_answer_times.sql",
+    "manifestSha256": "c3483f48fca820df68b71b0ebacafd5e7b0b410085fee819995fc6719acee080",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0167_public_report_own_carrier.sql",
+    "sha256": "7cf5fdca35857e040cc3017b587ccb0ada49bf65e85253206697592d21ad36ca"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

@@ -344,7 +344,9 @@ describe("story v4: the preview's story repair check accepts contracts v4", () =
     ({ ...storyRequest(contractId), callSiteKey: "STORY:CHECKER:1", role: "EVALUATOR" } as ProviderCallRequest);
 
   it("lists the two current versions of each story contract, and the story package's own ids are in it", () => {
-    expect(PREVIEW_STORY_REPAIR_CONTRACT_IDS).toEqual(["story.storyteller.v3", "story.checker.v3", "story.storyteller.v4", "story.checker.v4"]);
+    // V4 start step (Task 52): story v5's two contracts join the list (tests/unit/path-drafts-unsealed.test.ts proves their sites).
+    expect(PREVIEW_STORY_REPAIR_CONTRACT_IDS).toEqual(["story.storyteller.v3", "story.checker.v3", "story.storyteller.v4", "story.checker.v4",
+      "story.paths.v5", "story.paths-check.v5"]);
     for (const id of [STORYTELLER_CONTRACT_ID, STORY_CHECKER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID]) {
       expect(PREVIEW_STORY_REPAIR_CONTRACT_IDS).toContain(id);
     }

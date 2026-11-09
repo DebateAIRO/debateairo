@@ -183,6 +183,25 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(sentDigOf("c-7")).toEqual({ target, mode: "thorough" });
     expect(sentDigOf("c-8")).toBeNull();
   });
+
+  // Independent review (Task 79, wave 16): a path debate's dig goes with its paths as the person shaped them (DIG_PICKS: two
+  // picks combined into one path, say). "Try this dig again" digs the same, so it goes with the same paths, never one path per
+  // pick (the server's rule for a dig that sends none). A dig rebuilt from its link has none to give: today's dig.
+  it("a dig sent with its paths is tried again with the same paths (made-up words)", () => {
+    const target: DigTarget = { kind: "picks", path: mix, picks: [suggestionPick(mix.id, suggestion), ownViewPick(mix.id, "Small towns behave differently.", 1)] };
+    const paths = {
+      source: "DIG_PICKS" as const, width: 1, chosen_by: "PERSON" as const,
+      paths: [{ title: "T", question: "Q?", members: [{ pick_no: 1 }, { pick_no: 2 }], combine_ref: "r.s" }]
+    };
+    const failed = view(linkOf(target, "c-10", "quick"), "FAILED");
+    const offer = digRetryOf(failed, [failed], map, { target, mode: "quick", paths }, () => false);
+    expect(offer).toEqual({ kind: "OFFER", target, mode: "quick", paths });
+    if (offer.kind !== "OFFER") throw new Error("offered");
+    expect(retryPending(offer, "quick", 1_000, 10_000)).toEqual({ target, mode: "quick", sendsAt: 11_000, paths });
+    // Rebuilt from its link (another visit): no paths are known, so none go.
+    const rebuilt = digRetryOf(failed, [failed], map, null, () => true);
+    expect(rebuilt.kind === "OFFER" && "paths" in rebuilt).toBe(false);
+  });
 });
 
 describe("the month pause (wait-f2, wait-f5, map-f31, public-f16)", () => {

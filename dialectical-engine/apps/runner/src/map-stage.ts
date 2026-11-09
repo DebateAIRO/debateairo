@@ -5,7 +5,7 @@ import {
   TypedDomainError, type QuestionLanguage
 } from "@debateai/kernel";
 import {
-  MAP_ENGINE_LIMITS, MAP_LIMITS, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
+  MAP_ENGINE_LIMITS, MAP_LIMITS, START_SEAT_REUSE_SUFFIX, mapErrorCodeOf, mapProviderPieces, mapRunAngleMap, mapRunBlindLists, mapRunSnowball,
   type MapCallOutcome, type MapCallRequest, type MapCaller, type MapChoiceRepository, type MapLimits, type MapResult, type MapRunInput,
   type MapSeat, type MapStep
 } from "@debateai/map";
@@ -63,11 +63,19 @@ export type RunnerMapCaller = MapCaller & Readonly<{
   spendStop: () => EnvelopeStopKind | null;
   stopped: () => boolean;
   settled: () => Promise<void>;
+  /**
+   * Review of Task 88: the first abandon this caller met (claim lost, time up, the month wall's pause), boxed; null: none. The start
+   * steps read a thrown call as a failed one, so a run that builds its own list asks this before it seals what the stop left.
+   */
+  abandoned: () => Readonly<{ error: unknown }> | null;
 }>;
 
-/** Ruling R-2: merge and choose are long structured lists with thinking inside the room — the sealed map bounds; the rest the judge bound. */
+/**
+ * Ruling R-2: merge and choose are long structured lists with thinking inside the room — the sealed map bounds; the rest the judge bound.
+ * V4 start step, Task 53: a run's own merge of its start lists (RUN_BUILT, START_MERGE) is the same long list: the merge bound.
+ */
 export function mapStageBound(bound: CallBound, step: MapStep, longBounds: Readonly<{ merge: number; choose: number }>): CallBound {
-  const ceiling = step === "MERGE" ? longBounds.merge : step === "CHOOSE" ? longBounds.choose : null;
+  const ceiling = step === "MERGE" || step === "START_MERGE" ? longBounds.merge : step === "CHOOSE" ? longBounds.choose : null;
   return ceiling === null || ceiling <= bound.tokenCeiling ? bound : Object.freeze({ ...bound, tokenCeiling: ceiling });
 }
 
@@ -84,6 +92,11 @@ export function guidedMapBound(bound: CallBound, replyWordsCeiling: number | nul
 }
 
 const MAKER_SAT_OUT = "MAKER_SAT_OUT";
+
+/** V4 start step, Task 53: a seat's member ref, without a company's second-seat mark ("#2"). */
+export function memberRefOfSeat(aiRef: string): string {
+  return aiRef.endsWith(START_SEAT_REUSE_SUFFIX) ? aiRef.slice(0, -START_SEAT_REUSE_SUFFIX.length) : aiRef;
+}
 
 /**
  * Engine redesign R3 (spec 2026-10-15 §5, deviation 10): engine 2's map sends one answer check, so a shaped engine-2 run
@@ -119,8 +132,11 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
   };
   const call = async <T>(request: MapCallRequest<T>): Promise<MapCallOutcome<T>> => {
     if (abandoned !== null) throw abandoned.error;
-    const member = deps.memberOf(request.seat.aiRef);
-    if (member === null || deps.sitsOut(request.seat.aiRef)) return { kind: "BUSY", code: MAKER_SAT_OUT };
+    // V4 start step, Task 53: a company's second list seat (START_SEAT_REUSE_SUFFIX, "#2") is its member: the mark is stripped
+    // before the member is found, its sit-out read and its call made, so a gate, a ledger row and a charge only see the member.
+    const aiRef = memberRefOfSeat(request.seat.aiRef);
+    const member = deps.memberOf(aiRef);
+    if (member === null || deps.sitsOut(aiRef)) return { kind: "BUSY", code: MAKER_SAT_OUT };
     // Engine 2: the seal that covers the call's contract. Unreachable without the engine settings (R1d refuses such a run
     // first, ENGINE_RUNNER_UNCONFIGURED); a wiring defect would otherwise record the wrong seal, so it stops here.
     const contractHash = request.spec.engine === true ? deps.engineContractHash : deps.mapContractHash;
@@ -158,7 +174,7 @@ export function createRunnerMapCaller(deps: MapStageDeps): RunnerMapCaller {
     while (inFlight.size > 0) await Promise.allSettled([...inFlight]);
     await tail;
   };
-  return Object.freeze({ call, spendStop: () => spendStop, stopped: () => stopped, settled });
+  return Object.freeze({ call, spendStop: () => spendStop, stopped: () => stopped, settled, abandoned: () => abandoned });
 }
 
 /** The map AIs: the first `mapAIs` seats of the distinct-maker order (the opener-rotation seat plans). */

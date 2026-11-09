@@ -6,7 +6,6 @@ import { PlanIdSchema } from "@debateai/contract";
 import { exhaustive } from "@debateai/kernel";
 import type { AskRoom } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { READING_LEVELS } from "@/lib/v4/types";
 import { RESET_TIME_MARK, ResetSentence } from "./ResetSentence";
 
 type RoomSentence = Readonly<{
@@ -102,20 +101,25 @@ export function roomSentence(room: AskRoom | null): RoomSentence | null {
 }
 
 /**
+ * V4 start step, Task 70b (read-f17): whether the notice shows sentence D (one question already waits, with its start). A
+ * page then adds no refusal line of its own beside it, and its buttons wait, described by it: one line, never both.
+ */
+export function alreadyWaitingShown(room: AskRoom | null): boolean {
+  return roomSentence(room)?.key === "newDebate.room.alreadyWaiting";
+}
+
+/**
  * Where "Open the waiting debate" leads (V4 review ask-f11, read-f4, public-f21). The notice is shared by the classic
  * pages (/new, the home composer) and the V4 pages, so it reads the address it sits on: on a V4 page (/v4 and below) the
- * link opens the waiting debate's V4 map, at the reading level the address carries (`?level=`, the parameter every V4
- * link carries, lib/v4/storage.ts); anywhere else, the classic debate page as before. `address` is the path with its
- * query ("" while it is unknown, e.g. on the server).
+ * link opens the waiting debate's V4 map; anywhere else, the classic debate page as before. V4 start step, Task 75d (owner,
+ * 5 Nov): the map shows the waiting debate at the level it was asked at, so the link carries no `?level=`, whatever the address
+ * says. `address` is the path with its query ("" while it is unknown, e.g. on the server).
  */
 export function waitingDebateHref(runRef: string, address: string): string {
   const run = encodeURIComponent(runRef);
   const queryAt = address.indexOf("?");
   const path = queryAt === -1 ? address : address.slice(0, queryAt);
-  if (path !== "/v4" && !path.startsWith("/v4/")) return `/debate/${run}`;
-  const level = new URLSearchParams(queryAt === -1 ? "" : address.slice(queryAt + 1)).get("level");
-  const known = READING_LEVELS.find((option) => option === level);
-  return known === undefined ? `/v4/debate/${run}` : `/v4/debate/${run}?level=${known}`;
+  return path === "/v4" || path.startsWith("/v4/") ? `/v4/debate/${run}` : `/debate/${run}`;
 }
 
 /** The address, read from window.location (as lib/v4/useReadingLevel.ts does) and re-read on Back/Forward. */

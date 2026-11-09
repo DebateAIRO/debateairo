@@ -3,12 +3,12 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0170_outbound_mail_limit.sql",
-    "manifestSha256": "8182b49090d9601a2b366fb2f78494713b313e991e67707dfe3551a32494c6f6",
+    "manifestSha256": "df54b3c3a83a67c2dfb73c01ee5de3bb58428dceaec73b3d0e3dd115a6e0fe23",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
     "name": "0171_security_review_hardening.sql",
-    "sha256": "b7aa124a9448569699534167023118b5d01e9e082d38220e3a0ea489485bc451"
+    "sha256": "39cfd9db85c836a5ed3a35d38740489d7590742994900f3ad5399eb99217c248"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
@@ -385,6 +385,34 @@
       "functions": [
         "identity.dig_is_settled(uuid)",
         "identity.mark_dig_tree_settled(uuid)"
+      ]
+    },
+    {
+      "step": "0158_pre_start_charge.sql",
+      "field": "function_definition",
+      "functions": [
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "step": "0163_carry_on_session_free_digs.sql",
+      "field": "function_definition",
+      "functions": [
+        "core.create_encrypted_run(jsonb,uuid,uuid,jsonb)"
+      ]
+    },
+    {
+      "step": "0165_pre_start_release.sql",
+      "field": "function_definition",
+      "functions": [
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "step": "0168_set_aside_continue.sql",
+      "field": "function_definition",
+      "functions": [
+        "staff.read_team_internal_spent(timestamptz,timestamptz)"
       ]
     }
   ]

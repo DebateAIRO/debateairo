@@ -267,7 +267,7 @@ describe("P3-01 production database-principal manifest", () => {
       }
        ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
         ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'staff.publication_review_event', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission','staff.threat_report','staff.threat_report_event','staff.threat_report_alert','identity.ask_clarify_reservation'],
-        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend','ledger.record_question_check_spend','identity.record_ask_clarify_charge','identity.read_ask_clarify_spent','staff.keep_threat_report','staff.list_threat_reports','staff.count_unread_threat_reports','staff.read_threat_report','staff.decide_threat_report','staff.erase_due_threat_reports','staff.hold_threat_report_email','staff.claim_threat_report_alerts','staff.complete_threat_report_alert','identity.read_data_export_threat_reports','identity.reserve_ask_clarify_charge','identity.delete_ask_clarify_reservations_due'] },
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend','ledger.record_question_check_spend','identity.record_ask_clarify_charge','identity.read_ask_clarify_spent','identity.record_pre_start_charge','identity.read_pre_start_spent','identity.record_pre_start_try_charge','identity.link_pre_start_try','identity.read_run_quota_used','staff.keep_threat_report','staff.list_threat_reports','staff.count_unread_threat_reports','staff.read_threat_report','staff.decide_threat_report','staff.erase_due_threat_reports','staff.hold_threat_report_email','staff.claim_threat_report_alerts','staff.complete_threat_report_alert','identity.read_data_export_threat_reports','identity.reserve_ask_clarify_charge','identity.delete_ask_clarify_reservations_due'] },
       {"roleName":"debateai_password_recovery_owner","login":false,"inherit":false,"directMemberships":[],"ownsSchemas":[],"ownsRelations":["identity.password_recovery_control","identity.password_recovery_staged_code","identity.password_recovery_retry_lock","identity.password_recovery_source_window","identity.password_recovery_notice","identity.password_recovery_feed"],"ownsFunctions":["identity.password_recovery_rules","identity.password_recovery_eligible","identity.password_recovery_audit","identity.password_recovery_notice_event","identity.password_recovery_close","identity.password_recovery_current","identity.password_recovery_prepare","identity.password_recovery_start","identity.password_recovery_exchange","identity.password_recovery_read","identity.password_recovery_read_code","identity.password_recovery_accept_code","identity.password_recovery_stage_factor","identity.password_recovery_verify_factor","identity.password_recovery_stage_codes","identity.password_recovery_ack_code","identity.password_recovery_complete","identity.password_recovery_cancel","identity.expire_password_recovery","identity.password_recovery_started_scope","identity.password_recovery_admit","identity.password_recovery_failure","identity.password_recovery_cancel_session","identity.password_recovery_read_feed","identity.password_recovery_cancel_own","identity.password_recovery_claim_notice","identity.password_recovery_finish_notice"]}
     ]);
 
@@ -774,7 +774,7 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 // Side-by-side spec §13 (migration 0124, plan S1, D8), in source order: the activation pointer's one reader for the API's
-// role alone (the runner's login holds debateai_runtime only, so it cannot read the pointer), then the two pass readers
+// role (the runner's login holds debateai_runtime only; 0169, the owner's answer of 8 Nov, grants it the reader too), then the two pass readers
 // for the runtime. The release owner and operator stay outside this manifest until Phase 3 (sideBySideReleaseRoles).
 {
   "roleName": "debateai_billing_runtime",
@@ -1410,6 +1410,178 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text)",
     "EXECUTE ON FUNCTION identity.settle_stuck_public_flags()"
   ]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0158_pre_start_charge.sql",
+  "grants": [
+    "SELECT, INSERT ON identity.pre_start_charge"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0158_pre_start_charge.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.read_pre_start_spent(uuid,timestamptz,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0158_pre_start_charge.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_pre_start(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0159_start_paths.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_start_paths(uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION core.read_start_paths(uuid)",
+    "EXECUTE ON FUNCTION core.read_start_path_ids(uuid)",
+    "EXECUTE ON FUNCTION core.record_carry_on_due(uuid)",
+    "EXECUTE ON FUNCTION core.claim_carry_on_due(integer)",
+    "EXECUTE ON FUNCTION core.read_carry_on_begun(integer)",
+    "EXECUTE ON FUNCTION core.record_carry_on_done(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0160_path_results.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.write_path_root(uuid,text,integer,uuid,text)",
+    "EXECUTE ON FUNCTION core.record_path_outcome(uuid,text,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION core.record_path_gap_round(uuid,integer,jsonb,bytea)",
+    "EXECUTE ON FUNCTION core.read_path_roots(uuid)",
+    "EXECUTE ON FUNCTION core.read_path_outcomes(uuid)",
+    "EXECUTE ON FUNCTION core.read_path_gap_round(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0161_path_progress.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_path_step(uuid,text,text)",
+    "EXECUTE ON FUNCTION core.record_path_point_mark(uuid,text,uuid,text,text)",
+    "EXECUTE ON FUNCTION core.read_path_progress(uuid)",
+    "EXECUTE ON FUNCTION core.read_carry_on_mark(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0161_path_progress.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.count_public_reports(uuid,uuid)"
+  ]
+},
+// The V4 start step's saved questions (0162, plan 2026-11-03 Task 39d): the five functions for the API's own role (never the shared
+// runtime role), the export reader for the export worker alone, as 0131. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0162_saved_questions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.create_saved_question(uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_saved_questions(uuid,integer)",
+    "EXECUTE ON FUNCTION identity.read_saved_question(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.delete_saved_question(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0162_saved_questions.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"]
+},
+// V4 start step, Task 57c (0165): a failed question gives back its path-list charge. The try's table for the writer's owner (as 0158's
+// charge table), the writer with the try, the link at Start and the failed debate's quota read for the shared runtime role, as 0158's.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": ["SELECT, INSERT, UPDATE (run_id, linked_at) ON identity.pre_start_try"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
+    "EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid)",
+    "EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid)",
+    // Task 57e: the one automatic retry's writer, for the runner (the shared runtime role).
+    "EXECUTE ON FUNCTION core.record_work_item_retry(uuid,uuid,timestamptz)"
+  ]
+},
+// Task 57e: whether a failed debate keeps what its charges before Start bought, for the readers' owner (they call it as their definer).
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": ["EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"]
+},
+// Task 57f: a failed debate continues where it stopped. The waiver, call by call, for the readers' owner (its readers read it); the facts and
+// the re-open for the API's role alone; the waiver's writer (the runner) and its reader (the subscription reader) for the shared runtime role.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": ["SELECT ON ledger.model_spend_call_waiver"]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.read_run_continue(uuid,uuid)",
+    "EXECUTE ON FUNCTION core.continue_failed_run(uuid,uuid,text,bigint)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
+    "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
+  ]
+},
+// V4 start step, Task 56g (0166): a public debate's finished main-answer versions 0147 does not hold, ids and times only, whatever the
+// debate's state, for the runner's climb (the shared runtime role).
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0166_main_answer_times.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_main_answer_times(uuid)"]
+},
+// V4 start step, Task 56h (0167): a visitor's report of a public debate nothing else can carry, on a run of their own made for it (the API's role).
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0167_public_report_own_carrier.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)"]
+},
+// V4 start step, Task 57j (0168): until when a set-aside debate's charges are the site's, for the readers' owner (they call it as their definer)
+// and the shared runtime role (packages/budget's subscription reader runs as it). Its table of Continues is read by no role.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0168_set_aside_continue.sql",
+  "grants": ["EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0168_set_aside_continue.sql",
+  "grants": ["EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"]
+},
+// V4 start step, Task 57o-fix (0169; the owner's answer of 8 Nov, "Your switched-on one (Recommended)": "the runner may read which settings are
+// switched on (a number, nothing private)"): 0124's pointer reader for the runner's role too, for a background piece of an older debate.
+// Task 57p (the owner's answer of 8 Nov, "On each piece's record"): the ten writers that store which settings wrote each piece, the runner's alone.
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0169_piece_settings_version.sql",
+  "grants": ["EXECUTE ON FUNCTION register.read_active_settings_version()",
+    "EXECUTE ON FUNCTION identity.record_web_reading_with_settings(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_with_settings(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version_with_settings(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line_with_settings(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_main_answer_update_with_settings(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_check_passed_with_settings(uuid,uuid,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_answer_update_with_settings(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_report_with_settings(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)"]
 },
 {
   "roleName": "debateai_staff_security_owner",

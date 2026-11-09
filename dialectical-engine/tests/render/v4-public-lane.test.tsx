@@ -72,7 +72,12 @@ import { contributionOf, seedPublicDebates, PUBLIC_DIG_SUGGESTIONS, PUBLIC_REF, 
 const messages = (name: string) => JSON.parse(readFileSync(resolve(import.meta.dirname, `../../apps/ui/messages/en/${name}.json`), "utf8")) as Record<string, string>;
 const V4 = messages("v4");
 const PUBLIC = messages("public");
-const debate = (at = 0): PublicDebate => PublicDebateSchema.parse(seedPublicDebates()[at]);
+// The mock's first public debate names the level it was asked at (the start-step branch's Task 75d seed); these tests read
+// it as one published before the level was copied, so it names none (Plain words), and `atLevel` below hands a level on.
+const debate = (at = 0): PublicDebate => {
+  const { reading_level: _level, ...rest } = PublicDebateSchema.parse(seedPublicDebates()[at]);
+  return rest;
+};
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
@@ -360,9 +365,29 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(startButtons()).toEqual([]);
     const card = host!.querySelector("[data-public-dig-card]")!;
     expect(card.textContent).toContain(`${V4["v4.seed.yourDig"]} Rural towns differ.`);
-    expect(card.textContent).toContain(V4["v4.public.digCard.running"]);
     expect(card.classList.contains("v4GroundLOOKING")).toBe(true);
     expect([...card.querySelectorAll(".v4PubDigStop")].map((stop) => stop.getAttribute("data-reached"))).toEqual(["false", "false"]);
+    // Question 47 A (owner, 9 Nov; journey-d2 A): while it runs, the card is the shared waiting card, keeping the two stops and
+    // the promise that the result shows here: "Looking into it", "Started 14:31", the stops, that line, "You can leave this
+    // page. It keeps going.", then "Open it".
+    const wait = card.querySelector("[data-wait-block]")!;
+    expect(wait.querySelector("[data-wait-word]")!.textContent).toBe(V4["v4.state.LOOKING"]);
+    expect(wait.querySelector("[data-wait-started]")!.textContent).toMatch(/^Started \d{2}:\d{2}$/u);
+    const parts = [wait.querySelector("[data-wait-word]"), wait.querySelector("[data-wait-started]"), wait.querySelector(".v4PubDigStops"),
+      wait.querySelector("[data-public-dig-result-here]"), wait.querySelector("[data-wait-leave]"), card.querySelector(".v4PubDigOpen")];
+    expect(parts.every((part) => part !== null)).toBe(true);
+    for (const [at, part] of parts.slice(1).entries()) {
+      expect(parts[at]!.compareDocumentPosition(part!) & Node.DOCUMENT_POSITION_FOLLOWING, `part ${at + 1}`).toBeTruthy();
+    }
+    expect(wait.querySelector("[data-public-dig-result-here]")!.textContent).toBe(V4["v4.public.digCard.resultShowsHere"]);
+    expect(wait.querySelector("[data-wait-leave]")!.textContent).toBe(V4["v4.wait.leave"]);
+    expect(card.textContent).not.toContain("Your dig is running");
+    // The card's state word is read out, and the outcome's status line is already there, empty, so the outcome is read out when it
+    // comes (the review of 9 Nov: a status line that appears already filled is often not read).
+    expect(wait.querySelector("[data-wait-word]")!.getAttribute("role")).toBe("status");
+    const outcomeLine = card.querySelector("[data-public-dig-outcome]")!;
+    expect(outcomeLine.getAttribute("role")).toBe("status");
+    expect(outcomeLine.textContent).toBe("");
     // Task 75d: the account remembers no level, so none rides the link; the dig's map shows the level it was kept at.
     expect(card.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999");
     expect(lane.readRun).toHaveBeenCalledWith("99999999-9999-4999-8999-999999999999");
@@ -749,6 +774,8 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await click(startButtons()[0]!);
     await undoRunsOut();
     expect(host!.querySelector("[data-public-dig-card]")!.getAttribute("data-public-dig-card")).toBe("RUNNING");
+    const outcomeLine = host!.querySelector("[data-public-dig-card] [data-public-dig-outcome]");
+    expect(outcomeLine).not.toBeNull();
     // Nothing moves while the person stays: the card is read again only when they come back to the page.
     lane.readRun = vi.fn(async () => ({ state: "SETTLED", hold_until: null }));
     const before = debate().contributions![0]!.line;
@@ -762,8 +789,13 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     const card = host!.querySelector("[data-public-dig-card]")!;
     expect(card.getAttribute("data-public-dig-card")).toBe("ON_THE_PAGE");
     expect(card.classList.contains("v4GroundLOOKING")).toBe(false);
+    // Settled: no waiting card any more, the stops and the outcome as before.
+    expect(card.querySelector("[data-wait-block]")).toBeNull();
     expect([...card.querySelectorAll(".v4PubDigStop")].map((stop) => stop.getAttribute("data-reached"))).toEqual(["true", "true"]);
     expect(card.textContent).toContain(V4["v4.public.digCard.onPage"]);
+    // The same status line, kept in place from running to the outcome, now holds it.
+    expect(card.querySelector("[data-public-dig-outcome]")).toBe(outcomeLine);
+    expect(outcomeLine!.textContent).toContain(V4["v4.public.digCard.onPage"]);
     expect([...card.querySelectorAll("ins")].map((mark) => mark.textContent)).toEqual(["Rural lines too."]);
     await click([...card.querySelectorAll("button")].find((one) => one.textContent === V4["v4.public.digCard.seeOnPage"])!);
     expect(lane.refresh).toHaveBeenCalled();
@@ -1038,7 +1070,8 @@ describe("Write a report", () => {
 
   it.each([
     ["PUBLIC_DEBATE_ONGOING", "Something is still being added to this debate. Try again when it is finished."],
-    ["PUBLIC_DEBATE_NO_CARRIER", "This debate's first author has left and no dig is on it yet, so a report can't be written. Dig into a path first."],
+    // Question 46 A (owner, 8 Nov): after the start step's 56h this shows only when the debate holds nothing at all.
+    ["PUBLIC_DEBATE_NO_CARRIER", "There's nothing in this debate yet to write a report from."],
     ["PUBLIC_DEBATE_WAITS_FOR_RESET", "You've used what your plan allows for now. You can carry on once it resets."]
   ])("%s reads in plain words, and the button stays", async (error, words) => {
     lane.writePublicReport = vi.fn(async () => ({ error, message: error }));
@@ -1068,7 +1101,9 @@ describe("Write a report", () => {
 describe("a public debate at its own reading level", () => {
   const atLevel = (level: string): PublicDebate => ({ ...debate(), reading_level: level }) as PublicDebate;
   const firstOpen = (): HTMLButtonElement => buttons(V4["v4.public.dig.open"]!)[0]!;
-  const basisLines = (): number => host!.querySelectorAll(".v4PubFound .v4PanelBasis").length;
+  // A point's open basis line (the start-step branch's question 27 A also gives Plain words a folded own-knowledge line, which
+  // is not one: it sits inside its fold).
+  const basisLines = (): number => host!.querySelectorAll(".v4PubFound .v4PanelPointBody > .v4PanelBasis").length;
 
   it("a dig asked there is asked and priced at the debate's level, and its card opens the dig at that level", async () => {
     vi.useFakeTimers();

@@ -5,17 +5,25 @@
 // wait for running digs and their rewrites (F7 A), versions (the later one reads the earlier
 // answer, F8 A), the newest rewrite covered, and the "paths changed since your report" count 0 right after a report and 1
 // after the next rewrite. The wipe on close is 0133's, in the same transaction as the close (the integration test).
+// V4 start step, Task 50c: a report whose root question states what the person cares about says how that goal fares (the drafts).
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { InvestigationReportStorySchema } from "@debateai/contract";
 import type { PathRewriteEntry } from "@debateai/db";
-import { ANTHROPIC_DOSSIER_FIRST_SYSTEM, anthropicMessagesRequestBody, previewThinkingStepOf, readPromptFrame } from "@debateai/providers";
+import {
+  ANTHROPIC_DOSSIER_FIRST_SYSTEM, anthropicMessagesRequestBody, previewThinkingStepOf, readPromptFrame, type ProviderCallRequest
+} from "@debateai/providers";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, closingReservesOf } from "@debateai/register";
 import { engineContractHash, ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
 import {
-  closeInvestigation, closingRandomBytes, investigationReportIdOf, type InvestigationReportContent, type InvestigationReportSettled
+  closeInvestigation, closingRandomBytes, investigationReportIdOf, type InvestigationCloseSettings, type InvestigationReportContent,
+  type InvestigationReportSettled
 } from "../../apps/runner/src/investigation-close.js";
 import { buildInvestigationDossier, investigationReportGuard } from "../../apps/runner/src/investigation-dossier.js";
-import { writeOverallAnswer, type StoryRoleMaker } from "@debateai/story";
+import {
+  REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT, REPORT_ANSWER_V5_PROMPT_CONTRACT, writeOverallAnswer,
+  type StoryRoleMaker
+} from "@debateai/story";
 import { pathRewriteBodyBytes, pathRewriteBodyFits } from "../../apps/runner/src/path-rewrite-material.js";
 import { latestWrittenReportOf, servePathRewrites, type RewriteTurn } from "../../packages/serve/src/path-rewrites.js";
 import {
@@ -324,5 +332,81 @@ describe("R22 the overall answer, the one module the report and the main-answer 
       .toEqual([["ANSWER_UPDATE:ANSWER:1", "report.answer.later.v4", DIG_READY]]);
     expect(vendors.glm.requests.map((request) => [request.callSiteKey, contractOf(request.packet)]))
       .toEqual([["ANSWER_UPDATE:ANSWER_CHECK:1", "report.answer-check.v3"]]);
+  });
+});
+
+/* ----------------------------------------------------------------- Task 50c: the person's stated goal */
+
+// V4 start step, Task 50c (follow-up to Task 50b; the owner, 4 Nov, "Always say it", and Q4: "the final answer says how the person's goal
+// fares"): when the investigation's ROOT question carries the person's marked care answer, the report's answer says how that goal fares.
+// Version 1 asks Task 50b's draft report.answer.v5, a later version the draft report.answer.later.v5, both checked by Task 50b's draft
+// report.answer-check.v4; the story and its check stay as they are (they follow the answer). Without a goal, every call's bytes are
+// today's: the digests below were taken on this file's world before Task 50c changed any code (wave16-t50c-1.log and -2.log).
+const GOAL_WRITER_SENTENCE = "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";
+const GOAL_CHECKER_SENTENCE = "If the question says what the person cares about, the answer must say how that goal fares across the paths.";
+const instructionOf = (request: ProviderCallRequest): string => request.packet.messages[0]!.content;
+/** The closing's read as the root's purpose lines with the care mark make it (investigation-close-sources.ts). */
+const withGoal = (settings: InvestigationCloseSettings): InvestigationCloseSettings => ({ ...settings, sources: { inputOf: async (closing, earlier) => {
+  const read = await settings.sources.inputOf(closing, earlier);
+  return read === null ? null : { ...read, goalStated: true };
+} } });
+/** Every call's bytes as sent, in each member's order, the fence and the canary masked. */
+function sentDigest(requests: readonly ProviderCallRequest[]): string {
+  return createHash("sha256").update(JSON.stringify(requests.map((request) => {
+    const frame = readPromptFrame({ messages: request.packet.messages.slice(0, 2) });
+    return [request.callSiteKey, request.providerRef,
+      JSON.stringify(request.packet.messages).split(frame.fence).join("<fence>").split(frame.canary).join("<canary>")];
+  })), "utf8").digest("hex");
+}
+
+describe("Task 50c: the report says how the person's stated goal fares", () => {
+  it("version 1 of a report whose root stated a goal: report.answer.v5 checked by report.answer-check.v4; the story's two as today", async () => {
+    const plain = team();
+    await closeInvestigation(settingsOver({ store: memoryReports(), vendors: plain }), closingOf());
+    const store = memoryReports();
+    const vendors = team();
+    expect(await closeInvestigation(withGoal(settingsOver({ store, vendors })), closingOf())).toBe("RECORDED");
+    expect(store.records[0]).toMatchObject({ outcome: "READY", storyOutcome: "READY" });
+    expect(vendors.haiku.requests.map((request) => [request.callSiteKey, contractOf(request.packet)])).toEqual([
+      ["INVESTIGATION_REPORT:ANSWER:1", "report.answer.v5"], ["INVESTIGATION_REPORT:STORY:1", "report.story.v1"]]);
+    expect(vendors.glm.requests.map((request) => [request.callSiteKey, contractOf(request.packet)])).toEqual([
+      ["INVESTIGATION_REPORT:ANSWER_CHECK:1", "report.answer-check.v4"], ["INVESTIGATION_REPORT:STORY_CHECK:1", "report.story-check.v1"]]);
+    expect(instructionOf(vendors.haiku.requests[0]!).startsWith(REPORT_ANSWER_V5_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(vendors.haiku.requests[0]!)).toContain(GOAL_WRITER_SENTENCE);
+    expect(instructionOf(vendors.glm.requests[0]!).startsWith(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.instruction)).toBe(true);
+    expect(instructionOf(vendors.glm.requests[0]!)).toContain(GOAL_CHECKER_SENTENCE);
+    // The story and its check send what they send without a goal, byte for byte (the closing's fence is the same seed's).
+    expect(vendors.haiku.requests[1]!.packet).toEqual(plain.haiku.requests[1]!.packet);
+    expect(vendors.glm.requests[1]!.packet).toEqual(plain.glm.requests[1]!.packet);
+    // Only the answer's instructions change: every call reads the same material, field for field.
+    for (const member of ["haiku", "glm"] as const) {
+      expect(vendors[member].requests.map((request) => [...fieldsOf(request.packet)]))
+        .toEqual(plain[member].requests.map((request) => [...fieldsOf(request.packet)]));
+    }
+  });
+
+  it("a later version of a report whose root stated a goal: report.answer.later.v5 (later.v4 and the one sentence), checked by report.answer-check.v4", async () => {
+    const store = memoryReports();
+    await closeInvestigation(withGoal(settingsOver({ store, vendors: team() })), closingOf(1));
+    const vendors = team();
+    expect(await closeInvestigation(withGoal(settingsOver({ store, vendors })), closingOf(2, "2026-10-31T15:00:00.000Z"))).toBe("RECORDED");
+    expect(store.records.map((record) => [record.reportVersion, record.outcome])).toEqual([[1, "READY"], [2, "READY"]]);
+    expect(vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.later.v5", "report.story.v1"]);
+    expect(vendors.glm.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer-check.v4", "report.story-check.v1"]);
+    expect(instructionOf(vendors.haiku.requests[0]!).startsWith(`${REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`)).toBe(true);
+    expect(JSON.parse(fieldsOf(vendors.haiku.requests[0]!.packet).get("earlier_report")!)).toMatchObject({ version: 1 });
+  });
+
+  it("without a goal, every call of version 1 and of version 2 sends today's bytes", async () => {
+    const store = memoryReports();
+    const first = team();
+    await closeInvestigation(settingsOver({ store, vendors: first }), closingOf(1));
+    const second = team();
+    await closeInvestigation(settingsOver({ store, vendors: second }), closingOf(2, "2026-10-31T15:00:00.000Z"));
+    expect([first, second].map((vendors) => [...vendors.haiku.requests, ...vendors.glm.requests].map((request) => contractOf(request.packet)))).toEqual([
+      ["report.answer.v4", "report.story.v1", "report.answer-check.v3", "report.story-check.v1"],
+      ["report.answer.later.v4", "report.story.v1", "report.answer-check.v3", "report.story-check.v1"]]);
+    expect(sentDigest([...first.haiku.requests, ...first.glm.requests])).toBe("6f505ec386133743ac3fefd545f97e3a305dc8222294287a9ea458bdc6f6a995");
+    expect(sentDigest([...second.haiku.requests, ...second.glm.requests])).toBe("fd5c259f36e4a6955066588232764a5ef4f956d70619fef9ca10737f0944ea86");
   });
 });

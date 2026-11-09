@@ -1,4 +1,4 @@
-import { PurposeLinesSchema, purposeLinesUnsaid, type PurposeLines } from "@debateai/contract";
+import { PurposeLinesSchema, type PurposeLines } from "@debateai/contract";
 import {
   PostgresTreeUpdateRepository, RUN_PURPOSE_LINES_CARRIER, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease, type Pool
 } from "@debateai/db";
@@ -49,8 +49,8 @@ export async function recordPurposeLinesAtAsk(input: Readonly<{ ownerRef: string
   return outcome;
 }
 
-/** The text the question check reads: the question, then each stored line it does not already say. The question alone when there are none. */
-export function questionWithPurposeLines(questionLine: string, lines: PurposeLines | undefined): string {
-  const added = purposeLinesUnsaid(questionLine, lines);
-  return added.length === 0 ? questionLine : `${questionLine}\n\n${added.join("\n")}`;
-}
+/**
+ * The text the question check reads (the question, then each stored line it does not already say). V4 start step, Task 48: it lives in
+ * the contract beside `purposeLinesUnsaid`, so the runner's path planners read the same text; its callers here keep this name.
+ */
+export { questionWithPurposeLines } from "@debateai/contract";

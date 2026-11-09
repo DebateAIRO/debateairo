@@ -593,6 +593,58 @@ cache mark of this release (`REQUEST_PARAMETERS_INVALID`), and the app has no wa
 new files (phase 1) and its slot (phase 2) before the app of the same release goes up, and the runner of this release
 starts only after both gates are `active` with their slots (README.md's section, phase 2, step 5).
 
+## V4 start step (2026-11): four calls at once and this release's gate code
+
+**When.** In the upload sitting of the release that carries the V4 start step, and only with the owner's yes in the
+live chat (owner answer 6, 3 Nov: this gate gets 4 calls at once, with the start-of-debate check as it is). Nothing
+here runs before that yes, and a refusal stops the sitting at that step. Before Start, several AIs write their lists
+at once and Haiku merges them, and a v2 debate's final writers run on Haiku too: four calls at once let them run side
+by side instead of waiting in line.
+
+**1. This release's gate code, in all three gates.** The release's `preview_budget_authority.py` answers `/remaining`
+with the day's pot (`daily_pot_usd`) only to a request that asks for it (`"daily_pot": true`); a plain request gets
+today's reply, seven or nine members, so the app running on the server keeps reading it while the gates change. For
+the DeepInfra gate (README.md) and the Perplexity gate (README-perplexity.md), README.md's "Redeploy (2026-10-12)"
+steps 1-6 with that gate's `G`, `GO` and service. For this gate, steps 1-3 of that section with this gate's `G`, `GO`
+and service, then step 2 below in place of its steps 4-6. A settings version is refused while any gate runs other
+code than the release's (`SETTINGS_GATE_HELPER_DIFFERS:<gate>`): align that gate first, then go on.
+
+**2. The GO edit, by named fields only.** It changes the two hashes and `max_concurrent_calls` (to `4`) and nothing
+else: not the models, not the day's figures, not `max_final_writer_calls`. The block checks that the GO is Anthropic's
+(else `WRONG_GO: stop here`), and the `cmp` line installs the new GO only when nothing else changed:
+
+```sh
+G=/opt/debateai-v3-preview/operator/anthropic-budget-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+jq -e '.provider=="anthropic"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
+umask 077
+jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.max_concurrent_calls=4 | .bridge_sha256=$b | .helper_sha256=$h' "$GO" > "$GO.new"
+diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
+cmp <(jq -S 'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)' "$GO") <(jq -S 'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+```
+
+The last line must show `["claude-haiku-5-5"]`, `4` and `1`.
+
+**3. Restart and activate.** `systemctl restart debateai-preview-anthropic-budget.service`, then `activate` (install
+step 6's command). `activate` checks that the calls in flight, each setting aside the largest worst case it may hold,
+fit in the pot: 3 x $0.24704 (standard calls) + 1 x $0.97664 (the final writer) = $1.71776. The pot itself is the
+owner's figure on the server and is never written here; if `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`, stop and
+ask the owner. `status` must show `state` `active`. Restart the runner only after all three gates are `active` (README.md,
+"Redeploy (2026-10-12)", last paragraph): it reads each gate's calls at once at start-up.
+
+**The way back** (the owner's yes again): `stop`, then the same named-field edit back to two calls at once, then restart
+the service and `activate`. The gate code stays: its plain `/remaining` reply is the old one.
+
+```sh
+GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+jq -e '.provider=="anthropic"' "$GO" >/dev/null || { echo "WRONG_GO: stop here"; false; }
+umask 077
+jq '.max_concurrent_calls=2' "$GO" > "$GO.new"
+cmp <(jq -S 'del(.max_concurrent_calls)' "$GO") <(jq -S 'del(.max_concurrent_calls)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+```
+
+The last line must show `["claude-haiku-5-5"]`, `2` and `1`. The gate files go back only by README.md's "Redeploy
+(2026-10-12)" way back, gate by gate, and only together with an app that does not ask for the pot.
+
 ## Daily operations
 
 **How much did we spend today? Is the gate open?** This only reads. Look at `today_spend_usd`,

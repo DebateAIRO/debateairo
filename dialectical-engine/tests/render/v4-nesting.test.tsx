@@ -74,11 +74,12 @@ describe("the breadcrumb on a dig's map", () => {
       shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).text.line), 40),
       shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).dig_paths.find((path) => path.position_ref === "n-nuclear")!.line), 40)
     ]);
+    // Task 76n (owner, 5 Nov: no level is ever taken from the address): links to the debate's other maps carry no `?level=`.
     expect(parts.map((part) => part.getAttribute("href"))).toEqual([
-      `/v4/debate/${DIG_RUNS.root}?level=background`,
-      `/v4/debate/${DIG_RUNS.root}?path=n-renew&level=background`,
-      `/v4/debate/${DIG_RUNS.levelOne}?path=n-renew&level=background`,
-      `/v4/debate/${DIG_RUNS.levelTwo}?path=n-nuclear&level=background`
+      `/v4/debate/${DIG_RUNS.root}`,
+      `/v4/debate/${DIG_RUNS.root}?path=n-renew`,
+      `/v4/debate/${DIG_RUNS.levelOne}?path=n-renew`,
+      `/v4/debate/${DIG_RUNS.levelTwo}?path=n-nuclear`
     ]);
   });
 
@@ -97,6 +98,17 @@ describe("the breadcrumb on a dig's map", () => {
     harness.answer = trailAnswer(DIG_RUNS.root);
     await mountMap(1600, DIG_RUNS.root);
     expect(page().querySelector(".v4Trail")).toBeNull();
+  });
+
+  it("the back link above a dig's map leads to the map it was dug from with no `?level=` either (Task 76n)", async () => {
+    seedTrail();
+    harness.answer = trailAnswer(DIG_RUNS.levelOne);
+    harness.records = {
+      parent: { parent_run_id: DIG_RUNS.root, child_run_id: DIG_RUNS.levelOne, places: ["path:n-renew"], mode: "quick", created_at: "2026-10-29T10:05:00.000Z" },
+      children: []
+    };
+    await mountMap(1600, DIG_RUNS.levelOne);
+    expect(page().querySelector<HTMLAnchorElement>("a.v4DebBack")!.getAttribute("href")).toBe(`/v4/debate/${DIG_RUNS.root}`);
   });
 });
 
@@ -162,7 +174,9 @@ describe("changed further down (owner Q-D5: marked, never rewritten)", () => {
 
   it("three levels up, the path shows the mark on the tree, the outline and the panel", async () => {
     const root = PATH_REWRITES[DIG_RUNS.root]!;
-    harness.answer = marked(DIG_RUNS.root, { ...root, paths: [...root.paths.filter((path) => path.position_ref !== "n-smr"), BELOW_ONLY] });
+    // n-smr's confirmation goes, so two finished rewrites are left to count (the seed counts three, as the server does).
+    harness.answer = marked(DIG_RUNS.root, { paths: [...root.paths.filter((path) => path.position_ref !== "n-smr"), BELOW_ONLY],
+      changed_since: { ...root.changed_since, count: 2 } });
     await mountMap(1600, DIG_RUNS.root);
     // n-renew: rewritten by 8888 and marked; n-smr: only marked (no dig rewrote it).
     expect(branch(PATHS.renew).querySelector(".v4RewriteNoteBelow")!.textContent).toBe(CATALOG["v4.rewrite.changedBelow"]);
@@ -200,7 +214,7 @@ describe("a dig's own page (in place of its short answer)", () => {
     expect([...intro.querySelectorAll(".v4DigPagePicks li")].map((item) => item.textContent)).toEqual(dig.picks.map((pick) => pick.text));
     expect(intro.textContent).toContain(word("v4.digPage.rewrote", { line: ready(dig.rewrite).text.line }));
     expect(linkNamed(CATALOG["v4.digPage.backToPath"]!, intro)!.getAttribute("href"))
-      .toBe(`/v4/debate/${DIG_RUNS.root}?path=n-renew&level=background`);
+      .toBe(`/v4/debate/${DIG_RUNS.root}?path=n-renew`);
     // Its own answer text, as usual, in the answer card above the map (map-d1); nothing says a short answer is missing or
     // still being written.
     const card = page().querySelector<HTMLElement>(".v4AnswerCard")!;

@@ -43,6 +43,8 @@ describe("B10 sealed admission-policy register row", () => {
       askRoomReads: null,
       // Owner ruling 2026-11-07: the team pages' budget joins the deployment row only.
       staffRequests: null,
+      // Owner ruling 2026-11-09: the start step's budget joins the deployment row only.
+      startStepCalls: null,
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);

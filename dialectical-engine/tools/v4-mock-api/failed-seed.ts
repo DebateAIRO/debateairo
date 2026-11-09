@@ -31,6 +31,17 @@ export type FailedDigSeed = Readonly<{
   mode: "quick" | "thorough";
   question: string;
   askedAt: string;
+  /**
+   * V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, "Continue the same dig"): its run read says `continuable`, exactly
+   * where the API's rule would (a stop of ours: apps/api/src/run-continue.ts stopIsOurs), so its panel's "Try this dig again" continues
+   * this dig (server.ts: it runs again, then finishes). Absent: the press digs afresh, as before.
+   */
+  continuable?: true;
+  /**
+   * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"): its run read says `keeps_failing`, as the API's would
+   * after two continues of a stop of ours that failed again: its panel offers no button and says "This keeps failing. We're looking into it…".
+   */
+  keepsFailing?: true;
 }>;
 
 const PARENT_QUESTION = "Should my country build new nuclear power, or put the money into renewables and storage? (seven digs that did not finish)";
@@ -64,20 +75,22 @@ const pathDig = (line: string): string => asDig(`Look deeper into this part of t
  */
 export const FAILED_DIGS: readonly FailedDigSeed[] = Object.freeze([
   {
-    kind: "STOPPED", runRef: "f1000000-0000-4000-8000-000000000001", seq: 17, reason: "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED",
+    // Task 57m: a stop of ours (a provider call failed; until 57m a step's tries used up, never continued) that was continued twice and
+    // failed again both times, so its read says `keeps_failing` (and no `continuable`).
+    kind: "STOPPED", runRef: "f1000000-0000-4000-8000-000000000001", seq: 17, reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED",
     quotaUsed: "SOME", place: "path:n-mix", mode: "quick", question: pathDig(PATH_LINES.mix),
-    askedAt: "2026-11-01T10:00:00.000Z"
+    askedAt: "2026-11-01T10:00:00.000Z", keepsFailing: true
   },
   {
     kind: "NOT_STARTED", runRef: "f1000000-0000-4000-8000-000000000002", seq: 18, reason: "RUN_ROLE_ASSIGNMENT_INVALID",
     quotaUsed: "NONE", place: "path:n-renew", mode: "quick", question: pathDig(PATH_LINES.renew),
-    askedAt: "2026-11-01T10:05:00.000Z"
+    askedAt: "2026-11-01T10:05:00.000Z", continuable: true
   },
   {
     kind: "MODELS_UNAVAILABLE", runRef: "f1000000-0000-4000-8000-000000000003", seq: 19, reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
     quotaUsed: "NONE", place: "p:n-renew-storage", mode: "thorough",
     question: asDig("Does this hold up, and when? Batteries and long-distance power lines can already cover multi-day lulls in wind and sun at an acceptable cost."),
-    askedAt: "2026-11-01T10:10:00.000Z"
+    askedAt: "2026-11-01T10:10:00.000Z", continuable: true
   },
   {
     kind: "RUN_LIMIT_REACHED", runRef: "f1000000-0000-4000-8000-000000000004", seq: 20, reason: "RUN_CEILING_BELOW_FIRST_CALL",
@@ -107,7 +120,56 @@ export const FAILED_DIGS: readonly FailedDigSeed[] = Object.freeze([
 export const RUN_FAILED_SOME = Object.freeze({
   runRef: "45000000-0000-4000-8000-000000000045",
   seq: 24,
-  reason: "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED",
+  // V4 start step, Task 57g: a stop of ours (a provider call failed), the kind the API continues; the page reads it "stopped partway", as
+  // before. A step's tries used up (CALL_BUDGET_EXHAUSTED, this seed's code until 57g) is never continued (packages/battery RUN_STOPS_NOT_OURS).
+  reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED",
   quotaUsed: "SOME" as const,
-  question: "Should my city make its buses free for everyone, or only for people on low incomes?"
+  question: "Should my city make its buses free for everyone, or only for people on low incomes?",
+  // V4 start step, Task 57g (the owner's 7 Nov answers; Task 57e's `reusable`, renamed by Task 57f): its read says `continuable`, so its
+  // page offers "Continue where it stopped" (server.ts: Continue runs it again, then it finishes). The first failed question cannot continue.
+  continuable: true as const
 });
+
+/**
+ * V4 start step, Task 57j (the owner's answer of 7 Nov afternoon, "Continue, they pay the rest"): a question an update set aside, as from an
+ * older release, so Continue would move it to the release that is current (the API's rule, apps/api/src/run-continue.ts): its read says
+ * `continuable`, and `quota_used: "NONE"` (what ran before the set-aside is the site's; its own sentence says "It did not use your quota."). Its
+ * Continue runs it again, then it finishes, as the second failed question's. The failed dig an update set aside (FAILED_DIGS, SET_ASIDE) stays
+ * the one the API would not move (refused).
+ */
+export const RUN_FAILED_SET_ASIDE = Object.freeze({
+  runRef: "46000000-0000-4000-8000-000000000046",
+  seq: 25,
+  reason: "RUN_SET_ASIDE:BACKSTOP",
+  quotaUsed: "NONE" as const,
+  question: "Should my town turn its empty shopping centre into homes, or keep it for shops and offices?",
+  continuable: true as const
+});
+
+/**
+ * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"; "Yes, same rule" for a whole debate): a question that
+ * stopped on our side, was continued twice and failed again both times, so its read says `keeps_failing` (and no `continuable`), as the API's
+ * would: its page offers no Continue, says "This keeps failing. We're looking into it, and a future fix will solve it." and keeps "Change the
+ * question". Its Continue is refused (409 RUN_NOT_CONTINUABLE).
+ */
+export const RUN_FAILED_KEEPS_FAILING = Object.freeze({
+  runRef: "47000000-0000-4000-8000-000000000047",
+  seq: 26,
+  reason: "RUNNER_EXECUTION_FAILED:PROVIDER_CALL_FAILED",
+  quotaUsed: "SOME" as const,
+  question: "Should my village keep its small school open, or send the children to the bigger school in the next town?",
+  keepsFailing: true as const
+});
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers; the API's route, apps/api/src/run-continue.ts): what the stand-in's Continue
+ * (POST /v1/runs/{id}/continue) does with a run. A FAILED question whose read says `continuable` continues (CONTINUE: it runs again,
+ * then finishes; Task 57i: a failed dig whose read says so alike, in place); a second press while it runs answers CONTINUING again (AGAIN), as the API's re-open does; any other FAILED run is
+ * refused (NOT_CONTINUABLE: 409 RUN_NOT_CONTINUABLE). Everything else is the month pause's Continue, unchanged (MONTH).
+ */
+export type MockContinueStep = "CONTINUE" | "AGAIN" | "NOT_CONTINUABLE" | "MONTH";
+
+export function mockContinueStep(run: Readonly<{ failed: boolean; running: boolean; continuable: boolean; continued: boolean }>): MockContinueStep {
+  if (run.failed) return run.continuable ? "CONTINUE" : "NOT_CONTINUABLE";
+  return run.continued && run.running ? "AGAIN" : "MONTH";
+}

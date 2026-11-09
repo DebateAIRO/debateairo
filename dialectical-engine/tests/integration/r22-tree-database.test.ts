@@ -610,7 +610,7 @@ describe("decision 23: erasing a dig leaves the answer version it made as writte
     const newest = (await tree.readMainAnswers(root))!.at(-1)!;
     expect((await tree.recordMainAnswer({ updateId: UPDATE_BY_STRANGER, rootRunId: root, basedOnUpdateId: newest.update_id, triggerKind: "PATH_UPDATE", triggerId: randomUUID(),
       triggerRunId: two!, paidByOwnerRef: digger.owner_ref, outcome: "READY", failureCode: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1,
-      artifactRefs: [], spentMicros: 5, content: sealed })).outcome).toBe("RECORDED");
+      artifactRefs: [], spentMicros: 5, content: sealed, settingsVersion: 4 })).outcome).toBe("RECORDED");
     await database.pool.query('DELETE FROM identity."user" WHERE owner_ref = $1', [digger.owner_ref]);
     const byStranger = (await versionsOf(root)).at(-1)!;
     expect(byStranger).toMatchObject({ paid_by_owner_ref: null, outcome: "READY" });

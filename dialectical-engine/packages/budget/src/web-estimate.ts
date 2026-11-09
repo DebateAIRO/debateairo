@@ -111,7 +111,13 @@ export function webCallTokens(sites: WebSites): Readonly<{
     // The pack's reading inside the arguing: input only (the arguing calls' own output is already in the debate's
     // estimate), one figure per pack.
     // A dig's legs read all its picks' packs together, at most three packs' worth (apps/runner web-packs.ts `WEB_DIG_SOURCES_BYTES`).
-    pack: Object.freeze({ calls: sites.kind === "DIG" ? Math.min(sites.packs, 3) : sites.packs, inputTokens: a.packReadTokensPerPack, outputTokens: 0 })
+    // V4 start step, Task 37: on a path debate every path's arguing reads every chosen path's pack (owner 31 Oct), so each of its
+    // packs is read `packReadsPerCall` (= packs) times; `webSitesOf` always sets it on PATHS.
+    pack: Object.freeze({
+      calls: sites.kind === "PATHS" ? sites.packs * (sites.packReadsPerCall ?? sites.packs)
+        : sites.kind === "DIG" ? Math.min(sites.packs, 3) : sites.packs,
+      inputTokens: a.packReadTokensPerPack, outputTokens: 0
+    })
   });
 }
 

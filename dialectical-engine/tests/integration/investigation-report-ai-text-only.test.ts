@@ -101,7 +101,7 @@ async function webStep(runId: string, who: string): Promise<string> {
       about: cipher.seal(WEB_EVIDENCE_CARRIERS.page, pageId, { url: `https://${who}.example.org/queues`, site: `${who}.example.org`, title: "Pier queues", date: "2026-09-30" }) })).toBe("RECORDED");
     const readingId = randomUUID();
     expect(await store.recordReading({ runId, readingId, pageId, reader: 1, maker: "anthropic", outcome: "READ", grade: 3,
-      line: cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: NOTE, language: "en" }) })).toBe("RECORDED");
+      line: cipher.seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: NOTE, language: "en" }), settingsVersion: 4 })).toBe("RECORDED");
     expect(await store.recordExtract({ runId, extractId, pageId, label: "S1-1", foundBy: [1],
       quote: cipher.seal(WEB_EVIDENCE_CARRIERS.extract, extractId, { quote: passage(who) }) })).toBe("RECORDED");
     const shown = await withRunContentLease(runner, [runId], () => encryptAttestedContentForRun(runner, runId, WEB_SHOWN_QUOTE_CARRIER, extractId, { quote: cutQuoteAtWordEdge(passage(who)) }));
@@ -147,7 +147,8 @@ async function debateWithDig(): Promise<Tree> {
     what_changed: ["The dig weakened the year-round case."], view_reason: null,
     dig_paths: [{ position_ref: digPath, line: "Winter ridership falls.", fate: "HELD_UP" }] }));
   expect(await store.recordRewrite({ rewriteId, digRunId: dig, parentAnswerVersion: 1, basedOnRewriteId: null, outcome: "READY", failureCode: null,
-    fateBefore: "HELD_UP", fateAfter, verdict: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [randomUUID()], content })).toBe("RECORDED");
+    fateBefore: "HELD_UP", fateAfter, verdict: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [randomUUID()], content,
+      settingsVersion: 4 })).toBe("RECORDED");
   return { root, position, dig, digPath, rewriteId, digPoints: [looked, reasoned], investigationId: joined.investigationId! };
 }
 
@@ -271,7 +272,8 @@ describe("R22 decisions 2 and 5: what else the report reads", () => {
     const content = await withRunContentLease(runner, [deep], () => encryptAttestedContentForRun(runner, deep, PATH_REWRITE_CARRIER, deepRewrite, {
       text: { line: "Winter ridership falls; summer grows.", summary: "The summer peak lasts.", fate: "HELD_UP" }, what_changed: ["It added summer."], view_reason: null, dig_paths: [] }));
     expect(await store.recordRewrite({ rewriteId: deepRewrite, digRunId: deep, parentAnswerVersion: 1, basedOnRewriteId: null, outcome: "READY", failureCode: null,
-      fateBefore: "HELD_UP", fateAfter: "HELD_UP", verdict: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [randomUUID()], content })).toBe("RECORDED");
+      fateBefore: "HELD_UP", fateAfter: "HELD_UP", verdict: null, writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [randomUUID()], content,
+      settingsVersion: 4 })).toBe("RECORDED");
 
     const climbs = new PostgresTreeUpdateRunnerRepository(runner);
     const updateId = randomUUID();
@@ -279,7 +281,7 @@ describe("R22 decisions 2 and 5: what else the report reads", () => {
     const sealed = await withRunContentLease(runner, [deep], () => encryptAttestedContentForRun(runner, deep, PATH_UPDATE_CARRIER, updateId,
       { text: { line: "Yes in summer, no in winter: the climb's newest line.", summary: "It climbed.", fate: "PARTLY_HELD" } }));
     expect(await climbs.record({ updateId, basedOn: { kind: "PATH_REWRITE", id: tree.rewriteId }, outcome: "READY", failureCode: null, changed: true, fateBefore: "PARTLY_HELD", fateAfter: "PARTLY_HELD",
-      writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [], content: sealed })).toBe("RECORDED");
+      writerLineage: LINEAGE, checkerLineage: LINEAGE, rounds: 1, artifactRefs: [], content: sealed, settingsVersion: 4 })).toBe("RECORDED");
 
     const read = (await postgresInvestigationCloseSources(runner).inputOf(closingOf(tree), null))!;
     expect(read.input.first.paths[0]!.current).toEqual({ line: "Yes in summer, no in winter: the climb's newest line.", summary: "It climbed.", fate: "PARTLY_HELD" });

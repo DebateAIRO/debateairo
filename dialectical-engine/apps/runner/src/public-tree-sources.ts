@@ -4,7 +4,7 @@ import {
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_UPDATE_CARRIER, PUBLIC_ANSWER_UPDATE_CARRIER, PUBLIC_DIG_INPUT_CARRIER, PostgresDigPicksRunnerRepository, PostgresPublicDebateRunnerRepository,
   PostgresPublicTreeRunnerRepository, PostgresTreeUpdateRunnerRepository, RunRepository, decryptContentForRun, encryptAttestedContentForRun, withRunContentLease,
-  type PathLineEntry, type Pool, type PublicContributionRead, type WebSealed
+  type MainAnswerTimeRead, type MainAnswerUpdateRead, type PathLineEntry, type Pool, type PublicContributionRead, type WebSealed
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { InvestigationCloseInput } from "./investigation-close.js";
@@ -144,6 +144,15 @@ export function dossierFromMaterial(material: PublicMaterial, input: Readonly<{
 /** Whether the root's key still lives: 0138's reader answers null once it does not. */
 const rootLives = async (tree: PostgresTreeUpdateRunnerRepository, rootRunId: string): Promise<boolean> => (await tree.readMainAnswers(rootRunId)) !== null;
 
+/** Task 56f review: 0147's newest finished version when it was written after `after` (0138's newest, from before a suspension); otherwise null. */
+const goneVersionAfter = (rows: readonly MainAnswerUpdateRead[], after: string): MainAnswerUpdateRead | null => {
+  const newest = rows.filter((row) => row.outcome === "READY" || row.outcome === "READY_WITH_RESERVATION").at(-1);
+  return newest !== undefined && Date.parse(newest.recorded_at) > Date.parse(after) ? newest : null;
+};
+
+/** Task 56g: whether a finished version 0147 does not hold (0166's list: 0138's, or the page's copy of one an erasure took) was written after `after`. */
+const keptVersionAfter = (times: readonly MainAnswerTimeRead[], after: string): boolean => times.some((time) => Date.parse(time.recorded_at) > Date.parse(after));
+
 /** What the climb reads for one public dig (`climbFrom` and `writePublicDigLevel`'s ports). The copy is read once per dig. */
 export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts {
   const publicTree = new PostgresPublicTreeRunnerRepository(pool);
@@ -233,12 +242,22 @@ export function publicTreePortsOf(pool: Pool, digRunId: string): TreeUpdatePorts
     // Only a version a public contribution caused is ever opened here. A version from the author's private digs (0138 lists them too, for the bookkeeping of "based on") stays
     // shut: no prompt holds it, and the page's own main answer stands in for it.
     openMainAnswer: async (rootRunId, row) => {
-      // 0150: a row older than the debate's last review step has no content here: the page's copy stands for it, corrected.
-      if (row.content === null || (await contributions.readContribution(row.trigger_run_id))?.outcome !== "ALLOWED") return null;
       const lives = await rootLives(liveTree, rootRunId);
-      const under = lives ? rootRunId : row.trigger_run_id;
-      const opened = await withRunContentLease(pool, [under], () => decryptContentForRun<unknown>(pool, under, lives ? MAIN_ANSWER_UPDATE_CARRIER : PUBLIC_ANSWER_UPDATE_CARRIER,
-        row.update_id, row.content, null));
+      // Task 56f review: a root whose owner was suspended and is back lives again, and 0138's newest (`row`) is from before; a version a public dig wrote meanwhile
+      // (0147, under that dig's key) is newer, and the page shows it: the next version revises that one. Its dig's key gone since: the page's copy stands for it.
+      const meanwhile = lives ? goneVersionAfter(await publicTree.readGoneAnswers(rootRunId), row.recorded_at) : null;
+      // Task 56g, the mirror: a root not live again (its owner suspended again, or erased after a suspension), and `row` is 0147's newest; a version
+      // written under the root's key while she was back (0138), or the page's copy of it once her erasure took 0138's rows, is newer, and the page
+      // shows it: the page's copy stands for it, so the next version revises that one.
+      if (!lives && keptVersionAfter(await publicTree.readMainAnswerTimes(rootRunId), row.recorded_at)) return null;
+      const found = meanwhile ?? row;
+      // 0150: a row older than the debate's last review step has no content here: the page's copy stands for it, corrected.
+      if (found.content === null || (await contributions.readContribution(found.trigger_run_id))?.outcome !== "ALLOWED") return null;
+      const underRoot = lives && meanwhile === null;
+      const under = underRoot ? rootRunId : found.trigger_run_id;
+      const open = () => withRunContentLease(pool, [under], () => decryptContentForRun<unknown>(pool, under, underRoot ? MAIN_ANSWER_UPDATE_CARRIER : PUBLIC_ANSWER_UPDATE_CARRIER,
+        found.update_id, found.content, null));
+      const opened = meanwhile === null ? await open() : await open().catch(() => null);
       return isRecord(opened) && Array.isArray(opened.segments) && opened.segments.every((segment) => typeof segment === "string") ? opened.segments as readonly string[] : null;
     },
     answerInputOf: async (rootRunId, earlier): Promise<InvestigationCloseInput | null> => {

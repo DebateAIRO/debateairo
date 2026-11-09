@@ -194,7 +194,7 @@ describe("a rewritten path (desktop)", () => {
     expect(points.textContent).toContain(CATALOG["v4.trust.SURE"]);
     expect(points.textContent).toContain("What new power costs in 2025: a survey of recent auctions");
     const map = [...panel().querySelectorAll<HTMLAnchorElement>("a")].find((link) => link.textContent === CATALOG["v4.rewrite.openDigMap"])!;
-    expect(map.getAttribute("href")).toBe(`/v4/debate/${DIG_RUNS.ownView}?level=background`);
+    expect(map.getAttribute("href")).toBe(`/v4/debate/${DIG_RUNS.ownView}`);
     await click(buttonNamed(CATALOG["v4.rewrite.hideDigPoints"]!, panel()));
     expect(panel().querySelector(".v4RewriteDigPoints")).toBeNull();
   });
@@ -285,7 +285,7 @@ describe("the four states (draft 5.5)", () => {
     await openPath(PATHS.nuclear);
     expect(panel().textContent).toContain(CATALOG["v4.rewrite.digPointsElsewhere"]);
     const map = [...panel().querySelectorAll<HTMLAnchorElement>("a")].find((link) => link.textContent === CATALOG["v4.rewrite.openDigMap"])!;
-    expect(map.getAttribute("href")).toBe(`/v4/debate/${DIG_FAILED}?level=background`);
+    expect(map.getAttribute("href")).toBe(`/v4/debate/${DIG_FAILED}`);
   });
 });
 

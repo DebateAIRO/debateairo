@@ -6,6 +6,7 @@ import {
   canDigFromLevel,
   type Answer,
   type AnswerStory,
+  type CarryOnPart,
   type DigLinks,
   type DigSuggestion,
   type RunProjection
@@ -17,6 +18,7 @@ import { V4BottomStack, type V4BarJob } from "@/components/v4/V4BottomStack";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import type { V4DigChoice } from "@/components/v4/V4DigSuggest";
 import { V4DigTray, V4PicksList } from "@/components/v4/V4DigTray";
+import { useDigPaths } from "@/components/v4/V4DigPaths";
 import { V4DigNotes, V4DigStartingLine } from "@/components/v4/V4DigUndo";
 import { V4FailedScreen } from "@/components/v4/V4FailedScreen";
 import { V4Header } from "@/components/v4/V4Header";
@@ -26,10 +28,14 @@ import { V4LeaveQuestion } from "@/components/v4/V4LeaveQuestion";
 import { V4LoadingOutline, V4LoadingPage, V4SignInAgain } from "@/components/v4/V4LoadingOutline";
 import { V4PicksClearedNote } from "@/components/v4/V4PicksClearedNote";
 import {
-  digFor, digsUnder, openCount, pathTitle, resolveSelection, rootPanelOpen, selectionIdOf, shortText, TitleText, V4MapTree
+  digFor, digsUnder, firstCardQuestion, openCount, pathIdOf, pathTitle, resolveSelection, resolveSelectionNear, rootPanelOpen, selectionIdOf,
+  shortText, TitleText, V4MapTree
 } from "@/components/v4/V4MapTree";
+import { V4MainAnswer } from "@/components/v4/V4MainAnswer";
+import { CARRY_ON_REPORT_POLL_MS, runIsRunning, V4RunRoot } from "@/components/v4/V4RunPaths";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
+import { V4PendingMap } from "@/components/v4/V4PendingMap";
 import { useQuestionShare, V4QuestionShareLine, V4TopLine } from "@/components/v4/V4QuestionShare";
 import { V4PublicMark } from "@/components/v4/V4PublicMark";
 import { usePublicStage } from "@/lib/v4/publicState";
@@ -38,17 +44,17 @@ import type { V4ResearchedPress } from "@/components/v4/V4Sources";
 import { V4ChangedSince } from "@/components/v4/V4PathRewrite";
 import { V4AnswerCard, type V4ReportAnswer } from "@/components/v4/V4AnswerCard";
 import { V4PathList, V4SkipToAnswer, V4WhereBar } from "@/components/v4/V4MapPlace";
-import { V4PausedScreen } from "@/components/v4/V4PausedScreen";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { useMapView } from "@/components/v4/useMapView";
+import { useStoppedContinue } from "@/components/v4/useStoppedContinue";
 import { V4Steps } from "@/components/v4/V4Steps";
 import { useV4Ready } from "@/components/v4/useV4Ready";
 import { useMapReport } from "@/components/v4/useMapReport";
 import { digAboutLine } from "@/components/v4/digAbout";
 import { phoneBarJob, picksPlaceOf, showChoices, type PhoneTarget } from "@/components/v4/mapDigHelpers";
-import { isNotFound } from "@/lib/api";
+import { contractClient, isNotFound } from "@/lib/api";
 import { isSignedOut, signInHrefHere } from "@/lib/signInWayBack";
-import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { mergeDigLinks, readDigRecords, storableItems } from "@/lib/v4/accountMemory";
 import { diffSnapshots, isRewriteWord, selectionForChange, snapshotItems } from "@/lib/v4/changes";
@@ -59,36 +65,37 @@ import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { panelDigsPicks, trayShows } from "@/lib/v4/digDock";
 import { askAgainHref } from "@/lib/v4/failedRun";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
-import { useClaimDigNotes, waitingDigFor } from "@/lib/v4/digUndo";
+import { DIG_UNDO_MS, useClaimDigNotes, waitingDigFor } from "@/lib/v4/digUndo";
+import { isPathsParent } from "@/lib/v4/digPathPlan";
 import { startedThisVisit, useDigQueue } from "@/lib/v4/useDigQueue";
 import { useFailedDigs } from "@/lib/v4/useFailedDigs";
+import { useParentDigRetry, type ParentDigRetryReads } from "@/lib/v4/useParentDigRetry";
+import { waitingDigQuestionOf } from "@/lib/v4/reportWriting";
 import { useUnseenSaving, useVisitMemory } from "@/lib/v4/useVisitMemory";
 import { selectedDigOf, usePausedBarJob } from "@/lib/v4/usePausedBarJob";
 import {
   addToResearched, loadAnswer, loadDigProgress, loadDigTrail, loadDigView, loadStory, loadV4, storyReadFailed, type DigTrail, type V4Load
 } from "@/lib/v4/load";
 import { researchedWaiting } from "@/lib/v4/web";
-import { buildV4Map, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
-import {
-  borrowLines,
-  continueRun,
-  limitLine,
-  monthPauseOf,
-  type ContinueOutcome,
-  type MoneyLine
-} from "@/lib/v4/money";
-import { clock24 } from "@/lib/v4/clock";
-import type { V4DigQuota } from "@/lib/v4/digQuota";
+import { buildV4Map, buildV4PendingMap, buildV4RunMap, rewriteByDig, rewriteWaiting, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import { clearHandOff, handOffFor, type StartHandOff } from "@/lib/v4/startHandOff";
+import { borrowLines, digShareLine, limitLine, limitLineWhileReportWaits, type MoneyLine } from "@/lib/v4/money";
+import { digButtonLabel, type V4DigQuota } from "@/lib/v4/digQuota";
 import { useBorrowed } from "@/lib/v4/useBorrowed";
 import { useDigQuota } from "@/lib/v4/useDigQuota";
 import { useQuotaMoments } from "@/lib/v4/useQuotaMoments";
-import { pauseDate, pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
+import { pausedDigCount, pauseOfDig, pauseOfRun } from "@/lib/v4/monthPause";
+import { CARRY_ON_BUILT } from "@/lib/v4/carryOn";
+import { stateWordText, waitStateOfRun } from "@/lib/v4/stateWords";
 import {
   addPick,
+  digSuggestionsWithMore,
   draftTarget,
   editPick,
   EMPTY_DRAFT,
   isEdited,
+  mainQuestionTarget,
+  morePick,
   openPick,
   ownViewPick,
   pickedOpenIds,
@@ -97,7 +104,7 @@ import {
   suggestionPick,
   togglePick as toggleDraftPick
 } from "@/lib/v4/suggestions";
-import { levelHref, useReadingLevel } from "@/lib/v4/storage";
+import { levelHref } from "@/lib/v4/storage";
 import type {
   DigLink,
   DigMode,
@@ -106,7 +113,9 @@ import type {
   ReadingLevel,
   V4Change,
   V4DigDraft,
+  V4DigPick,
   V4Map,
+  V4MoreItem,
   V4Selection
 } from "@/lib/v4/types";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
@@ -141,6 +150,11 @@ const STORY_POLL_FIRST_MS = 10_000;
 const STORY_POLL_MAX_MS = 60_000;
 /** R2TIME-3: the page stops waiting for a story still being written only after about this long in total. */
 const STORY_WAIT_LIMIT_MS = 15 * 60_000;
+/**
+ * V4 start step, Task 62 (wait-f10): once the page stopped waiting for a short answer still being written, it asks again this
+ * often (the pace of the site-version check), and once at once when the tab is shown again.
+ */
+export const STORY_SLOW_POLL_MS = 300_000;
 /** DATA-3: a story read that failed is accepted only after this many failures in a row (V3's readFailureLimit). */
 const STORY_READ_FAILURE_LIMIT = 4;
 const DIG_POLL_MS = 15_000;
@@ -162,9 +176,15 @@ const INDEX_FIRST_READ_FAILURES = 3;
 const INDEX_REREAD_LIMIT = 20;
 /** R2DIG-6: a dig's own page reads this many pages past the dig itself, to reach the older debate it came from. */
 const INDEX_PARENT_PAGES = 2;
-const CLOCK_TICK_MS = 15_000;
-/** The reading level a page uses when the address names none (Decision A). */
-const DEFAULT_LEVEL: ReadingLevel = "background";
+/** Task 62: a sign no path title holds, so the polite line splits around the title and the title alone is marked AI text. */
+const FILLED_SLOT = "\u2063\u2063";
+/** Task 62: a path's whole title in the polite "ready to read" line (the panel's heading shows it whole too). */
+const PATH_TITLE_WHOLE = 2_000;
+/**
+ * The reading level the page uses for a debate asked without one. V4 start step, Task 75d (owner, 5 Nov, second round): Plain
+ * words, the level every question starts on (it was "some background" while the address named the level).
+ */
+const DEFAULT_LEVEL: ReadingLevel = "plain";
 /**
  * Spec: desktop ≥ 1100 px, 768–1099 px a top strip, < 768 px the phone layout. map-d3 (3 Nov): from 1440 px the three
  * columns; 1100–1439 px ("laptop") a 56 px strip of steps, the map in two columns with only the opened path unfolded;
@@ -194,12 +214,17 @@ const STAND_IN: NonNullable<DigStatus["view"]> = { state: "RUNNING", headline: n
 
 /** dig-f2: the reads that follow the digs below this map's own (their records, their state, the answers in between). */
 const BELOW_READS: DigsBelowReads = { readDigRecords, loadDigView, loadAnswer };
+/** Task 76j (wiring item 12): the reads of the map a failed dig was dug from (lib/v4/useParentDigRetry.ts). */
+const PARENT_RETRY_READS: ParentDigRetryReads = { ...BELOW_READS, loadStory: (answerId) => loadStory(answerId) };
 
 export type V4DebateClientProps = Readonly<{
   id: string;
   /** W4-6: the path the address names (`?path=`, a link back from a dig), opened in the panel at first; null: none. */
   initialPath?: string | null;
-  /** The reading level the address names (`?level=`), or null. */
+  /**
+   * The reading level the address names (`?level=`), or null. V4 start step, Task 75c (owner answer Q15, 5 Nov): no longer read;
+   * the page shows the debate's own level, as its run read says.
+   */
   initialLevel: ReadingLevel | null;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -209,17 +234,43 @@ export type V4DebateClientProps = Readonly<{
   crisisCountryHint: string | null;
 }>;
 
+/**
+ * V4 start step, Task 76i (the review session's note "the map header remounts while loading"): every screen of the page (the
+ * outline, the hand-off, the status screens and the map) holds its header in the wrapper with this key, so React keeps the one
+ * header element from the first look to the map, wherever the wrapper sits among the screen's other parts. The wrapper adds no
+ * box of its own (`.v4DebBehind`), so on the screens before the map it holds the header alone.
+ */
+const HEADER_FRAME = "header-frame";
+
 /** Every V3 read is asker-scoped, so the page waits for a session first (the classic page does the same). */
 export function V4DebateClient(props: V4DebateClientProps) {
+  // Task 76i (wait-f14): the ask page's hand-off for this debate, read once when the page opens on it; none after a reload, in
+  // another tab, for another debate, or once it is a minute old (lib/v4/startHandOff.ts).
+  const handOff = useHandOff(props.id);
   return (
-    // map-f6: one look while the page loads, from the session check on: a grey outline of the page.
-    <AuthGate catalog={props.newDebateCatalog} checkingView={<V4LoadingPage catalog={props.catalog} />}>
+    // map-f6: one look while the page loads, from the session check on: a grey outline of the page. Task 76i: after Start, the
+    // question and its paths instead, under the held header bar (the sign-in check runs behind them, never on a blank page).
+    <AuthGate
+      catalog={props.newDebateCatalog}
+      checkingView={handOff === null
+        ? <V4LoadingPage catalog={props.catalog} />
+        : <HandOffPage handOff={handOff} catalog={props.catalog} locale={props.locale} />}
+    >
       {() => (
         // Keyed by id: moving between two debates (a dig's back link) starts fresh, never with the last one's state.
-        <V4Debate key={props.id} {...props} />
+        <V4Debate key={props.id} {...props} handOff={handOff} />
       )}
     </AuthGate>
   );
+}
+
+/** Task 76i: this debate's hand-off, read once for each debate the page opens on (as V4Debate is keyed by its id). */
+function useHandOff(id: string): StartHandOff | null {
+  const [held, setHeld] = useState(() => ({ id, handOff: handOffFor(id, Date.now()) }));
+  if (held.id === id) return held.handOff;
+  const next = { id, handOff: handOffFor(id, Date.now()) };
+  setHeld(next);
+  return next.handOff;
 }
 
 /** Desktop on the server render and the first paint; the real width is read once mounted. */
@@ -237,11 +288,6 @@ function useLayout(): Layout {
     };
   }, []);
   return layout;
-}
-
-/** "HH:MM" in the page's language on the 24-hour clock (journey-f15, lib/v4/clock.ts), or null when unreadable. */
-function clockTime(iso: string | null | undefined, locale: string): string | null {
-  return typeof iso === "string" ? clock24(iso, locale) : null;
 }
 
 function isRunning(dig: DigView): boolean {
@@ -320,17 +366,15 @@ function visitNews(stored: Readonly<Record<string, string>>, now: Readonly<Recor
 function V4Debate({
   id,
   initialPath = null,
-  initialLevel,
   catalog,
   homeCatalog,
   newDebateCatalog,
   billingCatalog,
   locale,
-  crisisCountryHint
-}: V4DebateClientProps) {
+  crisisCountryHint,
+  handOff
+}: V4DebateClientProps & Readonly<{ handOff: StartHandOff | null }>) {
   const layout = useLayout();
-  const [chosenLevel, chooseLevel, levelKnown] = useReadingLevel(initialLevel);
-  const readingLevel: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
   const [digMode, setDigMode] = useState<DigMode>("quick");
 
   // ── The debate: poll the run until it is served or failed ─────────────────────────────────────────────────────────
@@ -341,6 +385,21 @@ function V4Debate({
   const [load, setLoad] = useState<V4Load | null>(null);
   const [loadProblem, setLoadProblem] = useState<LoadProblem | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov): the level belongs to the question. The page shows the debate at the level it
+  // was asked at, as its run read says (lib/v4/load.ts); the address's `?level=` and the account's saved level no longer change it,
+  // and nothing on this page changes it. A debate asked without one reads as the default level (Task 75d: Plain words). Links from
+  // here carry no `?level=`: into its report (Task 76l: the report page reads the level itself) or to its other maps (Task 76n:
+  // each map reads its own debate's level, so the address never names one).
+  const debateLevel: ReadingLevel | null = load === null ? null : load.kind === "RUN" ? load.run.reading_level ?? null : load.level ?? null;
+  const readingLevel: ReadingLevel = debateLevel ?? DEFAULT_LEVEL;
+  /** The level is known once the debate was read (map-f6: no level shows before). */
+  const levelKnown = load !== null;
+  // Task 76i (wait-f14): once the debate's first read answered, whatever it said, the ask page's hand-off is used up; a reload,
+  // or this map opened again, finds none.
+  const firstReadAnswered = load !== null || loadProblem !== null;
+  useEffect(() => {
+    if (firstReadAnswered) clearHandOff(id);
+  }, [firstReadAnswered, id]);
   useWaitPolling(async (stillWanted) => {
     try {
       const next = await loadV4(id);
@@ -381,7 +440,12 @@ function V4Debate({
 
   // ── The story: while it is missing, being written or its read failed, ask again, backing off (R2TIME-3) ─────────
   const [polledStory, setPolledStory] = useState<Readonly<{ answerId: string; story: AnswerStory | null }> | null>(null);
-  const [storyGaveUp, setStoryGaveUp] = useState(false);
+  // Task 62 (wait-f10): the page gave up waiting for ONE answer version, so a newer version (after a dig) is waited for afresh.
+  const versionKey = answerId === null ? null : `${answerId}/${answerVersion}`;
+  const [gaveUpFor, setGaveUpFor] = useState<string | null>(null);
+  const storyGaveUp = versionKey !== null && gaveUpFor === versionKey;
+  /** wait-f10: how many times a short answer came after the page stopped waiting for it (each is one ready moment). */
+  const [shortAnswerLate, setShortAnswerLate] = useState(0);
   const story = polledStory !== null && polledStory.answerId === answerId ? polledStory.story : served?.story ?? null;
   const storyFailedRead = story !== null && storyReadFailed(story);
   const storyPending = served !== null && !noStory && !storyGaveUp && (story === null || story.status === "WRITING" || storyFailedRead);
@@ -413,7 +477,7 @@ function V4Debate({
       failuresInARow = readFailed ? failuresInARow + 1 : 0;
       if (!readFailed && next !== null && next.status !== "WRITING") return;
       if (failuresInARow >= STORY_READ_FAILURE_LIMIT || Date.now() - waitStarted >= STORY_WAIT_LIMIT_MS) {
-        setStoryGaveUp(true);
+        setGaveUpFor(`${answerId}/${answerVersion}`);
         return;
       }
       delay = Math.min(STORY_POLL_MAX_MS, delay * 2);
@@ -426,6 +490,50 @@ function V4Debate({
     };
   }, [answerId, answerVersion, storyPending]);
 
+  // ── Task 62 (wait-f10): after the page stops waiting, the short answer still being written is asked for every 5 minutes ──
+  // and once at once when the tab is shown again. A read that answers READY clears the gave-up state (the map takes the story's
+  // paths, the answer card's short answer fills its place, and the late moment plays once); UNAVAILABLE, or the page leaving,
+  // stops the reads.
+  const slowStory = storyGaveUp && story !== null && (story.status === "WRITING" || storyFailedRead);
+  useEffect(() => {
+    if (answerId === null || !slowStory) return;
+    const key = `${answerId}/${answerVersion}`;
+    let active = true;
+    let busy = false;
+    let timer: number | undefined;
+    const read = async (): Promise<void> => {
+      if (busy) return;
+      busy = true;
+      window.clearTimeout(timer);
+      let next: AnswerStory | null = null;
+      try {
+        next = await loadStory(answerId, undefined, answerVersion);
+      } catch {
+        next = null;
+      }
+      busy = false;
+      if (!active) return;
+      if (next !== null) {
+        setPolledStory({ answerId, story: next });
+        if (!storyReadFailed(next) && (next.status === "READY" || next.status === "READY_WITH_RESERVATION")) {
+          setGaveUpFor((was) => (was === key ? null : was));
+          setShortAnswerLate((count) => count + 1);
+        }
+      }
+      timer = window.setTimeout(() => void read(), STORY_SLOW_POLL_MS);
+    };
+    const onVisibility = (): void => {
+      if (document.visibilityState === "visible") void read();
+    };
+    timer = window.setTimeout(() => void read(), STORY_SLOW_POLL_MS);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [answerId, answerVersion, slowStory]);
+
   // TIME-6/FIT-5: once the page stops waiting, the map says the summary is unavailable, not "still being written".
   const map = useMemo<V4Map | null>(
     () => (served === null ? null : buildV4Map({ runId: served.runId, answer: served.answer, story, storyGaveUp })),
@@ -433,6 +541,71 @@ function V4Debate({
   );
   const servedRunId = served?.runId ?? null;
   const servedQuestionLine = served?.answer.question_line ?? null;
+  // ── V4 start step, Task 62 (wait-d1, map-d2): a path debate's run read draws the map at once, before the answer ─────────
+  // (lib/v4/mapModel.ts buildV4RunMap; null for an R22 run read and for a failed run). The page DRAWS `map ?? runMap`;
+  // everything that digs, picks, tours or keeps news reads `map` (the served one), so during the wait none of them exists.
+  const runRead = load?.kind === "RUN" ? load.run : null;
+  const runMap = useMemo<V4Map | null>(() => (runRead === null ? null : buildV4RunMap({ runId, run: runRead })), [runId, runRead]);
+  const drawn: V4Map | null = map ?? runMap;
+
+  // ── The carry-on line (wait-f16): the part the server says is running (`carry_on_part`, Task 58) ──────────────────────
+  // During the run the page's usual run reads carry it. Once the answer is served, while the line shows, the owner's run read
+  // is asked again every CARRY_ON_REPORT_POLL_MS; the reads stop when the server names no part, and the line then goes.
+  const lastRunCarry = useRef<CarryOnPart | null>(null);
+  useEffect(() => {
+    if (runRead !== null) lastRunCarry.current = runRead.carry_on_part ?? null;
+  });
+  const [servedCarry, setServedCarry] = useState<Readonly<{ runId: string; part: CarryOnPart | null }> | null>(null);
+  const carryPart: CarryOnPart | null = served === null
+    ? runRead?.carry_on_part ?? null
+    : servedCarry !== null && servedCarry.runId === served.runId ? servedCarry.part : served.answer.carry_on_part ?? lastRunCarry.current;
+  const carryShown = CARRY_ON_BUILT && drawn?.carryOnToReport === true && carryPart !== null;
+  useEffect(() => {
+    if (servedRunId === null || !carryShown) return;
+    let active = true;
+    let timer: number | undefined;
+    const read = async (): Promise<void> => {
+      let part: CarryOnPart | null | undefined;
+      try {
+        part = (await contractClient.readRun(servedRunId)).carry_on_part ?? null;
+      } catch {
+        // Quiet: the line keeps what it showed, and the run is asked again later.
+        part = undefined;
+      }
+      if (!active) return;
+      if (part !== undefined) setServedCarry({ runId: servedRunId, part });
+      if (part !== null) timer = window.setTimeout(() => void read(), CARRY_ON_REPORT_POLL_MS);
+    };
+    timer = window.setTimeout(() => void read(), CARRY_ON_REPORT_POLL_MS);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [servedRunId, carryShown]);
+
+  // ── Task 62 (map-f4): a path that fills in between two run reads is said once, politely, per path per visit ──────────
+  // (the main answer's arrival is its own ready moment, not this line).
+  // Review of Tasks 60-62: each title keeps whether an AI wrote it (a path the person added or rewrote is theirs, Task 61).
+  const [filledTitles, setFilledTitles] = useState<readonly Readonly<{ text: string; ai: boolean }>[]>([]);
+  const filledSeen = useRef<Set<string>>(new Set());
+  const lookingBefore = useRef<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    if (runMap === null) {
+      lookingBefore.current = null;
+      return;
+    }
+    const looking = new Set(runMap.paths.filter((path) => path.branch?.state === "LOOKING").map((path) => path.id));
+    const before = lookingBefore.current;
+    lookingBefore.current = looking;
+    if (before === null) return;
+    const fresh = runMap.paths.filter((path) => before.has(path.id) && !looking.has(path.id) && !filledSeen.current.has(path.id));
+    if (fresh.length === 0) return;
+    for (const path of fresh) filledSeen.current.add(path.id);
+    setFilledTitles(fresh.map((path) => {
+      const title = pathTitle(path, catalog, PATH_TITLE_WHOLE);
+      return { text: title.text, ai: title.ai };
+    }));
+  }, [runMap, catalog]);
 
   // ── The account's question list (Decision A): digs and the back link are found again in it, by text ───────────
   const [index, setIndex] = useState<readonly IndexEntry[]>([]);
@@ -654,10 +827,44 @@ function V4Debate({
   const planTier = ask.planTier;
   // Owner's screen review (3 Nov): every dig button's quota words, from its own check with the server (dig-f5), read
   // again after each quota moment (dig-f11); lib/v4/useDigQuota.ts.
-  const digQuota = useDigQuota({
+  const { quota: readQuota, room: digRoomRead } = useDigQuota({
     room: ask.room, parentRunId: servedRunId === null || !canDig ? null : servedRunId, picks: draft.picks.length,
     mode: digMode, readingLevel, catalog, locale
   });
+  // V4 start step, Task 79b (owner answer Q19 of 4 Nov, "a dig's share follows a combine"; journey-f8): on a path debate a dig of
+  // picks looks into one path per pick (the server's rule for a dig that sends no paths; Task 79: the dig plan's paths), so the
+  // picks' share is the room read's own for that many paths (`digShareLine(room, paths)`): a change of the count moves it at once,
+  // without another read, and its grey change shows for SHARE_DELTA_SHOW_MS (V4ShareChange). A whole path, one open question and a
+  // wait for a reset keep their own words; an R22 debate's dig, or a read with no share per path count, keeps today's single share.
+  // Independent review (Task 79b): an open question picked stays a place in the dig's question, never a path (spec 2026-11-03 §4.4;
+  // the ask sends it in `places`, not in `picks`, so the server makes no path of it), so it is not counted; a dig of open questions
+  // alone sends no picks and is today's dig, with today's single share.
+  // V4 start step, Task 79 (spec §4.4, dig-f35; answer Q19): the count is the dig plan's paths (components/v4/V4DigPaths.tsx
+  // useDigPaths: the picks that are not open questions, as the person combined and split them), which travels with the draft.
+  // Coordinator ruling (7 Nov, the wave-16 review of Task 79): where the start step runs, the server argues EVERY dig of picks as paths,
+  // an R22 debate's too (apps/api/src/index.ts digRuns), and its room read then names a share per path count; so the page follows it.
+  const digPathsParent = served !== null && (isPathsParent(served.answer) || digRoomRead?.dig_share_by_paths !== undefined);
+  const digPathPlan = useDigPaths({
+    pathsParent: digPathsParent, parentRunId: servedRunId === null || !canDig ? null : servedRunId,
+    freePlan: ask.planTier === "free", planTier: ask.planTier, readingLevel, draft, draftRef, commitDraft, holding: picksUndo.offered
+  });
+  const digPaths = digPathPlan.pathCount;
+  const digQuota = useMemo((): Readonly<{ quota: V4DigQuota; room: typeof digRoomRead }> => {
+    const line = digPaths === undefined || digRoomRead?.dig_share_by_paths === undefined ? null : digShareLine(digRoomRead, digPaths);
+    const percent = typeof line?.values.percent === "number" ? line.values.percent : null;
+    if (percent === null) return { quota: readQuota, room: digRoomRead };
+    const share = (target: DigTarget): number | null => (target.kind === "picks" && readQuota.share(target) !== null ? percent : readQuota.share(target));
+    return {
+      room: digRoomRead,
+      quota: Object.freeze({
+        ...readQuota,
+        share,
+        label: (target: DigTarget, tray?: boolean) => (target.kind === "picks" && readQuota.share(target) !== null
+          ? digButtonLabel({ target, share: percent, wait: null, catalog, locale, tray: tray === true })
+          : readQuota.label(target, tray))
+      })
+    };
+  }, [readQuota, digRoomRead, digPaths, catalog, locale]);
   const digQuotaRef = useRef(digQuota);
   useEffect(() => {
     digQuotaRef.current = digQuota;
@@ -789,6 +996,24 @@ function V4Debate({
     const loop = digLoop.current;
     if (loop !== null && loop.seenKey() !== linkKey) loop.kick();
   }, [linkKey]);
+  // V4 start step, Task 57i (lib/v4/useFailedDigs.ts): a failed dig continued in place shows as running at once (the API re-opened it with
+  // its answer) and the dig loop follows it again; one the API would not continue is read once more.
+  const rereadDig = useCallback((childRunId: string, running: boolean): void => {
+    const link = linksRef.current.find((known) => known.childRunId === childRunId);
+    if (link === undefined) return;
+    const put = (view: Omit<DigView, "link">): void => {
+      const next = new Map(statusesRef.current);
+      next.set(childRunId, { view, failures: 0, headlessTries: 0 });
+      statusesRef.current = next;
+      setStatuses(next);
+    };
+    if (running) {
+      put(STAND_IN);
+      digLoop.current?.kick();
+      return;
+    }
+    loadDigView(link).then(({ link: _read, ...view }) => put(view), () => undefined);
+  }, []);
 
   // ── Rewrites (W4-6): read the answer again while a path is being rewritten, or a dig's rewrite is not on it yet ────
   // One read in flight; a finished rewrite a dig reports first is fetched at once, a path still being rewritten every 15 s.
@@ -910,10 +1135,36 @@ function V4Debate({
   const isDig = servedDig !== null;
   const reportReady = useRef<() => void>(() => undefined);
   const barJobRef = useRef<HTMLElement | null>(null);
+  // Task 76j (the owner's 5 Nov answers; the review session's wiring list, items 6 and 7): question 18 A, the phone's bottom
+  // bar says when it shows "Write my report" (V4BottomStack's onReportShown), so the top bar's own steps aside; question 23 A,
+  // the wait line names the one dig the report waits for: report-f7's rule over this map's digs as READ (never the stand-in
+  // of a dig not read yet), the same digs the report page waits on; never on a dig's own map.
+  const [bottomShowsReport, setBottomShowsReport] = useState(false);
+  const waitingDigQuestion = isDig ? null
+    : waitingDigQuestionOf(links.map((link) => ({ link, view: statuses.get(link.childRunId)?.view })));
+  // Task 76l (the review session's wiring list, item 21): a report version this visit saw being written is done, so the answer
+  // is read again once and the map's count of changes names that version. A rewrite that finished after the version began but
+  // before it was written then brings "Your report is older than the map" back (the owner's fourth round, 6 Nov).
+  const readAnswerAfterReport = (): void => {
+    if (servedRunId === null) return;
+    void loadAnswer(servedRunId).then((next) => {
+      if (next !== null) setFreshAnswer(next);
+    });
+  };
   const report = useMapReport({
     runId, servedRunId, isDig, answer: served?.answer,
     free: map?.webNote === "FREE" || planTier === "free", sharesShown: planTier !== "free",
-    digsKey: linkKey, level: chosenLevel, onReady: () => reportReady.current(), barJobRef, catalog, locale
+    // Task 76l (owner, 5 Nov: no level is ever taken from the address on V4 pages): the links into the report carry none; the
+    // report page reads the debate's own level from its loader.
+    digsKey: linkKey, level: null, barJobRef, catalog, locale,
+    onReady: () => {
+      reportReady.current();
+      readAnswerAfterReport();
+    },
+    waitingDigQuestion, waitingDigLanguage: served?.language ?? served?.story?.language ?? null, bottomShowsReport,
+    // V4 start step, Task 56c (public-f25, owner answer Q20 B): a further report on a public debate waits for the reset, and its
+    // buttons say when (the dig buttons' room read, read again after each quota moment).
+    room: digQuota.room, isPublic: publicStage?.kind === "PUBLIC"
   });
   const reportAnswer = report.answer;
 
@@ -935,7 +1186,19 @@ function V4Debate({
   const [focusRequest, setFocusRequest] = useState(0);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const panelColRef = useRef<HTMLElement | null>(null);
-  const shownSelection: V4Selection = map === null ? "root" : selectionIdOf(resolveSelection(map, digs, selected));
+  // Task 62 (map-f4, "Kept where you were"): the selection lives above both maps and survives the switch from the run map to
+  // the served one (the same `path:b<n>` ids). A part that left the map opens the part right above it (the path of the last
+  // selection that opened, else the question), and one line says so until the next selection. Nothing moves focus or scrolls.
+  const lastPathRef = useRef<string | null>(null);
+  const lastOpenedRef = useRef<V4Selection | null>(null);
+  const near = drawn === null ? null : resolveSelectionNear(drawn, digs, selected, lastPathRef.current);
+  const shownSelection: V4Selection = near === null ? "root" : selectionIdOf(near.resolved);
+  const movedShown = near !== null && near.moved && lastOpenedRef.current === selected;
+  useEffect(() => {
+    if (near === null || near.moved) return;
+    lastPathRef.current = pathIdOf(near.resolved);
+    lastOpenedRef.current = selected;
+  });
   // dig-d1 B (owner's screen review, 3 Nov): the open dig's steps and checked findings while it works (lib/v4/useDigProgress.ts).
   const openDig = useMemo(() => {
     if (map === null) return null;
@@ -978,35 +1241,50 @@ function V4Debate({
     if (question === undefined) return;
     commitDraft(toggleDraftPick(draftRef.current, openPick(question), planTier).draft);
   }, [map, canDig, planTier, commitDraft]);
+  // Task 62 (spec §2.5): what the main question offers first when you dig (on a path debate, the menu paths left out).
+  const mainQuestionPicks = useMemo(() => (served === null ? [] : digSuggestionsWithMore(served.answer, [])), [served]);
   const choice = useMemo<V4DigChoice | undefined>(() => {
     if (map === null) return undefined;
+    // Task 79 (spec §4.4): on a path debate one more pick that makes a path than the dig may look into is refused (PATHS_FULL).
+    const pathPicks = (picks: readonly V4DigPick[]): number => picks.filter((pick) => pick.kind !== "OPEN").length;
     const keep = (change: Readonly<{ draft: V4DigDraft; refused: ReturnType<typeof pickRefusal> }>) => {
-      if (change.refused === null) commitDraft(change.draft);
-      return change.refused;
+      if (change.refused !== null) return change.refused;
+      if (digPathPlan.newPickRefusal !== null && pathPicks(change.draft.picks) > pathPicks(draftRef.current.picks)) return digPathPlan.newPickRefusal;
+      commitDraft(change.draft);
+      return null;
     };
     return {
       draft,
       planTier,
       canDig,
       digHereToo: (pathId: string) => canDig && (isDigMap || digsUnder(map, digs, pathId).length > 0),
-      refusalFor: (group: string | null) => pickRefusal(draft, group, planTier),
+      refusalFor: (group: string | null, makesPath?: boolean) =>
+        pickRefusal(draft, group, planTier) ?? (makesPath === true ? digPathPlan.newPickRefusal : null),
       onToggleSuggestion: (pathId: string, suggestion: DigSuggestion) => {
-        if (canDig) keep(toggleDraftPick(draftRef.current, suggestionPick(pathId, suggestion), planTier));
+        if (canDig) keep(toggleDraftPick(draftRef.current, suggestionPick(pathId, suggestion), planTier, digPathsParent));
       },
-      onEditPick: (key: string, text: string) => keep(editPick(draftRef.current, key, text)),
+      onEditPick: (key: string, text: string) => keep(editPick(draftRef.current, key, text, digPathsParent)),
       onAddOwnView: (pathId: string, text: string) => {
         ownViewSerial.current += 1;
-        return keep(addPick(draftRef.current, ownViewPick(pathId, text, ownViewSerial.current), planTier));
+        return keep(addPick(draftRef.current, ownViewPick(pathId, text, ownViewSerial.current), planTier, digPathsParent));
       },
       onRemovePick: (key: string) => commitDraft(removePick(draftRef.current, key)),
       onClear: clearPicks,
+      mainQuestionPicks,
+      onToggleMainPick: (pick: V4DigPick) => {
+        if (canDig) keep(toggleDraftPick(draftRef.current, pick, planTier, digPathsParent));
+      },
       typed,
       // dig-f5: where the picks wait, by name, with [Go to them] (the path, or the main question for its own open questions).
       ...(picksPlaceOf(map, draft, catalog, select) ?? {}),
       // journey-f20 / dig-f26 / public-f26: the own-view box's one grey line when what is typed there will be public.
-      ...(publicLine === null ? {} : { publicLine })
+      ...(publicLine === null ? {} : { publicLine }),
+      // Task 79 (dig-f35): a path debate's dig, and its path rows under the picks.
+      pathsParent: digPathsParent,
+      ...(digPathPlan.rows === null ? {} : { digPaths: { ...digPathPlan.rows, locale } })
     };
-  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, publicLine]);
+  }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, publicLine, mainQuestionPicks, digPathsParent,
+    digPathPlan.newPickRefusal, digPathPlan.rows, locale]);
   // ── The dig flow (dig-d3 B, owner pick 3 Nov): lib/v4/useDigQueue.tsx ──────────────────────────────────────────
   // A dig waiting out its 10 seconds belongs to the whole V4 site, not to this page (lib/v4/digUndo.ts, memory only): it
   // keeps its own Undo when the person digs again or opens another page, and the other dig buttons stay active. Its
@@ -1019,9 +1297,35 @@ function V4Debate({
   const digQueue = useDigQueue({
     map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
     setVisitLinks, ask, onCounting: dismissPicksUndo, aboutOf: (target) => digAboutLine(target, catalog),
-    digsRest: report.digsRest, catalog, locale
+    // Task 79 review: a combined question written during the dig's 10 seconds goes with it.
+    digsRest: report.digsRest, settlePaths: digPathPlan.settledPaths, catalog, locale
   });
-  const { waitingDigs, queueDig, startDig, undoDig } = digQueue;
+  const { waitingDigs, queueDig, undoDig } = digQueue;
+  // V4 start step, Task 79 (dig-f35, r2-22): a dig of the draft's picks on a path debate goes with its path plan (DIG_PICKS) through
+  // the shared 10-second Undo, unchanged; the words the person wrote on its rows get the crisis check at the press, as their own
+  // views do (V, 2026-09-30). Every other dig is today's.
+  const { startPathsFor, ownWords: digRowWords } = digPathPlan;
+  const startPicksDig = digQueue.startDig;
+  const offerCrisisHelp = ask.offerCrisisHelp;
+  const startDig = useCallback((target: DigTarget): void => {
+    const paths = startPathsFor(target);
+    if (paths === undefined) {
+      startPicksDig(target);
+      return;
+    }
+    const written = digRowWords();
+    if (written.length > 0 && offerCrisisHelp(written)) return;
+    queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + DIG_UNDO_MS, paths });
+  }, [startPathsFor, digRowWords, startPicksDig, offerCrisisHelp, queueDig, sentDigMode]);
+  // Task 62 (journey-f13, r2-22): a chosen path's one dig button digs deeper into it, and a "+ N more" item is dug as a MORE
+  // pick of the main question; both through the shared Undo note (nothing is sent for 10 seconds), once the answer is served.
+  const digDeeper = useMemo(() => (map === null || !canDig ? undefined : (pathId: string): void => {
+    const path = map.paths.find((candidate) => candidate.id === pathId);
+    if (path !== undefined) startDig({ kind: "path", path });
+  }), [map, canDig, startDig]);
+  const digMore = useMemo(() => (map === null || !canDig ? undefined : (item: V4MoreItem): void => {
+    startDig({ kind: "picks", path: null, picks: [morePick(item)] });
+  }), [map, canDig, startDig]);
   const trayTarget = map === null || !canDig ? null : draftTarget(draft, map.paths);
   // While the picks' own dig waits, they are on their way: the tray steps back (Undo brings them back). dig-f4 / map-f14:
   // the tray shows on a computer only, from the second pick, or from the first while new digs wait for a reset
@@ -1032,8 +1336,11 @@ function V4Debate({
   const trayClearRef = useRef<HTMLButtonElement | null>(null);
 
   // ── A dig that did not finish (owner review 3 Nov, dig-f12/wait-f18): lib/v4/useFailedDigs.ts ───────────────────
+  // Task 76j (wiring item 15): its optional homeCatalog is no longer read (question 3 A), so the page hands none.
   const failedDigs = useFailedDigs({
-    map, digs, canDig, digMode, planTier, servedQuestionLine, queueDig, catalog, homeCatalog, locale
+    map, digs, canDig, digMode, planTier, servedQuestionLine, queueDig, catalog, locale,
+    // Task 57i: a dig that can continue is continued in place, through the same Undo.
+    room: ask.room, aboveRunIds, rereadDig
   });
 
   // ── What changed since your last visit and while you were here (D4, fix wave 1, N7) ─────────────────────────────
@@ -1137,6 +1444,9 @@ function V4Debate({
     map,
     // wait-f5 / journey-f22: a debate paused at the month wall is "Paused", never "Looking into it".
     waiting: map === null && load?.kind === "RUN" && load.run.state !== "FAILED" && pauseOfRun(load.run) === null,
+    // Task 76l (the owner's fourth and fifth rounds, 6-7 Nov): the tab says the page's own state word for the unfinished
+    // question ("Waiting" for a free spot, a short break, the other question, the month's pause), from its run read.
+    waitState: runRead === null ? null : waitStateOfRun(runRead),
     isDigPage: isDigPage || recordParent !== null,
     news,
     hiddenNews,
@@ -1148,6 +1458,8 @@ function V4Debate({
     hideNews: () => setHiddenNews(news.length),
     focusHeading: () => headingRef.current?.focus(),
     reportHref,
+    // Task 62 (wait-f10): a short answer that came after the page had stopped waiting for it.
+    shortAnswerLate,
     catalog,
     locale
   });
@@ -1180,16 +1492,18 @@ function V4Debate({
     return entry === null || entry.runId === runId ? null : { runId: entry.runId, question: ownWords(entry.questionLine) };
   }, [visitEntry, recordParent, questionLine, index, catalog, runId]);
   const startedAt = visitEntry?.link.startedAt ?? recordParent?.created_at ?? null;
-
-  // A slow clock for "started N minutes ago" while the debate runs (only when the start time is known).
-  const [now, setNow] = useState<number | null>(null);
-  const waiting = load?.kind === "RUN" && load.run.state !== "FAILED" && startedAt !== null;
-  useEffect(() => {
-    if (!waiting) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
-    return () => window.clearInterval(timer);
-  }, [waiting]);
+  // Task 76j (wiring item 12; the owner's third round, 5 Nov): a dig's own failed page says what the map it was dug from offers
+  // for it (V4FailedScreen's digRetry), read once from that map; unknown or unreadable: nothing, the page as it was.
+  const parentRetry = useParentDigRetry({
+    runId, failed: load?.kind === "RUN" && load.run.state === "FAILED" && (isDigPage || recordParent !== null),
+    parentRunId: parent?.runId ?? null, index, indexSettled, visit: visitAll, catalog, locale, reads: PARENT_RETRY_READS
+  });
+  // V4 start step, Task 57g (the owner's 7 Nov answers): "Continue where it stopped" on a question that did not finish, when its read says
+  // `continuable`: the 10-second Undo, then the same debate continues on this page (components/v4/useStoppedContinue.tsx).
+  const stoppedContinue = useStoppedContinue({
+    runId, run: load?.kind === "RUN" ? load.run : null, loaded: load !== null, dig: isDigPage || recordParent !== null, room: ask.room,
+    reread: () => setLoadAttempt((count) => count + 1), catalog, locale
+  });
 
   // ── The map as shown (V4 screen review, 3 Nov): components/v4/useMapView.ts ─────────────────────────────────────
   // The star moved off what is dug (map-f5), the cards that turn over (dig-d4 B), the answer card's fold (map-d1), the
@@ -1203,25 +1517,25 @@ function V4Debate({
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice); the report
-  // link is made above, with the ready moments.
-  const askHref = levelHref("/v4", chosenLevel);
-  // wait-f23 / ask-f6 / journey-f19 (owner's screen review): "Open in the classic view" shows once. While the question
-  // waits, is paused or did not finish, it is at the bottom of that screen; otherwise in the header's account menu.
-  const classicInBody = map === null && load?.kind === "RUN";
+  // link is made above, with the ready moments. Task 75c: the debate's own level is no choice for the next question, so the ask
+  // page's link carries none (step 1 offers the account's level, as before).
+  const askHref = levelHref("/v4", null);
   // map-f6: no reading level shows until the saved one is known; the map waits for it behind its outline (not forever).
-  const levelSettled = useLevelSettled(levelKnown, map !== null);
+  // Task 62: the run read's map too.
+  const levelSettled = useLevelSettled(levelKnown, drawn !== null);
   // journey-d3 / dig-f16: this page draws the dig notes in its own bottom stack once its map shows (and not while the
   // grey outline waits for the reading level, which draws no notes: the site-wide holder keeps them until then).
-  useClaimDigNotes(map !== null && levelSettled);
+  // Task 62: the run read's map draws its own bottom stack too.
+  useClaimDigNotes(drawn !== null && levelSettled);
   // wait-f2: a dig paused at the month wall, open in the panel: the phone's pinned bar says "Paused · Continue".
   const pausedBar = usePausedBarJob(map === null ? null : selectedDigOf(digs, shownSelection), catalog, locale);
   const header = (
     <V4Header
       catalog={catalog}
-      readingLevel={levelSettled ? readingLevel : null}
-      linkLevel={chosenLevel}
-      onReadingLevel={chooseLevel}
-      classicHref={classicInBody ? null : classicHref}
+      // wait-f23 / ask-f6 / journey-f19 with the owner's answer 12 B (5 Nov): "Open in the classic view" is in the account
+      // menu only, once, on every screen of the map's step (waiting, paused and failed too); no body screen draws one. No
+      // level is handed (the 5 Nov ruling: no header shows or carries one).
+      classicHref={classicHref}
       after={served !== null ? report.headerStrip : null}
     >
       {/* W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).
@@ -1237,7 +1551,7 @@ function V4Debate({
     // wait-f1: the sign-in ended (on the waiting card, or before the first read): sign in again, and come back here.
     return (
       <div className="v4DebPage">
-        {header}
+        <div key={HEADER_FRAME} className="v4DebBehind">{header}</div>
         <div className="v4DebCentre">
           <V4SignInAgain
             questionLine={load?.kind === "RUN" ? load.run.question_line : null}
@@ -1248,20 +1562,25 @@ function V4Debate({
       </div>
     );
   }
-  if ((map === null && load === null && loadProblem === null) || (map !== null && !levelSettled)) {
-    // map-f6: the page's grey outline until there is something to show (and, on the map, until the level is known).
+  if ((map === null && load === null && loadProblem === null) || (drawn !== null && !levelSettled)) {
+    // map-f6: the page's grey outline until there is something to show (and, on the map, until the level is known). Task 76i
+    // (wait-f14): after Start, never the outline: the question and its paths, each being looked into, until the first read answers.
     return (
       <div className="v4DebPage">
-        {header}
-        <div className="v4DebMain"><V4LoadingOutline catalog={catalog} /></div>
+        <div key={HEADER_FRAME} className="v4DebBehind">{header}</div>
+        {handOff !== null && load === null
+          ? <HandOffMap handOff={handOff} catalog={catalog} locale={locale} />
+          : <div className="v4DebMain"><V4LoadingOutline catalog={catalog} /></div>}
       </div>
     );
   }
-  if (map === null) {
+  // Task 62 (wait-d1, journey-d2): an R22 run read is the map's first card alone, the question and the waiting card under it,
+  // in place of the progress screen; a path debate's run read draws the map below (`drawn`).
+  if (map === null && runMap === null) {
     return (
       <div className="v4DebPage" {...tabPrefix}>
         {ready.announcer}
-        {header}
+        <div key={HEADER_FRAME} className="v4DebBehind">{header}</div>
         {/* journey-f18 / read-f25: the waiting, paused and failed screens are on the map's step of the four. */}
         {load?.kind === "RUN" ? <div className="v4StepsTop"><V4Steps current="map" shape="line" catalog={catalog} /></div> : null}
         {/* UI-4: the layout already holds the page's one <main>. */}
@@ -1280,36 +1599,39 @@ function V4Debate({
             // Owner review 3 Nov (wait-f11, map-f30): "Ask this again" fills the ask step from this debate; a dig leads back to its map.
             <V4FailedScreen
               run={load.run}
-              askAgainHref={levelHref(askAgainHref(runId), chosenLevel)}
+              // Task 75d: the ask step reads this debate's level back from the server with its words, never from the address.
+              askAgainHref={askAgainHref(runId)}
               askHref={askHref}
-              classicHref={classicHref}
               dig={isDigPage || recordParent !== null
-                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel) }
+                ? { backHref: parent === null ? null : levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, null) }
                 : null}
+              {...(parentRetry === undefined ? {} : { digRetry: parentRetry })}
+              // Task 57g: "Continue where it stopped" only when the read says `continuable` ("Ask this again" then says "Change the question").
+              {...(stoppedContinue.offered ? { onContinue: stoppedContinue.press, continueNote: stoppedContinue.note } : {})}
               catalog={catalog}
               homeCatalog={homeCatalog}
             />
-          ) : pauseOfRun(load.run) !== null ? (
-            // Owner review 3 Nov (wait-f5, public-f17): paused at the month wall, the pause is said once, with a still mark.
-            <V4PausedScreen
-              run={load.run}
-              runId={runId}
-              reconnecting={loadProblem === "UNREACHABLE"}
-              classicHref={classicHref}
-              catalog={catalog}
-              locale={locale}
-            />
           ) : (
-            <ProgressScreen
-              run={load.run}
-              runId={runId}
-              startedAt={startedAt}
-              now={now}
-              reconnecting={loadProblem === "UNREACHABLE"}
-              classicHref={classicHref}
-              catalog={catalog}
-              locale={locale}
-            />
+            <section className="v4Card v4DebStatus v4DebProgress v4DebFirstCard">
+              <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
+              {/* The person's own words (the tab title follows this heading); the added lines are not a title. */}
+              <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(load.run.question_line)}</h1>
+              {/* Owner review 3 Nov (wait-f5): paused at the month wall, the one pause block stands in the waiting card's place. */}
+              <V4RunRoot
+                map={null}
+                run={load.run}
+                startedAt={startedAt}
+                reconnecting={loadProblem === "UNREACHABLE"}
+                carryOn={null}
+                free={planTier === "free"}
+                layout={layout === "phone" ? "phone" : layout === "mid" ? "mid" : "desktop"}
+                selected="root"
+                onSelect={select}
+                catalog={catalog}
+                locale={locale}
+                pauseFocusAfter={firstCardHeading}
+              />
+            </section>
           )}
         </div>
       </div>
@@ -1323,8 +1645,13 @@ function V4Debate({
     done: digs.filter((dig) => dig.state === "DONE").length,
     failed: digs.filter((dig) => dig.state === "FAILED").length
   };
-  // The map as shown: its star moved off what is dug (map-f5). Everything else reads the same map.
-  const view = shownMap ?? map;
+  // The map as shown: its star moved off what is dug (map-f5). Everything else reads the same map. Task 62: while the debate
+  // runs, the run read's map (nothing on it digs, picks, tours or keeps news).
+  const view: V4Map = map === null ? runMap! : shownMap ?? map;
+  /** Task 62: the debate is still running, so the page draws the run read's map. */
+  const runPhase = map === null;
+  /** The AIs work on it right now (the cards pulse); not while it waits, holds or is paused at the month wall. */
+  const running = runPhase && runIsRunning(runRead);
   const openLeft = openCount(view, digs);
   // The room read the dig buttons work from: the page's own, or the newer one read after a quota moment (useDigQuota).
   const room = digQuota.room;
@@ -1332,7 +1659,13 @@ function V4Debate({
   // public-f24: the one V4 line whichever server switch is in force. dig-f5 / public-d3 A: a dig's share is on its own
   // button (digQuota), in no other line.
   const startsWait = limitLine(room, locale);
-  const money: readonly MoneyLine[] = startsWait === null ? [] : [startsWait];
+  // Task 56c: while this debate's report waits for the reset, the month line goes without "You can still write your report.".
+  const money: readonly MoneyLine[] = startsWait === null ? [] : [limitLineWhileReportWaits(startsWait, report.waitLine !== null)];
+  // Task 56c: beside a dig button the month's wait line is that same line (lib/v4/digQuota.ts digWaitLine), so it goes without it too.
+  const startsWaitText = startsWait === null ? null : t(catalog, startsWait.key, startsWait.values);
+  const shownQuota: V4DigQuota = money[0] !== undefined && money[0] !== startsWait && digQuota.quota.waitLine === startsWaitText
+    ? Object.freeze({ ...digQuota.quota, waitLine: t(catalog, money[0].key, money[0].values) })
+    : digQuota.quota;
   const roomNotice = startsWait === null && room !== null
     && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
@@ -1350,9 +1683,20 @@ function V4Debate({
   // job says the report's state in the bar. A paused dig open in the panel gives the bar its Continue.
   const digRest = report.digsRest ? report.restReason : null;
   const phoneDig: V4BarJob | null = phoneTarget !== null && waitingDigFor(waitingDigs, servedRunId, phoneTarget.target) === null
-    ? phoneBarJob(phoneTarget, digQuota.quota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
+    ? phoneBarJob(phoneTarget, shownQuota, catalog, () => startDig(phoneTarget.target), (place) => showChoices(panelColRef.current, place), digRest)
     : null;
-  const phoneJob: V4BarJob = digRest !== null && phoneDig !== null
+  // Task 62 (wait-d1 A, answer Q15): during the wait the bar holds "Map" and one quiet line for the whole question: the waiting
+  // card's state word while any path works, then "Writing your answer" once every path is filled and the run still runs. Each
+  // path's step stays on its card; no dig button until the answer.
+  const allFilled = view.paths.length > 0 && view.paths.every((path) => path.branch?.state === "ARGUED" || path.branch?.state === "FAILED");
+  const waitBar: V4BarJob | null = !runPhase || runRead === null ? null : {
+    kind: "status",
+    text: allFilled && running ? t(catalog, "v4.paths.writingAnswer") : stateWordText(waitStateOfRun(runRead), catalog, locale),
+    working: running
+  };
+  const phoneJob: V4BarJob = waitBar !== null
+    ? waitBar
+    : digRest !== null && phoneDig !== null
     ? phoneDig
     : report.barStatus !== null
       ? { kind: "status", ...report.barStatus }
@@ -1360,17 +1704,21 @@ function V4Debate({
         ? pausedBar
         : phoneTarget !== null
           ? phoneDig ?? { kind: "none" }
-          : goodTime ? { kind: "report", href: reportHref } : { kind: "none" };
+          // Task 56c: a report that waits for the reset keeps its place in the bar, greyed, with the line that says when.
+          : goodTime ? { kind: "report", href: reportHref, ...(report.waitLine === null ? {} : { waiting: true, reason: report.waitLine }) }
+            : { kind: "none" };
 
   const rail = (variant: "column" | "strip" | "marks" | "notes" | "steps") => (
     <V4Rail
       runId={runId}
-      level={chosenLevel}
+      // Task 76l: no level rides a link into the report (the rail's own link is the page's `reportHref`, which carries none).
+      level={null}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
       usageNotes={borrowLines(borrowed)}
-      moment={moment}
+      // Review of Task 56c: no "Good time to write your report" while the report waits for the reset (its step says when instead).
+      moment={moment === "GOOD" && report.waitLine !== null ? null : moment}
       reportReady={ready.reportDot}
       {...(report.rail === undefined ? {} : { report: report.rail })}
       reportHref={reportHref}
@@ -1389,8 +1737,31 @@ function V4Debate({
     catalog,
     locale,
     reveal,
-    ...(choice === undefined ? {} : { choice })
+    ...(choice === undefined ? {} : { choice }),
+    // Task 61 / 62: the paths being looked into pulse only while the AIs work.
+    running,
+    ...(digDeeper === undefined ? {} : { onDigDeeper: digDeeper }),
+    ...(digMore === undefined ? {} : { onDigMore: digMore })
   } as const;
+  // Task 62 (journey-d2): under the map's first card, the waiting card and its lines while the debate runs; after the answer,
+  // only the carry-on line (V4RunPaths.tsx). A computer and a tablet draw it under the question's card on the map, a phone on
+  // the question's own screen.
+  const runRoot = runPhase || carryShown ? (
+    <V4RunRoot
+      map={view}
+      run={runPhase ? runRead : null}
+      startedAt={startedAt}
+      reconnecting={loadProblem === "UNREACHABLE"}
+      carryOn={carryPart}
+      free={planTier === "free"}
+      layout={layout === "phone" ? "phone" : layout === "mid" ? "mid" : "desktop"}
+      selected={shownSelection}
+      onSelect={select}
+      catalog={catalog}
+      locale={locale}
+      pauseFocusAfter={firstCardHeading}
+    />
+  ) : null;
   // map-d1: the answer card folds into its line when another question is open or the window is short. On a phone its
   // line goes back to "Your question"; elsewhere it unfolds in place.
   const rootShown = shownSelection === "root";
@@ -1409,7 +1780,10 @@ function V4Debate({
       {...(answerUnfolded ? { onFold: () => setAnswerUnfolded(false) } : {})}
       catalog={catalog}
       locale={locale}
-    />
+    >
+      {/* Task 61 / 62: on a path debate, how sure the main answer is, worked out from its paths' words. */}
+      <V4MainAnswer mainAnswer={null} mainTrust={view.mainTrust ?? null} catalog={catalog} locale={locale} />
+    </V4AnswerCard>
   );
   // The tray of picks (components/v4/V4DigTray.tsx). dig-f4 / map-f14 (3 Nov): on a computer the tray shows from the second
   // pick (the first while new digs wait, public-d4 A), docked at the foot of the panel column, with no dig button of its
@@ -1422,10 +1796,12 @@ function V4Debate({
       planTier={planTier}
       mode={sentDigMode}
       money={money}
-      quota={digQuota.quota}
+      quota={shownQuota}
       rest={report.digsRest ? report.restReason : null}
       publicNote={publicNotes.tray}
-      withDig={!panelDigsPicks(shownSelection, draft, rootPanelOpen(view, digs), view.paths)}
+      // Task 62: the main question's own button also digs its "+ N more" picks when it lists every pick.
+      withDig={!(panelDigsPicks(shownSelection, draft, rootPanelOpen(view, digs), view.paths)
+        || (shownSelection === "root" && mainQuestionTarget(rootPanelOpen(view, digs), mainQuestionPicks, draft, view.paths) !== null))}
       onDig={() => startDig(picksTarget)}
       onClear={clearPicks}
       clearRef={trayClearRef}
@@ -1479,22 +1855,46 @@ function V4Debate({
     />
   );
 
-  const pageClass = `v4DebPage v4DebLayout-${layout}${hasTray ? " v4DebHasTray" : ""}${sheetOpen ? " v4DebSheetOpen" : ""}`;
+  // Task 62 (wait-f9, coordinator's ruling of 4 Nov night): an R22 answer whose short answer is still being written keeps a wait
+  // view with no path column until the story is READY or UNAVAILABLE: the map's first card, then the answer card, which says
+  // "Almost ready: the short answer is being written." once and holds the long answer under "Read the full answer". No waiting
+  // card: the debate has finished. The answer card keeps its place in the page, so its fold stays as the reader left it.
+  const storyWait = !runPhase && served !== null && served.answer.branches === undefined && view.paths.length === 0
+    && view.storyState === "WRITING";
+  // wait-d1 A: during the wait a computer and a tablet draw the panel column only while something other than the question is
+  // open; with the question open the map takes the width. After the answer, today's layout.
+  const panelShown = !runPhase || layout === "phone" || shownSelection !== "root";
+  const mapPieces = layout !== "phone" && runRoot !== null ? { ...pieces, rootExtra: runRoot } : pieces;
+  const pageClass = `v4DebPage v4DebLayout-${layout}${hasTray ? " v4DebHasTray" : ""}${sheetOpen ? " v4DebSheetOpen" : ""}`
+    + `${panelShown ? "" : " v4DebNoPanel"}`;
   return (
     <div className={pageClass} {...tabPrefix}>
       {/* The tab title follows this heading (DocumentTitle): the person's own words, not the added lines. R2TIME-9: it
           sits outside the inert wrapper, so the title stays while the phone map is open. wait-f4: the state word above
           (data-tab-prefix) and the one live region sit outside it too. */}
-      <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(map.question)}</h1>
+      <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(view.question)}</h1>
       {ready.announcer}
+      {/* Task 62 (map-f4): a path that filled in between two reads, said once, politely (the title marked as AI text only when
+          an AI wrote it). */}
+      <p className="v4SrOnly" role="status" aria-live="polite" data-paths-filled="">
+        {filledTitles.map((title, at) => {
+          const [before = "", after = ""] = t(catalog, "v4.paths.filled", { title: FILLED_SLOT }).split(FILLED_SLOT);
+          return (
+            <span key={at}>
+              {at > 0 ? " " : null}
+              {before}<span data-ai-generated={title.ai ? "true" : undefined}>{title.text}</span>{after}
+            </span>
+          );
+        })}
+      </p>
       {/* UI-6: while the phone map is open, everything behind it is inert (the sheet is a real modal). */}
-      <div className="v4DebBehind" inert={sheetOpen}>
+      <div key={HEADER_FRAME} className="v4DebBehind" inert={sheetOpen}>
         {header}
         {/* map-f9: the top bar's question on one line and what this question has used (the phone: below and in its bar). */}
-        {layout === "phone" ? null : <V4TopLine question={ownWords(map.question)} share={questionShare} catalog={catalog} />}
+        {layout === "phone" ? null : <V4TopLine question={ownWords(view.question)} share={questionShare} catalog={catalog} />}
         {layout === "mid" ? rail("strip") : null}
         {/* map-f7 / map-d3 B: on the phone, where you are stays pinned under the header, with the live minimap. */}
-        {layout === "phone" ? (
+        {layout === "phone" && !storyWait ? (
           <V4WhereBar
             map={view}
             digs={digs}
@@ -1509,7 +1909,7 @@ function V4Debate({
         ) : null}
         <div className="v4DebMain">
           {parent !== null ? (
-            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel)}>
+            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, null)}>
               <span aria-hidden="true">‹</span>{" "}
               {parent.question.length > 0 ? (
                 <>
@@ -1520,34 +1920,52 @@ function V4Debate({
             </Link>
           ) : null}
           {/* W4-6: a dig's map says where it sits; the top of every map, how many paths changed since the answer. */}
-          {map.dig !== null && map.dig !== undefined ? (
-            <V4LevelTrail level={map.dig.level} trail={trail} linkLevel={chosenLevel} catalog={catalog} />
+          {view.dig !== null && view.dig !== undefined ? (
+            <V4LevelTrail level={view.dig.level} trail={trail} linkLevel={null} catalog={catalog} />
           ) : null}
           <V4PublicMark stage={publicStage} catalog={catalog} />
           <V4ContributionNote contribution={served?.answer.contribution} catalog={catalog} />
-          {answerCard}
+          {/* Task 62 (wait-f9): while an old debate's short answer is written, the map's first card stands above the answer. */}
+          {storyWait ? (
+            <section className="v4Card v4DebFirstCard" aria-label={t(catalog, "v4.debate.yourQuestion")}>
+              <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
+              <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{firstCardQuestion(view)}</p>
+            </section>
+          ) : null}
+          {/* Task 62: the answer card waits for the answer (during the run the map's first card is the question). */}
+          {runPhase ? null : answerCard}
           {/* report-d2: the report waiting for digs, being written or not written, in the shared waiting card. */}
-          {report.waitCard}
+          {runPhase || storyWait ? null : report.waitCard}
           {/* dig-f19 / map-f17: once a report exists and the map moved on, the paths it does not have yet, named. */}
-          <V4ChangedSince
-            changedSince={map.changedSince}
-            changedPaths={pathsChangedSinceReport(map, reportAnswer?.writtenAt ?? null)}
-            digRunning={dugCounts.running > 0}
-            reportHref={reportHref}
-            catalog={catalog}
-            locale={locale}
-          />
+          {runPhase || storyWait || map === null ? null : (
+            <V4ChangedSince
+              changedSince={map.changedSince}
+              // Item 21 (this side's follow-up, 9 Nov): named from the same read as the server's count, with the counted version's
+              // asked-for time as a floor, never cut at a report's written time.
+              changedPaths={pathsChangedSinceReport(map, report.versions)}
+              digRunning={dugCounts.running > 0}
+              // Task 76l (the owner's fourth round, 6 Nov): hidden while a new report version waits or is written.
+              reportStage={report.stage}
+              // Held, with nothing drawn, until the first report check answers (as the report button's place is).
+              reportRead={report.firstCheckAnswered}
+              reportHref={reportHref}
+              catalog={catalog}
+              locale={locale}
+            />
+          )}
           {/* journey-f10 / dig-f3: "What your digs did", which is also the finished-dig notice. wait-f9 / map-f21: the
               short answer being written is said once, in the answer card, not here as well. */}
-          <V4ChangesBar
-            headline={ready.notice.headline}
-            stops={ready.notice.stops}
-            sinceLastVisit={hiddenNews < visitNewsCount}
-            onSee={ready.notice.onSee}
-            onDismiss={() => setHiddenNews(news.length)}
-            results={pathResults(map)}
-            catalog={catalog}
-          />
+          {runPhase || storyWait || map === null ? null : (
+            <V4ChangesBar
+              headline={ready.notice.headline}
+              stops={ready.notice.stops}
+              sinceLastVisit={hiddenNews < visitNewsCount}
+              onSee={ready.notice.onSee}
+              onDismiss={() => setHiddenNews(news.length)}
+              results={pathResults(map)}
+              catalog={catalog}
+            />
+          )}
           {/* W3-4: the deepest level offers no dig anywhere on its map; this line says so once, at the top. */}
           {canDig ? null : <p className="v4DebNote v4DebDeepest" role="note">{t(catalog, "v4.nest.deepest")}</p>}
           {/* map-f9: on the phone, "This question: …" on the question's own screen, and the borrow notices on every other
@@ -1559,14 +1977,16 @@ function V4Debate({
             </div>
           ) : null}
 
-          {/* map-f23: on the phone's "Your question", the paths looked into come right under the answer. */}
-          {layout === "phone" && rootShown ? (
+          {/* map-f23: on the phone's "Your question", the paths looked into come right under the answer. Task 62: during the
+              wait they are the waiting card's "Your paths" (in the question's screen), so not here as well. */}
+          {layout === "phone" && rootShown && !runPhase && !storyWait ? (
             <>
               <V4PathList map={view} onSelect={select} catalog={catalog} />
               {rail("notes")}
             </>
           ) : null}
 
+          {storyWait ? null : (
           <div className="v4DebGrid">
             {layout === "desktop" ? <div className="v4DebRailCol">{rail("column")}</div> : null}
             {layout === "laptop" ? <div className="v4DebRailCol v4DebRailMarksCol">{rail("marks")}</div> : null}
@@ -1574,10 +1994,12 @@ function V4Debate({
               <section className="v4DebMapCol" aria-label={t(catalog, "v4.debate.mapRegion")}>
                 {layout === "laptop" ? rail("notes") : null}
                 {/* map-f10: past the map in one step, to the answer of the question open in the panel. */}
-                <V4SkipToAnswer onSkip={() => headingRef.current?.focus()} catalog={catalog} />
-                {layout === "mid" ? <V4Outline {...pieces} /> : <V4MapTree {...pieces} fold={layout === "laptop"} />}
+                {/* Task 62: during the wait, with the question open, there is no panel to skip to. */}
+                {panelShown ? <V4SkipToAnswer onSkip={() => headingRef.current?.focus()} catalog={catalog} /> : null}
+                {layout === "mid" ? <V4Outline {...mapPieces} /> : <V4MapTree {...mapPieces} fold={layout === "laptop"} />}
               </section>
             ) : null}
+            {panelShown ? (
             <section
               ref={panelColRef}
               id="v4-deb-panel"
@@ -1585,12 +2007,14 @@ function V4Debate({
               aria-label={t(catalog, "v4.debate.panelRegion")}
               {...(layout === "phone" ? swipe : {})}
             >
+              {/* Task 62 (map-f4): what was open left the map, so the part right above it opened; said until the next selection. */}
+              {movedShown ? <p className="v4PanelHint v4DebMoved" role="status" data-moved="">{t(catalog, "v4.paths.movedUp")}</p> : null}
               <V4Panel
                 map={view}
                 digs={digs}
                 selected={shownSelection}
                 readingLevel={readingLevel}
-                linkLevel={chosenLevel}
+                linkLevel={null}
                 picked={picked}
                 onTogglePick={togglePick}
                 onSelect={select}
@@ -1611,7 +2035,7 @@ function V4Debate({
                 researchedPresses={researchedPresses}
                 roomNotice={roomNotice}
                 money={money}
-                digQuota={digQuota.quota}
+                digQuota={shownQuota}
                 digPathLine={trail?.steps.at(-1)?.line ?? null}
                 reportAnswer={reportAnswer}
                 answerOnTop
@@ -1621,13 +2045,20 @@ function V4Debate({
                 underCrumbs={ready.underCrumbs}
                 openDigProgress={openDigLive.progress}
                 openDigCheckedAt={openDigLive.progress !== null ? openDigLive.checkedAt : digsCheckedAt}
+                // Task 62: a chosen path's one dig button and "Dig into this" on a "+ N more" item, once the answer is served.
+                {...(digDeeper === undefined ? {} : { onDigDeeper: digDeeper })}
+                {...(digMore === undefined ? {} : { onDigMore: digMore })}
+                // Task 62: on a phone the question's own screen is the map's first card, with the waiting card under it.
+                {...(layout === "phone" && runRoot !== null ? { rootExtra: runRoot } : {})}
                 catalog={catalog}
                 locale={locale}
               />
               {/* dig-f4: from the second pick, the tray docked at the foot of the panel column (never on a phone). */}
               {tray}
             </section>
+            ) : null}
           </div>
+          )}
         </div>
       </div>
 
@@ -1650,12 +2081,16 @@ function V4Debate({
           jobRef={barJobRef}
           onMap={sheetFocus.openFromMap}
           job={phoneJob}
-          goodTime={goodTime}
+          // Task 56c: no slim "Good time to write your report" line while the report waits for the reset (the top bar's button
+          // says when, greyed).
+          goodTime={goodTime && report.waitLine === null}
           reportHref={reportHref}
           {...(layout === "phone" && !rootShown && questionShare !== null
             ? { status: <V4QuestionShareLine share={questionShare} catalog={catalog} /> } : {})}
           {...(report.writeFromBar === undefined ? {} : { onWriteReport: report.writeFromBar })}
           strip={layout === "phone" ? report.bottomStrip : null}
+          // Question 18 A (Task 76j): it says, before the browser paints, whether it shows "Write my report" now.
+          onReportShown={setBottomShowsReport}
           catalog={catalog}
         />
       )}
@@ -1678,6 +2113,48 @@ function V4Debate({
 }
 
 // ── Screens before the map ──────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * V4 start step, Task 76i (wait-f14, wait-f20; choose-f19's "if the map takes long"): after Start, until the debate's first run
+ * read answers, the map the ask page showed: the question as it was sent and each path being looked into (b1..bn, so the run
+ * map's cards come where these were), with one quiet "Starting…" under the question; nothing pulses, picks or opens a panel.
+ */
+function HandOffMap({ handOff, catalog, locale }: Readonly<{ handOff: StartHandOff; catalog: MessageCatalog; locale: string }>) {
+  const map = useMemo(() => buildV4PendingMap({ questionLine: handOff.questionLine, paths: handOff.paths }), [handOff]);
+  return (
+    <div className="v4DebMain">
+      <V4PendingMap
+        map={map}
+        rootExtra={<p className="v4DebNote v4Muted" role="status">{t(catalog, "v4.ask.starting")}</p>}
+        catalog={catalog}
+        locale={locale}
+      />
+    </div>
+  );
+}
+
+/**
+ * Task 76i: the session check's view after Start (AuthGate's `checkingView`): the outline's held header bar (V4LoadingPage's,
+ * the real header's size, so nothing moves when the header comes) over the hand-off's map. The generic check keeps its own look.
+ */
+function HandOffPage(props: Readonly<{ handOff: StartHandOff; catalog: MessageCatalog; locale: string }>) {
+  return (
+    <div className="v4DebPage">
+      <div className="v4Hdr v4DebOutlineHdr" aria-hidden="true"><span className="v4DebOutlineBrand" /></div>
+      <HandOffMap {...props} />
+    </div>
+  );
+}
+
+/**
+ * W2L-4 (the wave-2 checks) for Task 62's first card: once a paused run continues, the pause block goes. Where Continue held
+ * focus, it goes to the question it was under (the first card's heading, or the map's question card), found on the page.
+ */
+function firstCardHeading(): HTMLElement | null {
+  const heading = document.querySelector<HTMLElement>(".v4DebFirstCard .v4DebStatusQuestion, .v4DebMapCol .v4MapRoot, .v4Panel-root .v4PanelH2");
+  if (heading !== null && heading.tagName !== "BUTTON" && !heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+  return heading;
+}
 
 function StatusScreen({ problem, onRetry, askHref, catalog }: Readonly<{
   problem: LoadProblem | null;
@@ -1705,101 +2182,6 @@ function StatusScreen({ problem, onRetry, askHref, catalog }: Readonly<{
   }
   // map-f6: the page's grey outline, never a bare "Loading…" line.
   return <V4LoadingOutline catalog={catalog} />;
-}
-
-/** RULES-4: QUEUED and CLAIMED say "Starting"; only a run that really waits for a spot says so. */
-function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string): string {
-  // W3-4 (the money rule): at the month wall the debate's planned calls and searches pause until the month resets.
-  const pause = monthPauseOf(run);
-  // journey-f22 / journey-f15: the month pause's one date form (lib/v4/monthPause.ts pauseDate).
-  if (pause !== null) return t(catalog, "v4.debate.state.PAUSED_MONTH", { date: pauseDate(pause.until, locale) });
-  switch (run.state) {
-    case "WAITING": {
-      const time = clockTime(run.waits_until, locale);
-      return time === null ? t(catalog, "v4.debate.state.WAITING.noTime") : t(catalog, "v4.debate.state.WAITING", { time });
-    }
-    case "HOLDING": {
-      const time = clockTime(run.hold_until, locale);
-      return time === null ? t(catalog, "v4.debate.state.HOLDING.noTime") : t(catalog, "v4.debate.state.HOLDING", { time });
-    }
-    case "RUNNING":
-      return t(catalog, "v4.debate.state.RUNNING");
-    case "SETTLED":
-      return t(catalog, "v4.debate.state.FINISHING");
-    case "QUEUED":
-    case "CLAIMED":
-    case "FAILED":
-      return t(catalog, "v4.debate.state.STARTING");
-  }
-}
-
-/**
- * W3-4 (the money rule, owner 31 Oct): a debate paused at the month wall. Continue resumes it once the month has reset
- * (true resume: what is done is not paid for again); pressed too early, nothing changes and the page says from when.
- */
-function MonthPaused({ run, runId, catalog, locale }: Readonly<{
-  run: RunProjection; runId: string; catalog: MessageCatalog; locale: string;
-}>) {
-  const pause = monthPauseOf(run);
-  const [pressing, setPressing] = useState(false);
-  const [outcome, setOutcome] = useState<ContinueOutcome | null>(null);
-  if (pause === null) return null;
-  const date = (iso: string): string => pauseDate(iso, locale);
-  const press = async (): Promise<void> => {
-    setPressing(true);
-    const next = await continueRun(runId);
-    setOutcome(next);
-    setPressing(false);
-  };
-  const continuing = pressing || outcome?.kind === "CONTINUING";
-  return (
-    <div className="v4DebPaused">
-      <p>{pause.can_continue ? t(catalog, "v4.money.pausedReady") : t(catalog, "v4.money.paused", { date: date(pause.until) })}</p>
-      <button type="button" className="v4Btn v4BtnPrimary" disabled={continuing} onClick={() => void press()}>
-        {continuing ? t(catalog, "v4.money.continuing") : t(catalog, "v4.money.continue")}
-      </button>
-      <p className="v4Muted">{t(catalog, "v4.money.continueNote")}</p>
-      {outcome?.kind === "TOO_EARLY" ? (
-        <p role="status">{t(catalog, "v4.money.continueTooEarly", { date: date(outcome.until) })}</p>
-      ) : null}
-      {outcome?.kind === "FAILED" ? <p role="status">{t(catalog, "v4.money.continueFailed")}</p> : null}
-    </div>
-  );
-}
-
-function ProgressScreen({ run, runId, startedAt, now, reconnecting, classicHref, catalog, locale }: Readonly<{
-  run: RunProjection;
-  runId: string;
-  startedAt: string | null;
-  now: number | null;
-  reconnecting: boolean;
-  classicHref: string;
-  catalog: MessageCatalog;
-  locale: string;
-}>) {
-  const started = startedAt === null ? Number.NaN : new Date(startedAt).getTime();
-  const minutes = now === null || Number.isNaN(started) ? null : Math.max(0, Math.floor((now - started) / 60_000));
-  return (
-    <section className="v4Card v4DebStatus v4DebProgress">
-      <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
-      {/* The person's own words (the tab title follows this heading); the added lines are not a title. */}
-      <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</h1>
-      <p className="v4DebProgressState" role="status">
-        <span className="v4DebPulse" aria-hidden="true" />
-        {stateLine(run, catalog, locale)}
-      </p>
-      {minutes === null ? null : (
-        <p className="v4Muted">
-          {minutes < 1 ? t(catalog, "v4.debate.elapsedJustNow") : tPlural(catalog, "v4.debate.elapsed", minutes, locale)}
-        </p>
-      )}
-      {monthPauseOf(run) === null
-        ? <p className="v4Muted">{t(catalog, "v4.debate.usually")}</p>
-        : <MonthPaused run={run} runId={runId} catalog={catalog} locale={locale} />}
-      {reconnecting ? <p className="v4Muted">{t(catalog, "v4.debate.reconnecting")}</p> : null}
-      <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
-    </section>
-  );
 }
 
 // ── Phone pieces (D6, D7) ───────────────────────────────────────────────────────────────────────────────────────

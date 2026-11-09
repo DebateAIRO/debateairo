@@ -14,7 +14,8 @@
  *   rules match it (`addressKey`: no scheme, no www, no tracking parameters). The first member to have read it, in the
  *   order they joined, is the one reused.
  * - Each member's rows are opened under that member's own key, one short lease at a time, after the dig's searches and
- *   before any reader call: no lease waits on a vendor.
+ *   before any reader call: no lease waits on a vendor. V4 start step, Task 55d: the runner looks pages up inside the dig's own
+ *   content lease, which may never widen to another debate, so each member's lease is taken outside it (`withOwnRunContentLease`).
  * - What a page carries is sealed into the dig's own reader-1 reading at once (`reusedReadingContent`), before any
  *   reader call: a copy of the dig claimed again reads it back from its own store (`reusedOfReadingContent`), so it reuses
  *   exactly the same pages and sends byte-identical prompts.
@@ -23,7 +24,7 @@
 import type { Pool } from "pg";
 import {
   PostgresInvestigationRunnerRepository, PostgresPassageRetentionRepository, PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS,
-  WEB_SHOWN_QUOTE_CARRIER, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun, type CryptoEnvelope
+  WEB_SHOWN_QUOTE_CARRIER, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun, withOwnRunContentLease, type CryptoEnvelope
 } from "@debateai/db";
 import { addressKey } from "@debateai/evidence";
 
@@ -139,43 +140,45 @@ export function postgresWebReuseSource(pool: Pool, runId: string): WebReuseSourc
         const evidence = await store.read(memberRunId);
         if (evidence === null || evidence.pages.length === 0) continue;
         const shownQuotes = (await retention.readShownQuotes(memberRunId)) ?? [];
-        const leased = await prepareLeasedContentEncryptionForRun(pool, memberRunId);
-        try {
-          if (leased.prepared === null) continue;
-          const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_SHOWN_QUOTE_CARRIER, id: string,
-            envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(leased, carrier, id, envelope, null);
-          for (const page of evidence.pages) {
-            const one = evidence.readings.find((reading) => reading.page_id === page.page_id && reading.reader === 1
-              && reading.outcome === "READ");
-            if (one === undefined || !isGrade(one.grade)) continue;
-            const url = textOf(open(WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content), "url");
-            const key = url === null ? null : addressKey(url);
-            if (key === null || !wanted.has(key) || found.has(key)) continue;
-            const reading = open(WEB_EVIDENCE_CARRIERS.reading, one.reading_id, one.content);
-            const line = textOf(reading, "line");
-            const language = textOf(reading, "language");
-            if (line === null || language === null) continue;
-            const extracts = shownQuotes.filter((shown) => shown.page_id === page.page_id).flatMap((shown): WebReusedExtract[] => {
-              const quote = textOf(open(WEB_SHOWN_QUOTE_CARRIER, shown.extract_id, shown.content), "quote");
-              const foundBy = shown.found_by.filter(isReader);
-              return quote === null || foundBy.length === 0 ? [] : [Object.freeze({ quote: quote.replace(CUT_AT_END, ""), foundBy: Object.freeze(foundBy) })];
-            });
-            const topReadings = evidence.readings.filter((entry) => entry.page_id === page.page_id && (entry.reader === 2 || entry.reader === 3))
-              .map((entry): WebReusedTopReading => Object.freeze({ reader: entry.reader as 2 | 3, maker: entry.maker,
-                outcome: entry.outcome === "READ" ? "READ" as const : "FAILED" as const, grade: isGrade(entry.grade) ? entry.grade : null }));
-            let text: string | null = null;
-            if (page.text_state === "STORED") {
-              const kept = (await store.readPageTexts(memberRunId, [page.page_id]))[0];
-              const opened = kept === undefined ? null : open(WEB_EVIDENCE_CARRIERS.pageText, page.page_id, kept.envelope);
-              text = typeof opened === "string" ? opened : null;
+        await withOwnRunContentLease(pool, memberRunId, async () => {
+          const leased = await prepareLeasedContentEncryptionForRun(pool, memberRunId);
+          try {
+            if (leased.prepared === null) return;
+            const open = (carrier: (typeof WEB_EVIDENCE_CARRIERS)[keyof typeof WEB_EVIDENCE_CARRIERS] | typeof WEB_SHOWN_QUOTE_CARRIER, id: string,
+              envelope: CryptoEnvelope | null): unknown => decryptLeasedContentForRun<unknown>(leased, carrier, id, envelope, null);
+            for (const page of evidence.pages) {
+              const one = evidence.readings.find((reading) => reading.page_id === page.page_id && reading.reader === 1
+                && reading.outcome === "READ");
+              if (one === undefined || !isGrade(one.grade)) continue;
+              const url = textOf(open(WEB_EVIDENCE_CARRIERS.page, page.page_id, page.content), "url");
+              const key = url === null ? null : addressKey(url);
+              if (key === null || !wanted.has(key) || found.has(key)) continue;
+              const reading = open(WEB_EVIDENCE_CARRIERS.reading, one.reading_id, one.content);
+              const line = textOf(reading, "line");
+              const language = textOf(reading, "language");
+              if (line === null || language === null) continue;
+              const extracts = shownQuotes.filter((shown) => shown.page_id === page.page_id).flatMap((shown): WebReusedExtract[] => {
+                const quote = textOf(open(WEB_SHOWN_QUOTE_CARRIER, shown.extract_id, shown.content), "quote");
+                const foundBy = shown.found_by.filter(isReader);
+                return quote === null || foundBy.length === 0 ? [] : [Object.freeze({ quote: quote.replace(CUT_AT_END, ""), foundBy: Object.freeze(foundBy) })];
+              });
+              const topReadings = evidence.readings.filter((entry) => entry.page_id === page.page_id && (entry.reader === 2 || entry.reader === 3))
+                .map((entry): WebReusedTopReading => Object.freeze({ reader: entry.reader as 2 | 3, maker: entry.maker,
+                  outcome: entry.outcome === "READ" ? "READ" as const : "FAILED" as const, grade: isGrade(entry.grade) ? entry.grade : null }));
+              let text: string | null = null;
+              if (page.text_state === "STORED") {
+                const kept = (await store.readPageTexts(memberRunId, [page.page_id]))[0];
+                const opened = kept === undefined ? null : open(WEB_EVIDENCE_CARRIERS.pageText, page.page_id, kept.envelope);
+                text = typeof opened === "string" ? opened : null;
+              }
+              found.set(key, Object.freeze({ sourceRunId: memberRunId, sourcePageId: page.page_id, text, grade: one.grade, line,
+                note: textOf(reading, "note"), lineLanguage: language, readerOneMaker: one.maker, topReadings: Object.freeze(topReadings), extracts: Object.freeze(extracts) }));
             }
-            found.set(key, Object.freeze({ sourceRunId: memberRunId, sourcePageId: page.page_id, text, grade: one.grade, line,
-              note: textOf(reading, "note"), lineLanguage: language, readerOneMaker: one.maker, topReadings: Object.freeze(topReadings), extracts: Object.freeze(extracts) }));
+            await leased.assertLive();
+          } finally {
+            await leased.close();
           }
-          await leased.assertLive();
-        } finally {
-          await leased.close();
-        }
+        });
       }
       return found;
     }

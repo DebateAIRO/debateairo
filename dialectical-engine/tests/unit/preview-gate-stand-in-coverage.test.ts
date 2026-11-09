@@ -5,13 +5,27 @@ import {
   PublicContributionCheckReplySchema, PublicReportCheckReplySchema, classifyStructuredArtifact, webDigPlannerV2ReplySchema, webDigPlannerV3ReplyIssues,
   webPlannerV2ReplyIssues, webPlannerV2ReplySchema, webReadTopReplyIssues, webReadTopReplySchema, webSuggestDigReplySchema, webSuggestReplySchema
 } from "@debateai/judgement";
-import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
+import { mapContractNameOf, mapEngineContractNameOf, startCombineReplySchema, startFitReplySchema, startListSpec, startMergeLateSpec, startMergeSpec,
+  type StartSpecContext } from "@debateai/map";
+// V4 start step (Task 23): the step before Start's call sites, and the map's engine-2 angle planner its own planner asks.
+import { START_CALL_SITES, mapEnginePromptContracts, startListCallSiteKey } from "@debateai/map";
+import { engineMapScriptedContent } from "../support/engine-map-script.js";
+import { lockedReplyLanguageExpectation, questionLanguageFromRun, replyLanguageExpectation } from "@debateai/kernel";
+import type { StartMenu } from "@debateai/contract";
 import { buildFramedPrompt, type FramedMaterialField, type PromptContract } from "@debateai/providers";
 import {
   ReportAnswerCheckReplySchema, ReportStoryCheckReplySchema, answerUpdateCallSiteKey, classifyPathRewriteCheckerContent, classifyPathRewriteContent,
   classifyReportAnswerContent, classifyReportStoryContent, classifyStoryChartsContent, investigationReportCallSiteKey, pathRewriteCallSiteKey,
   pathRewriteSuggestCallSiteKey, publicReportCallSiteKey
 } from "@debateai/story";
+// V4 start step (Task 52): the path steps after Start, read by their own readers.
+import { PATH_GAP_LIMITS, pathGapCallSiteKey, pathGapSpec } from "@debateai/map";
+import { replyLanguageCheckFor, type PathId, type QuestionLanguage } from "@debateai/kernel";
+import {
+  PATH_OUTCOME_CHECKER_PROSE, PATH_OUTCOME_PROSE, STORY_BODY_PROSE, STORY_CHECKER_PROSE, classifyPathOutcomeCheckerContent, classifyPathOutcomeContent,
+  classifyStoryContent, classifyStoryPathsCheckContent, pathOutcomeCallSiteKey, storyPathsMaterial, storyPathsStoryIndex, type StoryPathsMaterialInput
+} from "@debateai/story";
+import { pathOutcomeMaterial } from "../../apps/runner/src/path-outcomes.js";
 import { readAskClarifyReply } from "../../apps/api/src/ask-clarify.js";
 import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { parseQuestionCheckAnswer } from "../../apps/api/src/question-check/verdict.js";
@@ -57,7 +71,15 @@ const NOT_ANSWERED_BY_DEFAULT: Readonly<Record<string, string>> = Object.freeze(
   "support.chat-answer.v3": "the support chat is not part of a debate", "support.case-summary.v1": "the support chat is not part of a debate",
   "support.case-summary.v2": "the support chat is not part of a debate", "support.no-source-judgement.v1": "the support chat is not part of a debate",
   "evaluator.blind-judge-grade.v1": "the dormant evaluator lane's add-on", "evaluator.domain-tagger.v1": "the dormant evaluator lane's add-on",
-  "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on"
+  "evaluator.consumer-aggregate.v1": "the dormant evaluator lane's add-on",
+  // V4 start step (Task 50b): the main answer's goal versions, drafts until Task 92 seals them (and then maps them to REPORT_ANSWER and
+  // REPORT_ANSWER_CHECK in tests/support/gate-later-steps.ts). A path run asks them only when the person stated a goal, which only the
+  // clarifying call's version 2 (sealed by the same Task 92) offers, so nothing the practice runs sends them before then.
+  "report.answer.v5": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers",
+  "report.answer-check.v4": "Task 50b's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers",
+  // V4 start step (Task 50c): the later version's goal writer (a main-answer update after a dig, a report's version 2 on), the same kind
+  // of draft for the same reason; Task 92 seals it and maps it to REPORT_ANSWER with Task 50b's two.
+  "report.answer.later.v5": "Task 50c's draft: asked only after a stated goal, which only ask.clarify.v2 (sealed by Task 92) offers"
 });
 
 const chatOf = (contract: PromptContract, material: readonly FramedMaterialField[]): string =>
@@ -98,11 +120,60 @@ const REWRITE_MATERIAL = [field("question", "Q"), field("path", { line: "L", poi
 const REWRITE_INDEX = Object.freeze({ pointRefs: new Set(["P1", "P2"]), digPathRefs: ["D1"], personWords: false });
 const REPORT_INDEX = Object.freeze({ refs: new Set(["P1"]), cardRefs: ["C1"] });
 const SUGGEST_MATERIAL = [field("for", [{ ref: "f1", text: "F" }]), field("against", [{ ref: "a1", text: "A" }])];
+// The step before Start (V4 start step, Task 22): read by its own specs (the combine's and the fit's by their schemas until their specs exist).
+// Each language's default reply is read against a question in that language, so a reply in the wrong one fails.
+const START_QUESTIONS = Object.freeze({ en: "Should the town build a second ferry pier before next summer?",
+  ro: "Ar trebui orașul să construiască un al doilea debarcader înainte de vara viitoare?" });
+const START_CTX = (language: StubLanguage): StartSpecContext => language === "en"
+  ? { questionLine: START_QUESTIONS.en, languageName: "English", languageTag: "en", replyLanguage: replyLanguageExpectation(START_QUESTIONS.en), readingLevel: null }
+  : { questionLine: START_QUESTIONS.ro, languageName: "Romanian", languageTag: "ro",
+    replyLanguage: lockedReplyLanguageExpectation(questionLanguageFromRun("ro", "Romanian")!, START_QUESTIONS.ro), readingLevel: null };
+const START_ANGLE = { angleId: "g1", kind: "OPPOSITE_CASE", label: "The case against", focus: "Why it could be a mistake." } as const;
+const START_SUGGESTIONS = [{ viewpoint_id: "pt11", title: "Queues", question: "Do the queues matter?", why: "They are the complaint.", angle_id: "g1" },
+  { viewpoint_id: "pt12", title: "Winter", question: "Does winter matter?", why: "Half the year is quiet.", angle_id: "g1" }];
+const START_PRIOR: StartMenu = { menu_id: "A".repeat(22), revision: 1, language: { code: "en", name: "English" }, angles: [{ angle_id: "g1", kind: "GENERAL", label: "All" }],
+  viewpoints: [{ ...START_SUGGESTIONS[0]!, repeat_ids: [] }], repeats: [], paths: [{ path_ref: "kp00", title: "Queues", question: "Do the queues matter?",
+    viewpoint_ids: ["pt11"], put_together: false, is_new: false }], cards: [], suggestions: [] };
+const START_LATE = [{ ...START_SUGGESTIONS[1]!, viewpoint_id: "pt21" }];
+/**
+ * V4 start step (Task 52): the path steps after Start. Each default reply is read by its step's own reader, in the language of a question
+ * in that language (Romanian locked, as a Romanian run is), against material its step's own builder wrote, so a reply the step would
+ * refuse fails here.
+ */
+const PATH_LOCK = (language: StubLanguage): QuestionLanguage | null => language === "en" ? null : questionLanguageFromRun("ro", "Romanian")!;
+const PATH_GAP_PATHS = [
+  { pathId: "b1" as PathId, title: "Winter use", question: "Would the pier be used in winter?", viewpoints: ["Winter: who rides in January?"] },
+  { pathId: "b2" as PathId, title: "Upkeep", question: "What would the pier cost each year?", viewpoints: ["Upkeep: what does a pier cost to keep?"] }
+];
+const OUTCOME_MATERIAL = pathOutcomeMaterial({
+  question: { line: START_QUESTIONS.en, place: null, time: null, purpose: null, readingLevel: null, language: null },
+  path: { pathId: "b1", pathNo: 1, title: "Winter use", question: "Would the pier be used in winter?",
+    statement: "The pier would stand half empty in winter.", viewpoints: ["Winter: who rides in January?"],
+    ownWords: ["Winter ferries run half empty."], rootNodeId: "root-1",
+    points: [{ id: "n1", text: "Winter ridership falls by half.", onId: null, side: "for", trust: "SURE", disputed: false }], sources: [] },
+  readingLevel: null, language: { name: "English", tag: "en" }
+});
+const STORY_PATHS_INPUT: StoryPathsMaterialInput = {
+  paths: [
+    { pathId: "b1", title: "Winter use", question: "Would the pier be used in winter?", author: "AI_SUGGESTION", ownWords: [],
+      outcome: { state: "READY", text: { line: "The pier helps in summer only.", summary: "Winter ridership falls by half.", fate: "PARTLY_HELD" },
+        what_changed: ["The arguing added the winter figure."], view: null, trust: "STILL_ARGUED", rests_on: [] } },
+    { pathId: "b2", title: "Upkeep", question: "What would the pier cost each year?", author: "PERSON_OWN_VIEW",
+      ownWords: ["The upkeep is the real cost."], outcome: null }
+  ],
+  mainAnswer: ["Build the pier for the summer months first."], mainTrust: "STILL_ARGUED", alsoRaised: [],
+  points: [{ ref: "P1", text: "Winter ridership falls by half.", disputed: false }, { ref: "P2", text: "Upkeep doubles after ten years.", disputed: true }],
+  questionLine: START_QUESTIONS.en, length: null, readingLevel: null, language: null
+};
+const STORY_PATHS_BUILT = storyPathsMaterial(STORY_PATHS_INPUT);
+const STORY_PATHS_INDEX = storyPathsStoryIndex(STORY_PATHS_INPUT, STORY_PATHS_BUILT, new Set(["fixture"]), "fixture");
+/** A step's material as its builder wrote it, less the question line the row's chat adds itself. */
+const builtFields = (fields: readonly FramedMaterialField[]): readonly FramedMaterialField[] => fields.filter((entry) => entry.name !== "question_line");
 
 /** A problem list: empty means the code's own reader takes the default reply. */
 const issuesOf = (read: Readonly<{ parseStatus: string; parseError?: string | null }>): readonly string[] => read.parseStatus === "PARSED" ? [] : [read.parseError ?? read.parseStatus];
 const zodIssues = (read: Readonly<{ success: boolean }>): readonly string[] => read.success ? [] : ["SCHEMA"];
-type Row = Readonly<{ kind: LaterGateKind; id: string; material: readonly FramedMaterialField[]; accept: (content: string) => readonly string[] }>;
+type Row = Readonly<{ kind: LaterGateKind; id: string; material: readonly FramedMaterialField[]; accept: (content: string, language: StubLanguage) => readonly string[] }>;
 const ROWS: readonly Row[] = [
   { kind: "STORY_CHARTS", id: "story.charts.v2", material: [], accept: (content) => issuesOf(classifyStoryChartsContent(content)) },
   { kind: "SUGGESTIONS", id: "web.suggest.v1", material: SUGGEST_MATERIAL, accept: (content) => issuesOf(classifyStructuredArtifact(content, webSuggestReplySchema, undefined)) },
@@ -136,7 +207,35 @@ const ROWS: readonly Row[] = [
   { kind: "WEB_READ_TOP", id: "web.read-top.v2", material: [PAGES], accept: (content) => {
     const read = webReadTopReplySchema.safeParse(JSON.parse(content));
     return read.success ? webReadTopReplyIssues(read.data, ["p1", "p2", "p3"]).map((issue) => issue.message) : ["SCHEMA"];
-  } }
+  } },
+  { kind: "START_LIST", id: "start.list.v1", material: [field("angles", [{ angle_id: "g1", label: START_ANGLE.label, focus: START_ANGLE.focus }])],
+    accept: (content, language) => issuesOf(startListSpec(START_CTX(language), [START_ANGLE], 1).classify(content)) },
+  { kind: "START_MERGE", id: "start.merge.v1", material: [field("said", []), field("suggestions", START_SUGGESTIONS.map((one) => ({ id: one.viewpoint_id,
+    title: one.title, question: one.question, why: one.why })))],
+    accept: (content, language) => issuesOf(startMergeSpec(START_CTX(language), { said: [], viewpoints: START_SUGGESTIONS }).classify(content)) },
+  { kind: "START_MERGE_LATE", id: "start.merge-late.v1", material: [field("said", []), field("new_suggestions", [{ id: "pt21", title: "Winter",
+    question: "Does winter matter?", why: "Half the year is quiet." }])],
+  accept: (content, language) => issuesOf(startMergeLateSpec(START_CTX(language), { said: [], prior: START_PRIOR, viewpoints: START_LATE }).classify(content)) },
+  { kind: "START_COMBINE", id: "start.combine.v1", material: [], accept: (content) => zodIssues(startCombineReplySchema.safeParse(JSON.parse(content))) },
+  { kind: "START_FIT", id: "start.fit.v1", material: [], accept: (content) => zodIssues(startFitReplySchema.safeParse(JSON.parse(content))) },
+  // V4 start step (Task 52): the gap round after Start, each path's answer so far (writer and checker) and the path run's story and its
+  // check (see PATH_LOCK above).
+  { kind: "PATH_GAP", id: "map.gap-paths.v1", material: [field("paths", PATH_GAP_PATHS.map((path) => ({ id: path.pathId, title: path.title,
+    question: path.question, viewpoints: path.viewpoints }))), field("already_raised", [])],
+  accept: (content, language) => issuesOf(pathGapSpec(START_CTX(language), { paths: PATH_GAP_PATHS, alreadyRaised: [],
+    room: PATH_GAP_LIMITS.pointsPerRoundMax }).classify(content)) },
+  { kind: "PATH_OUTCOME_WRITER", id: "path.outcome.v1", material: builtFields(OUTCOME_MATERIAL.fields),
+    accept: (content, language) => issuesOf(classifyPathOutcomeContent(content, OUTCOME_MATERIAL.index, undefined,
+      replyLanguageCheckFor(START_QUESTIONS[language], PATH_LOCK(language), PATH_OUTCOME_PROSE))) },
+  { kind: "PATH_OUTCOME_CHECKER", id: "path.outcome-check.v1", material: [],
+    accept: (content, language) => issuesOf(classifyPathOutcomeCheckerContent(content, undefined,
+      replyLanguageCheckFor(START_QUESTIONS[language], PATH_LOCK(language), PATH_OUTCOME_CHECKER_PROSE))) },
+  { kind: "STORY_PATHS", id: "story.paths.v5", material: builtFields(STORY_PATHS_BUILT.fields),
+    accept: (content, language) => issuesOf(classifyStoryContent(content, STORY_PATHS_INDEX, undefined,
+      replyLanguageCheckFor(START_QUESTIONS[language], PATH_LOCK(language), STORY_BODY_PROSE))) },
+  { kind: "STORY_PATHS_CHECK", id: "story.paths-check.v5", material: [],
+    accept: (content, language) => issuesOf(classifyStoryPathsCheckContent(content, undefined,
+      replyLanguageCheckFor(START_QUESTIONS[language], PATH_LOCK(language), STORY_CHECKER_PROSE))) }
 ];
 
 describe("the stand-in's default replies pass the code's own readers", () => {
@@ -148,9 +247,16 @@ describe("the stand-in's default replies pass the code's own readers", () => {
     it.each(ROWS.map((row) => [row.id, row] as const))(`${language}: %s`, (_id, row) => {
       const chat = chatOf(contractOf(row.id), [...row.material, field("question_line", "Q")]);
       expect(classifyGateRequest(chat)).toBe(row.kind);
-      expect(row.accept(laterStepContent(row.kind, chat, language))).toEqual([]);
+      expect(row.accept(laterStepContent(row.kind, chat, language), language)).toEqual([]);
     });
   }
+
+  // V4 start step (Task 52): not vacuous: the path rows read the reply's language, so the English reply to a Romanian question is refused.
+  it.each(["PATH_GAP", "PATH_OUTCOME_WRITER", "STORY_PATHS"] as const)("%s: the English reply to a Romanian question is refused", (kind) => {
+    const row = ROWS.find((candidate) => candidate.kind === kind)!;
+    const chat = chatOf(contractOf(row.id), [...row.material, field("question_line", "Q")]);
+    expect(row.accept(laterStepContent(kind, chat, "en"), "ro")).not.toEqual([]);
+  });
 });
 
 /** Every call-site name, as the code builds it, with the family the report names it by and a default reply to re-check. */
@@ -173,19 +279,32 @@ const SITES: readonly (readonly [string, string, LaterGateKind | null])[] = [
   ["CONTRIBUTION_CHECK:CHECKER:1", "CONTRIBUTION_CHECK", "CONTRIBUTION_CHECK"],
   ["WEB:plan", "WEB", "WEB_PLAN"], ["WEB:plan:seat:runnerUp", "WEB", "WEB_PLAN"], ["WEB:plan:2", "WEB", "WEB_DIG_PLAN"],
   ["WEB:read1:0:0", "WEB", "WEB_READ_ALL"], ["WEB:pick:0", "WEB", "WEB_PICK"], ["WEB:read-top:0:2", "WEB", "WEB_READ_TOP"],
-  ["WEB_RESEARCHED:read1", "WEB_RESEARCHED", "WEB_READ_ALL"], ["WEB_RESEARCHED:read-top:2", "WEB_RESEARCHED", "WEB_READ_TOP"]
+  ["WEB_RESEARCHED:read1", "WEB_RESEARCHED", "WEB_READ_ALL"], ["WEB_RESEARCHED:read-top:2", "WEB_RESEARCHED", "WEB_READ_TOP"],
+  // V4 start step (Task 23): the step before Start's six call sites. The angle planner asks map.angles.v2, so it has no later-step kind (null):
+  // its default reply is the map's own.
+  [START_CALL_SITES.angles, "START", null], [startListCallSiteKey(1), "START", "START_LIST"], [START_CALL_SITES.merge, "START", "START_MERGE"],
+  [START_CALL_SITES.mergeLate, "START", "START_MERGE_LATE"], [START_CALL_SITES.combine, "START", "START_COMBINE"], [START_CALL_SITES.fit, "START", "START_FIT"],
+  // V4 start step (Task 52): the gap round after Start is a map call; a path's answer so far has a family of its own.
+  [pathGapCallSiteKey(1), "MAP", "PATH_GAP"], [pathOutcomeCallSiteKey("WRITER", 1, 1), "PATH_OUTCOME", "PATH_OUTCOME_WRITER"],
+  [pathOutcomeCallSiteKey("CHECKER", 3, 2), "PATH_OUTCOME", "PATH_OUTCOME_CHECKER"]
 ];
 const SITE_CHAT = (kind: LaterGateKind): string => {
   const row = ROWS.find((candidate) => candidate.kind === kind)!;
   return chatOf(contractOf(row.id), [...row.material, field("question_line", "Q")]);
 };
+/** A site with no later-step kind (the start step's angle planner) is answered as the map's engine-2 angle planner is. */
+const SITE_REPLY = (kind: LaterGateKind | null): string => kind === null
+  ? engineMapScriptedContent(mapEnginePromptContracts().angles.contractId, [field("question_line", "Q")])!
+  : laterStepContent(kind, SITE_CHAT(kind), "en");
 
 describe("the practice's report names every call site", () => {
   const prefixes = allOf(/\b[A-Z_]*CALL_SITE_PREFIX\b[^=\n]*=\s*"([A-Z_]+:)"/gu);
   const patterns = allOf(/\b[A-Z_]*CALL_SITE\b[^=\n]*=\s*\/\^([A-Z_]+:)/gu);
 
   it("found the code's call-site families (a scan that finds nothing would prove nothing)", () => {
-    expect(prefixes).toEqual(expect.arrayContaining(["ANSWER_UPDATE:", "CONTRIBUTION_CHECK:", "INVESTIGATION_REPORT:", "PATH_CLIMB:", "PATH_REWRITE:", "PUBLIC_REPORT:", "WEB_RESEARCHED:"]));
+    expect(prefixes).toEqual(expect.arrayContaining(["ANSWER_UPDATE:", "CONTRIBUTION_CHECK:", "INVESTIGATION_REPORT:", "PATH_CLIMB:", "PATH_REWRITE:", "PUBLIC_REPORT:", "WEB_RESEARCHED:",
+      // V4 start step (Task 23).
+      "START:"]));
     expect(patterns).toEqual(expect.arrayContaining(["PATH_REWRITE:", "PUBLIC_REPORT:"]));
   });
 
@@ -198,7 +317,7 @@ describe("the practice's report names every call site", () => {
   it.each(SITES.map((site) => [site[0], site] as const))("%s has its family and step, and its reply is re-checked by its own form", (key, [, family, kind]) => {
     expect(callFamilyOf(key)).toBe(family);
     expect(practiceStepOf(key)).not.toBe("UNMAPPED");
-    const reply = laterStepContent(kind!, SITE_CHAT(kind!), "en");
+    const reply = SITE_REPLY(kind);
     expect(recheckReply(key, reply)).toEqual({ family, issues: [] });
     // A try that repairs it is read as the step it repairs, its own family staying STRUCTURE_REPAIR.
     expect(recheckReply(`REPAIR:STRUCTURE:${key}`, reply)).toEqual({ family: "STRUCTURE_REPAIR", issues: [] });

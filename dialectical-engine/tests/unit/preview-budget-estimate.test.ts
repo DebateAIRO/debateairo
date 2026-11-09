@@ -918,7 +918,7 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
     await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
-  async function gate(answer: (response: ServerResponse) => void, timeoutMs?: number) {
+  async function gate(answer: (response: ServerResponse) => void, timeoutMs?: number, options?: Readonly<{ dailyPot?: true }>) {
     const directory = await mkdtemp(join(tmpdir(), "pvr-"));
     directories.push(directory);
     const socket = join(directory, "gate.sock");
@@ -933,7 +933,7 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
     });
     servers.push(server);
     await new Promise<void>((done) => server.listen(socket, done));
-    return { port: createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: "fixture-scope" }, timeoutMs), received, socket };
+    return { port: createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: "fixture-scope" }, timeoutMs, options), received, socket };
   }
   const reply = (status: number, body: unknown) => (response: ServerResponse) => {
     response.writeHead(status, { "content-type": "application/json" });
@@ -951,6 +951,13 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
       maxConcurrentCalls: 4, largestReservationNanoUsd: 72_499_200n, enabledModels: [GLM, DEEPSEEK]
     });
     expect(received).toEqual(["POST /remaining {\"scope_id\":\"fixture-scope\"}"]);
+  });
+
+  // V4 start step, Task 5: the day's pot is asked for only by name, and read only when it was.
+  it("asks for the day's pot only when told to, and reads it", async () => {
+    const { port, received } = await gate(reply(200, { ...GOOD, daily_pot_usd: "7.25" }), undefined, { dailyPot: true });
+    await expect(port.remaining()).resolves.toMatchObject({ remainingNanoUsd: 2_879_512_000n, dailyPotNanoUsd: 7_250_000_000n });
+    expect(received).toEqual(['POST /remaining {"scope_id":"fixture-scope","daily_pot":true}']);
   });
 
   it("accepts whole-dollar and zero figures", async () => {

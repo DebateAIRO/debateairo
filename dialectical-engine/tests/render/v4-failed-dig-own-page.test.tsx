@@ -91,16 +91,6 @@ describe("a dig's own failed page and the map's offer to try it again", () => {
   });
 });
 
-describe("the failed screen's two small links (w6 browser check)", () => {
-  it("'Open in the classic view', while the page still hands it, is as small as 'Ask a new question' beside it", async () => {
-    const page = await draw(
-      <V4FailedScreen run={failedDig(UNAVAILABLE)} askAgainHref="/v4?again=1" askHref="/v4" dig={null} classicHref={`/debate/${RUN}`}
-        catalog={CATALOG} homeCatalog={HOME} />
-    );
-    const links = page.querySelector(".v4DebFailedLinks")!;
-    const askNew = [...links.querySelectorAll("a")].find((link) => link.textContent === CATALOG["v4.debate.askNew"])!;
-    const classic = [...links.querySelectorAll("a")].find((link) => link.textContent === CATALOG["v4.common.classicView"])!;
-    expect(askNew.classList.contains("v4DebFailedNew")).toBe(true);
-    expect(classic.className).toBe(askNew.className);
-  });
-});
+// The w6 browser check's "classic link as small as 'Ask a new question'" case went with the owner's answer 12 B (Task 76j):
+// the map page hands this screen no classic link any more; the header's account menu holds it
+// (tests/render/v4-map-wiring.test.tsx).

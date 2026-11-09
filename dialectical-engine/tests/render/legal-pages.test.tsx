@@ -550,7 +550,8 @@ describe("the model providers page lists the companies the API's targets reach (
     }
   });
 
-  it("names the eight jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  // Privacy 3.12 (V4 start step): two jobs before a debate starts join the eight.
+  it("names the ten jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -562,6 +563,8 @@ describe("the model providers page lists the companies the API's targets reach (
         "The synthesis of a finished debate — to check it for four categories",
         "A question before a debate starts — to check whether the debate may start",
         REPORT_CHECK_LINE,
+        "Before a debate starts: suggesting clarifying questions",
+        "Before a debate starts: suggesting what to look into",
         "What you type in the support chat — to answer you"
       ].sort()
     );
@@ -589,7 +592,9 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every
-  // Register names that recipient for both purposes, whichever companies the API's targets reach.
+  // Register names that recipient for both purposes, whichever companies the API's targets reach. Privacy 3.12 (V4
+  // start step, Task 83): the clarifying questions before a debate starts run on the same model, so they too stand on
+  // exactly one row.
   it.each([
     ["no answer from the API (the whole reviewed catalogue)", null],
     ["targets on DeepInfra only", ["deepinfra"]],
@@ -597,7 +602,7 @@ describe("the model providers page lists the companies the API's targets reach (
     ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
   ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
     const register = providerRegister(companies);
-    for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck"] as const) {
+    for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions"] as const) {
       const rows = register.filter((entry) => entry.purposes.includes(purpose));
       expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
       expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });

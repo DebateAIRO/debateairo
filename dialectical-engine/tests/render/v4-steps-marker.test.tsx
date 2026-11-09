@@ -15,8 +15,8 @@ import { CATALOG, digPart, harness, mountMap, page, resetHarness, seededAnswer, 
  *   journey-f18  one rail on every page: "Your question · What we'll look into · The map · Your report"; on a phone, small
  *                dots in the pinned top, next to the breadcrumb.
  *   read-f25     the same small four-step marker on every screen, the current step marked; dig pages show all four steps.
- *   ask-f6       "classic view" at most once on a V4 page (with journey-f19: the header's account menu, unless the page's
- *                own screen already shows it).
+ *   ask-f6       "classic view" at most once on a V4 page (with journey-f19 and the owner's answer 12 B, 5 Nov: the header's
+ *                account menu only, on every screen of the map's step).
  */
 const seen = vi.hoisted(() => ({ headerLinks: [] as Array<string | null> }));
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -149,14 +149,14 @@ describe("the screens before the map (waiting, paused, failed)", () => {
     expect(marker.querySelector("a")).toBeNull();
   });
 
-  // The owner's answers of 5 Nov (question 12 B) move it to the account menu only; that lands with the page's own wiring
-  // (V4DebateClient, the start-step's file), which then hands it to the header and not to this screen.
-  it("ask-f6: a debate that did not finish shows the classic view once, on its screen, and not in the header's menu too", async () => {
+  // The owner's answers of 5 Nov (question 12 B) move it to the account menu only: the page's own wiring (V4DebateClient,
+  // Task 76j) hands it to the header and not to this screen.
+  it("ask-f6: a debate that did not finish offers the classic view once, in the header's menu, and not on its screen too", async () => {
     const runId = crypto.randomUUID();
     harness.run = run(runId, "FAILED");
     await mountMap(1600, runId);
-    expect(seen.headerLinks.at(-1)).toBeNull();
-    expect(classicLinks()).toHaveLength(1);
+    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(classicLinks()).toHaveLength(0);
     expect(page().querySelector(".v4StepsTop nav.v4Steps-line")).not.toBeNull();
   });
 

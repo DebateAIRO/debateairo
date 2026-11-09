@@ -81,6 +81,8 @@ export const harness = {
   lastVisit: null as SeenSnapshot | null,
   /** R22 W5-1: the investigation's report versions (null: not readable, the first answer stays). */
   investigation: null as InvestigationReports | null,
+  /** While set, the investigation reads wait for it (a page whose first report check has not answered yet). */
+  investigationGate: null as Promise<void> | null,
   loadStory: vi.fn(),
   loadAnswer: vi.fn(),
   /** W4-4: "Add to researched"'s press. */
@@ -93,6 +95,11 @@ export const harness = {
   loadPending: false,
   /** map-f6: the account's reading level (null: none kept); a promise that never settles keeps it unknown. */
   accountLevel: null as Promise<ReadingLevel | null> | null,
+  /**
+   * V4 start step, Task 75c (owner answer Q15, 5 Nov): the level the debate was asked at, as its run read says (null: asked
+   * without one). The map page shows it; its links carry none (Tasks 76l, 76n); "background", as the address's level was before.
+   */
+  level: "background" as ReadingLevel | null,
   /**
    * Owner's screen review (3 Nov, dig-f5): the share the second room read says for a whole dig while picks wait (null:
    * none); every query it was asked with, newest last.
@@ -134,6 +141,7 @@ export function resetHarness(): void {
   harness.digProgress = null;
   harness.lastVisit = null;
   harness.investigation = null;
+  harness.investigationGate = null;
   harness.loadStory = vi.fn(async () => harness.story);
   harness.loadAnswer = vi.fn(async (runId: string) => harness.fresh ?? harness.answer ?? seededAnswer(runId));
   harness.addToResearched = vi.fn(async () => "READING" as const);
@@ -141,6 +149,7 @@ export function resetHarness(): void {
   harness.loadError = null;
   harness.loadPending = false;
   harness.accountLevel = null;
+  harness.level = "background";
   harness.wholeShare = null;
   harness.digShareReads = [];
   harness.roomAgain = null;
@@ -187,14 +196,19 @@ export function loadMock(original: Record<string, unknown>) {
     loadV4: async (id: string) => {
       if (harness.loadPending) return new Promise(() => undefined);
       if (harness.loadError !== null) throw harness.loadError;
+      // Task 75c: the debate's own level comes with the run read, and loadV4 carries it to the served answer.
+      const level = harness.level;
       return harness.run !== null
-        ? { kind: "RUN", runId: id, run: harness.run }
-        : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story };
+        ? { kind: "RUN", runId: id, run: level === null ? harness.run : { ...harness.run, reading_level: level } }
+        : { kind: "SERVED", runId: id, answer: harness.answer ?? seededAnswer(id), story: harness.story, ...(level === null ? {} : { level }) };
     },
     loadStory: (...args: unknown[]) => harness.loadStory(...args),
     loadAnswer: (runId: string) => harness.loadAnswer(runId),
     addToResearched: (runId: string, pathId: string, pageRef: string) => harness.addToResearched(runId, pathId, pageRef),
-    loadInvestigation: async () => harness.investigation,
+    loadInvestigation: async () => {
+      if (harness.investigationGate !== null) await harness.investigationGate;
+      return harness.investigation;
+    },
     // The trail's own walk up the answers runs; only its reads are the harness's.
     loadDigTrail: (dig: Answer["dig"]) => (original.loadDigTrail as (dig: unknown, client: unknown) => Promise<DigTrail>)(dig, {
       readRunAnswer: async (runId: string) => {

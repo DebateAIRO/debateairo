@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Câu trả lời khác…",
   "newDebate.askText.otherLabel": "Lời giải thích thêm của riêng bạn",
   "newDebate.askText.matters": "Nếu các câu trả lời đi theo hướng khác nhau, điều quan trọng nhất đối với tôi là: {matters}",
-  "newDebate.askText.angles": "Bạn vui lòng xem thêm: {list}.",
   "newDebate.freePublicNotice": "Với gói Miễn phí, câu hỏi của bạn và cuộc tranh luận về câu hỏi đó sẽ được công khai. Đừng đưa thông tin cá nhân vào."
 }

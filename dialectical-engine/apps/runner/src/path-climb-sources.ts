@@ -1,12 +1,12 @@
 import { StoryFateSchema, type StoryFate } from "@debateai/contract";
 import {
   MAIN_ANSWER_UPDATE_CARRIER, PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository,
-  PostgresTreeUpdateRunnerRepository, RunRepository, decryptContentForRun, encryptAttestedContentForRun,
-  withRunContentLease, type CryptoEnvelope, type PathLineEntry, type Pool, type WebSealed
+  PostgresPathResultsRepository, PostgresStartPathsStore, PostgresTreeUpdateRunnerRepository, RunRepository, decryptContentForRun,
+  encryptAttestedContentForRun, withRunContentLease, type CryptoEnvelope, type PathLineEntry, type Pool, type WebSealed
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { postgresInvestigationCloseSources } from "./investigation-close-sources.js";
-import type { MainAnswerContent, TreeUpdatePorts } from "./path-climb.js";
+import type { AddedPath, MainAnswerContent, TreeUpdatePorts } from "./path-climb.js";
 import { postgresPathRewriteSources, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 
@@ -40,15 +40,38 @@ const seal = (pool: Pool, runId: string, carrier: typeof PATH_UPDATE_CARRIER | t
     return sealed;
   });
 
-/** Each dig whose rewrite or climb called an AI between the two times (the sweep's list). */
+/**
+ * Each dig whose rewrite or climb called an AI between the two times (the sweep's list). V4 start step, Task 55e: and each path debate dug
+ * under the main question of a path debate whose paths' answers so far (PATH_OUTCOME calls) stood still in that window and whose first
+ * debate has no main-answer version triggered by it yet (0164's PATH_ADDED): an update a runner left undone before its first call. Read
+ * through the runtime's own definers (0138's climb and versions, 0159's path ids), so a first debate, a dig under a path and an R22 dig
+ * are never listed by it.
+ */
 export async function readRecentTreeDigs(pool: Pool, since: Date, before: Date, limit: number): Promise<readonly string[]> {
   const rows = (await pool.query<{ run_id: string }>(
-    `SELECT entry.run_id::text AS run_id FROM ledger.ledger_entry AS entry
-      WHERE entry.action_kind = 'MODEL_CALL' AND entry.finished_at >= $1
-        AND (entry.call_site_key LIKE 'PATH\\_REWRITE:%' OR entry.call_site_key LIKE 'PATH\\_CLIMB:%' OR entry.call_site_key LIKE 'ANSWER\\_UPDATE:%')
-      GROUP BY entry.run_id
-     HAVING max(entry.finished_at) < $2
-      ORDER BY max(entry.finished_at), entry.run_id
+    `WITH climbed AS (
+       SELECT entry.run_id, max(entry.finished_at) AS last_at FROM ledger.ledger_entry AS entry
+        WHERE entry.action_kind = 'MODEL_CALL' AND entry.finished_at >= $1
+          AND (entry.call_site_key LIKE 'PATH\\_REWRITE:%' OR entry.call_site_key LIKE 'PATH\\_CLIMB:%' OR entry.call_site_key LIKE 'ANSWER\\_UPDATE:%')
+        GROUP BY entry.run_id
+       HAVING max(entry.finished_at) < $2),
+     argued AS (
+       SELECT entry.run_id, max(entry.finished_at) AS last_at FROM ledger.ledger_entry AS entry
+        WHERE entry.action_kind = 'MODEL_CALL' AND entry.finished_at >= $1 AND entry.call_site_key LIKE 'PATH\\_OUTCOME:%'
+        GROUP BY entry.run_id
+       HAVING max(entry.finished_at) < $2),
+     added AS (
+       SELECT argued.run_id, argued.last_at FROM argued
+         CROSS JOIN LATERAL (SELECT identity.read_path_climb_next(argued.run_id) AS next) AS climb
+        WHERE climb.next IS NOT NULL AND climb.next->>'position_ref' IS NULL
+          AND climb.next->>'parent_run_id' = climb.next->>'root_run_id'
+          AND core.read_start_path_ids((climb.next->>'root_run_id')::uuid) IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(identity.read_main_answer_updates_of_run((climb.next->>'root_run_id')::uuid),
+              '[]'::jsonb)) AS version
+            WHERE version->>'trigger_kind' = 'PATH_ADDED' AND (version->>'trigger_id')::uuid = argued.run_id))
+     SELECT listed.run_id::text AS run_id FROM (SELECT * FROM climbed UNION ALL SELECT * FROM added) AS listed
+      GROUP BY listed.run_id
+      ORDER BY max(listed.last_at), listed.run_id
       LIMIT $3`, [since, before, limit])).rows;
   return Object.freeze(rows.map((row) => row.run_id));
 }
@@ -58,9 +81,35 @@ export function postgresTreeUpdatePorts(pool: Pool): TreeUpdatePorts {
   const digModel = new PostgresDigModelRunnerRepository(pool);
   const picks = new PostgresDigPicksRunnerRepository(pool);
   const runs = new RunRepository(pool);
+  const startPaths = new PostgresStartPathsStore(pool);
+  const pathResults = new PostgresPathResultsRepository(pool);
   const sources = postgresPathRewriteSources(pool);
   const closing = postgresInvestigationCloseSources(pool);
+  /**
+   * V4 start step, Task 55e: the run as a first-level path of its first debate, by the investigation's own rule (investigation-close-sources):
+   * a private dig whose picks hang under the main question of the first debate (0135's set, 0138's climb), both path debates (0159), each
+   * of the dig's paths with its answer so far (0160). Its name is the item its path's pick named ("more-<id>"), else `<b n>@<dig run>`; a
+   * second dig of the same item is "#2" there, and keeps the item's name here. Ids first, then the dig's sealed set and outcomes, each
+   * under the dig's own short lease (never inside another run's).
+   */
+  const addedPathOf = async (runId: string, pathRef: string | null): Promise<AddedPath | null> => {
+    const own = await picks.read(runId);
+    if (own === null || own.positionRef !== null) return null;
+    const next = await tree.readClimbNext(runId);
+    if (next === null || next.position_ref !== null || next.parent_run_id.toLowerCase() !== next.root_run_id.toLowerCase()) return null;
+    if (await startPaths.readStartPathIds(next.root_run_id) === null || await startPaths.readStartPathIds(runId) === null) return null;
+    const set = await startPaths.readStartPaths(runId);
+    if (set === null || set.paths.length === 0) return null;
+    const outcomes = await pathResults.readPathOutcomes(runId);
+    if (set.paths.some((path) => !outcomes.has(path.pathId))) return null;
+    const path = set.paths.find((candidate) => candidate.pathId === pathRef) ?? set.paths[0]!;
+    const place = path.viewpoints.map((viewpoint) => own.picks.find((pick) => pick.pickNo === viewpoint.pickNo)?.place)
+      .find((candidate): candidate is string => candidate !== undefined && candidate.startsWith("more-"));
+    const ask = await runs.readStoredAsk(runId);
+    return Object.freeze({ rootRunId: next.root_run_id, positionRef: place ?? `${path.pathId}@${runId.toLowerCase()}`, free: ask?.planTier === "free" });
+  };
   return Object.freeze({
+    addedPathOf,
     tree,
     digOf: sources.digOf,
     parentPathOf: sources.parentPathOf,

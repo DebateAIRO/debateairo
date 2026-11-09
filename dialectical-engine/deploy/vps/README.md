@@ -1890,7 +1890,10 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
 
 1. **Data recipient** — `pg_dumpall --globals-only`, then `pg_dump --format=custom debateai`, then
    a tar of the custody tree (user-DEK store including `runs/*/content-key.v1.json`, the
-   publication-key store, the audit-key store), all in one `age` envelope. DB first, keys second:
+   publication-key store, the audit-key store), all in one `age` envelope. The tar leaves out the
+   user-DEK store's own `saved-questions/` folder, the keys of questions not started yet, so that a
+   question deleted or started after a backup can never be read from it (owner answer S8 A, 5 Nov
+   2026). DB first, keys second:
    a key referenced by a dumped row is present in the later snapshot; the reverse order can leave
    a row whose key no longer exists. A dump **alone restores nothing** — every private run is
    ciphertext under keys that live outside PostgreSQL (audit L2-F3).
@@ -1937,7 +1940,8 @@ the off-host copy grow by roughly the size of every prompt sent: plan disk and r
 `backup.sh` stays the nightly backup. Before the migrations of a side-by-side upgrade (§5, step 6)
 take one more, online, while both releases' services keep running: the same three parts in the
 same order as `backup.sh` (cluster globals, the `debateai` database in custom format, then the
-custody tree), each encrypted to the same data recipient, and their sha256 sums. Nothing
+custody tree without the user-DEK store's `saved-questions/`, as above), each encrypted to the same
+data recipient, and their sha256 sums. Nothing
 unencrypted touches the disk: each part streams straight into `age`. It stays on this host, in a
 new `0700` folder under `BACKUP_DIR`, with no off-host copy, because it is a last resort for this
 upgrade only (§11 of the side-by-side spec): going back is the switch in the other direction, not
@@ -1955,7 +1959,7 @@ covers them.
   install -d -m 0700 -o root -g root "$dir"
   sudo -u postgres pg_dumpall --globals-only | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/globals.sql.age"
   sudo -u postgres pg_dump --format=custom --compress=9 debateai | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/debateai.dump.age"
-  tar -cf - -C "$(dirname "$USER_DEK_STORE_PATH")" "$(basename "$USER_DEK_STORE_PATH")" -C "$(dirname "$PUBLICATION_KEY_STORE_PATH")" "$(basename "$PUBLICATION_KEY_STORE_PATH")" -C "$(dirname "$AUDIT_KEY_STORE_PATH")" "$(basename "$AUDIT_KEY_STORE_PATH")" | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/custody.tar.age"
+  tar -cf - --exclude="$(basename "$USER_DEK_STORE_PATH")/saved-questions" -C "$(dirname "$USER_DEK_STORE_PATH")" "$(basename "$USER_DEK_STORE_PATH")" -C "$(dirname "$PUBLICATION_KEY_STORE_PATH")" "$(basename "$PUBLICATION_KEY_STORE_PATH")" -C "$(dirname "$AUDIT_KEY_STORE_PATH")" "$(basename "$AUDIT_KEY_STORE_PATH")" | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/custody.tar.age"
   (cd "$dir" && sha256sum globals.sql.age debateai.dump.age custody.tar.age > SHA256SUMS)
   echo "ONLINE_BACKUP_OK $dir"
 )
@@ -2004,6 +2008,11 @@ Only then does it print `RESTORE_DRILL_OK` and drop the scratch database and dir
 running the whole drill on a **separate machine**: that exercises "the VPS is gone" rather than
 "a table was dropped". On the live host the globals are verified, not applied, unless you set
 `DRILL_APPLY_GLOBALS=true`.
+
+**A restore brings back no question not started yet.** Their keys (the user-DEK store's
+`saved-questions/`) are in no backup (owner answer S8 A, 5 Nov 2026), so after a restore each such
+question no longer opens and leaves the person's list, and the person asks it again; every debate
+keeps its key. The drill reads no question key, so it is unaffected.
 
 Record each drill: date, artefact, `core.run` count, chain totals, and the decrypt line.
 

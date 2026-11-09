@@ -11,7 +11,7 @@ import { focusInPlace, useFocusHandOff } from "@/lib/v4/useFocusHandOff";
 /*
  * V4 UX fixes (owner picks 3 Nov: journey-d3 A, dig-f16, dig-f17): the bottom of the map page is ONE stack that measures
  * itself, so nothing overlaps and the page's bottom room is the stack's real height (never a guessed 150 px).
- *  - Phone: one pinned bar whose job changes ("Dig into your pick · up to 3%"; dig-f31: with nothing picked, "Choose what
+ *  - Phone: one pinned bar whose job changes ("Dig into this · up to 3%"; dig-f31: with nothing picked, "Choose what
  *    to dig ›", which goes to the choices; or "Write my report" when that is the next step),
  *    with the Map button. Above it, inside the same surface: the slim "Good time to write your report" line when the rule
  *    fires (dig-f17, with a small × to close it), the Undo and ready notes for their few seconds (never floating over
@@ -38,7 +38,12 @@ export type V4BarJob =
   | Readonly<{ kind: "dig"; label: string; onDig: () => void; waiting?: boolean; reason?: string; share?: number | null; place?: string }>
   /** dig-f31: with nothing picked, "Choose what to dig ›" takes the person to the choices instead of digging at once. */
   | Readonly<{ kind: "choose"; label: string; onChoose: () => void }>
-  | Readonly<{ kind: "report"; href: string }>
+  /**
+   * V4 start step, Task 56c (public-f25): `waiting`, a further report on a public debate waits for the reset, so "Write my report"
+   * stays where it is, greyed, and `reason` ("This report can start after 08:00.") shows right above the bar, as the dig job's does;
+   * a press gives it the highlight again and sends nothing.
+   */
+  | Readonly<{ kind: "report"; href: string; waiting?: boolean; reason?: string }>
   /**
    * wait-f2: "Paused · Continue" (after the reset), or before it "Paused · Continue on 1 December" as a greyed button that
    * sends nothing (question 19 A, 5 Nov). `reason` is the pause's one sentence: the bar finds it in the page's pause block
@@ -220,7 +225,7 @@ export function V4BottomStack(props: Readonly<{
 
   // The greyed button's reason, right above the bar: a dig that waits (journey-f14), or a paused dig only where no pause block
   // on the page says it (question 19 A: the pause is said once, wait-f5).
-  const why = job.kind === "dig" && job.waiting === true && job.reason !== undefined
+  const why = (job.kind === "dig" || job.kind === "report") && job.waiting === true && job.reason !== undefined
     ? job.reason
     : pauseLineId === null ? pauseReason : null;
   const writeReport = (className: string, ref?: RefObject<HTMLElement | null>): ReactNode => (props.onWriteReport === undefined ? (
@@ -337,7 +342,20 @@ export function V4BottomStack(props: Readonly<{
             {job.label}
           </button>
         ) : null}
-        {job.kind === "report" && !hasStrip ? writeReport("v4Btn v4BtnPrimary v4DebPhoneDig v4DebPhoneReport", props.jobRef) : null}
+        {job.kind === "report" && !hasStrip && job.waiting === true ? (
+          // Task 56c: greyed but focusable, pointing at its visible reason; a press shows it again and sends nothing (journey-f14).
+          <button
+            ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
+            type="button"
+            className="v4Btn v4BtnPrimary v4DebPhoneDig v4DebPhoneReport v4DigWaiting"
+            aria-disabled="true"
+            aria-describedby={job.reason !== undefined ? reasonId : undefined}
+            onClick={() => setWhyReplay((count) => count + 1)}
+          >
+            {t(catalog, "v4.rail.writeReport")}
+          </button>
+        ) : null}
+        {job.kind === "report" && !hasStrip && job.waiting !== true ? writeReport("v4Btn v4BtnPrimary v4DebPhoneDig v4DebPhoneReport", props.jobRef) : null}
         {job.kind === "status" ? (
           <p className="v4DebPhoneStatus" data-bar-status="">
             {job.working ? <span className="v4WaitDot v4WaitDot-PULSE" aria-hidden="true" /> : null}

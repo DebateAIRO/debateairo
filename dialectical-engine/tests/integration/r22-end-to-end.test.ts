@@ -2,16 +2,24 @@
 // Each path sends what the page sends (createDebate over v4AskConfig, the typed client, lib/v4/load.ts, lib/v4/publicPage.ts) over real HTTP, and feeds what comes back
 // through the page's own builders (buildV4Map, publicPathViews), so the mock in tools/v4-mock-api can hide no contract mismatch here. No vendor is contacted; all data is made up.
 // Integration suites are skipped by the CI gate: run this file by hand, alone.
+// V4 start step, Task 88: the world runs with the step before Start switched on, so paths 1-12 run on v2 (an ask without paths builds
+// its own list, RUN_BUILT), and paths 13-19 drive the step as the page does: the lists, the merge and the page's own path plan
+// (apps/ui/lib/v4/pathPlan.ts), then Start, over real HTTP. Path 19 is the public side of a debate started from its lists.
 import { PREVIEW_UNFINISHED_RUNS_SQL } from "../../apps/api/src/preview-budget-estimate.js";
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { StartPathsSchema, type StartListsEvent, type StartPathChoice } from "@debateai/contract";
+import { PostgresModelSpendStore } from "@debateai/budget";
+import { START_STEP_TIMING, startRestatesMainQuestion } from "@debateai/map";
 import { loadV4, loadInvestigation, writeReport, reopenInvestigation, currentReportVersion, loadDigTrail } from "../../apps/ui/lib/v4/load.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
-import { pathWebOf, sourcesOf } from "../../apps/ui/lib/v4/web.js";
-import { askParentOf, ownViewPick, pathSuggestionsOf, suggestionPick } from "../../apps/ui/lib/v4/suggestions.js";
+import { pathWebOf, sourcesOf, webNoteOf } from "../../apps/ui/lib/v4/web.js";
+import { askParentOf, digSuggestionsWithMore, ownViewPick, pathSuggestionsOf, suggestionPick } from "../../apps/ui/lib/v4/suggestions.js";
 import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
+import { pathPlanCombineMembers, pathPlanFromMenu, pathPlanReduce, pathPlanToStartPaths, type PathPlan, type PathPlanAction } from "../../apps/ui/lib/v4/pathPlan.js";
 import type { DigTarget, V4Path } from "../../apps/ui/lib/v4/types.js";
-import { stubJudgement } from "../support/preview-gate-stubs.js";
+import { stubJudgement, type GateRequest } from "../support/preview-gate-stubs.js";
+import { driveStartStep, topPathsChoice, type StartStepDrive } from "../support/start-step-cases.js";
 import { publicDigAsk, publicPathViews } from "../../apps/ui/lib/v4/publicPage.js";
 import { composeQuestion, purposeLinesOfGoal } from "../../apps/ui/lib/v4/askText.js";
 import { canonicalPublicReviewBinding, groundFieldsOf } from "../../apps/api/src/staff/public-review.js";
@@ -30,7 +38,8 @@ const { handleInvestigationReportRequest } = await websiteModule<{ handleInvesti
 
 let world: R22World;
 const lines: string[] = [];
-beforeAll(async () => { world = await startR22World({ log: (line) => { lines.push(line); } }); }, 900_000);
+// V4 start step, Task 88: the world runs with the step before Start switched on (Task 86), so paths 1-12 run on v2 and 13-19 drive the step.
+beforeAll(async () => { world = await startR22World({ startStep: "ON", log: (line) => { lines.push(line); } }); }, 900_000);
 afterAll(async () => { await world?.stop(); });
 
 /** The debate page's first read and its map, with the page's own code. */
@@ -42,6 +51,8 @@ async function readPage(who: R22Account, runId: string) {
 
 const opening = (text: string): string => text.slice(0, text.indexOf(".") + 1);
 const pagesOf = (field: (name: string) => string | undefined) => JSON.parse(field("pages") ?? "[]") as { page_id: string; text?: string }[];
+/** How many path planners have answered (each plans its own pair). */
+let pathPlans = 0;
 /** The planner searches a pair per path; the readers quote each page's first sentence, as a real reader of the made-up pages could. */
 const webReplies: R22Script = (contract, request, _chat, field) => {
   // A case writer that reads a pack cites its first extract: a point the page shows with its source.
@@ -50,6 +61,14 @@ const webReplies: R22Script = (contract, request, _chat, field) => {
     if (id !== undefined) return { content: JSON.stringify({ ...JSON.parse(stubJudgement("A point the page reports, with its figure.")) as object, way_of_knowing: "LOOKED_UP", locator: id }) };
   }
   if (contract === null) return null;
+  // V4 start step, Task 88: on a path debate each path has its own planner (web.plan-dig.v3, a dig's word for word, at WEB:plan:<n>): a
+  // pair of its own (the same words from two paths would be one search).
+  if (contract === "web.plan-dig.v3") {
+    pathPlans += 1;
+    return { content: JSON.stringify({ country: null, needs_search: true, reason: null, pace: "normal",
+      searches: [{ side: "for", local: false, query: `harbour pier evidence for path ${String(pathPlans)}` },
+        { side: "against", local: false, query: `harbour pier evidence against path ${String(pathPlans)}` }] }) };
+  }
   if (contract.startsWith("web.plan.")) {
     const answers = JSON.parse(field("answers") ?? "[]") as { answer_id: string }[];
     return { content: JSON.stringify({ country: null, answers: answers.map((answer, index) => ({ answer_id: answer.answer_id, needs_search: true, reason: null, pace: "normal",
@@ -94,6 +113,71 @@ const markedAtCreation = async (runId: string): Promise<boolean | null> => (awai
 
 /** What the start-of-debate estimate still holds right now: a finished dig must not be here, or a few digs refuse the next question. */
 const heldByEstimate = async (): Promise<number> => (await world.database.pool.query(PREVIEW_UNFINISHED_RUNS_SQL, [true, 3600])).rows.length;
+
+// V4 start step, Task 88: what paths 13-19 read beside the pages.
+/** Every model call's site key on the run, in the ledger's order. */
+const runSites = async (runId: string): Promise<readonly string[]> => (await world.database.pool.query<{ call_site_key: string }>(
+  "SELECT call_site_key FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence", [runId])).rows.map((row) => row.call_site_key);
+/** The calls before Start booked to the person (0158), each with its ledger row: the kind, the person's cost, the row's source and run. */
+const preStart = async (ownerRef: string) => (await world.database.pool.query<{ kind: string; charge_micros: string; spend_source: string | null; run_id: string | null }>(
+  `SELECT c.kind, c.charge_micros::text AS charge_micros, s.spend_source, s.run_id::text AS run_id
+     FROM identity.pre_start_charge AS c LEFT JOIN ledger.model_spend AS s ON s.spend_id = c.charge_id WHERE c.owner_ref=$1 ORDER BY c.recorded_at`, [ownerRef])).rows;
+/** Who chose the run's sealed paths (0159): PERSON or AIS; null: no set. */
+const chosenByOf = async (runId: string): Promise<string | null> => (await world.database.pool.query<{ chosen_by: string }>(
+  "SELECT chosen_by FROM core.start_path_set WHERE run_id=$1", [runId])).rows[0]?.chosen_by ?? null;
+/** What the lists are read with at Next: the line, the page's language and the reading level the ask config sends ("plain"). */
+const readOf = (questionLine: string) => Object.freeze({ questionLine, siteLanguage: "en" as const, readingLevel: "plain" as const });
+/** A maker's or a model's name as the roster, the declared targets and the gates spell them. */
+const MAKER_OR_MODEL = /z\.ai|zai-org|glm|deepseek|xiaomi|mimo|alibaba|qwen|anthropic|claude|haiku|deepinfra/iu;
+/** The first maker or model name in a lists stream, its signed references left out (random text that could spell anything); null: none. */
+const nameIn = (events: readonly StartListsEvent[]): string | null =>
+  MAKER_OR_MODEL.exec(JSON.stringify(events, (key, value: unknown) => key === "ref" || key === "check_ref" ? undefined : value))?.[0] ?? null;
+/** A list past the cut (START_STEP_TIMING.cutAtMs, 30 s today: 35 s), well before the lists' hard cap, so it comes late. */
+const LATE_MS = START_STEP_TIMING.cutAtMs + 5_000;
+/** A delay for the list calls of the models `late` names; every other call is answered at once. */
+const listsLate = (late: (model: string) => boolean) => (request: GateRequest): number => request.kind === "START_LIST" && late(request.model) ? LATE_MS : 0;
+/**
+ * Paths 14 and 17's Free merge: every suggestion a path of its own (the doubles' grouping), one "Another way to see it" card and both
+ * one-tap suggestions, "Combine?" for the first two paths and "fits path 1" for the last. Under two suggestions: the doubles' own merge.
+ */
+const mergeWithCardAndSuggestions: R22Script = (contract, _request, _chat, field) => {
+  if (contract !== "start.merge.v1") return null;
+  const ids = (JSON.parse(field("suggestions") ?? "[]") as { id: string }[]).map((one) => one.id);
+  if (ids.length < 2) return null;
+  return { content: JSON.stringify({ repeats: [], paths: ids.map((id) => ({ ids: [id], title: null, question: null })),
+    cards: [{ kind: "WHAT_WOULD_CHANGE_IT", sentence: "Cheaper tickets in winter could change who takes the ferry at all.", title: "Winter ticket prices",
+      question: "Would cheaper winter tickets change who takes the ferry?", fits_path: null, as_question: null }],
+    suggestions: [{ kind: "COMBINE", paths: [1, 2], reason: "Both paths look at the same people from two sides." }, { kind: "FITS", path: ids.length, into: 1 }] }) };
+};
+/** Path 14's fit: the person's own view fits inside the first path it is given (the doubles' own fit says none). */
+const fitsFirst: R22Script = (contract, _request, _chat, field) => contract !== "start.fit.v1" ? null
+  : { content: JSON.stringify({ fits: (JSON.parse(field("paths") ?? "[]") as { key: string }[])[0]?.key ?? null }) };
+
+/** The page's path plan after one change (pathPlanReduce): a change it refuses, or one that changes nothing, fails the path. */
+function changed(plan: PathPlan, action: PathPlanAction): PathPlan {
+  const result = pathPlanReduce(plan, action);
+  expect(result.refusal, action.type).toBeNull();
+  expect(result.plan, action.type).not.toBe(plan);
+  return result.plan;
+}
+/** The key of the one path on the list still being written (after a Combine, before the AI's words). */
+function writingKey(plan: PathPlan): string {
+  const writing = plan.paths.filter((path) => path.wording === "WRITING");
+  expect(writing).toHaveLength(1);
+  return writing[0]!.key;
+}
+/**
+ * A path being written, as the page asks for it (useStartPaths' combine): its members, the line the lists were read with, the check and
+ * the menu's id; the AI's words and reference go into the plan.
+ */
+async function combined(who: R22Account, drive: StartStepDrive, plan: PathPlan, key: string): Promise<PathPlan> {
+  const path = plan.paths.find((one) => one.key === key)!;
+  const answer = await who.client.startPathCombine({
+    context: { kind: "MENU", question_line: drive.read.questionLine, check_ref: drive.check!.check_ref, menu_id: drive.menu!.menu.menu_id },
+    reading_level: drive.read.readingLevel, members: [...pathPlanCombineMembers(path)] });
+  if (answer.source !== "AI") throw new Error(`the combine answered none: ${answer.reason}`);
+  return changed(plan, { type: "COMBINE_WRITTEN", key, title: answer.title, question: answer.question, combineRef: answer.combine_ref });
+}
 
 describe("R22 on the real API", () => {
   const QUESTION = "Should Harbour Town build a second ferry pier?";
@@ -487,6 +571,315 @@ describe("R22 on the real API", () => {
   }, 300_000);
   class PostgresFlagLimit { async personHour(): Promise<number> { return (await readAbuseLimits(world.fixtureSuperuserPool, world.nextVersion)).publicFlag.personHour; } }
 
+  // V4 start step, Task 88: paths 13-19, the step before Start as the page drives it (tests/support/start-step-cases.ts's drive: the
+  // lists read once for the line at Next, the first merge at the cut, a late merge of the late lists), the person's list shaped
+  // through the page's own path plan, then Start.
+  let fia: R22Account; let shapedRun: string;
+  const SHAPED_QUESTION = "Should Harbour Town build a new ferry terminal?";
+  const OWN_PATH = "My own path: the terminal must not take the fishing boats' moorings.";
+
+  it("path 13: Plus: four lists, one cut; the menu shaped (combine, split, combine, rewrite, own path); Start with a clarify answer in the line: the paths argued as sent", async () => {
+    world.setScript(webScript);
+    const from = world.stubs.requests.length;
+    fia = await world.account("fia", "PLUS");
+    // Next: the lists for the line as typed; nothing in the stream names a maker or a model.
+    const drive = await driveStartStep(fia.client, readOf(SHAPED_QUESTION));
+    const check = drive.check!;
+    const signed = drive.menu!;
+    expect(check.seats).toBe(4);
+    const progress = drive.events.flatMap((event) => event.event === "progress" ? [event.data] : []);
+    expect(progress.length).toBeGreaterThan(0);
+    expect(progress.map((one) => one.of)).toEqual(progress.map(() => 4));
+    expect(drive.events.filter((event) => event.event === "cut")).toHaveLength(1);
+    expect(drive.events.at(-1)).toEqual({ event: "end", data: { reason: "DONE" } });
+    expect(nameIn(drive.events)).toBeNull();
+    expect(drive.late).toEqual([]);
+    expect(signed.menu.paths.length).toBeGreaterThanOrEqual(3);
+    // Review Focus 1: the clarifying answer flies into the box after Next; the lists and every pre-Start call keep the line read at Next.
+    const clarify = await fia.client.clarifyAsk({ question_line: SHAPED_QUESTION });
+    if (clarify.source !== "AI") throw new Error(`clarify answered ${clarify.source}`);
+    const purpose = clarify.purpose!;
+    const chosen = purpose.answers[0]!;
+    const goal = { answers: [{ question: purpose.text, answer: chosen }], matters: "" } as never;
+    const line = composeQuestion(SHAPED_QUESTION, goal, newDebateCatalog);
+    expect(line).not.toBe(drive.read.questionLine);
+    // Step 2, through the page's own plan at How wide 3: combine the first two, split them apart again, combine the second with the
+    // third, rewrite the first in the person's words, add the person's own path.
+    let plan = pathPlanFromMenu(signed.menu, 3, false);
+    const [first, second] = plan.paths;
+    plan = changed(plan, { type: "SELECT", key: first!.key });
+    plan = changed(plan, { type: "SELECT", key: second!.key });
+    plan = changed(plan, { type: "COMBINE_SELECTED" });
+    plan = await combined(fia, drive, plan, writingKey(plan));
+    plan = changed(plan, { type: "SPLIT", key: plan.paths[0]!.key });
+    expect(plan.paths.map((path) => path.viewpoints.length)).toEqual([1, 1, 1]);
+    const [, splitOff, third] = plan.paths;
+    plan = changed(plan, { type: "SELECT", key: splitOff!.key });
+    plan = changed(plan, { type: "SELECT", key: third!.key });
+    plan = changed(plan, { type: "COMBINE_SELECTED" });
+    plan = await combined(fia, drive, plan, writingKey(plan));
+    plan = changed(plan, { type: "REWRITE", key: plan.paths[0]!.key, title: "Who runs the terminal in winter",
+      question: "Who would pay to keep the new terminal open through the winter months?" });
+    plan = changed(plan, { type: "ADD_OWN", text: OWN_PATH, intoPathKey: null });
+    expect(plan.paths.map((path) => path.wording)).toEqual(["PERSON", "COMBINED", "PERSON"]);
+    const startPaths = StartPathsSchema.parse({ source: "MENU", menu: signed, paths: [...pathPlanToStartPaths(plan)], width: plan.width, chosen_by: "PERSON" });
+    // Start: the box's whole line with the check and the paths; the server checks the whole line once.
+    const checks = () => world.stubs.requests.filter((request) => request.kind === "QUESTION_CHECK");
+    const checkedBefore = checks().length;
+    const started = await ask(fia, line, { purposeLines: purposeLinesOfGoal(goal)!, startLane: { startCheck: { ref: check.check_ref }, startPaths } });
+    const checked = checks().slice(checkedBefore);
+    expect(checked).toHaveLength(1);
+    expect(JSON.stringify(checked[0]!.body)).toContain(chosen);
+    shapedRun = started.id;
+    const done = await world.settle();
+    expect(done.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
+    const { answer, map } = await readPage(fia, shapedRun);
+    const branches = answer.branches!;
+    expect(answer.question_line).toContain(chosen);
+    expect(branches.source).toBe("MENU");
+    expect(await chosenByOf(shapedRun)).toBe("PERSON");
+    expect(branches.paths.map((path) => path.title)).toEqual(startPaths.paths.map((path) => path.title));
+    expect(branches.paths.map((path) => path.author)).toEqual(["PERSON_EDITED", "AI_COMBINED", "PERSON_OWN_VIEW"]);
+    expect(startRestatesMainQuestion(branches.paths[1]!.question, SHAPED_QUESTION, "en")).toBe(false);
+    expect((await preStart(fia.ownerRef)).filter((charge) => charge.kind === "COMBINE")).toHaveLength(2);
+    expect(branches.paths.map((path) => pathWebOf(answer, path.path_id)?.search.status)).toEqual(branches.paths.map(() => "SEARCHED"));
+    // No call of R22's map step and none of the step before Start: the debate's only MAP: calls are its gap rounds (MAP:gap-paths:<round>).
+    const sites = await runSites(shapedRun);
+    expect(sites.filter((site) => (site.startsWith("MAP:") && !/^MAP:gap-paths:[1-9][0-9]*$/u.test(site)) || site.startsWith("START:"))).toEqual([]);
+    expect(world.stubs.requests.slice(from).filter((request) => request.kind === "UNKNOWN")).toEqual([]);
+    expect(branches.paths[2]!.outcome?.view).toEqual(expect.objectContaining({ outcome: expect.any(String) }));
+    expect(map.paths.map((path) => path.id)).toEqual(["b1", "b2", "b3"]);
+    saw("13", `4 seats, ${String(progress.length)} progress events of 4, one cut, end DONE, no maker or model named; combine, split, combine, rewrite, own path; `
+      + `Start with the clarify answer in the line (one whole-line check): ${branches.paths.map((path) => `${path.path_id} ${path.author} "${path.title}"`).join(", ")}; 2 COMBINE charges; every path SEARCHED; ${String(sites.length)} run calls, none of R22's map step or START: (gap rounds ${String(sites.filter((site) => site.startsWith("MAP:gap-paths:")).length)})`);
+  }, 300_000);
+
+  it("path 14: Free: two lists, a menu with a card and both suggestions, one AI combine and a fit; four paths refused, the AIs' three started: no search, no AI dig suggestion", async () => {
+    world.setScript(both(mergeWithCardAndSuggestions, fitsFirst, webScript));
+    const hal = await world.account("hal");
+    const question = "Should Harbour Town open a summer night market by the quay?";
+    const drive = await driveStartStep(hal.client, readOf(question));
+    const check = drive.check!;
+    const signed = drive.menu!;
+    expect(check.seats).toBe(2);
+    expect(signed.menu.cards.length).toBeGreaterThan(0);
+    expect([...new Set(signed.menu.suggestions.map((suggestion) => suggestion.kind))].sort()).toEqual(["COMBINE", "FITS"]);
+    // "Combine?" taken as the page takes it: one path being written, one AI combine, booked once.
+    let plan = pathPlanFromMenu(signed.menu, 3, true);
+    plan = changed(plan, { type: "APPLY_SUGGESTION", suggestionId: signed.menu.suggestions.find((suggestion) => suggestion.kind === "COMBINE")!.suggestion_id });
+    plan = await combined(hal, drive, plan, writingKey(plan));
+    expect((await preStart(hal.ownerRef)).filter((charge) => charge.kind === "COMBINE")).toHaveLength(1);
+    // The person's own path: which path on the list it fits inside.
+    const fit = await hal.client.startPathFit({ question_line: drive.read.questionLine, check_ref: check.check_ref, reading_level: drive.read.readingLevel,
+      own_text: "My own view: the market should close by ten.", paths: plan.paths.map((path) => ({ key: path.key, title: path.title, question: path.question })) });
+    expect(fit).toEqual({ source: "AI", fits_key: plan.paths[0]!.key });
+    // Four paths are more than Free's How wide allows: refused, nothing started.
+    const startCheck = { ref: check.check_ref };
+    const asWritten: StartPathChoice[] = signed.menu.paths.slice(0, 3).map((path) => ({ title: path.title, question: path.question,
+      members: path.viewpoint_ids.map((id) => ({ viewpoint_id: id })) }));
+    const owns: StartPathChoice[] = Array.from({ length: 4 - asWritten.length }, (_unused, at) => {
+      const text = `My own path number ${String(at + 1)}: the stalls need light.`;
+      return { title: text, question: text, members: [{ own_text: text }] };
+    });
+    const four = StartPathsSchema.parse({ source: "MENU", menu: signed, paths: [...asWritten, ...owns], width: 4, chosen_by: "PERSON" });
+    await expect(ask(hal, question, { settings: FREE, publicLane: { freePublicNotice: true }, startLane: { startCheck, startPaths: four } }))
+      .rejects.toMatchObject({ status: 400, serverCode: "START_PATHS_TOO_MANY" });
+    expect(world.queue).toHaveLength(0);
+    // "Just answer it" on step 2: the AIs' top three, admitted.
+    const top = topPathsChoice(drive, 3)!;
+    const suggestionCalls = () => world.stubs.requests.filter((request) => request.kind === "SUGGESTIONS").length;
+    const suggestedBefore = suggestionCalls();
+    const started = await ask(hal, question, { settings: FREE, publicLane: { freePublicNotice: true }, startLane: { startCheck, startPaths: top } });
+    const done = await world.settle();
+    expect(done.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
+    const { answer, map } = await readPage(hal, started.id);
+    const branches = answer.branches!;
+    expect(branches.source).toBe("MENU");
+    expect(branches.paths).toHaveLength(3);
+    expect(branches.paths.map((path) => path.author)).toEqual(["AI_SUGGESTION", "AI_SUGGESTION", "AI_SUGGESTION"]);
+    expect(await chosenByOf(started.id)).toBe("AIS");
+    expect(webNoteOf(answer)).toBe("FREE");
+    expect((await runSites(started.id)).filter((site) => site.startsWith("WEB:"))).toEqual([]);
+    // After the debate: only the suggestions code finds, no AI suggestion call (owner F14).
+    expect(suggestionCalls()).toBe(suggestedBefore);
+    const offered = map.paths.flatMap((path) => pathSuggestionsOf(answer, path.id));
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.filter((suggestion) => suggestion.kind === "HELPS_MAIN_QUESTION")).toEqual([]);
+    saw("14", `2 seats; menu with ${String(signed.menu.cards.length)} card(s) and suggestions ${signed.menu.suggestions.map((suggestion) => suggestion.kind).join(",")}; one AI combine, one COMBINE charge; `
+      + `fit ${String(fit.source === "AI" ? fit.fits_key : fit.reason)}; four paths 400 START_PATHS_TOO_MANY; three by the AIs COMPLETED, web note FREE, no WEB: call, ${String(offered.length)} code-found dig suggestion(s), no AI suggestion call`);
+  }, 300_000);
+
+  it("path 15: Plus: the lists read and merged, Start never pressed: only the calls before Start are booked, run-less, and they count in the person's usage", async () => {
+    world.setScript(webScript);
+    const gil = await world.account("gil", "PLUS");
+    const spend = new PostgresModelSpendStore(world.database.pool);
+    const now = new Date();
+    const monthOf = async () => spend.readOwnerSpentMicros(gil.ownerRef, new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), new Date(Date.now() + 60_000));
+    const usedBefore = await monthOf();
+    const drive = await driveStartStep(gil.client, readOf("Should Harbour Town charge cars to park by the beach?"));
+    expect(drive.check?.seats).toBe(4);
+    expect(drive.menu).not.toBeNull();
+    const charges = await preStart(gil.ownerRef);
+    expect(charges.map((charge) => charge.kind).sort()).toEqual(["ANGLES", "LIST", "LIST", "LIST", "LIST", "MERGE"]);
+    expect(charges.filter((charge) => charge.spend_source === "PRE_START" && charge.run_id === null)).toHaveLength(6);
+    expect((await world.database.pool.query("SELECT 1 FROM core.run_ownership_event WHERE owner_ref=$1", [gil.ownerRef])).rows).toEqual([]);
+    expect(world.queue).toHaveLength(0);
+    const usedAfter = await monthOf();
+    const booked = charges.reduce((sum, charge) => sum + Number(charge.charge_micros), 0);
+    expect(booked).toBeGreaterThan(0);
+    expect(usedAfter - usedBefore).toBe(booked);
+    saw("15", `4 seats; charges ANGLES 1, LIST 4, MERGE 1, all run-less PRE_START ledger rows; no run; the month's usage moved by ${String(booked)} micros (made-up prices)`);
+  }, 300_000);
+
+  it("path 16: \"Just answer it\" on step 1: no lists before Start; the run writes its own lists and merge and argues the AIs' top paths", async () => {
+    world.setScript(webScript);
+    const hu = await world.account("hu", "PLUS");
+    const started = await ask(hu, "Should Harbour Town add a late bus to the ferry?");
+    const done = await world.settle();
+    expect(done.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
+    const branches = (await readPage(hu, started.id)).answer.branches!;
+    expect(branches.source).toBe("RUN_BUILT");
+    expect(await chosenByOf(started.id)).toBe("AIS");
+    expect(branches.paths.map((path) => path.author)).toEqual(branches.paths.map(() => "AI_SUGGESTION"));
+    expect(branches.paths.length).toBeLessThanOrEqual(5);
+    const sites = await runSites(started.id);
+    expect(sites).toEqual(expect.arrayContaining(["START:angles", "START:list:1", "START:merge"]));
+    expect(sites.filter((site) => site === "MAP:choose" || site === "MAP:check")).toEqual([]);
+    expect(await preStart(hu.ownerRef)).toEqual([]);
+    saw("16", `RUN_BUILT, ${String(branches.paths.length)} paths by the AIs; run calls ${[...new Set(sites.filter((site) => site.startsWith("START:")))].join(",")}, no MAP:choose or MAP:check; no pre-Start charge`);
+  }, 300_000);
+
+  it("path 17: trouble: every list fails (none, then a Start with no paths builds its own); two of four lists late (revision 2 keeps revision 1, Start admitted); Free with one list late", async () => {
+    // Every list answers a vendor 500: no list, none, the stream ends NONE; Start with the check alone, and the run builds its own list.
+    const ivy = await world.account("ivy", "PLUS");
+    const failingQuestion = "Should Harbour Town move the ferry ticket office?";
+    world.setScript(both((_contract, request) => request.kind === "START_LIST" ? { vendorStatus: 500 } : null, webScript));
+    let failed: StartStepDrive;
+    try { failed = await driveStartStep(ivy.client, readOf(failingQuestion)); } finally { world.setScript(webScript); }
+    expect(failed.events.filter((event) => event.event === "list" || event.event === "late_list")).toEqual([]);
+    expect(failed.events.slice(-2).map((event) => event.event)).toEqual(["none", "end"]);
+    expect(failed.events.at(-1)).toEqual({ event: "end", data: { reason: "NONE" } });
+    expect(failed.menu).toBeNull();
+    const lone = await ask(ivy, failingQuestion, failed.check === null ? {} : { startLane: { startCheck: { ref: failed.check.check_ref } } });
+    const loneDone = await world.settle();
+    expect(loneDone.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
+    expect((await readPage(ivy, lone.id)).answer.branches?.source).toBe("RUN_BUILT");
+    const noneReason = failed.events.find((event) => event.event === "none");
+    // Two of Plus's four lists (Qwen's and DeepSeek's) come after the cut: two in at the cut, the first menu from them, both late lists
+    // merged as revision 2, which keeps revision 1's paths; Start with revision 2 is admitted and the debate finishes.
+    const jan = await world.account("jan", "PLUS");
+    const slowQuestion = "Should Harbour Town turn the fish market into a library?";
+    world.setScript(webScript);
+    world.setDelays(listsLate((model) => model.startsWith("Qwen/") || model.startsWith("deepseek-ai/")));
+    let slow: StartStepDrive;
+    try { slow = await driveStartStep(jan.client, readOf(slowQuestion)); } finally { world.setDelays(null); }
+    expect(slow.events.find((event) => event.event === "cut")).toEqual({ event: "cut", data: { lists_in: 2 } });
+    expect(slow.late).toHaveLength(2);
+    const firstMerge = slow.merges[0];
+    if (firstMerge === undefined || firstMerge.source === "NONE") throw new Error("the first merge gave no menu");
+    expect(firstMerge.menu.menu.revision).toBe(1);
+    expect(slow.menu!.menu.revision).toBe(2);
+    expect(slow.menu!.menu.paths.slice(0, firstMerge.menu.menu.paths.length)).toEqual(firstMerge.menu.menu.paths);
+    const top = topPathsChoice(slow, 5)!;
+    expect(top.menu?.menu.revision).toBe(2);
+    await ask(jan, slowQuestion, { startLane: { startCheck: { ref: slow.check!.check_ref }, startPaths: top } });
+    const slowDone = await world.settle();
+    expect(slowDone.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
+    // Free with GLM's list late: one list in at the cut, and the first menu (an AI merge of that one list) already has a card and a suggestion.
+    const kai = await world.account("kai");
+    world.setScript(both(mergeWithCardAndSuggestions, webScript));
+    world.setDelays(listsLate((model) => model.startsWith("zai-org/")));
+    let one: StartStepDrive;
+    try { one = await driveStartStep(kai.client, readOf("Should Harbour Town plant trees along the ferry road?")); } finally { world.setDelays(null); world.setScript(webScript); }
+    expect(one.check?.seats).toBe(2);
+    expect(one.events.find((event) => event.event === "cut")).toEqual({ event: "cut", data: { lists_in: 1 } });
+    const freeFirst = one.merges[0];
+    if (freeFirst === undefined || freeFirst.source === "NONE") throw new Error("the Free first merge gave no menu");
+    expect(freeFirst.source).toBe("AI");
+    expect(freeFirst.menu.menu.cards.length).toBeGreaterThanOrEqual(1);
+    expect(freeFirst.menu.menu.suggestions.length).toBeGreaterThanOrEqual(1);
+    saw("17", `every list 500: ${JSON.stringify(noneReason?.data)}, end NONE, a lone check RUN_BUILT COMPLETED; two late: cut 2, late 2, revision 2 keeps revision 1's ${String(firstMerge.menu.menu.paths.length)} paths, Start COMPLETED; `
+      + `Free with GLM late: cut 1, first menu AI with ${String(freeFirst.menu.menu.cards.length)} card(s) and ${String(freeFirst.menu.menu.suggestions.length)} suggestion(s)`);
+  }, 300_000);
+
+  it("path 18: digs with paths: three picks on b2 (one the person's own view) argued as three paths; the parent's b2 rewritten, its title kept; a '+ N more' idea dug", async () => {
+    world.setScript(both(changing(), webScript));
+    const parent = await readPage(fia, shapedRun);
+    const b2 = parent.map.paths.find((path) => path.id === "b2")!;
+    const offered = pathSuggestionsOf(parent.answer, b2.id).slice(0, 2).map((suggestion) => suggestionPick(b2.id, suggestion));
+    const views = Array.from({ length: 3 - offered.length }, (_unused, at) => ownViewPick(b2.id, `My own view number ${String(at + 1)}: the terminal needs a winter timetable.`, at));
+    const digRun = await dig(fia, shapedRun, b2, [...offered, ...views], parent.answer.question_line);
+    const done = await world.settle();
+    expect(done.length).toBeGreaterThan(0);
+    expect(done.map((job) => job.result)).toEqual(done.map(() => expect.objectContaining({ kind: "COMPLETED" })));
+    const child = await readPage(fia, digRun);
+    const dugPaths = child.answer.branches!;
+    expect(dugPaths.source).toBe("DIG_PICKS");
+    expect(dugPaths.paths).toHaveLength(3);
+    expect(dugPaths.paths.map((path) => path.author)).toContain("PERSON_OWN_VIEW");
+    expect(child.answer.dig?.position_ref).toBe("b2");
+    const rewrite = child.answer.dig?.rewrite;
+    if (rewrite?.state !== "READY") throw new Error(`the dig's rewrite: ${String(rewrite?.state)}`);
+    const after = await readPage(fia, shapedRun);
+    expect(after.answer.path_rewrites?.paths.map((path) => path.position_ref)).toContain("b2");
+    const moved = after.map.paths.find((path) => path.id === "b2")!;
+    expect(moved.line).toBe(rewrite.text.line);
+    expect(moved.line).not.toBe(b2.line);
+    expect(moved.branch?.title).toBe(b2.branch?.title);
+    // A "+ N more" idea the person left out before Start, dug from the main question.
+    const more = digSuggestionsWithMore(after.answer, []).filter((pick) => pick.kind === "MORE");
+    expect(more.length).toBeGreaterThan(0);
+    const target: DigTarget = { kind: "picks", path: null, picks: [more[0]!] };
+    const moreParent = askParentOf(shapedRun, target, "quick");
+    expect(moreParent).not.toBeNull();
+    const moreDig = await ask(fia, digQuestion(target, after.answer.question_line, v4Catalog, "en"), { parent: moreParent! });
+    expect(moreDig.id).toEqual(expect.any(String));
+    const moreDone = await world.settle();
+    expect(moreDone.length).toBeGreaterThan(0);
+    expect(moreDone.map((job) => job.result)).toEqual(moreDone.map(() => expect.objectContaining({ kind: "COMPLETED" })));
+    saw("18", `a dig of b2 with ${String(offered.length)} suggestion(s) and ${String(views.length)} own view(s): DIG_PICKS ${dugPaths.paths.map((path) => `${path.path_id} ${path.author}`).join(", ")}; `
+      + `b2's line "${moved.line}", title kept "${String(moved.branch?.title)}"; a '+ N more' dig (${more[0]!.key}) admitted and COMPLETED`);
+  }, 300_000);
+
+  it("path 19: a Free debate started from its lists goes public with its paths' titles; a stranger digs path:b1; a refused check keeps a second one private", async () => {
+    world.setScript(webScript);
+    const jo = await world.account("jo");
+    const question = "Should Harbour Town paint the ferry blue?";
+    const drive = await driveStartStep(jo.client, readOf(question));
+    const started = await ask(jo, question, { settings: FREE, publicLane: { freePublicNotice: true },
+      startLane: { startCheck: { ref: drive.check!.check_ref }, startPaths: topPathsChoice(drive, 3)! } });
+    const done = await world.settle();
+    expect(done.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
+    const ref = await listedRef(question);
+    expect(ref).toBeDefined();
+    const page = await world.stranger.readPublicDebate(ref!);
+    const own = await readPage(jo, started.id);
+    expect(page.branches?.paths.map((path) => path.title)).toEqual(own.answer.branches!.paths.map((path) => path.title));
+    // A stranger's dig on the first path, as the public page sends it.
+    const kim = await world.account("kim");
+    const first = publicPathViews(page).find((view) => view.ref === "b1")!;
+    const built = publicDigAsk({ publicRef: ref!, question: page.question, path: first, views: ["A stranger's view: blue fades fast in the sea air."], catalog: v4Catalog, locale: "en" })!;
+    expect(built.parent.places).toContain("path:b1");
+    const dug = await ask(kim, built.questionLine, { settings: FREE, publicLane: { publicParent: built.parent } });
+    expect(dug.public_dig_not_joined).toBeUndefined();
+    await world.settle();
+    // A second debate whose check refuses: it stays its author's own.
+    const refusedQuestion = "Should Harbour Town paint the refused ferry red?";
+    const second = await driveStartStep(jo.client, readOf(refusedQuestion));
+    world.content.refuse = (snapshot) => snapshot.question === refusedQuestion;
+    try {
+      const kept = await ask(jo, refusedQuestion, { settings: FREE, publicLane: { freePublicNotice: true },
+        startLane: { startCheck: { ref: second.check!.check_ref }, startPaths: topPathsChoice(second, 3)! } });
+      await world.settle();
+      expect((await readPage(jo, kept.id)).answer.branches?.source).toBe("MENU");
+    } finally {
+      world.content.refuse = () => false;
+    }
+    expect(await listedRef(refusedQuestion)).toBeUndefined();
+    saw("19", `public under ${jo.pseudonym} with titles ${page.branches!.paths.map((path) => `"${path.title}"`).join(", ")}; a stranger's dig on path:b1 admitted; a refused check kept the second debate private`);
+  }, 300_000);
+
+  // V4 start step, Task 88: path 12 runs last. Its first funded question waits in the site's line for good (its later start is
+  // tests/integration/team-limit-admission.test.ts's), and the line makes every later question wait behind it.
   it("path 12: the team limit and an allowance: a funded question waits with no limit set, starts under the limit, and runs with the top plan's features", async () => {
     world.setScript(webScript);
     const fixture = internalFundingFixture(world.database.pool, world.fixtureSuperuserPool);

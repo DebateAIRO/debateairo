@@ -13,13 +13,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * words the person already typed are never replaced. Nothing starts by itself.
  */
 const reads = vi.hoisted(() => ({ runs: new Map<string, unknown>(), asked: [] as string[] }));
-const submitted = vi.hoisted(() => ({ calls: [] as unknown[][] }));
+const submitted = vi.hoisted(() => ({ calls: [] as unknown[][], levels: [] as unknown[] }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // The ask page learns the session beside the page (ask-d1 D, w1-step1's V4AskGate): a signed-in person here, whose
 // earlier debate the page may read.
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: "IN") => React.ReactNode }) => children("IN") }));
-vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null }));
+// V4 start step, Task 70b: no notice shows, so it never says one question already waits (sentence D).
+vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
+// Task 76b: "Just answer it" waits its 10-second Undo window before the send; here the window is 0 and the test lets its timer run.
+vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
+}));
 vi.mock("@/lib/api", () => ({
   contractClient: {
     readAnswerIndex: async () => ({ items: [], open_runs: [] }),
@@ -33,7 +38,11 @@ vi.mock("@/lib/api", () => ({
   }
 }));
 vi.mock("@/lib/v4/useV4Ask", () => ({
-  useV4Ask: () => ({ planTier: "premium", submit: async (...args: unknown[]) => { submitted.calls.push(args); return { kind: "STOPPED" }; }, ensureConsent: async () => true, flagsCrisis: () => false, room: null, submitting: false, dialogs: null })
+  // Task 75d: the level the page hands the ask hook is the level its asks are sent at.
+  useV4Ask: (options: { readingLevel?: unknown }) => {
+    submitted.levels.push(options.readingLevel);
+    return { planTier: "premium", submit: async (...args: unknown[]) => { submitted.calls.push([...args, options.readingLevel]); return { kind: "STOPPED" }; }, ensureConsent: async () => true, flagsCrisis: () => false, room: null, submitting: false, dialogs: null };
+  }
 }));
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
@@ -55,6 +64,7 @@ afterEach(async () => {
   reads.runs.clear();
   reads.asked = [];
   submitted.calls = [];
+  submitted.levels = [];
 });
 
 async function mountAsk(againRunId: string | null, initialQuestion = ""): Promise<HTMLTextAreaElement> {
@@ -69,9 +79,13 @@ async function mountAsk(againRunId: string | null, initialQuestion = ""): Promis
   return host.querySelector<HTMLTextAreaElement>("textarea")!;
 }
 
-function failed(questionLine: string) {
-  return { run_ref: RUN, question_line: questionLine, state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", hold_until: null };
+function failed(questionLine: string, readingLevel?: "plain" | "background" | "expert") {
+  return { run_ref: RUN, question_line: questionLine, state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", hold_until: null,
+    ...(readingLevel === undefined ? {} : { reading_level: readingLevel }) };
 }
+
+const levelsChecked = (): boolean[] => [...host!.querySelectorAll<HTMLInputElement>(".v4AskLevels input[type=radio]")].map((radio) => radio.checked);
+const justAnswer = (): HTMLButtonElement => [...host!.querySelectorAll("button")].find((button) => button.textContent?.trim() === CATALOG["v4.ask.justAnswer"])!;
 
 describe("'Ask this again' fills the ask step from the server (wait-f11)", () => {
   it("fills the box with the person's own words of that debate, and sends nothing", async () => {
@@ -109,5 +123,47 @@ describe("'Ask this again' fills the ask step from the server (wait-f11)", () =>
     reads.asked = [];
     expect((await mountAsk(null)).value).toBe("");
     expect(reads.asked).toEqual([]);
+  });
+});
+
+/*
+ * V4 start step, Task 75d (owner, 5 Nov): "Ask this again" carries the failed debate's own level. The address names only the
+ * debate; its level is read back from the server with its words (the run read's `reading_level`), never from the address. A
+ * debate asked without one starts on Plain words, as every new question does; a level the person chose meanwhile stays.
+ */
+describe("'Ask this again' keeps the failed debate's level (Task 75d)", () => {
+  it("a failed Expert debate: step 1 shows Expert chosen, and the ask is sent at Expert", async () => {
+    reads.runs.set(RUN, failed("Will AI tutors replace homework help?", "expert"));
+    window.history.replaceState(null, "", `/v4?again=${RUN}&level=plain`);
+    try {
+      await mountAsk(RUN);
+      expect(levelsChecked()).toEqual([false, false, true]);
+      await act(async () => justAnswer().click());
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      for (let round = 0; round < 3; round += 1) await act(async () => undefined);
+      expect(submitted.calls).toHaveLength(1);
+      expect(submitted.calls[0]!.at(-1)).toBe("expert");
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
+  it("a failed debate asked without a level starts on Plain words", async () => {
+    reads.runs.set(RUN, failed("Will AI tutors replace homework help?"));
+    await mountAsk(RUN);
+    expect(levelsChecked()).toEqual([true, false, false]);
+    expect(submitted.levels.at(-1)).toBe("plain");
+  });
+
+  it("a level the person chose before the debate came back stays theirs", async () => {
+    let answer: (run: unknown) => void = () => undefined;
+    reads.runs.set(RUN, new Promise((resolve) => { answer = resolve; }));
+    await mountAsk(RUN);
+    const background = host!.querySelectorAll<HTMLInputElement>(".v4AskLevels input[type=radio]")[1]!;
+    await act(async () => background.click());
+    await act(async () => answer(failed("Will AI tutors replace homework help?", "expert")));
+    await act(async () => undefined);
+    expect(levelsChecked()).toEqual([false, true, false]);
+    expect(submitted.levels.at(-1)).toBe("background");
   });
 });

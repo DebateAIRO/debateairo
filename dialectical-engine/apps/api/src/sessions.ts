@@ -121,9 +121,10 @@ export interface SessionApplication {
   ): Promise<"passed" | "refused" | "SESSION_NOT_FOUND">;
   /**
    * Sensitive-data consent (V, 2026-09-29): "required" until the account agrees, once, to
-   * the processing of sensitive information in its own questions. No debate starts before.
+   * the processing of sensitive information in its own questions. No debate starts before. V4 start step, Task 56: only the
+   * account is read, so the carry-on asks it for a person with no live sign-in, as POST /v1/asks asks it.
    */
-  readSensitiveDataConsent?(session: AuthenticatedSession): Promise<"required" | "given">;
+  readSensitiveDataConsent?(session: Pick<AuthenticatedSession, "userId">): Promise<"required" | "given">;
   /** Records that agreement; `SESSION_NOT_FOUND` means this session was not live. */
   recordSensitiveDataConsent?(
     session: AuthenticatedSession,
@@ -668,7 +669,7 @@ export class SessionService implements SessionApplication {
     });
   }
 
-  async readSensitiveDataConsent(session: AuthenticatedSession): Promise<"required" | "given"> {
+  async readSensitiveDataConsent(session: Pick<AuthenticatedSession, "userId">): Promise<"required" | "given"> {
     return await this.dependencies.repository.readSensitiveDataConsent(session.userId) ? "given" : "required";
   }
 

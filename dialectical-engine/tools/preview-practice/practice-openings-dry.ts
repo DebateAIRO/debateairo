@@ -12,10 +12,19 @@
  *  - choose names one answer, so the code fills a second (ANSWERS_FILLED);
  *  - each gap round adds one point, so the gap rounds stop after one (GAP_STOPPED).
  * The expected verdict is PASS_WITH_WARNINGS (exit 10): a busy model that answered before, a repaired slip and the
- * unbilled refusals.
+ * unbilled refusals. Arm S (V4 start step, Task 91) is answered too (`openingsDryStartContent`): the planner, every
+ * list and both merges, at once and with no slip, so arm S alone ends PASS (exit 0).
  */
 import { detectArgumentLanguage } from "@debateai/kernel";
-import { MAP_LIMITS, mapContractNameOf } from "@debateai/map";
+import {
+  MAP_CONTRACT_IDS,
+  MAP_LIMITS,
+  START_LIST_CONTRACT_ID,
+  START_MERGE_CONTRACT_ID,
+  START_MERGE_LATE_CONTRACT_ID,
+  mapContractNameOf,
+  mapEngineContractNameOf
+} from "@debateai/map";
 import {
   parsePreviewProviderTestConfig,
   previewTargetJsonRow,
@@ -161,6 +170,47 @@ function openingsDryPatch(paths: readonly string[], fields: readonly FramedMater
   return JSON.stringify(Object.fromEntries(paths.map((path) => [path, `${text.point} 1`])));
 }
 
+/** A path's question in a dry list, from the angle it looks from. */
+const OPENINGS_DRY_START_QUESTION: Readonly<Record<"ro" | "en", (label: string) => string>> = Object.freeze({
+  ro: (label: string) => `Ce schimbă acest punct în răspunsul la întrebare, privit din unghiul: ${label}?`,
+  en: (label: string) => `What does this change in the answer to the question, seen from the angle: ${label}?`
+});
+
+/**
+ * V4 start step (Task 91, arm S): the step before Start's replies, in the question's language, or null for any other
+ * contract (openingsDryContent answers those). The planner (map.angles.v2: engine 2's angles have engine 1's form) gets
+ * the four dry angles; a list gets one path per angle it was given, at least three, each titled with its angle's label
+ * and its place in the list; the merge makes each suggestion a path of its own, a title already listed being a repeat of
+ * the first; the late merge makes each new suggestion a path of its own.
+ */
+export function openingsDryStartContent(input: Readonly<{ contractId: string; fields: readonly FramedMaterialField[] }>): string | null {
+  if (mapEngineContractNameOf(input.contractId) === "angles") {
+    return openingsDryContent({ contractId: MAP_CONTRACT_IDS.angles, fields: input.fields, serial: 0, slip: false });
+  }
+  const text = openingsDryTextOf(input.fields);
+  if (input.contractId === START_LIST_CONTRACT_ID) {
+    const question = OPENINGS_DRY_START_QUESTION[text === OPENINGS_DRY_TEXT.ro ? "ro" : "en"];
+    const angles = JSON.parse(openingsDryField(input.fields, "angles")) as { angle_id: string; label: string }[];
+    return JSON.stringify({ paths: Array.from({ length: Math.max(3, angles.length) }, (_unused, at) => {
+      const angle = angles[at % angles.length]!;
+      return { angle_id: angle.angle_id, title: `${angle.label} ${String(at + 1)}`, question: question(angle.label), why: text.why };
+    }) });
+  }
+  if (input.contractId !== START_MERGE_CONTRACT_ID && input.contractId !== START_MERGE_LATE_CONTRACT_ID) return null;
+  const late = input.contractId === START_MERGE_LATE_CONTRACT_ID;
+  const given = JSON.parse(openingsDryField(input.fields, late ? "new_suggestions" : "suggestions")) as { id: string; title: string }[];
+  const firstOf = new Map<string, string>();
+  const repeats: { id: string; same_as: string }[] = [];
+  const paths: { ids: string[]; title: null; question: null }[] = [];
+  for (const one of given) {
+    const first = firstOf.get(one.title);
+    if (first !== undefined) { repeats.push({ id: one.id, same_as: first }); continue; }
+    firstOf.set(one.title, one.id);
+    paths.push({ ids: [one.id], title: null, question: null });
+  }
+  return JSON.stringify(late ? { repeats, paths, fits: [] } : { repeats, paths, cards: [], suggestions: [] });
+}
+
 /** What the dry script has done so far. */
 export type OpeningsDryScript = { busyModel: string | null; slipped: boolean; requests: number };
 
@@ -197,7 +247,8 @@ export function openingsDryPorts(): Readonly<{
       const slip = provider === "anthropic" && !script.slipped && mapContractNameOf(frame.contractId) === "listOpen" && !isPatch;
       if (slip) script.slipped = true;
       const content = isPatch ? openingsDryPatch(patchPaths.split(","), frame.fields)
-        : openingsDryContent({ contractId: frame.contractId, fields: frame.fields, serial: script.requests, slip });
+        : openingsDryStartContent({ contractId: frame.contractId, fields: frame.fields })
+          ?? openingsDryContent({ contractId: frame.contractId, fields: frame.fields, serial: script.requests, slip });
       return { status: 200, body: openingsDryVendorReply(provider, model, content, script.requests) };
     }
   });

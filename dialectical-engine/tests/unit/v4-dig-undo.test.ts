@@ -19,6 +19,7 @@ import {
   type DigUndoResult
 } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTarget, PendingDig, V4OpenQuestion, V4Path } from "../../apps/ui/lib/v4/types.js";
+import type { StartPaths } from "../../packages/contract/src/index.js";
 
 /*
  * V4 UX fixes (owner pick dig-d3, 3 Nov 2026): the digs waiting out their 10-second Undo belong to the whole V4 site, in
@@ -293,5 +294,31 @@ describe("nothing is sent before sendsAt; Undo means nothing is sent", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]![0]).toBe(dig);
     expect((send.mock.calls[0]![0] as unknown as { paths: unknown }).paths).toBe(paths);
+  });
+
+  // V4 start step, Task 79 (dig-f35, r2-22): a dig of picks on a path debate carries its path plan (`PendingDig.paths`) through the
+  // shared 10-second Undo, unchanged: it waits its 10 seconds, then goes with its paths; undone, nothing goes.
+  it("a dig with its paths waits its 10 seconds, then goes with them; undone, nothing goes", async () => {
+    const send = vi.fn<Sender>(async () => started("child-1"));
+    const paths: StartPaths = {
+      source: "DIG_PICKS", width: 1, chosen_by: "PERSON",
+      paths: [{ title: "T", question: "Q?", members: [{ pick_no: 1 }, { pick_no: 2 }], combine_ref: "r.s" }]
+    };
+    const dig: PendingDig = { target: target("a"), mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS, paths };
+    addDig({ parentRunId: "run-1", runIds: [], dig, sharePercent: 5, showMode: true, send, failedLine: "x" });
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - 1);
+    expect(send).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]![0].paths).toBe(paths);
+
+    const undone = addDig({
+      parentRunId: "run-1", runIds: [], dig: { ...dig, target: target("b"), sendsAt: Date.now() + DIG_UNDO_MS }, sharePercent: 5, showMode: true, send,
+      failedLine: "x"
+    });
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - 1);
+    expect(undoDig(undone)).toBe(true);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS * 3);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });

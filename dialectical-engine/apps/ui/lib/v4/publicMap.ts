@@ -16,8 +16,8 @@ import type { V4Map, V4OpenQuestion, V4Path, V4Point } from "./types.js";
  * Nothing here reads a score, a model or a count of the engine; the scores only rank which point is the strongest on
  * each side (publicSidesOf) and never leave this file.
  * A debate published without its tree has no points: its paths then carry no word and no bar. Server need (public-d1):
- * each path's trust word and bar on every public debate, which the start-step branch's per-path public trust word
- * (its Task 63) is to carry; once it does, this reads it in place of the tree.
+ * each path's trust word and bar on every public debate. A path debate's snapshot carries each path's own trust word
+ * (the start-step branch's Task 63, `branches`), read here in place of the tree; its bar still needs the tree.
  */
 
 /**
@@ -106,8 +106,10 @@ export function publicMapOf(debate: PublicDebate): PublicMap {
       unchecked,
       open: stillArguedUnder(points, id),
       positionRef: storyPath.position_ref,
-      // r2-20 A: a path's one word is its position's; a path that fell (also after a contribution) did not hold.
-      trust: fate === "FELL" ? "DIDNT_HOLD" : byId.get(storyPath.position_ref)?.trust ?? null
+      // r2-20 A: a path's one word is its position's, or on a path debate its path's own (Task 63, no published tree needed); a path that fell
+      // (also after a contribution) did not hold.
+      trust: fate === "FELL" ? "DIDNT_HOLD"
+        : debate.branches?.paths.find((branch) => branch.path_id === storyPath.position_ref)?.outcome?.trust ?? byId.get(storyPath.position_ref)?.trust ?? null
     };
   });
   const allPoints = [...byId.values()];

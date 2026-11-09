@@ -306,7 +306,13 @@ const AMENDS = [
     "staff.complete_public_flag_notice(uuid,uuid,boolean)", "staff.public_flag_notice_user(uuid,uuid)"] },
   // F5: the runner's mark of a settled dig tree and the estimate's question whether a dig is settled move.
   { step: "0153_dig_tree_settled.sql", field: "function_definition" as const, functions: [
-    "identity.dig_is_settled(uuid)", "identity.mark_dig_tree_settled(uuid)"] }
+    "identity.dig_is_settled(uuid)", "identity.mark_dig_tree_settled(uuid)"] },
+  // F5, at the second merge of the V4 line: the team's spent reader's grant is taken back from debateai_runtime, and 0158, 0165 and 0168, which restate it, digest its grants.
+  { step: "0158_pre_start_charge.sql", field: "function_definition" as const, functions: ["staff.read_team_internal_spent(timestamptz,timestamptz)"] },
+  // F2: 0163 restated the run's creation with the carry-on's commit, and digests it.
+  { step: "0163_carry_on_session_free_digs.sql", field: "function_definition" as const, functions: ["core.create_encrypted_run(jsonb,uuid,uuid,jsonb)"] },
+  { step: "0165_pre_start_release.sql", field: "function_definition" as const, functions: ["staff.read_team_internal_spent(timestamptz,timestamptz)"] },
+  { step: "0168_set_aside_continue.sql", field: "function_definition" as const, functions: ["staff.read_team_internal_spent(timestamptz,timestamptz)"] }
 ];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0171_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");

@@ -59,8 +59,9 @@ describe("a call refused by the stopped lane leaves as it arrived", () => {
     expect(source).toMatch(/bodyFailed = true;\s*bodyFailures\.push\(Object\.freeze\(\{ rank: stage\.rank, error \}\)\);\s*callLane\?\.stop\(\);/u);
     // Two stops: `runChain`'s, and (ruling R30, Task 12 fix round 1) the keep-alive hook's on the parallel path — each
     // right after marking the body failed. Debate shape (P2b Task 12): plus the map stage's own, when an abandon
-    // leaves the map before root 0 (no arguing has started, so there is no body to mark failed).
-    expect(source.match(/callLane\?\.stop\(\)/gu) ?? []).toHaveLength(3);
+    // leaves the map before root 0 (no arguing has started, so there is no body to mark failed). V4 start step, Task 53:
+    // plus a path debate's own start steps' (a run that builds its own list), as the map's, before root 0.
+    expect(source.match(/callLane\?\.stop\(\)/gu) ?? []).toHaveLength(4);
     expect(source).toMatch(/\} catch \(error\) \{\s*callLane\?\.stop\(\);\s*\/\/ Controller ruling T12-W/u);
     expect(source).toMatch(/if \(keepAliveStop\(error\)\) \{\s*bodyFailed = true;\s*callLane\?\.stop\(\);\s*keepAliveStopped\.resolve\(error\);/u);
     // Debate shape (plan Task 13): a root's turn also writes which answer it argued, after its node — never after a failure.
@@ -106,10 +107,12 @@ describe("a call the lane held back leaves as it arrived, and ends its chain wit
     expect(together).toBeGreaterThan(0);
     const installs = [...source.matchAll(/callLane\?\.guardStarts\(/gu)].map((match) => match.index!);
     // Debate shape (P2b Task 12): the map stage installs its own guard while the map runs and removes it after, before
-    // root 0 — so before the arguing's block; the arguing's two are inside it.
+    // root 0 — so before the arguing's block; the arguing's two are inside it. V4 start step, Task 53: a path debate's own
+    // start steps install and remove theirs the same way, also before root 0.
     const mapStage = source.indexOf("const runMap = async (): Promise<");
     expect(mapStage).toBeGreaterThan(0);
-    expect(installs.filter((at) => at > mapStage && at < together)).toHaveLength(2);
+    expect(installs.filter((at) => at > mapStage && at < together)).toHaveLength(4);
+    expect(source).toContain("callLane?.guardStarts(() => !startCaller.stopped());");
     const arguing = installs.filter((at) => at > together);
     expect(arguing).toHaveLength(2);
     for (const at of arguing) expect(at > together && at < serial).toBe(true);

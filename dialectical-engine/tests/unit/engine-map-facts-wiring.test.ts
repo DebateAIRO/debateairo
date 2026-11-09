@@ -35,7 +35,7 @@ describe("R3: the map's words, assumptions and bases in the run body", () => {
   });
 
   it("the judges read them, and so does the writer's verdict material built from the judges' source (R2b B5)", async () => {
-    const body = between(await readFile(RUNNER, "utf8"), "const comparingJudges = engineTwo === null ? null : await (async () => {",
+    const body = between(await readFile(RUNNER, "utf8"), "const comparingJudges = engineTwo === null || pathsRunPaths !== null ? null : await (async () => {",
       "const makerPositionServe = decideMakerPositionServe({");
     expect(body).toContain("const source = engineSourceWithMap(engineMaterialSourceOf(graph,");
     expect(body).toContain("engineMaterialInvestigationsOf(engineInvestigation?.rows ?? [])), engineMapFactsNow());");

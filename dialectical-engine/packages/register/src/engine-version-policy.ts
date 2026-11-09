@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { TypedDomainError } from "@debateai/kernel";
+import { START_STEP_LIMITS, TypedDomainError } from "@debateai/kernel";
+import type { DebateShapePlanKey } from "./debate-shape-policy.js";
 import { canonicalDecimal, canonicalRegisterJson, type CanonicalJsonAst, type CanonicalRegisterJson } from "./register-publication.js";
 
 /**
@@ -224,7 +225,10 @@ export function engineVersionPolicyStartValues(): EngineVersionPolicy {
 export type EngineSites = Readonly<{
   /** min(judges.count, makers): the comparing judges are capped by the makers present. */
   comparingJudges: number;
-  /** investigate.maxPerDebate: the cap, so a ceiling never under-counts. */
+  /**
+   * investigate.maxPerDebate: the cap, so a ceiling never under-counts; on a paid path debate (V4 start step, Task 54e)
+   * `pathRunInvestigations(cap, paths)`, set by the ceiling (`withPathDebateInvestigations`).
+   */
   investigations: number;
   /** 1 when the map opens the debate (spec §5: the new shape only), else 0. */
   answerCheck: 0 | 1;
@@ -276,10 +280,44 @@ export function engineSettingsOf(policy: EngineVersionPolicy, input: Readonly<{ 
 }
 
 /**
+ * V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path": every path gets one look-up, 3 paths = 3; every path is
+ * checked, the debate costs a little more): a paid path debate's investigations, so every path holds at least one slot:
+ * max(cap, paths). A cap of 0 (no investigation on that engine) stays 0.
+ */
+export function pathRunInvestigations(cap: number, paths: number): number {
+  if (!Number.isSafeInteger(cap) || cap < 0 || !Number.isSafeInteger(paths) || paths < 0) throw new TypeError("PATH_RUN_INVESTIGATIONS_INVALID");
+  return cap === 0 ? 0 : Math.max(cap, paths);
+}
+
+/**
+ * Task 54e: the investigation sites a debate's receipt counts: the row's cap, and on a paid path debate (shape receipt v2, any
+ * plan but Free; `pathDebate` its plan and chosen paths) `pathRunInvestigations(cap, paths)`. Free keeps the cap. The ceiling
+ * mints by it (`withPathDebateInvestigations`) and the strict receipt parser checks by it.
+ */
+export function investigationSitesOf(cap: number, pathDebate: Readonly<{ plan: DebateShapePlanKey; paths: number }> | null): number {
+  return pathDebate === null || pathDebate.plan === "free" ? cap : pathRunInvestigations(cap, pathDebate.paths);
+}
+
+/**
+ * Task 54e: this debate's engine with its investigation sites as `investigationSitesOf` counts them; the very settings when
+ * they do not change (every debate without paths, Free, a paid path debate of no more paths than the cap), so those
+ * receipts keep their bytes.
+ */
+export function withPathDebateInvestigations(
+  settings: EngineSettings,
+  pathDebate: Readonly<{ plan: DebateShapePlanKey; paths: number }> | null
+): EngineSettings {
+  const investigations = investigationSitesOf(settings.investigate.maxPerDebate, pathDebate);
+  if (investigations === settings.sites.investigations) return settings;
+  return deepFreeze({ ...settings, sites: { ...settings.sites, investigations } });
+}
+
+/**
  * The receipt member `envelope_basis.engine` (INTERFACE §3.1): the settings in snake_case, version 1, strict at every
  * level, with the row's own rules re-checked and the sites tied to the values (the comparing judges never above the
- * row's judges, the investigations exactly the row's cap). `added_model_attempts` is tied to the receipt's per-site
- * attempts by the strict receipt parser (`parseCostEnvelopeBasis`), which can see them.
+ * row's judges, the investigations the row's cap, or on a paid path debate one per path above it: Task 54e). `added_model_attempts`
+ * and a path debate's investigations are tied to the receipt's per-site attempts and paths by the strict receipt parser
+ * (`parseCostEnvelopeBasis`), which can see them.
  */
 export const engineReceiptSchema = z.object({
   version: z.literal(1),
@@ -303,7 +341,8 @@ export const engineReceiptSchema = z.object({
   answer_check: z.object({ candidates: whole(0, LIMITS.answerCheckMax) }).strict(),
   sites: z.object({
     comparing_judges: whole(1, LIMITS.judgesMax),
-    investigations: whole(0, LIMITS.investigationsMax),
+    // Task 54e: a paid path debate's investigations run to one per stored path (b8) when that is above the row's cap.
+    investigations: whole(0, Math.max(LIMITS.investigationsMax, START_STEP_LIMITS.storedPathsMax)),
     answer_check: z.union([z.literal(0), z.literal(1)]),
     added_model_attempts: z.number().int().min(0)
   }).strict()
@@ -316,7 +355,11 @@ export const engineReceiptSchema = z.object({
   if (receipt.sites.comparing_judges > receipt.judges.count) {
     ctx.addIssue({ code: "custom", path: ["sites", "comparing_judges"], message: "more comparing judges than the row allows" });
   }
-  if (receipt.sites.investigations !== receipt.investigate.max_per_debate) {
+  // Task 54e: the row's cap, or above a cap that is not 0 (a paid path debate's one per path; the strict receipt parser ties the
+  // number to the receipt's paths, which it can see).
+  const { investigations } = receipt.sites;
+  const cap = receipt.investigate.max_per_debate;
+  if (investigations !== cap && (cap === 0 || investigations < cap)) {
     ctx.addIssue({ code: "custom", path: ["sites", "investigations"], message: "the investigation sites are not the row's cap" });
   }
 });

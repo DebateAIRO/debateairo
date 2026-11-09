@@ -78,11 +78,23 @@ const REGION_WIDEN_MIGRATION = "0154_region_iceland_liechtenstein.sql";
 const OWNER_ANSWER_WRITES_MIGRATION = "0155_owner_answer_writes.sql";
 const MODERATION_NOTICE_MIGRATION = "0156_moderation_notice.sql";
 const MODERATION_STATEMENTS_MIGRATION = "0157_moderation_statements.sql";
-/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234), chained after the moderation statements; migrate() applies it last. */
+const PRE_START_CHARGE_MIGRATION = "0158_pre_start_charge.sql";
+const START_PATHS_MIGRATION = "0159_start_paths.sql";
+const PATH_RESULTS_MIGRATION = "0160_path_results.sql";
+const PATH_PROGRESS_MIGRATION = "0161_path_progress.sql";
+const SAVED_QUESTIONS_MIGRATION = "0162_saved_questions.sql";
+const CARRY_ON_DIGS_MIGRATION = "0163_carry_on_session_free_digs.sql";
+const PATH_ADDED_MIGRATION = "0164_main_answer_path_added.sql";
+const PRE_START_RELEASE_MIGRATION = "0165_pre_start_release.sql";
+const MAIN_ANSWER_TIMES_MIGRATION = "0166_main_answer_times.sql";
+const PUBLIC_REPORT_OWN_CARRIER_MIGRATION = "0167_public_report_own_carrier.sql";
+const SET_ASIDE_CONTINUE_MIGRATION = "0168_set_aside_continue.sql";
+const PIECE_SETTINGS_VERSION_MIGRATION = "0169_piece_settings_version.sql";
+/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234), chained after 0169 (the runner reading which settings are switched on); migrate() applies it last. */
 const OUTBOUND_MAIL_MIGRATION = "0170_outbound_mail_limit.sql";
 const SECURITY_REVIEW_MIGRATION = "0171_security_review_hardening.sql";
 const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAIL_LOCALE_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION, REPLY_MEASURES_MIGRATION, ENGINE_VERDICT_MIGRATION, ENGINE_MAP_CHECK_MIGRATION, SIDE_BY_SIDE_MIGRATION, SETTINGS_ACTIVATION_MIGRATION, ITALY_APPROVAL_MIGRATION, SYNTHESIS_CHECK_MIGRATION, PUBLICATION_REVIEW_MIGRATION, THREAT_REPORT_MIGRATION, SUPPORT_ANSWER_SCOPE_MIGRATION, RLS_MIGRATION, V4_ACCOUNT_MEMORY_MIGRATION, WEB_EVIDENCE_MIGRATION, INVESTIGATIONS_MIGRATION, DIG_MODEL_MIGRATION, DIG_PICKS_MIGRATION, INVESTIGATION_REPORTS_MIGRATION, PUBLIC_DEBATES_MIGRATION, TREE_UPDATES_MIGRATION, PASSAGE_RETENTION_MIGRATION,
-  SPEND_KINDS_MIGRATION, PATH_SUGGESTIONS_MIGRATION, TEAM_LIMIT_MIGRATION, RUN_HANDOVER_MIGRATION, ASK_CLARIFY_CHARGE_MIGRATION, WEB_RESEARCHED_UNSETTLED_MIGRATION, TEAM_ALLOWANCES_MIGRATION, PUBLIC_TREE_MIGRATION, ERASURE_KEEPS_PUBLIC_MIGRATION, PUBLIC_REPORT_TEAM_MONTH_MIGRATION, PUBLIC_REVIEW_MIGRATION, PUBLIC_FLAG_MIGRATION, REPORT_EXPORT_MIGRATION, DIG_TREE_SETTLED_MIGRATION, REGION_WIDEN_MIGRATION, OWNER_ANSWER_WRITES_MIGRATION, MODERATION_NOTICE_MIGRATION, MODERATION_STATEMENTS_MIGRATION, OUTBOUND_MAIL_MIGRATION, SECURITY_REVIEW_MIGRATION] as const;
+  SPEND_KINDS_MIGRATION, PATH_SUGGESTIONS_MIGRATION, TEAM_LIMIT_MIGRATION, RUN_HANDOVER_MIGRATION, ASK_CLARIFY_CHARGE_MIGRATION, WEB_RESEARCHED_UNSETTLED_MIGRATION, TEAM_ALLOWANCES_MIGRATION, PUBLIC_TREE_MIGRATION, ERASURE_KEEPS_PUBLIC_MIGRATION, PUBLIC_REPORT_TEAM_MONTH_MIGRATION, PUBLIC_REVIEW_MIGRATION, PUBLIC_FLAG_MIGRATION, REPORT_EXPORT_MIGRATION, DIG_TREE_SETTLED_MIGRATION, REGION_WIDEN_MIGRATION, OWNER_ANSWER_WRITES_MIGRATION, MODERATION_NOTICE_MIGRATION, MODERATION_STATEMENTS_MIGRATION, PRE_START_CHARGE_MIGRATION, START_PATHS_MIGRATION, PATH_RESULTS_MIGRATION, PATH_PROGRESS_MIGRATION, SAVED_QUESTIONS_MIGRATION, CARRY_ON_DIGS_MIGRATION, PATH_ADDED_MIGRATION, PRE_START_RELEASE_MIGRATION, MAIN_ANSWER_TIMES_MIGRATION, PUBLIC_REPORT_OWN_CARRIER_MIGRATION, SET_ASIDE_CONTINUE_MIGRATION, PIECE_SETTINGS_VERSION_MIGRATION, OUTBOUND_MAIL_MIGRATION, SECURITY_REVIEW_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";
 /**
@@ -569,7 +581,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(after.ledger.filter((row) => !(CHAIN as readonly string[]).includes(row.name))).toEqual(before.ledger);
     expect(after.forward108).toEqual(before.forward108);
     expect(after.forward110).toEqual(before.forward110);
-    expect(after.steps).toHaveLength(49);
+    expect(after.steps).toHaveLength(61);
     expect(after.steps[0]).toMatchObject({
       source_name: NETOPIA_MIGRATION, base_recipe_sha256: plan.recipeSha256,
       previous_manifest_sha256: plan.forward110.manifestSha256, forward_manifest_sha256: step!.manifestSha256,
@@ -773,11 +785,11 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
         { name: WEB_EVIDENCE_MIGRATION, n: 1 }, { name: INVESTIGATIONS_MIGRATION, n: 1 }, { name: DIG_MODEL_MIGRATION, n: 1 }, { name: DIG_PICKS_MIGRATION, n: 1 },
         { name: INVESTIGATION_REPORTS_MIGRATION, n: 1 },
         { name: PUBLIC_DEBATES_MIGRATION, n: 1 }, { name: TREE_UPDATES_MIGRATION, n: 1 }, { name: PASSAGE_RETENTION_MIGRATION, n: 1 },
-        { name: SPEND_KINDS_MIGRATION, n: 1 }, { name: PATH_SUGGESTIONS_MIGRATION, n: 1 }, { name: TEAM_LIMIT_MIGRATION, n: 1 }, { name: RUN_HANDOVER_MIGRATION, n: 1 }, { name: ASK_CLARIFY_CHARGE_MIGRATION, n: 1 }, { name: WEB_RESEARCHED_UNSETTLED_MIGRATION, n: 1 }, { name: TEAM_ALLOWANCES_MIGRATION, n: 1 }, { name: PUBLIC_TREE_MIGRATION, n: 1 }, { name: ERASURE_KEEPS_PUBLIC_MIGRATION, n: 1 }, { name: PUBLIC_REPORT_TEAM_MONTH_MIGRATION, n: 1 }, { name: PUBLIC_REVIEW_MIGRATION, n: 1 }, { name: PUBLIC_FLAG_MIGRATION, n: 1 }, { name: REPORT_EXPORT_MIGRATION, n: 1 }, { name: DIG_TREE_SETTLED_MIGRATION, n: 1 }, { name: REGION_WIDEN_MIGRATION, n: 1 }, { name: OWNER_ANSWER_WRITES_MIGRATION, n: 1 }, { name: MODERATION_NOTICE_MIGRATION, n: 1 }, { name: MODERATION_STATEMENTS_MIGRATION, n: 1 }, { name: OUTBOUND_MAIL_MIGRATION, n: 1 }, { name: SECURITY_REVIEW_MIGRATION, n: 1 }]);
+        { name: SPEND_KINDS_MIGRATION, n: 1 }, { name: PATH_SUGGESTIONS_MIGRATION, n: 1 }, { name: TEAM_LIMIT_MIGRATION, n: 1 }, { name: RUN_HANDOVER_MIGRATION, n: 1 }, { name: ASK_CLARIFY_CHARGE_MIGRATION, n: 1 }, { name: WEB_RESEARCHED_UNSETTLED_MIGRATION, n: 1 }, { name: TEAM_ALLOWANCES_MIGRATION, n: 1 }, { name: PUBLIC_TREE_MIGRATION, n: 1 }, { name: ERASURE_KEEPS_PUBLIC_MIGRATION, n: 1 }, { name: PUBLIC_REPORT_TEAM_MONTH_MIGRATION, n: 1 }, { name: PUBLIC_REVIEW_MIGRATION, n: 1 }, { name: PUBLIC_FLAG_MIGRATION, n: 1 }, { name: REPORT_EXPORT_MIGRATION, n: 1 }, { name: DIG_TREE_SETTLED_MIGRATION, n: 1 }, { name: REGION_WIDEN_MIGRATION, n: 1 }, { name: OWNER_ANSWER_WRITES_MIGRATION, n: 1 }, { name: MODERATION_NOTICE_MIGRATION, n: 1 }, { name: MODERATION_STATEMENTS_MIGRATION, n: 1 }, { name: PRE_START_CHARGE_MIGRATION, n: 1 }, { name: START_PATHS_MIGRATION, n: 1 }, { name: PATH_RESULTS_MIGRATION, n: 1 }, { name: PATH_PROGRESS_MIGRATION, n: 1 }, { name: SAVED_QUESTIONS_MIGRATION, n: 1 }, { name: CARRY_ON_DIGS_MIGRATION, n: 1 }, { name: PATH_ADDED_MIGRATION, n: 1 }, { name: PRE_START_RELEASE_MIGRATION, n: 1 }, { name: MAIN_ANSWER_TIMES_MIGRATION, n: 1 }, { name: PUBLIC_REPORT_OWN_CARRIER_MIGRATION, n: 1 }, { name: SET_ASIDE_CONTINUE_MIGRATION, n: 1 }, { name: PIECE_SETTINGS_VERSION_MIGRATION, n: 1 }, { name: OUTBOUND_MAIL_MIGRATION, n: 1 }, { name: SECURITY_REVIEW_MIGRATION, n: 1 }]);
       const receipt110 = (await older.pool.query("SELECT source_name, chain_manifest_sha256 FROM public.debateai_schema_migration_forward110")).rows;
       expect(receipt110).toEqual([{ source_name: DEV_110, chain_manifest_sha256: plan.forward108.manifestSha256 }]);
       const receipts = await receiptOf(older.pool);
-      expect(receipts).toHaveLength(49);
+      expect(receipts).toHaveLength(61);
       expect(receipts[0]).toMatchObject({ source_name: NETOPIA_MIGRATION, previous_manifest_sha256: plan.forward110.manifestSha256 });
       expect(receipts[1]).toMatchObject({ source_name: AUTH_DB_BATCH, previous_manifest_sha256: plan.forwardChain[0]!.manifestSha256 });
       expect(receipts[2]).toMatchObject({ source_name: PART_C_MIGRATION, previous_manifest_sha256: plan.forwardChain[1]!.manifestSha256 });
@@ -825,8 +837,20 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       expect(receipts[44]).toMatchObject({ source_name: OWNER_ANSWER_WRITES_MIGRATION, previous_manifest_sha256: plan.forwardChain[43]!.manifestSha256 });
       expect(receipts[45]).toMatchObject({ source_name: MODERATION_NOTICE_MIGRATION, previous_manifest_sha256: plan.forwardChain[44]!.manifestSha256 });
       expect(receipts[46]).toMatchObject({ source_name: MODERATION_STATEMENTS_MIGRATION, previous_manifest_sha256: plan.forwardChain[45]!.manifestSha256 });
-      expect(receipts[47]).toMatchObject({ source_name: OUTBOUND_MAIL_MIGRATION, previous_manifest_sha256: plan.forwardChain[46]!.manifestSha256 });
-      expect(receipts[48]).toMatchObject({ source_name: SECURITY_REVIEW_MIGRATION, previous_manifest_sha256: plan.forwardChain[47]!.manifestSha256 });
+      expect(receipts[47]).toMatchObject({ source_name: PRE_START_CHARGE_MIGRATION, previous_manifest_sha256: plan.forwardChain[46]!.manifestSha256 });
+      expect(receipts[48]).toMatchObject({ source_name: START_PATHS_MIGRATION, previous_manifest_sha256: plan.forwardChain[47]!.manifestSha256 });
+      expect(receipts[49]).toMatchObject({ source_name: PATH_RESULTS_MIGRATION, previous_manifest_sha256: plan.forwardChain[48]!.manifestSha256 });
+      expect(receipts[50]).toMatchObject({ source_name: PATH_PROGRESS_MIGRATION, previous_manifest_sha256: plan.forwardChain[49]!.manifestSha256 });
+      expect(receipts[51]).toMatchObject({ source_name: SAVED_QUESTIONS_MIGRATION, previous_manifest_sha256: plan.forwardChain[50]!.manifestSha256 });
+      expect(receipts[52]).toMatchObject({ source_name: CARRY_ON_DIGS_MIGRATION, previous_manifest_sha256: plan.forwardChain[51]!.manifestSha256 });
+      expect(receipts[53]).toMatchObject({ source_name: PATH_ADDED_MIGRATION, previous_manifest_sha256: plan.forwardChain[52]!.manifestSha256 });
+      expect(receipts[54]).toMatchObject({ source_name: PRE_START_RELEASE_MIGRATION, previous_manifest_sha256: plan.forwardChain[53]!.manifestSha256 });
+      expect(receipts[55]).toMatchObject({ source_name: MAIN_ANSWER_TIMES_MIGRATION, previous_manifest_sha256: plan.forwardChain[54]!.manifestSha256 });
+      expect(receipts[56]).toMatchObject({ source_name: PUBLIC_REPORT_OWN_CARRIER_MIGRATION, previous_manifest_sha256: plan.forwardChain[55]!.manifestSha256 });
+      expect(receipts[57]).toMatchObject({ source_name: SET_ASIDE_CONTINUE_MIGRATION, previous_manifest_sha256: plan.forwardChain[56]!.manifestSha256 });
+      expect(receipts[58]).toMatchObject({ source_name: PIECE_SETTINGS_VERSION_MIGRATION, previous_manifest_sha256: plan.forwardChain[57]!.manifestSha256 });
+      expect(receipts[59]).toMatchObject({ source_name: OUTBOUND_MAIL_MIGRATION, previous_manifest_sha256: plan.forwardChain[58]!.manifestSha256 });
+      expect(receipts[60]).toMatchObject({ source_name: SECURITY_REVIEW_MIGRATION, previous_manifest_sha256: plan.forwardChain[59]!.manifestSha256 });
       const before = (await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(older.pool);
       expect((await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);

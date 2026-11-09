@@ -32,6 +32,14 @@ export type PathRewriteSweepSettings = Readonly<{
   giveUpMs?: number;
   /** At most this many digs per pass (default 20). */
   limit?: number;
+  /**
+   * V4 start step, Task 57l: before a dig's calls, the dig is mapped to the settings version it owns now (run-settings.ts `runVersionMapper`):
+   * this process may never have claimed it (a restart). Task 57o: today's version if its own is refused (57o-fix: the owners' switched-on
+   * version; if refused too, the release's own). A dig whose version could not be
+   * mapped (a database failure) is skipped and logged, nothing sent, and asked again on a later pass. Absent: as before. Task 57p: a dig
+   * given up (its FAILED row, no call) is mapped too, so its row notes a version (0169); a failure there is logged and the row written all the same.
+   */
+  mapRun?: (runId: string) => Promise<void>;
   now?: () => Date;
 }>;
 
@@ -84,6 +92,21 @@ export async function sweepPathRewrites(settings: PathRewriteSweepSettings): Pro
         failureCode = "PATH_REWRITE_INPUT_UNREAD";
       }
       if (failureCode !== null && !givenUp) { skipped += 1; continue; }
+      // Task 57l: calls follow only from readable material; the dig's own version first (Task 57o: today's if its own is refused), or a
+      // database failure leaves it for a later pass.
+      // Task 57p: a dig given up (no call follows) is mapped too, so its FAILED row notes the settings version it would have run under
+      // (0169); if that fails, the row is still written (nothing waits behind it), noting none.
+      if (settings.mapRun !== undefined) {
+        try {
+          await settings.mapRun(open.runId);
+        } catch (error) {
+          log("PATH_REWRITE_SWEEP_UNMAPPED", { runId: open.runId, code: codeOf(error) });
+          if (failureCode === null) {
+            skipped += 1;
+            continue;
+          }
+        }
+      }
       log("PATH_REWRITE_SWEEP_RESUMED", { runId: open.runId, rewriteId: pathRewriteIdOf(open.runId), pathSeq: open.pathSeq,
         failureCode });
       await rewriteThePath(rewrite, Object.freeze({

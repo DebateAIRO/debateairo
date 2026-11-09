@@ -39,6 +39,15 @@ function reportLinks(): HTMLAnchorElement[] {
   return [...page().querySelectorAll<HTMLAnchorElement>("a")].filter((link) => link.textContent?.trim() === CATALOG["v4.rail.writeReport"]);
 }
 
+/**
+ * Every "Write my report" a person sees, link or button. The owner's answer 18 A (5 Nov): below 768 px the top bar's steps
+ * aside (.v4DebReportAtBottom, v4-debate.css) while the bottom bar shows its own.
+ */
+function shownWriteReport(): Element[] {
+  return [...page().querySelectorAll("a, button")]
+    .filter((element) => element.textContent?.trim() === CATALOG["v4.rail.writeReport"] && !element.classList.contains("v4DebReportAtBottom"));
+}
+
 function paused(runId: string, canContinue: boolean): RunProjection {
   return {
     run_ref: runId, question_line: "Should countries build new nuclear power?", state: "RUNNING", terminal_reason: null,
@@ -248,13 +257,13 @@ describe("a debate paused at the month wall", () => {
     expect(text()).toBe(before);
     expect(document.getElementById(early.getAttribute("aria-describedby")!)!.classList.contains("v4Highlight")).toBe(true);
     expect(document.activeElement).toBe(early);
-    // ask-f6: the classic view once, on this card, while the page hands it here (the owner's 5 Nov answer 12 B moves it to
-    // the account menu with the page's own wiring, the start-step's V4DebateClient).
-    const card = page().querySelector(".v4DebPausedCard");
+    // ask-f6 with the owner's 5 Nov answer 12 B: the classic view is in the header's account menu only (the page's own wiring,
+    // Task 76j), so this card draws none. Merge with the start step (6 Nov): its page shows the pause in the first card of the
+    // map's step (V4RunRoot in .v4DebFirstCard), not in V4PausedScreen's card.
+    const card = page().querySelector(".v4DebFirstCard");
     expect(card).not.toBeNull();
     const classic = [...page().querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
-    expect(classic).toHaveLength(1);
-    expect(card!.contains(classic[0]!)).toBe(true);
+    expect(classic).toEqual([]);
   });
 
   it("on a phone too, the pause is said once (wait-f5)", async () => {
@@ -262,7 +271,7 @@ describe("a debate paused at the month wall", () => {
     harness.run = paused(runId, false);
     await mountMap(375, runId);
     const sentence = word("v4.money.paused", { date: formatDate("en", NEXT_MONTH, { day: "numeric", month: "long" }) });
-    expect(page().querySelector(".v4DebPausedCard")).not.toBeNull();
+    expect(page().querySelector(".v4DebFirstCard")).not.toBeNull();
     expect(text().split(sentence).length - 1).toBe(1);
   });
 
@@ -348,6 +357,8 @@ describe("\"Write my report\" is always there", () => {
       const links = reportLinks();
       expect(links.length).toBeGreaterThan(0);
       expect(links[0]!.getAttribute("href")).toMatch(new RegExp(`^/v4/debate/${runId}/report`, "u"));
+      // The owner's answer 18 A (5 Nov): one on a phone's screen, never the top bar's and the bottom bar's together.
+      if (width === 375) expect(shownWriteReport()).toHaveLength(1);
     });
   }
 

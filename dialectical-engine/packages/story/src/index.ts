@@ -51,6 +51,14 @@ export {
   classifyStoryContent,
   parseCheckerVerdict,
   parseStoryBody,
+  // V4 start step, Task 51: story v5's check and its paths check.
+  STORY_PATHS_CHECK_CRITERIA,
+  STORY_PATHS_ISSUES,
+  StoryPathsCheckVerdictSchema,
+  classifyStoryPathsCheckContent,
+  parseStoryPathsCheckVerdict,
+  storyPathsIssues,
+  type StoryPathsCheckVerdict,
   type StoryCheckerVerdict,
   type StoryLanguageCheck,
   type StoryMaterialIndex
@@ -170,3 +178,7 @@ export * from "./public.js";
 export * from "./path-rewrite.js";
 // W5-1: the final report over an investigation.
 export * from "./investigation-report.js";
+// V4 start step, Task 51: story v5, one entry per path (drafts, sealed at Task 92).
+export * from "./path-final.js";
+// V4 start step, Task 49: each path's answer so far, its writer and checker (drafts, sealed at Task 92).
+export * from "./path-outcome.js";

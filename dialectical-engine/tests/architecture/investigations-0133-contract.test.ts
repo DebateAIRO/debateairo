@@ -56,7 +56,7 @@ const body = (sql: string, name: string): string => {
 
 describe("0133: the investigations step", () => {
   it("C-T follows 0132 in the chain's STEPS (the dig model's 0134 comes after it), with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0170,loadForward0171]);");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171]);");
     const loader = read("packages/db/src/migration-forward0133.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "investigations-forward0133-v1";');

@@ -15,7 +15,7 @@ import {
 import { engineContractHash } from "./engine-contracts.js";
 import { fitRewriteToTokenLine } from "./token-line.js";
 import {
-  pathRewriteDigPathsOf, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
+  pathRewriteDigPathsOf, pathRewriteDigPathsOfDig, pathRewriteDigPathsOfRoots, pathRewriteGuard, type PathRewriteDigPath, type PathRewriteExtract,
   type PathRewriteParentPath, type PathRewritePick, type PathRewriteQuestion
 } from "./path-rewrite-material.js";
 import { holdRunPassages, releaseRunPassages } from "./passage-record.js";
@@ -85,6 +85,11 @@ export type PathRewriteSources = Readonly<{
     => Promise<ReadonlyMap<string, Pick<StoryNodeEnrichment, "reviewOutcome">>>;
   /** The checked extracts the dig's own points cite, by point id; absent: none. */
   digExtractsOf?: (runId: string, pointIds: readonly string[]) => Promise<ReadonlyMap<string, readonly PathRewriteExtract[]>>;
+  /**
+   * V4 start step, Task 55: the dig's roots in force when it is itself a path debate (0160's `readPathRoots`, by root index), each by
+   * its path id b<n>; none (empty, or absent): an R22 dig, whose own paths are its positions in the judges' order.
+   */
+  pathRootsOf?: (runId: string) => Promise<readonly Readonly<{ ref: string; rootNodeId: string }>[]>;
   /** W3-7 (0135): stores the dig's own paths and its work item before it takes its turn; absent: nothing stored. */
   recordInput?: (runId: string, workItemId: string, digPaths: readonly PathRewriteDigPath[]) => Promise<string>;
   /** W3-7: what `recordInput` stored, for the sweep; null when nothing was. */
@@ -189,10 +194,21 @@ export type PathRewriteRunnerSettings = Readonly<{
   /** Decision 13: true when the settled run is a contribution to a public debate, and that pipeline ran for it. Absent: none. */
   publicDig?: (input: StoryWriteInput, lease: StepLease) => Promise<boolean>;
   isPublicDig?: (runId: string) => Promise<boolean>;
+  /**
+   * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): the settings version a run's calls are charged
+   * under now, read from the runner's one run → version map (`runSettingsVersions.versionOf`, main.ts); each row written notes it for
+   * the DIG, whose run its calls were charged to. Absent, or no version held for that run (local mode, tests): the row notes none (NULL).
+   */
+  settingsVersionOf?: (runId: string) => number | undefined;
   /** R22 decision 2: the path's whole line (absent: 0134's rows alone, a runner without the tree's settings). */
   line?: PathRewriteLine;
   /** R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. */
   afterStored?: (digRunId: string, lease: StepLease) => Promise<unknown>;
+  /**
+   * V4 start step, Task 55e (spec §4.4): once a run that got its story is settled (index.ts), a dig under the main question of a path
+   * debate updates the main answer (path-climb.ts `advanceAfterStory`); a first debate and an R22 dig do nothing. Never rejects.
+   */
+  afterStory?: (runId: string, lease: StepLease) => Promise<unknown>;
   /**
    * Asked once the dig's row is stored and the dig is above level 10 (DIG_LEVEL_MAX): a dig there cannot be dug further.
    */
@@ -302,10 +318,12 @@ export async function digPathsOf(settings: PathRewriteRunnerSettings, input: Sto
   const digRunId = input.runId;
   const enrichment = await lease(() => settings.sources.readEnrichment({ runId: digRunId,
     nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
-  const pathsWithoutSources = pathRewriteDigPathsOf(input, enrichment);
+  // V4 start step, Task 55: a dig that is a path debate hands the rewrite its own paths b<n>, each from its root in force.
+  const roots = settings.sources.pathRootsOf === undefined ? [] : await lease(() => settings.sources.pathRootsOf!(digRunId));
+  const pathsWithoutSources = pathRewriteDigPathsOfDig(input, enrichment, new Map(), roots);
   const extracts = settings.sources.digExtractsOf === undefined ? new Map<string, readonly PathRewriteExtract[]>()
     : await lease(() => settings.sources.digExtractsOf!(digRunId, pathsWithoutSources.flatMap((path) => path.points.map((point) => point.id))));
-  return pathRewriteDigPathsOf(input, enrichment, extracts);
+  return pathRewriteDigPathsOfDig(input, enrichment, extracts, roots);
 }
 
 function safeLog(settings: PathRewriteRunnerSettings): (event: string, detail: Record<string, unknown>) => void {
@@ -455,8 +473,10 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
         }
       }
     }
-    const stored = settings.line === undefined || front.lineBase === undefined ? await settings.turns.recordRewrite(record)
-      : await settings.line.recordRewriteInLine(front.lineBase, record);
+    // Task 57p: the row notes the version the dig's calls were charged under (a FAILED one written with no call: the dig's all the same).
+    const noted = { ...record, settingsVersion: settings.settingsVersionOf?.(digRunId) ?? null };
+    const stored = settings.line === undefined || front.lineBase === undefined ? await settings.turns.recordRewrite(noted)
+      : await settings.line.recordRewriteInLine(front.lineBase, noted);
     log("PATH_REWRITE_STORED", { runId: digRunId, outcome: record.outcome, failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
     if (stored === "RECORDED" && refreshAfter !== null) await (refreshAfter as () => Promise<void>)();
@@ -614,9 +634,12 @@ export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string,
 /**
  * A first debate's suggestions, once its story is written (index.ts, the after-settle branch): the writer of the rewrite, on the same
  * never-walled seam. A run that was rewritten as a dig has its own (sealed with its rewrite). No settings, no store or no writer: none.
+ * V4 start step, Task 54: a path run hands its path roots (0160's `readPathRoots`, in force, by root index), and each path is read
+ * from its own root and keyed by its id, b<n> (`pathRewriteDigPathsOfRoots`); without them, R22's paths by their roots' node ids.
  * Never rejects.
  */
-export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput): Promise<void> {
+export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput,
+  pathRoots?: readonly Readonly<{ ref: string; rootNodeId: string }>[]): Promise<void> {
   const first = settings?.firstDebateSuggestions;
   if (settings === undefined || first === undefined) return;
   const log = safeLog(settings);
@@ -632,7 +655,8 @@ export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSetti
       nodes: input.nodes.map((node) => ({ nodeId: node.nodeId, judgeArtifactRef: input.judgeArtifactRefs.get(node.nodeId) ?? null })) }));
     const book = settings.replayBookOf === undefined ? null : await lease(() => settings.replayBookOf!(input.runId, input.workItemId));
     await writeFirstDebateSuggestions(Object.freeze({ runId: input.runId, workItemId: input.workItemId, free: false, question: input.questionLine,
-      language: null, paths: pathRewriteDigPathsOf(input, enrichment), wouldChangeIt: facts.wouldChangeIt, writer, log,
+      language: null, wouldChangeIt: facts.wouldChangeIt, writer, log,
+      paths: pathRoots === undefined ? pathRewriteDigPathsOf(input, enrichment) : pathRewriteDigPathsOfRoots(input, enrichment, new Map(), pathRoots),
       send: (maker, request) => {
         const gateway = book === null ? maker.provider : replayingGateway(book, maker.provider);
         return lease(() => gateway.call(request));

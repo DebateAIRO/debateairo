@@ -353,12 +353,20 @@ export function V4ChangedSince(props: Readonly<{
    * digs or is written, the box is hidden; it comes back when the map changes after that version. Absent: as before.
    */
   reportStage?: ReportStage;
+  /**
+   * The start step's hand-over (9 Nov): false until the map's first report check has answered (useMapReport's
+   * `firstCheckAnswered`). Until then the box draws nothing, as the report button's place is held ([data-report-hold]): on a
+   * page opened while a new version is written, the box would otherwise flash before the stage says it takes the changes
+   * in. A check that answered and failed shows the box as before. Absent: as before.
+   */
+  reportRead?: boolean;
 }>) {
   const { changedSince, catalog } = props;
   const titleId = useId();
   if (changedSince === null || changedSince === undefined || changedSince.since_report_version === null || changedSince.count === 0) {
     return null;
   }
+  if (props.reportRead === false) return null;
   if (props.reportStage !== undefined && reportCoversChanges(props.reportStage, changedSince.since_report_version)) return null;
   const named = props.changedPaths ?? [];
   return (

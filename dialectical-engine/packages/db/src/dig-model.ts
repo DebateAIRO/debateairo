@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { WebSealed } from "./web-evidence.js";
+import type { PieceSettingsVersion, WebSealed } from "./web-evidence.js";
 // 0135 (W3-7): a dig's picks and its path rewrite's material, re-exported here (the package index's bytes are pinned by the
 // migration audit, NATIVE_MIGRATE_MODULE_SHA256).
 export * from "./dig-picks.js";
@@ -90,6 +90,15 @@ export type RunPauseRead = Readonly<{
   reason: "MONTH_WALL" | null; resumable_at: string | null;
   planned_calls: number | null; planned_searches: number | null; planned_micros: number | null; paused_at: string | null;
 }>;
+/** V4 start step, Task 57f (0165): a debate as Continue sees it (core.read_run_continue). */
+export type RunContinueRead = Readonly<{
+  state: "NONE" | "OPEN" | "DONE" | "FAILED"; terminal_reason: string | null; content_live: boolean; waived: boolean; settled: boolean;
+  paused: boolean; reopened: boolean;
+  /** Task 57j (0168): how many re-opens of its newest work item ended FAILED again on their own (Task 57m-fix: never an update's set-aside). */
+  failed_continues: number;
+}>;
+/** Task 57f (0165): what core.continue_failed_run did. */
+export type RunReopenRead = "RECORDED" | "CONTINUING" | "NOT_FAILED" | "NOT_CONTINUABLE" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED";
 
 export class PostgresDigModelRepository {
   constructor(private readonly pool: Executor) {}
@@ -114,6 +123,25 @@ export class PostgresDigModelRepository {
     : Promise<"RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "NOT_PAUSED" | "NOT_OWNED" | "NOT_CURRENT" | "VERSION_NOT_PASSED" }>(
       "SELECT identity.continue_paused_run_in_release($1,$2,$3,$4) AS outcome", [ownerRef, runId, toReleaseKey, toRegisterVersion])).rows[0]!.outcome;
+  }
+
+  /**
+   * V4 start step, Task 57f (0165's core.read_run_continue): the person's own debate as Continue and its FAILED read see it, codes and flags
+   * only (its newest work item's state and terminal reason, live, set aside, settled, paused, re-opened); null when it is not this account's.
+   */
+  async readRunContinue(ownerRef: string, runId: string): Promise<RunContinueRead | null> {
+    return (await this.pool.query<{ facts: RunContinueRead | null }>("SELECT core.read_run_continue($1,$2) AS facts", [ownerRef, runId]))
+      .rows[0]?.facts ?? null;
+  }
+
+  /**
+   * Task 57f (0165's core.continue_failed_run): the person's Continue on their own FAILED debate: its work item goes back to be claimed and
+   * the re-open is recorded; a debate of an older release moves to `toReleaseKey` (a version this release has passed) in the same transaction.
+   * Whether its stop was ours is the API's rule, asked before this. The room code has already found room.
+   */
+  async continueFailedRun(ownerRef: string, runId: string, toReleaseKey: string | null, toRegisterVersion: number | null): Promise<RunReopenRead> {
+    return (await this.pool.query<{ outcome: RunReopenRead }>("SELECT core.continue_failed_run($1,$2,$3,$4) AS outcome",
+      [ownerRef, runId, toReleaseKey, toRegisterVersion])).rows[0]!.outcome;
   }
 
   /** The release and settings version that own the debate now (0143), for the API's hand-over decision. */
@@ -150,15 +178,16 @@ export class PostgresDigModelRunnerRepository {
       .rows[0]?.turn ?? null;
   }
 
-  async recordRewrite(record: PathRewriteRecord): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
+  /** Task 57p: 0169's writer, the rewrite's settings version last. */
+  async recordRewrite(record: PathRewriteRecord & PieceSettingsVersion): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED" }>(
-      "SELECT identity.record_path_rewrite($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14::jsonb,$15::jsonb,$16) AS outcome",
+      "SELECT identity.record_path_rewrite_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14::jsonb,$15::jsonb,$16,$17) AS outcome",
       [record.rewriteId, record.digRunId, record.parentAnswerVersion, record.basedOnRewriteId, record.outcome, record.failureCode,
         record.fateBefore, record.fateAfter, record.verdict?.outcome ?? null, record.verdict?.scope ?? null,
         record.writerLineage === null ? null : JSON.stringify(record.writerLineage),
         record.checkerLineage === null ? null : JSON.stringify(record.checkerLineage), record.rounds,
         JSON.stringify(record.artifactRefs), record.content === null ? null : JSON.stringify(record.content.envelope),
-        record.content?.attestation ?? null])).rows[0]!.outcome;
+        record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 
   /** A live debate's rewrites (its paths' histories and its own as a dig); null when it is not a live private debate or, in a request, not the connection's own (0171). */

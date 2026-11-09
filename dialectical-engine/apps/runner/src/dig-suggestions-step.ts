@@ -1,6 +1,6 @@
 // apps/runner/src/dig-suggestions-step.ts
 import { createHash } from "node:crypto";
-import { DIG_LEVEL_MAX, WEB_CONTRACT_LIMITS, type DigSuggestion } from "@debateai/contract";
+import { DIG_LEVEL_MAX, PATH_ID_PATTERN, WEB_CONTRACT_LIMITS, type DigSuggestion } from "@debateai/contract";
 import {
   PATH_SUGGESTIONS_CARRIER, PostgresDigPicksRunnerRepository, PostgresInvestigationRunnerRepository, PostgresPathSuggestionsRepository,
   encryptAttestedContentForRun, withRunContentLease, type Pool
@@ -88,17 +88,31 @@ const suggestionText = (question: string, why: string): string => {
 type PathInput = Readonly<{
   fields: ReturnType<typeof webSuggestDigMaterialFields>;
   refs: ReadonlySet<string>;
+  /** Task 79a: each ref's point (its node id). */
+  pointOf: ReadonlyMap<string, string>;
 }>;
+
+/**
+ * V4 start step, Task 79a (owner answer Q18 A: code finds overlapping dig picks): on a path debate's path (named b<n>) a kept
+ * suggestion names the points its refs stand for, as node ids, in its rests_on order, each once, at most the contract's count. An R22
+ * path's suggestion names none, so its sealed set keeps its bytes.
+ */
+function withPoints(positionRef: string, restsOn: readonly string[], pointOf: ReadonlyMap<string, string>): Readonly<{ points?: string[] }> {
+  if (!PATH_ID_PATTERN.test(positionRef)) return {};
+  const points = restsOn.flatMap((ref) => { const id = pointOf.get(ref); return id === undefined ? [] : [id]; });
+  return { points: [...new Set(points)].slice(0, WEB_CONTRACT_LIMITS.suggestionPointsMax) };
+}
 
 /** One path's material: its points named by code (f1… for, a1… against), the same bytes every time. */
 function materialOf(job: DigSuggestionsJob, path: PathRewriteDigPath, alreadyInvestigated: string): PathInput {
   const named = (side: "for" | "against", letter: string) => path.points.filter((point) => (point.side ?? "for") === side)
-    .map((point, at) => Object.freeze({ ref: `${letter}${String(at + 1)}`, text: point.text, disputed: point.disputed }));
+    .map((point, at) => Object.freeze({ ref: `${letter}${String(at + 1)}`, id: point.id, text: point.text, disputed: point.disputed }));
   const forPoints = named("for", "f");
   const againstPoints = named("against", "a");
   const all = [...forPoints, ...againstPoints];
   return Object.freeze({
     refs: new Set(all.map((point) => point.ref)),
+    pointOf: new Map(all.map((point) => [point.ref, point.id] as const)),
     fields: webSuggestDigMaterialFields({ planFree: job.free, question: job.question.line, answer: path.statement,
       forPoints: forPoints.map(({ ref, text }) => ({ ref, text })), againstPoints: againstPoints.map(({ ref, text }) => ({ ref, text })),
       disputedRefs: all.filter((point) => point.disputed).map((point) => point.ref), whatChanged: job.whatChanged, alreadyInvestigated })
@@ -111,7 +125,7 @@ async function suggestOnPath(job: DigSuggestionsJob, path: PathRewriteDigPath, a
   try {
     // A path with no point has nothing a suggestion could start from.
     if (path.points.length === 0) return null;
-    const { fields, refs } = materialOf(job, path, alreadyInvestigated);
+    const { fields, refs, pointOf } = materialOf(job, path, alreadyInvestigated);
     const language: QuestionLanguage | null = job.question.language;
     const framed = buildFramedPrompt({ contract: WEB_SUGGEST_DIG_PROMPT_CONTRACT, material: withQuestionLanguageField(fields, language) });
     const classify = (content: string, reply: ModelReplyFacts | undefined): ContentClassification =>
@@ -134,7 +148,8 @@ async function suggestOnPath(job: DigSuggestionsJob, path: PathRewriteDigPath, a
       kind: "HELPS_MAIN_QUESTION" as const,
       side: entry.side === "for" ? "FOR" as const : "AGAINST" as const,
       text: suggestionText(entry.question, entry.why),
-      places: [place]
+      places: [place],
+      ...withPoints(path.positionRef, entry.rests_on, pointOf)
     }))) });
   } catch (error) {
     job.log("DIG_SUGGESTION_CALL_FAILED", { runId: job.digRunId, path: at + 1,
@@ -250,7 +265,7 @@ export async function writeFirstDebateSuggestions(job: FirstDebateSuggestionsJob
       if (kept.has(path.positionRef) || path.points.length === 0) return;
       try {
         const name = (side: "for" | "against", letter: string) => path.points.filter((point) => (point.side ?? "for") === side)
-          .map((point, order) => Object.freeze({ ref: `${letter}${String(order + 1)}`, text: point.text, disputed: point.disputed }));
+          .map((point, order) => Object.freeze({ ref: `${letter}${String(order + 1)}`, id: point.id, text: point.text, disputed: point.disputed }));
         const forPoints = name("for", "f");
         const againstPoints = name("against", "a");
         const all = [...forPoints, ...againstPoints];
@@ -271,9 +286,12 @@ export async function writeFirstDebateSuggestions(job: FirstDebateSuggestionsJob
         }));
         const parsed = parseStructuredArtifact(result.content, webSuggestReplySchema, reading.acceptedAs(result.content).reply);
         if (parsed.kind !== "PARSED") return;
+        const pointOf = new Map(all.map((point) => [point.ref, point.id] as const));
         const suggestions = webSuggestionsKept(parsed.value, all.map((point) => point.ref)).map((entry, order): DigSuggestion => ({
           suggestion_id: digSuggestionIdOf(job.runId, path.positionRef, order + 1), kind: "HELPS_MAIN_QUESTION" as const,
-          side: entry.side === "for" ? "FOR" as const : "AGAINST" as const, text: suggestionText(entry.question, entry.why), places: [`path:${path.positionRef}`]
+          side: entry.side === "for" ? "FOR" as const : "AGAINST" as const, text: suggestionText(entry.question, entry.why), places: [`path:${path.positionRef}`],
+          // V4 start step, Task 79a: a path debate's path (b<n>) names the points the suggestion rests on; an R22 path none.
+          ...withPoints(path.positionRef, entry.rests_on, pointOf)
         }));
         await store.record({ setId: pathSuggestionsSetIdOf(job.runId, job.runId, path.positionRef, 0), runId: job.runId, debateRunId: job.runId,
           positionRef: path.positionRef, content: Object.freeze({ suggestions: Object.freeze(suggestions) }) });

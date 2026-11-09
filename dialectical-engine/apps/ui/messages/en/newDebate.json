@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Other…",
   "newDebate.askText.otherLabel": "Your own extra clarification",
   "newDebate.askText.matters": "If the answers pull in different directions, what matters most to me: {matters}",
-  "newDebate.askText.angles": "Please also look at: {list}.",
   "newDebate.freePublicNotice": "On the Free plan your question and its debate are public. Don't include personal details."
 }

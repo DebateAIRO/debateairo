@@ -19,6 +19,12 @@ import { mapAnswersArgued, mapMergeAlsoRaised, mapNamesInternalWord } from "@deb
  * the route first asks `findMapRun` (one owner query that also names the answer's run, then
  * one primary-key lookup of the map choice's opening) and answers 404 before any full answer
  * read or content lease when there is no map.
+ *
+ * V4 start step, Task 59 (spec 2026-11-03 §4.5 "The classic view"): a debate with chosen
+ * paths (0159's `core.start_path_set`) has no classic map view; its page reads the paths from
+ * `Answer.branches`. After the owner query, and only for the caller's own run, one code-only
+ * question (`core.read_start_path_ids`, no lease, no decryption) says whether the run has paths;
+ * if it has, the map choice is never read.
  */
 
 /**
@@ -44,15 +50,25 @@ export interface RunOwnerCheck {
   owns(runId: string, ownership: RunOwnershipAccess): Promise<boolean>;
   /** The run of this answer when the caller owns it, else null: one owner query, no content read. */
   ownedRunOfAnswer(answerId: string, ownership: RunOwnershipAccess): Promise<string | null>;
+  /**
+   * V4 start step, Task 59: does this run carry chosen paths (a v2 run)? Asked only after the owner query said yes; one
+   * code-only query, no content read. Absent (a composition that cannot ask): no run is a path run, as before.
+   */
+  isPathRun?(runId: string): Promise<boolean>;
 }
 
 /** One query on the runtime pool; main.ts passes `pool.query`. */
 export type RunOwnerQuery = (
   text: string,
   values: unknown[]
-) => Promise<Readonly<{ rows: readonly Readonly<{ owned?: unknown; run_id?: unknown }>[] }>>;
+) => Promise<Readonly<{ rows: readonly Readonly<{ owned?: unknown; run_id?: unknown; path_run?: unknown }>[] }>>;
 
 const RUN_OWNED_SQL = "SELECT core.run_is_owned_by($1,$2,$3) AS owned";
+/**
+ * V4 start step, Task 59: `core.read_start_path_ids(uuid)` (migration 0159, EXECUTE granted to debateai_runtime) names a
+ * run's path ids, or NULL when the run has no set; it checks codes only, so an erased path run is still a path run.
+ */
+const PATH_RUN_SQL = "SELECT core.read_start_path_ids($1) IS NOT NULL AS path_run";
 
 /**
  * Ruling C-MAPREAD: the answer's run, only for its owner, in the ownership query itself. serve.answer's primary key
@@ -64,7 +80,7 @@ const ANSWER_RUN_OWNED_SQL = `SELECT answer.run_id::text AS run_id FROM serve.an
 /**
  * `core.run_is_owned_by(p_run_id uuid, p_owner_ref uuid, p_legacy_asker_id text)` (migration
  * 0037, EXECUTE granted to debateai_runtime). Only a true answer owns: no row, null or any
- * other value is "not yours".
+ * other value is "not yours". Likewise only a true answer is a path run (Task 59).
  */
 export function runOwnerCheckFrom(query: RunOwnerQuery): RunOwnerCheck {
   return Object.freeze({
@@ -76,6 +92,10 @@ export function runOwnerCheckFrom(query: RunOwnerQuery): RunOwnerCheck {
       const result = await query(ANSWER_RUN_OWNED_SQL, [answerId, ownership.ownerRef, ownership.legacyAskerId]);
       const runId = result.rows[0]?.run_id;
       return typeof runId === "string" ? runId : null;
+    },
+    isPathRun: async (runId: string): Promise<boolean> => {
+      const result = await query(PATH_RUN_SQL, [runId]);
+      return result.rows[0]?.path_run === true;
     }
   });
 }
@@ -155,9 +175,9 @@ export type MapRunFindInput = Readonly<{
 export interface AnswerMapViewApplication {
   /**
    * Ruling C-MAPREAD — the route's cheap gate, before the full answer read: the run of the caller's own answer, only
-   * when that run's map opened the debate; else null. At most one owner query and one map-choice lookup, no content
-   * lease, no decryption. A caller who does not own the answer learns nothing about its map: the owner query runs
-   * first and the map is not looked up for them.
+   * when that run's map opened the debate; else null. At most one owner query, one path-run question (Task 59: a debate
+   * with chosen paths has no classic map) and one map-choice lookup, no content lease, no decryption. A caller who does
+   * not own the answer learns nothing about its map: the owner query runs first and nothing else is asked for them.
    */
   findMapRun(input: MapRunFindInput): Promise<string | null>;
   readMapView(input: MapViewReadInput): Promise<DebateMapView | null>;
@@ -181,7 +201,9 @@ function ownershipOrNull(ownership: RunOwnershipAccess): RunOwnershipAccess | nu
  * fewer than two answers left the debate arguing today's opening. The page then shows exactly
  * what it shows today. A caller who does not own the run has no view either, and the map is not
  * read for them. An ownership naming nobody (or both principals) is refused before any query, as
- * `StoryRepository.readForAnswer` refuses it.
+ * `StoryRepository.readForAnswer` refuses it. A debate with chosen paths has no view either
+ * (Task 59): for the caller's own run the owner check is asked whether it is a path run, and
+ * the map choice is not read for one.
  */
 export class RepositoryAnswerMapViewApplication implements AnswerMapViewApplication {
   constructor(
@@ -189,11 +211,16 @@ export class RepositoryAnswerMapViewApplication implements AnswerMapViewApplicat
     private readonly owner: RunOwnerCheck
   ) {}
 
+  /** Task 59: a path run per the owner check; one that cannot ask has none (R22's reads). */
+  private async isPathRun(runId: string): Promise<boolean> {
+    return this.owner.isPathRun === undefined ? false : await this.owner.isPathRun(runId);
+  }
+
   async findMapRun(input: MapRunFindInput): Promise<string | null> {
     const ownership = ownershipOrNull(input.ownership);
     if (ownership === null) return null;
     const runId = await this.owner.ownedRunOfAnswer(input.answerId, ownership);
-    if (runId === null) return null;
+    if (runId === null || await this.isPathRun(runId)) return null;
     return await this.reader.readMapOpeningForRun(runId) === "MAP" ? runId : null;
   }
 
@@ -201,6 +228,7 @@ export class RepositoryAnswerMapViewApplication implements AnswerMapViewApplicat
     const ownership = ownershipOrNull(input.ownership);
     if (ownership === null) return null;
     if (!await this.owner.owns(input.runId, ownership)) return null;
+    if (await this.isPathRun(input.runId)) return null;
     const record = await this.reader.readMapChoiceForRun(input.runId);
     // Ruling C-TWO: the runner's own story rule. With fewer than two map answers the debate argued today's opening
     // and the story got no also-raised points, so the page gets no view either.

@@ -17,6 +17,7 @@ import {
   previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
   previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
+import { previewFinalWriterAsk, previewFinalWriterRoleOf, type PreviewFinalWriterPlan } from "./preview-final-writer.js";
 import {
   parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
   previewThinkingStepOf, type PreviewThinkingLevels
@@ -369,20 +370,23 @@ export function previewFinalWriterTierUnreadLine(event: PreviewFinalWriterTierUn
  * else, LG-A's structure-repair calls included.
  */
 export function previewCallTierOf(request: Readonly<{ callSiteKey: string; lane: string; role: string }>): PreviewCallTier {
-  const step = lengthCallStepOf(request.callSiteKey, request.lane);
-  const served = request.lane === "served";
-  const story = request.lane === "story";
-  return (step === "answer_writer" && served && request.role === "SYNTHESIZER")
-    || (step === "answer_checker" && served && request.role === "EVALUATOR")
-    || (step === "story_writer" && story && request.role === "SYNTHESIZER")
-    || (step === "story_checker" && story && request.role === "EVALUATOR") ? "FINAL_WRITER" : "STANDARD";
+  // V4 start step, Task 2: the four roles are read in one place, the shared final-writer rule's.
+  return previewFinalWriterRoleOf(request) === null ? "STANDARD" : "FINAL_WRITER";
 }
 /**
  * Story v4 (engine redesign R1d, absorbing LG-D; spec 2026-10-15 §7.4): the story contracts whose native requests keep
  * the one safe repair try: v3, and v4 for an engine-2 debate. An id missing here silently turns that try off.
+ * V4 start step (Task 52): story v5, a path run's storyteller and its check (packages/story path-final.ts).
  */
 export const PREVIEW_STORY_REPAIR_CONTRACT_IDS = Object.freeze(
-  ["story.storyteller.v3", "story.checker.v3", "story.storyteller.v4", "story.checker.v4"] as const);
+  ["story.storyteller.v3", "story.checker.v3", "story.storyteller.v4", "story.checker.v4",
+    // V4 start step (Task 52).
+    "story.paths.v5", "story.paths-check.v5"] as const);
+/** Each story site's contract families: a contract keeps the try only on its own site (V4 start step, Task 52: story v5's two). */
+const PREVIEW_STORY_SITE_CONTRACT_PREFIXES = Object.freeze({
+  STORYTELLER: Object.freeze(["story.storyteller.", "story.paths.v"]),
+  CHECKER: Object.freeze(["story.checker.", "story.paths-check.v"])
+} as const);
 /**
  * Only the current native storyteller and story checker requests may keep one safe locator repair (story format
  * robustness, 2026-10-12: the checker too, so one format slip no longer costs the story its check). The current
@@ -396,7 +400,7 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
   try {
     const contractId = assertFramedPrompt(request.packet).contractId;
     return (PREVIEW_STORY_REPAIR_CONTRACT_IDS as readonly string[]).includes(contractId)
-      && contractId.startsWith(site === "STORYTELLER" ? "story.storyteller." : "story.checker.");
+      && PREVIEW_STORY_SITE_CONTRACT_PREFIXES[site].some((prefix) => contractId.startsWith(prefix));
   } catch { return false; }
 }
 /**
@@ -661,6 +665,13 @@ export function withPreviewProviderCallPolicy(
      * AsyncLocalStorage: the scheduler's pump starts one debate's call inside another's context).
      */
     thinkingLevelsOf?: (runId: string | null) => PreviewThinkingLevels | undefined;
+    /**
+     * V4 start step, Task 3 (spec 2026-11-03 §5): the final-writer terms of the call's run, by `request.runId`: a v2
+     * run's plan, so its four final writers ask the shared rule (previewFinalWriterAsk) on every attempt; undefined =
+     * R22's asks, byte for byte. Asked once per final-writer call, never for another call; a resolver that throws ends
+     * the call before anything is sent. Synchronous and closure-captured, as `thinkingLevelsOf`.
+     */
+    finalWriterTermsOf?: (runId: string | null) => Readonly<{ plan: PreviewFinalWriterPlan }> | undefined;
   }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
@@ -723,7 +734,23 @@ export function withPreviewProviderCallPolicy(
     // bound) and their length retry is held to `outputBound` (previewStorytellerOutputCap), exactly as the slow
     // storyteller; a fast row (DeepSeek, Claude Haiku) asks its own maximum. The 1 MiB body room stays for all four.
     const slowRow = reviewed.storytellerTokenCeiling <= reviewed.outputBound;
-    const finalWriter = previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
+    // V4 start step, Task 3: a v2 run's final writer asks the shared rule instead: the F3 cap of its role and plan as a
+    // ceiling (never the request's guided bound above it), the length retry held to the same cap, and the 1 MiB body
+    // room only for a FINAL_WRITER ask the gate offers; otherwise a STANDARD call at the row's own bound, told once as
+    // today. A STANDARD ask never reads the gate.
+    const role = previewFinalWriterRoleOf(request);
+    const terms = role === null || options.finalWriterTermsOf === undefined ? undefined : options.finalWriterTermsOf(request.runId);
+    const v2Ask = role === null || terms === undefined ? undefined : previewFinalWriterAsk(reviewed, role, 1, terms.plan);
+    const v2Sized = (tokens: number, caps: Readonly<{ packetByteCap?: number }> = {}) =>
+      Object.freeze({ bound: Object.freeze({ ...preview, tokenCeiling: tokens }), caps: Object.freeze({ ...caps, outputTokenCap: tokens }) });
+    const standard = v2Ask === undefined
+      ? Object.freeze({ bound: standardBound, caps: Object.freeze({}) })
+      : v2Sized(v2Ask.tier === "FINAL_WRITER" ? reviewed.outputBound : v2Ask.maxTokens);
+    const finalWriter = v2Ask !== undefined
+      ? v2Ask.tier === "FINAL_WRITER"
+        ? v2Sized(v2Ask.maxTokens, { packetByteCap: PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes })
+        : undefined
+      : previewCallTierOf(request) === "FINAL_WRITER" ? Object.freeze({
       bound: storyteller
         ? Object.freeze({ ...preview, tokenCeiling: previewStorytellerTokenCeiling(reviewed) })
         : Object.freeze({ ...preview, tokenCeiling: Math.max(preview.tokenCeiling,
@@ -758,12 +785,12 @@ export function withPreviewProviderCallPolicy(
     const slipFix = previewSlipFixLevel(levels, reviewed);
     const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
     const send = async () => {
-      const tier = await finalWriterCall();
+      const tier = (await finalWriterCall()) ?? standard;
       return gateway.call({ ...request, thinkingLevel: level,
         ...(repairLevel === undefined ? {} : { repairThinkingLevel: repairLevel }),
         ...(lengthRetry === undefined ? {} : { lengthRetry }),
-        ...(tier === undefined ? {} : tier.caps),
-        bound: tier === undefined ? standardBound : tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
+        ...tier.caps,
+        bound: tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
         attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}),
         ...(judgeReAsk ? { fullReAskAfterPatch: true } : {}) });
     };

@@ -57,20 +57,32 @@ export const WEB_SITES_START = Object.freeze({
   pickCallsPerPack: 1
 });
 
-/** The largest debate the receipt accepts (five paths today; ten gives room) and the most paths one dig may choose (the contract's). */
-export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digPicksMax: 16 });
+/**
+ * The largest debate the receipt accepts (five paths today; ten gives room) and the most paths one dig may choose (the contract's).
+ * V4 start step, Task 8: a path debate has at most 8 paths (b1..b8), every one of which may search.
+ */
+export const WEB_SITES_LIMITS = Object.freeze({ webPathsMax: 10, digPicksMax: 16, pathsKindMax: 8 });
 
 export type WebDepth = "QUICK" | "THOROUGH";
-export type WebKind = "START" | "DIG";
+/**
+ * START and DIG: a v1 receipt (R22). PATHS (V4 start step, Task 8): a v2 receipt, a path debate whose every chosen path
+ * is a pack of its own, at a debate's start or for a dig (`origin`).
+ */
+export type WebKind = "START" | "DIG" | "PATHS";
+export type WebOrigin = "START" | "DIG";
+/** The most paths of a path debate (WEB_SITES_LIMITS.pathsKindMax), by the name the path debate's callers use. */
+export const WEB_PATHS_KIND_MAX = WEB_SITES_LIMITS.pathsKindMax;
 
 /** What admission knows about the web part: a debate's start or a dig, one pack per path or per chosen path. */
 export type WebSiteInput = Readonly<{
   kind: WebKind;
   depth: WebDepth;
-  /** START: the paths the debate weighs, every one of which may search (the planner may plan fewer, never more). */
+  /** START: the paths the debate weighs, every one of which may search (the planner may plan fewer, never more). PATHS: its chosen paths (1 to 8). */
   paths?: number;
   /** DIG: the paths the person chose (R22 decision 9): each has its own planner and up to 4 searches. */
   digPicks?: number;
+  /** PATHS only: a debate's start (10 results per search) or a dig (5). */
+  origin?: WebOrigin;
 }>;
 
 /** The web part's counts, camelCase (the estimate and the runner read these). */
@@ -95,6 +107,10 @@ export type WebSites = Readonly<{
   pickCalls: number;
   /** Readers 2 and 3, each reading the pack's top pages whole: one call each per pack. */
   topReaderCalls: number;
+  /** PATHS only (V4 start step, Task 8): a debate's start or a dig. */
+  origin?: WebOrigin;
+  /** PATHS only: the packs every path's arguing call reads (every chosen path's pages, labelled; owner 31 Oct) = packs. */
+  packReadsPerCall?: number;
 }>;
 
 const invalid = (message: string): never => {
@@ -118,7 +134,17 @@ export function webReaderOneCalls(tokens: number, pageCap: number, batch: number
   return Math.ceil(tokens / (batch - pageCap));
 }
 
-/** The web part's counts for one debate start or one dig, at the owner's start values. */
+/**
+ * V4 start step, Task 8 (owner 30 Oct: every web path gets all its searches): a path debate's search cap, its paths
+ * x 4 on a Quick look, x 8 on a Thorough one, for 1 to 8 paths.
+ */
+export function webSearchCapForPaths(paths: number, depth: WebDepth): number {
+  if (!whole(paths, 1, WEB_PATHS_KIND_MAX)) return invalid(`A path debate has 1 to ${WEB_PATHS_KIND_MAX} paths, not ${String(paths)}`);
+  if (depth !== "QUICK" && depth !== "THOROUGH") return invalid("The web depth is QUICK or THOROUGH");
+  return paths * WEB_SITES_START.searchesPerPath[depth];
+}
+
+/** The web part's counts for one debate start, one dig, or one path debate's paths, at the owner's start values. */
 export function webSitesOf(input: WebSiteInput): WebSites {
   if (input?.depth !== "QUICK" && input?.depth !== "THOROUGH") return invalid("The web depth is QUICK or THOROUGH");
   const start = WEB_SITES_START;
@@ -126,7 +152,18 @@ export function webSitesOf(input: WebSiteInput): WebSites {
   let searchesPerPack: number;
   let resultsPerSearch: number;
   let plannerCalls: number = start.plannerCalls;
-  if (input.kind === "START") {
+  if (input.kind !== "PATHS" && input.origin !== undefined) return invalid("Only a path debate's web part has an origin");
+  if (input.kind === "PATHS") {
+    // V4 start step, Task 8: every chosen path is a pack, counted as a debate's start counts one path, with its own planner.
+    if (input.origin !== "START" && input.origin !== "DIG") return invalid("A path debate's web part names its origin, START or DIG");
+    if (!whole(input.paths, 1, WEB_PATHS_KIND_MAX) || input.digPicks !== undefined) {
+      return invalid(`A path debate's web part needs its paths (1 to ${WEB_PATHS_KIND_MAX}) and no dig picks`);
+    }
+    packs = input.paths;
+    searchesPerPack = start.searchesPerPath[input.depth];
+    resultsPerSearch = start.resultsPerSearch[input.origin];
+    plannerCalls = input.paths;
+  } else if (input.kind === "START") {
     if (!whole(input.paths, 1, WEB_SITES_LIMITS.webPathsMax) || input.digPicks !== undefined) {
       return invalid("A debate's web part needs its paths (1 to 10) and no dig picks");
     }
@@ -154,7 +191,8 @@ export function webSitesOf(input: WebSiteInput): WebSites {
     depth: input.depth,
     packs,
     searchesPerPack,
-    searches: input.kind === "DIG" ? Math.min(packs * searchesPerPack, start.digSearchCap[input.depth]) : packs * searchesPerPack,
+    searches: input.kind === "DIG" ? Math.min(packs * searchesPerPack, start.digSearchCap[input.depth])
+      : input.kind === "PATHS" ? webSearchCapForPaths(packs, input.depth) : packs * searchesPerPack,
     resultsPerSearch,
     pageTokenCap: WEB_SEARCH_PAGE_TOKEN_CAP,
     searchTokenCap: WEB_SEARCH_REQUEST_TOKEN_CAP,
@@ -165,7 +203,8 @@ export function webSitesOf(input: WebSiteInput): WebSites {
     plannerCalls,
     readerOneCalls: packs * readerOneCallsPerPack,
     pickCalls: packs * start.pickCallsPerPack,
-    topReaderCalls: packs * start.topReaders
+    topReaderCalls: packs * start.topReaders,
+    ...(input.kind === "PATHS" ? { origin: input.origin!, packReadsPerCall: packs } : {})
   });
 }
 
@@ -230,12 +269,72 @@ export const webReceiptSchema = z.object({
 });
 export type WebReceipt = z.infer<typeof webReceiptSchema>;
 
-/** The member, parsed with its own schema before it is handed back: a receipt the parser would refuse is never minted. */
-export function webReceipt(sites: WebSites, perSiteAttempts: number): WebReceipt {
+/**
+ * V4 start step, Task 8: the receipt member `envelope_basis.web`, version 2, kind PATHS: a path debate's web part, every
+ * count tied to the others by `webSitesOf` exactly as version 1 is, plus its origin and the packs every path's arguing
+ * reads. Version 1 (above) is untouched, so an R22 runner's strict v1 parse refuses a v2 receipt.
+ */
+export const webReceiptV2Schema = z.object({
+  version: z.literal(2),
+  kind: z.literal("PATHS"),
+  origin: z.enum(["START", "DIG"]),
+  depth: z.enum(["QUICK", "THOROUGH"]),
+  packs: count(1, WEB_PATHS_KIND_MAX),
+  searches_per_pack: count(1, 64),
+  searches: count(1, 640),
+  results_per_search: count(1, 10),
+  page_token_cap: count(1, 1_048_576),
+  search_token_cap: count(1, 1_048_576),
+  reader_batch_tokens: count(1, WEB_HAIKU_PROMPT_TOKEN_LINE),
+  top_count: count(1, 10),
+  pack_reads_per_call: count(1, WEB_PATHS_KIND_MAX),
+  sites: z.object({
+    planner: count(1, WEB_PATHS_KIND_MAX),
+    reader_one: count(1, 10_000),
+    pick: count(1, 64),
+    top_readers: count(1, 64),
+    added_model_attempts: z.number().int().min(0)
+  }).strict()
+}).strict().superRefine((receipt, ctx) => {
+  let expected: WebSites | null = null;
+  try {
+    expected = webSitesOf({ kind: "PATHS", depth: receipt.depth, paths: receipt.packs, origin: receipt.origin });
+  } catch (error) {
+    ctx.addIssue({ code: "custom", path: ["packs"], message: `the web part cannot be counted (${error instanceof Error ? error.message : String(error)})` });
+  }
+  if (expected === null) return;
+  const disclosed = {
+    searches_per_pack: receipt.searches_per_pack, searches: receipt.searches, results_per_search: receipt.results_per_search,
+    page_token_cap: receipt.page_token_cap, search_token_cap: receipt.search_token_cap, reader_batch_tokens: receipt.reader_batch_tokens,
+    top_count: receipt.top_count, pack_reads_per_call: receipt.pack_reads_per_call, planner: receipt.sites.planner,
+    reader_one: receipt.sites.reader_one, pick: receipt.sites.pick, top_readers: receipt.sites.top_readers
+  };
+  const minted = {
+    searches_per_pack: expected.searchesPerPack, searches: expected.searches, results_per_search: expected.resultsPerSearch,
+    page_token_cap: expected.pageTokenCap, search_token_cap: expected.searchTokenCap, reader_batch_tokens: expected.readerBatchTokens,
+    top_count: expected.topCount, pack_reads_per_call: expected.packReadsPerCall, planner: expected.plannerCalls,
+    reader_one: expected.readerOneCalls, pick: expected.pickCalls, top_readers: expected.topReaderCalls
+  };
+  for (const key of Object.keys(minted) as (keyof typeof minted)[]) {
+    if (disclosed[key] !== minted[key]) {
+      ctx.addIssue({ code: "custom", path: [key], message: `web ${key} ${disclosed[key]} disagrees with the counting rule's ${minted[key]}` });
+    }
+  }
+});
+export type WebReceiptV2 = z.infer<typeof webReceiptV2Schema>;
+/** Either version, by its own strict schema. */
+export const webReceiptAnySchema = z.discriminatedUnion("version", [webReceiptSchema, webReceiptV2Schema]);
+
+/**
+ * The member, parsed with its own schema before it is handed back: a receipt the parser would refuse is never minted.
+ * START and DIG mint version 1, byte for byte as before; PATHS mints version 2.
+ */
+export function webReceipt(sites: WebSites, perSiteAttempts: number): WebReceipt | WebReceiptV2 {
   if (!whole(perSiteAttempts, 1, 1_000)) return invalid(`The web calls need a whole number of attempts per site, not ${String(perSiteAttempts)}`);
+  if (sites.kind === "PATHS") return webReceiptV2(sites, perSiteAttempts);
   const receipt: WebReceipt = Object.freeze({
     version: 1 as const,
-    kind: sites.kind,
+    kind: sites.kind as "START" | "DIG",
     depth: sites.depth,
     packs: sites.packs,
     searches_per_pack: sites.searchesPerPack,
@@ -260,8 +359,41 @@ export function webReceipt(sites: WebSites, perSiteAttempts: number): WebReceipt
   return receipt;
 }
 
+/** V4 start step, Task 8: a path debate's version 2 member, parsed with its own schema before it is handed back. */
+function webReceiptV2(sites: WebSites, perSiteAttempts: number): WebReceiptV2 {
+  if (sites.origin === undefined || sites.packReadsPerCall === undefined) return invalid("A path debate's web part names its origin and its pack reads");
+  const receipt: WebReceiptV2 = Object.freeze({
+    version: 2 as const,
+    kind: "PATHS" as const,
+    origin: sites.origin,
+    depth: sites.depth,
+    packs: sites.packs,
+    searches_per_pack: sites.searchesPerPack,
+    searches: sites.searches,
+    results_per_search: sites.resultsPerSearch,
+    page_token_cap: sites.pageTokenCap,
+    search_token_cap: sites.searchTokenCap,
+    reader_batch_tokens: sites.readerBatchTokens,
+    top_count: sites.topCount,
+    pack_reads_per_call: sites.packReadsPerCall,
+    sites: Object.freeze({
+      planner: sites.plannerCalls,
+      reader_one: sites.readerOneCalls,
+      pick: sites.pickCalls,
+      top_readers: sites.topReaderCalls,
+      added_model_attempts: webModelCalls(sites) * perSiteAttempts
+    })
+  });
+  const parsed = webReceiptV2Schema.safeParse(receipt);
+  if (!parsed.success) {
+    return invalid("The web receipt does not parse: " + parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
+  }
+  return receipt;
+}
+
 /** The web part a run was admitted with, read back from its receipt (the runner and the estimate never recount it). */
-export function webSitesOfReceipt(receipt: WebReceipt): WebSites {
+export function webSitesOfReceipt(receipt: WebReceipt | WebReceiptV2): WebSites {
+  if (receipt.version === 2) return webSitesOf({ kind: "PATHS", depth: receipt.depth, paths: receipt.packs, origin: receipt.origin });
   return receipt.kind === "START"
     ? webSitesOf({ kind: "START", depth: receipt.depth, paths: receipt.packs })
     : webSitesOf({ kind: "DIG", depth: receipt.depth, digPicks: receipt.sites.planner });

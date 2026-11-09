@@ -18,10 +18,10 @@ import { V4LevelTrail } from "./V4LevelTrail";
  * pause's Continue, the paths being looked into); "You can leave this page. It keeps going." with the one account-wide
  * "Tell me when it's ready" (`notify`, built later); "taking longer than usual" only past the MEASURED top of the usual
  * range (wait-f8: there is no default number); with reduced motion a still dot and "Still working · checked 14:09"
- * (wait-f17); the lost-touch line with [Try now] (wait-f19); and "Open in the classic view" once, small, at the bottom
- * (wait-f23), only when the page hands it (the owner's answers of 5 Nov, question 12 B, journey-f19: the account menu carries
- * it once the page stops handing it here). The card reads nothing itself: the page passes what it knows (useWaitPolling gives `checkedAt`,
- * `reconnecting` and `onTryNow`). Before Start it may sit inside the question card (`variant="inline"`, no heading).
+ * (wait-f17); the lost-touch line with [Try now] (wait-f19). The card draws no classic-view link: "Open in the classic view"
+ * is in the account menu only (the owner's answers of 5 Nov, question 12 B, journey-f19). The card reads nothing itself: the
+ * page passes what it knows (useWaitPolling gives `checkedAt`, `reconnecting` and `onTryNow`). Before Start it may sit inside
+ * the question card (`variant="inline"`, no heading).
  *
  * Motion (journey-d1 A and the owner's chat answer): the working dot has one slow pulse; a new state line shows at once
  * with a 1-second soft highlight; with reduced motion the dot is still, and the highlight and the written line stay.
@@ -82,11 +82,6 @@ export type V4WaitCardProps = Readonly<{
   back?: V4WaitCardBack | null;
   /** The level trail above the card (a dig's own page); null or absent: none. */
   levelTrail?: V4WaitCardTrail | null;
-  /**
-   * "Open in the classic view", once, small, at the bottom; null or absent: none. The owner's answers of 5 Nov (question 12 B,
-   * journey-f19) put it in the account menu only: a page whose header carries it passes none here.
-   */
-  classicHref?: string | null;
   catalog: MessageCatalog;
   locale: string;
 }>;
@@ -221,11 +216,6 @@ export function V4WaitCard(props: V4WaitCardProps) {
             )}
           </p>
         ) : null}
-        {props.classicHref === null || props.classicHref === undefined ? null : (
-          <p className="v4WaitClassic">
-            <Link className="v4Link" href={props.classicHref}>{t(catalog, "v4.common.classicView")}</Link>
-          </p>
-        )}
       </section>
     </div>
   );

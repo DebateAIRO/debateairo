@@ -466,10 +466,15 @@ describe("execute() reads one debate's settings only (O1): the source scan", () 
     expect(readsIn(source).length).toBeGreaterThan(reads.length);
   });
 
-  it("hands the operator snapshot the debate's own scoring row at both call sites, and the method reads no boot row", () => {
+  it("hands the operator snapshot the debate's own scoring row at every call site, and the method reads no boot row", () => {
     const text = read(RUNNER);
     const calls = [...text.matchAll(/this\.#resolveOperatorResolvedSnapshot\(([^)]*)\)/gu)].map((match) => match[1]);
-    expect(calls).toEqual(["run.runId, settings.scoringOperator", "run.runId, settings.scoringOperator"]);
+    // The round's snapshot, each path's investigation on a path run (V4 start step, Task 54), and the final one.
+    expect(calls).toEqual([
+      "run.runId, settings.scoringOperator",
+      "run.runId, settings.scoringOperator",
+      "run.runId, settings.scoringOperator"
+    ]);
     expect(readsIn(method("#resolveOperatorResolvedSnapshot").body!)).toEqual([]);
   });
 

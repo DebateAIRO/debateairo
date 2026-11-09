@@ -60,11 +60,14 @@ export function pathSuggestionsOfSet(opened: unknown): readonly DigSuggestion[] 
   });
 }
 
-/** What code finds on the points of one path. */
-export function digPointSuggestions(positionRef: string, points: readonly Node[]): readonly DigSuggestion[] {
+/**
+ * What code finds on the points of one path. V4 start step, Task 79a (owner answer Q18 A): on a path debate's path (`namePoints`)
+ * each names the point it is about, `points: [node_id]`, so the page can see two picks resting on one point; the id is unchanged.
+ */
+export function digPointSuggestions(positionRef: string, points: readonly Node[], namePoints = false): readonly DigSuggestion[] {
   const offer = (kind: "CONTRADICTING" | "UNDOCUMENTED", list: readonly Node[]): DigSuggestion[] =>
     list.slice(0, CODE_KIND_MAX).map((node) => ({ suggestion_id: idOf(node.node_id, kind, positionRef), kind, side: null, text: cut(node.claim),
-      places: [`path:${positionRef}`] }));
+      places: [`path:${positionRef}`], ...(namePoints ? { points: [node.node_id] } : {}) }));
   const disputed = points.filter((node) => node.review?.outcome === "dispute");
   const shown = new Set(disputed.slice(0, CODE_KIND_MAX).map((node) => node.node_id));
   return [...offer("CONTRADICTING", disputed),
@@ -74,10 +77,14 @@ export function digPointSuggestions(positionRef: string, points: readonly Node[]
 /**
  * The answer's web part with what code finds joined to each path's suggestions, each id once, within the contract's count.
  * At level 10 no path offers any. A web part with no suggestions to add comes back as the same paths.
+ * V4 start step, Task 55b (owner F14): a path debate names its web paths by path id (b<n>), which names no node, so `rootOf` (each
+ * path id's root in force, 0160) says where its points hang; each suggestion still hangs under its path, "path:b<n>". Absent (R22):
+ * the path's own ref is its root, as today.
+ * Task 79a: a path the root map names is a path debate's, so what code finds on it names its point (`points`); an R22 path never.
  */
 export function webWithDigSuggestions(web: AnswerWeb, nodes: readonly Node[],
   edges: readonly Pick<Edge, "from_node_ref" | "target_kind" | "target_ref">[], level: number | null,
-  newest: ReadonlyMap<string, readonly DigSuggestion[]> = new Map()): AnswerWeb {
+  newest: ReadonlyMap<string, readonly DigSuggestion[]> = new Map(), rootOf?: ReadonlyMap<string, string>): AnswerWeb {
   if (level !== null && level >= DIG_LEVEL_MAX) return { paths: web.paths.map((path) => ({ ...path, suggestions: [] })) };
   return { paths: web.paths.map((path) => {
     const seen = new Set<string>();
@@ -85,7 +92,8 @@ export function webWithDigSuggestions(web: AnswerWeb, nodes: readonly Node[],
     // set is no longer offered, even when the new one is empty (owner Q-D8).
     const set = newest.get(path.position_ref.toLowerCase());
     const offered = set === undefined ? path.suggestions : [...path.suggestions.filter((suggestion) => suggestion.kind !== "HELPS_MAIN_QUESTION"), ...set];
-    const suggestions = [...offered, ...digPointSuggestions(path.position_ref, pointsUnder(path.position_ref, nodes, edges))]
+    const root = rootOf?.get(path.position_ref);
+    const suggestions = [...offered, ...digPointSuggestions(path.position_ref, pointsUnder(root ?? path.position_ref, nodes, edges), root !== undefined)]
       .filter((suggestion) => { if (seen.has(suggestion.suggestion_id)) return false; seen.add(suggestion.suggestion_id); return true; })
       .slice(0, WEB_CONTRACT_LIMITS.suggestionsPerPathMax);
     return { ...path, suggestions };

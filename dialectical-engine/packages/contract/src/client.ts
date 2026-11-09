@@ -1,5 +1,7 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
+// V4 start step, Task 57f: Continue on a failed debate: its two refusals, answered as data.
+import { RunNotContinuedSchema, type RunNotContinued } from "./web.js";
 import { ModerationStatementsSchema, type ModerationStatements, InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
 import {
   InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
@@ -12,6 +14,11 @@ import {
   type AccountReadingLevel, type ReadingLevelState, type LastVisit, type LastVisitRecorded, type VisitItems,
   type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded, type DigLinkMode
 } from "./account-memory.js";
+// V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04 §3.14).
+import {
+  SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema,
+  type SavedQuestionDoc, type SavedQuestionList, type SavedQuestionRead, type SavedQuestionWritten
+} from "./saved-questions.js";
 import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
   type PublicationReviewState } from "./publication-review.js";
@@ -163,6 +170,38 @@ import {
   type SessionList
 } from "./index.js";
 import type { DeclaredRegion } from "@debateai/kernel";
+import {
+  StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema, StartListsEventSchema,
+  StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, type StartCombineRequest, type StartCombineResponse,
+  type StartFitRequest, type StartFitResponse, type StartListsEvent, type StartListsRequest, type StartMergeRequest,
+  type StartMergeResponse
+} from "./start-paths.js";
+
+/**
+ * V4 start step, Task 10: the step before Start's live-event frames, read as `streamEvents` reads a run's: frames end at
+ * a blank line (LF or CRLF), comment lines (":") are ignored, a frame without data is dropped, and the text after the
+ * last blank line is handed back as `rest` (a frame cut across chunks). A frame's name is its `event:` line
+ * ("message" without one); its data is the `data:` lines joined, read as JSON (anything else is an invalid response).
+ */
+export function parseStartStepFrames(text: string): Readonly<{ events: readonly Readonly<{ event: string; data: unknown }>[]; rest: string }> {
+  const frames = text.split(/\r?\n\r?\n/u);
+  const rest = frames.pop() ?? "";
+  const events: Readonly<{ event: string; data: unknown }>[] = [];
+  for (const frame of frames) {
+    const lines = frame.split(/\r?\n/u).filter((line) => !line.startsWith(":"));
+    const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+    if (data.length === 0) continue;
+    const named = lines.find((line) => line.startsWith("event:"));
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch (error) {
+      throw new ContractHttpError("INVALID_RESPONSE", 200, error instanceof Error ? error.message : "Invalid event response");
+    }
+    events.push(Object.freeze({ event: named === undefined ? "message" : named.slice(6).trim(), data: parsed }));
+  }
+  return Object.freeze({ events: Object.freeze(events), rest });
+}
 
 export { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 
@@ -549,6 +588,16 @@ export interface ContractClient {
   /** V4 account memory (N7): the reading level kept in the account (null until first chosen). */
   readReadingLevel(): Promise<ReadingLevelState>;
   saveReadingLevel(level: AccountReadingLevel): Promise<ReadingLevelState>;
+  /**
+   * V4 start step, Task 39e: the questions not started yet, the newest first (at most 20), with their titles and the day each was saved.
+   * The first and later saves send the document exactly as given (checked with SavedQuestionDocSchema.safeParse, never replaced by the
+   * parse, whose words() would trim signed text); Pick up answers the stored document as is. Delete answers nothing (204).
+   */
+  listSavedQuestions(): Promise<SavedQuestionList>;
+  createSavedQuestion(doc: SavedQuestionDoc): Promise<SavedQuestionWritten>;
+  saveSavedQuestion(id: string, revision: number, doc: SavedQuestionDoc): Promise<SavedQuestionWritten>;
+  readSavedQuestion(id: string): Promise<SavedQuestionRead>;
+  deleteSavedQuestion(id: string): Promise<void>;
   /** V4 account memory (N7): what this debate's map showed when the person last looked (both null before a first visit). */
   readLastVisit(runId: string): Promise<LastVisit>;
   recordLastVisit(runId: string, items: VisitItems): Promise<LastVisitRecorded>;
@@ -557,9 +606,11 @@ export interface ContractClient {
   recordDigLink(parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkRecorded>;
   /**
    * R22 W3-8 (the money rule): Continue on a debate paused at the month wall. Pressed before the month reset it is
-   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`.
+   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`. V4 start step, Task 57f: the
+   * same route continues the person's own FAILED debate where it stopped; a failed debate it cannot continue (409 RUN_NOT_CONTINUABLE) and
+   * one with no room left for the rest (409 RUN_CONTINUE_NO_ROOM) are answered as data too, nothing changed.
    */
-  continueRun(runId: string): Promise<RunContinued | RunContinueRefused>;
+  continueRun(runId: string): Promise<RunContinued | RunContinueRefused | RunNotContinued>;
   /** R22 W5-1: the investigation the debate is in and its report versions, oldest first. */
   readInvestigation(runId: string): Promise<InvestigationReports>;
   /**
@@ -588,6 +639,14 @@ export interface ContractClient {
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
   readEvents(runId: string): Promise<readonly RunEvent[]>;
   streamEvents(runId: string, consume: (event: RunEvent) => void, signal?: AbortSignal): Promise<void>;
+  /** V4 start step, Task 10: the lists before Start, as a stream of events (POST /v1/asks/paths/lists). */
+  startPathLists(input: StartListsRequest, onEvent: (event: StartListsEvent) => void, signal: AbortSignal): Promise<void>;
+  /** The merge of the lists into a menu (POST /v1/asks/paths/merge): its menu, or why there is none. */
+  startPathMerge(input: StartMergeRequest, signal?: AbortSignal): Promise<StartMergeResponse>;
+  /** One question for several points (POST /v1/asks/paths/combine). */
+  startPathCombine(input: StartCombineRequest, signal?: AbortSignal): Promise<StartCombineResponse>;
+  /** Which chosen path the person's own point of view fits inside (POST /v1/asks/paths/fit). */
+  startPathFit(input: StartFitRequest, signal?: AbortSignal): Promise<StartFitResponse>;
 }
 
 const UnlinkSchema = { parse(value: unknown) {
@@ -638,6 +697,52 @@ export function createContractClient(
     if (!response.ok) throw await contractErrorForResponse(response);
     return response;
   };
+  /**
+   * V4 start step, Task 10: POST `body` to `path` as an event stream (with the CSRF pair, as every POST), reading each
+   * frame as it arrives and handing its parsed event to `consume`; a refusal is the contract's error for its status.
+   */
+  const startStepStream = async <E>(path: string, body: unknown, schema: { parse(value: unknown): E }, consume: (event: E) => void,
+    signal?: AbortSignal): Promise<void> => {
+    let response: Response;
+    try {
+      const headers = new Headers({ accept: "text/event-stream", "content-type": "application/json" });
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
+      response = await fetchImplementation(new URL(path, root), { method: "POST", body: JSON.stringify(body), headers,
+        cache: "no-store", credentials: "same-origin" as const, ...(signal === undefined ? {} : { signal }) });
+    } catch (error) {
+      if (signal?.aborted === true) throw error;
+      throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
+    }
+    if (!response.ok) throw await contractErrorForResponse(response);
+    if (response.body === null) throw new ContractHttpError("INVALID_RESPONSE", response.status, "Event stream has no body");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const hand = (events: readonly Readonly<{ event: string; data: unknown }>[]) => {
+      for (const one of events) {
+        let parsed: E;
+        try {
+          parsed = schema.parse(one);
+        } catch (error) {
+          throw new ContractHttpError("INVALID_RESPONSE", 200, error instanceof Error ? error.message : "Invalid event response");
+        }
+        consume(parsed);
+      }
+    };
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      const read = parseStartStepFrames(buffer);
+      buffer = read.rest;
+      hand(read.events);
+      if (chunk.done) break;
+    }
+    hand(parseStartStepFrames(`${buffer}\n\n`).events);
+  };
   const parseFrame = (frame: string): RunEvent | null => {
     const data = frame.split(/\r?\n/)
       .filter((line) => line.startsWith("data:"))
@@ -651,6 +756,22 @@ export function createContractClient(
     }
   };
   return Object.freeze({
+    startPathLists: (input: StartListsRequest, onEvent: (event: StartListsEvent) => void, signal: AbortSignal) =>
+      startStepStream("/v1/asks/paths/lists", StartListsRequestSchema.parse(input), StartListsEventSchema, onEvent, signal),
+    async startPathMerge(input: StartMergeRequest, signal?: AbortSignal): Promise<StartMergeResponse> {
+      let answer: StartMergeResponse | null = null;
+      await startStepStream("/v1/asks/paths/merge", StartMergeRequestSchema.parse(input), StartMergeEventSchema, (event) => {
+        if (answer !== null) return;
+        if (event.event === "menu") answer = { source: event.data.source, menu: event.data.menu };
+        else if (event.event === "none") answer = { source: "NONE", reason: event.data.reason };
+      }, signal);
+      if (answer === null) throw new ContractHttpError("INVALID_RESPONSE", 200, "The merge stream ended without a menu or a reason");
+      return answer;
+    },
+    startPathCombine: (input: StartCombineRequest, signal?: AbortSignal) => request("/v1/asks/paths/combine", StartCombineResponseSchema,
+      { method: "POST", body: JSON.stringify(StartCombineRequestSchema.parse(input)), ...(signal === undefined ? {} : { signal }) }),
+    startPathFit: (input: StartFitRequest, signal?: AbortSignal) => request("/v1/asks/paths/fit", StartFitResponseSchema,
+      { method: "POST", body: JSON.stringify(StartFitRequestSchema.parse(input)), ...(signal === undefined ? {} : { signal }) }),
     checkAge: (dateOfBirth: string) => request(
       "/v1/auth/age-check",
       AgeCheckResultSchema,
@@ -999,19 +1120,37 @@ export function createContractClient(
     readReadingLevel: () => request("/v1/account/reading-level", ReadingLevelStateSchema),
     saveReadingLevel: (level: AccountReadingLevel) => request("/v1/account/reading-level", ReadingLevelStateSchema,
       { method: "POST", body: JSON.stringify(ReadingLevelSaveRequestSchema.parse({ reading_level: level })) }),
+    // V4 start step, Task 39e: the raw document goes out as given; the parse is a check only.
+    listSavedQuestions: () => request("/v1/account/saved-questions", SavedQuestionListSchema),
+    createSavedQuestion: (doc: SavedQuestionDoc) => {
+      const checked = SavedQuestionCreateSchema.safeParse({ doc });
+      if (!checked.success) return Promise.reject(checked.error);
+      return request("/v1/account/saved-questions", SavedQuestionWrittenSchema, { method: "POST", body: JSON.stringify({ doc }) }, 201);
+    },
+    saveSavedQuestion: (id: string, revision: number, doc: SavedQuestionDoc) => {
+      const checked = SavedQuestionSaveSchema.safeParse({ revision, doc });
+      if (!checked.success) return Promise.reject(checked.error);
+      return request(`/v1/account/saved-questions/${encodeURIComponent(id)}`, SavedQuestionWrittenSchema,
+        { method: "PUT", body: JSON.stringify({ revision, doc }) });
+    },
+    readSavedQuestion: (id: string) => request(`/v1/account/saved-questions/${encodeURIComponent(id)}`, SavedQuestionReadSchema),
+    deleteSavedQuestion: (id: string) => requestNoContent(root.href, fetchImplementation, `/v1/account/saved-questions/${encodeURIComponent(id)}`,
+      { method: "DELETE" }, auth),
     readLastVisit: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitSchema),
     recordLastVisit: (runId: string, items: VisitItems) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitRecordedSchema,
       { method: "POST", body: JSON.stringify(LastVisitRecordRequestSchema.parse({ items })) }),
     readDigLinks: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/dig-links`, DigLinksSchema),
     recordDigLink: (parentRunId: string, link: DigLinkRecordRequest) => request(`/v1/runs/${encodeURIComponent(parentRunId)}/dig-links`, DigLinkRecordedSchema,
       { method: "POST", body: JSON.stringify(DigLinkRecordRequestSchema.parse(link)) }),
-    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused>(
+    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused | RunNotContinued>(
       root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/continue`, RunContinuedSchema,
       { method: "POST", body: JSON.stringify(RunContinueRequestSchema.parse({})) }, auth, undefined,
       (status, body) => {
         if (status !== 409) return null;
         const refused = RunContinueRefusedSchema.safeParse(body);
-        return refused.success ? refused.data : null;
+        if (refused.success) return refused.data;
+        const notContinued = RunNotContinuedSchema.safeParse(body);
+        return notContinued.success ? notContinued.data : null;
       }
     ),
     readInvestigation: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/investigation`, InvestigationReportsSchema),

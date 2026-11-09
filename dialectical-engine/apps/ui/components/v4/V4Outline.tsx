@@ -2,7 +2,6 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n/translate";
-import { ownWords } from "@/lib/v4/askText";
 import { digGround, groundClass } from "@/lib/v4/mapLooks";
 import { useMapKeys } from "@/lib/v4/useMapKeys";
 import type { DigView, V4OpenQuestion, V4Selection } from "@/lib/v4/types";
@@ -12,9 +11,11 @@ import {
   digSprouts,
   digsUnder,
   digTitle,
+  firstCardQuestion,
   HoldsSeal,
   LevelWords,
   MapLegendItems,
+  MoreToExploreRow,
   NewDot,
   OpenWord,
   openNote,
@@ -30,6 +31,7 @@ import {
   TitleText,
   TrustWordTag,
   undugOpen,
+  V4PathCard,
   viaKeyboard,
   type MapPiecesProps
 } from "./V4MapTree";
@@ -49,6 +51,9 @@ import { V4TrustBar } from "./V4TrustBar";
  * moved with the arrow keys, every row says its level, a path folds (Right and Left, or its own fold button beside it,
  * which alone says whether it is open: the row itself opens the path in the panel), and "What the shades mean" is one
  * folded line at the top. map-d3 shows it beside the panel on tablets too.
+ * V4 start step, Task 61: a chosen path's row is its one card in compact form (V4MapTree's V4PathCard), the same while the
+ * AIs look into it (the title, the step line, the dots to its right) and once it is filled in; what the page adds under the
+ * question (rootExtra) sits right under its row; "+ N more to explore" under the paths; a map with no path lists none.
  */
 
 function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesProps; selectedId: V4Selection; group: string; level: number }>) {
@@ -240,10 +245,12 @@ export function V4Outline(props: MapPiecesProps) {
             aria-current={rootSelected ? "true" : undefined}
             onClick={(event) => props.onSelect("root", viaKeyboard(event))}
           >
-            <span className="v4OutRootTitle v4Serif" data-ai-generated="true">{shortText(ownWords(map.question), 110)}</span>
+            {/* V4 start step, Task 62 (r2-8): a path debate's question as it was sent, its answers sentences in it. */}
+            <span className="v4OutRootTitle v4Serif" data-ai-generated="true">{firstCardQuestion(map)}</span>
             {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
             <LevelWords level={1} catalog={catalog} />
           </button>
+          {props.rootExtra === undefined ? null : <div className="v4MapRootExtra">{props.rootExtra}</div>}
           <Children
             groupKey="root"
             group="root"
@@ -255,7 +262,7 @@ export function V4Outline(props: MapPiecesProps) {
             {...reasonOf("root")}
           />
           {map.paths.length === 0
-            ? <p className="v4MapEmpty v4Muted">{t(catalog, "v4.map.noPaths")}</p>
+            ? (map.phase === "RUN" ? null : <p className="v4MapEmpty v4Muted">{t(catalog, "v4.map.noPaths")}</p>)
             : (
               <ul className="v4OutGroup" data-group="root">
                 {map.paths.map((path) => {
@@ -271,6 +278,23 @@ export function V4Outline(props: MapPiecesProps) {
                   return (
                     <li key={path.id} className="v4OutRow">
                       <div className="v4OutPathLine">
+                      {path.branch !== undefined ? (
+                        // Task 61: a chosen path's one card, in its compact form.
+                        <V4PathCard
+                          path={path}
+                          selected={selected}
+                          changed={news}
+                          phase={map.phase === "RUN" ? "RUN" : "ANSWER"}
+                          running={props.running === true}
+                          compact
+                          onSelect={(keyboard) => props.onSelect(id, keyboard)}
+                          catalog={catalog}
+                          locale={props.locale ?? "en"}
+                          digs={digs}
+                          reveal={props.reveal?.has(id) === true}
+                          {...(hasChildren ? { expanded: !isFolded } : {})}
+                        />
+                      ) : (
                       <button
                         type="button"
                         className={`v4OutPath ${groundClass("SETTLED")}${selected ? " v4OutSelected" : ""}${props.reveal?.has(id) === true ? " v4Reveal" : ""}`}
@@ -293,6 +317,7 @@ export function V4Outline(props: MapPiecesProps) {
                         <V4RewriteCardNote path={path} catalog={catalog} locale={props.locale ?? "en"} digs={digs} />
                         <LevelWords level={2} catalog={catalog} />
                       </button>
+                      )}
                       {hasChildren ? (
                         // map-f10: the path's own fold button, for a pointer or a finger (the arrow keys reach it from the row).
                         <button
@@ -329,6 +354,7 @@ export function V4Outline(props: MapPiecesProps) {
                     </li>
                   );
                 })}
+                <MoreToExploreRow pieces={props} selected={selectedId === "more"} />
               </ul>
             )}
         </li>

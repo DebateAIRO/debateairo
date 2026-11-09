@@ -16,7 +16,9 @@ import { previewModelRow, type PreviewEffort, type PreviewModelRow } from "./pre
  */
 export const PREVIEW_THINKING_STEPS = Object.freeze(["opening", "pros_cons", "cross_exchange", "judge_panel", "reviewer",
   "answer_writer", "answer_checker", "story_writer", "story_checker", "slip_fix",
-  "web_planner", "web_reader", "web_pick", "web_reader_top", "path_rewrite_writer", "path_rewrite_checker"] as const);
+  "web_planner", "web_reader", "web_pick", "web_reader_top", "path_rewrite_writer", "path_rewrite_checker",
+  // V4 start step (Task 23): the step before Start's calls (START:*), at each AI's lowest level unless the owner's table names the step.
+  "start_step"] as const);
 /** Spec 2026-10-12 §4.3: one step name (see PREVIEW_THINKING_STEPS). */
 export type PreviewThinkingStep = typeof PREVIEW_THINKING_STEPS[number];
 /** Spec 2026-10-12 §4.2: one AI's entry in the table: its usual level and optional per-step levels. */
@@ -101,6 +103,13 @@ export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; l
   // R22 decision 3: the automatic main-answer update is the report's answer step, at the same two steps.
   const updateSite = /^ANSWER_UPDATE:(ANSWER|ANSWER_ASKED|ANSWER_CHECK):[1-4]$/u.exec(request.callSiteKey);
   if (request.lane === "story" && updateSite !== null) return updateSite[1] === "ANSWER" || updateSite[1] === "ANSWER_ASKED" ? "answer_writer" : "answer_checker";
+  // V4 start step (Task 23): every call of the step before Start (packages/map START_CALL_SITE_PREFIX: the angle planner, the list
+  // writers, the merges, the combine and the fit) is one step of its own.
+  if (/^START:/u.test(request.callSiteKey)) return "start_step";
+  // V4 start step (Task 52): each path's answer so far (packages/story PATH_OUTCOME_CALL_SITE: path 1-8, round 1-2, on the served lane)
+  // is written and checked like a dig's rewrite, so it runs at the rewrite's two steps, the writer's and the checker's.
+  const outcomeSite = /^PATH_OUTCOME:(WRITER|CHECKER):[1-8]:[1-2]$/u.exec(request.callSiteKey);
+  if (outcomeSite !== null) return outcomeSite[1] === "WRITER" ? "path_rewrite_writer" : "path_rewrite_checker";
   // Debate shape (merge of dev into Phase 2, 2026-10-13): the map's calls (MAP:angles, MAP:list:N, MAP:merge, MAP:gap:N,
   // MAP:choose; packages/map) build the debate's opening, so they run at the owner's `opening` level, the closest step.
   if (/^MAP:/u.test(request.callSiteKey)) return "opening";
@@ -145,6 +154,8 @@ export const PREVIEW_CODE_STEP_LEVELS: Readonly<Partial<Record<PreviewThinkingSt
   path_rewrite_writer: "low", path_rewrite_checker: "low"
 });
 function codeStepLevel(row: PreviewModelRow, step: PreviewThinkingStep | null): PreviewEffort | undefined {
+  // V4 start step (Task 23): the step before Start runs at the AI's lowest level, the last of its strength order (every row has one).
+  if (step === "start_step") return row.effortsByStrength.at(-1);
   const level = step === null ? undefined : PREVIEW_CODE_STEP_LEVELS[step];
   return level !== undefined && (row.efforts as readonly string[]).includes(level) ? level : undefined;
 }

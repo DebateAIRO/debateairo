@@ -37,7 +37,7 @@ export function V4Header({
   linkLevel?: ReadingLevel | null;
   /** Accepted and unused (the 5 Nov reading-level ruling: the level is chosen only when asking). */
   onReadingLevel?: (level: ReadingLevel) => void;
-  /** journey-f19 / ask-f6: this page's classic view, offered once, in the account menu (null: none, or the page shows it). */
+  /** journey-f19 / ask-f6: this page's classic view, offered once, in the account menu (null: none). */
   classicHref?: string | null;
   /**
    * journey-f19: the quota share shows only on the ask, choosing and map pages. False on any other page (a public page's

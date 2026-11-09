@@ -1,4 +1,7 @@
-import { ACCOUNT_MEMORY_LIMITS, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, type AskParent, type DigPick } from "@debateai/contract";
+import {
+  ACCOUNT_MEMORY_LIMITS, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, ReadingLevelSchema, type AnswerLength, type AskParent, type DepthParams, type DigPick,
+  type ReadingLevel
+} from "@debateai/contract";
 
 /**
  * Plan 2026-10-30 dig-model revision, task W3-2 — A DIG'S ADMISSION, before anything is charged.
@@ -114,6 +117,31 @@ export function digPickAuthorOf(pick: DigPick, storedSuggestionText: string | nu
   return storedSuggestionText !== null && storedSuggestionText.trim() === pick.text.trim() ? "AI_SUGGESTION" : "PERSON_EDITED";
 }
 
+/** Task 75d: the answer length each reading level picks, as the V4 pages ask it (apps/ui/lib/v4/askConfig.ts). */
+const ANSWER_LENGTH_BY_LEVEL: Readonly<Record<ReadingLevel, AnswerLength>> = Object.freeze({
+  plain: "short",
+  background: "standard",
+  expert: "detailed"
+});
+
+/**
+ * V4 start step, Task 75c (owner answer Q15, 5 Nov: the level "should propagate throughout the whole debate and shouldn't be
+ * changed"): a dig is written at its parent debate's reading level, whatever the request names (another is ignored, never
+ * refused). `parent` is the parent's stored depth_params: its level replaces the asked one, and a parent asked without one (or
+ * with a stored value that is not a level) gives the dig none, the default as today. Null (the parent could not be read): the
+ * asked params stay as they are. Task 75d: an asked answer length becomes the one the parent's level picks (below).
+ */
+export function digDepthParamsAtParentLevel(asked: DepthParams, parent: Readonly<Record<string, unknown>> | null): DepthParams {
+  if (parent === null) return asked;
+  const level = ReadingLevelSchema.safeParse(parent.readingLevel);
+  const { readingLevel: _asked, answerLength, ...rest } = asked;
+  // Task 75d (owner's second-round answers: "every dig is stored and priced at its debate's level"): the length a price counts is
+  // the one the debate's level picks, whatever length the request names; a debate without a level reads as Plain words. A request
+  // that names no length (no length switch in force) gets none.
+  const length = answerLength === undefined ? {} : { answerLength: ANSWER_LENGTH_BY_LEVEL[level.success ? level.data : "plain"] };
+  return Object.freeze(level.success ? { ...rest, ...length, readingLevel: level.data } : { ...rest, ...length });
+}
+
 /** The dig's checks, cheapest first; nothing is written and nothing charged. */
 export async function admitDig(input: Readonly<{ ownerRef: string; parent: AskParent; free: boolean }>,
   ports: DigAdmissionPorts): Promise<DigAdmission> {
@@ -174,14 +202,19 @@ export interface DigPicksPort {
 /** The text of a dig suggestion the parent offers (W4-3), or null when it offers none under that id. */
 export type DigSuggestionTextReader = (ownerRef: string, parentRunId: string, suggestionId: string) => Promise<string | null>;
 
-/** A suggestion's text as the parent's answer serves it, whichever path offers it; null when none has that id. */
+/**
+ * A suggestion's text as the parent's answer serves it, whichever path offers it; null when none has that id.
+ * V4 start step, Task 55 (the page's contract, Task 62): on a path debate a "+ N more to explore" item is offered too; a pick of
+ * one names the item's `more_id` as its suggestion (and its place), and its text is the item's question.
+ */
 export function digSuggestionTextOf(answer: Readonly<{ web?: Readonly<{ paths: readonly Readonly<{ suggestions: readonly Readonly<{
-  suggestion_id: string; text: string }>[] }>[] }> | undefined }> | null, suggestionId: string): string | null {
+  suggestion_id: string; text: string }>[] }>[] }> | undefined;
+  branches?: Readonly<{ more: readonly Readonly<{ more_id: string; question: string }>[] }> | undefined }> | null, suggestionId: string): string | null {
   for (const path of answer?.web?.paths ?? []) {
     const found = path.suggestions.find((suggestion) => suggestion.suggestion_id === suggestionId);
     if (found !== undefined) return found.text;
   }
-  return null;
+  return answer?.branches?.more.find((item) => item.more_id === suggestionId)?.question ?? null;
 }
 
 /**

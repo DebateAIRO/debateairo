@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
 import {
-  PostgresDigModelRepository, PostgresDigModelRunnerRepository, PostgresInvestigationRepository, PostgresInvestigationRunnerRepository, PostgresWebEvidenceRepository,
+  createPool, PostgresDigModelRepository, PostgresDigModelRunnerRepository, PostgresInvestigationRepository, PostgresInvestigationRunnerRepository, PostgresWebEvidenceRepository,
   WEB_EVIDENCE_CARRIERS, encryptAttestedLeasedContentForRun, prepareLeasedContentEncryptionForRun, withRunContentLease, type WebSealed
 } from "@debateai/db";
 import { addressKey } from "../../packages/evidence/src/host-filter.js";
@@ -14,6 +14,7 @@ const { countOpenWork } = await import("../../deploy/" + "preview-lifecycle/v1/r
   countOpenWork: (input: Readonly<{ releaseKey: string | null; run: unknown; layout: unknown }>) => Promise<number> };
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { postgresRunnerRetirementStore } from "../../apps/runner/src/runner-retirement.js";
+import { createRunSettingsVersions, readRunSettingsVersionNow, runVersionMapper } from "../../apps/runner/src/run-settings.js";
 import { ServeRepository } from "@debateai/serve";
 import { backfillShownQuotes, sweepPassages } from "../../apps/runner/src/passage-sweep.js";
 import { webStepRowId } from "../../apps/runner/src/web-step.js";
@@ -156,6 +157,42 @@ describe("Continue moves the debate, once, to the release that is current", () =
     expect(await pauses().resumeInRelease(owner, paused.runId, C, 2)).toBe("RECORDED");
     expect(await hops(paused.runId)).toHaveLength(1);
   });
+
+  it("Task 57o-fix2: the runner's own login reads a real debate's version, then the version Continue moved it to; the claim's wins over a lane's mapping", async () => {
+    // After the case above C is current and has passed version 2. A paused debate of B, stamped version 1 (made up).
+    const runId = await fixture.createEncryptedRun("Should the ferry run at night?", { releaseKey: B });
+    await runnerPauses().recordPause({ runId, reason: "MONTH_WALL", resumableAt: new Date(Date.now() + 3_600_000), plannedCalls: 1, plannedSearches: 0, plannedMicros: 5 });
+    // A login holding the runner's role only (debateai_runtime), never the API's.
+    const login = ["s57o2", "runner"].join("_");
+    const password = ["private", "fixture", login].join("-");
+    await db().query(`CREATE ROLE ${login} LOGIN PASSWORD '${password}' IN ROLE debateai_runtime`);
+    const url = new URL(fixture.database.connectionString);
+    url.username = login;
+    url.password = password;
+    const runner = createPool(url.toString(), { max: 1, connectionTimeoutMillis: 5000, name: "test:runner-version-now" });
+    try {
+      expect(await readRunSettingsVersionNow(runner, runId)).toBe(1);
+      // "Add to researched" (a background lane) maps the debate to its own version, which loads here; the pointer is never read.
+      const lines: Array<Readonly<Record<string, unknown>>> = [];
+      const versions = createRunSettingsVersions({ log: (line) => { lines.push(line); } });
+      const map = runVersionMapper({ readVersion: (id) => readRunSettingsVersionNow(runner, id), requireSettings: async () => undefined, versions,
+        switchedOnVersion: async () => { throw new Error("made-up: the pointer is not read for a version that loads"); }, siteVersion: 2,
+        log: (line) => { lines.push(line); } });
+      await map(runId);
+      expect(versions.versionOf(runId)).toBe(1);
+      // The person presses Continue: the debate moves to C's version 2, and the runner's login reads the moved version.
+      expect(await pauses().resumeInRelease(fixture.ownerRef, runId, C, 2)).toBe("RECORDED");
+      expect(await hops(runId)).toMatchObject([{ hop: 1, from_release_key: B, from_register_version: "1", to_release_key: C, to_register_version: "2" }]);
+      expect(await readRunSettingsVersionNow(runner, runId)).toBe(2);
+      // The claim maps the debate to the version it owns now: it wins over the lane's mapping, one content-free line, and the debate runs.
+      versions.set(runId, await readRunSettingsVersionNow(runner, runId));
+      expect(versions.versionOf(runId)).toBe(2);
+      expect(lines).toEqual([{ kind: "DEBATEAI_RUNNER_RUN_SETTINGS_CLAIMED", runId, laneVersion: "1", version: "2" }]);
+    } finally {
+      await runner.end();
+      await db().query(`DROP ROLE ${login}`);
+    }
+  });
 });
 
 describe("what a paused debate found stays until it finishes", () => {
@@ -174,7 +211,7 @@ describe("what a paused debate found stays until it finishes", () => {
             addressKey: addressKey(`https://s.example/${id}`), text: { chars: text.length, digest: Buffer.alloc(32, 9), sealed: seal(WEB_EVIDENCE_CARRIERS.pageText, id, text) } } as never);
         }
         await store.recordReading({ runId, readingId, pageId, reader: 1, maker: "anthropic", outcome: "READ", grade: 3,
-          line: seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: "One line.", language: "en", note: "It is a report." }) });
+          line: seal(WEB_EVIDENCE_CARRIERS.reading, readingId, { line: "One line.", language: "en", note: "It is a report." }), settingsVersion: 4 });
         await store.recordExtract({ runId, extractId, pageId, label: "S1-1", foundBy: [1], quote: seal(WEB_EVIDENCE_CARRIERS.extract, extractId, { quote: PASSAGE }) });
         await store.recordPicks(runId, "a1", [pageId]);
         await store.recordPack({ runId, packId, pathRef: "a1", extractLabels: ["S1-1"], pack: seal(WEB_EVIDENCE_CARRIERS.pack, packId, { path_ref: "a1", pages: [], extracts: [] }) });

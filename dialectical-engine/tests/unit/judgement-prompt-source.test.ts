@@ -184,13 +184,17 @@ describe("FAIR-01 / DR-140(b) — one debate, one claim frame, carried by the le
     const runner = readFileSync(RUNNER_SRC, "utf8");
     // Each `judge.judge({ … })` call must hand it `run.questionLine` and nothing
     // else. A leg that passed its own composed line would re-open exactly the
-    // defect DR-140(b) closed, and it would do so silently.
+    // defect DR-140(b) closed, and it would do so silently. V4 start step, Task 53: the run's ONE line is
+    // `pathsQuestionLine` — `run.questionLine` itself, except on a path debate, where it is that line with the run's
+    // own step-2 lines (read-d3), set once before any leg and read by every leg alike.
     const calls = runner.split(/\.judge\.judge\(\{/u).slice(1);
     expect(calls.length).toBeGreaterThanOrEqual(2);
     for (const call of calls) {
       const head = call.slice(0, call.indexOf("})"));
-      expect(head).toContain("questionLine: run.questionLine");
+      expect(head).toContain("questionLine: pathsQuestionLine,");
     }
+    expect(runner.split("let pathsQuestionLine = run.questionLine;")).toHaveLength(2);
+    expect(runner.split(/pathsQuestionLine = questionWithPurposeLines\(/u)).toHaveLength(2);
   });
 
   it("the classifier reads questionLine directly, with no override left", () => {

@@ -37,7 +37,9 @@
  *    the integration test only; the real practice waits for real.
  */
 import type { Pool } from "pg";
-import { PostgresDigModelRunnerRepository, RunRepository } from "@debateai/db";
+import {
+  PostgresDigModelRunnerRepository, PostgresPathProgressRepository, PostgresPathResultsRepository, PostgresStartPathsStore, RunRepository
+} from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -96,9 +98,9 @@ import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "../../apps/runner
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
 import { targetTokenCounter } from "../../apps/runner/src/token-line.js";
 import {
-  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
-  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings, runPreviewThinkingLevelsOf,
-  type RunnerVersionReaders
+  createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings,
+  preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings,
+  runPreviewThinkingLevelsOf, type RunnerVersionReaders
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -225,6 +227,10 @@ export async function composePracticeRunner(input: Readonly<{
   // Side-by-side spec §13 (S6), as main.ts: each claimed run's version by run id, and each call's own version's guard.
   const runSettingsVersions = createRunSettingsVersions();
   const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+  // V4 start step, Task 57p (0169), as main.ts: each piece's record notes the version of the run its calls were charged to, from this map.
+  const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);
+  // V4 start step, Task 53, as main.ts: each claimed run's final-writer terms by run id (a v2 run's plan), read by the call policy.
+  const runFinalWriterTerms = createRunFinalWriterTerms();
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
   const callStats = new PracticeCallStats();
   const callPolicy = input.callConcurrency
@@ -288,6 +294,8 @@ export async function composePracticeRunner(input: Readonly<{
       gateRemaining: input.remaining,
       onFinalWriterTierUnread: finalWriterTierUnread,
       thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),
+      // V4 start step, Task 53, as main.ts: a v2 run's terms (its plan); a v1 run and a call of no run, none.
+      finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms),
       ...(input.sleep === undefined ? {} : { sleep: input.sleep })
     });
   }
@@ -337,14 +345,14 @@ export async function composePracticeRunner(input: Readonly<{
   })();
   const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
-    log: storyLog });
+    settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
   // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
   const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
   const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
     reserveMicros: closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 }, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
     members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
     priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
-    log: storyLog });
+    settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({
       preview: true,
@@ -357,6 +365,8 @@ export async function composePracticeRunner(input: Readonly<{
     });
   }
   const wait = input.wait ?? ((cooldownMs: number) => new Promise<void>((resolve) => setTimeout(resolve, cooldownMs)));
+  // V4 start step, Tasks 53 and 56, as main.ts: the one chosen paths store, read by a path debate and marking a ticked first debate DUE.
+  const startPaths = new PostgresStartPathsStore(pool);
   const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
     workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
     // Side-by-side spec §3, as main.ts: the runner runs only debates of its release (the practice's one key).
@@ -368,6 +378,13 @@ export async function composePracticeRunner(input: Readonly<{
     // Side-by-side spec §13 (S6), as main.ts: every debate on its own stamped version, with the run → version map.
     settingsForVersion: (version) => runnerSettings.settingsFor(version),
     runSettingsVersions,
+    // V4 start step, Task 53, as main.ts: the run → final-writer terms map, and a path debate's stores on the runner's pool.
+    runFinalWriterTerms,
+    startPaths,
+    pathResults: new PostgresPathResultsRepository(pool),
+    pathProgress: new PostgresPathProgressRepository(pool),
+    // V4 start step, Task 56, as main.ts: the same store marks a ticked first debate DUE ("Let the AIs carry on to the report").
+    carryOn: startPaths,
     providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
     ...(providerTopology.critique === undefined
       ? {} : { critique: providerTopology.critique }),

@@ -1,9 +1,17 @@
 import { TRUST_WORDS, type TrustWord } from "@debateai/contract";
 import type {
+  AnswerBranchViewpoint,
   AnswerDig,
+  BranchState,
   DigSuggestion,
   PathRewrite,
   PathsChangedSince,
+  PointOfViewVerdict,
+  RunPathPointState,
+  RunPathStep,
+  StartCheck,
+  StartPathAuthor,
+  StartPaths,
   StoryFate,
   WebOtherPage,
   WebSearchStatus,
@@ -91,10 +99,49 @@ export type V4OpenQuestion = Readonly<{
   pathId: string | null;
 }>;
 
+/**
+ * V4 start step, Task 60 (owner answer Q16): who made a chosen path, as its card's tag says it. TOGETHER: the AIs put
+ * two viewpoints or more together; COMBINED: the person combined them; EDITED: the person rewrote it; ADDED: the person's
+ * own path. An AI's path of one viewpoint has no tag, and there is never a "You picked" mark.
+ */
+export const V4_PATH_TAGS = ["TOGETHER", "COMBINED", "EDITED", "ADDED"] as const;
+export type V4PathTag = (typeof V4_PATH_TAGS)[number];
+
+/**
+ * Task 60 (wait-d1, journey-f1): a path still being looked into, as the run read says it: its step line (null before its
+ * first step) and its quiet dots, one per point put forward (at most RUN_PATH_LIMITS.pointsShownMax).
+ */
+export type V4PathProgress = Readonly<{ step: RunPathStep | null; dots: readonly RunPathPointState[] }>;
+
+/**
+ * Task 60: one path the person chose before Start (`Answer.branches`, Task 16), as the map shows it: its menu words, its
+ * viewpoints, its state and, once argued, its answer so far (the outcome's line and summary), what changed, the point of
+ * view line and the trust word worked out from its points. `progress` only on the run read, while it is being looked into.
+ */
+export type V4Branch = Readonly<{
+  order: number;
+  title: string;
+  question: string;
+  author: StartPathAuthor;
+  tag: V4PathTag | null;
+  viewpoints: readonly AnswerBranchViewpoint[];
+  state: BranchState;
+  answerSoFar: string | null;
+  summary: string | null;
+  whatChanged: readonly string[];
+  view: PointOfViewVerdict | null;
+  trust: TrustWord | null;
+  /** LOOKING on the run read only; null otherwise. */
+  progress: V4PathProgress | null;
+}>;
+
+/** Task 60 (wait-d1): a "+ N more to explore" item: a menu path the person did not choose (its id `more-<path_ref>`). */
+export type V4MoreItem = Readonly<{ id: string; title: string; question: string; isNew: boolean }>;
+
 /** One path the debate followed (a story path: one answer it weighed and what became of it). */
 export type V4Path = Readonly<{
   id: string;
-  /** null only for the stand-in path used when no story is available (no fate is invented). */
+  /** null when nothing says what became of it yet (a chosen path still being looked into); no fate is invented. */
   fate: StoryFate | null;
   /** AI text: the story's one line about this path. */
   line: string;
@@ -110,8 +157,8 @@ export type V4Path = Readonly<{
    */
   suggestions?: readonly DigSuggestion[];
   /**
-   * W4-6: the story position (or the dig's own path) this path stands for; `id` adds "#2" to a repeated one. Absent: the
-   * stand-in path, which stands for no position.
+   * W4-6: the story position (or the dig's own path) this path stands for; `id` adds "#2" to a repeated one. Task 60: on a
+   * path debate, the path id (b1..b8), the position everywhere. Task 60 (map-f4): the map draws no stand-in path any more.
    */
   positionRef?: string;
   /** W4-6: what digs did to this path (Answer.path_rewrites); absent when no dig rewrote it or changed anything below it. */
@@ -119,9 +166,12 @@ export type V4Path = Readonly<{
   /**
    * Owner r2-20 A (3 Nov): the path's one trust word, shown with its bar in place of the outcome tags ("Held up",
    * "Partly held", "Set aside"): the word of the point the path stands for (its position), as the server worked it out
-   * for a rewritten path, else as the page places it. null: that point has no word yet; absent: the stand-in path.
+   * for a rewritten path, else as the page places it. null: that point has no word yet. Task 60: a chosen path's word is
+   * its answer so far's (worked out from its points), unless a dig's rewrite gave its root one.
    */
   trust?: TrustWord | null;
+  /** V4 start step, Task 60: the path the person chose before Start; absent on every R22 debate's path. */
+  branch?: V4Branch;
 }>;
 
 /**
@@ -201,6 +251,21 @@ export type V4Map = Readonly<{
   changedSince?: PathsChangedSince | null;
   /** W4-6: on a dig's own map, what it dug and its rewrite of the path it came from (`Answer.dig`); null otherwise. */
   dig?: AnswerDig | null;
+  /**
+   * V4 start step, Task 60 (wait-d1, map-d2): "RUN" on the map drawn from the run read while a path debate runs, or from the
+   * person's paths during Start's 10 s (answer Q11); absent on a served answer's map.
+   */
+  phase?: "RUN";
+  /** Task 60 (wait-f16): on a RUN map, the AIs are still choosing what to look into (no path is named yet). */
+  pending?: boolean;
+  /** Task 60 (wait-d1): "+ N more to explore", the menu paths the person left out; absent without branches. */
+  more?: readonly V4MoreItem[];
+  /** Task 60: "Also raised, not looked into", the points the gap round found that no path took (AI text). */
+  alsoRaised?: readonly string[];
+  /** Task 60: the main answer's trust word, worked out from its paths' words; null on a RUN map (the main answer comes last). */
+  mainTrust?: TrustWord | null;
+  /** Task 60 (wait-f16): the box "Let the AIs carry on to the report without asking me" was ticked. */
+  carryOnToReport?: boolean;
 }>;
 
 /** Row D / sieve 2026-10-26: the reading level is chosen once; ids follow the D1 prototype's three choices. */
@@ -248,11 +313,32 @@ export type V4Goal = Readonly<{
   answers: readonly V4GoalAnswer[];
   /** What matters most when the answers pull apart, in the person's words. */
   matters: string;
-  /** The person's own angles ("Add your own angle"), at most five: things to investigate, in their words. */
-  angles: readonly string[];
+  // V4 start step, Task 67 (decision 2): no own angles here. A person's own angle is a path added at the choosing step,
+  // never a sentence added to the question; an old debate's stored angles still read (PurposeLines keeps `angles`).
 }>;
 
-export const EMPTY_GOAL: V4Goal = Object.freeze({ answers: Object.freeze([]), matters: "", angles: Object.freeze([]) });
+export const EMPTY_GOAL: V4Goal = Object.freeze({ answers: Object.freeze([]), matters: "" });
+
+/**
+ * V4 start step, Task 68 (read-d2, read-d3, choose-d2): what Start hands to the ask. `questionLine` is the question box's
+ * line (the line read at Next, with the answer sentences and the person's typing); `startCheck` is the check of Next as it
+ * was given (`{ref}`, or `{ref, original_question_line}` after an accepted rewrite); `startPaths` the chosen paths;
+ * `carryOnToReport` the ticked carry-on box. Each is absent when the page has none: no member, today's ask. `ownWords`:
+ * everything the person wrote into the paths (titles and questions of their own paths, own texts), which the page's
+ * crisis check reads before anything is sent; it never goes on the wire as such.
+ */
+export type V4StartHandOver = Readonly<{
+  questionLine: string;
+  startCheck?: StartCheck;
+  startPaths?: StartPaths;
+  carryOnToReport?: true;
+  ownWords: readonly string[];
+  /**
+   * V4 start step, Task 76f (saved-questions spec §3.7): the question the account keeps for this step 2, which the server
+   * removes once it accepts the debate. Absent: none kept.
+   */
+  savedQuestionId?: string;
+}>;
 
 /**
  * What the page saw earlier, per item id: the item's word (a trust word, a fate or a dig state). In memory for this visit;
@@ -310,24 +396,37 @@ export type DigView = Readonly<{
    */
   quotaUntouched?: true;
   /**
+   * V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, "Continue the same dig"): FAILED, and its own run read says
+   * Continue would continue it where it stopped (the contract's `continuable`), so "Try this dig again" continues this dig. Absent:
+   * the server did not say so; the press digs afresh, as before.
+   */
+  continuable?: true;
+  /**
+   * V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"): FAILED, and its own run read says it keeps failing
+   * (the contract's `keeps_failing`: two continues of it failed again), so its panel offers nothing more, only its line and the report.
+   */
+  keepsFailing?: true;
+  /**
    * map-f29 / dig-f20: DONE, a new-model dig: what it looked into, as its own answer names it (`Answer.dig.picks`: each
    * pick's words and who wrote them). Absent: not read yet, or a dig from before R22.
    */
   picks?: readonly Readonly<{ text: string; by: "AI_SUGGESTION" | "PERSON_EDITED" | "PERSON_OWN_VIEW" }>[];
 }>;
 
-/** What the panel shows: the question itself, one path, one open question or one dig. */
-export type V4Selection = "root" | `path:${string}` | `open:${string}` | `dig:${string}`;
+/** What the panel shows: the question itself, one path, one open question, one dig or (Task 60) "+ N more to explore". */
+export type V4Selection = "root" | `path:${string}` | `open:${string}` | `dig:${string}` | "more";
 
 /**
  * W3-4: one thing a dig is made of, chosen on the map: an open question, one of a path's dig suggestions (its text as the
  * person left it: as written, or edited), or the person's own view at a path. `group` is the path it belongs to (null:
- * the main question itself); owner Q-D1, a dig combines picks of one group only (lib/v4/suggestions.ts).
+ * the main question itself); owner Q-D1, a dig combines picks of one group only (lib/v4/suggestions.ts). V4 start step,
+ * Task 60: a "+ N more to explore" item of a path debate (MORE), under the main question.
  */
 export type V4DigPick =
   | Readonly<{ kind: "OPEN"; key: string; group: string | null; question: V4OpenQuestion }>
   | Readonly<{ kind: "SUGGESTION"; key: string; group: string; suggestion: DigSuggestion; text: string }>
-  | Readonly<{ kind: "OWN_VIEW"; key: string; group: string; text: string }>;
+  | Readonly<{ kind: "OWN_VIEW"; key: string; group: string; text: string }>
+  | Readonly<{ kind: "MORE"; key: string; group: null; more: V4MoreItem }>;
 
 /** W3-4: what the person has chosen to dig so far: picks of one group, in the order they were chosen. */
 export type V4DigDraft = Readonly<{ group: string | null; picks: readonly V4DigPick[] }>;
@@ -339,5 +438,8 @@ export type DigTarget =
   /** `path`: the path the picks belong to (null: the main question), whose line the dig's question names first. */
   | Readonly<{ kind: "picks"; path: V4Path | null; picks: readonly V4DigPick[] }>;
 
-/** A dig waiting out its 10-second Undo (row D decision 1). Nothing is sent before `sendsAt`. */
-export type PendingDig = Readonly<{ target: DigTarget; mode: DigMode; sendsAt: number }>;
+/**
+ * A dig waiting out its 10-second Undo (row D decision 1). Nothing is sent before `sendsAt`. V4 start step, Task 79 (dig-f35):
+ * `paths`, a path debate's dig of picks as the person shaped them (DIG_PICKS); absent, today's dig (one path per pick there).
+ */
+export type PendingDig = Readonly<{ target: DigTarget; mode: DigMode; sendsAt: number; paths?: StartPaths }>;

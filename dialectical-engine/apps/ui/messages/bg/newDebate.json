@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Друг отговор…",
   "newDebate.askText.otherLabel": "Собствено допълнително уточнение",
   "newDebate.askText.matters": "Ако отговорите сочат в различни посоки, най-важното за мен е: {matters}",
-  "newDebate.askText.angles": "Моля, разгледайте също: {list}.",
   "newDebate.freePublicNotice": "При плана „Безплатен“ въпросът Ви и дебатът по него са публични. Не включвайте лични данни."
 }

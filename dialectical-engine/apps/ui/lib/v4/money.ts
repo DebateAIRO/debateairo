@@ -1,8 +1,11 @@
 import {
+  RUN_CONTINUE_NO_ROOM,
+  RUN_NOT_CONTINUABLE,
   RUN_PAUSED_UNTIL_RESET,
   type ContractClient,
   type MonthPause,
   type RunProjection,
+  type StartStepRoom,
   type UsageBorrow
 } from "@debateai/contract";
 import { contractClient } from "../api.js";
@@ -73,21 +76,76 @@ export function sharePeriodOf(room: AskRoom | null): SharePeriod {
   return room?.plan_id === "FREE" ? "PERSON_MONTH" : "PERSON_DAY";
 }
 
-/** Before a dig: "This dig uses about {percent}% of today. …" (approved), when the room read for the dig says a share. */
-export function digShareLine(room: AskRoom | null): MoneyLine | null {
-  const percent = room?.dig_share_percent;
+/**
+ * Before a dig: "This dig uses about {percent}% of today. …" (approved), when the room read for the dig says a share.
+ * V4 start step, Task 79b (owner answer Q19 of 4 Nov: "a dig's share follows a combine"): with `paths`, the number of paths a path
+ * debate's dig will look into, and the read's share for each path count (`dig_share_by_paths`, entry i - 1 for i paths, the
+ * server's own figures), that count's share (a count outside them reads the nearest entry, as `startPathsShare` does); otherwise, an
+ * R22 dig's read included, today's single `dig_share_percent`, as before.
+ */
+export function digShareLine(room: AskRoom | null, paths?: number): MoneyLine | null {
+  const byPaths = room?.dig_share_by_paths;
+  const percent = paths === undefined || byPaths === undefined || byPaths.length === 0 || !Number.isFinite(paths)
+    ? room?.dig_share_percent
+    : byPaths[Math.min(byPaths.length, Math.max(1, Math.trunc(paths))) - 1];
   return percent === undefined || percent <= 0 ? null : Object.freeze({ key: "v4.dig.quotaShare", values: { percent } });
 }
 
 /**
  * Before a new question: its share, when the room read says one: "… of today", or of the window it is measured against
  * (read-f19, public-f14: "… of this month" on Free, "… of this week" when the server names the week).
+ * V4 start step, Task 69 (choose-f14: one share line, the same unit on step 1 and step 2): with the plan's own Free mark
+ * (`freePlan`, the page's planIsFree, read-f3) the unit is step 2's, decided by that mark alone: "… of this month" on Free,
+ * "… of today" otherwise. Without it (today's callers) the room read's window stands, as above.
  */
-export function startShareLine(room: AskRoom | null): MoneyLine | null {
+export function startShareLine(room: AskRoom | null, freePlan?: boolean): MoneyLine | null {
   const percent = room?.start_share_percent;
   if (percent === undefined || percent <= 0) return null;
-  const period = sharePeriodOf(room);
+  const period: SharePeriod = freePlan === undefined ? sharePeriodOf(room) : freePlan ? "PERSON_MONTH" : "PERSON_DAY";
   return Object.freeze({ key: period === "PERSON_DAY" ? "v4.room.startShare" : `v4.room.startShare.${period}`, values: { percent } });
+}
+
+/**
+ * V4 start step, Task 69 (journey-f8, read-d5, the owner's 2-second request): how long a share change shows its grey
+ * "+4%" / "−2%" after the number rolls to its new value. The one place this time lives (the bar, the rows, a dig's tray).
+ */
+export const SHARE_DELTA_SHOW_MS = 2_000;
+
+/**
+ * Task 69: the share of today (Free: of its month) a debate of `paths` paths takes, from the room read's start step
+ * (`share_by_paths`, entry i - 1 for i paths, the server's own figures). A count outside 1..widest reads the nearest entry.
+ * Null without the start step or its shares (an internal grant, billing off): the page then shows no share.
+ */
+export function startPathsShare(step: StartStepRoom | null, paths: number): number | null {
+  const shares = step?.share_by_paths;
+  if (shares === undefined || shares.length === 0 || !Number.isFinite(paths)) return null;
+  return shares[Math.min(shares.length, Math.max(1, Math.trunc(paths))) - 1] ?? null;
+}
+
+/**
+ * Task 69 (choose-f14, journey-f8): step 2's one share line, "about 18% of today", on Free "about 16% of this month". The
+ * period is named once, here; never a price and never what would be left (r2-2). Null without a share or at 0.
+ */
+export function startPathsShareLine(percent: number | null, freePlan: boolean): MoneyLine | null {
+  if (percent === null || !(percent > 0)) return null;
+  return Object.freeze({ key: freePlan ? "v4.start.share.month" : "v4.start.share.day", values: { percent } });
+}
+
+/** Task 69 (journey-f8): a share change as its grey mark, "+4%" or "−2%" (the real minus sign); null when nothing changed. */
+export function shareDeltaLine(delta: number): MoneyLine | null {
+  if (!Number.isFinite(delta) || delta === 0) return null;
+  return Object.freeze({ key: delta > 0 ? "v4.start.shareUp" : "v4.start.shareDown", values: { percent: Math.abs(delta) } });
+}
+
+/**
+ * Task 69 (choose-f7, owner answer Q7): the true share after a change of path count (`from` → `to`, each read as
+ * `startPathsShare` reads it) and the change, for the shares beside combine ("Combining frees 1 path (about 15%, −3%)") and
+ * look wider ("Look wider: 7 paths (about 24%, +6%)"). Null without the start step or its shares.
+ */
+export function startShareChange(step: StartStepRoom | null, from: number, to: number): Readonly<{ percent: number; delta: number }> | null {
+  const before = startPathsShare(step, from);
+  const after = startPathsShare(step, to);
+  return before === null || after === null ? null : Object.freeze({ percent: after, delta: after - before });
 }
 
 /** New starts wait for the reset of a full day, week or month: the line with the reset time; null otherwise. */
@@ -125,6 +183,30 @@ export function limitWindowOf(room: AskRoom | null): LimitWindow | null {
 export function limitLine(room: AskRoom | null, locale: string): MoneyLine | null {
   const held = limitWindowOf(room);
   return held === null ? null : Object.freeze({ key: `v4.money.startsWait.${held.scope}`, values: resetValues(held.at, held.scope, locale) });
+}
+
+/**
+ * V4 start step, Task 56c (item public-f25; owner answer Q20 B: only a debate's very first report uses the kept reserve): a further
+ * report on a public debate (after a visitor's report, or a second one) uses the quota and waits for the reset like digs, "and their
+ * button says when they can run": "This report can start after 08:00." (a day's or a week's reset), "… on 1 December." (a month's).
+ * Only when the page is sure: the debate is public (`isPublic`), the server said this press would not be its first report
+ * (`firstReportLeft` false, the owner's investigation read, Task 56b; true or not said: the first report goes ahead), and a person
+ * window holds new starts. The words say when, never what is left and never a price. Null otherwise.
+ */
+export function reportWaitLine(input: Readonly<{ room: AskRoom | null; isPublic: boolean; firstReportLeft: boolean | null; locale: string }>): MoneyLine | null {
+  if (!input.isPublic || input.firstReportLeft !== false) return null;
+  const held = limitWindowOf(input.room);
+  return held === null ? null : Object.freeze({ key: `v4.report.waits.${held.scope}`, values: resetValues(held.at, held.scope, input.locale) });
+}
+
+/**
+ * Task 56c: while this debate's report waits for the reset, the month line's last sentence ("You can still write your report.") is
+ * untrue here, so the month line goes without it, with the same date; a day's and a week's line say nothing of the report.
+ */
+export function limitLineWhileReportWaits(line: MoneyLine, reportWaits: boolean): MoneyLine {
+  return reportWaits && line.key === "v4.money.startsWait.PERSON_MONTH"
+    ? Object.freeze({ key: "v4.money.startsWait.PERSON_MONTH_NO_REPORT", values: line.values })
+    : line;
 }
 
 /**
@@ -228,10 +310,32 @@ export type ContinueOutcome =
  * with its reset (`until`), answered as data. True resume: finished work is never paid for again. Never throws.
  */
 export async function continueRun(runId: string, client: Pick<ContractClient, "continueRun"> = contractClient): Promise<ContinueOutcome> {
+  const outcome = await sendContinue(runId, client);
+  // Task 57g: a failed debate's own two refusals never answer a month-paused one; if they did, they would read as before (FAILED).
+  return outcome.kind === "NOT_CONTINUABLE" || outcome.kind === "NO_ROOM" ? { kind: "FAILED" } : outcome;
+}
+
+/**
+ * V4 start step, Task 57g (the owner's 7 Nov answers: "continue where it broke, and not charge the customer again"): the same Continue on
+ * the person's own FAILED debate, "Continue where it stopped". Besides the month pause's answers, the API refuses a failed debate it cannot
+ * continue (NOT_CONTINUABLE: the page reads the debate again and the button goes) and one with no room left for the rest (NO_ROOM: the
+ * usual quota words). Nothing changed either way. Anything else it cannot use (an upload switching, 503 RUN_CONTINUE_TRY_AGAIN; a lost
+ * connection) is FAILED: the person may press again. Never throws.
+ */
+export type StoppedContinueOutcome = ContinueOutcome | Readonly<{ kind: "NOT_CONTINUABLE" }> | Readonly<{ kind: "NO_ROOM" }>;
+
+export function continueStopped(runId: string, client: Pick<ContractClient, "continueRun"> = contractClient): Promise<StoppedContinueOutcome> {
+  return sendContinue(runId, client);
+}
+
+/** POST /v1/runs/{id}/continue once, through the typed client (its 409 bodies come back as data); every answer named. Never throws. */
+async function sendContinue(runId: string, client: Pick<ContractClient, "continueRun">): Promise<StoppedContinueOutcome> {
   try {
     const answer = await Promise.resolve().then(() => client.continueRun(runId));
     if ("state" in answer && answer.state === "CONTINUING") return { kind: "CONTINUING" };
     if ("error" in answer && answer.error === RUN_PAUSED_UNTIL_RESET) return { kind: "TOO_EARLY", until: answer.until };
+    if ("error" in answer && answer.error === RUN_NOT_CONTINUABLE) return { kind: "NOT_CONTINUABLE" };
+    if ("error" in answer && answer.error === RUN_CONTINUE_NO_ROOM) return { kind: "NO_ROOM" };
     return { kind: "FAILED" };
   } catch {
     return { kind: "FAILED" };

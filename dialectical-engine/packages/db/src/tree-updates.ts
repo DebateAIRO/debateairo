@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import type { CryptoEnvelope } from "@debateai/crypto";
-import type { WebSealed } from "./web-evidence.js";
+import type { PieceSettingsVersion, WebSealed } from "./web-evidence.js";
 import type { PathFate, PathRewriteRecord } from "./dig-model.js";
 
 /**
@@ -60,7 +60,8 @@ export type PathLineEntry = Readonly<{
   content: CryptoEnvelope | null;
 }>;
 export type PathClimbNext = Readonly<{ parent_run_id: string; root_run_id: string; position_ref: string | null }>;
-export type MainAnswerTriggerKind = "PATH_REWRITE" | "PATH_UPDATE";
+/** 0164 (V4 start step, Task 55e): PATH_ADDED, a dig under the main question of a path debate; its trigger id is the dig's run id. */
+export type MainAnswerTriggerKind = "PATH_REWRITE" | "PATH_UPDATE" | "PATH_ADDED";
 export type MainAnswerUpdateRecord = Readonly<{
   updateId: string; rootRunId: string; basedOnUpdateId: string | null; triggerKind: MainAnswerTriggerKind; triggerId: string; triggerRunId: string;
   paidByOwnerRef: string | null; outcome: PathUpdateOutcome; failureCode: string | null;
@@ -98,24 +99,25 @@ export class PostgresTreeUpdateRunnerRepository {
     return (await this.pool.query<{ turn: PathUpdateTurnRead | null }>("SELECT identity.read_path_update_turn($1) AS turn", [updateId])).rows[0]?.turn ?? null;
   }
 
-  async record(record: PathUpdateRecord): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
+  /** Task 57p: 0169's writer, the update's settings version last. */
+  async record(record: PathUpdateRecord & PieceSettingsVersion): Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED" }>(
-      "SELECT identity.record_path_update($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13::jsonb,$14) AS outcome",
+      "SELECT identity.record_path_update_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13::jsonb,$14,$15) AS outcome",
       [record.updateId, record.basedOn?.kind ?? null, record.basedOn?.id ?? null, record.outcome, record.failureCode, record.changed,
         record.fateBefore, record.fateAfter, lineage(record.writerLineage), lineage(record.checkerLineage), record.rounds,
         JSON.stringify(record.artifactRefs), record.content === null ? null : JSON.stringify(record.content.envelope),
-        record.content?.attestation ?? null])).rows[0]!.outcome;
+        record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 
-  /** 0134's writer, held to the whole line. */
-  async recordRewriteInLine(lineBase: Readonly<{ kind: PathLineBaseKind; id: string }> | null, record: PathRewriteRecord):
+  /** 0134's writer, held to the whole line (Task 57p: 0169's, the rewrite's settings version last). */
+  async recordRewriteInLine(lineBase: Readonly<{ kind: PathLineBaseKind; id: string }> | null, record: PathRewriteRecord & PieceSettingsVersion):
     Promise<"RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "NO_TURN" | "WAIT_TURN" | "BASE_MOVED" }>(
-      "SELECT identity.record_path_rewrite_in_line($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16::jsonb,$17::jsonb,$18) AS outcome",
+      "SELECT identity.record_path_rewrite_in_line_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16::jsonb,$17::jsonb,$18,$19) AS outcome",
       [lineBase?.kind ?? null, lineBase?.id ?? null, record.rewriteId, record.digRunId, record.parentAnswerVersion, record.basedOnRewriteId,
         record.outcome, record.failureCode, record.fateBefore, record.fateAfter, record.verdict?.outcome ?? null, record.verdict?.scope ?? null,
         lineage(record.writerLineage), lineage(record.checkerLineage), record.rounds, JSON.stringify(record.artifactRefs),
-        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!.outcome;
+        record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 
   /** A live debate's paths, every turn in order, a public dig the check has not allowed marked; null when not live or, in a request, not the connection's own (0171). */
@@ -128,13 +130,14 @@ export class PostgresTreeUpdateRunnerRepository {
     return (await this.pool.query<{ next: PathClimbNext | null }>("SELECT identity.read_path_climb_next($1) AS next", [runId])).rows[0]?.next ?? null;
   }
 
-  async recordMainAnswer(record: MainAnswerUpdateRecord): Promise<Readonly<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "BASE_MOVED"; answerSeq: number | null }>> {
+  /** Task 57p: 0169's writer, the version's settings version last. */
+  async recordMainAnswer(record: MainAnswerUpdateRecord & PieceSettingsVersion): Promise<Readonly<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "BASE_MOVED"; answerSeq: number | null }>> {
     const row = (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_LIVE" | "BASE_MOVED"; answer_seq: number | null }>(
-      "SELECT outcome,answer_seq FROM identity.record_main_answer_update($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14,$15::jsonb,$16)",
+      "SELECT outcome,answer_seq FROM identity.record_main_answer_update_with_settings($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14,$15::jsonb,$16,$17)",
       [record.updateId, record.rootRunId, record.basedOnUpdateId, record.triggerKind, record.triggerId, record.triggerRunId, record.paidByOwnerRef,
         record.outcome, record.failureCode, lineage(record.writerLineage), lineage(record.checkerLineage), record.rounds,
         JSON.stringify(record.artifactRefs), record.spentMicros, record.content === null ? null : JSON.stringify(record.content.envelope),
-        record.content?.attestation ?? null])).rows[0]!;
+        record.content?.attestation ?? null, record.settingsVersion])).rows[0]!;
     return Object.freeze({ outcome: row.outcome, answerSeq: row.answer_seq });
   }
 

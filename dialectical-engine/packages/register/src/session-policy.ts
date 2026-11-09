@@ -151,7 +151,9 @@ const admissionPolicyValueSchema = z.object({
   // its value in the hosted operator's file, in the same version as the budget band (ruling C7).
   ask_room_reads: admissionScopeValueSchema("owner").optional(),
   // Owner ruling 2026-11-07: every team page (each route of the staff inventory), per signed-in person.
-  staff_requests: admissionScopeValueSchema("owner").optional()
+  staff_requests: admissionScopeValueSchema("owner").optional(),
+  // Owner ruling 2026-11-09: the four calls before Start that run a small AI (lists, merge, combine, fit), per signed-in person.
+  start_step_calls: admissionScopeValueSchema("owner").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -186,6 +188,8 @@ export type AdmissionPolicy = Readonly<{
   askRoomReads: AdmissionScopePolicy<"owner"> | null;
   /** Owner ruling 2026-11-07: every team page, per signed-in person; `null` in a version that carries none. */
   staffRequests: AdmissionScopePolicy<"owner"> | null;
+  /** Owner ruling 2026-11-09: the four calls before Start, per signed-in person; `null` in a version that carries none. */
+  startStepCalls: AdmissionScopePolicy<"owner"> | null;
   sourceRef: string;
 }>;
 
@@ -254,7 +258,8 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     + " + paid plans P8c billing_checkout, V ratification pending (V-1)"
     + " + paid plans P9a billing_notify, V ratification pending (V-1)"
     + " + paid plans P13 billing_cancel_link, V ratification pending (V-1)"
-    + " + team pages staff_requests (owner ruling 2026-11-07), V ratification pending (V-1)",
+    + " + team pages staff_requests (owner ruling 2026-11-07), V ratification pending (V-1)"
+    + " + start step start_step_calls (owner ruling 2026-11-09), V ratification pending (V-1)",
   value: Object.freeze({
     ...ADMISSION_POLICY_REGISTER_ROW.value,
     support_reads: Object.freeze({
@@ -294,6 +299,13 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     // Any signed-in account reaches the enrollment and invitation routes, so the key table is as large as the others'.
     staff_requests: Object.freeze({
       key: "owner" as const, limit: 120, window_ms: 60_000, capacity: 65_536
+    }),
+    // Owner ruling 2026-11-09 (CodeQL js/missing-rate-limiting on POST /v1/asks/paths/merge): the four calls before Start that
+    // each run a small AI (the lists, their merge, a combined question, a path's fit), one budget per signed-in person, 30 a
+    // minute. Each is a press of the person's own (a start step makes a few), so a person choosing paths is never touched,
+    // while a loop or a stolen session can no longer start small AIs without bound (the quota still counts each one).
+    start_step_calls: Object.freeze({
+      key: "owner" as const, limit: 30, window_ms: 60_000, capacity: 65_536
     })
   })
 });
@@ -382,6 +394,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.staff_requests.limit,
       windowMs: policy.staff_requests.window_ms,
       capacity: policy.staff_requests.capacity
+    }),
+    startStepCalls: policy.start_step_calls === undefined ? null : Object.freeze({
+      key: policy.start_step_calls.key,
+      limit: policy.start_step_calls.limit,
+      windowMs: policy.start_step_calls.window_ms,
+      capacity: policy.start_step_calls.capacity
     }),
     sourceRef
   });

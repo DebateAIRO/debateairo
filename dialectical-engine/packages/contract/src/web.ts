@@ -43,6 +43,8 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
   sourcesPerPointMax: 8,
   otherPagesPerPathMax: 100,
   suggestionsPerPathMax: 20,
+  /** V4 start step, Task 79a: the points of the map one suggestion names (a path debate's). */
+  suggestionPointsMax: 40,
   pathsMax: 8,
   /** A dig's picks: as many as the places one dig link can name (0131). Free is capped lower (FREE_DIG_PICKS_MAX). */
   digPicksMax: ACCOUNT_MEMORY_LIMITS.digPlacesMax,
@@ -196,13 +198,19 @@ export const DigSuggestionKindSchema = z.enum(DIG_SUGGESTION_KINDS);
 export type DigSuggestionKind = z.infer<typeof DigSuggestionKindSchema>;
 export const DigSuggestionSideSchema = z.enum(["FOR", "AGAINST"]);
 
-/** One dig suggestion on a path: its text (the person may edit it before digging) and the map places it rests on. */
+/**
+ * One dig suggestion on a path: its text (the person may edit it before digging) and the map places it rests on.
+ * V4 start step, Task 79a (owner answer Q18 A: code finds overlapping dig picks): on a path debate's suggestions only, `points`
+ * names the points of the map (node ids) it rests on, so the page can see two picks resting on one point, with no AI call.
+ * Absent on every R22 suggestion and on a set stored before it, which still parses.
+ */
 export const DigSuggestionSchema = z.object({
   suggestion_id: WebRefSchema,
   kind: DigSuggestionKindSchema,
   side: DigSuggestionSideSchema.nullable(),
   text: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.suggestionTextMaxChars),
-  places: z.array(DigLinkPlaceSchema).min(1).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax)
+  places: z.array(DigLinkPlaceSchema).min(1).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax),
+  points: z.array(z.string().min(1).max(160)).max(WEB_CONTRACT_LIMITS.suggestionPointsMax).optional()
 }).strict().superRefine((suggestion, context) => {
   if ((suggestion.kind === "HELPS_MAIN_QUESTION") !== (suggestion.side !== null)) {
     context.addIssue({ code: "custom", message: "only a 'helps the main question' suggestion names a side, and it always does" });
@@ -742,6 +750,18 @@ export const RunContinueRefusedSchema = z.object({
   until: z.iso.datetime()
 }).strict();
 export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
+/**
+ * V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate. A failed debate it cannot continue
+ * (erased, a stop the person caused, a spending wall, set aside by an upload, a step's tries used up) is refused with RUN_NOT_CONTINUABLE; a
+ * continuable one with no room left for the rest (the person's quota or the site's day) with RUN_CONTINUE_NO_ROOM. Nothing changed either way.
+ */
+export const RUN_NOT_CONTINUABLE = "RUN_NOT_CONTINUABLE" as const;
+export const RUN_CONTINUE_NO_ROOM = "RUN_CONTINUE_NO_ROOM" as const;
+export const RunNotContinuedSchema = z.object({
+  error: z.enum([RUN_NOT_CONTINUABLE, RUN_CONTINUE_NO_ROOM]),
+  message: z.enum([RUN_NOT_CONTINUABLE, RUN_CONTINUE_NO_ROOM])
+}).strict().refine((refused) => refused.error === refused.message, { message: "the message names the refusal" });
+export type RunNotContinued = z.infer<typeof RunNotContinuedSchema>;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // The owner's changes of 31 Oct 2026 (plan 2026-10-31-r22-owner-changes.md): the shapes the lanes fill. Every member that rides an ask,
@@ -750,8 +770,13 @@ export type RunContinueRefused = z.infer<typeof RunContinueRefusedSchema>;
 
 const PurposeLineSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.purposeLineMaxChars);
 
-/** Decision 29: one clarifying question the person answered, as asked and as answered. */
-export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema }).strict();
+/**
+ * Decision 29: one clarifying question the person answered, as asked and as answered.
+ * V4 start step, Task 50b (owner answer Q4; "Goal in answer": "Always say it"): `cares`, on the answer to "What do you care about most?"
+ * (the clarifying call's `cares` question, an offered or a typed answer), set by the page at Start; the run reads a stated goal from it,
+ * never from the words. Absent on every other answer, and on every line stored before (a widening only).
+ */
+export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema, cares: z.literal(true).optional() }).strict();
 export type PurposeAnswer = z.infer<typeof PurposeAnswerSchema>;
 
 /**
@@ -759,12 +784,14 @@ export type PurposeAnswer = z.infer<typeof PurposeAnswerSchema>;
  * and the person's answers, the one about what the answer is for among them), `matters` and `angles` (the person's own words: an angle stays a
  * thing to investigate). `place`, `time` and `purpose` are the first shape: nothing writes them any more, and what was stored that way stays
  * readable. Stored encrypted, written at the ask, passed to every rewrite, answer update and report. An old debate has none.
+ * V4 start step, Task 76d (owner answer Q4): `answers` has room for the answer to "What do you care about most?" too (a widening only:
+ * every stored line still parses).
  */
 export const PurposeLinesSchema = z.object({
   place: PurposeLineSchema.optional(),
   time: PurposeLineSchema.optional(),
   purpose: PurposeLineSchema.optional(),
-  answers: z.array(PurposeAnswerSchema).min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 1).optional(),
+  answers: z.array(PurposeAnswerSchema).min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2).optional(),
   matters: PurposeLineSchema.optional(),
   angles: z.array(PurposeLineSchema).min(1).max(WEB_CONTRACT_LIMITS.anglesMax).optional()
 }).strict().refine((lines) => lines.place !== undefined || lines.time !== undefined || lines.purpose !== undefined
@@ -783,11 +810,29 @@ export function purposeAnswerSentence(answer: PurposeAnswer): string {
  * The stored lines the question's own text does not already say, in the order they were added. New debates say every one of them in
  * `question_line`, so this is empty for them unless the words were changed after step 2 (the language pop-up's rewrite); the question check
  * and the later AIs read whatever is left here, so nothing the person said is lost and nothing is read twice.
+ *
+ * V4 start step, Task 36 (read-d3): with `answersSaid`, the line already says every answer (the v2 page writes each one into the
+ * question as a sentence, which the person may then reword or take out), so `answers` are left out as said; the other lines are read
+ * as before. Without it, today's lines, byte for byte.
  */
-export function purposeLinesUnsaid(questionLine: string, lines: PurposeLines | null | undefined): readonly string[] {
+export function purposeLinesUnsaid(questionLine: string, lines: PurposeLines | null | undefined,
+  options?: Readonly<{ answersSaid?: true }>): readonly string[] {
   if (lines === null || lines === undefined) return Object.freeze([]);
-  const all = [lines.place, lines.time, lines.purpose, ...(lines.answers ?? []).map(purposeAnswerSentence), lines.matters, ...(lines.angles ?? [])];
+  const answers = options?.answersSaid === true ? [] : (lines.answers ?? []).map(purposeAnswerSentence);
+  const all = [lines.place, lines.time, lines.purpose, ...answers, lines.matters, ...(lines.angles ?? [])];
   return Object.freeze(all.filter((line): line is string => line !== undefined && !questionLine.includes(line)));
+}
+
+/**
+ * The text the question check reads: the question, then each stored line it does not already say. The question alone when there are none.
+ * V4 start step, Task 36 (read-d3): `answersSaid` is passed on to `purposeLinesUnsaid` (the answers count as said); without it, today's bytes.
+ * Task 48: here beside `purposeLinesUnsaid` (apps/api/src/purpose-lines.ts re-exports it), so a path debate's web planners read the very
+ * text the question check reads.
+ */
+export function questionWithPurposeLines(questionLine: string, lines: PurposeLines | null | undefined,
+  options?: Readonly<{ answersSaid?: true }>): string {
+  const added = purposeLinesUnsaid(questionLine, lines, options);
+  return added.length === 0 ? questionLine : `${questionLine}\n\n${added.join("\n")}`;
 }
 
 /**
@@ -807,31 +852,56 @@ Readonly<{ place: string | null; time: string | null; purpose: string | null }> 
 const ClarifyTextSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.clarifyQuestionMaxChars);
 const ClarifyAnswerSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.clarifyAnswerMaxChars);
 
-/** Decision 29: one question to the person, with the answers to choose from. "Other" is the page's own, never the AI's. */
+/**
+ * Decision 29: one question to the person, with the answers to choose from. "Other" is the page's own, never the AI's.
+ * V4 start step, Task 76d (owner answer Q5; version 2 of the call, sealed only through Task 92): `sentences`, the small AI's own sentence
+ * for each answer, in the person's voice ("I mean the next 25 years."), exactly one per answer and in the same order; `about_place`, on
+ * the one question that asks where (the page puts the site's country first among its answers). Both are absent from a version 1 reply.
+ */
 export const ClarifyQuestionSchema = z.object({
   text: ClarifyTextSchema,
-  answers: z.array(ClarifyAnswerSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax)
-}).strict();
+  answers: z.array(ClarifyAnswerSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax),
+  sentences: z.array(ClarifyTextSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax).optional(),
+  about_place: z.literal(true).optional()
+}).strict().refine((question) => question.sentences === undefined || question.sentences.length === question.answers.length,
+  { message: "one sentence per answer", path: ["sentences"] });
 export type ClarifyQuestion = z.infer<typeof ClarifyQuestionSchema>;
 
-/** POST /v1/asks/clarify: the question as typed. Nothing else; the person is the session's. */
-export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim().min(1) }).strict();
+/**
+ * read-f1 (Task 76d): the questions the page showed for an earlier wording of the question (the AI's, the purpose question and the care
+ * question) and the answers the person gave them. The API reads it only once version 2 of the call is sealed.
+ */
+export const AskClarifyEarlierSchema = z.object({
+  questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2),
+  answers: z.array(PurposeAnswerSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2)
+}).strict();
+export type AskClarifyEarlier = z.infer<typeof AskClarifyEarlierSchema>;
+
+/** POST /v1/asks/clarify: the question as typed. Nothing else; the person is the session's. Task 76d (read-f1): and, after a new wording, `earlier`. */
+export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim().min(1), earlier: AskClarifyEarlierSchema.optional() }).strict();
 export type AskClarifyRequest = z.infer<typeof AskClarifyRequestSchema>;
 
 /**
  * The questions for step 2. `AI`: up to three questions and the one about what the answer is for (absent only when the AI would not write it, even
  * asked twice). `NONE`: no AI read the question (it failed, it was too slow, the person's pool or limit is spent, or this deployment has no paid AI):
  * the page shows no questions, only the person's own-words boxes, and they carry on.
+ * V4 start step, Task 76d (owner answer Q4): version 2's `cares`, the question "What do you care about most?" with 2 to 4 answers; the page
+ * shows it last. It counts as a question of its own.
  */
 export const AskClarifyResponseSchema = z.discriminatedUnion("source", [
-  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema.optional() }).strict()
-    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined, { message: "at least one question" }),
+  z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema.optional(),
+    cares: ClarifyQuestionSchema.optional() }).strict()
+    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined || reply.cares !== undefined, { message: "at least one question" }),
   z.object({ source: z.literal("NONE") }).strict()
 ]);
 export type AskClarifyResponse = z.infer<typeof AskClarifyResponseSchema>;
 
-/** Decision 3: what made the main answer change: a first-debate path a dig rewrote, or one a deeper dig's change climbed to. */
-export const MAIN_ANSWER_TRIGGERS = ["PATH_REWRITE", "CHILD_PATH"] as const;
+/**
+ * Decision 3: what made the main answer change: a first-debate path a dig rewrote, or one a deeper dig's change climbed to. V4 start step,
+ * Task 55e (spec §4.4): PATH_ADDED, a dig under the main question of a path debate (a path left out before Start, "+ N more") added a
+ * first-level path; its `position_ref` names that path as the investigation does (the item its pick named, such as "more-kp07").
+ */
+export const MAIN_ANSWER_TRIGGERS = ["PATH_REWRITE", "CHILD_PATH", "PATH_ADDED"] as const;
 const MainAnswerSegmentSchema = z.object({ text: z.string().trim().min(1).max(12_000) }).strict();
 
 /** One automatic version of the main answer. Never a score, a price or who paid. */

@@ -293,6 +293,34 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
     expect(contents.join("\n")).not.toMatch(/different maker|another maker/u);
   });
 
+  // V4 start step, Task 46: a path's root rides Judge.judge's one framing (no new builder); its path words, the person's own
+  // among them, are material only, and no author, seat or company reaches the model.
+  it("the path root writer reads the path's words as code built them, and names no author (V4 start step)", async () => {
+    const captures: Capture[] = [];
+    const gateway = capturingGateway("path-root", captures);
+    const OWN_WORDS = "The old pier is enough if it is repaired.";
+    await expect(new Judge(gateway).judge({ runId: SUBJECT.runId, subjectItemId: SUBJECT.subjectItemId, callSiteKey: SUBJECT.callSiteKey,
+      questionLine: QUESTION_LINE, argumentLanguageName: ARGUMENT_LANGUAGE_NAME,
+      leg: { kind: "path-root", pathTitle: "Whole-system costs", pathQuestion: TARGET_STATEMENT, viewpoints: `Costs: ${STATEMENT}\n${OWN_WORDS}`,
+        pointsRaised: "What about winter storms?", readingLevel: "plain" },
+      providerRef: SUBJECT.providerRef, contractHash: SUBJECT.contractHash, bound: BOUND,
+      length: { words: 120, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord } })).rejects.toBeDefined();
+    expect(captures.map((capture) => capture.stage)).toEqual(["initial", "repair"]);
+    const contents = captures.flatMap((capture) => capture.packet.messages.map((message) => message.content));
+    expect(contents.join("\n")).toMatch(/judge\.path-root\.(unknown|resolved)\.v1/u);
+    for (const text of [QUESTION_LINE, STATEMENT, TARGET_STATEMENT, OWN_WORDS, "Whole-system costs", "What about winter storms?"]) {
+      expect(contents.some((content) => content.includes(text)), text).toBe(true);
+    }
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    for (const capture of captures) {
+      const system = capture.packet.messages.filter((message) => message.role === "system");
+      expect(system).toHaveLength(1);
+      expect(system[0]!.content).toContain(argumentLanguageDirective(ARGUMENT_LANGUAGE_NAME));
+      expect(system[0]!.content).not.toContain(OWN_WORDS);
+      expect(system[0]!.content).not.toMatch(/different maker|another maker/u);
+    }
+  });
+
   it.each(BUILDERS.map(({ name }) => name))(
     "%s sends no withheld routing or provenance value to the model",
     async (builder) => {

@@ -2,8 +2,8 @@
   "version": "outbound-mail-limit-forward0170-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0157_moderation_statements.sql",
-    "manifestSha256": "988be1f24790c197047a7d3340da2f9207d34182e9308ad3f3f669353f0dea64",
+    "name": "0169_piece_settings_version.sql",
+    "manifestSha256": "562fcd17d381057ea0316bd669026e7d968da11ccc266bd86e1dea0eae0a3649",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

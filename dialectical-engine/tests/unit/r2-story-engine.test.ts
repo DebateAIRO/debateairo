@@ -1,7 +1,7 @@
 // tests/unit/r2-story-engine.test.ts
 import { describe, expect, it } from "vitest";
 import type { StoryVerdictBasis } from "@debateai/contract";
-import { ENGINE_VERDICT_TRIGGERS, deriveJudgesVerdict, type ComparingJudgeVote, type EngineVerdictTrigger } from "@debateai/serve";
+import { ENGINE_VERDICT_TRIGGERS, deriveJudgesVerdict, type ComparingJudgeVote, type JudgesVerdictTrigger } from "@debateai/serve";
 import type { ProviderGateway } from "@debateai/providers";
 import {
   assembleStoryCheckerInstruction, assembleStorytellerInstruction, buildStoryMaterial, loadStoryPack, resolveStoryPackDir,
@@ -23,7 +23,7 @@ const pack = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta
  * counted, so the raw leader can lose) and is true with one seated judge; JUDGES_MAJORITY covers a grouped choice and
  * reads as one sentence. The walk below checks each sentence's claims against every verdict it reaches.
  */
-const SENTENCES: Readonly<Record<EngineVerdictTrigger, readonly [StoryVerdictBasis["label"], string]>> = {
+const SENTENCES: Readonly<Record<JudgesVerdictTrigger, readonly [StoryVerdictBasis["label"], string]>> = {
   JUDGES_UNANIMOUS: ["SUPPORTED", "The label is SUPPORTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, and none of them found that it holds only in some cases."],
   JUDGES_CONDITIONAL: ["CONTESTED", "The label is CONTESTED because every judge who compared the answers side by side chose this answer or one the judges counted as the same, but at least one found that it holds in some cases and not in others."],
   JUDGES_MAJORITY: ["CONTESTED", "The label is CONTESTED because enough of the judges who compared the answers side by side chose this answer, or one the judges counted as the same, to settle it, but not clearly: too few judges could take part for the answer to be called clear, or at least one judge chose another answer, gave no usable choice, or chose an answer that its own maker had argued or that the judges counted as the same as one its maker had argued, which does not count."],

@@ -12,7 +12,29 @@ import { z } from "zod";
 export const ThreatReportSchema = StaffThreatReportSchema.extend({
   account: StaffThreatReportSchema.shape.account.nullable()
 }).strict();
-import { CatalogLocaleCodeSchema } from "./locale.js";
+import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguageSchema, type QuestionLanguageOffer } from "./question-language.js";
+export * from "./question-language.js";
+// V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
+export * from "./start-paths.js";
+import {
+  StartCheckSchema, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema, StartListsEventSchema,
+  StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, StartPathsSchema
+} from "./start-paths.js";
+// V4 start step, Task 15: a path debate's results per path.
+export * from "./path-outcome.js";
+// V4 start step, Task 16: Answer.branches, the run read's and the public snapshot's paths.
+export * from "./branches.js";
+import { ANSWER_BRANCH_LIMITS, AnswerBranchesSchema, PublicBranchesSchema } from "./branches.js";
+// V4 start step, Task 57a: the run read's progress of each path and the carry-on part.
+export * from "./run-paths.js";
+import { CARRY_ON_PARTS, RunPathProgressSchema } from "./run-paths.js";
+// V4 start step, Task 39c: a question not started yet, as the account keeps it (saved questions spec 2026-11-04).
+export * from "./saved-questions.js";
+import { SavedQuestionIdSchema } from "./saved-questions.js";
+// V4 start step, Task 39e: the five saved-question routes' requests and answers, in the inventory's resources.
+import {
+  SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema
+} from "./saved-questions.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
@@ -33,7 +55,7 @@ import { PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequ
   ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
   WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
   PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
-  RunContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
+  RunContinuedSchema, RunNotContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
 export * from "./web.js";
 import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
   InvestigationReportWritingSchema, PublicReportVersionSchema } from "./investigation-report.js";
@@ -260,17 +282,8 @@ export function readingLevelOf(depthParams: Readonly<Record<string, unknown>>): 
   return parsed.data;
 }
 
-/** The 35 site locales (apps/ui/messages/<locale>): the language the person's page is in (question-language spec 2026-10-13, L1). */
-export const SiteLanguageSchema = CatalogLocaleCodeSchema;
-export const SITE_LANGUAGE_CODES = CatalogLocaleCodeSchema.options;
-export type SiteLanguage = z.infer<typeof SiteLanguageSchema>;
-/** The person's answer to a real-mix offer: a reference the server signed and a choice; never a language or text of its own. */
-export const QuestionLanguageChoiceSchema = z.object({
-  check_ref: z.string().min(3).max(4096).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u),
-  choice: z.enum(["USE_REWRITE", "KEEP_MINE"]),
-  original_question_line: z.string().trim().min(1).max(8192).optional()
-}).strict();
-export type QuestionLanguageChoice = z.infer<typeof QuestionLanguageChoiceSchema>;
+// V4 start step, Task 9: the site language and the question-language choice moved to ./question-language.js, unchanged,
+// so the start step's contract can use them without importing this file; re-exported below.
 
 /** Side-by-side spec §13 (Task S12): a sealed settings version's number, as the room read names it and an ask echoes it. */
 const SettingsVersionSchema = z.number().int().positive();
@@ -302,7 +315,17 @@ export const AskRequestSchema = z.object({
   // Decision 5: the debate's place, time and purpose lines, structured (PurposeLinesSchema, ./web.ts); absent, the debate keeps none.
   purpose_lines: PurposeLinesSchema.optional(),
   // Decision 13: this Free ask showed the notice that its question and debate are public. Only such a debate ever goes public.
-  free_public_notice: z.literal(true).optional()
+  free_public_notice: z.literal(true).optional(),
+  // V4 start step, Task 14 (spec 2026-11-03 §4.2), last: the proof that this line is the one checked at Next, the chosen
+  // paths, and the carry-on box ("Let the AIs carry on to the report", owner answer 9; only ever true). Absent: R22's ask.
+  start_check: StartCheckSchema.optional(),
+  start_paths: StartPathsSchema.optional(),
+  carry_on_to_report: z.literal(true).optional(),
+  // V4 start step, Task 39c (saved questions spec 2026-11-04 §3.7), last: the question not started yet this ask starts from,
+  // removed once the debate is accepted. Read only by that removal: never stored with the run, sealed, logged or passed to the runner.
+  saved_question_id: SavedQuestionIdSchema.optional()
+  // V4 start step, Task 57f (the owner's 7 Nov answers): Task 57e's `again_of` (a new debate on what a failed question kept) is gone; the
+  // same failed debate continues instead (POST /v1/runs/{id}/continue), and changed words are a new question, charged as new.
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -413,21 +436,6 @@ export type MadeByNewerRelease = z.infer<typeof MadeByNewerReleaseSchema>;
  * bytes — the decider safeParses its offer with this schema and locks instead, so the 409 never becomes a 500.
  */
 export const QUESTION_LANGUAGE_CHOICE_NEEDED = "QUESTION_LANGUAGE_CHOICE_NEEDED" as const;
-const LANGUAGE_NAME_BYTES = Object.freeze({ max: 64 });
-const NamedLanguageSchema = z.object({
-  code: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/u),
-  name: z.string().min(1).max(LANGUAGE_NAME_BYTES.max)
-    .refine((name) => new TextEncoder().encode(name).length <= LANGUAGE_NAME_BYTES.max, "a language name is at most 64 bytes")
-}).strict();
-export const QuestionLanguageOfferSchema = z.object({
-  check_ref: z.string().min(3).max(4096),
-  main_language: NamedLanguageSchema,
-  languages_seen: z.array(NamedLanguageSchema).min(2).max(6)
-    .refine((seen) => new Set(seen.map((language) => language.code.split("-")[0])).size === seen.length,
-      "each language is named once"),
-  proposed_question: z.string().min(1)
-}).strict();
-export type QuestionLanguageOffer = z.infer<typeof QuestionLanguageOfferSchema>;
 export const QuestionLanguageChoiceNeededSchema = z.object({
   error: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
   message: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
@@ -505,14 +513,60 @@ function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null
  * question's estimate or a dig's, never both.
  */
 function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; new_starts?: string | undefined;
-  start_share_percent?: number | undefined; dig_share_percent?: number | undefined }>, context: z.RefinementCtx): void {
+  start_share_percent?: number | undefined; dig_share_percent?: number | undefined; start_step?: unknown;
+  dig_share_by_paths?: readonly number[] | undefined }>, context: z.RefinementCtx): void {
   if (answer.new_starts !== undefined && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
   }
   if (answer.start_share_percent !== undefined && answer.dig_share_percent !== undefined) {
     context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
   }
+  // V4 start step, Task 14: the start step belongs to a new question's read, never a dig's.
+  if (answer.start_step !== undefined && answer.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "the start step comes with a new question's read, not a dig's" });
+  }
+  // V4 start step, Task 79b: a path debate's dig's share per path count comes only beside the dig's own share (so never on a new
+  // question's read, its share or its start step).
+  if (answer.dig_share_by_paths !== undefined && answer.dig_share_percent === undefined) {
+    context.addIssue({ code: "custom", message: "the share per path count comes with a dig's read and its share" });
+  }
 }
+
+/**
+ * V4 start step, Task 79b (owner answer Q19 of 4 Nov: "a dig's share follows a combine"): on a dig's read where the start step runs,
+ * the dig's share of today (Free: of its month) for each number of paths it may look into, entry i - 1 for i paths (1 to 7), each a
+ * whole percent (Task 38's rule), so a combine that takes one path away always shows.
+ */
+const DigShareByPathsSchema = z.array(z.number().int().min(0).max(100)).min(1).max(7);
+
+/**
+ * V4 start step, Task 14 (spec 2026-11-03 §2.6): How wide's choices (1 to 3 path counts, whole numbers 1 to 7, rising)
+ * and the one it starts on.
+ */
+export const StartStepWidthsSchema = z.object({
+  options: z.array(z.number().int().min(1).max(7)).min(1).max(3),
+  default: z.number().int().min(1).max(7)
+}).strict().superRefine((widths, context) => {
+  if (!widths.options.every((value, index) => index === 0 || value > widths.options[index - 1]!)) {
+    context.addIssue({ code: "custom", path: ["options"], message: "the widths rise" });
+  }
+  if (!widths.options.includes(widths.default)) context.addIssue({ code: "custom", path: ["default"], message: "the default is one of the widths" });
+});
+/**
+ * V4 start step, Task 14: the room read's start step: whether the lists run before Start, How wide's widths, and the
+ * share of today a debate of 1, 2, … paths takes (one entry per path count up to the widest), absent when the read has
+ * no money-rule window (internal funding, billing off).
+ */
+export const StartStepRoomSchema = z.object({
+  lists: z.enum(["ON", "OFF"]),
+  widths: StartStepWidthsSchema,
+  share_by_paths: z.array(z.number().int().min(0).max(100)).optional()
+}).strict().superRefine((room, context) => {
+  if (room.share_by_paths !== undefined && room.share_by_paths.length !== Math.max(...room.widths.options)) {
+    context.addIssue({ code: "custom", path: ["share_by_paths"], message: "one share per path count, up to the widest" });
+  }
+});
+export type StartStepRoom = z.infer<typeof StartStepRoomSchema>;
 
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
@@ -544,7 +598,11 @@ const CustomerAskRoomResponseSchema = z.object({
   // W2-7 (money rule): a new question's estimate, as a share of today in the same steps; absent on a read for a dig.
   start_share_percent: DigSharePercentSchema.optional(),
   // W2-7 (money rule): new questions and digs wait for `resets_at` (RoomNewStartsSchema, ./web.ts); running work goes on.
-  new_starts: RoomNewStartsSchema.optional()
+  new_starts: RoomNewStartsSchema.optional(),
+  // V4 start step, Task 14: the step before Start, present only when its switch is on for the read's plan.
+  start_step: StartStepRoomSchema.optional(),
+  // V4 start step, Task 79b: a path debate's dig's share for each number of paths (DigShareByPathsSchema), beside its own share.
+  dig_share_by_paths: DigShareByPathsSchema.optional()
 }).strict().superRefine((answer, context) => {
   roomReserveIssues(answer, context);
   roomMoneyIssues(answer, context);
@@ -576,7 +634,11 @@ const InternalAskRoomResponseSchema = z.object({
   dig_share_percent:DigSharePercentSchema.optional(),
   // W2-7: as the customer answer's `start_share_percent` and `new_starts`.
   start_share_percent:DigSharePercentSchema.optional(),
-  new_starts:RoomNewStartsSchema.optional()
+  new_starts:RoomNewStartsSchema.optional(),
+  // V4 start step, Task 14: as the customer answer's `start_step`.
+  start_step:StartStepRoomSchema.optional(),
+  // V4 start step, Task 79b: as the customer answer's `dig_share_by_paths`.
+  dig_share_by_paths:DigShareByPathsSchema.optional()
 }).strict().superRefine((answer,context)=>{
   roomReserveIssues(answer,context);
   roomMoneyIssues(answer,context);
@@ -970,10 +1032,44 @@ export const RunProjectionSchema = z.object({
   // W2-7 (money rule): the month wall paused this debate's planned calls and searches (MonthPauseSchema, ./web.ts).
   month_pause: MonthPauseSchema.optional(),
   // Decision 12: only on a debate that an update set aside: what the AIs found stays readable.
-  found: z.array(RunFoundPageSchema).max(64).optional()
+  found: z.array(RunFoundPageSchema).max(64).optional(),
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov): the reading level the debate was asked at, which its map, digs and report
+  // keep (as its stored depth_params hold it); absent when it was asked without one, so an older reader still parses. Before the
+  // paths, which stay last.
+  reading_level: ReadingLevelSchema.optional(),
+  // V4 start step, Task 16: a path debate's paths as they stand while it runs; absent on every R22 run.
+  branches: AnswerBranchesSchema.optional(),
+  // V4 start step, Task 57a (./run-paths.ts), last: each path's step line, dots and findings, in the paths' order ([] while the AIs
+  // are still choosing the paths), and the part a carry-on debate is running. Both absent on every R22 run.
+  path_progress: z.array(RunPathProgressSchema).max(ANSWER_BRANCH_LIMITS.pathsMax).optional(),
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional(),
+  // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up), last: whether a FAILED debate used any of the person's
+  // quota. NONE: nothing was taken (its path-list charge was given back, 0165, and nothing else ran); SOME: some was. Absent on every
+  // other run, and where the server cannot say, so an older reader still parses.
+  quota_used: z.enum(["NONE", "SOME"]).optional(),
+  // V4 start step, Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again"; Task 57e's
+  // `reusable`, renamed), last: true when POST /v1/runs/{id}/continue would continue this FAILED debate, as far as the read can know: it is
+  // the person's own, a first question or a dig, its content live, its stop ours (never their own act, a spending wall or a step's tries
+  // used up) or an upload's set-aside where Continue moves it to the release that is current (Task 57j), and fewer than 2 continues of it
+  // failed on our side (Task 57m; an update's set-aside is never one of them, Task 57m-fix). Absent otherwise (the press is then 409
+  // RUN_NOT_CONTINUABLE).
+  continuable: z.literal(true).optional(),
+  // V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"), last: true when this FAILED debate would be
+  // continuable but two continues of it already failed again, so Continue is no longer offered and the page says it keeps failing. Never
+  // beside `continuable`; absent for any other reason it cannot continue.
+  keeps_failing: z.literal(true).optional()
 }).strict().superRefine((run, context) => {
   if (run.found !== undefined && run.state !== "FAILED") {
     context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
+  }
+  if (run.quota_used !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["quota_used"], message: "only a failed debate says whether any quota was used" });
+  }
+  if (run.continuable !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["continuable"], message: "only a failed debate continues where it stopped" });
+  }
+  if (run.keeps_failing !== undefined && (run.state !== "FAILED" || run.continuable !== undefined)) {
+    context.addIssue({ code: "custom", path: ["keeps_failing"], message: "only a failed debate that cannot continue keeps failing" });
   }
   if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
     context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
@@ -992,6 +1088,29 @@ export const RunProjectionSchema = z.object({
   }
   if ((run.state === "WAITING") !== (run.waits_until !== undefined && run.waits_until !== null)) {
     context.addIssue({ code: "custom", message: "WAITING requires waits_until and other states forbid it" });
+  }
+  // V4 start step, Task 57a: the progress follows the paths one for one; none while the paths are being chosen; the carry-on part
+  // only on a path debate whose carry-on box is ticked.
+  const progress = run.path_progress;
+  const paths = run.branches?.paths;
+  if (progress !== undefined && paths !== undefined
+    && (progress.length !== paths.length || progress.some((entry, index) => entry.path_id !== paths[index]?.path_id))) {
+    context.addIssue({ code: "custom", path: ["path_progress"], message: "the paths and their progress name the same paths" });
+  }
+  if (progress !== undefined && progress.length === 0 && run.branches !== undefined) {
+    context.addIssue({ code: "custom", path: ["path_progress"], message: "a path debate still choosing its paths has none to show" });
+  }
+  if (run.carry_on_part !== undefined && progress === undefined) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "only a path debate carries the carry-on part" });
+  }
+  // V4 start step, Task 57b (owner, 4 Nov, "Show it from the start"): beside the paths the box must be ticked; before the paths are
+  // named (no `branches`), the server sends a part only for an ask whose box is ticked, and it is the answer.
+  if (run.carry_on_part !== undefined && run.branches !== undefined && run.branches.carry_on_to_report !== true) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
+  }
+  if (run.carry_on_part !== undefined && run.branches === undefined && progress !== undefined
+    && (progress.length > 0 || run.carry_on_part !== "ANSWER")) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "before its paths are named, a carry-on debate is on its answer" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -1070,6 +1189,12 @@ export type PublicAiProvidersResponse = z.infer<typeof PublicAiProvidersResponse
  */
 export const SENSITIVE_DATA_NOTICE_VERSION = "2026-09-29" as const;
 export const SENSITIVE_DATA_CONSENT_REQUIRED = "SENSITIVE_DATA_CONSENT_REQUIRED" as const;
+/**
+ * V4 start step, Task 36 (ask-f2; owner answer Q14): where the start step runs, a new question from a person on the Free plan
+ * that arrives without `free_public_notice` is refused 403 with this code (body `{ error, message }`, as the consent above),
+ * before anything is checked or charged; the page shows the notice and sends again.
+ */
+export const FREE_PUBLIC_NOTICE_REQUIRED = "FREE_PUBLIC_NOTICE_REQUIRED" as const;
 export const SensitiveDataConsentRequestSchema = z.object({
   notice_version: z.literal(SENSITIVE_DATA_NOTICE_VERSION),
   locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
@@ -1429,6 +1554,25 @@ export const AbstentionSchema = z.object({
   ledger_unknown_ref: z.string().trim().min(1)
 }).strict();
 
+/**
+ * V4 start step, Task 79c (owner answer Q33 A, 5 Nov 2026): "Your maps" shows a dig made on someone else's public page as a card of
+ * its own, "Dig: {its pick}" (dig-f30's words), the one case of a dig card of its own. A row of GET /v1/answers (served or still open)
+ * says whether it is one (`dug_on_public`) and, for one, its first pick's words (`dig_pick`, the person's own as they sent it; absent
+ * when the dig had no pick or the words cannot be read). Both optional and last: a row without them is today's, and a dig of the
+ * person's own debate, public or not, says false (it sits under its own question).
+ */
+function publicDigRowMembers() {
+  return {
+    dug_on_public: z.boolean().optional(),
+    dig_pick: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.pickTextMaxChars).optional()
+  };
+}
+function publicDigRowCheck(row: Readonly<{ dug_on_public?: boolean | undefined; dig_pick?: string | undefined }>, context: z.RefinementCtx): void {
+  if (row.dig_pick !== undefined && row.dug_on_public !== true) {
+    context.addIssue({ code: "custom", path: ["dig_pick"], message: "only a dig made on someone else's public page names its pick" });
+  }
+}
+
 export const AnswerSummarySchema = z.object({
   answer_id: z.string().min(1),
   run_ref: z.string().min(1),
@@ -1449,14 +1593,18 @@ export const AnswerSummarySchema = z.object({
   // nothing there and removes the home page's per-row full answer read.
   // Optional, never invented: a row with no recorded maker lineage says so by
   // omission rather than by an empty claim about what ran.
-  models: z.array(z.string().trim().min(1)).optional()
-}).strict();
+  models: z.array(z.string().trim().min(1)).optional(),
+  // V4 start step, Task 79c (owner answer Q33 A, 5 Nov), last: whether this is a dig made on someone else's public page, and its pick.
+  ...publicDigRowMembers()
+}).strict().superRefine(publicDigRowCheck);
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
   state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
-  created_at_sequence: z.number().int().positive()
+  created_at_sequence: z.number().int().positive(),
+  // V4 start step, Task 79c, last: the same two members on a run still open (a dig on a public page that is still running).
+  ...publicDigRowMembers()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
@@ -1464,6 +1612,7 @@ export const OpenRunSummarySchema = z.object({
       message: "FAILED requires a terminal reason and non-failed runs forbid one"
     });
   }
+  publicDigRowCheck(run, context);
 });
 export const AnswerIndexSchema = z.object({
   items: z.array(AnswerSummarySchema),
@@ -1650,7 +1799,13 @@ export const PublicDebateSchema = z.object({
   /** Decision 33: part of this debate was changed after a review. Plainly marked; no reason is ever given. */
   changed_after_review: z.literal(true).optional(),
   // Decisions 13 and 16: every report anyone wrote on it, oldest first; the newest is current, the earlier ones stay readable.
-  reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional()
+  reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional(),
+  // V4 start step, Task 16: a public path debate's paths (publicBranchesOf); absent on every R22 debate.
+  branches: PublicBranchesSchema.optional(),
+  // V4 start step, Task 75d (owner's second-round answers): the reading level the debate was asked at, copied at publish time from
+  // the run (as `language` is), so the public page shows it at that level and a dig made there is kept at it. Last and optional:
+  // every snapshot published before it parses, and a page reads one without it as Plain words.
+  reading_level: ReadingLevelSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1814,7 +1969,12 @@ export const AnswerSchema = z.object({
   // contribution to a public debate stands. Optional: older answers parse unchanged.
   main_answer: AnswerMainAnswerSchema.optional(),
   purpose_lines: PurposeLinesSchema.optional(),
-  contribution: AnswerContributionSchema.optional()
+  contribution: AnswerContributionSchema.optional(),
+  // V4 start step, Task 16: a path debate's paths (each its own branch); absent on every R22 answer.
+  branches: AnswerBranchesSchema.optional(),
+  // V4 start step, Task 57a (./run-paths.ts), last: the part a carry-on debate is running once its answer is served (digs, then the
+  // report); absent on every R22 answer.
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional()
 }).strict().superRefine((answer, context) => {
   // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
   for (const node of answer.nodes) {
@@ -1831,6 +1991,10 @@ export const AnswerSchema = z.object({
   }
   if (answer.verdict_unavailable !== null && answer.confidence_band !== null) {
     context.addIssue({ code: "custom", message: "an unavailable verdict cannot carry a confidence band" });
+  }
+  // V4 start step, Task 57a: the carry-on part only on a path debate whose carry-on box is ticked.
+  if (answer.carry_on_part !== undefined && answer.branches?.carry_on_to_report !== true) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
   }
 });
 export type Answer = z.infer<typeof AnswerSchema>;
@@ -1940,6 +2104,13 @@ export const contractInventory = Object.freeze({
     // V4 account memory (owner rulings N7 and N11, migration 0131): the reading level kept in the account.
     "GET /v1/account/reading-level",
     "POST /v1/account/reading-level",
+    // V4 start step, Task 39e (./saved-questions.ts): the questions not started yet: the list, the first save, a later save, Pick up
+    // and Delete.
+    "GET /v1/account/saved-questions",
+    "POST /v1/account/saved-questions",
+    "PUT /v1/account/saved-questions/{id}",
+    "GET /v1/account/saved-questions/{id}",
+    "DELETE /v1/account/saved-questions/{id}",
     "GET /v1/account/legal-status",
     // 0157 (DSA Art 17; D1): the person's own statements of reasons.
     "GET /v1/account/moderation-statements",
@@ -1973,6 +2144,11 @@ export const contractInventory = Object.freeze({
     "GET /v1/asks/room",
     // Decision 29: dynamic step 2.
     "POST /v1/asks/clarify",
+    // V4 start step, Task 30: the four calls before Start (./start-paths.ts); the lists and the merge answer as an event stream.
+    "POST /v1/asks/paths/lists",
+    "POST /v1/asks/paths/merge",
+    "POST /v1/asks/paths/combine",
+    "POST /v1/asks/paths/fit",
     "GET /v1/session",
     "GET /v1/deployment",
     // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
@@ -2080,6 +2256,13 @@ export const contractInventory = Object.freeze({
     PublicContributionSchema, PublicMainAnswerSchema, PublicReportVersionSchema, PublicReportRequestSchema, PublicReportAcceptedSchema, PublicDebateRefusedSchema,
     // Decision 29: dynamic step 2.
     AskClarifyRequestSchema, AskClarifyResponseSchema,
+    // V4 start step, Task 30: the four calls before Start, their requests and what each answers (an event of a stream, or JSON).
+    StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
+    StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
+    // V4 start step, Task 39e: the saved-question routes' requests (the first and later saves) and answers (the list, Pick up, a save).
+    SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema,
+    // V4 start step, Task 57f: Continue's refusals of a failed debate it cannot continue, or with no room left for the rest.
+    RunNotContinuedSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

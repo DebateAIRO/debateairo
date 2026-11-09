@@ -369,3 +369,50 @@ describe("deploy/vps/backup.sh: retention", () => {
     expect(await remoteLog(staged)).toEqual([]);
   });
 });
+
+/**
+ * Task 39f, owner answer S8 A (5 Nov 2026): the keys of questions not started yet (the user-key store's own
+ * saved-questions/ folder, one key per saved question) never enter a backup, so a question deleted or started after
+ * the backup can never be read from it. The debates' keys and every other key stay in the backup as before.
+ */
+describe("deploy/vps/backup.sh: the keys of questions not started yet stay out of the custody tar (S8 A)", () => {
+  /** The custody.tar inside tonight's artefact, listed by this machine's own tar (the age stub wrote one header line). */
+  async function custodyEntries(staged: Staged): Promise<string[]> {
+    const [artefact] = await artefacts(join(staged.backup, "daily"));
+    const bytes = await readFile(join(staged.backup, "daily", artefact!));
+    const outer = join(staged.root, "outer.tar");
+    await writeFile(outer, bytes.subarray(bytes.indexOf(0x0a) + 1));
+    const unpacked = join(staged.root, "unpacked");
+    await mkdir(unpacked);
+    await execute("tar", ["-xf", outer, "-C", unpacked, "custody.tar"]);
+    const { stdout } = await execute("tar", ["-tf", join(unpacked, "custody.tar")]);
+    return stdout.split("\n").filter(Boolean).map((entry) => entry.replace(/\/$/u, ""));
+  }
+
+  it("holds users/ and runs/ (every file) and no saved-questions/ entry; the other stores keep a folder of that name", async () => {
+    const staged = await stage({ rclone: "offsite:debateai" });
+    const custody = join(staged.root, "custody");
+    const kept = [
+      "user-deks/users/u1/dek.v1.json",
+      "user-deks/runs/r1/content-key.v1.json",
+      // A deeper folder of that name is not the store's own: only <store>/saved-questions is left out.
+      "user-deks/runs/r1/saved-questions/kept.json",
+      "publication-keys/saved-questions/p1.json",
+      "audit-keys/saved-questions/a1.json"
+    ];
+    const leftOut = ["user-deks/saved-questions/q1/question-key.v1.json", "user-deks/saved-questions/q2/question-key.v1.json"];
+    for (const file of [...kept, ...leftOut]) {
+      await mkdir(join(custody, file, ".."), { recursive: true });
+      await writeFile(join(custody, file), "{}\n");
+    }
+    const result = await backup(staged, { dayOfWeek: TUESDAY });
+    expect(result.code, result.stderr).toBe(0);
+    const entries = await custodyEntries(staged);
+    expect(entries.filter((entry) => entry === "user-deks/saved-questions" || entry.startsWith("user-deks/saved-questions/"))).toEqual([]);
+    for (const folder of ["user-deks", "user-deks/users", "user-deks/runs", "publication-keys/saved-questions", "audit-keys/saved-questions"]) {
+      expect(entries, folder).toContain(folder);
+    }
+    const files = entries.filter((entry) => entry.endsWith(".json"));
+    expect(files.sort()).toEqual(["user-deks/dek.json", ...kept].sort());
+  });
+});

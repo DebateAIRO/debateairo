@@ -137,6 +137,5 @@
   "newDebate.askText.otherAnswer": "Drugi odgovor…",
   "newDebate.askText.otherLabel": "Vaše vlastito dodatno pojašnjenje",
   "newDebate.askText.matters": "Ako odgovori vode u različitim smjerovima, što mi je najvažnije: {matters}",
-  "newDebate.askText.angles": "Molimo, pogledajte i ove aspekte: {list}.",
   "newDebate.freePublicNotice": "U besplatnom planu vaše pitanje i rasprava o njemu javni su. Nemojte navoditi osobne podatke."
 }

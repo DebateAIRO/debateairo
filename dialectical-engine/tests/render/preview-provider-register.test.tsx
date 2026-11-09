@@ -79,8 +79,9 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       expect(Object.isFrozen(entries)).toBe(true);
       // synthesis-flag S03 (REV-S03-p1 privacy N2): both checks call Claude Haiku on Anthropic, so without the Anthropic row
       // the support chat's row (the same model and contract) also names the two checks; otherwise it is the plain row.
+      // Privacy 3.12: the two jobs before a debate starts that run on Claude Haiku as well.
       if (keys.includes("claude")) expect(entries.at(-1)).toBe(SUPPORT_PROVIDER);
-      else expect(entries.at(-1)).toEqual({ ...SUPPORT_PROVIDER, purposes: ["synthesisCheck", "questionCheck", "reportCheck", "support"] });
+      else expect(entries.at(-1)).toEqual({ ...SUPPORT_PROVIDER, purposes: ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"] });
       if (keys.includes("claude")) expect(entries.find((entry) => entry.key === "claude")).toBe(ANTHROPIC_PREVIEW_PROVIDER);
       if (keys.includes("deepinfra")) expect(entries.find((entry) => entry.key === "deepinfra")).toBe(DEEPINFRA_PROVIDER);
     });
