@@ -382,8 +382,12 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(wait.querySelector("[data-public-dig-result-here]")!.textContent).toBe(V4["v4.public.digCard.resultShowsHere"]);
     expect(wait.querySelector("[data-wait-leave]")!.textContent).toBe(V4["v4.wait.leave"]);
     expect(card.textContent).not.toContain("Your dig is running");
-    // One status line: the card's state word.
-    expect(card.querySelectorAll("[role=status]")).toHaveLength(1);
+    // The card's state word is read out, and the outcome's status line is already there, empty, so the outcome is read out when it
+    // comes (the review of 9 Nov: a status line that appears already filled is often not read).
+    expect(wait.querySelector("[data-wait-word]")!.getAttribute("role")).toBe("status");
+    const outcomeLine = card.querySelector("[data-public-dig-outcome]")!;
+    expect(outcomeLine.getAttribute("role")).toBe("status");
+    expect(outcomeLine.textContent).toBe("");
     // Task 75d: the account remembers no level, so none rides the link; the dig's map shows the level it was kept at.
     expect(card.querySelector("a")!.getAttribute("href")).toBe("/v4/debate/99999999-9999-4999-8999-999999999999");
     expect(lane.readRun).toHaveBeenCalledWith("99999999-9999-4999-8999-999999999999");
@@ -770,6 +774,8 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     await click(startButtons()[0]!);
     await undoRunsOut();
     expect(host!.querySelector("[data-public-dig-card]")!.getAttribute("data-public-dig-card")).toBe("RUNNING");
+    const outcomeLine = host!.querySelector("[data-public-dig-card] [data-public-dig-outcome]");
+    expect(outcomeLine).not.toBeNull();
     // Nothing moves while the person stays: the card is read again only when they come back to the page.
     lane.readRun = vi.fn(async () => ({ state: "SETTLED", hold_until: null }));
     const before = debate().contributions![0]!.line;
@@ -787,6 +793,9 @@ describe("the map's dig flow on a public page (owner screen review, 3 Nov)", () 
     expect(card.querySelector("[data-wait-block]")).toBeNull();
     expect([...card.querySelectorAll(".v4PubDigStop")].map((stop) => stop.getAttribute("data-reached"))).toEqual(["true", "true"]);
     expect(card.textContent).toContain(V4["v4.public.digCard.onPage"]);
+    // The same status line, kept in place from running to the outcome, now holds it.
+    expect(card.querySelector("[data-public-dig-outcome]")).toBe(outcomeLine);
+    expect(outcomeLine!.textContent).toContain(V4["v4.public.digCard.onPage"]);
     expect([...card.querySelectorAll("ins")].map((mark) => mark.textContent)).toEqual(["Rural lines too."]);
     await click([...card.querySelectorAll("button")].find((one) => one.textContent === V4["v4.public.digCard.seeOnPage"])!);
     expect(lane.refresh).toHaveBeenCalled();

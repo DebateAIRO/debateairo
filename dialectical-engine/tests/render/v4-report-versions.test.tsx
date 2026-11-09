@@ -378,6 +378,8 @@ describe("the report page's versions", () => {
       word: word("v4.state.WAITING.noTime"), started: null, line: `Your report starts when your dig on “${mixLine}” finishes.`, leaves: true
     });
     expect(node.textContent).not.toContain(word("v4.state.BEING_WRITTEN"));
+    // The review of 9 Nov: the line keeps its status role, so a change of the dig it names is read out, as before the card.
+    expect(node.querySelector("[data-report-wait-line]")!.getAttribute("role")).toBe("status");
     expect(node.querySelector(".v4RepVersion")!.textContent).toBe("Version 1 · being written");
 
     await act(async () => root?.unmount());

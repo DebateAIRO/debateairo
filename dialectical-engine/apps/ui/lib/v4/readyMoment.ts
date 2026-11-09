@@ -218,9 +218,16 @@ function rewriteTimes(path: V4Path): Readonly<{ finished: readonly number[]; cha
  * which can be before the version was written, so a rewrite that finished while the version was being written counts.
  * Those are the `count` paths whose newest finished rewrite is newest, and the cut lies after the next path's. Of them,
  * the box names the ones a dig changed after that point (never one it only confirmed). A cut at the version's
- * written time named none of them in that case; one at its `closed_at` would name a path the report waited for and read.
+ * written time named none of them in that case; one at its `closed_at` alone would name a path the report waited for
+ * and read.
+ *
+ * The review of 9 Nov: the count alone cannot tell, on a path it counts for a later confirmation, whether an older change
+ * came after the cut. The counted version's `closed_at` (when it was asked for) is a floor: it reads every rewrite that
+ * finished before it starts, so a change before then is in it. `versions` are the investigation read's (useMapReport);
+ * without the counted one, the count alone decides.
  */
-export function pathsChangedSinceReport(map: V4Map): readonly V4Path[] {
+export function pathsChangedSinceReport(map: V4Map,
+  versions: readonly Readonly<{ report_version: number; closed_at: string }>[] = []): readonly V4Path[] {
   const since = map.changedSince ?? null;
   if (since === null || since.since_report_version === null || since.count === 0) return [];
   const seen = new Set<string>();
@@ -233,7 +240,9 @@ export function pathsChangedSinceReport(map: V4Map): readonly V4Path[] {
     rewritten.push({ path, newest: Math.max(...times.finished), changed: times.changed, order });
   }
   rewritten.sort((a, b) => b.newest - a.newest);
-  const cut = rewritten[since.count]?.newest ?? Number.NEGATIVE_INFINITY;
+  const asked = versions.find((version) => version.report_version === since.since_report_version);
+  const floor = asked === undefined ? Number.NaN : Date.parse(asked.closed_at);
+  const cut = Math.max(rewritten[since.count]?.newest ?? Number.NEGATIVE_INFINITY, Number.isNaN(floor) ? Number.NEGATIVE_INFINITY : floor);
   return rewritten.slice(0, since.count)
     .filter((entry) => entry.changed.some((time) => time > cut))
     .sort((a, b) => a.order - b.order)

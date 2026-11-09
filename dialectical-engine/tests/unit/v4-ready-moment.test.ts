@@ -177,6 +177,23 @@ describe("the report is older than the map (dig-f19, map-f17)", () => {
     expect(ids(pathsChangedSinceReport(map))).toEqual(["n-mix"]);
   });
 
+  it("the review of 9 Nov: a change before the counted version was asked for is never named, though a later confirmation counts its path", () => {
+    // Dig 1 changed n-mix at 10:00; version 1 was asked for at 10:20 and read it; dig 2 only confirmed n-mix at 11:00, so the server counts it.
+    const map = mapOf([
+      { position_ref: "n-mix", history: [ready("mix-1", "2026-10-29T10:00:00.000Z", true), ready("mix-2", "2026-10-29T11:00:00.000Z", false)] }
+    ], 1);
+    const versions = [{ report_version: 1, closed_at: "2026-10-29T10:20:00.000Z" }];
+    expect(ids(pathsChangedSinceReport(map, versions))).toEqual([]);
+    // A change after the version was asked for, which it may not have read, is still named (item 21).
+    const later = mapOf([
+      { position_ref: "n-renew", history: [ready("renew", "2026-10-29T10:00:00.000Z", true)] },
+      { position_ref: "n-mix", history: [ready("mix", "2026-10-29T10:30:00.000Z", true)] }
+    ], 1);
+    expect(ids(pathsChangedSinceReport(later, versions))).toEqual(["n-mix"]);
+    // Without the version's time (not read yet, or another version), the count alone decides, as before.
+    expect(ids(pathsChangedSinceReport(map, []))).toEqual(["n-mix"]);
+  });
+
   it("a path counted for a later confirmation is not named for an older change the report already has", () => {
     const map = mapOf([
       { position_ref: "n-renew", history: [ready("renew", "2026-10-29T09:00:00.000Z", true)] },

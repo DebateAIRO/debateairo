@@ -1340,7 +1340,8 @@ function VersionStatus({ version, investigation, runningDig, locale, language, c
       locale={locale}
     >
       {line === null ? null : (
-        <p className="v4RepNote" data-report-wait-line="">
+        // The review of 9 Nov: a status line, as before the card, so a change of the dig it names is read out.
+        <p className="v4RepNote" role="status" data-report-wait-line="">
           {line.kind === "NAMED" ? <>{line.before}<span {...aiProps(language)}>{line.dig}</span>{line.after}</> : line.text}
         </p>
       )}

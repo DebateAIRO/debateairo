@@ -1940,8 +1940,9 @@ function V4Debate({
           {runPhase || storyWait || map === null ? null : (
             <V4ChangedSince
               changedSince={map.changedSince}
-              // Item 21 (this side's follow-up, 9 Nov): named from the same read as the server's count, never cut at a report time.
-              changedPaths={pathsChangedSinceReport(map)}
+              // Item 21 (this side's follow-up, 9 Nov): named from the same read as the server's count, with the counted version's
+              // asked-for time as a floor, never cut at a report's written time.
+              changedPaths={pathsChangedSinceReport(map, report.versions)}
               digRunning={dugCounts.running > 0}
               // Task 76l (the owner's fourth round, 6 Nov): hidden while a new report version waits or is written.
               reportStage={report.stage}

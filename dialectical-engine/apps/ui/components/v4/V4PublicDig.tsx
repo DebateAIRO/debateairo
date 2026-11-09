@@ -230,12 +230,10 @@ export function PublicDigCard({ dig, openHref, catalog, locale }: Readonly<{
           <Stops progress={progress} catalog={catalog} />
           <p className="v4PubHint" data-public-dig-result-here="">{t(catalog, "v4.public.digCard.resultShowsHere")}</p>
         </V4WaitCard>
-      ) : (
-        <>
-          <Stops progress={progress} catalog={catalog} />
-          <div role="status">{outcome}</div>
-        </>
-      )}
+      ) : <Stops progress={progress} catalog={catalog} />}
+      {/* The review of 9 Nov: the outcome's status line stays in place from the start, empty while the dig runs, so the outcome is
+          read out when it comes (a status line that appears already filled is often not). */}
+      <div role="status" data-public-dig-outcome="">{outcome}</div>
       <p className="v4PubDigOpen">{openIt}</p>
     </div>
   );
