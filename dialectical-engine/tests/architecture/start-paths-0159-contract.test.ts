@@ -19,6 +19,8 @@ const PREVIOUS_MANIFEST_PATH = "migrations/lineage/pre-start-charge-forward0158.
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
+/** Every regular-expression metacharacter escaped, the backslash included (CodeQL js/incomplete-sanitization). */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 const TABLES = ["core.start_path_set", "core.start_path", "core.carry_on_mark"] as const;
@@ -150,7 +152,7 @@ describe("0159: the chosen paths, sealed per run", () => {
     // Whole-file, not line by line: a GRANT split over two lines, indented or inside a DO block counts too.
     expect(sql.match(/\bGRANT\b/giu)).toHaveLength(7);
     for (const signature of DEFINERS) {
-      expect(sql, signature).toMatch(new RegExp(`^REVOKE ALL ON FUNCTION ${signature.replace(/[.()]/gu, "\\$&")} FROM PUBLIC,`, "mu"));
+      expect(sql, signature).toMatch(new RegExp(`^REVOKE ALL ON FUNCTION ${escapeRegExp(signature)} FROM PUBLIC,`, "mu"));
     }
     const manifest = JSON.parse(read("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json")) as {
       privilegeDisclosures: Array<{ roleName: string; source: string; grants: string[] }> };

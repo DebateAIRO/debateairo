@@ -93,4 +93,4 @@ jobs:
           node tools/ci-known-red.mjs $(node "$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs" suites)
       - name: How to read a red run
         if: always() && steps.old_suites.outcome == 'failure'
-        run: echo "N1 red whose failures read DATABASE_AHEAD_NOT_ACCEPTED NOT_EXPAND = HEAD carries a drained step; the release takes the drained upload (spec §5 escape hatch). That is not a code defect."
+        run: echo "N1 red whose failures read DATABASE_AHEAD_NOT_ACCEPTED NOT_EXPAND, or MIGRATION_FORWARD_CHAIN_AMENDMENT_BINDING_DRIFT naming a step the released commit does not have (a drained step that redefines an earlier step's objects; the released code checks amendments before the ahead rule), = HEAD carries a drained step; the release takes the drained upload (spec §5 escape hatch). That is not a code defect."

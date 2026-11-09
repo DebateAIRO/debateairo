@@ -28,6 +28,8 @@ const PREVIOUS_MANIFEST_PATH = "migrations/lineage/path-progress-forward0161.jso
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
+/** Every regular-expression metacharacter escaped, the backslash included (CodeQL js/incomplete-sanitization). */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex");
 /** The SQL without its `--` comments (no literal or body of 0162 contains `--`). */
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
@@ -261,7 +263,7 @@ describe("0162: the questions not started yet, each under its own key", () => {
     expect(sql).not.toMatch(/\bGRANT\s+(?:SELECT|INSERT|UPDATE|DELETE|ALL)\b/iu);
     expect(sql).toMatch(/^REVOKE ALL ON identity\.saved_question FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;$/mu);
     for (const signature of FUNCTIONS) {
-      expect(sql, signature).toMatch(new RegExp(`^REVOKE ALL ON FUNCTION ${signature.replace(/[.()]/gu, "\\$&")} FROM PUBLIC,`, "mu"));
+      expect(sql, signature).toMatch(new RegExp(`^REVOKE ALL ON FUNCTION ${escapeRegExp(signature)} FROM PUBLIC,`, "mu"));
     }
     const manifest = JSON.parse(read("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json")) as {
       privilegeDisclosures: Array<{ roleName: string; source: string; grants: string[] }> };
