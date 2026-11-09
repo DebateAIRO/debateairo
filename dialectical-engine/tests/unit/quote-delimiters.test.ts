@@ -14,6 +14,21 @@ function decodedOk(text: string) {
 }
 
 /**
+ * CI-1b's time checks: the fastest of three tries, in milliseconds. On 9 Nov one try took 2.3 s on a busy CI runner (test
+ * files side by side) that reads in 0.4 s on the Mac, unchanged code. A moment of load slows one try; a reading that is not
+ * linear is slow on every try, so each bound stays as it was.
+ */
+function fastestOfThreeMs(read: () => void): number {
+  let fastest = Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const started = performance.now();
+    read();
+    fastest = Math.min(fastest, performance.now() - started);
+  }
+  return fastest;
+}
+
+/**
  * Practice debate 2026-10-16 (R1b release): GLM-5.3-Flash wrote five long texts of a cross-exchange judge leg between
  * typographic quotes “…” instead of straight ones. Synthetic placeholder texts of the same shape: commas, apostrophes, a
  * colon, parentheses and one inner straight quote each.
@@ -171,10 +186,10 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED: typographic quotes used as a value's de
     ["100 000 unclosed “ list items", `{"list": [${"“x, ".repeat(100000)}]}`],
     ["100 000 unclosed „ list items, each with a “ that closes nothing", `{"list": [${"„x“y, ".repeat(100000)}]}`]
   ])("answers %s in linear time", (_name, text) => {
-    const started = performance.now();
-    expect(decodeModelJson(text, STOP).ok).toBe(false);
-    expect(classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus).toBe("PARSE_FAILED");
-    expect(performance.now() - started).toBeLessThan(500);
+    expect(fastestOfThreeMs(() => {
+      expect(decodeModelJson(text, STOP).ok).toBe(false);
+      expect(classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING).parseStatus).toBe("PARSE_FAILED");
+    })).toBeLessThan(500);
   });
 });
 
@@ -275,10 +290,10 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED fix rounds 2-3: the syntax pass reads th
     ["prose and 100 000 spans that never decode", `note ${"{\"a\": “x}".repeat(100000)}`],
     ["prose and 100 000 spans each missing one bracket", `note ${"{\"a\": [1, 2, 3, 4}".repeat(100000)}`]
   ])("answers %s in linear time", (_name, text) => {
-    const started = performance.now();
-    decodeModelJson(text, STOP);
-    classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING);
-    expect(performance.now() - started).toBeLessThan(2000);
+    expect(fastestOfThreeMs(() => {
+      decodeModelJson(text, STOP);
+      classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING);
+    })).toBeLessThan(2000);
   });
 });
 
@@ -402,8 +417,8 @@ describe("the keep-words check: typographic quotes used as a broken reply's key 
   // CI-1b (model text is untrusted): a typographic opener that never closes is read once, to the end, never again.
   it("answers 100 000 unclosed typographic openers in linear time", () => {
     const text = `{"list": [${"“x, „y, ".repeat(100000)}]}`;
-    const started = performance.now();
-    expect(structureRepairKeepsWords(text, { list: ["x"] })).toBe(false);
-    expect(performance.now() - started).toBeLessThan(2000);
+    expect(fastestOfThreeMs(() => {
+      expect(structureRepairKeepsWords(text, { list: ["x"] })).toBe(false);
+    })).toBeLessThan(2000);
   });
 });
