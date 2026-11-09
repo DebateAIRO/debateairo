@@ -342,7 +342,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.public.dig.notStartedAway",
   "v4.public.dig.unconfirmed",
   "v4.digLive.foundNone",
-  "v4.public.digCard.running",
+  // Question 47 A (owner, 9 Nov): the running card's line, cut from the old "Your dig is running. When you come back…" (the shared
+  // waiting card's state word now says it runs).
+  "v4.public.digCard.resultShowsHere",
   "v4.public.digCard.stopReached",
   "v4.public.digCard.stopOpen",
   "v4.public.digCard.before",

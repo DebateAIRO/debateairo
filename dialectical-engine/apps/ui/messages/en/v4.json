@@ -796,7 +796,7 @@
   "v4.public.dig.writeOwn": "Or write your own",
   "v4.public.dig.chipsLabel": "Suggestions for this path",
   "v4.public.dig.dugNear": "Someone dug near here on {date}",
-  "v4.public.digCard.running": "Your dig is running. When you come back to this page, its result shows here.",
+  "v4.public.digCard.resultShowsHere": "When you come back to this page, its result shows here.",
   "v4.public.digCard.stopDone": "Dig done",
   "v4.public.digCard.stopChecked": "Checked",
   "v4.public.digCard.stopReached": "done",
