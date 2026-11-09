@@ -140,8 +140,8 @@ importers:
         specifier: workspace:*
         version: link:packages/valuation
       '@types/node':
-        specifier: 26.6.5
-        version: 26.6.5
+        specifier: 26.6.6
+        version: 26.6.6
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
@@ -171,7 +171,7 @@ importers:
         version: typescript@5.9.3
       vitest:
         specifier: 5.0.5
-        version: 5.0.5(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@1.8.0))(vite@8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1))
+        version: 5.0.5(@types/node@26.6.6)(jsdom@30.1.3(@noble/hashes@1.8.0))(vite@8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/api:
     dependencies:
@@ -254,8 +254,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/tax-quaderno
       '@hatchet-dev/typescript-sdk':
-        specifier: 1.38.0
-        version: 1.38.0(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.6.7)
+        specifier: 1.46.0
+        version: 1.46.0(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.6.7)
       '@simplewebauthn/server':
         specifier: 14.0.3
         version: 14.0.3
@@ -378,8 +378,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/valuation
       '@hatchet-dev/typescript-sdk':
-        specifier: 1.38.0
-        version: 1.38.0(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.6.7)
+        specifier: 1.46.0
+        version: 1.46.0(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.6.7)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -439,7 +439,7 @@ importers:
         version: 14.0.0
       next:
         specifier: 15.5.28
-        version: 15.5.28(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 15.5.28(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -448,8 +448,8 @@ importers:
         version: 19.3.1(react@19.3.1)
     devDependencies:
       '@types/node':
-        specifier: 26.6.5
-        version: 26.6.5
+        specifier: 26.6.6
+        version: 26.6.6
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
@@ -1004,21 +1004,21 @@ packages:
   '@bufbuild/protobuf@2.16.0':
     resolution: {integrity: sha512-FWa0sPlqYGJgpTs6OxBRcL/AW4JT0OIO+W1ajerluoTVh8CV0B7XM1qsNCRgnkSCkRCgOICKHRQlY17jrsm0+Q==}
 
-  '@connectrpc/connect-node@2.1.2':
-    resolution: {integrity: sha512-+i/aAOpsI8sIx1mbYp6d99zvxaUSF6t/jP9Ux9maAmjsZPgmIQ3JuIeYi0zJIP9zlCnBlJjkpPosshCgdRuThQ==}
-    engines: {node: '>=20'}
+  '@connectrpc/connect-node@2.3.0':
+    resolution: {integrity: sha512-kcQgV4GqFIESsl0MOHInC9/wNYU4aJDvG1OfGR5Lq6/l0gqycSGqEk+fixXGcUtPLc8vJBgS4V1nTmWlh4o9gw==}
+    engines: {node: '>=22'}
     peerDependencies:
       '@bufbuild/protobuf': ^2.7.0
-      '@connectrpc/connect': 2.1.2
+      '@connectrpc/connect': 2.3.0
 
-  '@connectrpc/connect-web@2.1.2':
-    resolution: {integrity: sha512-1tfaK85MU+gJjwwmL31d2rzdf0XCYX99chZf63uG89SGBUd4XuZ4ZzhGo2u79TPXOE6nLIZQ2okrpyey42PYdg==}
+  '@connectrpc/connect-web@2.3.0':
+    resolution: {integrity: sha512-JPXOiWaVsj+ZwaXOQjwvhc0ORnkl0a1w36Qyl3j1WTuak6/VYyuWGl1Aq8I60gQfQRjsjLLFGr64tO0sjwstcg==}
     peerDependencies:
       '@bufbuild/protobuf': ^2.7.0
-      '@connectrpc/connect': 2.1.2
+      '@connectrpc/connect': 2.3.0
 
-  '@connectrpc/connect@2.1.2':
-    resolution: {integrity: sha512-MXkBijtcX09R10Eb6sFeIetc6w6746eio6xtfuyVOH7oQAacT1X0GzMIQFux6Qy8cq3W/T5qX5Bei8YbFtmRGA==}
+  '@connectrpc/connect@2.3.0':
+    resolution: {integrity: sha512-rjAn8L9KbAZrkwiB8m1qzDsLs74hkYmwwM2iSWuxTPVOTRm/EZw31smKbQqPU50AXqJC5eKKpEnA6Uf/swQOgQ==}
     peerDependencies:
       '@bufbuild/protobuf': ^2.7.0
 
@@ -1306,9 +1306,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  '@hatchet-dev/typescript-sdk@1.38.0':
-    resolution: {integrity: sha512-NgohLm+j3P5TwD+PAWWST8SkqzKZrDVWeIBK1/L+Q9jP8kHBIevNRQYwBgyvLwl7XTHsYZrjvEUH0gmR0MwRTA==}
-    engines: {node: '>=20'}
+  '@hatchet-dev/typescript-sdk@1.46.0':
+    resolution: {integrity: sha512-TQ5O5ff+W9QMXQdq08GSVCIGe0fpycPELjm/C1L861JqpQivCoem5Y6IwbjroXlam94GmmudYQVjphuRcoFLAA==}
+    engines: {node: '>=22'}
     peerDependencies:
       '@anthropic-ai/claude-agent-sdk': ^0.3.148
       '@grpc/grpc-js': 1.14.5
@@ -1858,8 +1858,8 @@ packages:
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
 
-  '@types/node@26.6.5':
-    resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
@@ -2838,8 +2838,8 @@ packages:
   nice-grpc-common@2.0.4:
     resolution: {integrity: sha512-gOEXlD6ShXZMZ8k+49wm/bA2j1+3IKbEFV9WYREJcvZV4kM5L1KkILYTX9VYBzZF2OuYCe1wp8c82bQkvR0fHw==}
 
-  nice-grpc@2.1.17:
-    resolution: {integrity: sha512-pu9xYPlWSeqoYQOCqb2ftQqZi/P2DaI70PSuwnxvoyIRiilaOVtktyPe6LmuXegWB4Ic1sPuDGCnCCASbwzK0w==}
+  nice-grpc@2.1.18:
+    resolution: {integrity: sha512-m1if7HuVIhhVo/obvLgoSco2tj46zfeIEKkavlAnAsjklBzmFthvYX/uoKZmMKIwpVJllYpj+HVFRb+qGxibrA==}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -3509,17 +3509,17 @@ snapshots:
 
   '@bufbuild/protobuf@2.16.0': {}
 
-  '@connectrpc/connect-node@2.1.2(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.16.0))':
+  '@connectrpc/connect-node@2.3.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
-      '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect': 2.3.0(@bufbuild/protobuf@2.16.0)
 
-  '@connectrpc/connect-web@2.1.2(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.16.0))':
+  '@connectrpc/connect-web@2.3.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
-      '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect': 2.3.0(@bufbuild/protobuf@2.16.0)
 
-  '@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.16.0)':
+  '@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0)':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
 
@@ -3700,17 +3700,17 @@ snapshots:
       protobufjs: 7.6.6
       yargs: 17.7.3
 
-  '@hatchet-dev/typescript-sdk@1.38.0(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.6.7)':
+  '@hatchet-dev/typescript-sdk@1.46.0(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.6.7)':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
-      '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.16.0)
-      '@connectrpc/connect-node': 2.1.2(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.16.0))
-      '@connectrpc/connect-web': 2.1.2(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.16.0))
+      '@connectrpc/connect': 2.3.0(@bufbuild/protobuf@2.16.0)
+      '@connectrpc/connect-node': 2.3.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))
+      '@connectrpc/connect-web': 2.3.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))
       '@types/qs': 6.15.1
       abort-controller-x: 0.5.0
       axios: 1.20.0(debug@4.4.3)
       long: 5.3.2
-      nice-grpc: 2.1.17
+      nice-grpc: 2.1.18
       nice-grpc-common: 2.0.4
       protobufjs: 7.6.6
       qs: 6.16.1
@@ -4197,13 +4197,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       '@types/ssh2': 1.15.6
 
   '@types/dockerode@4.0.2':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       '@types/ssh2': 1.15.6
 
   '@types/estree@1.0.9': {}
@@ -4212,13 +4212,13 @@ snapshots:
     dependencies:
       undici-types: 5.26.5
 
-  '@types/node@26.6.5':
+  '@types/node@26.6.6':
     dependencies:
       undici-types: 8.9.0
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       pg-protocol: 1.16.1
       pg-types: 2.2.0
 
@@ -4234,11 +4234,11 @@ snapshots:
 
   '@types/ssh2-streams@0.1.13':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
 
   '@types/ssh2@0.5.52':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       '@types/ssh2-streams': 0.1.13
 
   '@types/ssh2@1.15.6':
@@ -4305,14 +4305,14 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@vitest/mocker@5.0.5(vite@8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1))':
+  '@vitest/mocker@5.0.5(vite@8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.5
       estree-walker: 3.0.3
       magic-string: 1.4.3
     optionalDependencies:
-      vite: 8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1)
+      vite: 8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1)
 
   '@vitest/spy@5.0.5': {}
 
@@ -5036,7 +5036,7 @@ snapshots:
 
   nanoid@3.3.18: {}
 
-  next@15.5.28(@types/node@26.6.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+  next@15.5.28(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       '@next/env': 15.5.28
       '@swc/helpers': 0.5.15
@@ -5054,7 +5054,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 15.5.28
       '@next/swc-win32-arm64-msvc': 15.5.28
       '@next/swc-win32-x64-msvc': 15.5.28
-      sharp: 0.35.5(@types/node@26.6.5)
+      sharp: 0.35.5(@types/node@26.6.6)
     transitivePeerDependencies:
       - '@babel/core'
       - '@types/node'
@@ -5064,7 +5064,7 @@ snapshots:
     dependencies:
       ts-error: 1.0.6
 
-  nice-grpc@2.1.17:
+  nice-grpc@2.1.18:
     dependencies:
       '@grpc/grpc-js': 1.14.5
       abort-controller-x: 0.5.0
@@ -5235,7 +5235,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.2
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       long: 5.3.2
 
   proxy-from-env@2.1.0: {}
@@ -5370,7 +5370,7 @@ snapshots:
 
   set-cookie-parser@2.7.2: {}
 
-  sharp@0.35.5(@types/node@26.6.5):
+  sharp@0.35.5(@types/node@26.6.6):
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
@@ -5401,7 +5401,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.5
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
     optional: true
 
   side-channel-list@1.0.1:
@@ -5661,7 +5661,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  vite@8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1):
+  vite@8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -5669,16 +5669,16 @@ snapshots:
       rolldown: 1.2.13
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       esbuild: 0.28.1
       fsevents: 2.3.3
       tsx: 4.23.15
       yaml: 2.9.1
 
-  vitest@5.0.5(@types/node@26.6.5)(jsdom@30.1.3(@noble/hashes@1.8.0))(vite@8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1)):
+  vitest@5.0.5(@types/node@26.6.6)(jsdom@30.1.3(@noble/hashes@1.8.0))(vite@8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.5(vite@8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1))
+      '@vitest/mocker': 5.0.5(vite@8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -5689,10 +5689,10 @@ snapshots:
       tinybench: 6.2.2
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.2.4(@types/node@26.6.5)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1)
+      vite: 8.2.4(@types/node@26.6.6)(esbuild@0.28.1)(tsx@4.23.15)(yaml@2.9.1)
       why-is-node-running: 3.2.1
     optionalDependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       jsdom: 30.1.3(@noble/hashes@1.8.0)
     transitivePeerDependencies:
       - msw
