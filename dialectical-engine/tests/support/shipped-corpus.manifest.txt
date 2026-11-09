@@ -144,6 +144,7 @@ apps/api/src/mfa.ts
 apps/api/src/moderation-statements.ts
 apps/api/src/month-pause.ts
 apps/api/src/onboarding-evidence.ts
+apps/api/src/outbound-mail-gate.ts
 apps/api/src/owner-read.ts
 apps/api/src/password-reset-mail.ts
 apps/api/src/password-reset-routes.ts
@@ -1291,6 +1292,7 @@ packages/db/src/migration-forward0166.ts
 packages/db/src/migration-forward0167.ts
 packages/db/src/migration-forward0168.ts
 packages/db/src/migration-forward0169.ts
+packages/db/src/migration-forward0170.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1302,6 +1304,7 @@ packages/db/src/moderation-notice.ts
 packages/db/src/moderation-statement.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
+packages/db/src/outbound-mail.ts
 packages/db/src/owner-recovery.ts
 packages/db/src/passage-retention.ts
 packages/db/src/password-reset.ts
@@ -1510,6 +1513,7 @@ packages/register/src/length-guidance-policy.ts
 packages/register/src/map-contract-hash.ts
 packages/register/src/mfa-policy.ts
 packages/register/src/model-scorecard-policy.ts
+packages/register/src/outbound-mail-policy.ts
 packages/register/src/password-reset-policy.ts
 packages/register/src/preview-line-up-policy.ts
 packages/register/src/product-role-policy.ts

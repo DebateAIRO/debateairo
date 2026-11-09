@@ -277,7 +277,7 @@ async function run(clusterFolder: string, hooks: TestHooks): Promise<{ ok: boole
       operatorSha256: "c".repeat(64), observedAt: "2026-10-09T12:00:00.000Z" };
     const source = await buildPreviewSourceRows(await loadBootstrapRegister(), observation);
     const base = [
-      ...source.filter((row) => !["consumerRecoveryPolicy", "publicationCheckPolicy", "questionCheckPolicy", "taxAuthorities"].includes(row.rowKey)),
+      ...source.filter((row) => !["consumerRecoveryPolicy", "outboundMailPolicy", "publicationCheckPolicy", "questionCheckPolicy", "taxAuthorities"].includes(row.rowKey)),
       ...[staffRow, allowanceRow].map((row) => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }))
     ];
     await publicationPort(adminPool).importHistorical({ registerVersion: parseVersion("4"), rows: base });

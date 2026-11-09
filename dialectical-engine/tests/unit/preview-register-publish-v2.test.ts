@@ -16,7 +16,7 @@ import {
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const runtime = { nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), operatorSha256: 'c'.repeat(64), observedAt: '2026-10-10T12:00:00.000Z' };
-const V1_ADDITIONS = ['consumerRecoveryPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities'];
+const V1_ADDITIONS = ['consumerRecoveryPolicy', 'outboundMailPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities'];
 const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
 const owned = () => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
 const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
@@ -63,7 +63,7 @@ describe('publish kit v2: source closure', () => {
     const bootstrap = await loadBootstrapRegister();
     const rows = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2].sort());
-    expect(rows).toHaveLength(71);
+    expect(rows).toHaveLength(72);
     const v1 = await buildPreviewSourceRows(bootstrap, runtime);
     const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(v1.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
     expect([...differing].sort()).toEqual(['abuseLimits', ...MULTI_MODEL_KEYS, 'answerRoleRotationPolicy', 'engineContractHash', 'mapContractHash'].sort());
@@ -96,7 +96,7 @@ describe('publish kit v2: composing from the current version', () => {
     const v2 = compose(f.source, f.v8, '8');
     expect(v2.rows.map(row => row.rowKey)).toEqual([...v1.rows.map(row => row.rowKey), 'abuseLimits', ROTATION_KEY, 'engineContractHash', 'mapContractHash'].sort((a, b) => a.localeCompare(b, 'en')));
     for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey) && row.rowKey !== ROTATION_KEY && row.rowKey !== 'mapContractHash' && row.rowKey !== 'engineContractHash' && row.rowKey !== 'abuseLimits') expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
-    expect(v2.addedKeys).toEqual(['abuseLimits', ROTATION_KEY, 'consumerRecoveryPolicy', 'engineContractHash', 'mapContractHash', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities']);
+    expect(v2.addedKeys).toEqual(['abuseLimits', ROTATION_KEY, 'consumerRecoveryPolicy', 'engineContractHash', 'mapContractHash', 'outboundMailPolicy', 'publicationCheckPolicy', 'questionCheckPolicy', 'taxAuthorities']);
     expect(v2.changedKeys).toEqual(['configuredProviderSet', 'nodeRuntimeVersion', 'providerFamilyMap']);
     for (const key of V1_ADDITIONS) {
       const entry = v2.delta.find(row => row.rowKey === key)!;
@@ -112,7 +112,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(() => composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const before = structuredClone(f.v9);
     const plan = compose(f.source, f.v9);
-    expect(plan.rows).toHaveLength(73);
+    expect(plan.rows).toHaveLength(74);
     expect(plan.addedKeys).toEqual(['abuseLimits', ROTATION_KEY, 'engineContractHash', 'mapContractHash']);
     expect(plan.rows.find(row => row.rowKey === ROTATION_KEY)).toEqual(f.source.find(row => row.rowKey === ROTATION_KEY));
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
@@ -142,11 +142,11 @@ describe('publish kit v2: composing from the current version', () => {
     expect(f.v9).toEqual(before);
   });
 
-  it('adds a key the current version lacks (how outboundMailPolicy will arrive) while changing another value', async () => {
+  it('adds a key the current version lacks (how a new row arrives) while changing another value', async () => {
     const f = await fixture();
     const base = f.v9.filter(row => row.rowKey !== 'taxAuthorities');
     const plan = compose(f.source, base);
-    expect(plan.rows).toHaveLength(73);
+    expect(plan.rows).toHaveLength(74);
     expect(plan.addedKeys).toEqual(['abuseLimits', ROTATION_KEY, 'engineContractHash', 'mapContractHash', 'taxAuthorities']);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
     expect(plan.rows.find(row => row.rowKey === 'taxAuthorities')).toEqual(f.source.find(row => row.rowKey === 'taxAuthorities'));
@@ -178,7 +178,7 @@ describe('publish kit v2: composing from the current version', () => {
     ['a base row the source no longer builds (silent drop)', (f: any) => ({ base: [...f.v9, { rowKey: 'retiredRow', valueJsonText: 'false', sourceRef: 'fixture' }] }), 'base-row-dropped'],
     ['a base lacking a base-owned policy', (f: any) => ({ base: f.v9.filter((row: Row) => row.rowKey !== 'staffAccessPolicy') }), 'base-owned-row-missing'],
     ['a source carrying a base-owned policy', (f: any) => ({ source: [...f.source, owned()[0]] }), 'base-owned-row-in-source'],
-    ['a source key outside the reviewed list', (f: any) => ({ source: [...f.source, { rowKey: 'outboundMailPolicy', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'source-key-list'],
+    ['a source key outside the reviewed list', (f: any) => ({ source: [...f.source, { rowKey: 'keyOutsideTheReviewedList', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'source-key-list'],
     ['a source missing a reviewed key', (f: any) => ({ source: f.source.filter((row: Row) => row.rowKey !== 'countryPolicy') }), 'source-key-list'],
     ['a support row in the source', (f: any) => ({ source: [...f.source, { rowKey: 'supportActivation', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row'],
     ['a scorecard row in the base', (f: any) => ({ base: [...f.v9, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row'],

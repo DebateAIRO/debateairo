@@ -89,6 +89,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       // ground, each step's grounds, the statement, what the queue has read and when it started.
       "moderation_decision", "moderation_ground", "moderation_notice", "moderation_notice_since",
       "moderation_statement", "moderation_statement_seen", "moderation_statement_since",
+      // 0170 the daily outbound mail limit.
+      "outbound_mail_daily_count", "outbound_mail_suppression",
       "page_reading_level",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",

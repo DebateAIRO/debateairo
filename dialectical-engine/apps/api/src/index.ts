@@ -1682,6 +1682,8 @@ type AuthorizationRoute = typeof authorizationPolicyInventory[number]["route"];
 const authorizationPolicies = new Map<string, typeof authorizationPolicyInventory[number]>(
   authorizationPolicyInventory.map((policy) => [policy.route, policy])
 );
+/** Owner ruling 2026-11-07: the team pages, each charged to the signed-in person's `staffRequests` budget. */
+const staffRouteNames: ReadonlySet<string> = new Set(staffAuthorizationPolicyInventory.map((policy) => policy.route));
 
 type RoutePolicyConfig = {readonly config: {readonly auth: RouteAuthPolicy; readonly staffCapability?: StaffCapability;
   readonly origin?: RouteOriginPolicy; readonly session?: RouteSessionPolicy}};
@@ -2992,6 +2994,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }
       }
       request.cookieRefresh = Object.freeze({ sessionToken: sessionToken!, csrfToken: csrfCookieToken });
+      // Owner ruling 2026-11-07: every team page (each route of the staff inventory, whether it asks for a team member or
+      // for any signed-in person) charges that person's own staffRequests budget when the version in force seals one,
+      // before the team key, the capability and every other team read. A refusal is 429 and the wait, nothing else.
+      const routeName = canonicalRoute(request.method, request.routeOptions.url ?? "");
+      if (staffRouteNames.has(routeName) && options.admission?.configured("staffRequests") === true
+        && !admitOrRefuse(reply, "staffRequests", routeName as AuthorizationRoute, authenticated.ownerRef)) return reply;
       if (authPolicy === "staff") {
         const staffToken = exactStaffCookie(rawCookie, STAFF_COOKIE_NAME);
         if (staffToken === null || options.staffAccess === undefined) {

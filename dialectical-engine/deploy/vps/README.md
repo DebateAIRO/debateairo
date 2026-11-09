@@ -1534,6 +1534,24 @@ socket here, never a runtime login); the API's runtime login may only read the a
 what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
 on this server nothing activates anything before Phase 3.
 
+### Upgrading to the daily mail limit (migration 0170)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+Every account mail now asks one gate before it goes: is the address on the suppression list, and is there room in today's
+shared count? The count is in the database, so it survives restarts and uploads and every API copy shares it.
+
+1. **Register first.** The API refuses to start without the `outboundMailPolicy` row (`OUTBOUND_MAIL_POLICY_UNRESOLVED`). Run
+   `pnpm register:publish-hosted` from the new checkout and repin `REGISTER_VERSION` before restarting. **On the live site, add
+   `outboundMailPolicy` with `daily_limit` 10000 to the hosted file first** (`deploy/vps/register/README.md`); without it the live
+   site seals the preview's 2000.
+2. **Then the migration, then the API.** 0170 is an expand step: the release before keeps running beside it.
+3. **Alerts.** The API writes `[OUTBOUND_MAIL_ALERT]` to its journal at 50% of the limit, when ordinary mail stops (80%) and when all
+   mail stops (100%), once a day each across every copy. It also mails `OWNER_REPORT_EMAIL_PATH`'s address when billing is on. With
+   billing off, the journal line is the only alert.
+4. **Not built yet: the bounce and complaint feed.** The suppression list stays empty until reports flow back from Amazon. Until
+   then, Amazon's own account-level suppression list is what drops mail to those addresses.
+
 ### Upgrading to the Italy-specific approval (migration 0125)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
@@ -2568,6 +2586,7 @@ version must carry, besides the algorithm's own rows:
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
 | `questionCheckPolicy` | the API refuses: `QUESTION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from S04's release on carries it (the code-owned 15000 ms, or the file's member); a version sealed before that release does not |
+| `outboundMailPolicy` | the API refuses: `OUTBOUND_MAIL_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the mail limit's release on carries it (the code-owned 2000 a day, or the file's member); a version sealed before it does not, so publish first and repin `REGISTER_VERSION` before restarting on that release |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `lengthGuidancePolicy` | optional: without it every request keeps today's bytes; the API reads it at start-up, and a malformed row refuses the boot (`LENGTH_GUIDANCE_POLICY_INVALID:<path>`) |
@@ -2638,6 +2657,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
 | `QUESTION_CHECK_POLICY_INVALID` | the file's optional `questionCheckPolicy` is not `{"kind": "QUESTION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 15000, or the member is `null` |
+| `OUTBOUND_MAIL_POLICY_INVALID` | the file's optional `outboundMailPolicy` is not `{"kind": "OUTBOUND_MAIL_POLICY", "daily_limit": N, "reserved_for_security_pct": P, "alert_at_pct": A}` within its bounds, leaves no room for one ordinary mail, or the member is `null` |
 | `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
 | `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
 | `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
@@ -2663,7 +2683,7 @@ Before restarting anything on a new version, check that the newest version carri
 rows a hosted start-up refuses without:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('outboundMailPolicy', 'costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
 ```
 
 Five rows is the pass. Then make that version a new release (§5 "A new register version is a new release").

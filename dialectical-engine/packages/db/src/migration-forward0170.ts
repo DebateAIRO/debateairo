@@ -1,0 +1,61 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import type { PoolClient } from 'pg';
+import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
+
+/**
+ * The daily outbound mail limit (owner's rulings of 2026-11-01): the chain step after 0169, the runner reading which settings
+ * are switched on (migrations/lineage/README.md); first chained after the moderation statements' 0157, it was re-chained to
+ * 0169 when the start-step steps 0158 to 0169 merged (2026-11-09). It was built as 0153 on dev (#234); on the V4 line 0153 is the finished dig's mark, so the
+ * owner moved it here as 0170 (2026-11-07). A gap is allowed: the chain only asks that each name sorts after the one before.
+ * If a step numbered below 0170 merges first, this step's `previous` is re-chained to that step (its number stays), as the
+ * README's renumber recipe says. It adds no billing object, so 0130's verifier stays in force; no supplemental verifier, so
+ * no replayVerifierSql: its checks are its postcondition digest (both tables' columns, constraints and ACLs, and the four
+ * functions whole), which every later migrate() compares.
+ */
+const NAME='0170_outbound_mail_limit.sql';
+const VERSION='outbound-mail-limit-forward0170-v1';
+const MANIFEST_PATH='lineage/outbound-mail-limit-forward0170.json';
+const VERIFIER_PATH='lineage/verify-effective-capabilities-130.sql';
+const PREVIOUS='0169_piece_settings_version.sql';
+const TABLES=['identity.outbound_mail_daily_count','identity.outbound_mail_suppression'] as const;
+const FUNCTIONS=['identity.claim_outbound_mail_alert(text,date)','identity.outbound_mail_recipient_suppressed(bytea)',
+ 'identity.outbound_mail_today()','identity.reserve_outbound_mail(text,integer)'] as const;
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0170_${detail}`);};
+const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
+const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
+const acl=(oid:string,kind:string,owner:string)=>`(SELECT jsonb_agg(g.item ORDER BY g.item COLLATE "C") FROM (SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(${oid},acldefault('${kind}',${owner}))) a) g)`;
+
+async function postconditionEvidence(client:PoolClient):Promise<string>{
+ const tables=(await client.query(`
+  SELECT relation,pg_get_userbyid(c.relowner)::text owner,c.relrowsecurity rls,${acl('c.relacl','r','c.relowner')} acl,
+   (SELECT jsonb_agg(jsonb_build_object('name',a.attname::text,'type',format_type(a.atttypid,a.atttypmod),'notnull',a.attnotnull,'default',pg_get_expr(d.adbin,d.adrelid)) ORDER BY a.attnum)
+    FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped) columns,
+   (SELECT jsonb_agg(pg_get_constraintdef(k.oid) ORDER BY k.conname COLLATE "C") FROM pg_constraint k WHERE k.conrelid=c.oid) constraints
+  FROM unnest($1::text[]) relation JOIN pg_class c ON c.oid=to_regclass(relation) AND c.relkind='r' ORDER BY relation COLLATE "C"`,[TABLES])).rows;
+ if(tables.length!==TABLES.length)return fail('POSTCONDITION_OBJECTS');
+ const functions=(await client.query(`
+  SELECT signature,pg_get_userbyid(p.proowner)::text owner,p.prosecdef definer,p.proconfig config,p.provolatile::text volatility,
+   encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') definition,${acl('p.proacl','f','p.proowner')} acl
+  FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature COLLATE "C"`,[FUNCTIONS])).rows;
+ if(functions.length!==FUNCTIONS.length)return fail('POSTCONDITION_OBJECTS');
+ return sha(JSON.stringify({tables,functions}));
+}
+
+export async function loadForward0170(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
+ const directory=new URL('../../../migrations/',import.meta.url);
+ const bytes=await readFile(new URL(MANIFEST_PATH,directory));const raw:unknown=JSON.parse(bytes.toString('utf8'));
+ if(!exactKeys(raw,['version','baseRecipeSha256','previous','migration','verifier'])||raw.version!==VERSION||raw.baseRecipeSha256!==anchor.baseRecipeSha256
+  ||!exactKeys(raw.previous,['name','manifestSha256','verifierSha256'])||raw.previous.name!==PREVIOUS||anchor.previousName!==PREVIOUS
+  ||raw.previous.manifestSha256!==anchor.previousManifestSha256||raw.previous.verifierSha256!==anchor.previousVerifierSha256
+  ||!exactKeys(raw.migration,['name','sha256'])||raw.migration.name!==NAME||!digest(raw.migration.sha256)
+  ||!exactKeys(raw.verifier,['path','sha256'])||raw.verifier.path!==VERIFIER_PATH||!digest(raw.verifier.sha256))return fail('MANIFEST');
+ const sqlBytes=await readFile(new URL(NAME,directory));
+ if(sha(sqlBytes)!==raw.migration.sha256)return fail('SOURCE_DIGEST');
+ const verifierBytes=await readFile(new URL(VERIFIER_PATH,directory));
+ if(sha(verifierBytes)!==raw.verifier.sha256)return fail('VERIFIER_DIGEST');
+ return Object.freeze({name:NAME,version:VERSION,manifestSha256:sha(bytes),sourceSha256:raw.migration.sha256,sql:sqlBytes.toString('utf8'),
+  previousName:PREVIOUS,previousManifestSha256:anchor.previousManifestSha256,previousVerifierSha256:anchor.previousVerifierSha256,
+  verifierPath:VERIFIER_PATH,verifierSha256:raw.verifier.sha256,verifierSql:verifierBytes.toString('utf8'),postconditionEvidence});
+}

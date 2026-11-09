@@ -8,7 +8,7 @@ import type { AdmissionPolicy } from "@debateai/register";
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
   | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote"
-  | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads";
+  | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads" | "staffRequests";
 
 export const SUPPORT_SWEPT_SCOPES = Object.freeze([
   "supportReads", "supportSessions", "supportModelCalls", "geoAvailability"
@@ -35,7 +35,8 @@ interface AdmissionBucket {
     | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]
     | AdmissionPolicy["geoAvailability"] | AdmissionPolicy["billingQuote"]
     | AdmissionPolicy["billingCheckout"] | AdmissionPolicy["billingNotify"]
-    | AdmissionPolicy["billingCancelLink"] | AdmissionPolicy["askRoomReads"]>;
+    | AdmissionPolicy["billingCancelLink"] | AdmissionPolicy["askRoomReads"]
+    | AdmissionPolicy["staffRequests"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -125,6 +126,10 @@ export class AdmissionLimiter {
       // Paid plans P4-G (go-live row 31): present only when the resolved register version carries it.
       ...(policy.askRoomReads === null ? [] : [[
         "askRoomReads", { policy: policy.askRoomReads, entries: new Map() }
+      ] as const]),
+      // Owner ruling 2026-11-07, the team pages: present only when the resolved register version carries it.
+      ...(policy.staffRequests === null ? [] : [[
+        "staffRequests", { policy: policy.staffRequests, entries: new Map() }
       ] as const])
     ]);
   }
