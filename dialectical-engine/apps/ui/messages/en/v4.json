@@ -831,7 +831,7 @@
   "v4.public.report.writtenBy": "Report written by {name}",
   "v4.public.report.earlier": "Earlier version {version}",
   "v4.public.report.ongoing": "Something is still being added to this debate. Try again when it is finished.",
-  "v4.public.report.noCarrier": "This debate's first author has left and no dig is on it yet, so a report can't be written. Dig into a path first.",
+  "v4.public.report.noCarrier": "There's nothing in this debate yet to write a report from.",
   "v4.public.report.failed": "We couldn't start the report just now. Please try again.",
   "v4.public.report.ready": "A new report is ready.",
   "v4.public.side.for": "For",

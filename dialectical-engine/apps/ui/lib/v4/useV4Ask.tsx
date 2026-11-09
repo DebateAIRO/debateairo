@@ -133,6 +133,12 @@ export function useV4Ask(input: Readonly<{
    * buttons keep it: a dig has no Next to sit under). The ask page passes false and shows its own line right under Next.
    */
   showDeclinedLine?: boolean;
+  /**
+   * A public page's dig only (agreed with the start step, 9 Nov): true when that debate already shows a report, so a further report
+   * waits for the reset too. A refused dig's used-up month line then goes without "You can still write your report."
+   * (publicDigRefusalWords). Absent: false.
+   */
+  publicReportWaits?: boolean;
 }>): Readonly<{
   /**
    * W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none.
@@ -282,11 +288,12 @@ export function useV4Ask(input: Readonly<{
   }, [room, adoptSettingsRead]);
 
   // The latest state, for a submit fired later (a dig sends after its 10-second Undo): never a stale closure.
+  const publicReportWaits = input.publicReportWaits === true;
   const live = React.useRef({ planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
-    pageLocale, consent, crisis, questionRefusal, languageChoice });
+    pageLocale, consent, crisis, questionRefusal, languageChoice, publicReportWaits });
   React.useEffect(() => {
     live.current = { planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
-      pageLocale, consent, crisis, questionRefusal, languageChoice };
+      pageLocale, consent, crisis, questionRefusal, languageChoice, publicReportWaits };
   });
 
   const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask",
@@ -435,7 +442,8 @@ export function useV4Ask(input: Readonly<{
       return { kind: "STARTED", runId: debate.id, ...(debate.public_dig_not_joined === true ? { notJoined: true } : {}) };
     } catch (exc) {
       // Decision 13: a public page's dig says its refusals in its own words: no level, no count, no code.
-      const publicRefusal = parent !== null && "public_ref" in parent ? publicDigRefusalWords(exc, now.catalog, now.room, now.pageLocale) : null;
+      const publicRefusal = parent !== null && "public_ref" in parent ? publicDigRefusalWords(exc, now.catalog, now.room, now.pageLocale, now.publicReportWaits)
+        : null;
       if (publicRefusal !== null) return refused(publicRefusal);
       // Task 68 (ask-f2): the server held a Free question sent without the notice. The notice shows from now on, nothing is
       // resent, and the next press carries it; no extra line, the notice itself stands above Start. Never about a dig.

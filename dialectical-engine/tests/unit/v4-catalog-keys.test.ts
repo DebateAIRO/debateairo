@@ -325,6 +325,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.public.mapBack",
   "v4.public.menu",
   "v4.public.report.ready",
+  // Question 46 A (owner, 8 Nov): the report press on a public debate that holds nothing yet (after the start step's 56h, the only case
+  // left for PUBLIC_DEBATE_NO_CARRIER). The owner's pick of the reworded line; the words are approved at the click-test.
+  "v4.public.report.noCarrier",
   // The owner's screen review of 3 Nov, wave 2 (public-f11, public-d2 A, public-f26, journey-f20): the public dig flow's and the public marks' lines the
   // record does not word ("the exact sentences go into the wording card"). The record's own words (Dig done, Checked, On the public page, See it on the
   // page, Kept with you…, Confirmed…, Or write your own, Someone dug near here on…, Public, See its page, Copy link, This will be public.) are pinned in

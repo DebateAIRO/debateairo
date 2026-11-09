@@ -145,7 +145,10 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
     locale,
     crisisCountryHint: lane.crisisCountryHint,
     mode: "quick",
-    readingLevel: level
+    readingLevel: level,
+    // Once the debate shows a report, a further one waits for the reset like a dig (Task 56c, publicReportWaitLine): a dig refused
+    // in a used-up month then says nothing of writing a report (lib/v4/publicPage.ts publicDigRefusalWords).
+    publicReportWaits: (debate.reports ?? []).length > 0
   });
   const { submit, room, planTier, submitting, dialogs } = ask;
   // The send runs after the 10 seconds, perhaps once the person has left this page: it uses the hook's last submit, which
