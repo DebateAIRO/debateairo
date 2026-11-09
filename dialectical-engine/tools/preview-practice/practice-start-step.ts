@@ -31,7 +31,7 @@ import {
 import { START_STEP_LIMITS, TypedDomainError } from "@debateai/kernel";
 import { structureRepairOriginalKey } from "@debateai/providers";
 import {
-  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapeStartStepStartValues, parseDebateShapePolicy, type BillingPlans, type DebateShapePolicy,
+  DEBATE_SHAPE_POLICY_ROW_KEY, debateShapeStartStepStartValues, parseDebateShapePolicy, type BillingPlans, type DebateShapePolicy, type PlanId,
   type FreeFixedGauges
 } from "@debateai/register";
 import {
@@ -84,6 +84,18 @@ export function practiceStartStepFromArgs(mode: string, flags: ReadonlyMap<strin
   const digsText = flags.get("--digs") ?? "0";
   if (!/^[0-2]$/u.test(digsText)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--digs");
   return Object.freeze({ plan, paths, digs: Number(digsText) as PracticeStartStep["digs"] });
+}
+
+/**
+ * V4 start step, Task 91f (owner 9 Nov, "Fix the practice first"): the plan a start-step practice's web step reads, the one billing would
+ * pin for a person on that plan (`billing.run_charge_scope`): premium is measured as Plus (the Plus row's sizes), so it reads PLUS and
+ * searches as the site's runner does for a Plus run; free reads FREE, which never searches (owner rule of 22 Oct). No --start-step: none,
+ * so the runner reads the plan as the site does (billing is off in the practice: no plan, no search), today's debate command unchanged.
+ */
+export function practiceStartWebPlan(start: PracticeStartStep): PlanId;
+export function practiceStartWebPlan(start: PracticeStartStep | undefined): PlanId | undefined;
+export function practiceStartWebPlan(start: PracticeStartStep | undefined): PlanId | undefined {
+  return start === undefined ? undefined : start.plan === "free" ? "FREE" : "PLUS";
 }
 
 /**

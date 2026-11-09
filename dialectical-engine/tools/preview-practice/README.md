@@ -953,6 +953,9 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
 - the whole-debate comparison (S-8): eight depth-1 debates over at least five days, after day 1's language mode and
   `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
   day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
+- the start-step Plus debate (`--start-step premium:5`) now searches the web as the site does for a Plus run (V4 Task
+  91f): up to about $1.34 more at the code's limits, about $0.25 likely (the searches' fees on the search gate and the
+  web readers' calls); a Free start never searches.
 - hosted preview: the same calls and cost; the debate is also held to the register's per-debate ceiling (the owner's
   value) and its story to the story ceiling, as on the server.
 
@@ -972,7 +975,8 @@ for d in node_modules/.pnpm/@embedded-postgres+darwin-arm64@*/node_modules/@embe
 shasum -a 256 tools/preview-practice/gate-relay.py
 ```
 
-The digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0` (the relay of the slow-answer ruling, 2026-10-12: it keeps a quiet connection
+The digest printed must be `fd449eee1d05c5745f51adb5d47e27bc1a39338c4802d621ccf0b3fafba5b206` (the relay of the web-search gate's third socket,
+`--perplexity-gate`, plan 2026-10-30 W1-1, on the relay of the slow-answer ruling, 2026-10-12: it keeps a quiet connection
 open 1,500 s and lets an in-flight call finish for up to 1,500 s, past the gate's 1,200 s vendor deadline and the app's
 1,290 s socket timeout). Copy the relay to the server (the server checks the same digest in S-4):
 
@@ -1017,6 +1021,14 @@ install -d -o ubuntu -g ubuntu -m 0700 /home/ubuntu/practice
 install -o ubuntu -g ubuntu -m 0600 /root/practice/register-export.json /root/practice/settings.env /root/practice/deepinfra-status.json /root/practice/anthropic-status.json /home/ubuntu/practice/
 ```
 
+Before the start-step Plus debate (S-6, `--start-step premium:5`, V4 Task 91f), also the web-search gate's status (that debate
+searches the web as the site does for a Plus run, through this gate; README-perplexity.md in deploy/preview-gate/v3):
+
+```sh
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1 > /root/practice/perplexity-status.json
+install -o ubuntu -g ubuntu -m 0600 /root/practice/perplexity-status.json /home/ubuntu/practice/
+```
+
 ### S-4, server, root: install and start the relay
 
 The relay's two sockets belong to the group `ubuntu` (the ssh user's own group), mode `0660`, so the ssh user's
@@ -1024,7 +1036,7 @@ forward can open them; the relay runs with `ubuntu` as a supplementary group so 
 versions of this step named a group `debateai-practice`; it does not exist on the server, and the relay refuses an
 unknown group, `GATE_RELAY_UNKNOWN_GROUP`. Nothing has to be created once per server.)
 
-Each time: install the relay (the digest printed must be `356f35eaf28764a3e17c2af5e2ec25360405c775331323177aac4e12ab409ce0`, the one printed on the Mac in S-0), then start it
+Each time: install the relay (the digest printed must be `fd449eee1d05c5745f51adb5d47e27bc1a39338c4802d621ccf0b3fafba5b206`, the one printed on the Mac in S-0), then start it
 as the runner account, sandboxed: no network but unix sockets, read-only system, no new privileges, ends by itself
 after 8 hours. It closes a connection only after 1,500 s with no bytes either way, and at its end (or a stop) lets a
 call in flight finish for up to 1,500 s: a model call may take up to the gate's 1,200 s (slow answer, 2026-10-12).
@@ -1043,12 +1055,19 @@ The journal must show one `"event": "start"` line and the folder two sockets, `s
 `ubuntu`. A refusal prints one plain word (for example `GATE_RELAY_GATE_MISSING:anthropic`) and the unit
 ends.
 
-**Web search (plan 2026-10-30, task W1-1).** Once the Perplexity gate is installed (deploy/preview-gate/v3/
-README-perplexity.md), a practice run that searches the web needs its socket too: add
-`--perplexity-gate /run/debateai-v3-preview/perplexity-budget-v1.sock` at the end of the relay command above. The folder
-then holds three sockets (`perplexity.sock` beside the other two), the S-5 forward adds
-`-L "$D/perplexity.sock:/run/debateai-practice/perplexity.sock"`, and the relay refuses to start
-(`GATE_RELAY_GATE_MISSING:perplexity`) while that gate is not running. Without the option nothing changes.
+**Web search (plan 2026-10-30, task W1-1; V4 Task 91f).** Once the Perplexity gate is installed (deploy/preview-gate/v3/
+README-perplexity.md), a practice run that searches the web needs its socket too: the relay command above with
+`--perplexity-gate /run/debateai-v3-preview/perplexity-budget-v1.sock` at its end. The start-step sitting's Plus debate
+(S-6, `--start-step premium:5`) searches, so for that sitting start the relay with it (the install and the sha256 check
+are the same):
+
+```sh
+systemd-run --unit=debateai-preview-practice-relay --collect -p User=debateai-preview-runner -p Group=debateai-preview-runner -p SupplementaryGroups=ubuntu -p RuntimeDirectory=debateai-practice -p RuntimeDirectoryMode=0711 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p PrivateNetwork=yes -p RestrictAddressFamilies=AF_UNIX -p IPAddressDeny=any -p CapabilityBoundingSet= -p AmbientCapabilities= -p RestrictSUIDSGID=yes -p LockPersonality=yes -p UMask=0077 -p RuntimeMaxSec=30600 -p TimeoutStopSec=1560 -p KillMode=mixed /usr/bin/python3 -I /usr/local/lib/debateai-practice/gate-relay.py --listen-dir /run/debateai-practice --group ubuntu --mode 0660 --max-connections 20 --lifetime-seconds 28800 --drain-seconds 1500 --idle-timeout-seconds 1500 --perplexity-gate /run/debateai-v3-preview/perplexity-budget-v1.sock
+```
+
+The folder then holds three sockets (`perplexity.sock` beside the other two), the S-5 forward is its three-socket line,
+and the relay refuses to start (`GATE_RELAY_GATE_MISSING:perplexity`) while that gate is not running. Without the
+option nothing changes.
 
 ### S-5, Mac: forward the two sockets
 
@@ -1060,6 +1079,12 @@ D=$(mktemp -d /tmp/dp.XXXXXX)
 P=$(mktemp -d /tmp/dpr.XXXXXX)
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*" "$P/"
 ssh -N -o ExitOnForwardFailure=yes -o StreamLocalBindUnlink=yes -o StreamLocalBindMask=0177 -L "$D/deepinfra.sock:/run/debateai-practice/deepinfra.sock" -L "$D/anthropic.sock:/run/debateai-practice/anthropic.sock" "$PREVIEW_SSH"
+```
+
+With the relay started with `--perplexity-gate` (S-4, the start-step sitting), forward the three sockets instead:
+
+```sh
+ssh -N -o ExitOnForwardFailure=yes -o StreamLocalBindUnlink=yes -o StreamLocalBindMask=0177 -L "$D/deepinfra.sock:/run/debateai-practice/deepinfra.sock" -L "$D/anthropic.sock:/run/debateai-practice/anthropic.sock" -L "$D/perplexity.sock:/run/debateai-practice/perplexity.sock" "$PREVIEW_SSH"
 ```
 
 ### S-6, Mac: run formats, then debate (and openings, when the owners ask for it)
@@ -1149,7 +1174,7 @@ export without that row and never writes over an existing file:
 P="$P" node_modules/.bin/tsx -e 'import("./tools/preview-practice/practice-start-step.ts").then((m) => m.writePracticeStartShapeFile(`${process.env.P}/register-export.json`, `${process.env.P}/start-step-shape.json`))'
 ```
 
-Then, before EACH run, S-3 on the server and the two status files down again. The Romanian Free question, 3 paths, one
+Then, before EACH run, S-3 on the server and the status files down again (the Plus run's three, below). The Romanian Free question, 3 paths, one
 dig:
 
 ```sh
@@ -1158,10 +1183,27 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
 echo "exit: $?"
 ```
 
-Then the same with `--question en` (together the Free month: 2 questions at 3 paths and 2 digs), then the same with
-`--question ro --start-step premium:5 --digs 0` (one Plus Quick question at 5 paths). On the hosted preview the debate
-also needs `--hosted-billing '<the same JSON the plan will get>'` beside `--register-next`, as above (without it the
-practice refuses `PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED` before anything is spent).
+Then the same with `--question en` (together the Free month: 2 questions at 3 paths and 2 digs; Free never searches the
+web, so these two need no search gate), then one Plus Quick question at 5 paths, which searches the web as the site does
+for a Plus run (V4 Task 91f): its web step reads the plan as Plus (`free` reads as Free), where the practice's ask, with
+billing kept off, pins none. It needs the relay's third socket (S-4, S-5) and the search gate's status (S-3):
+
+```sh
+scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" PRACTICE_PERPLEXITY_SOCKET="$D/perplexity.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --gate-status-perplexity "$P/perplexity-status.json" --register-next --shape-policy "$P/start-step-shape.json" --question ro --start-step premium:5 --digs 0 --out "$P/start-month"
+echo "exit: $?"
+```
+
+Where the settings name a search gate (`perplexity_budget_socket`), it refuses before anything is spent without
+`PRACTICE_PERPLEXITY_SOCKET` (`PRACTICE_SOCKET_MISSING`), without `--gate-status-perplexity` (`PRACTICE_FLAG_REQUIRED`), on
+a search gate whose status is not active or has three connection failures in a row, or whose "what is left today" is not
+open (`PRACTICE_GATE_NOT_OPEN: perplexity: ...`); the log says `web: this Plus debate searches the web ...`. Where the
+settings name none, it refuses before anything is spent (`PRACTICE_SEARCH_GATE_REQUIRED`): the Plus run is there to
+search, so it never runs with the web off. The report's web table (report.md "Web search per path") shows each path's
+searches; the month's `DEBATE` line counts their search fees. `--gate-status-perplexity` is refused on any other run.
+On the hosted preview each debate here also needs `--hosted-billing '<the same JSON the plan will get>'` beside
+`--register-next`, as above (without it the practice refuses `PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED` before
+anything is spent).
 
 The figures are in `$P/start-month/start-month.jsonl` only, which every run appends to: one `START_MONTH_RUN` line (plan,
 paths, digs, question), then one `START_MONTH` line per phase, each with its `calls` (the ledger rows of its model
