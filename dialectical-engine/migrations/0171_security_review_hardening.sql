@@ -90,7 +90,9 @@
 --   open_public_flag counted against limits its caller passed, so a request connection with its own live session could open its own flag on any
 --   public debate never hidden before and settle it AGREE, which hid another account's debate until a person restored it. The settlement moves from
 --   debateai_runtime to the marker (section 4): its one caller, the API's press, calls it after the judge, inside the reporter's request, on its
---   system login (the cross-account site X38), so no request login records a verdict, closes a flag or hides a debate; the reporter is the one the
+--   system login (the cross-account site X38), so no request login records a verdict of its own choosing, closes a flag or hides a debate (0157's sweep
+--   of a report left CHECKING for five minutes, which a request login may still run, records UNAVAILABLE, sends it to a person and hides nothing, and
+--   0157's close of a report by staff is 0151's dismissal, so a verdict that arrives after it hides nothing either); the reporter is the one the
 --   opening named under the reporter's own session, and no settlement changes it. It still closes or hides only for a connection that presents the
 --   reporter's own session or none (the system login presents none), and an AGREE now hides nothing for a report staff dismissed while the judge
 --   ran: its verdict is recorded and it goes to a person. The opening counts against the lower of the limits it is handed and the site's
@@ -170,8 +172,8 @@
 --   allowance; it answers one boolean of a run id and hands back nothing of the debate.
 --   tests/integration/security-review-hardening-database.test.ts
 --   censuses EVERY definer either request login (the production shapes api-runtime and api-authorization) may EXECUTE, with no name filter, each in
---   exactly one of four named lists: it asks the connection (0171's request_owner_matches or 0131's rule, 0130's context, a staff privilege token, or
---   the marker); it is gated by a secret, a token, a proof or its own transaction it is handed, never the connection (the sign-in, enrollment, recovery,
+--   exactly one of five named lists: it asks the connection (0171's request_owner_matches or 0131's rule, 0130's context, a staff privilege token, the
+--   marker, or 0040's lock of a request's own runs, which asks 0171's question of the owner it is handed); it is gated by a secret, a token, a proof or its own transaction it is handed, never the connection (the sign-in, enrollment, recovery,
 --   social, session and step-up family, the social sign-up's account, the staff token and action-proof ceremonies, the publication step-up grants, the
 --   legacy claim, the three sign-up writers and the delivery overload); it is a public or site reader that hands back no account's private content; or
 --   it is left alone on purpose, each with its one-line reason in that test, the same set as here: what this header leaves alone by name (billing's own
@@ -185,7 +187,16 @@
 --   the API's key makes; 0097's question whether an owner's active account has a phone on file, one bit of an owner ref, which no product code asks now;
 --   0128's hold of an erasing account's address on its threat reports, gated by the id of a prepared erasure; and 0152's measure of what a public check
 --   used, a record of the site that holds no account's, which nothing reads to gate anything. Still open there, for a review of its own: a request login
---   may still append such a refusal event to any account's trail (two of them take a user id). A new, a removed or a newly reachable definer fails the
+--   may still append such a refusal event to any account's trail (two of them take a user id). The fifth list, ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED, is
+--   what the merge of feat/2026-10-28-v4-initial brought and none of the four truly holds, seventeen definers of 0156, 0157 and 0170, each with a reason that
+--   says plainly what a request login can do with it: claim any account's pending moderation notice, statement of reasons or reporter's answer mail, read
+--   it under that claim (a user id, a publication, a ground and the sealed address) and mark it delivered unsent; read any person's statements and which
+--   of their contributions are off for review by naming the owner ref, as both readers take the owner they are handed; keep the first sealed quote of a
+--   report that hid its debate; run the stuck report sweep and the twelve-month erasure of moderation words; fill the day's count of outbound mail, which
+--   then refuses every later account mail until the next UTC day; take the day's mail alerts; and ask one bit of a keyed digest of an address. This step
+--   does not harden them: they are open, for a step of their own. The other six definers the merge brought are in the four lists because their bodies
+--   belong there: 0155's two owner writes and 0157's answered queue ask the connection, 0157's two staff acts are gated by an action proof, and 0170's
+--   count of the day's mail is a site reader. A new, a removed or a newly reachable definer fails the
 --   census, as does one that changes which list it belongs in. 0048's record of a provider's probe took any caller of debateai_runtime and any date, and
 --   the API's ask-time discovery trusts it: it takes each provider's latest row (0040's latest_provider_probes, by probed_at) for healthy while that row
 --   is HEALTHY and fresh, and probes every other provider again, one whose latest row is dated later than now included. So a request login with no
@@ -199,7 +210,8 @@
 --   database), so bounding the date needs a margin for those clocks. The test also censuses the relations
 --   either request login may INSERT, UPDATE or DELETE whose row security is off (billing.tool_order, scorecard.model_identity and
 --   serve.publication_check_record, each append-only and content-free, and 0000's one-row ledger.sequence_allocator, whose PRIMARY KEY admits no second
---   row and whose UPDATE this step takes back), which a definer-only census cannot see, so a new such writable relation fails too. The functions only the runner
+--   row and whose UPDATE this step takes back), which a definer-only census cannot see, so a new such writable relation fails too (the merge of
+--   feat/2026-10-28-v4-initial brought none: the tables of 0156, 0157 and 0170 are each no request login's to write). The functions only the runner
 --   or the API's system login call, with no owner, on any account's rows, move from debateai_runtime, which the API's request logins hold (through
 --   debateai_billing_runtime and debateai_authorization_runtime), to the marker, which only the system logins hold: the sweeps' readers and listers,
 --   their settlements, wipes, marks and page writers, the runner's own steps of one debate, which take only its run, turn or report (its web

@@ -117,6 +117,50 @@ async function unpublish(runId: string, ref: string): Promise<void> {
       VALUES ($1,$2,$3,'PRIVATE',$4,2,'COPIES_MAY_PERSIST_V1',now(),$5)`, [randomUUID(), runId, ref, randomUUID(), ++sequence]]]);
 }
 
+/**
+ * The definers the merge of feat/2026-10-28-v4-initial (2026-11-09) brought that either request login may EXECUTE and that none of the census's four lists truly holds
+ * (0156's, 0157's and 0170's). Each asks nothing of the connection, so each reason says plainly what a request login can do with it. This step does not harden them: they
+ * are open, for a step of their own, and 0171's header says so. The other six the merge brought are in the four lists, each because its body belongs there.
+ */
+const ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED: Readonly<Record<string, string>> = {
+  "identity.claim_moderation_notices(integer)":
+    "0156's claim (this release no longer calls it), no owner and no connection asked: claims up to 100 of any accounts' pending notices at a time and hands back each claim token",
+  "identity.read_moderation_notice(uuid,uuid)":
+    "0156's read under a claim, whose token the claim above hands any request login: a notice's user id, kind, time, language and the account's address, sealed",
+  "identity.complete_moderation_notice(uuid,uuid,text)":
+    "0156's settlement under that token: marks a notice delivered unsent, or dropped, so its person is never told their content left the page",
+  "identity.claim_moderation_statements(integer)":
+    "0157's claim, no owner and no connection asked: claims up to 100 of any accounts' pending statements of reasons at a time and hands back each claim token",
+  "identity.read_moderation_statement(uuid,uuid)":
+    "0157's read under a claim, whose token the claim above hands any request login: a statement's user id, publication, ground, time, language and the sealed address",
+  "identity.complete_moderation_statement(uuid,uuid,text)":
+    "0157's settlement under that token: marks a statement of reasons delivered unsent, or dropped, so its person is never sent it",
+  "identity.claim_public_flag_mail(integer)":
+    "0157's claim, no owner and no connection asked: claims up to 100 of any reporters' pending answer mails at a time and hands back each claim token",
+  "identity.read_public_flag_mail(uuid,uuid)":
+    "0157's read under a claim, whose token the claim above hands any request login: a report's user id, publication, kind, time, language and the reporter's sealed address",
+  "identity.complete_public_flag_mail(uuid,uuid,text)":
+    "0157's settlement under that token: marks a reporter's answer delivered unsent, or dropped, so the person who reported is never told the outcome",
+  "identity.read_own_moderation_statements(uuid)":
+    "0157's reader takes the owner it is handed and asks nothing: for any owner ref, that person's statements, their kinds, run ids, publications and grounds, and the sealed facts and quote",
+  "identity.read_own_contribution_review(uuid,uuid)":
+    "0157's reader takes the owner it is handed and asks nothing: for any owner ref and run id, which of that person's public contributions are off for review or kept private",
+  "identity.record_public_flag_quote(uuid,jsonb)":
+    "0157's keeper of an automatic hide's quote, asks nothing: given a flag id that hid its debate, writes the first sealed quote, an envelope of its own making, where the owner's statement reads it",
+  "identity.settle_stuck_public_flags()":
+    "0157's sweep, asks nothing: moves any report left CHECKING for five minutes to a person with the verdict UNAVAILABLE; it names no verdict of its own and hides nothing",
+  "identity.delete_moderation_words_due()":
+    "0157's retention sweep, asks nothing: runs the twelve-month erasure of typed facts and quotes early; it can only take what is already due",
+  "identity.reserve_outbound_mail(text,integer)":
+    "0170's count takes a ceiling from its caller: any number of calls fill the day's count, so the mail gate refuses every later account mail until the next UTC day",
+  "identity.claim_outbound_mail_alert(text,date)":
+    "0170's one-a-day alert, asks nothing: takes today's or yesterday's alert of a kind, so the API's own alert to the team is never sent",
+  "identity.outbound_mail_recipient_suppressed(bytea)":
+    "0170's question whether a 32-byte digest is suppressed: one bit, for digests keyed by the API's key, of a list that is empty until the bounce feed exists"
+};
+/** The two of them that take an owner. The owner-keyed census below names them, so a new one that asks nothing still fails. */
+const ARRIVED_OWNER_TAKING = ["identity.read_own_contribution_review(uuid,uuid)", "identity.read_own_moderation_statements(uuid)"] as const;
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
@@ -1060,7 +1104,9 @@ describe("F5: a request-facing function believes only the owner the database see
       WHERE n.nspname = 'identity' AND p.prosecdef AND p.proargnames && ARRAY['p_owner_ref','p_owner']::text[]
         AND has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
         AND p.prosrc !~ 'identity\\.(request_owner_matches|page_memory_run_owned)\\(' ORDER BY 1`)).rows.map(({ signature }) => signature);
-    expect(unchecked).toEqual([]);
+    // Only the two 0157 brought, which the merge did not harden and the census's fifth list names; any other that takes an owner and asks nothing fails.
+    expect(unchecked).toEqual([...ARRIVED_OWNER_TAKING]);
+    for (const signature of ARRIVED_OWNER_TAKING) expect(Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED), signature).toContain(signature);
     // And the ones that ask: at least the eighteen of 0131's rule still live and the fourteen others.
     const checked = (await database.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
       WHERE n.nspname = 'identity' AND p.prosecdef AND has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
@@ -1318,23 +1364,24 @@ describe("F5: the site's day of spend is the system's to write: the writers of a
       const synthesis = (spendId: string) => ({ spendId, spendSource: "SYNTHESIS_CHECK" as const, runId: ben.runId, providerRef: "synthesis-check:anthropic:claude-haiku-5-5",
         chargedOn: utcDay(0), chargeMicros: 1, inputTokens: 1, outputTokens: 1 });
       const denied = (name: string) => ({ code: "42501", message: `permission denied for ${name}` });
+      const [language, question, clarify] = [entry("language-check:anthropic:claude-haiku-5-5"), entry("question-check:anthropic:claude-haiku-5-5"),
+        { ...entry("ask-clarify:anthropic:claude-haiku-5-5"), ownerRef: ben.ownerRef, grant: null }];
+      const synthesisId = randomUUID();
       await inAccountRequest(ben.token, async () => {
-        const [language, question, clarify] = [entry("language-check:anthropic:claude-haiku-5-5"), entry("question-check:anthropic:claude-haiku-5-5"),
-          { ...entry("ask-clarify:anthropic:claude-haiku-5-5"), ownerRef: ben.ownerRef, grant: null }];
-        const synthesisId = randomUUID();
         await recordLanguageCheckSpend(crossAccountPool(request, "X30"), language);
         await recordQuestionCheckSpend(crossAccountPool(request, "X31"), question);
         await reserveAskClarifyCharge(request, clarify);
         await recordAskClarifyCharge(crossAccountPool(request, "X32"), clarify);
         await new PostgresModelSpendStore(crossAccountPool(request, "X33")).recordSpend(synthesis(synthesisId));
-        for (const id of [language.spendId, question.spendId, clarify.spendId, synthesisId]) expect(await ledgerRows(id)).toBe(1);
-        expect((await database.pool.query<{ owner_ref: string }>("SELECT owner_ref FROM identity.ask_clarify_charge WHERE charge_id=$1", [clarify.spendId])).rows)
-          .toEqual([{ owner_ref: ben.ownerRef }]);
         expect(await refusal(() => recordLanguageCheckSpend(request, entry("language-check:anthropic:claude-haiku-5-5")))).toEqual(denied("function record_language_check_spend"));
         expect(await refusal(() => recordQuestionCheckSpend(request, entry("question-check:anthropic:claude-haiku-5-5")))).toEqual(denied("function record_question_check_spend"));
         expect(await refusal(() => recordAskClarifyCharge(request, { ...clarify, spendId: randomUUID() }))).toEqual(denied("function record_ask_clarify_charge"));
         expect(await refusal(() => new PostgresModelSpendStore(request).recordSpend(synthesis(randomUUID())))).toEqual(denied("table model_spend"));
       });
+      // Read back after the request: the superuser's pool is refused inside one.
+      for (const id of [language.spendId, question.spendId, clarify.spendId, synthesisId]) expect(await ledgerRows(id)).toBe(1);
+      expect((await database.pool.query<{ owner_ref: string }>("SELECT owner_ref FROM identity.ask_clarify_charge WHERE charge_id=$1", [clarify.spendId])).rows)
+        .toEqual([{ owner_ref: ben.ownerRef }]);
       // The room as main.ts builds it: its decisions on the API's system login (roomDecisionPool), its reads on the request pool.
       const source = new FundingAwarePersonAllowanceSource({ allowances: new PostgresInternalAllowanceRepository(request), entitlements: new EntitlementRepository(request),
         plans, closeBasisPoints: 9500 });
@@ -1566,14 +1613,15 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
     const call = randomUUID();
     expect(await reserve(runner, call, anaRun)).toBe(true);
     for (const [label, within, pool] of strangers()) {
+      const own = randomUUID();
       await within(async () => {
         // A settlement of the call at any amount, a call of its own on her grant, and its own debate pinned to her grant: each refused before anything.
         expect(await refusal(() => settle(pool, call, anaRun, 9_007_199_254_740_991)), label).toEqual(MISMATCH);
-        const own = randomUUID();
         expect(await refusal(() => reserve(pool, own, anaRun)), label).toEqual(MISMATCH);
-        expect(await admitted(own), label).toBe(0);
         expect(await refusal(() => pin(pool, ben.runId, ana.ownerRef)), label).toEqual(MISMATCH);
       });
+      // Read back after the request: the superuser's pool is refused inside one.
+      expect(await admitted(own), label).toBe(0);
     }
     expect(await ledgerOf(call)).toEqual([]);
     expect(await scopeOf(ben.runId)).toBeNull();
@@ -1886,19 +1934,26 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
         GROUP BY 1 ORDER BY 1`, names)).rows;
       expect(relations.map(({ relation }) => relation)).toEqual(expect.arrayContaining(["core.run_ownership_event", "billing.run_charge_scope"]));
       /** The relations whose rows, read on `pool` through the columns `name` may read, hold ana's owner ref. */
-      const holding = (pool: Pool, token: string | null, name: string): Promise<string[]> => as(token, async () => {
-        const found: string[] = [];
+      const holding = async (pool: Pool, token: string | null, name: string): Promise<string[]> => {
+        // The columns `name` may read come first, outside the request: the superuser's pool is refused inside one.
+        const readableOf = new Map<string, string[]>();
         for (const { relation, columns } of relations) {
-          const readable = (await database.pool.query<{ column: string }>(`SELECT quote_ident(a.attname) AS column FROM pg_attribute AS a
+          readableOf.set(relation, (await database.pool.query<{ column: string }>(`SELECT quote_ident(a.attname) AS column FROM pg_attribute AS a
             WHERE a.attrelid = $1::regclass AND a.attnum > 0 AND NOT a.attisdropped AND has_column_privilege($2, a.attrelid, a.attnum, 'SELECT')`,
-          [relation, name])).rows.map(({ column }) => column).filter((column) => columns.includes(column));
+          [relation, name])).rows.map(({ column }) => column).filter((column) => columns.includes(column)));
+        }
+        return as(token, async () => {
+        const found: string[] = [];
+        for (const { relation } of relations) {
+          const readable = readableOf.get(relation)!;
           if (readable.length === 0) continue;
           const rows = await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${relation} AS t
             WHERE concat_ws(' ', ${readable.map((column) => `t.${column}::text`).join(",")}) ILIKE $1`, [`%${ana.ownerRef}%`]);
           if (rows.rows[0]!.n !== "0") found.push(relation);
         }
         return found;
-      });
+        });
+      };
       for (const [label, pool, token, name] of strangers) expect(await holding(pool, token, name), label).toEqual([]);
       // The scan sees an owner ref where a row holds one: the system login reads every account's ownership events and charge scopes.
       expect(await holding(open("api-system"), null, names[0]!)).toEqual(expect.arrayContaining(["core.run_ownership_event", "billing.run_charge_scope"]));
@@ -1930,25 +1985,29 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "read_web_shown_quotes", "read_path_suggestions_of_run"] as const;
   /**
    * The census (D3 stage 6): EVERY SECURITY DEFINER function either request login (the production shapes api-runtime and
-   * api-authorization, measured below) may EXECUTE, each in exactly one of four named lists, so a new, a removed or a newly
+   * api-authorization, measured below) may EXECUTE, each in exactly one of five named lists, so a new, a removed or a newly
    * reachable definer fails. ASKS asks what the database sees for this connection (0171's identity.request_owner_matches or
-   * 0131's page_memory_run_owned, 0130's rls context, a staff privilege token through staff.require_http_authority, or the
-   * login's cross-account marker). GATED is gated by a secret, a token, a proof or its own transaction it is handed, never by
+   * 0131's page_memory_run_owned, 0130's rls context, a staff privilege token through staff.require_http_authority, the
+   * login's cross-account marker, or 0040's lock of a request's own runs, which asks 0171's question of the owner it is handed:
+   * 0155's two owner writes have no other ownership gate, and their legacy branch, like the lock's, names no owner). GATED is gated by a secret, a token, a proof or its own transaction it is handed, never by
    * the connection. PUBLIC hands back only public or site-wide state, no account's private content. LEFT_ALONE maps each one
    * left alone on purpose to its reason, the set the 0171 header names by its classes (what it leaves alone by name, the sign-in
    * flows' prunes of dead rows, the audit attempt and the refusal audits, the pending-account creators, the phone question, the
    * threat reports' hold and 0152's record of the site; 0048's probe writer moved to the marker and left the census), so a new
    * one needs a reason of its own. staff.authorize_action is not a connection check (it consumes a WebAuthn action proof), so a
-   * function gated only by it is GATED, not ASKS (D4b).
+   * function gated only by it is GATED, not ASKS (D4b). The fifth list, ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED (above the first
+   * describe), names what the merge of feat/2026-10-28-v4-initial brought and none of these four truly holds, with what a request
+   * login can do with each: open, not hardened here. It asks nothing of the connection, and one that starts to must move to ASKS.
    */
-  const ASKS = /identity\.(?:request_owner_matches|page_memory_run_owned)\(|rls\.(?:context_owner_ref|context_user_id|session_credential_hash)\(|staff\.require_http_authority\(|pg_catalog\.pg_has_role\(session_user, 'debateai_rls_all_accounts', 'MEMBER'\)/u;
+  const ASKS = /identity\.(?:request_owner_matches|page_memory_run_owned)\(|rls\.(?:context_owner_ref|context_user_id|session_credential_hash)\(|staff\.require_http_authority\(|pg_catalog\.pg_has_role\(session_user, 'debateai_rls_all_accounts', 'MEMBER'\)|core\.lock_owned_live_runs\(/u;
   const ASKS_CONNECTION = [
     "billing.pending_erasure_owner_refs(uuid,integer)", "billing.read_internal_allowance(uuid,timestamp with time zone)",
     "billing.read_internal_allowance_for_run(uuid,timestamp with time zone)", "billing.read_internal_run_state(uuid)",
     "billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamp with time zone)",
     "billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)",
     "billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)", "core.list_unstarted_readmissions(uuid)",
-    "core.lock_owned_live_runs(uuid[],uuid,text)", "identity.close_investigation_keeping_texts(uuid,uuid)",
+    "core.lock_owned_live_runs(uuid[],uuid,text)", "core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)",
+    "identity.close_investigation_keeping_texts(uuid,uuid)",
     "identity.confirm_account_age_with_audit(uuid,uuid,boolean,smallint,text,text,timestamp with time zone,jsonb)",
     "identity.continue_paused_run_in_release(uuid,uuid,text,bigint)", "identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
     "identity.join_public_tree(uuid,uuid,uuid,uuid,text)", "identity.open_investigation(uuid,uuid)",
@@ -1972,7 +2031,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.reserve_publication_event_refs(uuid,uuid,uuid,text,text)", "identity.resume_paused_run(uuid,uuid)",
     "identity.revoke_all_sessions_with_audit(uuid,uuid,timestamp with time zone,jsonb)",
     "identity.revoke_session_with_audit(uuid,uuid,timestamp with time zone,jsonb)", "identity.save_page_reading_level(uuid,text)",
-    "identity.touch_investigation(uuid,uuid)", "rls.context_owner_ref()", "rls.context_user_id()", "rls.owns_execution_ref(text)", "rls.owns_run(uuid)",
+    "identity.touch_investigation(uuid,uuid)", "memory.unlink_owned_memory_link(uuid,uuid,text,text)", "rls.context_owner_ref()", "rls.context_user_id()", "rls.owns_execution_ref(text)", "rls.owns_run(uuid)",
     "serve.abandon_publication_key_provision(uuid,uuid)", "serve.publication_review_approved(uuid,uuid,integer)",
     "serve.read_publication_review_state(uuid,uuid,uuid)",
     "serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean)",
@@ -1982,7 +2041,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.list_threat_reports(jsonb,text)", "staff.open_publication_review(jsonb,text,uuid,text)", "staff.peek_threat_report_account(jsonb,text,uuid)",
     "staff.read_audit_page(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_issued_invitation(jsonb,text,uuid)",
     "staff.read_member_allowance_command(jsonb,text,uuid,uuid)", "staff.read_member_allowance_page(jsonb,text)",
-    "staff.read_mutation_target(jsonb,text,uuid,text)", "staff.read_public_flag_queue(jsonb,text)", "staff.read_public_review(jsonb,text,uuid)",
+    "staff.read_mutation_target(jsonb,text,uuid,text)", "staff.read_public_flag_queue(jsonb,text)", "staff.read_public_flag_queue_answered(jsonb,text)",
+    "staff.read_public_review(jsonb,text,uuid)",
     "staff.read_public_review_command(jsonb,text,uuid)", "staff.read_public_review_list(jsonb,text)", "staff.read_self_allowance_command(jsonb,text,uuid)",
     "staff.read_team_limit_command(jsonb,text)", "staff.read_team_limit_page(jsonb,text)",
     "staff.read_team_page(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_threat_report(jsonb,text,uuid)",
@@ -2044,7 +2104,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "serve.prepare_publication_key_provision(uuid,uuid,uuid,uuid,uuid,text)", "staff.authorize_alert_operation(uuid,text,uuid)",
     "staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.disable(jsonb,uuid,jsonb,uuid,text,uuid,jsonb,jsonb)",
     "staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)", "staff.invite(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,text,jsonb,jsonb)",
-    "staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)", "staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)",
+    "staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)", "staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)",
+    "staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)", "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
     "staff.read_action_proof(jsonb,text,text,jsonb)", "staff.read_authentication(uuid,uuid,text,text)", "staff.read_context(uuid,uuid,text)",
     "staff.read_current_context(jsonb,text)", "staff.read_enrollment(uuid,uuid,text)", "staff.read_invitation_context(uuid,uuid,text)",
     "staff.read_invitation_proof(jsonb,text,text)", "staff.read_owner_possession_context(uuid,uuid,uuid,text,text,text)",
@@ -2054,7 +2115,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
   ] as const;
   const PUBLIC = [
     "core.latest_provider_probes(text[])", "core.read_current_release()", "core.read_release_state(text)", "core.resolve_run_ref(uuid)",
-    "core.run_is_published(uuid,uuid)", "identity.public_author_name_gone(uuid)", "identity.public_review_held(uuid)",
+    "core.run_is_published(uuid,uuid)", "identity.outbound_mail_today()", "identity.public_author_name_gone(uuid)", "identity.public_review_held(uuid)",
     "identity.read_public_debate_reports(uuid)", "identity.read_public_debate_updates(uuid)", "identity.read_public_dig_parent(uuid,uuid)",
     "identity.read_public_flag_target(uuid)", "identity.read_public_review_overlay(uuid)", "identity.read_public_tree_of_run(uuid)",
     "identity.run_release_now(uuid)", "identity.run_settings_version_now(uuid)", "register.read_active_settings_version()",
@@ -2117,12 +2178,17 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
    * purges (they clamp the clock they are handed to now), the per-transaction audit attempt, the three challenge prunes (dead
    * rows only), 0000's sequence allocator (a definer since 0171) and 0112's release of a staff claim (it gives back only a
    * live claim). Each is in LEFT_ALONE above; this list fails on a new such loop that asks nothing of the connection.
+   * ARRIVED_LOOP_WRITERS are the five such loops the merge of feat/2026-10-28-v4-initial brought, named apart: each is in the fifth list, open, not left alone on purpose.
    */
   const LOOP_WRITERS = [
     "billing.purge_expired_records(timestamp with time zone)", "billing.purge_revoked_card_tokens(timestamp with time zone)",
     "billing.purge_short_lived(timestamp with time zone)", "identity.begin_runtime_audit_attempt()",
     "identity.prune_consumer_passkey_challenges(integer)", "identity.prune_consumer_security_challenges(integer)",
     "identity.prune_social_flows()", "ledger.allocate_sequence()", "staff.release_alert_delivery(uuid,uuid)"
+  ] as const;
+  const ARRIVED_LOOP_WRITERS = [
+    "identity.claim_moderation_notices(integer)", "identity.claim_moderation_statements(integer)", "identity.claim_public_flag_mail(integer)",
+    "identity.complete_moderation_notice(uuid,uuid,text)", "identity.delete_moderation_words_due()"
   ] as const;
   /**
    * The relations either request login may INSERT, UPDATE or DELETE whose row security is off: each append-only (its mutation
@@ -2136,6 +2202,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "billing.tool_order", "scorecard.model_identity", "serve.publication_check_record",
     // The one-row global sequence counter: its PRIMARY KEY and CHECK(singleton) admit no second row, so an INSERT always
     // conflicts, and 0171 took UPDATE back (section 4), so it is written only through its definer, ledger.allocate_sequence().
+    // The merge of feat/2026-10-28-v4-initial brought no such relation: the tables of 0156, 0157 and 0170 are each no request login's to write.
     "ledger.sequence_allocator"
   ] as const;
   const MISMATCH = { code: "42501", message: "REQUEST_OWNER_MISMATCH" };
@@ -2340,12 +2407,15 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
       });
       try {
         const press = async (publicationRef: string) => (await http.inject({ method: "POST", url: `/v1/public/debates/${publicationRef}/flag`, headers: testSessionHeaders(identity, true),
-          payload: { where: "The first path", claim: "It names a private person's home." } })).json() as { state: string };
+          payload: { where: "The first path", claim: "It names a private person's home.", good_faith: true } })).json() as { state: string };
         const flagOf = async (publicationRef: string) => (await database.pool.query("SELECT state,verdict,reporter_ref FROM identity.public_flag WHERE publication_ref=$1",
           [publicationRef])).rows;
         replies.push(JSON.stringify({ verdict: "AGREE", reason: "PERSONAL", quote: QUOTE }));
         expect(await press(pages[0]!)).toEqual({ state: "HIDDEN" });
         expect(await flagOf(pages[0]!)).toEqual([{ state: "HIDDEN", verdict: "AGREE", reporter_ref: eve.ownerRef }]);
+        // 0157: the press keeps the quote the hide relied on, on the request login under the reporter's own session, once the system login has settled it.
+        expect((await database.pool.query<{ key_id: string }>(`SELECT quote.quote_ciphertext->>'keyId' AS key_id FROM identity.public_flag_quote AS quote
+          JOIN identity.public_flag AS flag USING (flag_id) WHERE flag.publication_ref=$1`, [pages[0]])).rows).toEqual([{ key_id: `publication-snapshot:${pages[0]}:v1` }]);
         expect(Number((await database.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.public_review_event WHERE publication_ref=$1 AND action='HIDE'",
           [pages[0]])).rows[0]!.n)).toBe(1);
         replies.push(JSON.stringify({ verdict: "UNSURE", reason: null, quote: null }));
@@ -2354,6 +2424,57 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
         expect(replies).toEqual([]);
       } finally { await http.close(); }
     } finally { for (const pool of opened) await pool.end().catch(() => undefined); }
+  }, 300_000);
+
+  it("on the production logins (P3-01's memberships): beside the settlement's move, 0157's close never hides, its sweep of a report left CHECKING sends it to a person with no verdict of its own, and a quote is kept only for a report that hid", async () => {
+    const production = await logins!.production();
+    const request = createPool(production.url("api-runtime"), { max: 2 });
+    const authorization = createPool(production.url("api-authorization"), { max: 2 });
+    const system = createPool(production.url("api-system"), { max: 2 });
+    const eve = await seedSessionAccount(database.pool, "f5-flag-close");
+    const [stale, closed, closedStale, fresh] = [await publish(await run(ben)), await publish(await run(ben)), await publish(await run(ben)), await publish(await run(ben))];
+    const [staleFlag, closedFlag, closedStaleFlag, freshFlag] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    const stuck = "clock_timestamp() - interval '6 minutes'";
+    await seeded([
+      [`INSERT INTO identity.public_flag (flag_id,publication_ref,reporter_ref,state,content_ciphertext,created_at) VALUES ($1,$2,$3,'CHECKING',$4::jsonb,${stuck})`,
+        [staleFlag, stale, eve.ownerRef, JSON.stringify(pubEnvelope(stale))]],
+      ["INSERT INTO identity.public_flag (flag_id,publication_ref,reporter_ref,state,content_ciphertext) VALUES ($1,$2,$3,'CHECKING',$4::jsonb)",
+        [closedFlag, closed, eve.ownerRef, JSON.stringify(pubEnvelope(closed))]],
+      [`INSERT INTO identity.public_flag (flag_id,publication_ref,reporter_ref,state,content_ciphertext,created_at) VALUES ($1,$2,$3,'CHECKING',$4::jsonb,${stuck})`,
+        [closedStaleFlag, closedStale, eve.ownerRef, JSON.stringify(pubEnvelope(closedStale))]],
+      ["INSERT INTO identity.public_flag (flag_id,publication_ref,reporter_ref,state,content_ciphertext) VALUES ($1,$2,$3,'CHECKING',$4::jsonb)",
+        [freshFlag, fresh, eve.ownerRef, JSON.stringify(pubEnvelope(fresh))]]]);
+    const hides = async (publicationRef: string) => Number((await database.pool.query<{ n: string }>(
+      "SELECT count(*) AS n FROM identity.public_review_event WHERE publication_ref=$1 AND action='HIDE'", [publicationRef])).rows[0]!.n);
+    const flag = async (flagId: string) => (await database.pool.query<{ state: string; verdict: string | null; dismissed: boolean }>(
+      "SELECT state,verdict,dismissed_at IS NOT NULL AS dismissed FROM identity.public_flag WHERE flag_id=$1", [flagId])).rows[0]!;
+    const close = (flagId: string) => database.pool.query("SELECT identity.public_flag_close($1,'NO_BREACH',$2,$3,$4)", [flagId, randomUUID(), randomUUID(), "a".repeat(64)]);
+    const settle = (pool: Pool, flagId: string, verdict: string) => pool.query<{ state: string }>(
+      "SELECT identity.settle_public_flag($1::uuid,$2,'PERSONAL','judge-provider','judge-model',11,7,0.25) AS state", [flagId, verdict]).then((result) => result.rows[0]!.state);
+    try {
+      // 0157's close of a report still CHECKING is 0151's dismissal with what the person found, so the judge's AGREE arriving after it, on the system login, hides nothing.
+      await close(closedFlag);
+      expect(await settle(system, closedFlag, "AGREE")).toBe("QUEUED");
+      expect(await flag(closedFlag)).toEqual({ state: "QUEUED", verdict: "AGREE", dismissed: true });
+      expect(await hides(closed)).toBe(0);
+      // No request login may name a verdict: the settlement is the marker's alone, the 0157 sweep beside it notwithstanding.
+      for (const pool of [request, authorization]) {
+        expect(await refusal(() => settle(pool, freshFlag, "AGREE"))).toEqual({ code: "42501", message: "permission denied for function settle_public_flag" });
+      }
+      // The sweep, as the fifth list says, on a request login with no session: a report CHECKING for five minutes goes to a person as UNAVAILABLE, a closed one
+      // among them, and neither hides. A fresh one is left to its judge.
+      await close(closedStaleFlag);
+      expect((await request.query<{ settled: number }>("SELECT identity.settle_stuck_public_flags() AS settled")).rows[0]!.settled).toBeGreaterThanOrEqual(2);
+      expect(await flag(staleFlag)).toEqual({ state: "QUEUED", verdict: "UNAVAILABLE", dismissed: false });
+      expect(await flag(closedStaleFlag)).toEqual({ state: "QUEUED", verdict: "UNAVAILABLE", dismissed: true });
+      expect(await flag(freshFlag)).toEqual({ state: "CHECKING", verdict: null, dismissed: false });
+      for (const page of [stale, closedStale, fresh]) expect(await hides(page)).toBe(0);
+      // A quote is kept only for a report that hid its debate: none of these did.
+      const quote = (flagId: string, publicationRef: string) => request.query<{ kept: boolean }>("SELECT identity.record_public_flag_quote($1::uuid,$2::jsonb) AS kept",
+        [flagId, JSON.stringify(pubEnvelope(publicationRef))]).then((result) => result.rows[0]!.kept);
+      expect(await quote(staleFlag, stale)).toBe(false);
+      expect(await quote(closedFlag, closed)).toBe(false);
+    } finally { await Promise.all([request.end(), authorization.end(), system.end()]); }
   }, 300_000);
 
   it("a flag's limits are the site's own sealed row: a request's own numbers only tighten them; with no release named, its own; a CURRENT release with no valid row refuses", async () => {
@@ -2629,7 +2750,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     } finally { for (const pool of opened) await pool.end().catch(() => undefined); }
   }, 300_000);
 
-  it("the census sees every definer either request login may EXECUTE: each asks the connection, is gated by a secret it is handed, is a public or site reader, or is left alone on purpose", async () => {
+  it("the census sees every definer either request login may EXECUTE: each asks the connection, is gated by a secret it is handed, is a public or site reader, is left alone on purpose, or came with the V4 merge and is named as not reviewed", async () => {
     const production = await logins!.production();
     const names = [production.url("api-runtime"), production.url("api-authorization")].map((url) => decodeURIComponent(new URL(url).username));
     const rows = (await database.pool.query<{ signature: string; source: string }>(`
@@ -2638,16 +2759,16 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
       WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog','information_schema')
         AND (has_function_privilege($1, p.oid, 'EXECUTE') OR has_function_privilege($2, p.oid, 'EXECUTE')) ORDER BY 1`,
     names)).rows;
-    // The four lists partition every reachable definer, each in exactly one, so a new, a removed or a newly reachable one fails.
-    const named = [...ASKS_CONNECTION, ...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE)];
+    // The five lists partition every reachable definer, each in exactly one, so a new, a removed or a newly reachable one fails.
+    const named = [...ASKS_CONNECTION, ...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE), ...Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED)];
     expect(new Set(named).size, "a signature is in two lists").toBe(named.length);
     expect(rows.map((row) => row.signature)).toEqual([...named].sort());
-    // Each list is what it says: the asking ones ask the connection, and none of the other three does.
+    // Each list is what it says: the asking ones ask the connection, and none of the other four does.
     const source = new Map(rows.map((row) => [row.signature, row.source] as const));
     for (const signature of ASKS_CONNECTION) expect(ASKS.test(source.get(signature)!), signature).toBe(true);
-    for (const signature of [...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE)]) expect(ASKS.test(source.get(signature)!), signature).toBe(false);
-    // And each one left alone says why.
-    for (const [signature, reason] of Object.entries(LEFT_ALONE)) expect(reason.trim().length, signature).toBeGreaterThan(20);
+    for (const signature of [...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE), ...Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED)]) expect(ASKS.test(source.get(signature)!), signature).toBe(false);
+    // And each one left alone, or not yet reviewed, says why.
+    for (const [signature, reason] of Object.entries({ ...LEFT_ALONE, ...ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED })) expect(reason.trim().length, signature).toBeGreaterThan(20);
     // Two that are no request login's at all now: 0151's flag settlement (the press settles on its system login, X38) and
     // 0128's threat report keepers (they name an account, and nothing calls them).
     expect(rows.map((row) => row.signature)).not.toContain("identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)");
@@ -2755,8 +2876,9 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
         AND (p.prosrc ~ 'INSERT INTO' OR p.prosrc ~ 'DELETE FROM' OR p.prosrc ~ 'UPDATE .* SET')
         AND p.prosrc NOT LIKE '%pg_has_role(session_user, ''debateai_rls_all_accounts''%' ORDER BY 1`,
     names)).rows.map((row) => row.signature);
-    expect(loops).toEqual([...LOOP_WRITERS].sort());
+    expect(loops).toEqual([...LOOP_WRITERS, ...ARRIVED_LOOP_WRITERS].sort());
     for (const signature of LOOP_WRITERS) expect(Object.keys(LEFT_ALONE), signature).toContain(signature);
+    for (const signature of ARRIVED_LOOP_WRITERS) expect(Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED), signature).toContain(signature);
   }, 300_000);
 
   it("the relations either request login may INSERT, UPDATE or DELETE whose row security is off are these alone, each append-only or the one-row counter", async () => {

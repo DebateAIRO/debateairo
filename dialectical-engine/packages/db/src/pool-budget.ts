@@ -37,7 +37,13 @@
  * ask-time discovery's record of each provider probe it makes (X37) the system
  * login's, inside requests too; it needs no more: one short statement per
  * provider probed, in a discovery round that runs one at a time, and a recorded
- * probe keeps its provider fresh for the round after. max_connections stays 320.
+ * probe keeps its provider fresh for the round after. The Report button's
+ * settlement after its judge (X38, the same review's) is one short statement for
+ * each press that opened a report, inside the flag limits, and the V4 merge's seal
+ * of a stranger's report under the public debate's own run (X29) is one content
+ * lease and one statement beside it, only on the press that opens the report; the
+ * merge's moderation and flag mail timer runs one statement at a time outside any
+ * request. None needs more. max_connections stays 320.
  *
  * The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
@@ -101,7 +107,8 @@ export const API_DATABASE_POOLS = Object.freeze({
   // inside a signed-in request too, each paid call's record of the site's day (the language and question checks, the clarify
   // charge, the synthesis check: X30 to X33) and the room's count of the site's holds beside its day's spend (X23), so 8 (6 before);
   // and the ask-time discovery's record of each provider probe it makes (X37), one short statement per provider probed in a round that
-  // runs one at a time, which needs no more.
+  // runs one at a time, which needs no more; nor do a Report button press's settlement (X38, one short statement after its judge) and
+  // the V4 merge's seal of a stranger's report (X29, one lease and one statement, on the press that opens the report).
   system: budget("api:system", 8, 5_000),
   // The security review's 0171 (X36): inside a signed-in request too, what hands out a sign-in's secret, a passkey's credential
   // read and its sign-in and a recovery's proof read and its proof, and the recovery mail's lease, which holds one across a send

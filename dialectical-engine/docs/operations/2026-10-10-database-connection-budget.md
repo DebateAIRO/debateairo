@@ -313,7 +313,10 @@ and the recovery mail's lease, which holds its connection through the send, run 
 request too, beside the consumer security notice loop, so `api:authorization-system` is 4 and one API 74. The ask-time
 discovery's record of each provider probe it makes (the cross-account site X37) runs on `api:system` inside the request
 too since the same review, and takes no more: one short statement per provider probed, in a round that runs one at a
-time, and a recorded probe keeps its provider fresh for the asks after.
+time, and a recorded probe keeps its provider fresh for the asks after. Nor do the Report button's settlement after its
+judge (X38, one short statement for each press that opened a report, inside the flag limits) and the V4 merge's seal of
+a stranger's report under the public debate's own run (X29, one content lease and one statement beside it, only on the
+press that opens the report); the merge's moderation and flag mail timer runs one statement at a time outside any request.
 
 | Who | Connections at most |
 |---|---|
