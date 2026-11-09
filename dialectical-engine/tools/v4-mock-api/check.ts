@@ -496,7 +496,8 @@ await step("rewritten paths of the first debate, through the website's client", 
   must(byPath["n-mix"].current.line === byPath["n-mix"].history.at(-1).text.line, "the current text is the newest rewrite's");
   must(byPath["n-mix"].history.at(-1).view.outcome === "HELPED" && byPath["n-mix"].history.at(-1).view.scope === "MAIN_QUESTION", "a verdict");
   must(byPath["n-renew"].changed_below === true && byPath["n-renew"].history.at(-1).view === null, "changed further down; an AI pick has no verdict");
-  must(rewrites.changed_since.count === 2 && rewrites.changed_since.since_report_version === 1, "2 paths changed since report version 1");
+  // As the server counts (packages/serve path-rewrites.ts): every finished rewrite since the report, n-smr's confirmation too.
+  must(rewrites.changed_since.count === 3 && rewrites.changed_since.since_report_version === 1, "3 paths changed since report version 1");
   return `${rewrites.paths.length} paths rewritten, ${rewrites.changed_since.count} changed since report version ${rewrites.changed_since.since_report_version}`;
 }, (value: string) => value);
 await step("the dig trail three levels down (draft)", async () => {
