@@ -523,7 +523,8 @@ const FLAG_OPEN_PATCHES = [
 /**
  * F5: left out on purpose, a funded member's grant totals: billing functions whose grants 0130's verifier pins, which 0140's admission and staff's
  * allowance page read for other members as their owner; a request must name a member's owner, grant and configured event, and while a funded
- * debate's funding basis names its grant and event to any request by run id, none may read the member's owner ref.
+ * debate's funding basis names its grant and event to any request by run id, no relation shows a request the member's owner ref, and only 0159's
+ * two carry-on definers of the fifth list hand one, for an account with a carry-on due or begun, whose totals are open.
  */
 const SPEND_READERS = ["read_internal_grant_spent", "read_internal_grant_commitments"] as const;
 /**
