@@ -40,7 +40,7 @@ describe("P16c scheduling on real PostgreSQL", () => {
 
   it("purges as the API's system login, with no billing composed at all", async () => {
     // The main pool's timer runs outside any request, so on its system login (api-system: debateai_billing_runtime since 0093, which inherits
-    // debateai_runtime, and 0130's cross-account marker, which 0080's legal purge needs since 0154); nothing of the billing runtime is needed.
+    // debateai_runtime, and 0130's cross-account marker, which 0080's legal purge needs since 0171); nothing of the billing runtime is needed.
     const system = createPool(await createSystemTwin(database, "p16c_system", ["debateai_billing_runtime"]));
     try {
       const counts = await createRetentionPurge({
@@ -52,7 +52,7 @@ describe("P16c scheduling on real PostgreSQL", () => {
     }
     const client = await database.pool.connect();
     try {
-      // 0154: the request login's billing role alone may not run the legal purge any more; billing's stays its own.
+      // 0171: the request login's billing role alone may not run the legal purge any more; billing's stays its own.
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_billing_runtime");
       await expect(client.query("SELECT legal.purge_expired_acceptance(clock_timestamp())"))

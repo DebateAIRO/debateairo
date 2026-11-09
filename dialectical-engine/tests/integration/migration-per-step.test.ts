@@ -73,7 +73,7 @@ const PUBLIC_FLAG = "0151_public_flag.sql";
 const REPORT_EXPORT = "0152_report_export_and_check_usage.sql";
 const DIG_TREE_SETTLED = "0153_dig_tree_settled.sql";
 /** The security review's fixes in the database: the chain's last step. */
-const SECURITY_REVIEW = "0154_security_review_hardening.sql";
+const SECURITY_REVIEW = "0171_security_review_hardening.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -147,12 +147,12 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 });
 
 /**
- * Security review F2 (0154): a dig is known by its own row (identity.dig_run), which every dig's run is created with from 0154 on. A dig made before
+ * Security review F2 (0171): a dig is known by its own row (identity.dig_run), which every dig's run is created with from 0171 on. A dig made before
  * the step has only the records it left (its link to its parent, its place in an investigation under its parent, its picks, its public
  * contribution), and its parent's erasure takes the first two, so the step marks each such dig as it applies, by its run's owner now, leaving out a
  * run that was erased and an owner that is gone. Nothing published is touched (the operator's step, migrations/lineage/README.md).
  */
-describe("0154's backfill: a dig made before the step has its own row after it, and stays a dig when its parent is erased", () => {
+describe("0171's backfill: a dig made before the step has its own row after it, and stays a dig when its parent is erased", () => {
   let seq = 8_800_000;
   beforeAll(async () => {
     db = await startTestDatabase();
@@ -163,7 +163,7 @@ describe("0154's backfill: a dig made before the step has its own row after it, 
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 
-  /** Rows as the steps before 0154 left them, written past their guards and keys (the tests' own seeding). */
+  /** Rows as the steps before 0171 left them, written past their guards and keys (the tests' own seeding). */
   async function seeded(statements: ReadonlyArray<readonly [string, readonly unknown[]]>): Promise<void> {
     const client = await db.pool.connect();
     try {

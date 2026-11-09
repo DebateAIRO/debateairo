@@ -1,4 +1,4 @@
--- 0154 · The security review's fixes in the database (test-site release R22; the security review of 3 Nov 2026).
+-- 0171 · The security review's fixes in the database (test-site release R22; the security review of 3 Nov 2026).
 --
 -- Plain words. One drained step for every fix of the review that the database must make, F2 to F5. Each fix is named by its letter in every section
 -- below, and the contract at the end checks each one's end state as the step applies. Once applied, this file is fixed: any later change is a step of its own.
@@ -89,7 +89,7 @@
 --   open_public_flag counted against limits its caller passed, so a request connection with its own live session could open its own flag on any
 --   public debate never hidden before and settle it AGREE, which hid another account's debate until a person restored it. The settlement moves from
 --   debateai_runtime to the marker (section 4): its one caller, the API's press, calls it after the judge, inside the reporter's request, on its
---   system login (the cross-account site X29), so no request login records a verdict, closes a flag or hides a debate; the reporter is the one the
+--   system login (the cross-account site X38), so no request login records a verdict, closes a flag or hides a debate; the reporter is the one the
 --   opening named under the reporter's own session, and no settlement changes it. It still closes or hides only for a connection that presents the
 --   reporter's own session or none (the system login presents none), and an AGREE now hides nothing for a report staff dismissed while the judge
 --   ran: its verdict is recorded and it goes to a person. The opening counts against the lower of the limits it is handed and the site's
@@ -169,7 +169,7 @@
 --   allowance; it answers one boolean of a run id and hands back nothing of the debate.
 --   tests/integration/security-review-hardening-database.test.ts
 --   censuses EVERY definer either request login (the production shapes api-runtime and api-authorization) may EXECUTE, with no name filter, each in
---   exactly one of four named lists: it asks the connection (0154's request_owner_matches or 0131's rule, 0130's context, a staff privilege token, or
+--   exactly one of four named lists: it asks the connection (0171's request_owner_matches or 0131's rule, 0130's context, a staff privilege token, or
 --   the marker); it is gated by a secret, a token, a proof or its own transaction it is handed, never the connection (the sign-in, enrollment, recovery,
 --   social, session and step-up family, the social sign-up's account, the staff token and action-proof ceremonies, the publication step-up grants, the
 --   legacy claim, the three sign-up writers and the delivery overload); it is a public or site reader that hands back no account's private content; or
@@ -1362,21 +1362,21 @@ BEGIN
     }
   ]$inventory$::jsonb) LOOP
     v_target := pg_catalog.to_regprocedure(v_item->>'signature');
-    IF v_target IS NULL THEN RAISE EXCEPTION 'SECURITY_REVIEW_0154_PATCH_MISSING %', v_item->>'signature'; END IF;
+    IF v_target IS NULL THEN RAISE EXCEPTION 'SECURITY_REVIEW_0171_PATCH_MISSING %', v_item->>'signature'; END IF;
     SELECT p.proowner, p.proacl, p.prosecdef, p.proconfig, p.provolatile INTO v_before FROM pg_catalog.pg_proc AS p WHERE p.oid = v_target;
     v_definition := pg_catalog.pg_get_functiondef(v_target);
     FOR v_patch IN SELECT value FROM pg_catalog.jsonb_array_elements(v_item->'patches') LOOP
       v_old := v_patch->>'old';
       v_found := (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, ''))) / pg_catalog.length(v_old);
       IF v_found <> (v_patch->>'count')::integer OR pg_catalog.strpos(v_definition, v_patch->>'new') > 0 THEN
-        RAISE EXCEPTION 'SECURITY_REVIEW_0154_PATCH_ANCHOR % (%): found % times', v_item->>'signature', v_item->>'fix', v_found;
+        RAISE EXCEPTION 'SECURITY_REVIEW_0171_PATCH_ANCHOR % (%): found % times', v_item->>'signature', v_item->>'fix', v_found;
       END IF;
       v_definition := pg_catalog.replace(v_definition, v_old, v_patch->>'new');
     END LOOP;
     EXECUTE v_definition;
     SELECT p.proowner, p.proacl, p.prosecdef, p.proconfig, p.provolatile INTO v_after FROM pg_catalog.pg_proc AS p WHERE p.oid = v_target;
     IF pg_catalog.to_regprocedure(v_item->>'signature') IS DISTINCT FROM v_target OR v_before IS DISTINCT FROM v_after THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_PATCH_AUTHORITY % (%)', v_item->>'signature', v_item->>'fix';
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_PATCH_AUTHORITY % (%)', v_item->>'signature', v_item->>'fix';
     END IF;
   END LOOP;
 END
@@ -1676,7 +1676,7 @@ REVOKE EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz) FROM deba
 GRANT EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz) TO debateai_rls_all_accounts;
 -- F5: and 0151's settlement of a flag, which records the judge's verdict and hides a public debate on AGREE, and believed the verdict of whoever called
 -- it, so a request login with its own session settled its own flag AGREE and hid another account's debate. Its one caller is the API's press, after
--- the judge, inside the reporter's request, on its system login (apps/api/src/main.ts, the cross-account site X29); the reporter is the one the
+-- the judge, inside the reporter's request, on its system login (apps/api/src/main.ts, the cross-account site X38); the reporter is the one the
 -- opening named under that session, and a settlement never changes it.
 REVOKE EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric) FROM debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric) TO debateai_rls_all_accounts;
@@ -1796,13 +1796,13 @@ BEGIN
     ) AS added(fix, signature, owner, grantees) LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p WHERE p.oid = pg_catalog.to_regprocedure(v_item.signature)
         AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog'] AND pg_catalog.pg_get_userbyid(p.proowner) = v_item.owner) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT % definer %', v_item.fix, v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT % definer %', v_item.fix, v_item.signature;
     END IF;
     SELECT COALESCE(pg_catalog.array_agg(DISTINCT COALESCE(pg_catalog.pg_get_userbyid(NULLIF(a.grantee, 0)), 'PUBLIC')::text), '{}') INTO v_grantees
     FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
     WHERE p.oid = pg_catalog.to_regprocedure(v_item.signature) AND a.grantee <> p.proowner;
     IF NOT (v_grantees @> v_item.grantees AND v_grantees <@ v_item.grantees) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT % grants % %', v_item.fix, v_item.signature, v_grantees;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT % grants % %', v_item.fix, v_item.signature, v_grantees;
     END IF;
   END LOOP;
 
@@ -1959,19 +1959,19 @@ BEGIN
     ) AS taken(fix, signature) LOOP
     FOREACH v_role IN ARRAY v_roles LOOP
       IF pg_catalog.has_function_privilege(v_role, v_item.signature, 'EXECUTE') THEN
-        RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT % still callable % %', v_item.fix, v_role, v_item.signature;
+        RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT % still callable % %', v_item.fix, v_role, v_item.signature;
       END IF;
     END LOOP;
     IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
         WHERE p.oid = pg_catalog.to_regprocedure(v_item.signature) AND a.grantee = 0) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT % still callable PUBLIC %', v_item.fix, v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT % still callable PUBLIC %', v_item.fix, v_item.signature;
     END IF;
   END LOOP;
 
   -- F3: no role but its owner holds the legacy join at all.
   IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
       WHERE p.oid = 'identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)'::regprocedure AND a.grantee <> p.proowner) THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F3 join_public_investigation granted';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F3 join_public_investigation granted';
   END IF;
 
   -- F4a: the scope table is its owner's alone, as the guarded tables are, with the truncate guard; no role may read or write it, nor call a helper of it.
@@ -1979,14 +1979,14 @@ BEGIN
     OR EXISTS (SELECT 1 FROM pg_catalog.pg_class AS c CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))) AS a
       WHERE c.oid = 'identity.private_forget_scope'::regclass AND a.grantee <> c.relowner)
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = 'identity.private_forget_scope'::regclass AND t.tgname = 'reject_truncate') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4a scope table';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4a scope table';
   END IF;
   FOREACH v_role IN ARRAY v_roles LOOP
     IF pg_catalog.has_table_privilege(v_role, 'identity.private_forget_scope', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
       OR pg_catalog.has_function_privilege(v_role, 'identity.open_forget_scope(text)', 'EXECUTE')
       OR pg_catalog.has_function_privilege(v_role, 'identity.close_forget_scope(text)', 'EXECUTE')
       OR pg_catalog.has_function_privilege(v_role, 'identity.forget_scope_open(text)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4a reachable %', v_role;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4a reachable %', v_role;
     END IF;
   END LOOP;
 
@@ -2021,7 +2021,7 @@ BEGIN
     IF v_item.kind = 'guard' AND (pg_catalog.strpos(v_definition, pg_catalog.format('identity.forget_scope_open(%L)', v_item.scope)) = 0
         OR pg_catalog.strpos(v_definition, 'current_setting(') > 0
         OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.forget_scope_open(text)', 'EXECUTE')) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4a guard % %', v_item.signature, v_item.scope;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4a guard % %', v_item.signature, v_item.scope;
     END IF;
     IF v_item.kind = 'definer' AND (pg_catalog.strpos(v_definition, pg_catalog.format('PERFORM identity.open_forget_scope(%L);', v_item.scope)) = 0
         OR pg_catalog.strpos(v_definition, pg_catalog.format('PERFORM identity.close_forget_scope(%L);', v_item.scope))
@@ -2029,14 +2029,14 @@ BEGIN
         OR pg_catalog.strpos(v_definition, 'set_config(') > 0
         OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.open_forget_scope(text)', 'EXECUTE')
         OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.close_forget_scope(text)', 'EXECUTE')) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4a definer % %', v_item.signature, v_item.scope;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4a definer % %', v_item.signature, v_item.scope;
     END IF;
   END LOOP;
   -- F4a: and no function anywhere still reads, sets or carries in its settings one of the nine settings.
   IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
       WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
         AND (p.prosrc ~ 'debateai\.[a-z_]+_forget' OR COALESCE(pg_catalog.array_to_string(p.proconfig, ' '), '') ~ 'debateai\.[a-z_]+_forget')) THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4a setting still read';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4a setting still read';
   END IF;
 
   -- F5: the helper reads 0130's context as its owner, who may, and the marker by the login; it names the marker, never a login.
@@ -2045,7 +2045,7 @@ BEGIN
     OR pg_catalog.strpos(v_definition, 'rls.context_owner_ref()') = 0
     OR pg_catalog.strpos(v_definition, 'pg_catalog.pg_has_role(session_user, ''debateai_rls_all_accounts'', ''MEMBER'')') = 0
     OR pg_catalog.to_regrole('debateai_rls_all_accounts') IS NULL THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 helper';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 helper';
   END IF;
   -- F5: the clarify charge's reservations are the charge writer's owner's alone, with the truncate guard, going with the account; no role may read or
   -- write them; their writer refuses an owner that is not the connection's before it writes, then takes up to 100 hour-old rows of every owner, by
@@ -2061,18 +2061,18 @@ BEGIN
       WHERE i.indrelid = 'identity.ask_clarify_reservation'::regclass AND i.indnatts = 1 AND a.attname = 'reserved_at')
     OR pg_catalog.strpos(v_definition, E'\nBEGIN\n  IF p_charge_id IS NULL OR p_owner IS NULL THEN RAISE EXCEPTION USING ERRCODE=''23514'', MESSAGE=''ASK_CLARIFY_CHARGE_INVALID''; END IF;\n  IF NOT identity.request_owner_matches(p_owner) THEN RAISE EXCEPTION USING ERRCODE=''42501'', MESSAGE=''REQUEST_OWNER_MISMATCH''; END IF;\n  DELETE FROM identity.ask_clarify_reservation AS reservation WHERE reservation.charge_id IN (\n    SELECT stale.charge_id FROM identity.ask_clarify_reservation AS stale\n    WHERE stale.reserved_at <= pg_catalog.clock_timestamp() - interval ''1 hour''\n    ORDER BY stale.reserved_at LIMIT 100 FOR UPDATE SKIP LOCKED);\n  INSERT INTO identity.ask_clarify_reservation (charge_id, owner_ref) VALUES (p_charge_id, p_owner) ON CONFLICT (charge_id) DO NOTHING;\n  IF NOT FOUND AND NOT EXISTS (SELECT 1 FROM identity.ask_clarify_reservation AS held WHERE held.charge_id = p_charge_id AND held.owner_ref = p_owner) THEN\n    RAISE EXCEPTION USING ERRCODE=''23505'', MESSAGE=''ASK_CLARIFY_CHARGE_TAKEN'';\n  END IF;\n  RETURN ''RESERVED'';\n') = 0
     OR NOT pg_catalog.has_function_privilege(v_writer, 'identity.request_owner_matches(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 reservation';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 reservation';
   END IF;
   -- F5: the API's sweep takes the prune's rows, by the same window, as many as it is asked and no more, and refuses any other count first.
   v_definition := pg_catalog.pg_get_functiondef('identity.delete_ask_clarify_reservations_due(integer)'::regprocedure);
   IF pg_catalog.strpos(v_definition, E'\nBEGIN\n  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 1000 THEN RAISE EXCEPTION USING ERRCODE=''22023'', MESSAGE=''ASK_CLARIFY_RESERVATION_SWEEP_INVALID''; END IF;\n  DELETE FROM identity.ask_clarify_reservation AS reservation WHERE reservation.charge_id IN (\n    SELECT stale.charge_id FROM identity.ask_clarify_reservation AS stale\n    WHERE stale.reserved_at <= pg_catalog.clock_timestamp() - interval ''1 hour''\n    ORDER BY stale.reserved_at LIMIT p_limit FOR UPDATE SKIP LOCKED);\n  GET DIAGNOSTICS v_rows = ROW_COUNT;\n  RETURN v_rows;\n') = 0 THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 reservation sweep';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 reservation sweep';
   END IF;
   -- No role a request may hold reads or writes the reservations, or may call the sweep (the marker's holders may: section 2's grant).
   FOREACH v_role IN ARRAY v_roles LOOP
     IF pg_catalog.has_table_privilege(v_role, 'identity.ask_clarify_reservation', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
       OR pg_catalog.has_function_privilege(v_role, 'identity.delete_ask_clarify_reservations_due(integer)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 reservation reachable %', v_role;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 reservation reachable %', v_role;
     END IF;
   END LOOP;
   -- F5: what nothing calls is no role's at all, the marker's included; what only the workers call is the marker's alone.
@@ -2231,7 +2231,7 @@ BEGIN
     -- The evaluator call check keeps the evaluator worker's own grant of 0040 beside the marker's.
     IF v_grantees IS DISTINCT FROM (CASE WHEN v_item.kind = 'moved' AND v_item.signature = 'evaluator.provider_call_request_is_authorized(uuid,text,text,text)'
         THEN ARRAY['debateai_evaluator_worker','debateai_rls_all_accounts'] WHEN v_item.kind = 'moved' THEN ARRAY['debateai_rls_all_accounts'] ELSE ARRAY[]::text[] END) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 % grants % %', v_item.kind, v_item.signature, v_grantees;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 % grants % %', v_item.kind, v_item.signature, v_grantees;
     END IF;
   END LOOP;
   -- F5: 0112's release of an alert claim stays the runtime's alone, as 0112's verifier requires, and gives back only the live claim it is handed.
@@ -2240,12 +2240,12 @@ BEGIN
   WHERE p.oid = 'staff.release_alert_delivery(uuid,uuid)'::regprocedure AND a.grantee <> p.proowner;
   IF v_grantees IS DISTINCT FROM ARRAY['debateai_runtime']
     OR pg_catalog.strpos(pg_catalog.pg_get_functiondef('staff.release_alert_delivery(uuid,uuid)'::regprocedure), 's.claim_token IS DISTINCT FROM p_claim') = 0 THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 alert release %', v_grantees;
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 alert release %', v_grantees;
   END IF;
   -- F5: 0048's probe writer is the marker's alone (above), and 0040's reader of each provider's latest probe stays debateai_runtime's, as the API's
   -- discovery reads the latest probes on its request login.
   IF NOT pg_catalog.has_function_privilege('debateai_runtime', 'core.latest_provider_probes(text[])', 'EXECUTE') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 probe reader';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 probe reader';
   END IF;
   -- F5: 0085's hold question is no longer debateai_runtime's; the authorization runtime and the owners of the definers that ask it keep theirs.
   v_grantees := ARRAY(SELECT DISTINCT COALESCE(pg_catalog.pg_get_userbyid(NULLIF(a.grantee, 0)), 'PUBLIC')::text AS grantee
@@ -2255,7 +2255,7 @@ BEGIN
       'debateai_password_reset_owner','debateai_staff_security_owner']
     OR pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_account_security_hold(uuid)', 'EXECUTE')
     OR pg_catalog.has_function_privilege('debateai_billing_runtime', 'identity.read_account_security_hold(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 account hold %', v_grantees;
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 account hold %', v_grantees;
   END IF;
   -- F5: 0131's rule and each request-facing definer ask the session's owner, the definers that refuse as their first statement, and the owner of each
   -- may ask (staff's spend total and the clarify reservation by section 2's grants; 0144's charge writer asks nothing, below). The run-keyed readers ask
@@ -2354,7 +2354,7 @@ BEGIN
         OR (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, 'identity.request_owner_matches(', ''))) / pg_catalog.length('identity.request_owner_matches(') <> 1
         OR pg_catalog.strpos(v_definition, E'END IF;\n  RETURN ') = 0))
       OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.request_owner_matches(uuid)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 asks % %', v_item.kind, v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 asks % %', v_item.kind, v_item.signature;
     END IF;
   END LOOP;
   -- F5: 0144's charge writer, the marker's alone (above), asks nothing of the connection: it runs after the call was paid, so an owner question could
@@ -2375,7 +2375,7 @@ BEGIN
     OR (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, 'RAISE', ''))) / pg_catalog.length('RAISE') <> 1
     OR NOT pg_catalog.has_table_privilege(v_proowner, 'identity.ask_clarify_reservation', 'DELETE')
     OR NOT pg_catalog.has_table_privilege(v_proowner, 'billing.internal_grant', 'SELECT') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 clarify charge';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 clarify charge';
   END IF;
   -- F5: the refusals left alone (the header's F5) ask no owner: an owner question would read a connection that is not the owner's as not refused. Each
   -- is a definer a request login may still call, as before.
@@ -2388,7 +2388,7 @@ BEGIN
     ) AS refusal(signature) LOOP
     IF pg_catalog.strpos(pg_catalog.pg_get_functiondef(v_item.signature::regprocedure), 'identity.request_owner_matches(') > 0
       OR NOT pg_catalog.has_function_privilege('debateai_billing_runtime', v_item.signature, 'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 refusal asks %', v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 refusal asks %', v_item.signature;
     END IF;
   END LOOP;
   -- F5: and no other identity definer the API's billing role may call with an owner believes it, the two spend readers of 0144 and 0149 included.
@@ -2396,7 +2396,7 @@ BEGIN
       WHERE n.nspname = 'identity' AND p.prosecdef AND p.proargnames && ARRAY['p_owner_ref','p_owner']::text[]
         AND pg_catalog.has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
         AND p.prosrc !~ 'identity\.(request_owner_matches|page_memory_run_owned)\(') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 owner believed';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 owner believed';
   END IF;
   -- F5: the site's day is the system's to write. No role a request may hold inserts into its three tables, the marker does, and the request-facing
   -- roles still read them; and no definer a request login may call writes them, but 0107's settlement of a funded debate's admitted call, which
@@ -2406,7 +2406,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_catalog.unnest(v_roles) AS candidate(role) WHERE pg_catalog.has_table_privilege(candidate.role, v_role, 'INSERT'))
       OR NOT pg_catalog.has_table_privilege('debateai_rls_all_accounts', v_role, 'INSERT')
       OR NOT pg_catalog.has_table_privilege('debateai_runtime', v_role, 'SELECT') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 day table %', v_role;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 day table %', v_role;
     END IF;
   END LOOP;
   SELECT COALESCE(pg_catalog.array_agg(p.oid::regprocedure::text ORDER BY 1), '{}') INTO v_grantees FROM pg_catalog.pg_proc AS p
@@ -2414,7 +2414,7 @@ BEGIN
     AND (pg_catalog.has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_authorization_runtime', p.oid, 'EXECUTE'));
   IF v_grantees IS DISTINCT FROM ARRAY['billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)'] THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 day writers %', v_grantees;
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 day writers %', v_grantees;
   END IF;
   -- F5: 0000's sequence counter is written only through its allocator, a definer of the table's own owner with 0056's search path, which keeps the
   -- callers it had; no role a request may hold updates or removes the row (0000's INSERT stays: the one row's key admits no other). 0000's work queue keeps its UPDATE, under 0130's rule of the connection's own debates
@@ -2429,7 +2429,7 @@ BEGIN
     OR v_grantees IS DISTINCT FROM ARRAY['debateai_evaluator_api','debateai_evaluator_worker','debateai_runtime','debateai_settlement_watch']
     OR EXISTS (SELECT 1 FROM pg_catalog.unnest(v_roles) AS candidate(role)
       WHERE pg_catalog.has_table_privilege(candidate.role, 'ledger.sequence_allocator', 'UPDATE,DELETE,TRUNCATE')) THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 sequence %', v_grantees;
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 sequence %', v_grantees;
   END IF;
   IF NOT (SELECT c.relrowsecurity FROM pg_catalog.pg_class AS c WHERE c.oid = 'core.work_item'::regclass)
     OR EXISTS (SELECT 1 FROM pg_catalog.unnest(v_roles) AS candidate(role) JOIN pg_catalog.pg_policy AS policy ON policy.polrelid = 'core.work_item'::regclass
@@ -2439,7 +2439,7 @@ BEGIN
         AND (policy.polname <> 'rls_account' OR NOT policy.polpermissive
           OR pg_catalog.pg_get_expr(policy.polqual, policy.polrelid) IS DISTINCT FROM 'rls.owns_run(run_id)'
           OR pg_catalog.pg_get_expr(policy.polwithcheck, policy.polrelid) IS DISTINCT FROM 'rls.owns_run(run_id)')) THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 work queue';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 work queue';
   END IF;
   -- F5: the site's flag limits read 0123's CURRENT release and the register's sealed row as their owner, who may, and name no number of the limits.
   v_definition := pg_catalog.pg_get_functiondef('identity.public_flag_site_limits()'::regprocedure);
@@ -2449,7 +2449,7 @@ BEGIN
     OR pg_catalog.strpos(v_definition, 'FROM core.read_current_release() AS current_release') = 0
     OR pg_catalog.strpos(v_definition, 'r.row_key = ''abuseLimits'' AND v.sealed') = 0
     OR pg_catalog.strpos(v_definition, 'MESSAGE=''PUBLIC_FLAG_LIMITS_UNRESOLVED''') = 0 THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 flag limits';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 flag limits';
   END IF;
   -- F5: the billing functions keyed by a run or an owner ask in their bodies, once each, where section 3 put the question, and the owner of each may
   -- ask the helper: the sweep's list keeps no other owner's row, the readers answer as for nothing stored, the pin is the marker's first, and the settlement and the admission refuse before they lock, compare or write anything. Each keeps its
@@ -2481,7 +2481,7 @@ BEGIN
           > pg_catalog.strpos(v_definition, 'INTERNAL_PROVIDER_FRAME_INVALID')
         OR pg_catalog.strpos(v_definition, 'INTERNAL_PROVIDER_FRAME_INVALID') > pg_catalog.strpos(v_definition, 'PERFORM pg_advisory_xact_lock(')))
       OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.request_owner_matches(uuid)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 billing asks %', v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 billing asks %', v_item.signature;
     END IF;
   END LOOP;
   -- F5: and no billing definer a request login may call with a run or an owner believes it but the two spend readers left out on purpose (F5 above),
@@ -2495,7 +2495,7 @@ BEGIN
           'billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)'::regprocedure, 'billing.consume_withdrawal_grant(uuid,uuid,uuid,text)'::regprocedure,
           'billing.owner_erasure_pending(uuid)'::regprocedure, 'billing.owner_age_frozen(uuid)'::regprocedure,
           'billing.owner_erasure_committed(uuid)'::regprocedure, 'billing.read_run_funding_basis(uuid)'::regprocedure)) THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 billing owner believed';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 billing owner believed';
   END IF;
 
   -- F5: the account functions keyed by a user id ask in their bodies, once each, where section 3 put the question, of the account they are handed,
@@ -2537,7 +2537,7 @@ BEGIN
         OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.request_owner_matches(uuid)', 'EXECUTE')))
       OR (v_item.owner_arg IS NULL AND (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, 'pg_catalog.pg_current_xact_id()', '')))
         / pg_catalog.length('pg_catalog.pg_current_xact_id()') <> 1) THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 account asks %', v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 account asks %', v_item.signature;
     END IF;
   END LOOP;
   -- F5: the delivery's overload is its original's body with one question before it touches the channel, the mail's own token among the account's
@@ -2550,7 +2550,7 @@ BEGIN
     OR pg_catalog.strpos(v_definition, 'credential.token_hash=p_token_hash') < pg_catalog.strpos(v_definition, 'identity.lock_account_t9_internal(')
     OR pg_catalog.pg_get_userbyid(v_proowner) IS DISTINCT FROM v_delivery
     OR NOT pg_catalog.has_table_privilege(v_proowner, 'identity.verification_token_credential', 'SELECT') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 delivery %', pg_catalog.pg_get_userbyid(v_proowner);
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 delivery %', pg_catalog.pg_get_userbyid(v_proowner);
   END IF;
 
   -- F2: each refusal stands in its body, and the owner of each may ask the helper (no grant is made for that: 0085's key provision and 0127's review
@@ -2568,21 +2568,21 @@ BEGIN
     SELECT p.proowner INTO v_proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = v_item.signature::regprocedure;
     IF pg_catalog.strpos(v_definition, v_item.needle) = 0
       OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.run_is_dig(uuid)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 refuses %', v_item.signature;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 refuses %', v_item.signature;
     END IF;
   END LOOP;
   FOREACH v_role IN ARRAY ARRAY['core.prepare_free_publication(uuid,uuid)', 'core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)'] LOOP
     v_definition := pg_catalog.pg_get_functiondef(v_role::regprocedure);
     IF pg_catalog.strpos(v_definition, 'v_owner := identity.claim_free_public_ask(p_run_id);') = 0
       OR pg_catalog.strpos(v_definition, 'v_owner := identity.claim_free_public_ask(p_run_id);') > pg_catalog.strpos(v_definition, 'INSERT INTO ') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 Free path %', v_role;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 Free path %', v_role;
     END IF;
   END LOOP;
   -- F2: the helper follows a re-admission back through 0123's edges, which its owner may read, at most 16.
   v_definition := pg_catalog.pg_get_functiondef('identity.run_is_dig(uuid)'::regprocedure);
   IF NOT pg_catalog.has_table_privilege(v_owner, 'core.run_supersession', 'SELECT')
     OR pg_catalog.strpos(v_definition, 'FROM core.run_supersession AS edge JOIN chain ON edge.new_run_id = chain.run_id WHERE chain.hops < 16') = 0 THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 re-admission';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 re-admission';
   END IF;
   -- F2: in the key provision, after the owner's and the live content's checks, before the link's tombstone and the intent the transition needs.
   v_definition := pg_catalog.pg_get_functiondef('serve.prepare_publication_key_provision(uuid,uuid,uuid,uuid,uuid,text)'::regprocedure);
@@ -2591,7 +2591,7 @@ BEGIN
     OR pg_catalog.strpos(v_definition, 'IF identity.run_is_dig(p_run_id) THEN RETURN false; END IF;')
       > pg_catalog.strpos(v_definition, 'INSERT INTO core.publication_ref_tombstone')
     OR pg_catalog.strpos(v_definition, 'INSERT INTO core.publication_ref_tombstone') = 0 THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 key provision order';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 key provision order';
   END IF;
   -- F2: in the review ask, after the grant's and the request's checks, before the grant is consumed and the request is queued.
   v_definition := pg_catalog.pg_get_functiondef('serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)'::regprocedure);
@@ -2601,7 +2601,7 @@ BEGIN
       > pg_catalog.strpos(v_definition, 'UPDATE identity.step_up_grant g SET consumed_at=clock_timestamp()')
     OR pg_catalog.strpos(v_definition, 'UPDATE identity.step_up_grant g SET consumed_at=clock_timestamp()')
       > pg_catalog.strpos(v_definition, 'INSERT INTO serve.publication_review_request') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 review order';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 review order';
   END IF;
   -- F2: a dig's row is its owner's alone, as 0131's tables are, with the truncate guard, going with the account; no role may read or write it, and
   -- the question reads it.
@@ -2612,11 +2612,11 @@ BEGIN
     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'identity.dig_run'::regclass AND k.contype = 'f'
       AND k.confrelid = 'identity."user"'::regclass AND k.confdeltype = 'c')
     OR pg_catalog.strpos(pg_catalog.pg_get_functiondef('identity.run_is_dig(uuid)'::regprocedure), 'FROM identity.dig_run AS mark WHERE mark.run_id = chain.run_id') = 0 THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 dig row';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 dig row';
   END IF;
   FOREACH v_role IN ARRAY v_roles LOOP
     IF pg_catalog.has_table_privilege(v_role, 'identity.dig_run', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-      RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 dig row reachable %', v_role;
+      RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 dig row reachable %', v_role;
     END IF;
   END LOOP;
   -- F2: the run's creation writes a dig's row, once, right after the run's ownership event and before its key provision is completed, after the
@@ -2640,7 +2640,7 @@ BEGIN
     OR NOT pg_catalog.has_function_privilege(v_proowner, 'identity.run_is_dig(uuid)', 'EXECUTE')
     OR NOT pg_catalog.has_table_privilege(v_proowner, 'core.run_key_provision_intent', 'SELECT')
     OR v_grantees IS DISTINCT FROM ARRAY['debateai_content_provision'] THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 dig row at creation';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 dig row at creation';
   END IF;
   -- F2: every dig that was there as this step applied, by any of its four records, is marked, but a run erased and an owner gone (section 1).
   IF EXISTS (SELECT 1 FROM (SELECT picks.run_id FROM identity.dig_pick_set AS picks
@@ -2651,12 +2651,12 @@ BEGIN
       WHERE EXISTS (SELECT 1 FROM identity."user" AS account WHERE account.owner_ref = owner_now.owner_ref)
         AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS erased WHERE erased.run_id = dig.run_id)
         AND NOT EXISTS (SELECT 1 FROM identity.dig_run AS mark WHERE mark.run_id = dig.run_id)) THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 dig row backfill';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 dig row backfill';
   END IF;
   -- F2: the digs published before this step stay published; how many, for the operator's step (migrations/lineage/README.md).
   SELECT pg_catalog.count(DISTINCT snapshot.run_id) INTO v_published FROM serve.publication_snapshot AS snapshot
   WHERE core.publication_is_current(snapshot.publication_ref) AND identity.run_is_dig(snapshot.run_id);
-  RAISE NOTICE 'SECURITY_REVIEW_0154 F2 % digs published before this step stay published: staff hide each through the public review''s HIDE, or its owner keeps it (migrations/lineage/README.md, 0154)', v_published;
+  RAISE NOTICE 'SECURITY_REVIEW_0171 F2 % digs published before this step stay published: staff hide each through the public review''s HIDE, or its owner keeps it (migrations/lineage/README.md, 0171)', v_published;
   -- F2: 0131's per-debate forget takes the erased debate's own row, after its links, and no other (never one by its parent); its owner may.
   v_definition := pg_catalog.pg_get_functiondef('identity.forget_erased_debate_page_memory(uuid)'::regprocedure);
   IF pg_catalog.strpos(v_definition, E'  DELETE FROM identity.dig_run AS mark WHERE mark.run_id = p_run_id;\n  GET DIAGNOSTICS v_marks = ROW_COUNT;\n  RETURN v_visits + v_links + v_marks;') = 0
@@ -2664,18 +2664,18 @@ BEGIN
     OR (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, 'identity.dig_run', ''))) / pg_catalog.length('identity.dig_run') <> 1
     OR NOT pg_catalog.has_table_privilege((SELECT p.proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.forget_erased_debate_page_memory(uuid)'::regprocedure),
       'identity.dig_run', 'DELETE') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F2 dig row forget';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F2 dig row forget';
   END IF;
 
   -- F4b: the reviewer's door asks whether the link is current before it marks anything read, and its owner may ask.
   v_definition := pg_catalog.pg_get_functiondef('staff.read_public_review(jsonb,text,uuid)'::regprocedure);
   IF pg_catalog.strpos(v_definition, 'NOT core.publication_is_current(p_publication_ref) THEN RETURN NULL;') = 0
     OR pg_catalog.strpos(v_definition, 'NOT core.publication_is_current(p_publication_ref) THEN RETURN NULL;') > pg_catalog.strpos(v_definition, 'identity.public_review_mark_read(') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4b read_public_review';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4b read_public_review';
   END IF;
   IF NOT pg_catalog.has_function_privilege((SELECT p.proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'staff.read_public_review(jsonb,text,uuid)'::regprocedure),
       'core.publication_is_current(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F4b owner';
+    RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F4b owner';
   END IF;
 END
 $security_review_contract$;

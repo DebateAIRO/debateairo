@@ -568,7 +568,7 @@ describe("decision 3: the main answer on the debate's answer", () => {
     const served = JSON.stringify(answer.main_answer);
     expect(served).not.toContain(owner.ownerRef);
     expect(served).not.toContain(one!);
-    // The security review's F5 (0154): the owner's own request, on the API's request login, is served the same answer, its run-keyed
+    // The security review's F5 (0171): the owner's own request, on the API's request login, is served the same answer, its run-keyed
     // readers asking the session's owner; the system login above holds the cross-account marker and serves it with no session.
     const asOwner = asRequestOf(requests, await seedLiveSession(database.pool, owner.userId));
     configureContentEncryption(asOwner, contentCipherFor(database.pool)!);

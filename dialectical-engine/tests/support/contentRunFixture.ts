@@ -30,7 +30,7 @@ export interface ContentRunFixture {
   readonly authSessionId: string;
   /**
    * `extra.releaseKey`: the run's release stamp (side-by-side spec §1); absent, the column default `legacy` applies. `extra.digRun`: the run is a
-   * dig's, marked so by the statement that creates it (security review F2, 0154).
+   * dig's, marked so by the statement that creates it (security review F2, 0171).
    */
   createEncryptedRun(questionLine: string, extra?: RunExtra): Promise<string>;
   createLegacyRun(questionLine: string, extra?: RunExtra): Promise<string>;

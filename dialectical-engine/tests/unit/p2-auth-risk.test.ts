@@ -98,7 +98,7 @@ describe("P2-08 bounded authentication risk evaluation", () => {
 
 /**
  * F-AUTH-RISK-POISONED-CATCH kept `evaluateForRecovery`'s decrypt and parse stages apart (`context-decrypt`, `context-parse`). That reader of a
- * recovery's stored signals had no product caller, and 0154 took 0046's reader back from every role, so the repository no longer offers it and
+ * recovery's stored signals had no product caller, and 0171 took 0046's reader back from every role, so the repository no longer offers it and
  * its suite went with it; the categories stay the vocabulary below.
  */
 /**

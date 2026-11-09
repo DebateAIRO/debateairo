@@ -16,7 +16,7 @@ import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { profileAccount, profileGrant, profileAudit, profileUsers, profileKeys, profileBlindKey, profileSource, profileAad } from "../support/profileAccount.js";
 let db: TestDatabase, auth: Pool, runtime: Pool;
-/** 0154: the consumer notice loop is the cross-account marker's, which the authorization pool's system login holds outside any request. */
+/** 0171: the consumer notice loop is the cross-account marker's, which the authorization pool's system login holds outside any request. */
 let authSystem: Pool;
 beforeAll(async () => {
   db = await startTestDatabase();

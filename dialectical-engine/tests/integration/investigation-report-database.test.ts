@@ -20,7 +20,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * (and 0133's closing records it), reads the reports and when the newest unreported closing was made; the API's role
  * reads the person's reports; the content trigger binds the envelope to the root's run and the report id; the spend
  * source INVESTIGATION_REPORT must name its run; erasing the root and deleting the account remove the reports; no
- * request role reads the table. Data is made up. Since the security review's 0154 (F5) the API's role runs here as each person's own
+ * request role reads the table. Data is made up. Since the security review's 0171 (F5) the API's role runs here as each person's own
  * request (its login carrying their live session), as its functions believe no other owner.
  */
 let database: TestDatabase;
@@ -148,7 +148,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE rep_api LOGIN PASSWORD 'rep-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the closings' sweep list is the marker's alone.
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the closings' sweep list is the marker's alone.
   await database.pool.query("CREATE ROLE rep_runner LOGIN PASSWORD 'rep-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE rep_erasure LOGIN PASSWORD 'rep-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE rep_worker LOGIN PASSWORD 'rep-worker-test-only' IN ROLE debateai_data_export_worker");
@@ -310,7 +310,7 @@ describe("0136 the API's reader, the spend source, the grants", () => {
     expect(read!.reports).toEqual([expect.objectContaining({ report_version: 1, report_id: record.reportId, content: ENVELOPE })]);
     expect(await new PostgresInvestigationReportRepository(asking(stranger)).read(stranger.ownerRef, root)).toBeNull();
     expect(await reports.read(person.ownerRef, await run(person))).toBeNull();
-    // 0154 (F5): the person's request names no one else, and with no session the API's role names no one.
+    // 0171 (F5): the person's request names no one else, and with no session the API's role names no one.
     expect(await new PostgresInvestigationReportRepository(asking(stranger)).read(person.ownerRef, root)).toBeNull();
     expect(await new PostgresInvestigationReportRepository(api).read(person.ownerRef, root)).toBeNull();
     // The runner's role cannot reach the API's reader.
@@ -339,7 +339,7 @@ describe("0136 the API's reader, the spend source, the grants", () => {
         expect(await sqlError(() => pool.query(statement, [...values])), statement).toMatchObject({ code: "42501" });
       }
     }
-    // The closings' list and the closing's spend window are the runner's alone: since 0154 (F5) the cross-account marker's, which the API's role lacks.
+    // The closings' list and the closing's spend window are the runner's alone: since 0171 (F5) the cross-account marker's, which the API's role lacks.
     for (const pool of [api, erasure, worker]) {
       expect(await sqlError(() => pool.query("SELECT identity.read_unreported_closings(10)"))).toMatchObject({ code: "42501" });
       expect(await sqlError(() => pool.query("SELECT identity.read_closing_since_of_root($1)", [root]))).toMatchObject({ code: "42501" });

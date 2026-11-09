@@ -7,7 +7,7 @@ import type { WebSealed } from "./web-evidence.js";
  * on the runner's pool: the shown quotes' reader (`readShownQuotes`), which the API's answer read calls too, is debateai_runtime's; the writers of a
  * debate's replies and shown quotes, the sweep's list (`readHolding`), the wipe and the replies' reader (`readReplyTexts`) need the cross-account
  * marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's request login
- * does not (0154, the security review's F5).
+ * does not (0171, the security review's F5).
  *
  * THE RECORDED FORM. A passage lives in four kinds of place. Two are rows the wipe deletes (identity.web_extract, identity.web_pack). Two
  * are the append-only AI call records, which nothing may edit (sealed values are never edited, and they replay byte for byte), so they must
@@ -66,7 +66,7 @@ export class PostgresPassageRetentionRepository {
       [runId, extractId, JSON.stringify(sealed.envelope), sealed.attestation])).rows[0]!.outcome;
   }
 
-  /** A live debate's shown quotes by label; null when it is not a live private debate or, in a request, not the connection's own (0154). */
+  /** A live debate's shown quotes by label; null when it is not a live private debate or, in a request, not the connection's own (0171). */
   async readShownQuotes(runId: string): Promise<readonly WebShownQuoteRead[] | null> {
     return (await this.pool.query<{ quotes: WebShownQuoteRead[] | null }>(
       "SELECT identity.read_web_shown_quotes($1) AS quotes", [runId])).rows[0]?.quotes ?? null;

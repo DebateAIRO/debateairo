@@ -96,7 +96,7 @@ type Manifest = Readonly<{
     grants: readonly string[];
   }>[];
   /**
-   * The security review (migration 0154): a grant a later step takes back, by the step that takes it, in the same words as
+   * The security review (migration 0171): a grant a later step takes back, by the step that takes it, in the same words as
    * a disclosure. The disclosure of the step that granted it stays as that step granted it; its own contract test pins it.
    */
   privilegeRevocations: readonly Readonly<{
@@ -1369,7 +1369,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0154_security_review_hardening.sql",
+  "source": "migrations/0171_security_review_hardening.sql",
   "grants": [
     "EXECUTE ON FUNCTION core.publication_is_current(uuid)",
     "EXECUTE ON FUNCTION identity.request_owner_matches(uuid)"
@@ -1377,7 +1377,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0154_security_review_hardening.sql",
+  "source": "migrations/0171_security_review_hardening.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.reserve_ask_clarify_charge(uuid,uuid)",
     "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,text,timestamptz,boolean,text,jsonb)"
@@ -1385,14 +1385,14 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_billing_runtime",
-  "source": "migrations/0154_security_review_hardening.sql",
+  "source": "migrations/0171_security_review_hardening.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.read_run_is_dig(uuid,uuid)"
   ]
 },
 {
   "roleName": "debateai_rls_all_accounts",
-  "source": "migrations/0154_security_review_hardening.sql",
+  "source": "migrations/0171_security_review_hardening.sql",
   "grants": [
     "EXECUTE ON FUNCTION identity.delete_ask_clarify_reservations_due(integer)",
     "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
@@ -1526,7 +1526,7 @@ describe("P3-01 production database-principal manifest", () => {
     expect(manifest.privilegeRevocations).toEqual([
       {
         roleName: "debateai_billing_runtime",
-        source: "migrations/0154_security_review_hardening.sql",
+        source: "migrations/0171_security_review_hardening.sql",
         revokes: [
           "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
           "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
@@ -1544,7 +1544,7 @@ describe("P3-01 production database-principal manifest", () => {
       },
       {
         roleName: "debateai_runtime",
-        source: "migrations/0154_security_review_hardening.sql",
+        source: "migrations/0171_security_review_hardening.sql",
         revokes: [
           "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
           "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)",
@@ -1683,7 +1683,7 @@ describe("P3-01 production database-principal manifest", () => {
       },
       {
         roleName: "debateai_authorization_runtime",
-        source: "migrations/0154_security_review_hardening.sql",
+        source: "migrations/0171_security_review_hardening.sql",
         revokes: [
           "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
           "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
@@ -2152,9 +2152,9 @@ it("discloses exactly 0142's grants, all to the runtime role (R22 team limit, de
   expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(13);
 });
 
-it("discloses exactly 0154's grants, and records each grant it takes back under privilegeRevocations alone (the security review)", async () => {
+it("discloses exactly 0171's grants, and records each grant it takes back under privilegeRevocations alone (the security review)", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
-  const source = "migrations/0154_security_review_hardening.sql";
+  const source = "migrations/0171_security_review_hardening.sql";
   const sql = await readFile(source, "utf8");
   // One role per line, at the top level, so each line below is the whole statement: a function's EXECUTE, or (F5, the site's day) a ledger
   // table's INSERT or UPDATE.
@@ -2170,7 +2170,7 @@ it("discloses exactly 0154's grants, and records each grant it takes back under 
   const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
     .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
   expect(recorded).toEqual(revoked);
-  // Nowhere else: every revocation the manifest records is a line of its own step, and no step's disclosures name it as 0154's grant.
+  // Nowhere else: every revocation the manifest records is a line of its own step, and no step's disclosures name it as 0171's grant.
   for (const entry of manifest.privilegeRevocations) {
     const own = await readFile(entry.source, "utf8");
     for (const revoke of entry.revokes) expect(own, revoke).toContain(`REVOKE ${revoke} FROM ${entry.roleName};`);

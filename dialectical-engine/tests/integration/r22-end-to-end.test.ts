@@ -107,7 +107,7 @@ const listedRef = async (question: string): Promise<string | undefined> => (awai
 const saw = (path: string, what: string): void => { console.info(`SEEN ${path}: ${what}`); };
 
 /**
- * Security review F2 (0154): a dig's own row, and whether it was written in its run's own transaction (one xmin): the statement that creates the run
+ * Security review F2 (0171): a dig's own row, and whether it was written in its run's own transaction (one xmin): the statement that creates the run
  * writes it, so it is there whatever the route does after the submit (the world composes an account-memory store, which no longer writes it).
  * Null: no row.
  */

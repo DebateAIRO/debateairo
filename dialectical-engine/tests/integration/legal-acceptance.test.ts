@@ -417,7 +417,7 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       await shared.query("ROLLBACK");
       shared.release();
     }
-    // 0154: the API billing role alone (debateai_billing_runtime since 0094), which the API's request login holds, may not call it either.
+    // 0171: the API billing role alone (debateai_billing_runtime since 0094), which the API's request login holds, may not call it either.
     const billing = await database.pool.connect();
     try {
       await billing.query("BEGIN");
@@ -429,7 +429,7 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       billing.release();
     }
     // A clock far in the future is clamped to now: the five-year closure survives. R-36: P16c's yearly job runs it from its gated timer, outside
-    // any request, on the API's system login, which holds the billing role and, since 0154, 0130's cross-account marker; it may not DELETE itself.
+    // any request, on the API's system login, which holds the billing role and, since 0171, 0130's cross-account marker; it may not DELETE itself.
     // Two rows go: the old owner's one acceptance row and its closure date (A15: the record, and
     // the date that links the erased owner_ref to its closure, end together).
     const system = createPool(await createSystemTwin(database, "legal_purge_system", ["debateai_billing_runtime"]));

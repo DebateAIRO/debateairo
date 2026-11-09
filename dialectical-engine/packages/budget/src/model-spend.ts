@@ -112,12 +112,12 @@ export const PATH_CLIMB_SEAM_LEVELS = 10 as const;
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
- * function (pre-flight PF-L58, option (a)). Since the security review's 0154 it is the cross-account marker's alone,
+ * function (pre-flight PF-L58, option (a)). Since the security review's 0171 it is the cross-account marker's alone,
  * so the API calls it, and probes it, on its system login (main.ts's site X30). Its signature, as `to_regprocedure`
  * reads it: the hosted API's boot probe asks only whether it exists, and keeps the fast check off until it does.
  */
 export const LANGUAGE_CHECK_SPEND_WRITER = "ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
-/** The question check's one writer (0128), the cross-account marker's alone since 0154: the API calls and probes it on its system login (X31). */
+/** The question check's one writer (0128), the cross-account marker's alone since 0171: the API calls and probes it on its system login (X31). */
 export const QUESTION_CHECK_SPEND_WRITER = "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
 
 /** One fast language check's site cost, as the writer takes it: no run, no phase, no attempt. */
@@ -177,7 +177,7 @@ export type AskClarifyChargeEntry = LanguageCheckSpendEntry & Readonly<{
 }>;
 
 /**
- * The security review's 0154: before each paid call, while the request's session is live, its charge id is reserved for the person, so the record
+ * The security review's 0171: before each paid call, while the request's session is live, its charge id is reserved for the person, so the record
  * after the call names them whatever became of the session meanwhile (a sign-out, a step-up's new token). It refuses (42501 REQUEST_OWNER_MISMATCH)
  * an owner that is not the account of the live session the connection presents (a login holding the cross-account marker may name any): then no call
  * is made.
@@ -194,7 +194,7 @@ async function identityFunctionPresent(pool: Pick<Pool, "query">, signature: str
 }
 
 /**
- * The boot probe of the writer: may this login call it? Since 0154 the writer is the cross-account marker's alone, so the API asks it of its
+ * The boot probe of the writer: may this login call it? Since 0171 the writer is the cross-account marker's alone, so the API asks it of its
  * system login (main.ts's site X32), where it records each call. Missing is false, and the site makes no call. Read-only.
  */
 export async function askClarifyChargeWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
@@ -202,7 +202,7 @@ export async function askClarifyChargeWriterPresent(pool: Pick<Pool, "query">): 
 }
 
 /**
- * The boot probe of the reservation (0154): may this login call it? The API reserves each call on the request's own login, so it asks this of
+ * The boot probe of the reservation (0171): may this login call it? The API reserves each call on the request's own login, so it asks this of
  * that login. Missing is false, and the site makes no call. Read-only.
  */
 export async function askClarifyReservationPresent(pool: Pick<Pool, "query">): Promise<boolean> {
@@ -218,7 +218,7 @@ export async function reserveAskClarifyCharge(pool: Pick<Pool, "query">, entry: 
 }
 
 /**
- * The API's sweep of the reservations no charge took (0154): up to `limit` (1 to 1000) of every owner's, an hour old or older, the oldest first, and
+ * The API's sweep of the reservations no charge took (0171): up to `limit` (1 to 1000) of every owner's, an hour old or older, the oldest first, and
  * how many went. The cross-account marker's alone, so it is called outside any request, where the API's pools reach its system login.
  */
 export async function deleteAskClarifyReservationsDue(pool: Pick<Pool, "query">, limit: number): Promise<number> {
@@ -226,7 +226,7 @@ export async function deleteAskClarifyReservationsDue(pool: Pick<Pool, "query">,
 }
 
 /**
- * One paid call's charge, after the call: the site's ledger row and its person's. Since 0154 the writer is the cross-account marker's alone, so the
+ * One paid call's charge, after the call: the site's ledger row and its person's. Since 0171 the writer is the cross-account marker's alone, so the
  * API calls it on its system login (main.ts's site X32), inside the request that reserved the call; the reservation names the person.
  */
 export async function recordAskClarifyCharge(pool: Pick<Pool, "query">, entry: AskClarifyChargeEntry): Promise<void> {
@@ -1424,7 +1424,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   }
 
   /**
-   * One charge, by a direct INSERT, which since the security review's 0154 only a login that holds the cross-account
+   * One charge, by a direct INSERT, which since the security review's 0171 only a login that holds the cross-account
    * marker may make: the runner's, and inside a request the API's system login (main.ts's site X33, the synthesis check).
    */
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
@@ -1559,7 +1559,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * a committed hold always has its job, and a READY job always has its hold.
    * Nothing ever releases it. The transaction is a login's that holds the
    * cross-account marker (the room's decision pool, the API's system login): since
-   * 0154 no request login may write a hold.
+   * 0171 no request login may write a hold.
    */
   async openHold(
     client: Pick<PoolClient, "query">,
@@ -1584,7 +1584,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * UTC day, the part of its hold it has not yet spent (RUN + STORY), never less
    * than zero. Read from the live jobs outward (`work_item_live_run_idx`).
    * Every account's (X23, as `readDaySpentMicros`): inside a request the request
-   * login's row rule would count the requester's own holds alone (0154).
+   * login's row rule would count the requester's own holds alone (0171).
    */
   async readSiteCountedHoldsMicros(day: string): Promise<number> {
     return crossAccount("X23", async () => {

@@ -1915,7 +1915,7 @@ export interface ApiOptions {
    * V4 account memory (owner rulings N7 and N11, migration 0131): the reading level, each debate's last visit and each
    * dig's link, kept in the account. Its six routes are always mounted; without it they answer 503
    * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory. The asks route writes each
-   * dig's own row through it as the dig starts (0154, the security review's F2: a dig is never published).
+   * dig's own row through it as the dig starts (0171, the security review's F2: a dig is never published).
    */
   readonly accountMemory?: AccountMemoryStore;
   /**
@@ -4209,7 +4209,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : Object.freeze({ kind: "server" as const, userId: request.authenticatedSession.userId,
           ownerRef: request.authenticatedSession.ownerRef })
     ));
-    // Security review F2 (0154): a dig is never published, and is known as one by its own row (identity.dig_run), which the submit's run creation
+    // Security review F2 (0171): a dig is never published, and is known as one by its own row (identity.dig_run), which the submit's run creation
     // has already written in the same statement as the run (the application marks an owner's ask with a parent or a public parent), for a private
     // dig and a public one alike, so it is there whatever the joins below answer (and before the 202 of a public join that did not take), and stays
     // whatever becomes of the parent.
@@ -4711,7 +4711,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
-      // Security review F2 (migration 0154): the owner decided that a dig is never published. Asked once the grant is known live, so another's
+      // Security review F2 (migration 0171): the owner decided that a dig is never published. Asked once the grant is known live, so another's
       // debate still answers the audited 404 above, and before the answer is read, the synthesis gate runs or a key is made; the application and
       // the database's key provision refuse a dig as well.
       if (await options.publications.isDig?.({ runId, authenticated }) === true) {
@@ -6267,7 +6267,7 @@ export class PostgresAskApplication implements AskApplication {
       }
     }
     const appliedField = applied === null ? {} : { applied };
-    // Security review F2 (0154): an owner's ask with a parent or a public parent is a dig, marked by the statement that creates its run (0123's
+    // Security review F2 (0171): an owner's ask with a parent or a public parent is a dig, marked by the statement that creates its run (0123's
     // core.create_encrypted_run writes identity.dig_run with the run), on this path and the room's alike, so nothing between the start and the
     // route's joins can leave it unmarked. A legacy asker owns no account to mark it under, and its run is never published.
     const digRun = principal.kind === "server" && (requestedAsk.parent !== undefined || requestedAsk.public_parent !== undefined);
@@ -6622,7 +6622,7 @@ export class PostgresAskApplication implements AskApplication {
             envelopeBasis: evaluated.envelopeBasis,
             registerVersion: settings.registerVersion,
             releaseKey: settings.releaseKey,
-            // Security review F2 (0154): a dig's run is marked in the statement that creates it, START or WAIT alike.
+            // Security review F2 (0171): a dig's run is marked in the statement that creates it, START or WAIT alike.
             ...(digRun ? { digRun: true as const } : {}),
             batteryVersion: settings.batteryVersion,
             askContract: {

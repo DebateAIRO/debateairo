@@ -9,7 +9,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * (debateai_billing_runtime) saves and reads the reading level, the last visit of a debate it owns and the dig links
  * between its own debates; every write is validated before any read; the shared runtime role reaches none of it; the
  * tables are never read directly; the export worker reads the account's rows behind the export lease; deleting the
- * account (what 0110's erasure finally does) removes every row; deleting one debate (R22 item 16) removes its rows. Since the security review's 0154
+ * account (what 0110's erasure finally does) removes every row; deleting one debate (R22 item 16) removes its rows. Since the security review's 0171
  * (F5) every call names the owner of the session the request presents, so the API's role runs here as each person's own request (its login carrying
  * their live session); with no session, or another's, it is refused or reads as another account's debate.
  */
@@ -110,12 +110,12 @@ describe("0131 the reading level", () => {
     }
     const pending = await account("pending_verification");
     expect(await sqlError(() => saveLevel(asking(pending), pending.ownerRef, "plain"))).toMatchObject({ code: "22023", message: "PAGE_MEMORY_ACCOUNT_INVALID" });
-    // 0154 (F5): an owner with no account has no session, so a request cannot name it; the function's own refusal stands for a system login.
+    // 0171 (F5): an owner with no account has no session, so a request cannot name it; the function's own refusal stands for a system login.
     expect(await sqlError(() => saveLevel(asking(person), randomUUID(), "plain"))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
     expect(await sqlError(() => saveLevel(system, randomUUID(), "plain"))).toMatchObject({ code: "22023", message: "PAGE_MEMORY_ACCOUNT_INVALID" });
   });
 
-  it("D2b (0154, F5) a request names its own account only: another's, or none, is refused or read as nothing; a system login names any", async () => {
+  it("D2b (0171, F5) a request names its own account only: another's, or none, is refused or read as nothing; a system login names any", async () => {
     const [person, stranger] = [await account(), await account()];
     const run = await ownedRun(person);
     expect((await saveLevel(asking(person), person.ownerRef, "expert")).rows[0]!.level).toBe("expert");

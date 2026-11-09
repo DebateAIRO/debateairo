@@ -16,7 +16,7 @@ import { listRunnerSettingsPreload } from "../../apps/runner/src/run-settings.js
  * connected as the live runner's own login: debateai_runtime and, since row-level security S01, the marker role
  * debateai_rls_all_accounts (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it), so
  * every read and write below is one a runner may really make. The bare debateai_runtime login, with no account
- * context, sees none of these items, and since 0154 (the security review, F5) may not even ask the claims' and lists'
+ * context, sees none of these items, and since 0171 (the security review, F5) may not even ask the claims' and lists'
  * pause and hand-over questions, which are the marker's (the last case). The superuser pool only arranges rows (claims,
  * lapsed deadlines).
  * CI skips this directory; run it before merging.
@@ -341,10 +341,10 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await jobRow(bClaimed.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
   });
 
-  it("the bare runtime login, with no account context, reads and writes none of its own release's items (row-level security, 0126), and claims and lists nothing (0154)", async () => {
+  it("the bare runtime login, with no account context, reads and writes none of its own release's items (row-level security, 0126), and claims and lists nothing (0171)", async () => {
     const a = await runWithJob(KEY_A), runless = await runlessJob();
     const bare = new WorkItemRepository(bareRuntime, { releaseKey: KEY_A, workerId: "worker:a" });
-    // Since 0154 (F5) a claim and a list ask the debate's month pause and the set-aside asks whether its work is parked, both the marker's: a login
+    // Since 0171 (F5) a claim and a list ask the debate's month pause and the set-aside asks whether its work is parked, both the marker's: a login
     // without it is refused them before any row is read.
     const pause = { code: "42501", message: "permission denied for function read_run_pause_of_run" };
     await expect(bare.listDispatchable(10)).rejects.toMatchObject(pause);

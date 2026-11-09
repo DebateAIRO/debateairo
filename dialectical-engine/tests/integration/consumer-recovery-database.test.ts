@@ -4,7 +4,7 @@ import { createPool, migrate, type Pool } from '@debateai/db';
 import { hashToken } from '@debateai/crypto';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 import { createSystemTwin } from '../support/rls-logins.js';
-// The authorization login, and its system twin (the same capability role and the cross-account marker): since the security review's 0154 a
+// The authorization login, and its system twin (the same capability role and the cross-account marker): since the security review's 0171 a
 // recovery's proof and its stored proof's reader are the system login's alone (X36), as main.ts routes them.
 let database: TestDatabase, runtime: Pool, system: Pool;
 const SYSTEM = /\bidentity\.(?:prove_consumer_recovery|read_consumer_recovery_proof)\(/u;

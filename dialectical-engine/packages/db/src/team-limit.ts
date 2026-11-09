@@ -61,7 +61,7 @@ export class PostgresTeamLimitRepository {
   }
   /**
    * The mail loop's leases over 0142's notices. The API calls these three only from its gated timer, outside any request, so on its system login:
-   * they are the cross-account marker's (debateai_rls_all_accounts) since 0154, never a request login's.
+   * they are the cross-account marker's (debateai_rls_all_accounts) since 0171, never a request login's.
    */
   async claimNotices(limit: number): Promise<readonly TeamLimitNoticeClaim[]> {
     return (await this.pool.query<TeamLimitNoticeClaim>("SELECT notice_id,kind,recipient_staff_id,claim_token FROM staff.claim_team_limit_notices($1)", [limit])).rows;

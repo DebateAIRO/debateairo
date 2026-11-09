@@ -1148,7 +1148,7 @@ export const PublicationContentRefusalSchema = z.object({
   statement: PublicationRefusalStatementSchema
 }).strict();
 /**
- * Security review F2 (migration 0154): the 409 body of a publish of a dig. The owner decided that a dig, a debate dug from another, is never
+ * Security review F2 (migration 0171): the 409 body of a publish of a dig. The owner decided that a dig, a debate dug from another, is never
  * published; nothing was read, checked or provisioned for the attempt, and the debate stays private.
  */
 export const DIG_NOT_PUBLISHABLE = "DIG_NOT_PUBLISHABLE" as const;

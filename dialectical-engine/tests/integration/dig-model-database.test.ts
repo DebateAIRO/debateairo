@@ -24,7 +24,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * rewrite (a settled dig's turn, the rewrite written at the front of its path's line on the path's current text,
  * encrypted under the dig's key, read only by the owner; erasing the dig removes its rewrite and the path falls back),
  * the search planner's decision for each path (written once, its reason sealed), the month pause (PAUSED, Continue),
- * the spend source PATH_REWRITE, and the deletions and the export. Data is made up. Since the security review's 0154 (F5) the API's role
+ * the spend source PATH_REWRITE, and the deletions and the export. Data is made up. Since the security review's 0171 (F5) the API's role
  * runs here as each person's own request (its login carrying their live session), as its functions believe no other owner; 0134's owner
  * readers of every level, of the rewrites and of the paused debates had no caller and are no role's any more, so they are read here as the
  * migrator, as is 0133's first join.
@@ -63,13 +63,13 @@ async function account(): Promise<Account> {
 }
 /** The person's own request, on the API's role. */
 const asking = (person: Account): Pool => asRequestOf(requests, person.token);
-/** 0134's owner reader of an investigation's levels, as the migrator (no role's since 0154). */
+/** 0134's owner reader of an investigation's levels, as the migrator (no role's since 0171). */
 const readDigLevels = async (ownerRef: string, runId: string): Promise<ReadonlyArray<{ dig_level: number }> | null> =>
   (await database.pool.query("SELECT identity.read_investigation_dig_levels($1,$2) AS levels", [ownerRef, runId])).rows[0]?.levels ?? null;
-/** 0134's owner reader of a debate's path rewrites, as the migrator (no role's since 0154). */
+/** 0134's owner reader of a debate's path rewrites, as the migrator (no role's since 0171). */
 const readPathRewrites = async (ownerRef: string, runId: string): Promise<PathRewritesRead | null> =>
   (await database.pool.query("SELECT identity.read_path_rewrites($1,$2) AS rewrites", [ownerRef, runId])).rows[0]?.rewrites ?? null;
-/** 0134's owner reader of the account's paused debates, as the migrator (no role's since 0154). */
+/** 0134's owner reader of the account's paused debates, as the migrator (no role's since 0171). */
 const readPausedRuns = async (ownerRef: string): Promise<ReadonlyArray<{ run_id: string }>> =>
   (await database.pool.query("SELECT identity.read_paused_runs($1) AS paused", [ownerRef])).rows[0]!.paused;
 /** A private debate with content encryption and its attestation secret. */
@@ -136,7 +136,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE dig_api LOGIN PASSWORD 'dig-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the runner's own steps of a debate are the marker's.
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the runner's own steps of a debate are the marker's.
   await database.pool.query("CREATE ROLE dig_runner LOGIN PASSWORD 'dig-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE dig_erasure LOGIN PASSWORD 'dig-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE dig_worker LOGIN PASSWORD 'dig-worker-test-only' IN ROLE debateai_data_export_worker");
@@ -183,7 +183,7 @@ describe("0134 the dig level", () => {
     const stranger = await account();
     expect(await new PostgresDigModelRepository(asking(stranger)).readDigLevel(stranger.ownerRef, runs[2]!)).toBeNull();
     expect(await readDigLevels(stranger.ownerRef, runs[2]!)).toBeNull();
-    // 0154 (F5): the person's request names no one else, and with no session the API's role names no one.
+    // 0171 (F5): the person's request names no one else, and with no session the API's role names no one.
     expect(await levels.readDigLevel(stranger.ownerRef, runs[2]!)).toBeNull();
     expect(await new PostgresDigModelRepository(api).readDigLevel(person.ownerRef, runs[2]!)).toBeNull();
     // The level table holds 1..10 only, whoever writes.
@@ -220,7 +220,7 @@ describe("0134 the dig level", () => {
     const root = await run(person);
     const one = await run(person);
     const two = await run(person);
-    // 0133's join, as the release before called it (no code calls it any more, and since 0154 no role may: the migrator calls it here).
+    // 0133's join, as the release before called it (no code calls it any more, and since 0171 no role may: the migrator calls it here).
     await database.pool.query("SELECT * FROM identity.join_investigation($1,$2,$3,'{}'::text[],'quick')", [person.ownerRef, root, one]);
     await database.pool.query("SELECT * FROM identity.join_investigation($1,$2,$3,'{}'::text[],'quick')", [person.ownerRef, one, two]);
     expect(await levelRows(person.ownerRef)).toBe(0);
@@ -231,8 +231,8 @@ describe("0134 the dig level", () => {
     expect(await new PostgresInvestigationRepository(asking(person)).join({ ownerRef: person.ownerRef, parentRunId: two, childRunId: three,
       places: [], mode: "quick" })).toMatchObject({ outcome: "JOINED", digLevel: 3 });
     // 0134 replayed over the finished chain (its fill-in is ON CONFLICT DO NOTHING) writes the missing rows. The replay also puts back 0134's own
-    // bodies of the functions a later step redefined in place and declared as an amendment of 0134 (0154, the security review: the guard and the forget
-    // definer ask their scope, not a setting; the pause's reader and Continue ask the session's owner), and 0134's grants on the owner readers 0154
+    // bodies of the functions a later step redefined in place and declared as an amendment of 0134 (0171, the security review: the guard and the forget
+    // definer ask their scope, not a setting; the pause's reader and Continue ask the session's owner), and 0134's grants on the owner readers 0171
     // took back and on the runner's own steps it moved to the cross-account marker. The chain then refuses the database until they are that step's
     // again, so a replay cannot quietly undo it.
     const amended = (await loadMigrationPlan()).forwardChain.flatMap((step) => step.amendsPostconditionsOf ?? [])
@@ -380,7 +380,7 @@ describe("0134 the web plan", () => {
     const read = (await web.readPlanStatuses(debate))!;
     expect(read.map(({ pathRef, status, searchesToSend, reason: sealedReason }) => [pathRef, status, searchesToSend, sealedReason]))
       .toEqual([["pos-1", "PLANNED", 2, null], ["pos-2", "NO_SEARCH_PLANNED", 0, REASON], ["pos-3", "PLANNED", 0, null]]);
-    // The API's serve reads it too, in its owner's own request (its role is a member of the runtime role); since 0154 (F5) a request with
+    // The API's serve reads it too, in its owner's own request (its role is a member of the runtime role); since 0171 (F5) a request with
     // no session reads nothing, as for a plan never written.
     expect(await new PostgresWebEvidenceRepository(asking(person)).readPlanStatuses(debate)).toHaveLength(3);
     expect(await new PostgresWebEvidenceRepository(api).readPlanStatuses(debate)).toBeNull();
@@ -432,7 +432,7 @@ describe("0134 the month pause", () => {
     const strangerSide = new PostgresDigModelRepository(asking(stranger));
     expect(await strangerSide.resume(stranger.ownerRef, debate)).toBe("NOT_OWNED");
     expect(await strangerSide.readPause(stranger.ownerRef, debate)).toBeNull();
-    // 0154 (F5): a request names only its own session's account, and with no session the API's role names no one.
+    // 0171 (F5): a request names only its own session's account, and with no session the API's role names no one.
     expect(await sqlError(() => strangerSide.resume(person.ownerRef, debate))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
     expect(await sqlError(() => strangerSide.readPause(person.ownerRef, debate))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
     expect(await sqlError(() => new PostgresDigModelRepository(api).resume(person.ownerRef, debate)))

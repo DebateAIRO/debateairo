@@ -36,7 +36,7 @@ beforeAll(async () => {
     runtime = createPool(url.toString());
     systemRuntime = createPool(await createSystemTwin(database, 'consumer_test_runtime_system', ['debateai_authorization_runtime']));
     scopedRuntime = createPool(url.toString(), { crossAccount: systemRuntime });
-    // The security review's 0154: a passkey's stored credential and its sign-in completion are the system login's (X36), so the repository runs
+    // The security review's 0171: a passkey's stored credential and its sign-in completion are the system login's (X36), so the repository runs
     // on the authorization pool as main.ts wires it; outside a request its statements go to the system twin.
     repo = new PostgresConsumerAuthRepository(scopedRuntime, audit);
     sessions = await freshSessions();
@@ -427,7 +427,7 @@ describe('restricted consumer passkey authority', () => {
         }
     });
     it('rechecks login expiry after waiting on its credential lock', async () => {
-        // The completion is the system login's (0154, X36): the isolated repository's one connection is the system twin's.
+        // The completion is the system login's (0171, X36): the isolated repository's one connection is the system twin's.
         const a = await enrolled(), l = await login(a), blocker = await database.pool.connect(), client = await systemRuntime.connect();
         await database.pool.query("UPDATE identity.consumer_passkey_challenge SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE handle_hash=$1", [handleHash('LOGIN', l.options.challenge_handle)]);
         let blockerOpen = false;

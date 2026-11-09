@@ -6,11 +6,11 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  * `PostgresPublicDebateRepository` runs on the API's own pool (debateai_billing_runtime); `PostgresPublicDebateRunnerRepository` on the runner's or
  * the scheduler's pool, and the API's for the public page's two reads (`readPageUpdates`, `isAuthorNameGone`: debateai_runtime, which the API's roles
  * inherit). Its other methods, which take no owner, need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and
- * the API's system pool outside a request hold and the API's request login does not since 0154 (the security review, F5).
+ * the API's system pool outside a request hold and the API's request login does not since 0171 (the security review, F5).
  *
  * What the later lanes must respect:
  * - Public (13): a dig on a public debate, the root's owner's too, joins the publication with 0147's join
- *   (`PostgresPublicTreeRepository.join`, public-tree.ts), never 0134's join; 0137's first public join is retired (0154 takes its
+ *   (`PostgresPublicTreeRepository.join`, public-tree.ts), never 0134's join; 0137's first public join is retired (0171 takes its
  *   grant back). Its picks go through `recordPicks` (the pick set's position_ref stays null, the path is on the contribution); its
  *   rewrite goes through `identity.path_update` with kind PUBLIC_DIG, by 0147's public turn, never 0134's tables, so a refused one is
  *   no one's current text. Every contribution must end in `settleCheck` (UNAVAILABLE when the check could not run), or the path's
@@ -24,8 +24,8 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  *   (`readFreeToPublish`), runs the check, then `prepareFreePublication`, makes the key, and `publishFree`; a refusal is
  *   `refuseFree` (private for good); an unavailable check records nothing and the sweep tries again.
  * - A report on a public debate: 0147's `identity.open_public_report` (public-tree.ts); each PUBLIC_REPORT charge names the root's run
- *   and its payer through `recordReportCharge` (the runner's: the cross-account marker's since 0154); the window readers count it through
- *   0149's read_public_report_spent_by_funding (0137's read_public_report_spent had no caller and is no role's since 0154).
+ *   and its payer through `recordReportCharge` (the runner's: the cross-account marker's since 0171); the window readers count it through
+ *   0149's read_public_report_spent_by_funding (0137's read_public_report_spent had no caller and is no role's since 0171).
  */
 type Executor = Pick<Pool, "query"> | PoolClient;
 
@@ -79,7 +79,7 @@ export class PostgresPublicDebateRepository {
 /**
  * The runner's or the scheduler's pool. `readPageUpdates` and `isAuthorNameGone` are debateai_runtime's (the public page reads them on the API's
  * request pool); the rest, `readContribution` included, need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler
- * and the API's system pool outside a request hold and the API's request login does not (0154).
+ * and the API's system pool outside a request hold and the API's request login does not (0171).
  */
 export class PostgresPublicDebateRunnerRepository {
   constructor(private readonly pool: Executor) {}

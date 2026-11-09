@@ -98,7 +98,7 @@ describe("auth database batch: the forward step after NETOPIA's 0111", () => {
     expect(plan.forwardChain.at(-4)!.name).toBe("0151_public_flag.sql");
     expect(plan.forwardChain.at(-3)!.name).toBe("0152_report_export_and_check_usage.sql");
     expect(plan.forwardChain.at(-2)!.name).toBe("0153_dig_tree_settled.sql");
-    expect(plan.forwardChain.at(-1)!.name).toBe("0154_security_review_hardening.sql");
+    expect(plan.forwardChain.at(-1)!.name).toBe("0171_security_review_hardening.sql");
     const netopia = plan.forwardChain.find((entry) => entry.name === "0111_billing_netopia.sql")!;
     expect(plan.forwardChain.indexOf(step)).toBe(plan.forwardChain.indexOf(netopia) + 1);
     expect(step.previousName).toBe(netopia.name);

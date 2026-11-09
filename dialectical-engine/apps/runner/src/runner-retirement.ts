@@ -200,7 +200,7 @@ const SET_ASIDE_PAGE_SIZE = 100;
  * The facts in one snapshot: a FRONT_PAIR_STOPPED row is never seen without every admission committed before it (a
  * debate admitted a second before the pair stopped is counted as open work, never missed between two reads). Needs
  * EXECUTE on `core.read_release_state`, `identity.run_release_now` and `identity.run_work_is_parked` (the last the
- * cross-account marker's since 0154), and SELECT on `core.work_item` and `core.run` (the runner runtime login holds
+ * cross-account marker's since 0171), and SELECT on `core.work_item` and `core.run` (the runner runtime login holds
  * them all). `fence` is the runner's own work fence (spec §3): the backstop's set-aside writes only its release's work,
  * never under another worker's live claim, and refuses any other release key before it writes (O1). The set-aside
  * needs UPDATE on `core.work_item` and INSERT on `ledger.model_spend_waiver` (debateai_runtime's), and EXECUTE on

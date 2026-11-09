@@ -67,7 +67,7 @@ function pendingInput(acceptances?: readonly SignUpAcceptanceRow[]): PendingAcco
 /**
  * A pending account created through identity.create_pending_account_reserved_with_consent (its three rows), or _with_audit (none), on `pool`'s
  * login (the API's role unless a test names another), as the sign-up creates it. `then` runs on that same connection before the commit, as the
- * sign-up writes the Italy approval: since 0154 the writer writes only for an account its own transaction created (the row's xmin).
+ * sign-up writes the Italy approval: since 0171 the writer writes only for an account its own transaction created (the row's xmin).
  */
 async function pendingAccount(withConsent = true, then?: (client: PoolClient, input: PendingAccountInput) => Promise<void>,
   pool: Pool = signup): Promise<PendingAccountInput> {
@@ -205,7 +205,7 @@ describe("0125: the Italy-specific approval on real PostgreSQL", () => {
     const active = await activeAccount();
     expect(await sqlError(() => record(signup, active, approvalRow("PICKED")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
     expect(await sqlError(() => record(signup, randomUUID(), approvalRow("PICKED")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
-    // 0154: an account its sign-up already committed, still pending, is refused as one not pending: the approval is the sign-up's own.
+    // 0171: an account its sign-up already committed, still pending, is refused as one not pending: the approval is the sign-up's own.
     const committed = await pendingAccount();
     expect(await sqlError(() => record(signup, committed.userId, approvalRow("PICKED")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
     const noTerms = await pendingAccount(false, async (client, input) => {

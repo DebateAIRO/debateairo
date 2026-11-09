@@ -20,8 +20,8 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./question-lan
  * beside a run-less ledger row that keeps it in the site's day. The windows, a team member's grant and the team's one limit all read it. The caller
  * asks first whether the pool is empty: empty, no call. Every call is recorded from the vendor's real counts, or the projected maximum when a hosted
  * call may have been billed without readable counts; on the preview the gate settles the money and a refused send costs nothing, so only real counts.
- * Each paid call's charge id is reserved for the person first (0154), on the request's own connection while its session is live, so the record after the
- * call, which 0154 made the system login's alone (main.ts's site X32), names the person whatever became of the session meanwhile (a sign-out, a
+ * Each paid call's charge id is reserved for the person first (0171), on the request's own connection while its session is live, so the record after the
+ * call, which 0171 made the system login's alone (main.ts's site X32), names the person whatever became of the session meanwhile (a sign-out, a
  * step-up's new token); a reservation the database refuses (the session is not the person's any more) means no further call for this request. A record or a reservation that cannot be written stops the calls until a restart
  * (never spend unrecorded). The database keeps the grant a team member's call names only when it is that person's own and was running when the call was
  * reserved, and otherwise records the call on the person's own plan, refusing nothing. A reservation names its person for an hour: every call is recorded
@@ -100,7 +100,7 @@ const NONE: AskClarifyResponse = Object.freeze({ source: "NONE" });
 const RECORD_LATCHING_CODES: ReadonlySet<string> = new Set(["42501", "42883", "23514"]);
 const RECORD_FAILURES_IN_A_ROW = 3;
 /**
- * The security review's 0154 (F5): the reservation refuses, with 42501, an owner that is not the account of the live session the request's connection
+ * The security review's 0171 (F5): the reservation refuses, with 42501, an owner that is not the account of the live session the request's connection
  * presents. Only this request meets that (its session ended, or a step-up replaced its token, before the call was sent), never the next person's, so it
  * neither latches the breaker nor counts towards it. Refused before the first call, the request makes no paid call and shows no questions; refused before
  * the re-ask, there is no second call, and the first call's reading, reserved while the session was live and charged to the person, stands as for any
@@ -188,9 +188,9 @@ export function createAskClarify(deps: Readonly<{
   limits: Readonly<{ perHour: number; perDay: number }>;
   /** Null: this deployment has no paid AI for it (local mode, no gate, no key, no writer). */
   transportFor: AskClarifyTransportFor | null;
-  /** The one writer (0144), on the system login since 0154 (main.ts's site X32). A failure stops the calls; it never fails the page. */
+  /** The one writer (0144), on the system login since 0171 (main.ts's site X32). A failure stops the calls; it never fails the page. */
   record: (entry: AskClarifyChargeEntry) => Promise<void>;
-  /** Before each paid call, on the request's connection: the charge id it will be recorded under, reserved for the person (0154). */
+  /** Before each paid call, on the request's connection: the charge id it will be recorded under, reserved for the person (0171). */
   reserve: (entry: Readonly<{ spendId: string; ownerRef: string }>) => Promise<void>;
   clock: () => Date;
   report: (line: Readonly<{ event: string; code: string }>) => void;
@@ -289,13 +289,13 @@ export function createAskClarify(deps: Readonly<{
   });
 }
 
-/** How often the API sweeps the clarify reservations no charge took (0154): hourly, so none outlives about two hours (an hour's window, then a pass). */
+/** How often the API sweeps the clarify reservations no charge took (0171): hourly, so none outlives about two hours (an hour's window, then a pass). */
 export const ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS = 60 * 60_000;
 /** One pass: batches of this many, at most this many batches, so a backlog never holds the timer; the next pass takes the rest. */
 const RESERVATION_SWEEP = Object.freeze({ batch: 500, batchesPerPass: 20 });
 
 /**
- * One pass of the sweep (0154's identity.delete_ask_clarify_reservations_due, the cross-account marker's alone): batches until one comes back short.
+ * One pass of the sweep (0171's identity.delete_ask_clarify_reservations_due, the cross-account marker's alone): batches until one comes back short.
  * Its caller runs it outside any request, so the API's pool sends it to the system login. A batch that fails ends the pass with its failure; the
  * single-flight trigger logs one content-free line and the next pass tries again. Returns how many reservations went.
  */

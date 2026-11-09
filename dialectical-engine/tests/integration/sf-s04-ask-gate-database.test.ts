@@ -23,7 +23,7 @@ const labels = ["NONE healthy", "DRUGS healthy", "HARM_TO_OTHERS not", "WEAPONS_
   "QUESTION_CHECK_HTTP_STATUS"] as const;
 const starts = (label: string) => label.endsWith(" healthy") && !label.startsWith("SUICIDE_METHODS");
 
-/** The API's system login (the billing role and the cross-account marker), where it records each check's cost since 0154 (main.ts's site X31). */
+/** The API's system login (the billing role and the cross-account marker), where it records each check's cost since 0171 (main.ts's site X31). */
 const API_SYSTEM = "s04_gate_api_system";
 async function asSystem<T extends Record<string, unknown> = Record<string, unknown>>(
   statement: string, values: unknown[] = []

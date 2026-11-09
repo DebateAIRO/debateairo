@@ -20,7 +20,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * against the plan's reserve read from the ledger since the closing began; the version is stored once, sealed under the
  * root's key, and the closing is marked written; reopening and closing again writes version 2, which reads version 1's
  * answer, and version 1 stays. The investigation's content is the made-up dossier of the unit tests (the sources' reads
- * of stories and points are the path rewrite's, covered by its own integration test). Data is made up. Since the security review's 0154
+ * of stories and points are the path rewrite's, covered by its own integration test). Data is made up. Since the security review's 0171
  * (F5) the API's role runs here as the person's own request (its login carrying their live session), as its functions believe no other
  * owner; 0133's owner read of an investigation is no role's any more, so the runner's reader reads it.
  */
@@ -93,7 +93,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE close_api LOGIN PASSWORD 'close-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the closings' sweep list is the marker's alone.
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the closings' sweep list is the marker's alone.
   await database.pool.query("CREATE ROLE close_runner LOGIN PASSWORD 'close-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   api = loginPool("close_api", "close-api-test-only");
   runner = loginPool("close_runner", "close-runner-test-only");

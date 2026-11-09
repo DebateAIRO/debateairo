@@ -344,7 +344,7 @@ export function inAccountRequest<T>(sessionToken: string | null, fn: () => Promi
 }
 
 /**
- * The security review's F5 (migration 0154): `pool` as one account's requests use it. Every query and checkout runs inside a request
+ * The security review's F5 (migration 0171): `pool` as one account's requests use it. Every query and checkout runs inside a request
  * scope carrying `sessionToken` (inAccountRequest), so a request-facing database function sees that session's owner and believes no
  * other. `pool` must be a T1 pool, built with a cross-account target as main.ts builds the API's request pool (a file's own login:
  * `createPool(url, { crossAccount: createPool(url) })`, whose target is the same login with no session): a pool with no target never

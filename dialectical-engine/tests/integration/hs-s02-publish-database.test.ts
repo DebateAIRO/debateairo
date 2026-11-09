@@ -108,7 +108,7 @@ async function publishGrant(runId: string): Promise<string> {
   return token;
 }
 
-/** A settled private run of the owner, and the answer publish is handed: fixture case 1 + the canary. `dig`: created as a dig's run (0154's mark). */
+/** A settled private run of the owner, and the answer publish is handed: fixture case 1 + the canary. `dig`: created as a dig's run (0171's mark). */
 async function settledRun(label: string, canary: string, dig = false): Promise<{ runId: string; answer: Answer }> {
   const marker = `${label}-${randomUUID()}`;
   const runId = await createEncryptedStoryRun(database.pool, theOwner(), `hs-s02 publish ${marker}`, undefined, dig ? { digRun: true } : {});
@@ -428,13 +428,13 @@ describe("hate-speech S02 publish path — the runtime pool under concurrent att
 });
 
 /**
- * Security review F2 (migration 0154): the owner decided that a dig is never published. A dig here is a debate the owner dug from another of
- * theirs, with its picks recorded (0135's identity.dig_pick_set), or with the row the statement that creates every dig's run writes (0154's
+ * Security review F2 (migration 0171): the owner decided that a dig is never published. A dig here is a debate the owner dug from another of
+ * theirs, with its picks recorded (0135's identity.dig_pick_set), or with the row the statement that creates every dig's run writes (0171's
  * identity.dig_run, which names the dig alone, so it stays when the parent is deleted). The database refuses the dig's key provision (0085's
  * serve.prepare_publication_key_provision, whose PREPARED intent the transition needs before it writes a snapshot), whatever the API does; the
  * application refuses before the judge; the visibility read names it a dig. The parent publishes as before.
  */
-describe("a dig is never published (security review F2, 0154)", () => {
+describe("a dig is never published (security review F2, 0171)", () => {
   async function dugFrom(parentRunId: string, label: string): Promise<{ runId: string; answer: Answer }> {
     const dig = await settledRun(label, `HSCANARY-${randomUUID()}`);
     await database.pool.query("INSERT INTO identity.dig_pick_set (run_id,owner_ref,parent_run_id,pick_count) VALUES ($1,$2,$3,0)",
@@ -477,7 +477,7 @@ describe("a dig is never published (security review F2, 0154)", () => {
 
   it("a dig known by its own row stays a dig when its parent is deleted: the parent takes the link, the row stays, and the key provision is refused", async () => {
     const parent = await settledRun("dig-parent-deleted", `HSCANARY-${randomUUID()}`);
-    // Created as the API creates a dig's run, marked a dig by the statement that writes it (0154's row), then the link of a join that took (0131);
+    // Created as the API creates a dig's run, marked a dig by the statement that writes it (0171's row), then the link of a join that took (0131);
     // no picks.
     const dig = await settledRun("dig-row", `HSCANARY-${randomUUID()}`, true);
     const { ownerRef } = theOwner();

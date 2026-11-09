@@ -15,7 +15,7 @@ import { ACCOUNT_MEMORY_LIMITS, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX, type AskParen
  *     node, or the question itself when none does (or there is no story yet); an objection ("o:<n>"), "w" and anything
  *     else hang under the question itself. The places must share one anchor.
  * At start the dig's own row is already written, by the statement that created its run (the security review's F2, a dig
- * is never published: the submit marks the run, `digRun`, and 0154's patch of 0123's core.create_encrypted_run writes
+ * is never published: the submit marks the run, `digRun`, and 0171's patch of 0123's core.create_encrypted_run writes
  * identity.dig_run with it); then `joinAtStart` joins the dig to its parent's investigation through
  * `PostgresInvestigationRepository.join` (0134's join_investigation_nested, which writes 0131's dig link too and answers
  * TOO_DEEP itself under its locks). There are no search words: what is searched stays the planner's decision.

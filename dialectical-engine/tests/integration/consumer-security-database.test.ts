@@ -5,7 +5,7 @@ import { hashToken } from '@debateai/crypto';
 import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 let database: TestDatabase, runtime: Pool;
-/** 0154: the notice loop is the cross-account marker's, which the authorization pool's system login holds (the API's erasure reconciler's timer). */
+/** 0171: the notice loop is the cross-account marker's, which the authorization pool's system login holds (the API's erasure reconciler's timer). */
 let system: Pool;
 const source = { ipArgon2id: 'argon2id-audit:v1:' + 'ab'.repeat(32), userAgentArgon2id: 'argon2id-audit:v1:' + 'cd'.repeat(32) };
 const fixturePasswordHash = '$argon2id$v=19$m=65536,t=3,p=1$' + Buffer.alloc(16, 1).toString('base64').replace(/=/g, '') + '$' + Buffer.alloc(32, 1).toString('base64').replace(/=/g, '');

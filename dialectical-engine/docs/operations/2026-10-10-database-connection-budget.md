@@ -49,8 +49,8 @@ guard that keeps the code and the numbers in step is
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
 | `api:release-watch` (since 2026-10-22, side by side; section 8) | — | 1 | 1 s | The release watcher's read of the current release, once a second, never two at once. Its own pool, so a burst of page reads on `api:runtime` can never make `/readyz` say the database is unreachable |
-| `api:system` (since 2026-10-23, row-level security; section 9) | — | 8 (6 until 2026-11-03) | 5 s | The `api-system` login: every statement the API makes outside a signed-in request (background loops, billing jobs, boot checks), and since the security review (0154) inside one too, each paid call's record of the site's day, the room's count of the site's holds and the ask-time discovery's record of each provider probe it makes |
-| `api:authorization-system` (since 2026-10-23, row-level security; section 9) | — | 4 (2 until 2026-11-06) | 5 s | The `api-authorization-system` login: the same for the authorization pool (the consumer security notice loop, whose lease holds one connection through each notice's send), and since the security review (0154, X36) inside a signed-in request too, a passkey's credential read and its sign-in, a recovery's proof read and its proof, and the recovery mail's lease, held through its send of up to 5 s: one for each lease, one for the sign-in statements and one free |
+| `api:system` (since 2026-10-23, row-level security; section 9) | — | 8 (6 until 2026-11-03) | 5 s | The `api-system` login: every statement the API makes outside a signed-in request (background loops, billing jobs, boot checks), and since the security review (0171) inside one too, each paid call's record of the site's day, the room's count of the site's holds and the ask-time discovery's record of each provider probe it makes |
+| `api:authorization-system` (since 2026-10-23, row-level security; section 9) | — | 4 (2 until 2026-11-06) | 5 s | The `api-authorization-system` login: the same for the authorization pool (the consumer security notice loop, whose lease holds one connection through each notice's send), and since the security review (0171, X36) inside a signed-in request too, a passkey's credential read and its sign-in, a recovery's proof read and its proof, and the recovery mail's lease, held through its send of up to 5 s: one for each lease, one for the sign-in statements and one free |
 | **Total on the server** (dev menu off) | **104** | **74** (72 before 2026-11-06, 70 before the security review on 2026-11-03, 88 before the relay lease pool's removal on 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) | | |
 
 ### Debate runner
@@ -228,7 +228,7 @@ a freeze), but each still deserves its own fix:
 4. **The run-key lookup inside every content lease takes a second connection** (the owner resolver in
    `apps/api/src/main.ts`, `FileRunContentKeyStore`). Fix: resolve on the lease's connection, or cache it.
 5. **Recovery mail holds a connection and the account's row locks while it sends** (up to 5 s;
-   `packages/db/src/consumer-security-mail.ts`), with up to 32 sends at once. Since the security review (0154, X36) that
+   `packages/db/src/consumer-security-mail.ts`), with up to 32 sends at once. Since the security review (0171, X36) that
    connection is `api:authorization-system`'s (4), beside the passkey sign-ins and recovery proofs that run there; it was
    `api:authorization`'s before. A slow mail server can starve that pool, and with it those sign-ins. Fix: cap those sends
    below the pool size, or send after the commit.
@@ -304,7 +304,7 @@ so every statement the API makes outside a signed-in request (background loops, 
 runs on one of two new logins instead, each on a pool of its own: `api:system` (6, the `api-system` login) and
 `api:authorization-system` (2, the `api-authorization-system` login). The room-decision pool keeps its 4 and connects as
 `api-system`. One API is 70 at most (62 without row-level security, now that synthesis-flag S05 removed the
-18-connection `api:support-relay-lease` pool). Since the security review of 3 Nov 2026 (migration 0154) the writes of the
+18-connection `api:support-relay-lease` pool). Since the security review of 3 Nov 2026 (migration 0171) the writes of the
 site's day a signed-in request pays for (each language and question check, each small AI's clarify charge and each
 synthesis check: the cross-account sites X30 to X33) and the room's count of the site's holds run on `api:system` inside
 the request too, as only the system logins may write the day, so `api:system` is 8; and what hands out a sign-in's

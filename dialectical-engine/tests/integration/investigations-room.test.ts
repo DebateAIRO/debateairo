@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * start (level 10 admitted, past it refused with nothing written, a closed investigation reopened), the money rule's
  * room and usage over the real ledger (the day's borrow derived from recorded charges, PATH_REWRITE counted, new starts
  * waiting for the reset, the run that borrowed named), and the month pause from the runner's record to the person's
- * Continue. Data is made up. Since the security review's 0154 (F5) the API's role runs here as each person's own request (its login
+ * Continue. Data is made up. Since the security review's 0171 (F5) the API's role runs here as each person's own request (its login
  * carrying their live session), as its functions believe no other owner; 0133's owner read of an investigation is no role's any more,
  * so the runner's reader reads it.
  */
@@ -99,7 +99,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE inv_room_api LOGIN PASSWORD 'inv-room-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the runner's own steps of a debate are the marker's.
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the runner's own steps of a debate are the marker's.
   await database.pool.query("CREATE ROLE inv_room_runner LOGIN PASSWORD 'inv-room-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   api = loginPool("inv_room_api", "inv-room-api-test-only");
   runner = loginPool("inv_room_runner", "inv-room-runner-test-only");

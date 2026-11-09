@@ -458,7 +458,7 @@ describe("a member's debate, end to end at database level", () => {
     expect(await on(other, otherGrant, (await current(other))!.grantEventId)).toBe(0);
     expect(await spentNow()).toBe(before + charged);
     expect((await pageFor(owner)).members.find(x => x.staff_id === m.staffId)?.allowance?.spent_micros).toBe(charged);
-    // 0154: another member's clarify charge naming m's grant is recorded on their own plan: nothing moves on m's grant, in the team's month or on the page.
+    // 0171: another member's clarify charge naming m's grant is recorded on their own plan: nothing moves on m's grant, in the team's month or on the page.
     const borrowed = randomUUID();
     expect((await runtime.query("SELECT identity.record_ask_clarify_charge($1,$2,$3,$4,'ask-clarify:fixture:model',(now() AT TIME ZONE 'UTC')::date,$5,1,1) AS v", [borrowed, other.ownerRef, grant.grantId, grant.grantEventId, 999])).rows[0].v).toBe("RECORDED");
     expect((await database.pool.query("SELECT funding_kind,internal_grant_id FROM identity.ask_clarify_charge WHERE charge_id=$1", [borrowed])).rows[0]).toEqual({ funding_kind: "SUBSCRIPTION", internal_grant_id: null });

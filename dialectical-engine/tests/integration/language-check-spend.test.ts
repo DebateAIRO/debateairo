@@ -16,7 +16,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * 0118 (question-language spec 2026-10-13, plan P2L Task 19): the fast language check's cost is a SITE cost in the
  * day's pot (`readDaySpentMicros`), written before any debate exists, by ONE writer: the SECURITY DEFINER function
  * `ledger.record_language_check_spend` (pre-flight PF-L58, option (a)). The API's runtime role executed it until the
- * security review's 0154 (F5): since then only a login holding the cross-account marker may, and the API records each
+ * security review's 0171 (F5): since then only a login holding the cross-account marker may, and the API records each
  * check on its system login (main.ts's site X30), which this file's API_SYSTEM twin stands for. Embedded Postgres; run
  * this file alone.
  */
@@ -27,10 +27,10 @@ const TODAY = dayOffset(0);
 const PROVIDER = "language-check:anthropic:claude-haiku-5-5";
 /**
  * Row-level security (0126, D29): a system login holds debateai_runtime and the cross-account marker (the runner's
- * shape). The bare runtime role may write no row of the day's table at all since 0154 (F5), which took its INSERT.
+ * shape). The bare runtime role may write no row of the day's table at all since 0171 (F5), which took its INSERT.
  */
 const RUNTIME_TWIN = "language_check_runtime_twin";
-/** The API's system login (the billing role and the cross-account marker), where it records each check since 0154. */
+/** The API's system login (the billing role and the cross-account marker), where it records each check since 0171. */
 const API_SYSTEM = "language_check_api_system_twin";
 
 beforeAll(async () => {
@@ -80,7 +80,7 @@ async function asRole<T>(work: (client: { query: TestDatabase["pool"]["query"] }
 }
 
 describe("0118: the language check's site cost (one writer, the day's pot)", () => {
-  it("the boot probe sees the one writer on the API's system login once 0118 is applied, and not on the runtime role since 0154", async () => {
+  it("the boot probe sees the one writer on the API's system login once 0118 is applied, and not on the runtime role since 0171", async () => {
     expect(LANGUAGE_CHECK_SPEND_WRITER).toBe("ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)");
     expect(await asRole((client) => languageCheckSpendWriterPresent(client))).toBe(true);
     expect(await asRole((client) => languageCheckSpendWriterPresent(client), "debateai_runtime")).toBe(false);
@@ -155,7 +155,7 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
   it("fix round 2: option (a) in the database — a raw INSERT of a LANGUAGE_CHECK row is refused for the runtime role and for anyone but the writer's owner", async () => {
     const raw = `INSERT INTO ledger.model_spend (spend_id, spend_source, run_id, provider_ref, charged_on, charge_micros, input_tokens, output_tokens)
        VALUES ($1,'LANGUAGE_CHECK',NULL,$2,$3::date,1,1,1)`;
-    // The runtime role holds no INSERT on the table since 0154 (F5).
+    // The runtime role holds no INSERT on the table since 0171 (F5).
     await expect(asRole((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY]), "debateai_runtime"))
       .rejects.toMatchObject({ code: "42501", message: "permission denied for table model_spend" });
     // The API's system login, which holds the marker and so the table's INSERT, is refused by the guard.
@@ -171,7 +171,7 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
     const other = `INSERT INTO ledger.model_spend (spend_id, spend_source, run_id, provider_ref, charged_on,
       charge_micros, input_tokens, output_tokens) VALUES ($1,'SUPPORT',NULL,'support:x',$2::date,1,1,1)`;
     await asRole((client) => client.query(other, [randomUUID(), TODAY]), RUNTIME_TWIN);
-    // The bare runtime role may not write a row of the table at all (0154).
+    // The bare runtime role may not write a row of the table at all (0171).
     await expect(asRole((client) => client.query(other, [randomUUID(), TODAY]), "debateai_runtime"))
       .rejects.toMatchObject({ code: "42501", message: "permission denied for table model_spend" });
   });
@@ -210,7 +210,7 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
     expect((await database.pool.query("SELECT count(*)::int n FROM ledger.model_spend WHERE spend_id=$1", [base.spendId])).rows[0].n).toBe(0);
   });
 
-  it("only the cross-account marker may execute the writer (the runtime role until 0154); the function runs as the spend writers' owner, never PUBLIC", async () => {
+  it("only the cross-account marker may execute the writer (the runtime role until 0171); the function runs as the spend writers' owner, never PUBLIC", async () => {
     const acl = (await database.pool.query(`SELECT pg_get_userbyid(p.proowner) AS owner, p.prosecdef, p.proconfig,
         has_function_privilege('debateai_rls_all_accounts', p.oid, 'EXECUTE') AS marker,
         has_function_privilege('debateai_runtime', p.oid, 'EXECUTE') AS runtime,

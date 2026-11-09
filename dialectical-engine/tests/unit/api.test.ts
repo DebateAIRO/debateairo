@@ -380,7 +380,7 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     }
   });
 
-  // Security review F2 (0154): a dig is marked a dig by the statement that creates its run (0123's writer, patched by 0154), so nothing that
+  // Security review F2 (0171): a dig is marked a dig by the statement that creates its run (0123's writer, patched by 0171), so nothing that
   // happens after the run is written can leave it unmarked. The mark is one member of the run's document, sent for a dig alone; a legacy asker's
   // run is written in the clear by no such statement, so a dig of one is refused before anything is asked of the database.
   it("sends a dig's mark in the document that creates its run, only for a dig, and refuses a legacy asker's dig before any query", async () => {

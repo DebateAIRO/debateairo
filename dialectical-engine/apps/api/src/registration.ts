@@ -540,7 +540,7 @@ interface VerificationDelivery {
 
 interface VerificationDeliveryRecord {
   readonly userId: string;
-  /** The hash of the token the mail carried: the database records the delivery only for one of the account's own (0154). */
+  /** The hash of the token the mail carried: the database records the delivery only for one of the account's own (0171). */
   readonly tokenHash: string;
   readonly channelBindingId: string;
   readonly source: AuthSourceContext;

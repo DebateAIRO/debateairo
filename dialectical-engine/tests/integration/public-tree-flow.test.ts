@@ -600,7 +600,7 @@ describe("a report on a public debate", () => {
     expect(await spentOf(debate.root, "PUBLIC_REPORT")).toBeGreaterThan(0);
     const from = new Date(Date.now() - 3_600_000);
     const to = new Date(Date.now() + 3_600_000);
-    // 0137's window reader of these charges had no caller; 0154 took its grant back, so the migrator reads it.
+    // 0137's window reader of these charges had no caller; 0171 took its grant back, so the migrator reads it.
     const reportSpent = async (ownerRef: string): Promise<number> => Number((await database.pool.query<{ spent: string }>(
       "SELECT identity.read_public_report_spent($1,$2,$3) AS spent", [ownerRef, from, to])).rows[0]!.spent);
     expect(await reportSpent(eve.ownerRef)).toBe(await spentOf(debate.root, "PUBLIC_REPORT"));
@@ -1181,7 +1181,7 @@ async function delegate(): Promise<Actor> {
     expect(laterWorld.sent.length).toBeGreaterThan(0);
     expect(laterWorld.sent.some((packet) => contractOf(packet).startsWith("report."))).toBe(true);
     expect(everyPromptText(laterWorld.sent)).not.toContain(REMOVED);
-    // 0138's owner readers of the line and the main answers had no caller; 0154 took their grants back, so the migrator reads them.
+    // 0138's owner readers of the line and the main answers had no caller; 0171 took their grants back, so the migrator reads them.
     const ownerLine = (await database.pool.query("SELECT identity.read_path_line($1,$2) AS line", [ana.ownerRef, debate.root])).rows[0].line as { run_id: string; content: unknown }[];
     expect(ownerLine.some((entry) => entry.run_id === xRun)).toBe(false);
     const ownerAnswers = (await database.pool.query("SELECT identity.read_main_answer_updates($1,$2) AS rows", [ana.ownerRef, debate.root])).rows[0].rows as { trigger_run_id: string; content: unknown }[];
@@ -1303,7 +1303,7 @@ async function delegate(): Promise<Actor> {
     } } };
   };
   const FLAG_LIMITS: PublicFlagLimits = Object.freeze({ personHour: 11, debateDay: 22, siteDay: 99 }); // made up, like the register's row
-  // Every port on the API's system login, which holds the cross-account marker the settlement needs since 0154 (main.ts settles on X29).
+  // Every port on the API's system login, which holds the cross-account marker the settlement needs since 0171 (main.ts settles on X38).
   const flagPorts = (judge: ReturnType<typeof scriptedJudge>["port"] | null, limits: PublicFlagLimits = FLAG_LIMITS) => ({
     repository: new PostgresPublicFlagRepository(api), settlement: new PostgresPublicFlagRepository(api), judge: () => judge, seal: (ref: string, run: string, value: unknown) => application().withReviewKey(ref, run, (cipher) => cipher.encrypt(value)),
     readPublicDebate: (ref: string) => application().readPublicDebate(ref), limits });

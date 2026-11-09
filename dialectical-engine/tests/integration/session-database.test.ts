@@ -136,7 +136,7 @@ beforeAll(async () => {
     }};
   }} as unknown as Pool;
   await migrate(facade);
-  // The security review's 0154: a saved code's use is the marker's (the API's system login, X36), which holds the runtime role beside it.
+  // The security review's 0171: a saved code's use is the marker's (the API's system login, X36), which holds the runtime role beside it.
   await database.pool.query("CREATE ROLE session_test_system NOLOGIN IN ROLE debateai_runtime,debateai_rls_all_accounts");
 }, 120_000);
 

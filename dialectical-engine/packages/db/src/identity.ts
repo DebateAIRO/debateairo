@@ -376,7 +376,7 @@ export class PostgresIdentityRepository {
     });
   }
 
-  /** Records a verification mail's delivery for the token it carried (0154): the database records nothing for a token not of this account. */
+  /** Records a verification mail's delivery for the token it carried (0171): the database records nothing for a token not of this account. */
   async recordVerificationDelivery(input: {
     readonly userId: string;
     readonly tokenHash: string;
@@ -816,7 +816,7 @@ export class PostgresIdentityRepository {
 
   /** Consumes one saved recovery code. It is never refilled (design note 2026-10-09 item 3); the database tells every
    * verified email that a code was used. The SQL keeps its old replacement argument, which it ignores. The security
-   * review's 0154: it names any account's code, so it is the system login's alone (X36), after the code was verified. */
+   * review's 0171: it names any account's code, so it is the system login's alone (X36), after the code was verified. */
   async consumeRecoveryCode(input: {
     readonly userId: string;
     readonly recoveryCodeId: string;

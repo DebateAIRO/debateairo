@@ -99,7 +99,7 @@ function storyRunInput(input: {
 
 /**
  * `language` is the run's question language (core.run.argument_language_*); dev's default "und" when absent. `mark.digRun`: the run is a dig's,
- * marked so by the statement that creates it (0154), as the API creates every dig's run.
+ * marked so by the statement that creates it (0171), as the API creates every dig's run.
  */
 export function createEncryptedStoryRun(
   pool: Pool,

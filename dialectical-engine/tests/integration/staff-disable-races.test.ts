@@ -10,7 +10,7 @@ import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 const access = await import('../../apps/api/src/staff/access.js');
 let database: TestDatabase, runtime: Pool, repo: PostgresStaffRepository, web: StaffWebAuthnService;
-/** 0154: the owned ceremony, the grant and the capability check are the cross-account marker's: the staff repository runs on the system login (X14). */
+/** 0171: the owned ceremony, the grant and the capability check are the cross-account marker's: the staff repository runs on the system login (X14). */
 let system: Pool;
 const env = { v: 1 as const, keyId: 'fixture', nonce: 'AAAAAAAAAAAAAAAA', tag: 'AAAAAAAAAAAAAAAAAAAAAA==', ct: 'YQ==' };
 const source = { ipArgon2id: 'argon2id-audit:v1:' + '0'.repeat(64), userAgentArgon2id: 'argon2id-audit:v1:' + '1'.repeat(64) };
@@ -223,7 +223,7 @@ it('serializes actual compromise against native action-proof issuance and ordina
         await database.pool.query(`INSERT INTO identity.login_challenge(login_challenge_id,user_id,mfa_factor_id,token_hash,binding_hash,password_hash_snapshot,created_at,expires_at) VALUES($1,$2,$3,$4,$5,'fixture-password',now(),now()+interval '5 minutes')`, [challenge, target.userId, target.factorId, challengeHash, digest('browser')]);
         await database.pool.query(`INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_slot,code_hash) VALUES($1,$2,1,'fixture-recovery')`, [recoveryId, target.userId]);
         const binding = { action: 'CREDENTIAL_REVOKE' as const, targetId: target.userId, bodySha256: 'd'.repeat(64), expectedRevision: 0, operationId: randomUUID() }, options = await web.beginAction(t.context, binding), p = await action(owner, o.context, target.staffId, 'EMERGENCY_DISABLE'), first = await runtime.connect(), second = await (kind === 'proof' ? system : runtime).connect();
-        // 0154: the native action proof is the owned assertion, the cross-account marker's (X14); the ordinary admissions stay the runtime's.
+        // 0171: the native action proof is the owned assertion, the cross-account marker's (X14); the ordinary admissions stay the runtime's.
         try {
             await first.query('BEGIN');
             await new PostgresStaffRepository({ query: first.query.bind(first) } as unknown as Pool).disable({ actor: o.context, proof: p.proof, targetStaffId: target.staffId, mode: 'COMPROMISE', operationId: p.binding.operationId, reason: { code: 'SECURITY_RESPONSE' }, alertIntent: { schema: 'staff-alert-v1', event: 'DISABLE', operationId: p.binding.operationId, envelope: env } });
@@ -269,7 +269,7 @@ it('serializes actual compromise against native action-proof issuance and ordina
 it('records a mutation committed first, then disables its actor without claiming the committed grant was undone', async () => {
     const owner = await staff(true), o = await elevation(owner), actor = await staff(true), a = await elevation(actor), target = await staff(), p = await action(actor, a.context, target.staffId, 'TEAM_GRANT'), first = await system.connect();
     // actor is the new Owner; the previous Owner retains emergency disable capability. The grant is the cross-account
-    // marker's since 0154 (X14), so it commits on the system login; the disable stays the runtime's.
+    // marker's since 0171 (X14), so it commits on the system login; the disable stays the runtime's.
     try {
         await first.query('BEGIN');
         const receipt = await new PostgresStaffRepository({ query: first.query.bind(first) } as unknown as Pool).grant({ actor: a.context, proof: p.proof, targetStaffId: target.staffId, capabilities: ['AUDIT_READ'], operationId: p.binding.operationId, reason: { code: 'GRANT_CHANGE' }, alertIntent: { schema: 'staff-alert-v1', event: 'GRANT', operationId: p.binding.operationId, envelope: env } });

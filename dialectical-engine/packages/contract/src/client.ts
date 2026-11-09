@@ -446,7 +446,7 @@ export interface ContractClient {
     total: number;
   }>>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
-  /** Security review F2: `dig` is true for a dig, which is never published (absent from an API before 0154). */
+  /** Security review F2: `dig` is true for a dig, which is never published (absent from an API before 0171). */
   readRunVisibility(runId: string): Promise<RunVisibility>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;

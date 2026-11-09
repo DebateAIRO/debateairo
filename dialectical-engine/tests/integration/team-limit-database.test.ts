@@ -13,7 +13,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * way the ceremony stores one (the ceremony itself: the begin test below and staff-webauthn-database.test.ts).
  */
 let database: TestDatabase, runtime: Pool, fixture: ReturnType<typeof internalFundingFixture>, repository: PostgresTeamLimitRepository;
-/** The mail loop's login: the API drains the notices only from its gated timer, outside any request, so on its system login (the marker's, 0154). */
+/** The mail loop's login: the API drains the notices only from its gated timer, outside any request, so on its system login (the marker's, 0171). */
 let system: Pool, notices: PostgresTeamLimitRepository;
 const hash = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 const FUNDING = { code: "FUNDING_APPROVAL" } as const;
@@ -81,7 +81,7 @@ async function takeBack(actor: Actor, target: Actor) {
 }
 async function clearPartner() { const h = (await database.pool.query("SELECT staff_id FROM staff.team_limit_holder WHERE active")).rows[0]; if (h !== undefined) await database.pool.query("SELECT staff.end_team_limit_holder($1,'OWNER_REVOKED')", [h.staff_id]); }
 const roomFor = (estimate: number) => readTeamRoom(runtime, estimate);
-/** The capability check, as the staff routes ask it through the staff repository on the system login (X14): the marker's since 0154. */
+/** The capability check, as the staff routes ask it through the staff repository on the system login (X14): the marker's since 0171. */
 const authorized = async (a: Actor) => (await system.query("SELECT staff.authorize_action($1::jsonb,'TEAM_LIMIT_SET') AS ok", [a.context])).rows[0].ok as boolean;
 
 beforeAll(async () => {
@@ -305,7 +305,7 @@ describe("when the people change", () => {
 });
 
 describe("the notices", () => {
-  it("the mail loop is the system login's alone: the runtime role a request login holds is refused each of its three (0154)", async () => {
+  it("the mail loop is the system login's alone: the runtime role a request login holds is refused each of its three (0171)", async () => {
     for (const [sql, values] of [["SELECT * FROM staff.claim_team_limit_notices(1)", []],
       ["SELECT staff.complete_team_limit_notice($1,$2,true)", [randomUUID(), randomUUID()]],
       ["SELECT staff.team_limit_notice_user($1,$2)", [randomUUID(), randomUUID()]]] as const) {
@@ -355,7 +355,7 @@ describe("the team's month", () => {
   };
   it("counts funded spend across every grant against the current amount, and a new month starts clean", async () => {
     const { run } = await scope();
-    // 0154 took 0140's team spend sum back from every role: staff's month reader asks it as its owner, so the test reads it as the superuser.
+    // 0171 took 0140's team spend sum back from every role: staff's month reader asks it as its owner, so the test reads it as the superuser.
     const spent = Number((await database.pool.query("SELECT staff.read_team_internal_spent(date_trunc('month',now()),date_trunc('month',now())+interval '1 month') v")).rows[0].v);
     await setLimit(owner, spent + 1000);
     await expect(roomFor(1000)).resolves.toBe("FITS");

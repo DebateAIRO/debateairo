@@ -6,7 +6,7 @@ import type { PublicationApplication } from "../../apps/api/src/publications.js"
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 
 /**
- * Security review F2 (migration 0154): the owner decided that a dig is never published, so it is never put in the team's queue for an approval to
+ * Security review F2 (migration 0171): the owner decided that a dig is never published, so it is never put in the team's queue for an approval to
  * publish either. The owner's ask (POST /v1/runs/{id}/publication-review) answers 409 DIG_NOT_PUBLISHABLE, the publish route's own refusal, once the
  * grant is known live and before the answer is read, the verdict of record is asked or the repository writes anything (so no grant is consumed and
  * no request is queued); the database refuses it too (serve.ask_publication_review, tests/integration/publication-review-owner.test.ts). A debate
@@ -42,7 +42,7 @@ function routes(dig: boolean | undefined, preflight = true) {
   return { calls, ask: () => owner.ask({ runId: RUN_ID, authenticated, body: BODY, requestId: "request:review-dig" }) };
 }
 
-describe("the publication review refuses a dig (security review F2, 0154)", () => {
+describe("the publication review refuses a dig (security review F2, 0171)", () => {
   it("a dig's ask answers 409 DIG_NOT_PUBLISHABLE right after the grant's check, and reads, asks and writes nothing", async () => {
     const { calls, ask } = routes(true);
     const response = await ask();

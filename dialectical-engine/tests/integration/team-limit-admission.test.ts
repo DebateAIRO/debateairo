@@ -128,7 +128,7 @@ describe("a running team debate", () => {
     await setLimit(p.actor, await spentNow() + await committedNow() + 100);
     expect(await room().readPersonPool(p.actor.ownerRef, new Date())).toMatchObject({ empty: false });
     expect(await runtime.query("SELECT staff.read_team_room(100) AS room").then((read) => read.rows[0].room)).toBe("FITS");
-    // 0154: another account naming p's grant (any grant id a page or a log let it see) moves nothing in the team's month: the grant is not its own,
+    // 0171: another account naming p's grant (any grant id a page or a log let it see) moves nothing in the team's month: the grant is not its own,
     // so its call is on its own plan.
     await runtime.query("SELECT identity.record_ask_clarify_charge($1,$2,$3,$4,'ask-clarify:fixture:model',(now() AT TIME ZONE 'UTC')::date,1000,1,1)",
       [randomUUID(), other.ownerRef, p.grant.grantId, p.grant.grantEventId]);

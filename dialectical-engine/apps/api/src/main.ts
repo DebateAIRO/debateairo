@@ -539,7 +539,7 @@ const providerTargetsJson = boot.runSync("provider-discovery-targets", () => {
   }
   return environment.PROVIDER_DISCOVERY_TARGETS_JSON;
 });
-// The security review's 0154: 0048's writer of a provider's probe is the cross-account marker's alone, as the discovery below takes a provider's
+// The security review's 0171: 0048's writer of a provider's probe is the cross-account marker's alone, as the discovery below takes a provider's
 // latest probe for healthy while it is fresh and probes only the others. So each probe it makes, inside the asking request, is recorded on this
 // pool's system login (the cross-account site X37); it reads the latest probes on the request login, as before.
 const probeReader = new ProviderProbeRepository(pool);
@@ -679,7 +679,7 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
       previewFetch,
       readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
       spend: {
-        // 0154: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X30),
+        // 0171: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X30),
         // the system login, and the probe asks that login.
         writerPresent: () => languageCheckSpendWriterPresent(crossAccountPool(pool, "X30")),
         record: (entry) => recordLanguageCheckSpend(crossAccountPool(pool, "X30"), entry)
@@ -703,10 +703,10 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
 const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));
 /**
  * Decisions 29 and 31 (dynamic step 2): the small call before a debate exists takes the language check's one route decision (preview: the gate; hosted:
- * the support target's key; local: none, so no questions) and counts in the person's quota through 0144's writer: without the writer, or without 0154's
+ * the support target's key; local: none, so no questions) and counts in the person's quota through 0144's writer: without the writer, or without 0171's
  * reservation that names the person before each call while the request's session is live, no call (never spend unrecorded). The reservation runs on
  * the request pool, so inside a request it carries its session, and is probed on that login; the writer is the cross-account marker's alone since
- * 0154, so the record after the call runs on its site (X32), the system login, and is probed there. Above the support adapter, which clears the key
+ * 0171, so the record after the call runs on its site (X32), the system login, and is probed there. Above the support adapter, which clears the key
  * this process keeps. A hosted site with no day ceiling makes no call: nothing here may stop a boot.
  */
 const askClarifyDayCeiling = siteAdmission.costEnvelope?.guardPolicy.dailyCeilingMicros ?? null;
@@ -790,7 +790,7 @@ const askRoomComposition = askRoomReadiness === undefined ? undefined : boot.run
     // admitted while this release is not current waits in line; both read inside the room's spend-decision lock.
     // Side-by-side spec §13 (C14, Task S13): with the site version, the gate reads the activation pointer on a waiting
     // debate's START transaction (this pool's login is the API's system login, which may read the pointer, D8, and
-    // holds the cross-account marker the site count's run_work_is_parked needs since 0154).
+    // holds the cross-account marker the site count's run_work_is_parked needs since 0171).
     gate: new PostgresAskAdmissionGate({
       releaseKey: environment.RELEASE_KEY, hosted: environment.DEPLOYMENT_MODE === "hosted", siteVersion: environment.REGISTER_VERSION
     })
@@ -1069,7 +1069,7 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
 // Explicit protected adapters, config custody, installation and policy are startup-only gates. A stale ACK
 // proof or readiness publication never blocks boot: Team tools start locked (one api.staff.tools_locked line)
 // and each staff action re-checks readiness, so an operator unlock needs no restart. A staff change's alert maps its
-// key user on the system login (X14, 0154); the dispatcher drains on `pool`, outside any request, so on it too.
+// key user on the system login (X14, 0171); the dispatcher drains on `pool`, outside any request, so on it too.
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,mappingPool:crossAccountPool(pool, "X14"),keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
@@ -1358,7 +1358,7 @@ const triggerRetentionPurge=createSingleFlightErasureReconciler(
   ()=>console.error("[RETENTION_PURGE_PENDING]")
 );
 const retentionPurgeTimer=gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000);
-// The security review's 0154 (F5): the clarify reservations no charge took (a refused, skipped or abandoned call) go hourly, and once each time this
+// The security review's 0171 (F5): the clarify reservations no charge took (a refused, skipped or abandoned call) go hourly, and once each time this
 // release becomes current (below), whether or not anyone reserves again, so none outlives about two hours. Outside any request, so `pool` sends it to
 // the API's system login, which holds the cross-account marker the sweep is granted to. Whatever the route: rows may predate a change of it.
 const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
@@ -1483,7 +1483,7 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
   reportDiagnostic: reportSupportDiagnostic,
   policy: questionCheckPolicy,
   subjects: questionSubjects,
-  // 0154: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X31), the
+  // 0171: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X31), the
   // system login, and the probe asks that login.
   spend: {
     writerPresent: () => questionCheckSpendWriterPresent(crossAccountPool(pool, "X31")),
@@ -1513,7 +1513,7 @@ const synthesisCheckDeps: SynthesisCheckDeps = {
     ceilingMicros: siteAdmission.costEnvelope.guardPolicy.dailyCeilingMicros,
     spentMicros: (day: string) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   } }),
-  // 0154: a charge's INSERT is the cross-account marker's alone, so the check's record, inside the request that asked for it, runs on its
+  // 0171: a charge's INSERT is the cross-account marker's alone, so the check's record, inside the request that asked for it, runs on its
   // site (X33), the system login.
   recordSpend: (entry) =>
     new PostgresModelSpendStore(crossAccountPool(pool, "X33")).recordSpend({ ...entry, spendId: randomUUID() }),
@@ -1846,9 +1846,9 @@ const api = buildApi({
   ...(publications === undefined ? {} : { publicFlags: {
     limits: abuseLimits.publicFlag,
     repository: publicFlagRepository, judge: publicationJudgeSwitch.current,
-    // Row-level security (X29, the security review's F5): the report's settlement, after the judge, on the API's system login: the cross-account
-    // marker's alone since 0154, so no request login records a verdict or hides a debate.
-    settlement: new PostgresPublicFlagRepository(crossAccountPool(pool, "X29")),
+    // Row-level security (X38, the security review's F5): the report's settlement, after the judge, on the API's system login: the cross-account
+    // marker's alone since 0171, so no request login records a verdict or hides a debate.
+    settlement: new PostgresPublicFlagRepository(crossAccountPool(pool, "X38")),
     seal: (publicationRef: string, runId: string, value: unknown) => publications.withReviewKey(publicationRef, runId, (cipher) => cipher.encrypt(value)),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
     log: (event: string, detail: Record<string, unknown>) => { console.error(JSON.stringify({ event, ...detail })); }

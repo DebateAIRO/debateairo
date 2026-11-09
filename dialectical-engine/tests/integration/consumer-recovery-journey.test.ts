@@ -19,7 +19,7 @@ let db: TestDatabase, runtime: Pool, p2Runtime: Pool, argon2: Argon2WorkerPool, 
 // Row-level security (0126; D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own
 // login with that request's account context; outside one, or inside a crossAccount frame (X18a), on its system twin.
 let runtimeSystem: Pool, scopedRuntime: Pool;
-// The security review's 0154: a recovery's proof, its stored proof and a passkey's stored credential and sign-in are the system login's (X36), so
+// The security review's 0171: a recovery's proof, its stored proof and a passkey's stored credential and sign-in are the system login's (X36), so
 // the consumer recovery and passkey repositories run on the routed pool, as main.ts builds them on the authorization pool.
 const audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
 const mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), blindKey = Buffer.alloc(32, 7), recordsKey = Buffer.alloc(32, 9);
@@ -218,7 +218,7 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         expect((await db.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1', [a.userId])).rows[0].n).toBe(0);
     });
     it('holds the same erasure key-destruction lease through notice send and zeroes the loaded DEK before release', async () => {
-        // 0154: the notice loop is the cross-account marker's; the reconciler drains it outside any request, on the authorization pool's system login.
+        // 0171: the notice loop is the cross-account marker's; the reconciler drains it outside any request, on the authorization pool's system login.
         const a = await account(), repository = new PostgresConsumerSecurityNoticeRepository(scopedRuntime), claim = (await repository.claim(100)).find(c => c.userId === a.userId);
         if (!claim)
             throw new Error('NOTICE_MISSING');

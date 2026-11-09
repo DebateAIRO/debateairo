@@ -58,7 +58,7 @@ afterAll(async () => {
   if (owner) await releaseStoryEncryptedOwner(owner);
 });
 
-/** `dig`: the run is a dig's, marked so by the statement that creates it (security review F2, 0154). */
+/** `dig`: the run is a dig's, marked so by the statement that creates it (security review F2, 0171). */
 async function debate(verdict: "FLAGGED" | "CLEAR" = "FLAGGED", dig = false) {
   const runId = await createEncryptedStoryRun(database.pool, owner, `Review ${randomUUID()}?`, undefined, dig ? { digRun: true } : {});
   const { answerId } = await persistTerminalRun({
@@ -285,7 +285,7 @@ describe("publication review owner routes over migrated database", () => {
     } finally { await fixture.api.close(); }
   });
 
-  // Security review F2 (0154): a dig is never published, so it is never put in the team's queue either. Only a dig flagged before the step can
+  // Security review F2 (0171): a dig is never published, so it is never put in the team's queue either. Only a dig flagged before the step can
   // reach the ask at all (the publish route refuses a dig before its synthesis gate, so a new one is never flagged).
   it("a dig's ask is refused: the database answers NOT_ALLOWED and consumes no grant, the route answers 409, and nothing is queued", async () => {
     const target = await debate("FLAGGED", true);

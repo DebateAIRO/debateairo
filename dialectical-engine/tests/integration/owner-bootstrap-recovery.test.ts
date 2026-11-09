@@ -8,7 +8,7 @@ import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 
 let database: TestDatabase, jit: Pool, runtime: Pool;
-// 0154: the owned ceremony is the cross-account marker's; the owner's possession receipts go through a login shaped as the API's system login (X14).
+// 0171: the owned ceremony is the cross-account marker's; the owner's possession receipts go through a login shaped as the API's system login (X14).
 let staff: Pool;
 const digest=(value:string)=>`sha256:${createHash('sha256').update(value).digest('hex')}`;
 const firstGeneration=randomUUID(),firstVerifier=digest('task6-offline-proof');

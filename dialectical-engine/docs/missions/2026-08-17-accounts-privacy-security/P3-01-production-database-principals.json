@@ -3232,7 +3232,7 @@
     },
     {
       "roleName": "debateai_staff_security_owner",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "grants": [
         "EXECUTE ON FUNCTION core.publication_is_current(uuid)",
         "EXECUTE ON FUNCTION identity.request_owner_matches(uuid)"
@@ -3240,7 +3240,7 @@
     },
     {
       "roleName": "debateai_runtime",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.reserve_ask_clarify_charge(uuid,uuid)",
         "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,text,timestamptz,boolean,text,jsonb)"
@@ -3248,14 +3248,14 @@
     },
     {
       "roleName": "debateai_billing_runtime",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.read_run_is_dig(uuid,uuid)"
       ]
     },
     {
       "roleName": "debateai_rls_all_accounts",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.delete_ask_clarify_reservations_due(integer)",
         "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
@@ -3389,7 +3389,7 @@
   "privilegeRevocations": [
     {
       "roleName": "debateai_billing_runtime",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "revokes": [
         "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
         "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
@@ -3407,7 +3407,7 @@
     },
     {
       "roleName": "debateai_runtime",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "revokes": [
         "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
         "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)",
@@ -3546,7 +3546,7 @@
     },
     {
       "roleName": "debateai_authorization_runtime",
-      "source": "migrations/0154_security_review_hardening.sql",
+      "source": "migrations/0171_security_review_hardening.sql",
       "revokes": [
         "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
         "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",

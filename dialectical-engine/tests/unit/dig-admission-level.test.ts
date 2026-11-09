@@ -15,7 +15,7 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
  * Plan 2026-10-30 dig-model revision, task W3-2 — A DIG'S ADMISSION AND ITS LEVEL. A dig of a debate at level 9 is
  * level 10, the deepest, and is admitted; a dig of a level-10 debate would be level 11 and is refused 409 DIG_TOO_DEEP
  * before anything is charged (the question check, a paid site call, is never asked; nothing is submitted). Picks stay
- * on one path (owner Q-D1); Free combines at most 3. The dig's run is created with its own row (0154: what keeps it a
+ * on one path (owner Q-D1); Free combines at most 3. The dig's run is created with its own row (0171: what keeps it a
  * dig, never published, written by the statement that creates the run), then it joins its parent's investigation,
  * reopening it when it was closed. (The dig level is how many digs sit above a debate, never how far one debate's tree
  * grows.)
@@ -42,7 +42,7 @@ const askOf = (parent: AskParent | undefined, planTier: "free" | "premium" = "pr
 
 /**
  * The account-memory store as the database answers (0131): a link asks both runs, as the join does, so it is NOT_OWNED whenever the join was. Every
- * method the route calls on it is named in `calls`, so a write the route makes after the submit shows (0154: a dig's own row is the run's creation's,
+ * method the route calls on it is named in `calls`, so a write the route makes after the submit shows (0171: a dig's own row is the run's creation's,
  * never the route's).
  */
 function memoryOf(calls: string[], joinOutcome: DigJoinOutcome) {
@@ -127,8 +127,8 @@ describe("the dig level at the asks route", () => {
     await api.close();
   });
 
-  // Security review F2 (0154): a dig is never published, and is known as one by its own row (identity.dig_run), which the statement that creates
-  // its run writes (0123's writer, patched by 0154; the application marks the run a dig for an ask with a parent or a public parent). So the route
+  // Security review F2 (0171): a dig is never published, and is known as one by its own row (identity.dig_run), which the statement that creates
+  // its run writes (0123's writer, patched by 0171; the application marks the run a dig for an ask with a parent or a public parent). So the route
   // hands the submit the parent as it came and writes no dig row of its own after it: whatever the join then answers, NOT_OWNED among them (the
   // parent erased or no longer the account's between the admission and the join), the dig is a dig from its first statement. The join writes the
   // link when it takes; the server writes none.

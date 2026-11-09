@@ -7,7 +7,7 @@ import { decryptLeasedContentForRun, encryptAttestedContentForRun, prepareLeased
  * `PostgresDigPicksRepository` runs on the API's own pool (debateai_billing_runtime): the asks route writes a dig's picks at start, each pick's text
  * sealed under the DIG's run key here before the call. `PostgresDigPicksRunnerRepository` runs on the runner's pool: the path rewrite reads the
  * picks back (the runner's `digOf`; `read`, debateai_runtime's, which the API's answer read calls too), stores the dig's own paths before it takes
- * its turn (`recordInput`), and the sweep lists the settled digs whose rewrite has no row (`readUnwritten`); since 0154 those two need the
+ * its turn (`recordInput`), and the sweep lists the settled digs whose rewrite has no row (`readUnwritten`); since 0171 those two need the
  * cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's
  * request login does not.
  *
@@ -75,11 +75,11 @@ type PicksRow = Readonly<{
   input: Readonly<{ work_item_id: string; recorded_at: string; content: CryptoEnvelope }> | null;
 }>;
 
-/** The runner's side (`read`: debateai_runtime; `recordInput` and `readUnwritten`, the sweep's list: the cross-account marker, since 0154). */
+/** The runner's side (`read`: debateai_runtime; `recordInput` and `readUnwritten`, the sweep's list: the cross-account marker, since 0171). */
 export class PostgresDigPicksRunnerRepository {
   constructor(private readonly pool: Pool, private readonly executor: Executor = pool) {}
 
-  /** A run's picks and its rewrite's material, opened under its key; null when it keeps none, is not live or, in a request, is not the connection's own (0154). */
+  /** A run's picks and its rewrite's material, opened under its key; null when it keeps none, is not live or, in a request, is not the connection's own (0171). */
   async read(runId: string): Promise<DigPicksRead | null> {
     const row = (await this.executor.query<{ picks: PicksRow | null }>("SELECT identity.read_dig_picks_of_run($1) AS picks", [runId]))
       .rows[0]?.picks ?? null;

@@ -84,7 +84,7 @@ const applicationLogs: unknown[][] = [];
 let errorLog: ReturnType<typeof vi.spyOn>;
 const captured: {deliveryId: string;recipient: string;invitationUrl: string}[] = [];
 function composition() {
-    // As apps/api/src/main.ts composes staff HTTP: the staff repository reads across accounts (X14), and since 0154 so do the
+    // As apps/api/src/main.ts composes staff HTTP: the staff repository reads across accounts (X14), and since 0171 so do the
     // alert mappings, 0088's mapping now the cross-account marker's (createStaffRuntime's mappingPool).
     const repository = new PostgresStaffRepository(crossAccountPool(runtime,'X14')), alertRepository = new PostgresStaffAlertRepository(crossAccountPool(runtime,'X14')), access = new StaffAccessService(repository,sessions);
     const intents = new StaffAlertIntentProducer({keys: users,mappings: alertRepository,readiness: {require: operationId => outsideRequest(() => authorizeStaffAlertFixture(database.pool,operationId))}});

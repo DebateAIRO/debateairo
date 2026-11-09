@@ -8549,7 +8549,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       ipArgon2id: "argon2id-audit:v1:" + "1".repeat(64),
       userAgentArgon2id: "argon2id-audit:v1:" + "2".repeat(64)
     });
-    // The security review's 0154: the delivery names the token its mail carried; 0085's own, which named none, is no role's.
+    // The security review's 0171: the delivery names the token its mail carried; 0085's own, which named none, is no role's.
     const signature = "identity.record_verification_delivery_with_audit(uuid,text,timestamp with time zone,boolean,text,jsonb)";
     const original = "identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)";
     expect((await database.pool.query<{ runtime: boolean; authorization: boolean }>(`SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS runtime,
@@ -8557,7 +8557,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const tokenHash = (await database.pool.query<{ token_hash: string }>(`SELECT credential.token_hash FROM identity.verification_token_credential AS credential
       JOIN identity.channel_binding AS channel ON channel.channel_binding_id=credential.channel_binding_id
       WHERE channel.user_id=$1 AND channel.channel_type='email' ORDER BY credential.issued_at DESC LIMIT 1`, [userId])).rows[0]!.token_hash;
-    // A saved code's use is the marker's since 0154 (X36): the API's system login holds it beside the runtime role, as this role does.
+    // A saved code's use is the marker's since 0171 (X36): the API's system login holds it beside the runtime role, as this role does.
     await database.pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='registration_test_system') THEN
       CREATE ROLE registration_test_system NOLOGIN IN ROLE debateai_runtime,debateai_rls_all_accounts; END IF; END $$`);
     const catalog = await database.pool.query<{

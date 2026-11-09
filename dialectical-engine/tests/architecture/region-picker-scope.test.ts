@@ -20,10 +20,10 @@ const exportTypes = "apps/api/src/data-export/types.ts";
 // Italy clause approval S01: 0125 names record_registration_region only in a comment (its writer's grant follows that
 // writer's); its bytes are sha-pinned by the lineage, so it is listed here rather than edited.
 const italyApprovalMigration = "migrations/0125_italy_specific_approval.sql";
-// The security review's 0154 patches the writer in place (it writes only for an account the sign-up's own transaction created) and its loader
+// The security review's 0171 patches the writer in place (it writes only for an account the sign-up's own transaction created) and its loader
 // digests the writer; neither reads nor writes the table.
-const securityReviewMigration = "migrations/0154_security_review_hardening.sql";
-const securityReviewLoader = "packages/db/src/migration-forward0154.ts";
+const securityReviewMigration = "migrations/0171_security_review_hardening.sql";
+const securityReviewLoader = "packages/db/src/migration-forward0171.ts";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -49,7 +49,7 @@ describe("registration region scope", () => {
     expect(source(exportMigration)).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
     // 0125 neither reads nor writes the table.
     expect(source(italyApprovalMigration)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
-    // 0154 names the writer, never the table: its patch asks the account's row, before the writer's own INSERT, as it was.
+    // 0171 names the writer, never the table: its patch asks the account's row, before the writer's own INSERT, as it was.
     for (const path of [securityReviewMigration, securityReviewLoader]) {
       expect(source(path), path).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
       expect(source(path), path).toContain("identity.record_registration_region(uuid,text,text)");

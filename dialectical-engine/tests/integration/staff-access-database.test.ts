@@ -14,9 +14,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 let database: TestDatabase;
 let runtime: Pool;
-/** 0154: the API's system login, the runtime role and the cross-account marker, which since 0154 alone may grant, accept and check a capability. */
+/** 0171: the API's system login, the runtime role and the cross-account marker, which since 0171 alone may grant, accept and check a capability. */
 let system: Pool;
-/** The authorization runtime's login, which keeps 0085's hold question since 0154 took it from debateai_runtime. */
+/** The authorization runtime's login, which keeps 0085's hold question since 0171 took it from debateai_runtime. */
 let authorization: Pool;
 const hash = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
 const envelope = { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" };
@@ -90,7 +90,7 @@ beforeAll(async()=>{
   // account-erasure schedule that also records the owner's choice for published debates. The 4-argument original stays.
   const choiceScheduleSignature='identity.schedule_account_erasure(uuid,uuid,uuid,text,boolean)';
   const originalScheduleSignature='identity.schedule_account_erasure(uuid,uuid,uuid,text)';
-  // 0154 (the security review) adds a third: the verification delivery that names the token its mail carried. The original, which named any
+  // 0171 (the security review) adds a third: the verification delivery that names the token its mail carried. The original, which named any
   // account's user id, is no role's from then on, its owner's alone.
   const tokenDeliverySignature='identity.record_verification_delivery_with_audit(uuid,text,timestamp with time zone,boolean,text,jsonb)';
   const originalDeliverySignature='identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)';
@@ -250,7 +250,7 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
   });
 });
 
-// 0154 took 0085's first ceremonies (the registration, invitation and owner possession challenges, the invitation's proof and the possession
+// 0171 took 0085's first ceremonies (the registration, invitation and owner possession challenges, the invitation's proof and the possession
 // receipt) back from every role: 0086's owned ceremony replaced them, and 0094's owned assertion completes the last two as their owner. They run
 // here as the superuser, so their SQL stays proven for that one caller; the runtime login is refused each.
 describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
@@ -282,7 +282,7 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
     has_function_privilege('debateai_rls_all_accounts',p.oid,'EXECUTE') AS marker
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='staff' OR (n.nspname='identity' AND p.proname IN('lock_security_subjects','read_account_security_hold','staff_rotation_binding_current')) ORDER BY signature`)).rows;
   const runtimeNames=new Set(['read_member_allowance_command','read_member_allowance_page','read_authentication','read_current_context','read_action_proof','read_context','invite','read_invitation_context','disable','step_up_prerequisite','read_owner_possession_context','read_independent_alert_readiness','authorize_alert_operation','release_alert_delivery','read_enrollment','read_team_page','read_audit_page','read_invitation_proof','read_issued_invitation','read_mutation_target','read_owner_recovery_installation','read_internal_funding_policy','read_internal_funding_policy_at','read_self_allowance_command','configure_internal_allowance','revoke_internal_allowance','list_publication_reviews','open_publication_review','record_publication_review_copy','decide_publication_review','list_threat_reports','count_unread_threat_reports','peek_threat_report_account','read_threat_report','decide_threat_report','hold_threat_report_email','read_team_room','read_team_limit_command','read_team_limit_page','set_team_limit','record_team_practice','grant_team_limit_partner','revoke_team_limit_partner','read_public_review_command','read_public_review','read_public_review_list','public_review_act','read_public_flag_queue','public_flag_dismiss']);
-  // 0154 (the security review): staff's notice and alert loops, which the API drains only from its gated timers outside any request, are the
+  // 0171 (the security review): staff's notice and alert loops, which the API drains only from its gated timers outside any request, are the
   // cross-account marker's alone, which only the system logins hold; so are the grant, the acceptance, the capability check, the owned key ceremony
   // and the alert user mapping, which the API's staff repository calls on its system login (X14). 0085's first ceremonies and 0140's team spend sum
   // are no role's, and 0085's hold question is the authorization runtime's (and its definers' owners') alone. 0112's release stays the runtime's.
@@ -314,7 +314,7 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
   const challenge=(await database.pool.query('SELECT staff.begin_invitation_challenge($1,$2,$3,$4,$5) AS id',[target.userId,target.sessionId,inv.tokenHash,hash(randomUUID()),credential])).rows[0].id;
   await expect(database.pool.query('SELECT staff.complete_invitation_proof($1,$2,$3,$4,$5,$6,$7)',[challenge,target.userId,target.sessionId,credential,null,'localhost','https://localhost'])).rejects.toThrow('STAFF_CREDENTIAL_INVALID');
   const context=(await new PostgresStaffRepository(runtime).readInvitationContext({targetUserId:target.userId,ordinarySessionId:target.sessionId,invitationTokenHash:inv.tokenHash}))!;
-  // 0154 took 0085's ceremony back from every role (packages/db no longer offers its wrapper): 0094's owned assertion completes it as its owner.
+  // 0171 took 0085's ceremony back from every role (packages/db no longer offers its wrapper): 0094's owned assertion completes it as its owner.
   const proof=(await database.pool.query('SELECT staff.complete_invitation_proof($1,$2,$3,$4,$5::bigint,$6,$7) AS value',[challenge,context.targetUserId,context.ordinarySessionId,credential,1,'localhost','https://localhost'])).rows[0].value;
   expect(proof.context.invitationId).toBe(inv.invitationId);expect(Number.isFinite(Date.parse(proof.verifiedAt))).toBe(true);
   await expect(database.pool.query('SELECT staff.complete_invitation_proof($1,$2,$3,$4,$5,$6,$7)',[challenge,target.userId,target.sessionId,credential,2,'localhost','https://localhost'])).rejects.toThrow('STAFF_CEREMONY_INVALID');

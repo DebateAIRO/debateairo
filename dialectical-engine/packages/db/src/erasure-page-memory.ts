@@ -22,7 +22,7 @@ export const FORGET_ERASED_DEBATE_PATH_SUGGESTIONS = "identity.forget_erased_deb
 
 /**
  * R22 item 16 (owner, 2026-10-29: "Yes, delete them too"): deleting one private debate also deletes its V4 page memory
- * (0131: its last-visit row and every dig link where it is the parent or the child; since 0154, its own dig row as a
+ * (0131: its last-visit row and every dig link where it is the parent or the child; since 0171, its own dig row as a
  * dig, never its digs' rows) in the SAME transaction as the rest of that deletion, the one that writes the run's
  * erasure tombstone. `finalizeSql` is that finalize statement
  * (0040/0123's core.finalize_private_run_erasure or 0126's core.finalize_synthesis_check_erasure), one row with an

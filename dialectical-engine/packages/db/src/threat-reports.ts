@@ -30,8 +30,8 @@ export type ThreatReportAlertClaim = Readonly<{
 
 /**
  * Every operation delegates to one 0128 function; no application clock enters these calls. Nothing here keeps a report: no product code did since the
- * question check stopped keeping questions, and 0154 took 0128's two keepers back from the API's runtime role. `eraseDue`, `claimAlerts` and
- * `completeAlert` are the cross-account marker's since 0154 (the API calls them only from its gated timers, outside any request, so on its system
+ * question check stopped keeping questions, and 0171 took 0128's two keepers back from the API's runtime role. `eraseDue`, `claimAlerts` and
+ * `completeAlert` are the cross-account marker's since 0171 (the API calls them only from its gated timers, outside any request, so on its system
  * login); the staff reads, the decision and `holdEmails` stay debateai_runtime's.
  */
 export class PostgresThreatReportRepository {

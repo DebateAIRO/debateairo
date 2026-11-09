@@ -30,26 +30,26 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
   X21: [PREVIEW_BUDGET],
   X27: [MAIN],
   X28: [MAIN],
-  X29: [MAIN],
   X30: [MAIN],
   X31: [MAIN],
   X32: [MAIN],
   X33: [MAIN],
-  X37: [MAIN]
+  X37: [MAIN],
+  X38: [MAIN]
 });
 
 /**
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
- * X14 the three PostgresStaffRepository constructions and, since the security review (0154), the staff runtime's alert mapping pool; X18h the key store's owner lookup; X21 the gate's two reads; since
+ * X14 the three PostgresStaffRepository constructions and, since the security review (0171), the staff runtime's alert mapping pool; X18h the key store's owner lookup; X21 the gate's two reads; since
  * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
- * review's repository and its two readers; since the security review (0154), X29 the Report button's settlement, after its
+ * review's repository and its two readers; since the security review (0171), X38 the Report button's settlement, after its
  * judge, and the writers of the site's day a request pays for, each the marker's alone: X30 the language check's probe and record,
  * X31 the question check's, X32 the clarify charge's (its reservation stays the request login's) and X33 the synthesis check's
  * record; and X37 the ask-time discovery's writer of a provider's probe, the marker's alone too (its reader stays the request pool's).
  * The file-level map alone cannot see a site added under an id already mapped to that file.
  */
-const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1, X30: 2,
-  X31: 2, X32: 2, X33: 1, X37: 1 });
+const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X30: 2,
+  X31: 2, X32: 2, X33: 1, X37: 1, X38: 1 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
 const EXPECTED_TARGETS = Object.freeze([
@@ -169,7 +169,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X29, X30, X31, X32, X33 and X37 in main.ts and X21 in preview-budget-estimate.ts, each id a literal, with 3, 4, 1, 1, 3, 1, 2, 2, 2, 1, 1 and 2 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37 and X38 in main.ts and X21 in preview-budget-estimate.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1 and 2 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);
@@ -194,11 +194,11 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
   });
 
   /**
-   * The security review (0154, F5): the Report button's settlement records the judge's verdict and hides a public debate on AGREE, so it is the
+   * The security review (0171, F5): the Report button's settlement records the judge's verdict and hides a public debate on AGREE, so it is the
    * cross-account marker's alone. The press calls it inside the reporter's request, after the judge, through its own port on the request pool's
    * system target; the target read and the opening stay on the request pool, under the reporter's session.
    */
-  it("S4.3 (the security review) X29 is the Report button's settlement port, the press's one other repository is the request pool's", async () => {
+  it("S4.3 (the security review) X38 is the Report button's settlement port, the press's one other repository is the request pool's", async () => {
     const main = await parse(MAIN);
     const objects = descendants(main).filter((node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText() === "publicFlags")
       .map((assignment) => assignment.initializer).filter((value): value is ts.ObjectLiteralExpression => ts.isObjectLiteralExpression(value))
@@ -207,14 +207,14 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     const property = (name: string): string | undefined => objects[0]!.properties
       .filter((member): member is ts.PropertyAssignment => ts.isPropertyAssignment(member))
       .find((member) => member.name.getText() === name)?.initializer.getText();
-    expect(property("settlement")).toBe('new PostgresPublicFlagRepository(crossAccountPool(pool, "X29"))');
+    expect(property("settlement")).toBe('new PostgresPublicFlagRepository(crossAccountPool(pool, "X38"))');
     expect(property("repository")).toBe("publicFlagRepository");
     const repository = descendants(main).filter((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && node.name.getText() === "publicFlagRepository");
     expect(repository.map((declaration) => declaration.initializer?.getText())).toEqual(["new PostgresPublicFlagRepository(pool)"]);
   });
 
   /**
-   * The security review (0154, F5): 0048's writer of a provider's probe is the cross-account marker's alone, as the API's ask-time discovery takes a
+   * The security review (0171, F5): 0048's writer of a provider's probe is the cross-account marker's alone, as the API's ask-time discovery takes a
    * provider's latest row for healthy and probes only a stale one, so a request login dated rows as it liked. The discovery records each probe it makes,
    * inside the asking request, through the request pool's system target; it reads the latest rows on the request pool, as before.
    */
@@ -277,7 +277,7 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
    * statement goes to the target. Derived, not listed: every call in main.ts of an `assert…DatabaseRole…` function,
    * every `.assertRole()` and the probes of the writers a request's paid calls use. Each runs inside attestEveryRoute (the
    * pool's own login, then its target — V-12: the recovery workers' background work runs on the target) or, for the
-   * clarify charge's reservation, whose calls run inside requests only, onOwnConnections. The security review's 0154 made
+   * clarify charge's reservation, whose calls run inside requests only, onOwnConnections. The security review's 0171 made
    * the language check's, the question check's and the clarify charge's writers the cross-account marker's alone, so each
    * is probed on its site's pool (X30, X31, X32), the system login its record runs on, unwrapped.
    */
@@ -297,15 +297,15 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       "assertContentProvisionDatabaseRole(pool,contentProvisionPool) @ attestEveryRoute",
       "assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool) @ attestEveryRoute",
       "assertDataExportDatabaseRoles(authorizationPool, dataExportPool) @ attestEveryRoute",
-      // 0154: the language check's writer is the marker's, asked of its site's login (X30), where each check's record runs.
+      // 0171: the language check's writer is the marker's, asked of its site's login (X30), where each check's record runs.
       'languageCheckSpendWriterPresent(crossAccountPool(pool, "X30")) @ UNWRAPPED',
-      // Decisions 29 and 31: dynamic step 2 asks after 0144's writer on its site's login (X32), and after 0154's reservation on the request login.
+      // Decisions 29 and 31: dynamic step 2 asks after 0144's writer on its site's login (X32), and after 0171's reservation on the request login.
       'askClarifyChargeWriterPresent(crossAccountPool(pool, "X32")) @ UNWRAPPED',
       "askClarifyReservationPresent(pool) @ onOwnConnections",
       "passwordResetRepository.assertRole() @ attestEveryRoute",
       "backupEmailRepository.assertRole() @ attestEveryRoute",
       "mfaRecoveryRepository.assertRole() @ attestEveryRoute",
-      // 0154: the question check's writer is the marker's, asked of its site's login (X31), where each check's record runs.
+      // 0171: the question check's writer is the marker's, asked of its site's login (X31), where each check's record runs.
       'questionCheckSpendWriterPresent(crossAccountPool(pool, "X31")) @ UNWRAPPED',
       "assertSupportDatabaseRole(pool, supportPool) @ attestEveryRoute"
     ]);
@@ -369,7 +369,7 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     const staff = newsOf(main, "PostgresStaffRepository").map((construction) =>
       (construction.arguments ?? []).map((argument) => argument.getText()));
     expect(staff).toEqual([['crossAccountPool(pool, "X14")'], ['crossAccountPool(pool, "X14")'], ['crossAccountPool(pool, "X14")']]);
-    // The security review (0154): a staff change's alert maps its key user, 0088's mapping now the marker's, on the same site; the dispatcher's
+    // The security review (0171): a staff change's alert maps its key user, 0088's mapping now the marker's, on the same site; the dispatcher's
     // own pool stays `pool`, whose statements outside any request go to its system login.
     const runtimes = callsOf(main, "createStaffRuntime");
     expect(runtimes).toHaveLength(1);

@@ -76,7 +76,7 @@ const PUBLIC_REVIEW = "0150_public_review.sql";
 const PUBLIC_FLAG = "0151_public_flag.sql";
 const REPORT_EXPORT = "0152_report_export_and_check_usage.sql";
 const DIG_TREE_SETTLED = "0153_dig_tree_settled.sql";
-const SECURITY_REVIEW = "0154_security_review_hardening.sql";
+const SECURITY_REVIEW = "0171_security_review_hardening.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -91,7 +91,7 @@ describe("data export forward115", () => {
   it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the Italy-specific approval 0125, the synthesis check 0126, the publication review 0127, the threat reports 0128 and the support answer scope 0129 and the V4 account memory 0130 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, REPORT_EXPORT, DIG_TREE_SETTLED, SECURITY_REVIEW]);
-    const names = (await ledger(db)).map(row => row.name).filter(name => /^01[1-5]/u.test(name));
+    const names = (await ledger(db)).map(row => row.name).filter(name => /^01[1-7]/u.test(name));
     expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, REPORT_EXPORT, DIG_TREE_SETTLED, SECURITY_REVIEW]);
     const steps = await receipts(db);
     expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, REPORT_EXPORT, DIG_TREE_SETTLED, SECURITY_REVIEW]);
@@ -198,13 +198,13 @@ describe("data export forward115", () => {
     try { await expect(migrate(db.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT ${EXPORT}`); }
     finally { await db.pool.query("UPDATE public.debateai_schema_migration_step SET previous_manifest_sha256=$1 WHERE source_name=$2", [original.previous_manifest_sha256, EXPORT]); }
     await migrate(db.pool);
-    // The security review's 0154 amends 0115 (its export status and download ask the connection), so the chain compares 0115's
+    // The security review's 0171 amends 0115 (its export status and download ask the connection), so the chain compares 0115's
     // postcondition against that amendment's row, the one with the greatest amended_by (packages/db/src/migration-forward-chain.ts
     // assertPostconditions), not against its receipt's: zeroing that row's digest is refused the same way.
     const amendment = (await db.pool.query<{ amended_by: string; postcondition_evidence_digest: string }>(
       "SELECT amended_by, postcondition_evidence_digest FROM public.debateai_schema_migration_step_amendment WHERE source_name=$1 ORDER BY amended_by DESC LIMIT 1",
       [EXPORT])).rows[0]!;
-    expect(amendment.amended_by).toBe("0154_security_review_hardening.sql");
+    expect(amendment.amended_by).toBe("0171_security_review_hardening.sql");
     await db.pool.query("UPDATE public.debateai_schema_migration_step_amendment SET postcondition_evidence_digest=repeat('0',64) WHERE source_name=$1 AND amended_by=$2",
       [EXPORT, amendment.amended_by]);
     try { await expect(migrate(db.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${EXPORT}`); }

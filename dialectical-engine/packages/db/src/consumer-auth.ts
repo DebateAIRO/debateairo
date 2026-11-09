@@ -182,7 +182,7 @@ export class PostgresConsumerAuthRepository {
         const result = await this.pool.query('SELECT identity.read_consumer_passkey_challenge($1,$2,$3) AS value', [handleHash, purpose, bindingHash]);
         return result.rows[0].value;
     }
-    /** A passkey's stored credential, before any session: the system login's alone (0154, X36), as the request's challenge is its own to begin. */
+    /** A passkey's stored credential, before any session: the system login's alone (0171, X36), as the request's challenge is its own to begin. */
     async readCredential(handleHash: string, credentialId: string, bindingHash: string): Promise<ConsumerCredential | null> {
         const result = await crossAccount("X36", () => this.pool.query('SELECT identity.read_consumer_passkey_credential($1,$2,$3) AS value', [handleHash, credentialId, bindingHash]));
         return result.rows[0].value;
@@ -199,7 +199,7 @@ export class PostgresConsumerAuthRepository {
             return committed;
         });
     }
-    /** Opens the session the API verified the assertion for: the system login's alone (0154, X36), as no secret the database holds gates it. */
+    /** Opens the session the API verified the assertion for: the system login's alone (0171, X36), as no secret the database holds gates it. */
     async completeLogin(input: ConsumerLoginCompletion, source: AuthSourceContext): Promise<ConsumerSessionCommit> {
         return crossAccount("X36", () => this.audited(source, async (client, prepared) => { const result = await client.query<{
             value: ConsumerSessionCommit;

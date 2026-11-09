@@ -41,7 +41,7 @@ const kindSet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_KINDS);
  * The list is a VOCABULARY, not an execution order, and must not be read as one: a reader of
  * stored rows decrypts and parses their context BEFORE the evaluator is called at all, so
  * `context-decrypt` and `context-parse` can precede every other member on that path (no
- * reader of stored rows is left since 0154 took back 0046's recovery reader). Within
+ * reader of stored rows is left since 0171 took back 0046's recovery reader). Within
  * the evaluator the argument checks do precede the per-row check, but that is a local fact
  * about one function, not a property of this array.
  */
@@ -166,7 +166,7 @@ function versioned(value:string):string{
 
 /**
  * The sign-in risk signals' writer and their retention purge. Nothing reads them back: 0046's reader of a recovery's signals had no product
- * caller, and 0154 took it back from every role, so the repository no longer offers it. The retention and the scan bound only that reader
+ * caller, and 0171 took it back from every role, so the repository no longer offers it. The retention and the scan bound only that reader
  * used stay its arguments, as main.ts reads them from the sealed recovery policy.
  */
 export class PostgresAuthenticationRiskSignalRepository{

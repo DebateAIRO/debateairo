@@ -446,7 +446,7 @@ function date(value: unknown): Date {
 function receipt(value: SecurityReceipt): SecurityReceipt { return Object.freeze({ ...value, recordedAt: date(value.recordedAt) }); }
 function invitation(value: InvitationContext): InvitationContext { return Object.freeze({ ...value, expiresAt: date(value.expiresAt) }); }
 /**
- * This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. Since 0154 its grant, acceptance, capability check and
+ * This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. Since 0171 its grant, acceptance, capability check and
  * owned key ceremony are the cross-account marker's, so main.ts builds every staff route's repository on the request pool's system login (X14).
  */
 export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRepository, StaffManagementRepository, StaffTargetInvitationChannels {
@@ -666,7 +666,7 @@ export interface StaffAlertRepository extends StaffAlertKeyMappings {
     }>>;
 }
 /**
- * Enumerated definer calls only. Caller cannot upload an outbox payload or receipt body. Since 0154 the outbox's claim, key mapping, settlement and
+ * Enumerated definer calls only. Caller cannot upload an outbox payload or receipt body. Since 0171 the outbox's claim, key mapping, settlement and
  * status are the cross-account marker's, which the dispatcher's timer reaches outside any request, and the user mapping a staff change's alert intent
  * asks inside the request is too: createStaffRuntime builds that one on its mapping pool (main.ts's X14). 0112's release stays the runtime's.
  */

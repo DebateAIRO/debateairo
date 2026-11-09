@@ -12,13 +12,13 @@ export * from "./investigation-reports.js";
  * Pools: `PostgresInvestigationRepository` on the API's own pool (debateai_billing_runtime), which also reaches the runtime role's readers by
  * membership; `PostgresInvestigationRunnerRepository` on the runner's or the scheduler's pool (debateai_runtime; `wipeInactivePageText`, the sweep's
  * wipe, needs the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold
- * and the API's request login does not, since 0154).
+ * and the API's request login does not, since 0171).
  *
  * What W3-2 and W5-1 must respect:
  * - A closing is `close` (the investigation, the version; since R22 decision 7 no wipe of every text).
  * - `wipeInactivePageText` is the scheduler's sweep (owner Q4: 30 days after the investigation's last activity, even
  *   while it is open). Call `touch` when the person acts on an investigation, so its texts stay while it is in use.
- * - The security review (0154, F5): 0133's reserve writer and reader, its read of one investigation by its owner, its
+ * - The security review (0171, F5): 0133's reserve writer and reader, its read of one investigation by its owner, its
  *   first join, its first closing and its mark of a closing's report had no caller (0136's report writer marks the closing
  *   as its owner) and are no role's any more, so nothing here offers them. The reserve's table stays (the data export
  *   still reads its events), and the runner reads an investigation through `ofRun`.

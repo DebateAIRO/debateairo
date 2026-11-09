@@ -216,7 +216,7 @@ describe("B6b an ask with a room", () => {
     expect(hostedQuestions).toEqual(todayQuestions);
   });
 
-  // Security review F2 (0154): a dig is marked a dig by the statement that creates its run, so the ask hands RunRepository the mark itself, on the
+  // Security review F2 (0171): a dig is marked a dig by the statement that creates its run, so the ask hands RunRepository the mark itself, on the
   // room's START and WAIT and on the path with no room alike: an ask with a parent (a private dig) or a public parent (a dig on a public debate).
   // A debate dug from nothing carries no mark at all, so its run's document is the one it always was.
   it("a dig's run is created marked a dig, START, WAIT and with no room alike; a debate dug from nothing carries no mark", async () => {

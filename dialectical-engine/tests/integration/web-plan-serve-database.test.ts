@@ -182,7 +182,7 @@ describe("W3-6 the web plan and the web rows reach the served answer", () => {
     expect(JSON.stringify(answer!.web)).not.toMatch(/"a[1-4]"/u);
     expect(JSON.stringify(answer!.web)).not.toContain(deadA1);
     AnswerSchema.parse(answer);
-    // The security review's F5 (0154): the owner's own request, on the API's request login, is served the same web paths, the web step's
+    // The security review's F5 (0171): the owner's own request, on the API's request login, is served the same web paths, the web step's
     // readers asking the session's owner.
     const asOwner = asRequestOf(requests!, await seedLiveSession(database.pool, owner!.userId));
     configureContentEncryption(asOwner, contentCipherFor(database.pool)!);

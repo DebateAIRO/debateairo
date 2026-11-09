@@ -990,7 +990,7 @@ describe("data export over a real database and encrypted file store", () => {
       const joined = await investigations.join({ ownerRef: a.ownerRef, parentRunId: runId, childRunId: dig, places: ["pos-1"], mode: "quick" });
       expect(joined.outcome).toBe("JOINED");
       const closed = (await investigations.open(a.ownerRef, closedRoot))!;
-      // 0133's reserve writer had no caller; 0154 took its grant back, so the migrator records the reserve here.
+      // 0133's reserve writer had no caller; 0171 took its grant back, so the migrator records the reserve here.
       const reserve = async (kind: "HELD" | "USED", values: readonly unknown[]) => (await seedPool.query<{ outcome: string }>(
         "SELECT identity.record_reserve_event($1,$2,$3,$4,$5,NULL,NULL) AS outcome", [a.ownerRef, kind, ...values])).rows[0]!.outcome;
       expect(await reserve("HELD", [440_000, null, null])).toBe("RECORDED");

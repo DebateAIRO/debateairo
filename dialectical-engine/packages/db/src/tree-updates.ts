@@ -5,7 +5,7 @@ import type { PathFate, PathRewriteRecord } from "./dig-model.js";
 
 /**
  * Tree updates, main-answer updates and purpose lines (migration 0138; plan 2026-10-31-r22-owner-changes decisions 2, 3, 5), through 0138's definers
- * only. `PostgresTreeUpdateRunnerRepository` runs on the runner's pool (since 0154 its writers, its mark, its turns and `readClimbNext` need the
+ * only. `PostgresTreeUpdateRunnerRepository` runs on the runner's pool (since 0171 its writers, its mark, its turns and `readClimbNext` need the
  * cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's request login
  * does not; the readers the API's answer read calls too, `readLine`, `readMainAnswers` and `readPurposeLines`, stay debateai_runtime's);
  * `PostgresTreeUpdateRepository` on the API's own pool (debateai_billing_runtime).
@@ -20,7 +20,7 @@ import type { PathFate, PathRewriteRecord } from "./dig-model.js";
  * - `recordMainAnswer` writes the answer's new version under the ROOT's key, `MAIN_ANSWER_UPDATE_CARRIER`; charged ANSWER_UPDATE on the
  *   triggering dig's run, `paidByOwnerRef` the digger's. BASE_MOVED: a newer version came, rebuild on it.
  * - `recordPurposeLines` at the ask, sealed under the run's key, `RUN_PURPOSE_LINES_CARRIER`, bound to the run's id; a dig reads its root's.
- * - The security review (0154, F5): 0138's owner readers of a path's line and of the main answer's versions, and its public closing and
+ * - The security review (0171, F5): 0138's owner readers of a path's line and of the main answer's versions, and its public closing and
  *   reopening, had no caller (the runner and the answer read use the no-owner readers, and 0147's public report took the closing's place);
  *   they are no role's any more, and nothing here offers them. The climb's turns and records and `recordMainAnswer` are the cross-account
  *   marker's now, as the runner's.
@@ -77,7 +77,7 @@ export type MainAnswerUpdateRead = Readonly<{
 
 const lineage = (value: Readonly<Record<string, unknown>> | null): string | null => value === null ? null : JSON.stringify(value);
 
-/** Runner pool (the cross-account marker since 0154, but `readLine`, `readMainAnswers` and `readPurposeLines`: debateai_runtime). */
+/** Runner pool (the cross-account marker since 0171, but `readLine`, `readMainAnswers` and `readPurposeLines`: debateai_runtime). */
 export class PostgresTreeUpdateRunnerRepository {
   constructor(private readonly pool: Executor) {}
 
@@ -118,7 +118,7 @@ export class PostgresTreeUpdateRunnerRepository {
         record.content === null ? null : JSON.stringify(record.content.envelope), record.content?.attestation ?? null])).rows[0]!.outcome;
   }
 
-  /** A live debate's paths, every turn in order, a public dig the check has not allowed marked; null when not live or, in a request, not the connection's own (0154). */
+  /** A live debate's paths, every turn in order, a public dig the check has not allowed marked; null when not live or, in a request, not the connection's own (0171). */
   async readLine(runId: string): Promise<readonly PathLineEntry[] | null> {
     return (await this.pool.query<{ line: PathLineEntry[] | null }>("SELECT identity.read_path_line_of_run($1) AS line", [runId])).rows[0]?.line ?? null;
   }
@@ -143,7 +143,7 @@ export class PostgresTreeUpdateRunnerRepository {
       "SELECT identity.read_main_answer_updates_of_run($1) AS updates", [runId])).rows[0]?.updates ?? null;
   }
 
-  /** The debate's sealed purpose lines; null when it has none (an old debate), is not live or, in a request, is not the connection's own (0154). */
+  /** The debate's sealed purpose lines; null when it has none (an old debate), is not live or, in a request, is not the connection's own (0171). */
   async readPurposeLines(runId: string): Promise<CryptoEnvelope | null> {
     return (await this.pool.query<{ lines: CryptoEnvelope | null }>(
       "SELECT identity.read_run_purpose_lines_of_run($1) AS lines", [runId])).rows[0]?.lines ?? null;

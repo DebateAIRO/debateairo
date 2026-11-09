@@ -45,7 +45,7 @@ const OPERATOR_COMMANDS = 10; // billing, support and owner commands, run by han
 // and 291, so 26 stay free. Row-level security S01 (DECISIONS D50): the API's two system pools (api-system 6,
 // api-authorization-system 2; every statement outside a request runs on them) and the support relay lease pool's removal
 // (synthesis-flag S05, 18) make one API 70 and two releases 2 × (70 + 34) = 208, 271 in all, so 46 stayed free. The security
-// review's 0154 runs each paid call's record of the site's day and the room's count of the site's holds on api-system inside
+// review's 0171 runs each paid call's record of the site's day and the room's count of the site's holds on api-system inside
 // requests too (X30 to X33, X23), so api-system is 8, and a passkey's sign-in, a recovery's proof and the recovery mail's lease,
 // held through its send, on api-authorization-system (X36), so that is 4: one API 74, two releases 2 × (74 + 34) = 216, 279 in
 // all, so 38 stay free. max_connections stays 320.
@@ -126,7 +126,7 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // Every signed-in request and a check every 250 ms per open debate page
       // (apps/api/src/staff/access.ts). The recovery mail's lease, which holds
       // one across a send of up to 5 s, is api:authorization-system's since
-      // 0154 (X36, below).
+      // 0171 (X36, below).
       authorization: 8,
       // The 30 s timer runs both cleanups at once, each a lease plus a query.
       publicationCleanup: 2 * 2,
@@ -147,7 +147,7 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       releaseWatch: 1,
       // Row-level security S01 (DECISIONS D50): no flow audit exists for api-system yet, so its floor is its size.
       system: 8,
-      // The security review's 0154 (X36) runs inside requests on this login what hands out a sign-in's secret: one for the
+      // The security review's 0171 (X36) runs inside requests on this login what hands out a sign-in's secret: one for the
       // consumer security notice loop's lease held across a send (packages/db/src/consumer-security-mail.ts), one for a
       // recovery mail's lease held across a send of up to 5 s (packages/db/src/consumer-recovery.ts withDeliveryLease), one
       // for a passkey's credential read and sign-in and a recovery's proof read and proof, plus 1 free.

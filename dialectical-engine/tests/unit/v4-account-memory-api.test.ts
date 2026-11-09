@@ -272,7 +272,7 @@ describe("accountMemoryStoreFrom: the PostgreSQL adapter", () => {
     expect(seen[0]).toEqual(["SELECT identity.record_dig_link($1,$2,$3,$4::text[],$5) AS outcome", [OWNER_REF, RUN, CHILD, ["o:1"], "quick"]]);
   });
 
-  // Security review F2 (0154): a dig's own row is written by the statement that creates its run (0123's writer, patched by 0154), never by a call
+  // Security review F2 (0171): a dig's own row is written by the statement that creates its run (0123's writer, patched by 0171), never by a call
   // of this store's after the ask, so the store offers no writer of it.
   it("offers no writer of a dig's own row: the run's creation writes it", () => {
     const store = accountMemoryStoreFrom(recordingQuery([]));

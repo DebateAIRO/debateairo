@@ -108,7 +108,7 @@ describe("migration 0120 — the terminal recorded facts count a structure-repai
     ] as const) await modelCall(runId, callSiteKey, outcome);
     expect((await readTerminalRecordedFacts(database.pool, runId)).ledger).toMatchObject({
       judgeCallCount: 1, composerCallCount: 0, conformanceCallCount: 1, postComposeR9CallCount: 1 });
-    // 0120 re-asserted 0049's grant; 0154 moved it to the cross-account marker: the runner's login (debateai_runtime and the marker) calls it, and it
+    // 0120 re-asserted 0049's grant; 0171 moved it to the cross-account marker: the runner's login (debateai_runtime and the marker) calls it, and it
     // still runs as its definer; the bare runtime role is refused.
     const runnerTwin = createPool(await createSystemTwin(database, "reply_measures_runner_twin", ["debateai_runtime"]));
     try {

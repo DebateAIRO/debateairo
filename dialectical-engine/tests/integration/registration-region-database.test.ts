@@ -42,7 +42,7 @@ function pendingInput(region: DeclaredRegion, options: { acceptances?: readonly 
     declaredRegion: region, ...(options.acceptances === undefined ? {} : { acceptances: options.acceptances })
   };
 }
-/** A bare account, written on `client` (its own transaction, or the caller's: the region writer writes only for an account its own transaction made, 0154). */
+/** A bare account, written on `client` (its own transaction, or the caller's: the region writer writes only for an account its own transaction made, 0171). */
 async function bareAccount(state: "active" | "pending_verification" = "pending_verification", client: Pick<Pool, "query"> = database.pool) {
   const userId = randomUUID();
   await client.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,created_at)

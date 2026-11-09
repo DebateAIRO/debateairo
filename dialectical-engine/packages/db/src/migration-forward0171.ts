@@ -4,7 +4,7 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0154, the security review's fixes in the database (R22, the review of 3 Nov 2026; drained): the tables and helpers its patched bodies use, the earlier bodies it
+ * 0171, the security review's fixes in the database (R22, the review of 3 Nov 2026; drained): the tables and helpers its patched bodies use, the earlier bodies it
  * patches in place and the grants it takes back or moves, each declared as an amendment of the step whose postcondition digests it (a grant taken back or
  * moved too: the chain re-measures that step's whole digest, its grants included). Its own postcondition digests what it adds and the earlier functions
  * it changes that no step's postcondition digests: 0040's lock of a request's own runs, 0085's key provision, the billing functions keyed by a run or an
@@ -13,9 +13,9 @@ import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-cha
  * 0095's), the overload of 0085's verification delivery it adds, and 0000's sequence allocator, which it makes a definer. It moves no billing function's grants, owner, definer flag or settings, which 0130's verifier
  * pins, so that verifier stays its own. It holds F2 to F5 whole; once applied, any later change is a step of its own.
  */
-const NAME = "0154_security_review_hardening.sql";
-const VERSION = "security-review-hardening-forward0154-v1";
-const MANIFEST_PATH = "lineage/security-review-hardening-forward0154.json";
+const NAME = "0171_security_review_hardening.sql";
+const VERSION = "security-review-hardening-forward0171-v1";
+const MANIFEST_PATH = "lineage/security-review-hardening-forward0171.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
 const PREVIOUS = "0153_dig_tree_settled.sql";
 const TABLES: readonly string[] = [
@@ -308,7 +308,7 @@ const AMENDS = [
   { step: "0153_dig_tree_settled.sql", field: "function_definition" as const, functions: [
     "identity.dig_is_settled(uuid)", "identity.mark_dig_tree_settled(uuid)"] }
 ];
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0154_${detail}`); };
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0171_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -335,7 +335,7 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
   return sha(JSON.stringify({ tables, functions }));
 }
 
-export async function loadForward0154(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
+export async function loadForward0171(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {
   const directory = new URL("../../../migrations/", import.meta.url);
   const bytes = await readFile(new URL(MANIFEST_PATH, directory));
   const raw: unknown = JSON.parse(bytes.toString("utf8"));

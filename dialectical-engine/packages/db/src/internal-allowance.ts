@@ -128,7 +128,7 @@ export class PostgresInternalAllowanceRepository implements InternalAllowancePor
     return (await guardedAuthorityQuery<{ value: unknown }>(this.pool, "SELECT staff.read_member_allowance_page($1::jsonb,$2) AS value", [context, ordinaryTokenHash])).rows[0]?.value;
   }
   /**
-   * The mail loop's leases over 0146's notices, as 0142's. No notice names an amount or a person. The three are the cross-account marker's since 0154:
+   * The mail loop's leases over 0146's notices, as 0142's. No notice names an amount or a person. The three are the cross-account marker's since 0171:
    * the API calls them only from its gated timer, outside any request, so on its system login.
    */
   async claimNotices(limit: number): Promise<readonly AllowanceNoticeClaim[]> {

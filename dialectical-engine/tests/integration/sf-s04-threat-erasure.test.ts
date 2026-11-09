@@ -144,7 +144,7 @@ describe("S04 threat report erasure database gates", () => {
     repository = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) =>
       ({ rows: await asRuntime(sql, values) }) } as never);
     // The erasure sweep runs on the API's gated hourly timer, outside any request, so on its system login: the API's capability role and the
-    // cross-account marker (apps/runner/src/dev-database-principals.ts), which holds the sweep since 0154.
+    // cross-account marker (apps/runner/src/dev-database-principals.ts), which holds the sweep since 0171.
     await database.pool.query("CREATE ROLE threat_erasure_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
     sweep = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) =>
       ({ rows: await asRuntime(sql, values, "threat_erasure_api_system") }) } as never);
@@ -166,7 +166,7 @@ describe("S04 threat report erasure database gates", () => {
        prepared_cleanup_publication_refs)
       VALUES($1,$2,now(),now(),now(),'{}','{}','{}','{}','{}')`, [erasure,target]);
     await closure.threatReportEmailHold(repository)({ erasureId: erasure, userId: target, email: "held@example.test" });
-    // No product code keeps a report since 0154 took 0128's keepers back from the runtime role; the test's own connection keeps one as a seed would.
+    // No product code keeps a report since 0171 took 0128's keepers back from the runtime role; the test's own connection keeps one as a seed would.
     await expect(database.pool.query("SELECT staff.keep_threat_report($1::text,$2::uuid)", ["Question kept during erasure", target]))
       .rejects.toMatchObject({ message: "THREAT_REPORT_ACCOUNT_ERASING" });
     const ref = (await database.pool.query<{ report_ref: string }>(
@@ -193,7 +193,7 @@ describe("S04 threat report erasure database gates", () => {
     let complete!: () => void;
     const completed = new Promise<void>(resolve => { complete = resolve; });
     const calls: unknown[][] = [];
-    // A request login's runtime role is refused the sweep (0154); the system login runs it.
+    // A request login's runtime role is refused the sweep (0171); the system login runs it.
     await expect(repository.eraseDue()).rejects.toMatchObject({ code: "42501" });
     const workerRepository = { eraseDue: async (...args: unknown[]) => {
       calls.push(args);

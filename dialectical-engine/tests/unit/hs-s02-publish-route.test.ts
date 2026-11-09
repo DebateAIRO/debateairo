@@ -111,7 +111,7 @@ function publicationFakes(options: { preflight?: boolean; dig?: boolean; story?:
   const repository = {
     preflightGrant: async () => options.preflight ?? true,
     auditAuthenticatedPreflightDenial: async () => true,
-    // Security review F2 (0154): whether the owner's debate is a dig (a dig is never published).
+    // Security review F2 (0171): whether the owner's debate is a dig (a dig is never published).
     readRunIsDig: async () => options.dig ?? false,
     readAuthorPseudonym: async () => PSEUDONYM,
     readArgumentLanguageTag: async () => null,
@@ -358,7 +358,7 @@ describe("hate-speech S02 publish path", () => {
     });
   });
 
-  describe("a dig is never published (security review F2, 0154)", () => {
+  describe("a dig is never published (security review F2, 0171)", () => {
     // Property: a dig is refused before anything that costs or keeps: no answer read under a content lease, no synthesis
     // gate, no judge call, no check record, no key provision, cipher or transition.
     it("the route answers 409 DIG_NOT_PUBLISHABLE right after the grant's check, and reads, checks and provisions nothing", async () => {

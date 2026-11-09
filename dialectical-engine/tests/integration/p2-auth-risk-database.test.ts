@@ -96,7 +96,7 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
       source:{ip:"203.0.113.2",userAgent:"beta",requestId:randomUUID()}
     })).resolves.toBe("recorded");
 
-    // Nothing reads the signals back since 0154 took 0046's recovery reader back from every role: each handle's own row says what it recorded.
+    // Nothing reads the signals back since 0171 took 0046's recovery reader back from every role: each handle's own row says what it recorded.
     const rows=await database.pool.query<{
       user_id:string;signal_kind:string;context_ciphertext:Record<string,unknown>;
       observed_at:Date;expires_at:Date;
@@ -164,7 +164,7 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
       VALUES($1,'ACCOUNT_CONTENT_MATCH',$2::jsonb,clock_timestamp(),clock_timestamp()+interval '7776000 seconds')
     `,[alpha.userId,JSON.stringify({...wrong,debateText:"private"})])).rejects.toBeDefined();
 
-    // The scan bound's saturation before a key load was evaluateForRecovery's, which went with 0046's recovery reader (0154).
+    // The scan bound's saturation before a key load was evaluateForRecovery's, which went with 0046's recovery reader (0171).
   });
 
   it("purges only expired rows in bounded batches and denies direct runtime DML",async()=>{
@@ -210,7 +210,7 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
       has_table_privilege('debateai_runtime','identity.authentication_risk_signal','INSERT') AS runtime_insert,
       has_function_privilege('debateai_runtime','identity.purge_expired_authentication_risk_signals(integer)','EXECUTE') AS runtime_purge,
       has_function_privilege('debateai_rls_all_accounts','identity.purge_expired_authentication_risk_signals(integer)','EXECUTE') AS marker_purge`);
-    // 0154: the purge is the cross-account marker's, which the API's system login holds and runs it on from its timer; no request login holds it.
+    // 0171: the purge is the cross-account marker's, which the API's system login holds and runs it on from its timer; no request login holds it.
     expect(privileges.rows[0]).toEqual({runtime_select:false,runtime_insert:false,runtime_purge:false,marker_purge:true});
   });
 

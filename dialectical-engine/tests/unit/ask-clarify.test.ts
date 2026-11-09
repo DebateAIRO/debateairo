@@ -291,14 +291,14 @@ describe("what one person can spend", () => {
   }
   const refusedOwner = () => Object.assign(new Error("REQUEST_OWNER_MISMATCH"), { code: "42501" });
 
-  it("0154: each paid call's charge is reserved for the person first, while the request's session is live, and recorded under the id reserved", async () => {
+  it("0171: each paid call's charge is reserved for the person first, while the request's session is live, and recorded under the id reserved", async () => {
     const { port, events } = ledgerOf({ replies: [reply({ questions: [WHERE] }), reply({ questions: [WHERE], purpose: PURPOSE })] });
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE], purpose: PURPOSE });
     // The re-ask is a second paid call: a reservation of its own, under a new id.
     expect(events).toEqual([`reserve charge-1 ${OWNER}`, "send", `record charge-1 ${OWNER}`, `reserve charge-2 ${OWNER}`, "send", `record charge-2 ${OWNER}`]);
   });
 
-  it("0154: a reservation the database refuses (the connection's session is not the person's any more) makes no paid call and gives no questions, and never stops the next person's", async () => {
+  it("0171: a reservation the database refuses (the connection's session is not the person's any more) makes no paid call and gives no questions, and never stops the next person's", async () => {
     let refuse = true;
     const { port, events, reports } = ledgerOf({ reserve: async () => { if (refuse) throw refusedOwner(); } });
     // More refusals in a row than any breaker counts: each is this request's alone.
@@ -310,7 +310,7 @@ describe("what one person can spend", () => {
     expect(events.filter((event) => event === "send")).toHaveLength(1);
   });
 
-  it("0154: the re-ask's reservation refused: no second paid call, and the first reading, reserved while the session was live and charged, stands", async () => {
+  it("0171: the re-ask's reservation refused: no second paid call, and the first reading, reserved while the session was live and charged, stands", async () => {
     let reservations = 0;
     const { port, events, reports } = ledgerOf({ replies: [reply({ questions: [WHERE] })], reserve: async () => { reservations += 1; if (reservations === 2) throw refusedOwner(); } });
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
@@ -324,7 +324,7 @@ describe("what one person can spend", () => {
     expect(events.filter((event) => event === "send")).toHaveLength(2);
   });
 
-  it("0154: the re-ask's reservation refused after a first reply with no question to show: no questions for that request", async () => {
+  it("0171: the re-ask's reservation refused after a first reply with no question to show: no questions for that request", async () => {
     let reservations = 0;
     const { port, events, reports } = ledgerOf({ replies: ["not json"], reserve: async () => { reservations += 1; if (reservations === 2) throw refusedOwner(); } });
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
@@ -332,7 +332,7 @@ describe("what one person can spend", () => {
     expect(reports).toEqual(["REQUEST_OWNER_MISMATCH"]);
   });
 
-  it("0154: a reservation that cannot be written for any other reason stops the calls as a record does: at once for a refusal every later one would meet, after three in a row otherwise", async () => {
+  it("0171: a reservation that cannot be written for any other reason stops the calls as a record does: at once for a refusal every later one would meet, after three in a row otherwise", async () => {
     const latching = ledgerOf({ reserve: async () => { throw Object.assign(new Error("no such function"), { code: "42883" }); } });
     expect(await latching.port.read(OWNER, QUESTION, null)).toEqual({ source: "NONE" });
     expect(await latching.port.read(OTHER_OWNER, "Another question?", null)).toEqual({ source: "NONE" });
@@ -345,7 +345,7 @@ describe("what one person can spend", () => {
     expect(down.reports).toEqual(["RECORD_DOWN", "RECORD_DOWN", "RECORD_DOWN", "RECORD_DOWN"]);
   });
 
-  it("0154: a refused reservation keeps the call it took from the person's limits, as any request that reaches a call does", async () => {
+  it("0171: a refused reservation keeps the call it took from the person's limits, as any request that reaches a call does", async () => {
     let refuse = true;
     const reports: string[] = [];
     let sends = 0;
@@ -360,7 +360,7 @@ describe("what one person can spend", () => {
     expect(sends).toBe(1);
   });
 
-  it("0154: a charge id another person holds is refused (23505): the breaker counts it and does not latch on it at once", async () => {
+  it("0171: a charge id another person holds is refused (23505): the breaker counts it and does not latch on it at once", async () => {
     const taken = () => Object.assign(new Error("ASK_CLARIFY_CHARGE_TAKEN"), { code: "23505" });
     let refusals = 1;
     const { port, events, reports } = ledgerOf({ reserve: async () => { if (refusals > 0) { refusals -= 1; throw taken(); } } });
@@ -378,7 +378,7 @@ describe("what one person can spend", () => {
   });
 });
 
-describe("0154: the reservations no charge takes", () => {
+describe("0171: the reservations no charge takes", () => {
   it("the API's sweep takes them in batches of 500 until one comes back short", async () => {
     const limits: number[] = [];
     const left = [500, 500, 7];

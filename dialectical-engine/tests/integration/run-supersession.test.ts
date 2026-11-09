@@ -720,13 +720,13 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
 });
 
 /**
- * Security review F2 (migration 0154): a dig is never published, and is known as one by its own row (identity.dig_run), which the statement that
+ * Security review F2 (migration 0171): a dig is never published, and is known as one by its own row (identity.dig_run), which the statement that
  * creates its run writes: 0123's core.create_encrypted_run, every owner's run's one writer (RunRepository's, for a new ask's run, the room's START
- * and WAIT, and a re-admission's), patched in place by 0154. Its document may carry `digRun`, JSON true only; the row comes right after the run's
+ * and WAIT, and a re-admission's), patched in place by 0171. Its document may carry `digRun`, JSON true only; the row comes right after the run's
  * ownership event, in the same statement, so nothing after the creation (a sign-out, a step-up, a failure, a crash) can leave a dig unmarked. A run
  * that re-admits a dig gets its own row the same way, before its supersession edge exists.
  */
-describe("0154 F2: a dig is marked a dig by the statement that creates its run", () => {
+describe("0171 F2: a dig is marked a dig by the statement that creates its run", () => {
   const marks = async (runId: string) => (await fixture.database.pool.query<{ owner_ref: string; same: boolean }>(
     `SELECT mark.owner_ref::text AS owner_ref, mark.xmin::text = run.xmin::text AS same
      FROM identity.dig_run AS mark JOIN core.run AS run USING (run_id) WHERE mark.run_id=$1`, [runId])).rows;

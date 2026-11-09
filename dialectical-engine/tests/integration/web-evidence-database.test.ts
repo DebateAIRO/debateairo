@@ -10,8 +10,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * packs; every content value is an attested envelope under the run's key, never plaintext; the API's role records the
  * person's "added to researched" choices; no role reads a table; the rows are append-only; deleting one debate (R22 item
  * 16) and deleting the account remove them; the export worker reads them behind its lease. Pages are made up. Since the security review's
- * 0154 (F5) the API's role runs here as each person's own request (its login carrying their live session), as its functions believe no
- * other owner, and the runner's login holds the cross-account marker as production's does (0154 moved the page texts' reader to it).
+ * 0171 (F5) the API's role runs here as each person's own request (its login carrying their live session), as its functions believe no
+ * other owner, and the runner's login holds the cross-account marker as production's does (0171 moved the page texts' reader to it).
  */
 let database: TestDatabase;
 let runner: Pool;
@@ -285,7 +285,7 @@ describe("0132 the person's choice and who may reach it", () => {
     expect(await record(asking(person), person.ownerRef, step.pages[0]!)).toBe("NOT_OTHER_PAGE");
     expect(await record(asking(person), person.ownerRef, randomUUID())).toBe("NOT_OTHER_PAGE");
     expect(await record(asking(stranger), stranger.ownerRef, step.pages[2]!)).toBe("NOT_OWNED");
-    // 0154 (F5): a request names only its own session's account, and with no session the API's role names no one.
+    // 0171 (F5): a request names only its own session's account, and with no session the API's role names no one.
     for (const pool of [asking(stranger), api]) {
       expect(await sqlError(() => record(pool, person.ownerRef, step.pages[1]!))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
     }

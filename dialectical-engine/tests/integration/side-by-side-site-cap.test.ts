@@ -230,7 +230,7 @@ describe("side-by-side C8: at most 8 debates across releases", () => {
       } finally {
         client.release();
       }
-      // The bare role counts none of the site's debates: the cap needs the system login. Since 0154 (the security review, F5) it may not even ask
+      // The bare role counts none of the site's debates: the cap needs the system login. Since 0171 (the security review, F5) it may not even ask
       // whether a debate's work is parked, which is the cross-account marker's.
       const bareClient = await bare.connect();
       try {

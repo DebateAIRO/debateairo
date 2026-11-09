@@ -1,5 +1,5 @@
 // tests/integration/security-review-hardening-database.test.ts
-// Migration 0154 (the security review of 3 Nov 2026) on real PostgreSQL, through the dev logins the product runs on (and, for the Report button's
+// Migration 0171 (the security review of 3 Nov 2026) on real PostgreSQL, through the dev logins the product runs on (and, for the Report button's
 // settlement, the provider probe's writer and the API's discovery, the billing functions keyed by a run or an owner and an account's own flows, the
 // production logins of P3-01 too): what each fix closes, and
 // that the legitimate path beside it still works. One describe per fix, named by its letter as the migration names it. Data is made up.
@@ -244,7 +244,7 @@ describe("F4a: an append-only row goes only inside its definer's own scope, neve
     for (const row of rows) {
       await rolledBack(async (client) => {
         expect(await attempt(client, deleteOf(row), [runId]), row.table).toEqual(refusal(row));
-        // The setting every guard trusted until 0154, set for this transaction alone as any session may: the guard no longer reads it.
+        // The setting every guard trusted until 0171, set for this transaction alone as any session may: the guard no longer reads it.
         await client.query(`SET LOCAL debateai.${row.scope}_forget = 'on'`);
         expect(await attempt(client, deleteOf(row), [runId]), `${row.table} with debateai.${row.scope}_forget on`).toEqual(refusal(row));
         // Another guard's scope opens nothing here.
@@ -529,7 +529,7 @@ describe("F5: a request-facing function believes only the owner the database see
   /**
    * The staff ceremonies and changes the API calls only through its staff repository, which main.ts builds on its system login (the cross-account site
    * X14): 0085's grant, acceptance and capability check, 0086's owned key ceremony and the staff key reader, and 0088's mapping of a user to the audit
-   * token an alert is sealed for, which a staff change's alert intent asks inside the staff member's request, through the same site since 0154. Each
+   * token an alert is sealed for, which a staff change's alert intent asks inside the staff member's request, through the same site since 0171. Each
    * takes ids, a staff context or a ceremony handle, and none asks the session.
    */
   const STAFF_REQUESTS = [
@@ -539,12 +539,12 @@ describe("F5: a request-facing function believes only the owner the database see
     "staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
     "identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)", "staff.read_alert_user_mapping(uuid)"
   ] as const;
-  /** 0118's, 0128's and 0144's writers of a paid call that names no debate, the marker's since 0154 (see the site's day, below). */
+  /** 0118's, 0128's and 0144's writers of a paid call that names no debate, the marker's since 0171 (see the site's day, below). */
   const DAY_WRITERS = ["ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
     "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
     "identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)"] as const;
   /**
-   * 0048's writer of a provider's probe, whose latest row the API's ask-time discovery trusts: the marker's since 0154. The API records each probe
+   * 0048's writer of a provider's probe, whose latest row the API's ask-time discovery trusts: the marker's since 0171. The API records each probe
    * its discovery makes inside the asking request on its system login (X37), and the runner its claim-time probes on its own login.
    */
   const PROBE_WRITER = "core.record_provider_probe(uuid,text,text,text,text,text,timestamp with time zone)";
@@ -594,7 +594,7 @@ describe("F5: a request-facing function believes only the owner the database see
     ...STAFF_LOOPS,
     // The consumer security notice loop (from the authorization runtime) and the retention purges of what is due.
     ...CONSUMER_LOOP, ...PURGES,
-    // 0151's flag settlement, which the API's press calls after the judge on its system login alone (X29): it believed the verdict it was handed.
+    // 0151's flag settlement, which the API's press calls after the judge on its system login alone (X38): it believed the verdict it was handed.
     "identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
     // Staff's ceremonies and changes, on the API's staff repository's site (X14).
     ...STAFF_REQUESTS,
@@ -638,7 +638,7 @@ describe("F5: a request-facing function believes only the owner the database see
   const clarifyCharge = (pool: Pool, owner: string, chargeId: string = randomUUID()) => pool.query<{ outcome: string }>(
     "SELECT identity.record_ask_clarify_charge($1,$2,NULL,NULL,'ask-clarify:anthropic:claude-haiku-5-5',(clock_timestamp() AT TIME ZONE 'UTC')::date,3,10,2) AS outcome",
     [chargeId, owner]).then((result) => result.rows[0]!.outcome);
-  /** 0154's reservation of a clarify call's charge for the person, which the API makes before each paid call, on the request's connection. */
+  /** 0171's reservation of a clarify call's charge for the person, which the API makes before each paid call, on the request's connection. */
   const reserve = (pool: Pool, owner: string, chargeId: string = randomUUID()) => pool.query<{ outcome: string }>(
     "SELECT identity.reserve_ask_clarify_charge($1,$2) AS outcome", [chargeId, owner]).then((result) => result.rows[0]!.outcome);
   /** The writer's refusal to every login that holds no marker. */
@@ -729,7 +729,7 @@ describe("F5: a request-facing function believes only the owner the database see
   });
 
   it("a clarify call already paid always counts in the site's day and in a person's quota: its person's row names the account it was reserved for while the session was live, or with no reservation the owner it is handed", async () => {
-    // 0144's design, kept: the ledger row first, whatever becomes of the person; 0154 names the person by the reservation, and makes the writer the
+    // 0144's design, kept: the ledger row first, whatever becomes of the person; 0171 names the person by the reservation, and makes the writer the
     // system login's alone, which the API reaches through its site (X32) after the call it reserved inside the request. Its own account, so its
     // session can end here.
     const cy = await seedSessionAccount(database.pool, "f5-clarify");
@@ -851,7 +851,7 @@ describe("F5: a request-facing function believes only the owner the database see
       // No request files a threat report naming an account, its own or another's.
       ["SELECT staff.keep_threat_report('A made-up question', $1)", [ana.userId]],
       ["SELECT staff.keep_threat_report_with_email('A made-up question', $1, 'ana@example.test')", [ana.userId]],
-      // No request settles a flag, its own reporter's included: the judge's verdict is the API's system login's to record (X29).
+      // No request settles a flag, its own reporter's included: the judge's verdict is the API's system login's to record (X38).
       ["SELECT identity.settle_public_flag($1,'AGREE','PERSONAL','p','m',0,0,0)", [randomUUID()]],
       // Nor records a provider's probe, at any date: the discovery records its own on its system login (X37).
       ["SELECT core.record_provider_probe($1,'provider:review','maker:review','HEALTHY','model:review',NULL,'9999-01-01T00:00:00Z')", [randomUUID()]]
@@ -863,7 +863,7 @@ describe("F5: a request-facing function believes only the owner the database see
   });
 
   it("staff's notice and alert loops are the API's timers' alone: a request login, with a session or none, is refused each; the system login drains them", async () => {
-    // Before 0154 a request login with no session could claim every pending staff alert and notice and complete it as delivered, so none was sent.
+    // Before 0171 a request login with no session could claim every pending staff alert and notice and complete it as delivered, so none was sent.
     const claims = ["staff.claim_threat_report_alerts(1)", "staff.claim_team_limit_notices(1)", "staff.claim_allowance_notices(1)",
       "staff.claim_public_review_notices(1)", "staff.claim_public_flag_notices(1)"] as const;
     const others = [
@@ -871,7 +871,7 @@ describe("F5: a request-facing function believes only the owner the database see
       ["SELECT staff.erase_due_threat_reports()", []], ["SELECT staff.complete_team_limit_notice($1,$2,true)", [randomUUID(), randomUUID()]],
       ["SELECT staff.allowance_notice_user($1,$2)", [randomUUID(), randomUUID()]], ["SELECT staff.complete_public_review_notice($1,$2,true)", [randomUUID(), randomUUID()]],
       ["SELECT staff.complete_public_flag_notice($1,$2,true)", [randomUUID(), randomUUID()]], ["SELECT staff.public_flag_notice_user($1,$2)", [randomUUID(), randomUUID()]],
-      // 0088's outbox: before 0154 a request login could claim every pending independent alert (with its key user's audit token), settle it
+      // 0088's outbox: before 0171 a request login could claim every pending independent alert (with its key user's audit token), settle it
       // DELIVERED on a forged receipt, map its key and read the queue; and 0090's channel reader handed out the invitee's sealed address.
       ["SELECT staff.claim_alert_delivery(1)", []], ["SELECT staff.read_alert_key_mapping($1,$2)", [randomUUID(), randomUUID()]],
       ["SELECT staff.settle_alert_delivery($1,$2,'DELIVERED',NULL)", [randomUUID(), randomUUID()]], ["SELECT staff.read_alert_delivery_status()", []],
@@ -916,7 +916,7 @@ describe("F5: a request-facing function believes only the owner the database see
   });
 
   it("the consumer security notice loop is the authorization reconciler's timer's alone: the authorization request login, with a session or none, is refused each; its system login claims, reads and acknowledges", async () => {
-    // Before 0154 the authorization request login with no session could claim any person's pending takeover warning and acknowledge it unsent.
+    // Before 0171 the authorization request login with no session could claim any person's pending takeover warning and acknowledge it unsent.
     const cy = await seedSessionAccount(database.pool, "f5-consumer-notice");
     await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at)
       VALUES ($1,'email',$2::jsonb,'verified',now(),now())`, [cy.userId, JSON.stringify(ENVELOPE)]);
@@ -992,7 +992,7 @@ describe("F5: a request-facing function believes only the owner the database see
   });
 
   it("0085's hold question is no longer the request login's: the API's runtime and billing roles are refused it, the authorization login still asks it of its own session's account", async () => {
-    // Before 0154 the API's request login could ask, of any user id, whether the account is held or gone.
+    // Before 0171 the API's request login could ask, of any user id, whether the account is held or gone.
     const sql = "SELECT identity.read_account_security_hold($1) AS held";
     for (const [label, work] of [
       ["no session", () => apiRequest.query(sql, [ben.userId])],
@@ -1010,7 +1010,7 @@ describe("F5: a request-facing function believes only the owner the database see
   });
 
   it("on the production logins (P3-01's memberships): a staff request's ceremonies, changes and alert key mapping are its system login's (X14); the request logins are refused each", async () => {
-    // Before 0154 the API's request login could start any person's key ceremony, read any active account's audit token and ask any staff context's
+    // Before 0171 the API's request login could start any person's key ceremony, read any active account's audit token and ask any staff context's
     // capability, with a session or none.
     const production = await logins!.production();
     const opened: Pool[] = [];
@@ -1095,7 +1095,7 @@ describe("F5: the site's day of spend is the system's to write: the writers of a
   /** Enough to fill any day the site could set, and still a whole number JavaScript holds exactly. */
   const WHOLE_DAY = 4_000_000_000_000_000;
   const CLASS = { compositionBudgetTier: "low", makerCount: 2, depth: 1 } as const;
-  const plans = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:security-review-0154-day");
+  const plans = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:security-review-0171-day");
   let pools: ApiTestPools;
   let ana: RlsTestAccount;
   let ben: RlsTestAccount;
@@ -1135,7 +1135,7 @@ describe("F5: the site's day of spend is the system's to write: the writers of a
   }, 120_000);
 
   it("0118's, 0128's and 0144's writers are the marker's alone: every request login is refused each, at any amount, and the day is as it was; the system logins write", async () => {
-    // Before 0154 one call on the API's request login, with no session, filled tomorrow: every paid call on the site stopped until it ended.
+    // Before 0171 one call on the API's request login, with no session, filled tomorrow: every paid call on the site stopped until it ended.
     const tomorrow = utcDay(1);
     const before = await dayTotal(tomorrow);
     for (const [label, within, pool] of requests()) {
@@ -1192,7 +1192,7 @@ describe("F5: the site's day of spend is the system's to write: the writers of a
   });
 
   it("the sequence counter is written only through its allocator: no request login sets or locks the row, and every login that may draw still draws, in order", async () => {
-    // Before 0154 the API's request login could set the counter back, and every event the site appended next collided with one already written.
+    // Before 0171 the API's request login could set the counter back, and every event the site appended next collided with one already written.
     for (const [label, within, pool] of requests()) {
       for (const sql of ["UPDATE ledger.sequence_allocator SET next_sequence = 1 WHERE singleton", "SELECT next_sequence FROM ledger.sequence_allocator FOR UPDATE"]) {
         expect(await refusal(() => within(() => pool.query(sql))), `${label}: ${sql}`).toEqual({ code: "42501", message: "permission denied for table sequence_allocator" });
@@ -1226,7 +1226,7 @@ describe("F5: the site's day of spend is the system's to write: the writers of a
   });
 
   it("a person's spend totals (0144's clarify charges, 0149's public reports), counts that cap, refuse another account's connection, or none, and never answer it 0; the person's own and the system logins read them", async () => {
-    // Before 0154 any request login read any person's totals in any window, and so the times and sizes of their calls; and a total read as 0 to a
+    // Before 0171 any request login read any person's totals in any window, and so the times and sizes of their calls; and a total read as 0 to a
     // connection that is not the person's would let every cap it feeds (the room, Continue, the clarify pool, the usage page, the withdrawal) admit more.
     await seeded([
       ["INSERT INTO identity.ask_clarify_charge (charge_id,owner_ref,funding_kind,charge_micros,recorded_at) VALUES ($1,$2,'SUBSCRIPTION',4242,clock_timestamp())",
@@ -1468,12 +1468,12 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
   /**
    * The billing functions a request login may call that take a run or an owner: 0140's admission of a funded debate's call and 0107's settlement of
    * it, 0092's pin of a debate to a grant, 0123's run state and person's grant and 0092's grant of a run, and 0089's list of the owners billing stops
-   * for. Their grants, owners, definer flags and settings are as 0130's verifier pins them; only their bodies ask now. Left alone, as refusals (0154's
+   * for. Their grants, owners, definer flags and settings are as 0130's verifier pins them; only their bodies ask now. Left alone, as refusals (0171's
    * header): 0089's and 0091's erasure and age questions and 0092's funding basis, which answer every connection alike. A funded person here is a team
    * member the fixture's Owner configured a grant for, through staff's own guarded function, as the product does.
    */
   const MISMATCH = { code: "42501", message: "REQUEST_OWNER_MISMATCH" };
-  const plans = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:security-review-0154-billing");
+  const plans = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:security-review-0171-billing");
   let pools: ApiTestPools;
   let fixture: ReturnType<typeof internalFundingFixture>;
   let ana: Awaited<ReturnType<ReturnType<typeof internalFundingFixture>["fundedActor"]>>;
@@ -1752,7 +1752,7 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
   }, 300_000);
 
   /**
-   * 0093's two totals of a grant are left alone (0154's header): a request must name a member's owner, grant and configured event to read one. The
+   * 0093's two totals of a grant are left alone (0171's header): a request must name a member's owner, grant and configured event to read one. The
    * funding basis, a refusal also left alone, hands any connection a funded debate's grant and configured event by its run id (a published debate's
    * run id can be read), so only the member's owner ref stands between a request and the member's totals. So no definer either request login may
    * call hands back an owner ref for the ids a request can read (a published debate's run id and link, the grant and event its basis names, and the
@@ -1793,7 +1793,7 @@ describe("F5: the billing functions keyed by a run or an owner ask the connectio
         await as(token, async () => {
           // The basis names the grant and its configured event, as it does to every connection.
           expect((await pool.query<{ value: unknown }>("SELECT billing.read_run_funding_basis($1) AS value", [published])).rows[0]!.value, label).toEqual(basis());
-          // With them, her totals need her owner ref alone (still open, as 0154's header says): any other owner reads nothing.
+          // With them, her totals need her owner ref alone (still open, as 0171's header says): any other owner reads nothing.
           expect(await totals(pool, ana.ownerRef), label).toEqual(hers);
           expect(await totals(pool, ben.ownerRef), label).toEqual({ spent: "0", committed: "0" });
           expect(await totals(pool, randomUUID()), label).toEqual({ spent: "0", committed: "0" });
@@ -1931,11 +1931,11 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
   /**
    * The census (D3 stage 6): EVERY SECURITY DEFINER function either request login (the production shapes api-runtime and
    * api-authorization, measured below) may EXECUTE, each in exactly one of four named lists, so a new, a removed or a newly
-   * reachable definer fails. ASKS asks what the database sees for this connection (0154's identity.request_owner_matches or
+   * reachable definer fails. ASKS asks what the database sees for this connection (0171's identity.request_owner_matches or
    * 0131's page_memory_run_owned, 0130's rls context, a staff privilege token through staff.require_http_authority, or the
    * login's cross-account marker). GATED is gated by a secret, a token, a proof or its own transaction it is handed, never by
    * the connection. PUBLIC hands back only public or site-wide state, no account's private content. LEFT_ALONE maps each one
-   * left alone on purpose to its reason, the set the 0154 header names by its classes (what it leaves alone by name, the sign-in
+   * left alone on purpose to its reason, the set the 0171 header names by its classes (what it leaves alone by name, the sign-in
    * flows' prunes of dead rows, the audit attempt and the refusal audits, the pending-account creators, the phone question, the
    * threat reports' hold and 0152's record of the site; 0048's probe writer moved to the marker and left the census), so a new
    * one needs a reason of its own. staff.authorize_action is not a connection check (it consumes a WebAuthn action proof), so a
@@ -2027,7 +2027,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.read_social_signup(jsonb)", "identity.read_social_step_up(jsonb)",
     "identity.record_authentication_risk_signal_for_recovery(uuid,text,jsonb)",
     "identity.record_authentication_risk_signal_for_session(text,text,text,jsonb)", "identity.record_mfa_failure_with_audit(text,text,jsonb)",
-    // The three sign-up writers: only for an account the transaction they run in created (0154's xmin rule).
+    // The three sign-up writers: only for an account the transaction they run in created (0171's xmin rule).
     "identity.record_registration_age_check(uuid,smallint,text,text,timestamp with time zone)",
     "identity.record_registration_region(uuid,text,text)", "identity.record_signup_italy_approval(uuid,jsonb)",
     "identity.record_social_registration_region(uuid,text,text,text,text)",
@@ -2102,10 +2102,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.prune_consumer_security_challenges(integer)": "0100's prune of dead rows only: the security challenges consumed or expired",
     "identity.prune_social_flows()": "0101's prune of dead rows only: the social flows consumed or expired",
     "identity.prune_totp_addition(uuid)": "0099's prune of one account's TOTP addition only when it is dead (expired or consumed), the sign-in flow's own",
-    "identity.read_account_security_hold(uuid)": "0085's one bit of any user id, which the sign-in step-up asks on the authorization login; named open in the 0154 header",
+    "identity.read_account_security_hold(uuid)": "0085's one bit of any user id, which the sign-in step-up asks on the authorization login; named open in the 0171 header",
     "identity.record_public_check_usage(text,uuid,timestamp with time zone,integer,integer,integer,numeric)":
       "0152's measure of what a public check used: ids and numbers, append-only, which nothing reads to gate or count anything",
-    "ledger.allocate_sequence()": "0000's allocator, a definer since 0154: it hands out the next position and sets nothing back",
+    "ledger.allocate_sequence()": "0000's allocator, a definer since 0171: it hands out the next position and sets nothing back",
     "serve.run_removed_by_synthesis_check(uuid)":
       "0126's question whether the check removed a debate, a refusal: an owner question would read a mismatch as not removed; one boolean of a run id",
     "staff.hold_threat_report_email(uuid,text)": "0128's hold of an erasing account's address on its threat reports, gated by the id of a prepared, uncommitted erasure",
@@ -2115,7 +2115,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
    * The write-loops the API drains only from its gated timers, whose arguments name only a limit, a claim, a notice or the
    * like, so the main census above tells them apart from the owner-keyed writers only by what they ask: the three billing
    * purges (they clamp the clock they are handed to now), the per-transaction audit attempt, the three challenge prunes (dead
-   * rows only), 0000's sequence allocator (a definer since 0154) and 0112's release of a staff claim (it gives back only a
+   * rows only), 0000's sequence allocator (a definer since 0171) and 0112's release of a staff claim (it gives back only a
    * live claim). Each is in LEFT_ALONE above; this list fails on a new such loop that asks nothing of the connection.
    */
   const LOOP_WRITERS = [
@@ -2135,7 +2135,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     // Append-only, content-free facts: the owner-run tool's order ids, the model-identity facts, the publication-check record.
     "billing.tool_order", "scorecard.model_identity", "serve.publication_check_record",
     // The one-row global sequence counter: its PRIMARY KEY and CHECK(singleton) admit no second row, so an INSERT always
-    // conflicts, and 0154 took UPDATE back (section 4), so it is written only through its definer, ledger.allocate_sequence().
+    // conflicts, and 0171 took UPDATE back (section 4), so it is written only through its definer, ledger.allocate_sequence().
     "ledger.sequence_allocator"
   ] as const;
   const MISMATCH = { code: "42501", message: "REQUEST_OWNER_MISMATCH" };
@@ -2265,7 +2265,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
       "SELECT count(*) AS n FROM identity.public_review_event WHERE publication_ref=$1 AND action='HIDE'", [publicationRef])).rows[0]!.n);
     const flagRow = async (flagId: string) => (await database.pool.query(`SELECT state,verdict,judge_model_id,input_tokens,output_tokens,cost_usd::text AS cost,
       reporter_ref,judged_at IS NOT NULL AS judged FROM identity.public_flag WHERE flag_id=$1`, [flagId])).rows[0] as Record<string, unknown>;
-    // Before 0154 the reporter's own request settled its own flag AGREE and hid ben's debate: the database believed the verdict it was handed. No
+    // Before 0171 the reporter's own request settled its own flag AGREE and hid ben's debate: the database believed the verdict it was handed. No
     // request login may call the settlement now, with its own session, another's or none, on either of the API's request logins.
     const DENIED = { code: "42501", message: "permission denied for function settle_public_flag" };
     for (const [label, work] of [
@@ -2277,10 +2277,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     ] as const) expect(await refusal(work), label).toEqual(DENIED);
     expect(await flagRow(flags[0]!)).toMatchObject({ state: "CHECKING", verdict: null, judge_model_id: null, judged: false });
     expect(await hidden(pages[0]!)).toBe(0);
-    // The press's own way: inside the reporter's request, after the judge, on the request pool's system target (main.ts, X29), which is the API's
+    // The press's own way: inside the reporter's request, after the judge, on the request pool's system target (main.ts, X38), which is the API's
     // system login and presents no session. It records the judge's call, hides on AGREE, and names the reporter the opening named.
     const settled = await inAccountRequest(ana.token, async () => {
-      const system = crossAccountPool(pools.runtime, "X29");
+      const system = crossAccountPool(pools.runtime, "X38");
       expect((await system.query<{ who: string }>("SELECT current_user AS who")).rows[0]!.who).toBe(login("API_SYSTEM_DATABASE_URL"));
       return new PostgresPublicFlagRepository(system).settle({ flagId: flags[0]!, verdict: "AGREE", reason: "PERSONAL", providerRef: "judge-provider",
         modelId: "judge-model", inputTokens: 11, outputTokens: 7, costUsd: 0.25 });
@@ -2322,7 +2322,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
         expect(await refusal(() => inAccountRequest(eve.token, () => pool.query("SELECT identity.settle_public_flag($1::uuid,'AGREE','PERSONAL','p','m',0,0,0)", [flagId]))))
           .toEqual({ code: "42501", message: "permission denied for function settle_public_flag" });
       }
-      // The route, as main.ts composes the press: the target read, the opening and the judge on the request pool, the settlement on its X29 site.
+      // The route, as main.ts composes the press: the target read, the opening and the judge on the request pool, the settlement on its X38 site.
       const QUOTE = "names a private person's home address";
       const replies: string[] = [];
       const judge = { providerRef: "judge-provider", modelId: "judge-model", complete: async () => ({ text: replies.shift()!, usage: { input_tokens: 11, output_tokens: 7, cost_usd: 0.25 } }) };
@@ -2333,7 +2333,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
         publicFlags: {
           // Made up, as the register's development row: no release is CURRENT here, so the opening counts against these.
           limits: { personHour: 11, debateDay: 22, siteDay: 99 },
-          repository: new PostgresPublicFlagRepository(request), settlement: new PostgresPublicFlagRepository(crossAccountPool(request, "X29")),
+          repository: new PostgresPublicFlagRepository(request), settlement: new PostgresPublicFlagRepository(crossAccountPool(request, "X38")),
           judge: () => judge as never, seal: async (publicationRef: string) => pubEnvelope(publicationRef) as never,
           readPublicDebate: async () => ({ question: "Fixture question", answer: `The first path ${QUOTE}.` }) as never
         }
@@ -2378,7 +2378,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     const sealed = async (value: Record<string, unknown>): Promise<number> => {
       await persistBootstrapRegister(database.pool, await loadBootstrapRegister());
       const receipt = await publishReplacementRegisterFixture(database.pool, parseRegisterVersionText("1"),
-        [registerFixtureRow("abuseLimits", value, "fixture: made up")], "security-review-0154:flag-limits");
+        [registerFixtureRow("abuseLimits", value, "fixture: made up")], "security-review-0171:flag-limits");
       return registerVersionToSafeLegacyNumber(receipt.registerVersion);
     };
     const ROW = { kind: "ABUSE_LIMITS", clarify_per_hour: 11, clarify_per_day: 22, flag_per_person_hour: 2, flag_per_debate_day: 1, flag_per_site_day: 99,
@@ -2527,7 +2527,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     expect(await asked(apiSystem)).toEqual(found);
     // Another account's request, one with no session, an anonymous request or a revoked token: nothing listed, not approved, and the writer refuses
     // as for no attempt stored, before anything is written. Whether the check removed the debate is a refusal (each caller hides or refuses what it
-    // answers true for), so it asks no owner and answers removed to every connection (0154 leaves it alone).
+    // answers true for), so it asks no owner and answers removed to every connection (0171 leaves it alone).
     const nothingFound = [[], true, false, NOT_ITS_OWN];
     expect(await inAccountRequest(ben.token, () => asked(pools.runtime))).toEqual(nothingFound);
     expect(await asked(apiRequest)).toEqual(nothingFound);
@@ -2548,7 +2548,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     await seeded([["INSERT INTO serve.synthesis_check_removal_request (request_id,result_id,run_id) VALUES ($1,$2,$3)", [randomUUID(), randomUUID(), legacy]]]);
     expect([await removed(apiRequest, legacy), await inAccountRequest(null, () => removed(pools.runtime, legacy)),
       await inAccountRequest(ana.token, () => removed(pools.runtime, legacy)), await removed(apiSystem, legacy)]).toEqual([true, true, true, true]);
-    // Left alone on purpose (0154's header): whether a run's content is live still answers for another account's debate.
+    // Left alone on purpose (0171's header): whether a run's content is live still answers for another account's debate.
     expect((await inAccountRequest(ben.token, () => pools.runtime.query<{ live: boolean }>("SELECT core.run_private_content_is_live($1) AS live", [old]))).rows[0]!.live)
       .toBe(true);
   });
@@ -2648,7 +2648,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     for (const signature of [...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE)]) expect(ASKS.test(source.get(signature)!), signature).toBe(false);
     // And each one left alone says why.
     for (const [signature, reason] of Object.entries(LEFT_ALONE)) expect(reason.trim().length, signature).toBeGreaterThan(20);
-    // Two that are no request login's at all now: 0151's flag settlement (the press settles on its system login, X29) and
+    // Two that are no request login's at all now: 0151's flag settlement (the press settles on its system login, X38) and
     // 0128's threat report keepers (they name an account, and nothing calls them).
     expect(rows.map((row) => row.signature)).not.toContain("identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)");
     expect(rows.map((row) => row.signature).filter((signature) => signature.startsWith("staff.keep_threat_report"))).toEqual([]);
@@ -2660,7 +2660,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
 
   /**
    * 0048's writer of a provider's probe. The API's ask-time discovery takes a provider's latest row (0040's latest_provider_probes, by probed_at) and
-   * probes only a provider whose latest row is stale, so before 0154 a request login with no session could keep a provider on the panel unprobed with a
+   * probes only a provider whose latest row is stale, so before 0171 a request login with no session could keep a provider on the panel unprobed with a
    * HEALTHY row dated now, one freshness window per row, or make every ask probe it again with a row dated later, until that date. The writer is the
    * marker's alone now: the API records the probes its discovery makes through its site X37, the system login, and the runner on its own login.
    */
@@ -2880,7 +2880,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
   }, 120_000);
 
   it("an account's readers serve its own request, and answer as for nothing stored to another account's session, a dead one or none; the system login reads any", async () => {
-    // Before 0154 the authorization login, with any session or none, read any account's age check, consent, export state and email addresses.
+    // Before 0171 the authorization login, with any session or none, read any account's age check, consent, export state and email addresses.
     expect(await inAccountRequest(ana.token, () => readsOf(pools.authorization, ana))).toEqual(own);
     expect(await inAccountRequest(ben.token, () => readsOf(pools.authorization, ben))).toEqual(own);
     for (const token of [ben.token, ana.revokedToken, ana.expiredToken, null]) {
@@ -2891,7 +2891,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
   });
 
   it("an account's writers act only in its own request: another account's session, or none, revokes, confirms, consents, resends, reserves, abandons and downloads nothing", async () => {
-    // Before 0154 any request on the authorization or runtime login, with a session or none, did each of these to any account it named.
+    // Before 0171 any request on the authorization or runtime login, with a session or none, did each of these to any account it named.
     const victim = await seedSessionAccount(database.pool, "f5-account-victim");
     const second = await seedLiveSession(database.pool, victim.userId);
     const secondId = (await database.pool.query<{ session_id: string }>("SELECT session_id FROM identity.session WHERE token_hash=$1", [hashToken("session", second)])).rows[0]!.session_id;
@@ -2933,7 +2933,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
   });
 
   it("the sign-up writers write only for an account their own transaction created: one made earlier is refused on every login, a session's own included", async () => {
-    // Before 0154 the API's request login wrote a passed age check and a region, and an Italy approval after any account's terms, for any account
+    // Before 0171 the API's request login wrote a passed age check and a region, and an Italy approval after any account's terms, for any account
     // still pending.
     const pending = await account();
     await database.pool.query(`UPDATE identity."user" SET state='pending_verification' WHERE user_id=$1`, [pending.userId]);
@@ -2973,7 +2973,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
   });
 
   it("a verification mail's delivery is recorded only for the token that mail carried; 0085's record of any account's is no role's", async () => {
-    // Before 0154 the API's request login, with no session, marked any account's address delivered or failed and audited it under that account.
+    // Before 0171 the API's request login, with no session, marked any account's address delivered or failed and audited it under that account.
     const delivered = async (userId: string) => (await database.pool.query<{ status: string | null; error: string | null }>(
       "SELECT delivery_status AS status, delivery_error AS error FROM identity.channel_binding WHERE user_id=$1 AND channel_type='email'", [userId])).rows[0];
     const pending = async (): Promise<{ userId: string; tokenHash: string }> => {
@@ -3013,7 +3013,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
   });
 
   it("the sign-in and recovery secrets are the system login's: no request login reads a stored passkey or recovery proof, completes a passkey sign-in, proves a recovery or uses a code; the system logins may", async () => {
-    // Before 0154 the authorization request login, with no session, read any passkey's stored credential and any recovery's proof once it had begun
+    // Before 0171 the authorization request login, with no session, read any passkey's stored credential and any recovery's proof once it had begun
     // a challenge or recovery with a token of its own, and completed a sign-in or a recovery on the API's word, which no secret the database holds gates.
     const calls = [
       ["SELECT identity.read_consumer_passkey_credential($1,$2,$3)", [hash("handle"), "credential", hash("binding")], pools.authorization],
@@ -3050,7 +3050,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
     const authorizationSystem = createPool(production.url("api-authorization-system"), { max: 4 });
     const runtime = createPool(production.url("api-runtime"), { max: 4, crossAccount: system });
     const authorization = createPool(production.url("api-authorization"), { max: 4, crossAccount: authorizationSystem });
-    const custody = await mkdtemp(join(tmpdir(), "security-review-0154-custody-"));
+    const custody = await mkdtemp(join(tmpdir(), "security-review-0171-custody-"));
     await chmod(custody, 0o700);
     for (const directory of ["secrets", "user-deks"]) await mkdir(join(custody, directory), { mode: 0o700 });
     const blindIndexKey = randomBytes(32);
@@ -3059,7 +3059,7 @@ describe("F5: an account's own functions keyed by a user id ask the connection, 
     const bootstrap = await loadBootstrapRegister();
     await persistBootstrapRegister(database.pool, bootstrap);
     const services = await openRlsAccountServices({ runtime, authorization }, { custodyRoot: custody, registerVersion: bootstrap.registerVersion });
-    const source = { ip: "127.0.0.1", userAgent: "security-review-0154", requestId: "security-review-0154" };
+    const source = { ip: "127.0.0.1", userAgent: "security-review-0171", requestId: "security-review-0171" };
     const audit = { hashSourceIp: async () => "ab".repeat(32), hashUserAgent: async () => "cd".repeat(32) } as unknown as AuditContextHasher;
     try {
       // Sign-up by email, in an anonymous request: the account, its region (in the sign-up's own transaction) and its first mail, recorded by its token.
@@ -3350,7 +3350,7 @@ describe("F2: no dig is published, by the owner's decision", () => {
     expect(waiting).toContain(plainAgain);
   });
 
-  // A dig's own row (identity.dig_run), which the statement that creates the dig's run writes (0123's writer, patched by 0154), before anything else
+  // A dig's own row (identity.dig_run), which the statement that creates the dig's run writes (0123's writer, patched by 0171), before anything else
   // is written for it: it names the dig's run alone and asks nothing of the parent, so it is there whatever the join answers and whatever becomes of
   // the parent, and no session ending after the creation can part the two.
   const digRows = async (runId: string): Promise<number> =>

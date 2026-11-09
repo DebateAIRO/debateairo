@@ -125,7 +125,7 @@ describe("S01-C07 consumer-security writers and worker (R-13, R-14)", () => {
       await client.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())", [randomUUID(), a.userId]);
       await client.query("INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_slot,code_hash,created_at) VALUES($1,$2,1,$3,now())", [recoveryCodeId, a.userId, argon2Hash()]);
     });
-    // The security review's 0154: a saved code's use is the system login's (X36), so the repository runs on the routed pool.
+    // The security review's 0171: a saved code's use is the system login's (X36), so the repository runs on the routed pool.
     const consumed = await new PostgresIdentityRepository(scopedRuntime, audit).consumeRecoveryCode({ userId: a.userId, recoveryCodeId, occurredAt: new Date(), source: { ip: "198.51.100.15", userAgent: "mail-locale-test", requestId: randomUUID(), mailLocale: "pl" } });
     expect(consumed).toBe(true);
     expect(await languageOf(a.userId, "RECOVERY_CODE_USED")).toBe("pl");

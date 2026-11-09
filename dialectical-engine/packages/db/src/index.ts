@@ -1807,13 +1807,13 @@ export interface StartRunInput {
    */
   readonly releaseKey?: string;
   /**
-   * Security review F2 (migration 0154): this run is a dig, a debate dug from another (an ask with a parent or a public
-   * parent). Sent as the `digRun` key of 0123's core.create_encrypted_run document, which 0154 patched to write the
+   * Security review F2 (migration 0171): this run is a dig, a debate dug from another (an ask with a parent or a public
+   * parent). Sent as the `digRun` key of 0123's core.create_encrypted_run document, which 0171 patched to write the
    * dig's own row (identity.dig_run) right after the run's ownership event, in the same statement as the run, so no
    * sign-out, failure or crash between the start and the join can leave a dig unmarked. Only an owner's run can carry
    * it: a legacy asker's run owns no account, and is refused RUN_DIG_REQUIRES_OWNER before any SQL. A database
-   * without 0154 refuses the document (its closed key list), surfaced as RUN_OWNER_INVALID, so a dig never starts
-   * unmarked there either. A re-admission needs none: 0154 marks the new run of a dig from the run it re-admits.
+   * without 0171 refuses the document (its closed key list), surfaced as RUN_OWNER_INVALID, so a dig never starts
+   * unmarked there either. A re-admission needs none: 0171 marks the new run of a dig from the run it re-admits.
    */
   readonly digRun?: true;
 }
@@ -2409,7 +2409,7 @@ export class RunRepository {
     identity: RunRowIdentity,
     admissionClient?: PoolClient
   ): Promise<string> {
-    // Security review F2 (0154): a dig's mark is written by the owner's run creation alone; a legacy asker owns no
+    // Security review F2 (0171): a dig's mark is written by the owner's run creation alone; a legacy asker owns no
     // account to mark it under, so its dig is refused before anything is written (no intent, no key, no row).
     if (input.digRun === true && identity.kind === "plain") {
       throw new TypedDomainError("RUN_DIG_REQUIRES_OWNER", "A dig is started only by an authenticated owner");
@@ -2490,7 +2490,7 @@ export class RunRepository {
         const provisionExecutor=admissionClient ?? this.provisionPool;
         // `releaseKey` is sent only when given, and the capability probe below never strips it (unlike planTier and the
         // argument language): a database without 0123 refuses a stamped document rather than run it unstamped (O1).
-        // `digRun` likewise (0154, F2): a database without 0154 refuses a dig's document rather than start it unmarked.
+        // `digRun` likewise (0171, F2): a database without 0171 refuses a dig's document rather than start it unmarked.
         const created = await provisionExecutor.query<{
           created: boolean;
           plan_tier_supported: boolean;

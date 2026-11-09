@@ -481,7 +481,7 @@ export class PostgresPublicationRepository {
   }
 
   /**
-   * Security review F2 (migration 0154): whether a debate of the active user's is a dig, which is never published (0154's owner-scoped
+   * Security review F2 (migration 0171): whether a debate of the active user's is a dig, which is never published (0171's owner-scoped
    * identity.read_run_is_dig). A refusal, so it fails closed: true for every debate when the connection is not the owner's (F5's question, asked
    * first); else null when it is not theirs by 0131's ownership rule (another's, erased, inactive), which the grant's check asked before it refuses.
    */

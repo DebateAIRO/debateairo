@@ -33,7 +33,7 @@ export class PostgresConsumerRecoveryRepository {
     private readonly tx: ProfileTransactions;
     constructor(private readonly pool: Pool, audit: AuditContextHasher) { this.tx = new ProfileTransactions(pool, audit); }
     async start(index: Buffer, tokenHash: string, source: AuthSourceContext): Promise<RecoveryDelivery | null> { return this.tx.audited(source, async (c, context) => (await c.query('SELECT identity.start_consumer_recovery($1,$2,$3) value', [index, tokenHash, context])).rows[0].value); }
-    /** A recovery's stored proof and its proof, which the API checks and then records: the system login's alone (0154, X36), as a request begins its own recovery. */
+    /** A recovery's stored proof and its proof, which the API checks and then records: the system login's alone (0171, X36), as a request begins its own recovery. */
     async readProof(tokenHash: string, slot: number): Promise<RecoveryProof | null> { return (await crossAccount("X36", () => this.pool.query('SELECT identity.read_consumer_recovery_proof($1,$2) value', [tokenHash, slot]))).rows[0].value; }
     async prove(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<{
         expiresAt: string;

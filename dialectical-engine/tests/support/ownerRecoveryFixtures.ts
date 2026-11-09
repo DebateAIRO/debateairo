@@ -22,7 +22,7 @@ export async function ownerCandidate(admin:Pool) {
 }
 export type OwnerCandidate=Awaited<ReturnType<typeof ownerCandidate>>;
 /**
- * The owner's possession receipts, through the step-up on `runtime` and the owned ceremony on `staff`: since 0154 the ceremony is the cross-account
+ * The owner's possession receipts, through the step-up on `runtime` and the owned ceremony on `staff`: since 0171 the ceremony is the cross-account
  * marker's, so `staff` is a login shaped as the API's system login, on which main.ts builds its staff repository (X14).
  */
 export async function ownerNativeReceipts(runtime:Pool,a:OwnerCandidate,commandId:string,nonce:string,staff:Pool) {

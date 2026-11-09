@@ -82,7 +82,7 @@ describe("0150: a public debate under review", () => {
   it("follows 0149 as the chain's head, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0150 } from './migration-forward0150.js';");
-    expect(chain).toContain("loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154]");
+    expect(chain).toContain("loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0171]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "public-review-forward0150-v1";');

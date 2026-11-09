@@ -618,10 +618,12 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
 // Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
 // migrate() is byte-identical.
-// Security review F2 (2026-11-04, migration 0154): StartRunInput gained `digRun` and #insertRun sends it to
+// Security review F2 (2026-11-04, migration 0171): StartRunInput gained `digRun` and #insertRun sends it to
 // core.create_encrypted_run, refusing a legacy asker's dig before any SQL. migrate() is byte-identical (its 13,114-byte
 // slice, sha256 d1495dbe4bbf…).
-const NATIVE_MIGRATE_MODULE_SHA256 = "59526cf93829ff8e198010d719ef5a2f6451ff0ae171d70cdbaf2d3e38000c25";
+// The security review's step takes the number 0171 ahead of the merge of feat/2026-10-28-v4-initial (2026-11-09): the number
+// in the module's comments is all that moved. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "f5d03d77a5107b04947e315b09286dd2b8953d5a6a43cbeb33cd4abf39af9da4";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

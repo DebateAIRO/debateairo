@@ -27,7 +27,7 @@
  * (`system` 6, `authorizationSystem` 2; the room decision keeps its 4 and moves
  * to the `system` login). With the support relay lease pool gone (synthesis-flag
  * S05), one API is 70 at most; two releases 2 × (70 + 34) = 208, 271 in all, so
- * 46 spare. The security review's 0154 made the writes of the site's day a
+ * 46 spare. The security review's 0171 made the writes of the site's day a
  * signed-in request pays for (X30 to X33) and the room's count of the site's
  * holds (X23) the system login's, inside requests too, so `system` is 8; and a
  * passkey's credential read and sign-in, a recovery's proof and the recovery
@@ -65,7 +65,7 @@ export const API_DATABASE_POOLS = Object.freeze({
   runtime: budget("api:runtime", 20, 5_000),
   // Every signed-in request and a session check every 250 ms per open debate
   // page. (The recovery mail that holds one across a send of up to 5 s is
-  // `authorizationSystem`'s since the security review's 0154, X36.)
+  // `authorizationSystem`'s since the security review's 0171, X36.)
   authorization: budget("api:authorization", 12, 5_000),
   // The 30 s cleanup timer runs two cleanups at once, each a lease plus a query.
   publicationCleanup: budget("api:publication-cleanup", 4, 5_000),
@@ -97,13 +97,13 @@ export const API_DATABASE_POOLS = Object.freeze({
   releaseWatch: budget("api:release-watch", 1, 1_000),
   // Row-level security S01 (DECISIONS D29, D50): the runtime pool's cross-account target (api-system: background
   // loops, billing jobs, boot checks, every statement outside a request) and the authorization pool's
-  // (api-authorization-system, below). No flow audit of api-system yet; sized for the background loops that move here. The security review's 0154:
+  // (api-authorization-system, below). No flow audit of api-system yet; sized for the background loops that move here. The security review's 0171:
   // inside a signed-in request too, each paid call's record of the site's day (the language and question checks, the clarify
   // charge, the synthesis check: X30 to X33) and the room's count of the site's holds beside its day's spend (X23), so 8 (6 before);
   // and the ask-time discovery's record of each provider probe it makes (X37), one short statement per provider probed in a round that
   // runs one at a time, which needs no more.
   system: budget("api:system", 8, 5_000),
-  // The security review's 0154 (X36): inside a signed-in request too, what hands out a sign-in's secret, a passkey's credential
+  // The security review's 0171 (X36): inside a signed-in request too, what hands out a sign-in's secret, a passkey's credential
   // read and its sign-in and a recovery's proof read and its proof, and the recovery mail's lease, which holds one across a send
   // of up to 5 s, beside the consumer security notice loop, whose lease holds one across each notice's send. One for each lease,
   // one for the sign-in statements and one free, so 4 (2 before).

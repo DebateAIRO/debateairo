@@ -3578,7 +3578,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     // re-acceptance inside a request carries the account's context (C4's request scope, SPEC-v4 R23).
     expect(await outcome("api-runtime", forgeCheckout)).toBe("42501");
     expect(await outcome("api-runtime", readAcceptances)).toBe("ok");
-    // 0154: the retention purge is the cross-account marker's, so the API's request login may not run it; its timer runs it on api-system.
+    // 0171: the retention purge is the cross-account marker's, so the API's request login may not run it; its timer runs it on api-system.
     expect(await outcome("api-runtime", purge)).toBe("42501");
     for (const principalId of ["runner-runtime", "scheduler-liveness", "api-authorization"]) {
       for (const statement of [forgeCheckout, readAcceptances, purge, signUpWithConsent, regionWriter, countryGate]) {
@@ -3589,7 +3589,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
 
     // The census, one privilege at a time (has_*_privilege counts what a principal inherits and what PUBLIC holds):
     // among the principals the provisioner manages, only api-runtime may use the legal schema, touch legal.acceptance
-    // or run the three functions, and nobody may touch legal.account_closure. Since 0154 the purge's EXECUTE is the
+    // or run the three functions, and nobody may touch legal.account_closure. Since 0171 the purge's EXECUTE is the
     // cross-account marker's, so api-runtime lacks it and the marker's other holders have it without the schema's USAGE,
     // so only api-system can run it.
     const holders = (await adminPool.query<{ principal: string; what: string }>(`

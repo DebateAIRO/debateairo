@@ -20,7 +20,7 @@ const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 /**
  * PLAN S3.6, verbatim as a map: reader id → `<file>#<method or function>` that opens its frame, one entry per call site
- * (23 sites: X10 3, X23 3, X36 6, every other id 1; measured at b6a70bc0c, and since the security review's 0154 X23 also frames the room's
+ * (23 sites: X10 3, X23 3, X36 6, every other id 1; measured at b6a70bc0c, and since the security review's 0171 X23 also frames the room's
  * count of the holds on the site's day, which a request login's row rule had counted for the requester alone, and X36 frames the sign-in and
  * recovery steps that hand out a stored secret or open a session on the API's word: a passkey's credential and its sign-in, a recovery's
  * proof, its proof and its mail's lease, and a saved code's use, each the marker's alone).

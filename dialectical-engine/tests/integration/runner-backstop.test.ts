@@ -15,7 +15,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * whole again while the site's day still counts the money that really left. Over embedded Postgres, as the live
  * runner's own login: debateai_runtime and, since row-level security S01, the marker role debateai_rls_all_accounts
  * (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it); the bare debateai_runtime
- * login, with no account context, records no spend and sets nothing aside: since 0154 (the security review, F5) the
+ * login, with no account context, records no spend and sets nothing aside: since 0171 (the security review, F5) the
  * day's spend table takes INSERT from the marker alone, and asking whether a debate's work is parked is the marker's
  * too (the first case). The superuser pool only
  * arranges rows (a person, a live claim, a DONE item). The cases run in order on one database; each name states what
@@ -135,7 +135,7 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
     await database?.stop();
   });
 
-  it("the bare runtime login, with no account context, records no spend (0154 takes the day's INSERT from it) and sets nothing aside (0126)", async () => {
+  it("the bare runtime login, with no account context, records no spend (0171 takes the day's INSERT from it) and sets nothing aside (0126)", async () => {
     await expect(new PostgresModelSpendStore(bareRuntime).recordSpend({
       spendId: randomUUID(), spendSource: "RUN", runId: a1.runId, providerRef: "fake-provider",
       chargedOn: today, chargeMicros: 1, inputTokens: 1, outputTokens: 1

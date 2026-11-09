@@ -413,7 +413,7 @@ export interface PublicationApplication {
     dig?: boolean;
   }> | null>;
   /**
-   * Security review F2 (migration 0154): is this debate of the session's owner a dig? The owner decided that a dig is never published; the route
+   * Security review F2 (migration 0171): is this debate of the session's owner a dig? The owner decided that a dig is never published; the route
    * asks right after the grant's check, before it reads the answer or runs a check. Absent: the route does not ask (publish still refuses a dig).
    */
   isDig?(input: Readonly<{
@@ -695,7 +695,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       });
       return null;
     }
-    // Security review F2 (0154): a dig is never published, whoever calls; the database refuses its key's provision as well. Only a debate the
+    // Security review F2 (0171): a dig is never published, whoever calls; the database refuses its key's provision as well. Only a debate the
     // reader answers is the owner's and no dig goes on.
     if (await this.repository.readRunIsDig(input.runId, input.authenticated.userId, input.authenticated.ownerRef) !== false) return null;
     const pseudonym = await this.repository.readAuthorPseudonym(

@@ -187,7 +187,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   // The API's system login's shape (P3-01's api-system: the billing runtime plus 0130's cross-account marker), which the
-  // staff repository runs on since 0154 (X14).
+  // staff repository runs on since 0171 (X14).
   await database.pool.query('CREATE ROLE publication_review_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts');
 }, 180_000);
 afterAll(async () => database?.stop());
@@ -538,7 +538,7 @@ describe("0127 publication review database boundary", () => {
     await authorizeStaffAlertFixture(database.pool,operationId);
     const alert={schema:'staff-alert-v1',event:'GRANT',operationId,
       envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}};
-    // 0154: the grant is the cross-account marker's, which the API's staff repository's login holds (X14).
+    // 0171: the grant is the cross-account marker's, which the API's staff repository's login holds (X14).
     await asRole('publication_review_api_system',
       'SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',
       [ownerContext,proofId,binding,reviewer.staffId,['PUBLICATION_REVIEW'],operationId,
@@ -746,7 +746,7 @@ describe("0127 publication review database boundary", () => {
       await jit.query('SELECT staff.install_owner_recovery_generation($1,$2,$3)',[generation,verifier,randomUUID()]);
       await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',
         [commandId,'BOOTSTRAP',target.userId,null,null,false,target.credentialIds,operationId,digest(nonce),generation,verifier]);
-      // 0154: the owned ceremony is the cross-account marker's: its receipts go through a login shaped as the API's system login (X14).
+      // 0171: the owned ceremony is the cross-account marker's: its receipts go through a login shaped as the API's system login (X14).
       const staff=createPool(await createSystemTwin(isolated,'publication_review_fixture_system',['debateai_runtime']));
       const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,staff).finally(()=>staff.end());
       const readiness=randomUUID();

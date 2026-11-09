@@ -186,7 +186,7 @@ it("resumed PUBLISH asks on FLAGGED, publishes on CLEAR, waits for the read and 
   try { expect(host.textContent).toContain(pub["public.publication.statusUnavailable"]); expect(host.textContent).not.toContain("Complete proof"); }
   finally { await unmount(root, host); }
 });
-// Security review F2 (0154): a dig is never published, nor asked about; a resumed proof for one (a page left open from before) is told so in words
+// Security review F2 (0171): a dig is never published, nor asked about; a resumed proof for one (a page left open from before) is told so in words
 // the page already has, never that the proof failed: the review's own "not allowed" for an ask, the plain unavailable line for a publish.
 it("a resumed PUBLISH or ask for a dig refused 409 DIG_NOT_PUBLISHABLE shows a plain line, never the proof's failure", async () => {
   const resumeProof = { status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action: "PUBLISH", target_run_id: run, token: "g".repeat(43), expires_at: new Date(Date.now() + 300000).toISOString() } };

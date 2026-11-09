@@ -17,7 +17,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * role opens an investigation, joins digs to it (writing 0131's dig link too: the server-side dig parent), closes it
  * (a new report version; its page texts are wiped in the same transaction) and reopens it (earlier versions kept); it
  * records the person's ONE reserve, whose order the database enforces; the scheduler's sweep wipes page texts 30 days
- * after the investigation's last activity, open or not; deleting one debate and deleting the account remove the rows. Since the security review's 0154 (F5)
+ * after the investigation's last activity, open or not; deleting one debate and deleting the account remove the rows. Since the security review's 0171 (F5)
  * the API's role runs here as each person's own request (its login carrying their live session), as its functions believe no other owner; 0133's
  * reserve writer and reader, its owner read of an investigation, its first join, its first closing and its mark of a closing's report had no caller and
  * are no role's any more, so the reserve's rules and the report's mark are read here as the migrator, and the runner reads an investigation through its
@@ -55,27 +55,27 @@ async function account(): Promise<Account> {
 }
 /** The person's own request, on the API's role. */
 const asking = (person: Account): Pool => asRequestOf(requests, person.token);
-/** The runner's read of the investigation a debate is in (0133's owner read of it is no role's since 0154). */
+/** The runner's read of the investigation a debate is in (0133's owner read of it is no role's since 0171). */
 const investigationOf = (runId: string) => new PostgresInvestigationRunnerRepository(runner).ofRun(runId);
 type ReserveEvent =
   | Readonly<{ kind: "HELD"; amountMicros: number }>
   | Readonly<{ kind: "USED"; investigationId: string; reportVersion: number }>
   | Readonly<{ kind: "RELEASED" }>
   | Readonly<{ kind: "BLOCKED"; window: "day" | "week" | "month"; until: Date }>;
-/** 0133's reserve writer, as the migrator: no code called it, and since 0154 no role may; its order is still the database's. */
+/** 0133's reserve writer, as the migrator: no code called it, and since 0171 no role may; its order is still the database's. */
 async function recordReserveEvent(ownerRef: string, event: ReserveEvent): Promise<string> {
   return (await database.pool.query<{ outcome: string }>("SELECT identity.record_reserve_event($1,$2,$3,$4,$5,$6,$7) AS outcome", [ownerRef, event.kind,
     event.kind === "HELD" ? event.amountMicros : null, event.kind === "USED" ? event.investigationId : null, event.kind === "USED" ? event.reportVersion : null,
     event.kind === "BLOCKED" ? event.window : null, event.kind === "BLOCKED" ? event.until : null])).rows[0]!.outcome;
 }
-/** 0133's reserve reader, as the migrator (no role's since 0154). */
+/** 0133's reserve reader, as the migrator (no role's since 0171). */
 async function readReserve(ownerRef: string) {
   const row = (await database.pool.query<{ state: string; held_micros: string | null; since: Date | null; blocked_window: string | null; blocked_until: Date | null;
     open_investigations: number }>("SELECT * FROM identity.read_reserve($1)", [ownerRef])).rows[0]!;
   return { state: row.state, heldMicros: row.held_micros === null ? null : Number(row.held_micros), since: row.since, blockedWindow: row.blocked_window,
     blockedUntil: row.blocked_until, openInvestigations: row.open_investigations };
 }
-/** 0133's mark of a closing's report, as the migrator: 0136's report writer marks it as its owner, and since 0154 no role may call it. */
+/** 0133's mark of a closing's report, as the migrator: 0136's report writer marks it as its owner, and since 0171 no role may call it. */
 const recordReport = async (investigationId: string, reportVersion: number, reportRef: string): Promise<string> =>
   (await database.pool.query<{ outcome: string }>("SELECT identity.record_investigation_report($1,$2,$3) AS outcome", [investigationId, reportVersion, reportRef]))
     .rows[0]!.outcome;
@@ -146,7 +146,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE inv_api LOGIN PASSWORD 'inv-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  // The runner's login holds the cross-account marker, as runner-runtime does: since 0154 (F5) the idle page texts' wipe is the marker's alone.
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the idle page texts' wipe is the marker's alone.
   await database.pool.query("CREATE ROLE inv_runner LOGIN PASSWORD 'inv-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE inv_erasure LOGIN PASSWORD 'inv-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE inv_worker LOGIN PASSWORD 'inv-worker-test-only' IN ROLE debateai_data_export_worker");
@@ -201,7 +201,7 @@ describe("0133 an investigation and its digs", () => {
     expect(await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: theirs, places: [], mode: "quick" }))
       .toEqual({ outcome: "NOT_OWNED", investigationId: null, digLevel: null });
     expect(await new PostgresInvestigationRepository(asking(stranger)).open(stranger.ownerRef, root)).toBeNull();
-    // 0154 (F5): the person's own request names no one else, and with no session the API's role names no one.
+    // 0171 (F5): the person's own request names no one else, and with no session the API's role names no one.
     expect(await investigations.open(stranger.ownerRef, theirs)).toBeNull();
     expect(await new PostgresInvestigationRepository(api).open(person.ownerRef, root)).toBeNull();
     expect(await investigationOf(root)).toBeNull();
@@ -331,7 +331,7 @@ describe("0133 the one reserve", () => {
         .toMatchObject({ code: "22023", message: "RESERVE_EVENT_INVALID" });
     }
     expect(await recordReserveEvent(randomUUID(), { kind: "HELD", amountMicros: amount })).toBe("NOT_OWNED");
-    // No role may write or read the reserve since 0154: no code ever did.
+    // No role may write or read the reserve since 0171: no code ever did.
     for (const pool of [api, asking(person), runner]) {
       expect(await sqlError(() => pool.query("SELECT identity.record_reserve_event($1,'RELEASED',NULL,NULL,NULL,NULL,NULL)", [person.ownerRef]))).toMatchObject({ code: "42501" });
       expect(await sqlError(() => pool.query("SELECT * FROM identity.read_reserve($1)", [person.ownerRef]))).toMatchObject({ code: "42501" });

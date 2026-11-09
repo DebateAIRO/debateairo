@@ -9,7 +9,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { StaffTargetInvitationMessage } from '../../apps/api/src/staff/alerts.js';
 import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
-// 0154 (the security review): the grant, the alert user mapping and the outbox's claim, key mapping, settlement and status are the cross-account
+// 0171 (the security review): the grant, the alert user mapping and the outbox's claim, key mapping, settlement and status are the cross-account
 // marker's, which the API's system login holds (the staff repository's site X14, and the dispatcher's timer outside any request): `system` is that
 // login's shape, the runtime role and the marker. 0112's release stays the runtime's.
 let alerts:typeof import('../../apps/api/src/staff/alerts.js');let database:TestDatabase,runtime:Pool,system:Pool,jit:Pool;

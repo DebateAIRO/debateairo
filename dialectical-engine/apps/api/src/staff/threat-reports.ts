@@ -18,7 +18,7 @@ export interface ThreatReportStaffService {
 
 /**
  * Reads the live identity envelope on the runtime pool; alert claims first resolve a current staff holder, through 0128's
- * staff.threat_report_recipient_user, the cross-account marker's since 0154, so the "staff" reader runs only outside a request, on the system login.
+ * staff.threat_report_recipient_user, the cross-account marker's since 0171, so the "staff" reader runs only outside a request, on the system login.
  */
 export function threatReportEmailReader(
   pool: Pick<Pool, "query">, keys: Pick<ReadableUserDekStore, "load">, idKind: "user" | "staff" = "user"

@@ -11,12 +11,12 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 /**
  * 0144 on real PostgreSQL (plan 2026-10-31-r22-owner-changes decisions 29 and 31): step 2's small AI counts in the person's day, week and month, in a team
  * member's grant and in the team's one limit, and in the site's day; the row holds the person, the cost and the time; an erased account takes its rows;
- * the export gets the times only; no request role reads the table. Data is made up. Since the security review's 0154 (F5) the writer is the
+ * the export gets the times only; no request role reads the table. Data is made up. Since the security review's 0171 (F5) the writer is the
  * cross-account marker's alone: the API reserves each paid call on the person's own request (identity.reserve_ask_clarify_charge, which names only the
  * account of the live session the request presents) and makes no call it could not reserve, then records it on its system login (main.ts's site X32),
  * which names the owner it is handed. So each charge here is written as the API writes it: reserved on the API's billing login carrying the person's
  * session, recorded on the system twin (the billing role and the marker). A request login is refused the writer, and a person's windows are read in
- * their own request or on a login that holds the marker, as the runner's does (0154 asks the reader the connection's person too). The site's day counts
+ * their own request or on a login that holds the marker, as the runner's does (0171 asks the reader the connection's person too). The site's day counts
  * every call that was paid. A team grant the charge names funds it only when it is that person's own, by its configured event, and was running when the
  * call was reserved (with no reservation, when it is recorded); any other leaves the call on the person's own plan. A reservation is good for an hour,
  * and the API sweeps the ones no charge took.
@@ -91,13 +91,13 @@ const asking = (person: Account): Pool => asRequestOf(requests, person.token);
 const entry = (ownerRef: string, chargeMicros: number, grant: Grant | null = null) => ({ spendId: randomUUID(), ownerRef, grant, providerRef: ASK_CLARIFY_SPEND_REF,
   chargedOn: today(), chargeMicros, inputTokens: 700, outputTokens: 90 });
 const total = async (pool: Pool, sql: string, values: readonly unknown[]): Promise<number> => Number((await pool.query<{ total: string }>(sql, [...values])).rows[0]!.total);
-/** One paid call as the API makes it (0154, F5): reserved on the person's own request, then recorded on the system login (main.ts's site X32). */
+/** One paid call as the API makes it (0171, F5): reserved on the person's own request, then recorded on the system login (main.ts's site X32). */
 async function paid(person: Account, made: ReturnType<typeof entry>): Promise<void> {
   await reserveAskClarifyCharge(asking(person), made);
   await recordAskClarifyCharge(system, made);
 }
 const MISMATCH = { code: "42501", message: "REQUEST_OWNER_MISMATCH" };
-/** PostgreSQL's refusal of the writer to a login that does not hold the cross-account marker (0154, F5). */
+/** PostgreSQL's refusal of the writer to a login that does not hold the cross-account marker (0171, F5). */
 const NOT_THE_WRITER = { code: "42501", message: "permission denied for function record_ask_clarify_charge" };
 const refusal = async (run: () => Promise<unknown>) => { const { code, message } = await sqlError(run); return { code, message }; };
 
@@ -127,7 +127,7 @@ afterAll(async () => {
 });
 
 describe("0144: the charge reaches every reader", () => {
-  it("0154: the API's system login finds the writer and its request login the reservation; no login without the cross-account marker finds the writer", async () => {
+  it("0171: the API's system login finds the writer and its request login the reservation; no login without the cross-account marker finds the writer", async () => {
     expect(await askClarifyChargeWriterPresent(system)).toBe(true);
     expect(await askClarifyReservationPresent(billing)).toBe(true);
     for (const pool of [runner, billing, authorization, erasure]) expect(await askClarifyChargeWriterPresent(pool)).toBe(false);
@@ -148,7 +148,7 @@ describe("0144: the charge reaches every reader", () => {
     expect(await store.readOwnerSpentMicros(ana.ownerRef, new Date(Date.now() - 7_200_000), from)).toBe(0);
     expect(await store.readOwnerSpentInRangesMicros(ana.ownerRef, [{ from, to }, { from: new Date(Date.now() - 7_200_000), to: from }])).toEqual([42, 0]);
     expect(await site.readDaySpentMicros(today())).toBe(dayBefore + 42);
-    // 0154 (F5): another's request, or the request login with no session, may not reserve the call for ana, so the API makes none; and the writer
+    // 0171 (F5): another's request, or the request login with no session, may not reserve the call for ana, so the API makes none; and the writer
     // itself is refused to them (the system login's alone), so nothing is paid into the site's day or anyone's quota.
     for (const pool of [asking(dan), billing]) {
       const made = entry(ana.ownerRef, 1000);
@@ -161,7 +161,7 @@ describe("0144: the charge reaches every reader", () => {
     expect(await site.readDaySpentMicros(today())).toBe(dayBefore + 42);
     // It has no run to name in the borrow notice, and the notice's rows stay runs only.
     expect(await store.readOwnerChargesMicros(ana.ownerRef, from, to)).toEqual([]);
-    // The billing login reads her windows in her own request; with no session, or in another's request, it is refused (0154: the total is a count
+    // The billing login reads her windows in her own request; with no session, or in another's request, it is refused (0171: the total is a count
     // that caps, so it refuses a connection that is not the person's rather than reading 0, which would leave her more to spend).
     expect(await new PostgresModelSpendStore(asking(ana)).readOwnerSpentMicros(ana.ownerRef, from, to)).toBe(42);
     expect(await refusal(() => new PostgresModelSpendStore(asking(dan)).readOwnerSpentMicros(ana.ownerRef, from, to))).toEqual(MISMATCH);
@@ -172,7 +172,7 @@ describe("0144: the charge reaches every reader", () => {
     const ana = await account();
     const grant = await grantOf(ana);
     const [from, to] = window();
-    // 0154 took 0140's team spend sum back from every role (staff's month reader asks it as its owner): the superuser reads it here.
+    // 0171 took 0140's team spend sum back from every role (staff's month reader asks it as its owner): the superuser reads it here.
     const teamBefore = await total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
     const made = entry(ana.ownerRef, 70, grant);
     await paid(ana, made);
@@ -192,7 +192,7 @@ describe("0144: the charge reaches every reader", () => {
   const ledgerRows = async (spendId: string) => (await database.pool.query("SELECT 1 FROM ledger.model_spend WHERE spend_id=$1", [spendId])).rowCount;
   const SUBSCRIPTION = { funding_kind: "SUBSCRIPTION", internal_grant_id: null, internal_grant_event_id: null };
 
-  it("0154: a grant that is not the person's own funds nothing: another's, made up, the wrong event or half a pair leaves the call on their own plan, refused nothing", async () => {
+  it("0171: a grant that is not the person's own funds nothing: another's, made up, the wrong event or half a pair leaves the call on their own plan, refused nothing", async () => {
     const [ana, ben] = [await account(), await account()];
     const [own, bens] = [await grantOf(ana), await grantOf(ben)];
     const [from, to] = window();
@@ -216,7 +216,7 @@ describe("0144: the charge reaches every reader", () => {
     expect(await team()).toBe(teamBefore);
   });
 
-  it("0154: a grant that ends while the call runs still holds the call it admitted; one ended before the call was reserved funds nothing", async () => {
+  it("0171: a grant that ends while the call runs still holds the call it admitted; one ended before the call was reserved funds nothing", async () => {
     const ana = await account();
     const [from, to] = window();
     const team = () => total(database.pool, "SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to]);
@@ -246,7 +246,7 @@ describe("0144: the charge reaches every reader", () => {
     expect(await new PostgresModelSpendStore(runs).readOwnerSpentMicros(ana.ownerRef, from, to)).toBe(40);
   });
 
-  it("0154: with no reservation, the system login's charge is the owner's it names, funded by that owner's own running grant only; the person's request may not write it", async () => {
+  it("0171: with no reservation, the system login's charge is the owner's it names, funded by that owner's own running grant only; the person's request may not write it", async () => {
     const [ana, dan] = [await account(), await account()];
     const [anas, dans] = [await grantOf(ana), await grantOf(dan)];
     const [own, others] = [entry(ana.ownerRef, 3, anas), entry(ana.ownerRef, 4, dans)];
@@ -279,7 +279,7 @@ describe("0144: the writer's refusals", () => {
     expect((await sqlError(() => recordAskClarifyCharge(system, { ...entry(ana.ownerRef, 1), chargedOn: "2020-01-01" }))).code).toBe("23514");
     expect(Number((await database.pool.query("SELECT count(*) c FROM identity.ask_clarify_charge WHERE owner_ref=$1", [ana.ownerRef])).rows[0].c)).toBe(0);
   });
-  it("a raw insert of the source is refused to the API's request login and the runtime role's (0154 takes the table's INSERT from them)", async () => {
+  it("a raw insert of the source is refused to the API's request login and the runtime role's (0171 takes the table's INSERT from them)", async () => {
     for (const pool of [runner, billing, asking(await account())]) {
       expect((await sqlError(() => pool.query(`INSERT INTO ledger.model_spend (spend_id,spend_source,run_id,provider_ref,charged_on,charge_micros,input_tokens,output_tokens)
         VALUES ($1,'ASK_CLARIFY',NULL,'ask-clarify:x:y',$2::date,1,1,1)`, [randomUUID(), today()]))).code).toBe("42501");
@@ -291,7 +291,7 @@ describe("0144: the writer's refusals", () => {
     const rows = async (made: ReturnType<typeof entry>) => [
       (await database.pool.query("SELECT 1 FROM ledger.model_spend WHERE spend_id=$1", [made.spendId])).rowCount,
       (await database.pool.query("SELECT 1 FROM identity.ask_clarify_charge WHERE charge_id=$1", [made.spendId])).rowCount];
-    // The API's request login may not write it at all (0154, F5): refused, nothing written.
+    // The API's request login may not write it at all (0171, F5): refused, nothing written.
     const onRequest = entry(randomUUID(), 9);
     expect(await refusal(() => outcomeOf(billing, onRequest))).toEqual(NOT_THE_WRITER);
     expect(await rows(onRequest)).toEqual([0, 0]);
@@ -300,7 +300,7 @@ describe("0144: the writer's refusals", () => {
     expect(await outcomeOf(system, onSystem)).toBe("GONE");
     expect(await rows(onSystem)).toEqual([1, 0]);
     // A team member erased while the call ran, naming the grant they held: the erasure left the grant no owner, so it funds nothing, and the person
-    // is gone all the same (0154 asks the grant before the person's row, and refuses nothing for it).
+    // is gone all the same (0171 asks the grant before the person's row, and refuses nothing for it).
     const gone = await account();
     const held = await grantOf(gone);
     // The erasure leaves the grant no owner (staff.erase_internal_grant_mapping, in the deletion's own transaction); written ahead here, as the
@@ -321,7 +321,7 @@ describe("0144: the writer's refusals", () => {
   });
 });
 
-describe("0154: the person is named before the call is paid, while the request's session is live", () => {
+describe("0171: the person is named before the call is paid, while the request's session is live", () => {
   /** What a charge left: the site's ledger row (the call was paid), and the owner its person's row names, if any. */
   const left = async (made: ReturnType<typeof entry>) => ({
     ledger: (await database.pool.query("SELECT 1 FROM ledger.model_spend WHERE spend_id=$1", [made.spendId])).rowCount,
@@ -573,8 +573,8 @@ describe("0144: erasure, export and the roles", () => {
     const [from, to] = window();
     const owner = randomUUID();
     const denied = async (pool: Pool, sql: string, values: readonly unknown[]) => (await sqlError(() => pool.query(sql, [...values]))).code === "42501";
-    // The billing and authorization logins inherit the runtime role, as 0141's test finds: each may read (0154 holds the reader to the connection's
-    // person). The writer is the cross-account marker's alone since 0154: of these logins, only the API's system twin and the runner's may call it.
+    // The billing and authorization logins inherit the runtime role, as 0141's test finds: each may read (0171 holds the reader to the connection's
+    // person). The writer is the cross-account marker's alone since 0171: of these logins, only the API's system twin and the runner's may call it.
     const logins = async (signature: string) => (await database.pool.query<{ login: string }>(`SELECT login
       FROM unnest(ARRAY['ac_runner','ac_billing','ac_authorization','ac_system','ac_runs']) AS login WHERE has_function_privilege(login,$1,'EXECUTE') ORDER BY 1`,
       [signature])).rows.map(({ login }) => login);

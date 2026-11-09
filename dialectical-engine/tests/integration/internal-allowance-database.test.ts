@@ -36,7 +36,7 @@ async function owner() {
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  // With 0130's cross-account marker: since 0154 the funded run's admission and settlement, its pin and the funding and grant readers ask the
+  // With 0130's cross-account marker: since 0171 the funded run's admission and settlement, its pin and the funding and grant readers ask the
   // connection, and this login stands for their callers that name an account with no session, the runner's login and the API's system login
   // (P3-01's runner-runtime and api-system), which hold the marker; a request login answers only for its own session's account
   // (tests/integration/security-review-hardening-database.test.ts).
@@ -74,7 +74,7 @@ describe("internal funding is explicit database policy, never a staff role effec
     const actor = await owner();
     const context = (await runtime.query("SELECT staff.read_context($1,$2,$3) AS context", [actor.userId, actor.sessionId, hash(actor.privilegeId)])).rows[0].context;
     expect(context.capabilities).toEqual(coreCapabilities);
-    // 0154: the capability check is the cross-account marker's (the staff repository's site X14), so it is asked as the API's system login.
+    // 0171: the capability check is the cross-account marker's (the staff repository's site X14), so it is asked as the API's system login.
     expect((await asApiSystem("SELECT staff.authorize_action($1::jsonb,'ALLOWANCE_WRITE') AS allowed", [context])).allowed).toBe(false);
     expect((await database.pool.query("SELECT count(*)::int AS count FROM billing.internal_grant")).rows[0].count).toBe(0);
   });

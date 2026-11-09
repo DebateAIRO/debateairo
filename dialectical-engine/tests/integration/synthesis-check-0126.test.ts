@@ -97,7 +97,7 @@ describe("0126 synthesis check records and runtime boundaries", () => {
     const finalId = await insertResult(run, first.attemptId);
     const inherit = (role?: string) => withRuntime((client) => client.query(`SELECT serve.record_synthesis_check_inheritance(
       $1,$2,$3,2,$4)`, [first.attemptId,run.runId,run.answerId,finalId]), role);
-    // 0154: the writer is the cross-account marker's, so it is asked as the API's system login, its check worker's; the bare runtime role is refused.
+    // 0171: the writer is the cross-account marker's, so it is asked as the API's system login, its check worker's; the bare runtime role is refused.
     await expect(inherit(decodeURIComponent(new URL(logins!.url("API_SYSTEM_DATABASE_URL")).username))).rejects.toMatchObject({
       code: "23503", message: "SYNTHESIS_CHECK_ATTEMPT_MISMATCH"
     });

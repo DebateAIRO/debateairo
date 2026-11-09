@@ -265,7 +265,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     webResearched: { record: (ownerRef: string, runId: string, pageId: string) => new PostgresWebResearchedRepository(apiPool).record(ownerRef, runId, pageId),
       markActivity: async (ownerRef: string, runId: string) => { if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId); } },
     digPicks: new PostgresDigPicksRepository(apiPool), purposeLines: postgresPurposeLines(apiPool),
-    // The settlement on the same pool: the harness's login is a superuser, so it holds the cross-account marker that 0154 makes it need (main.ts: X29).
+    // The settlement on the same pool: the harness's login is a superuser, so it holds the cross-account marker that 0171 makes it need (main.ts: X38).
     publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), settlement: new PostgresPublicFlagRepository(apiPool), judge: () => flagJudge,
       seal: (ref: string, runId: string, value: unknown) => publications.withReviewKey(ref, runId, (each) => each.encrypt(value)), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     publicTree: { pool: apiPool, tree: new PostgresPublicTreeRepository(apiPool), contributions: new PostgresPublicDebateRepository(apiPool), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },

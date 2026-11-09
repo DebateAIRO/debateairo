@@ -10,7 +10,7 @@ export * from "./dig-picks.js";
  * through 0134's definers only. `PostgresDigModelRepository` runs on the API's own pool (debateai_billing_runtime, which
  * also reaches the runtime role's readers by membership); `PostgresDigModelRunnerRepository` on the runner's pool, whose
  * methods but `readPathRewrites` (debateai_runtime, which the API's answer read calls too) need the cross-account marker
- * (debateai_rls_all_accounts) since 0154: the runner, the scheduler and the API's system pool outside a request hold it,
+ * (debateai_rls_all_accounts) since 0171: the runner, the scheduler and the API's system pool outside a request hold it,
  * the API's request login does not.
  *
  * What the later tasks must respect:
@@ -18,7 +18,7 @@ export * from "./dig-picks.js";
  *   it is 10 (the contract's DIG_LEVEL_MAX); join with `PostgresInvestigationRepository.join`, which now calls
  *   identity.join_investigation_nested and answers TOO_DEEP itself under the locks (two quick clicks never reach 11).
  *   0133's identity.join_investigation kept its grant (an expand step revokes nothing) and no code called it; the security
- *   review's 0154 took it back, with 0134's owner readers of every level, of the rewrites and of the paused debates, which
+ *   review's 0171 took it back, with 0134's owner readers of every level, of the rewrites and of the paused debates, which
  *   no code called either (the runner and the answer read use the no-owner readers below).
  * - W3-5 (the path rewrite): when a dig settles, `takeRewriteTurn` for the path its picks came from; write only when
  *   `readRewriteTurn` says FRONT, on its `base_rewrite_id` (the path's current text; none: the story's line), then
@@ -161,7 +161,7 @@ export class PostgresDigModelRunnerRepository {
         record.content?.attestation ?? null])).rows[0]!.outcome;
   }
 
-  /** A live debate's rewrites (its paths' histories and its own as a dig); null when it is not a live private debate or, in a request, not the connection's own (0154). */
+  /** A live debate's rewrites (its paths' histories and its own as a dig); null when it is not a live private debate or, in a request, not the connection's own (0171). */
   async readPathRewrites(runId: string): Promise<PathRewritesRead | null> {
     return (await this.pool.query<{ rewrites: PathRewritesRead | null }>(
       "SELECT identity.read_path_rewrites_of_run($1) AS rewrites", [runId])).rows[0]?.rewrites ?? null;

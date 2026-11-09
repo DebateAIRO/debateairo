@@ -140,7 +140,7 @@ export async function createStaffRuntime(input: Readonly<{
     publicAppUrl: string;
     pool: Pool;
     /** Where a staff change's alert intent maps its key user to the audit token it seals for, inside the staff member's request: 0088's mapping
-     * is the cross-account marker's since 0154, so main.ts hands the request pool's system login (the cross-account site X14). */
+     * is the cross-account marker's since 0171, so main.ts hands the request pool's system login (the cross-account site X14). */
     mappingPool: Pool;
     keys: ReadableUserDekStore;
     operatorFiles?: StaffAlertConfigFiles;

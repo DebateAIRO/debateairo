@@ -16,7 +16,7 @@ describe("S04 threat report staff contract", () => {
     // Mutant: omit this page from SUPPORT_PAGE_ROUTES; changing its API path is a neighbour.
     expect(SUPPORT_PAGE_ROUTES).toContain("/admin/threat-reports");
   });
-  it("keeps no report: the repository has no keeper since 0154 took 0128's two back from the API's runtime role", () => {
+  it("keeps no report: the repository has no keeper since 0171 took 0128's two back from the API's runtime role", () => {
     // Property: no product path keeps a threat report through the repository; only the database's own owner may call the keepers.
     // Mutant: restore keepWithHeldEmail; a renamed list reader is a neighbour.
     expect(Object.getOwnPropertyNames(PostgresThreatReportRepository.prototype).filter((name) => /^keep/u.test(name))).toEqual([]);

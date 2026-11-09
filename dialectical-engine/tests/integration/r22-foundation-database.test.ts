@@ -13,9 +13,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * 0137 to 0140 on real PostgreSQL (plan 2026-10-31-r22-owner-changes, Foundation F1): the shapes the later lanes write. No feature logic
  * here: insert-once, plain-text refusals, a stranger's dig joining a public tree and paying for itself, a refused contribution staying
  * off the line, the climb's turns and the one line, the main answer's versions, the deletion keeping the quote and the notes, erasure,
- * export, and the funded window counting every spend kind. Data and amounts are made up. Since the security review's 0154 (F5) the API's
+ * export, and the funded window counting every spend kind. Data and amounts are made up. Since the security review's 0171 (F5) the API's
  * role runs here as each person's own request (its login carrying their live session), as its functions believe no other owner, and the
- * runner's login holds the cross-account marker as production's does (0154 moved the runner's readers and writers to it); 0138's owner
+ * runner's login holds the cross-account marker as production's does (0171 moved the runner's readers and writers to it); 0138's owner
  * readers of the line and the main answers and 0137's window reader of the public reports had no caller and are no role's any more, so
  * they are read here as the migrator.
  */
@@ -56,10 +56,10 @@ const asking = (person: Account): Pool => asRequestOf(requests, person.token);
 const publicDebates = (person: Account) => new PostgresPublicDebateRepository(asking(person));
 const publicTree = (person: Account) => new PostgresPublicTreeRepository(asking(person));
 const treeUpdates = (person: Account) => new PostgresTreeUpdateRepository(asking(person));
-/** 0138's owner reader of a debate's line, as the migrator (no role's since 0154). */
+/** 0138's owner reader of a debate's line, as the migrator (no role's since 0171). */
 const ownerLine = async (ownerRef: string, runId: string): Promise<readonly PathLineEntry[] | null> =>
   (await database.pool.query<{ line: PathLineEntry[] | null }>("SELECT identity.read_path_line($1,$2) AS line", [ownerRef, runId])).rows[0]?.line ?? null;
-/** 0138's owner reader of the main answer's versions, as the migrator (no role's since 0154). */
+/** 0138's owner reader of the main answer's versions, as the migrator (no role's since 0171). */
 const ownerMainAnswers = async (ownerRef: string, runId: string): Promise<readonly MainAnswerUpdateRead[] | null> =>
   (await database.pool.query<{ updates: MainAnswerUpdateRead[] | null }>("SELECT identity.read_main_answer_updates($1,$2) AS updates", [ownerRef, runId]))
     .rows[0]?.updates ?? null;
@@ -173,7 +173,7 @@ describe("0137: a stranger's dig joins a public tree", () => {
     const [ana, dan, eve] = [await account(), await account(), await account()];
     const root = await run(ana);
     const dig = await run(dan);
-    // A dig joins the publication through 0147's join (0137's first public join is retired: 0154 takes its grant back).
+    // A dig joins the publication through 0147's join (0137's first public join is retired: 0171 takes its grant back).
     const join = publicTree(dan);
     const input = { ownerRef: dan.ownerRef, parentRunId: root, childRunId: dig, positionRef: "pos-1" };
     // A debate not public under any link: nothing to join.
@@ -181,7 +181,7 @@ describe("0137: a stranger's dig joins a public tree", () => {
     const publicationRef = await publish(root);
     expect(await join.join({ ...input, publicationRef })).toEqual({ outcome: "JOINED", digLevel: 1 });
     expect((await join.join({ ...input, publicationRef })).outcome).toBe("ALREADY");
-    // Someone else's run is not theirs to join, and Dan's request names no one but Dan (0154, F5).
+    // Someone else's run is not theirs to join, and Dan's request names no one but Dan (0171, F5).
     expect((await publicTree(eve).join({ ...input, publicationRef, ownerRef: eve.ownerRef })).outcome).toBe("NOT_OWNED");
     expect((await join.join({ ...input, publicationRef, ownerRef: eve.ownerRef })).outcome).toBe("NOT_OWNED");
     // The contribution names the digger and the first debate; no investigation is written, so nothing goes with the first author's account.
@@ -260,7 +260,7 @@ describe("0137: a stranger's dig joins a public tree", () => {
     expect(await runnerRepo.readPageUpdates(publicationRef)).toEqual([]);
     expect(await publicDebates(dan).readOwn(dan.ownerRef, dig)).toEqual([expect.objectContaining({ dig_run_id: dig, outcome: "REFUSED" })]);
     expect(await publicDebates(ana).readOwn(ana.ownerRef, dig)).toEqual([]);
-    // 0154 (F5): Ana's request reads nothing of Dan's, and with no session the API's role names no one.
+    // 0171 (F5): Ana's request reads nothing of Dan's, and with no session the API's role names no one.
     expect(await publicDebates(ana).readOwn(dan.ownerRef, dig)).toEqual([]);
     expect(await new PostgresPublicDebateRepository(api).readOwn(dan.ownerRef, dig)).toEqual([]);
     // Its turn no longer holds the path: the next one writes on the story's line.
@@ -445,7 +445,7 @@ describe("0138: the climb's turns, the one line and the main answer", () => {
     expect((await sqlError(() => repo.recordPurposeLines(ana.ownerRef, plain, lines))).message).toBe("WEB_EVIDENCE_ENCRYPTION_REQUIRED");
     const other = await account();
     expect(await treeUpdates(other).recordPurposeLines(other.ownerRef, old, lines)).toBe("NOT_OWNED");
-    // 0154 (F5): a request names only its own session's account, and with no session the API's role names no one.
+    // 0171 (F5): a request names only its own session's account, and with no session the API's role names no one.
     for (const pool of [asking(other), api]) {
       expect(await sqlError(() => new PostgresTreeUpdateRepository(pool).recordPurposeLines(ana.ownerRef, old, lines)))
         .toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
@@ -550,7 +550,7 @@ describe("export and account erasure", () => {
     const lone = await run(dan);
     const publicationRef = await publish(root);
     expect((await publicTree(dan).join({ ownerRef: dan.ownerRef, publicationRef, parentRunId: root, childRunId: dig, positionRef: "pos-1" })).outcome).toBe("JOINED");
-    // The Free notice is a debate's that is no dig (0154 F2: a dig's is no one's, as the asks route never records one); dan's own debate has it.
+    // The Free notice is a debate's that is no dig (0171 F2: a dig's is no one's, as the asks route never records one); dan's own debate has it.
     expect(await publicDebates(dan).recordFreeNotice(dan.ownerRef, dig)).toBe("NOT_OWNED");
     expect(await publicDebates(dan).recordFreeNotice(dan.ownerRef, lone)).toBe("RECORDED");
     const lines = await sealed(dig, "identity.run_purpose_lines", dig);
@@ -610,14 +610,14 @@ describe("0137 and 0140: the money", () => {
     expect(Number(spent)).toBe(111_111);
     const team = (await database.pool.query<{ total: string }>("SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to])).rows[0]!.total;
     expect(Number(team)).toBeGreaterThanOrEqual(111_111);
-    // 0154 took the sum back from every role, the runner's included: staff's month reader asks it as its owner.
+    // 0171 took the sum back from every role, the runner's included: staff's month reader asks it as its owner.
     await expect(runner.query("SELECT staff.read_team_internal_spent($1,$2) AS total", [from, to])).rejects.toMatchObject({ code: "42501" });
     // Who pays a report on someone else's public debate: their window adds it.
     const repo = new PostgresPublicDebateRunnerRepository(runner);
     const charge = { spendId: randomUUID(), ownerRef: ana.ownerRef, investigationId: randomUUID(), reportVersion: 1, chargeMicros: 42 };
     expect(await repo.recordReportCharge(charge)).toBe("RECORDED");
     expect(await repo.recordReportCharge(charge)).toBe("ALREADY");
-    // 0137's window reader of these charges had no caller; 0154 took its grant back, so the migrator reads it.
+    // 0137's window reader of these charges had no caller; 0171 took its grant back, so the migrator reads it.
     expect(Number((await database.pool.query<{ spent: string }>("SELECT identity.read_public_report_spent($1,$2,$3) AS spent", [ana.ownerRef, from, to]))
       .rows[0]!.spent)).toBe(42);
   });

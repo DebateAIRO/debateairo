@@ -28,7 +28,7 @@ async function asRole<T extends Record<string, unknown> = Record<string, unknown
 }
 
 /**
- * `statement` on the API's system login, where it records each question check's cost since 0154 (F5; main.ts's site X31): its capability role and
+ * `statement` on the API's system login, where it records each question check's cost since 0171 (F5; main.ts's site X31): its capability role and
  * the cross-account marker. That shape lives for this transaction only, as the X27 case's below, so the role catalogue the last case reads gains no role.
  */
 async function asApiSystem<T extends Record<string, unknown> = Record<string, unknown>>(statement: string, values: unknown[] = []): Promise<T[]> {
@@ -92,7 +92,7 @@ async function proof(holder: Awaited<ReturnType<typeof actor>>, action: string, 
 }
 
 /**
- * Keeps a report as a seed would, on the test's own connection: no product code keeps one, and 0154 took 0128's two keepers back from
+ * Keeps a report as a seed would, on the test's own connection: no product code keeps one, and 0171 took 0128's two keepers back from
  * debateai_runtime, so only their owner's side of the database may call them.
  */
 async function keep(question: string, account: string | null = null): Promise<string> {
@@ -147,7 +147,7 @@ describe("0128 applied database", () => {
     }
   });
 
-  it("grants six staff functions to runtime, the alert loop and the erasure to the system logins' marker, and none to erasure runtime; no role may keep a report since 0154", async () => {
+  it("grants six staff functions to runtime, the alert loop and the erasure to the system logins' marker, and none to erasure runtime; no role may keep a report since 0171", async () => {
     for (const signature of ["keep_threat_report(text,uuid)","keep_threat_report_with_email(text,uuid,text)"]) {
       const rows = (await database.pool.query<{ runtime: boolean; erasure: boolean }>(
         "SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') runtime, has_function_privilege('debateai_erasure_runtime',$1,'EXECUTE') erasure",
@@ -165,7 +165,7 @@ describe("0128 applied database", () => {
         [`staff.${signature}`])).rows;
       expect(rows[0],signature).toEqual({runtime:true,erasure:false,marker:false});
     }
-    // 0154: the alert loop (its staff holder's account, its claim and its completion) and the erasure of the reports due run only on the API's gated
+    // 0171: the alert loop (its staff holder's account, its claim and its completion) and the erasure of the reports due run only on the API's gated
     // timers, outside any request, so on its system login: the cross-account marker's alone, never a request login's.
     for (const signature of ["threat_report_recipient_user(uuid)","erase_due_threat_reports()","claim_threat_report_alerts(integer)",
       "complete_threat_report_alert(uuid,uuid,boolean)"]) {
@@ -285,7 +285,7 @@ describe("0128 applied database", () => {
         [ref,`Retention ${i}`,i%2===0?-1:1,reported?"REPORTED":"UNREAD",reported,
           reported?holder.staffId:null]);
     }
-    // The API's gated hourly sweep, on its system login: its capability role and the cross-account marker, which holds the sweep since 0154. That
+    // The API's gated hourly sweep, on its system login: its capability role and the cross-account marker, which holds the sweep since 0171. That
     // shape lives for this transaction only, as the X27 case's below, so the role catalogue the last case reads gains no role.
     const sweep = await database.pool.connect();
     let erased = 0;
@@ -412,7 +412,7 @@ describe("0128 applied database", () => {
       ({rows: await asApiSystem(sql,values)})} as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0],entry);
     expect((await database.pool.query("SELECT spend_source,run_id,spend_phase,attempt_id FROM ledger.model_spend WHERE spend_id=$1",[spendId])).rows[0])
       .toEqual({spend_source:"QUESTION_CHECK",run_id:null,spend_phase:null,attempt_id:null});
-    // Since 0154 (F5) the runtime role may neither call the writer nor insert into the day's table; the system login, which may insert, meets the guard.
+    // Since 0171 (F5) the runtime role may neither call the writer nor insert into the day's table; the system login, which may insert, meets the guard.
     await expect(asRole("debateai_runtime","SELECT ledger.record_question_check_spend($1,$2,$3,4,3,2)",
       [randomUUID(),entry.providerRef,entry.chargedOn])).rejects.toMatchObject({message:"permission denied for function record_question_check_spend",code:"42501"});
     const raw=`INSERT INTO ledger.model_spend
@@ -437,7 +437,7 @@ describe("0128 applied database", () => {
   });
 
   it("records spend for both provider references made by the deployed transport", async () => {
-    // Property: each configured transport's provider identity is accepted by the real writer, on the API's system login (0154).
+    // Property: each configured transport's provider identity is accepted by the real writer, on the API's system login (0171).
     // Mutant: reject a colon in the provider reference; changing chargeMicros is a neighbour.
     for (const providerRef of [SUPPORT_RELAY_PROVIDER_REF, "vendor:anthropic"] as const) {
       const port = createQuestionCheckTransport({ providerRef, baseUrl: "http://127.0.0.1:1/v1",
@@ -488,7 +488,7 @@ describe("0128 applied database", () => {
   it("backfills the active owner capability with a revision, epoch and session revoke", async () => {
     expect((await database.pool.query("SELECT staff.valid_capabilities(ARRAY['THREAT_REPORT']::text[]) valid")).rows[0].valid)
       .toBe(true);
-    // 0154: the capability check is the cross-account marker's, which the API's staff repository's login holds (X14). It
+    // 0171: the capability check is the cross-account marker's, which the API's staff repository's login holds (X14). It
     // is asked as that login's shape, built for this transaction only, so the role catalogue the last case reads gains no role.
     const system = await database.pool.connect();
     try {

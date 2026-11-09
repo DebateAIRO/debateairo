@@ -6,7 +6,7 @@ import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationN1Compatibility, auditMigrationReplaySafety, definedFunctionNames, definedRelationNames, type N1AuditContext } from "../../tools/orphan-audit/src/index.js";
 
 /**
- * 0154 (the security review of 3 Nov 2026): the review's fixes in the database, one drained step. These read the migration's text, its loader, its manifest and
+ * 0171 (the security review of 3 Nov 2026): the review's fixes in the database, one drained step. These read the migration's text, its loader, its manifest and
  * the books: the n1 lines; that an earlier body changes only through the patch inventory, each anchor standing in that function's last definition as often as the
  * inventory says; that every earlier function it changes, its grants included, is declared against every chain step whose postcondition digests it, and
  * that it changes none the two steps before the chain pin; who may call each new function, and that no role holds its new table; what is taken back and
@@ -14,10 +14,10 @@ import { auditMigrationN1Compatibility, auditMigrationReplaySafety, definedFunct
  * below are the step's whole, F2 to F5: once it is applied anywhere, a later change is a step of its own. What the fixes do on real PostgreSQL is
  * tests/integration/security-review-hardening-database.test.ts's.
  */
-const NAME = "0154_security_review_hardening.sql";
+const NAME = "0171_security_review_hardening.sql";
 const SQL_PATH = `migrations/${NAME}`;
-const MANIFEST_PATH = "migrations/lineage/security-review-hardening-forward0154.json";
-const LOADER_PATH = "packages/db/src/migration-forward0154.ts";
+const MANIFEST_PATH = "migrations/lineage/security-review-hardening-forward0171.json";
+const LOADER_PATH = "packages/db/src/migration-forward0171.ts";
 const PREVIOUS = "0153_dig_tree_settled.sql";
 const PREVIOUS_MANIFEST_PATH = "migrations/lineage/dig-tree-settled-forward0153.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
@@ -239,7 +239,7 @@ const MOVED = [
   "identity.purge_expired_authentication_risk_signals(integer)",
   "serve.purge_expired_synthesis_check_removal_notices()",
   "legal.purge_expired_acceptance(timestamptz)",
-  // 0151's flag settlement, which believed the verdict it was handed: the API's press calls it after the judge, on its system login alone (X29).
+  // 0151's flag settlement, which believed the verdict it was handed: the API's press calls it after the judge, on its system login alone (X38).
   "identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
   // Staff's ceremonies and changes, which the API calls only through its staff repository on its system login (X14): 0085's grant, acceptance and
   // capability check, 0086's owned key ceremony and key reader, and 0088's user mapping, which a staff change's alert intent asks through the same site.
@@ -357,7 +357,7 @@ const ASKING = [
   { signature: "identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)", owner: "v.reporter_ref", kind: "flag" }
 ] as const;
 /**
- * F5: 0144's charge writer, which 0154 patches beside them (PERSON_GUARD) and which asks nothing of the connection: it is the marker's alone (MOVED),
+ * F5: 0144's charge writer, which 0171 patches beside them (PERSON_GUARD) and which asks nothing of the connection: it is the marker's alone (MOVED),
  * called after its AI call was paid, and the call's reservation, made on the request's own login while the session was live, names the person.
  */
 const CHARGE = { signature: "identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)" } as const;
@@ -421,7 +421,7 @@ const OWN_TRANSACTION = "pg_catalog.pg_current_xact_id()::xid";
  * F5: the account functions keyed by a user id the request logins call, each with the step that last wrote it, the owner its question names and its
  * patches, in step order. The session's own (its list's revocations, the age check and its confirmation, the consent and its record, the email
  * settings and the change's resend, the publication's event refs and its key provision's abandonment, the data export's status and download)
- * ask 0154's question of the account they are handed: a reader answers as for nothing stored, a writer does and writes nothing, and each answers
+ * ask 0171's question of the account they are handed: a reader answers as for nothing stored, a writer does and writes nothing, and each answers
  * as it does for an account with nothing to act on, before it updates, inserts or audits anything of the account's. The three sign-up writers
  * (the age check's record at sign-up, the region, the Italy approval), which a request makes with no session yet, write only for an account its own
  * transaction created (the row's xmin is the transaction's own).
@@ -728,7 +728,7 @@ const pinnedBy = (): ReadonlyMap<string, readonly string[]> => {
   const pins = new Map<string, readonly string[]>();
   const mentions = (text: string): number => (text.match(/\bpg_proc\b|\bpg_get_functiondef\b/gu) ?? []).length;
   for (const file of readdirSync(new URL("packages/db/src/", ROOT)).filter((entry) => /^migration-forward.*\.ts$/u.test(entry)
-      && !["migration-forward0154.ts", "migration-forward-chain.ts"].includes(entry))) {
+      && !["migration-forward0171.ts", "migration-forward-chain.ts"].includes(entry))) {
     const loader = read(`packages/db/src/${file}`);
     const step = /const NAME\s*=\s*["']([^"']+)["']/u.exec(loader)?.[1];
     expect(step, file).toBeDefined();
@@ -776,19 +776,19 @@ const pinnedBy = (): ReadonlyMap<string, readonly string[]> => {
   return pins;
 };
 
-describe("0154: the security review's fixes in the database", () => {
+describe("0171: the security review's fixes in the database", () => {
   it("follows 0153 last in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("import { loadForward0154 } from './migration-forward0154.js';");
-    expect(chain).toContain("loadForward0152,loadForward0153,loadForward0154]");
+    expect(chain).toContain("import { loadForward0171 } from './migration-forward0171.js';");
+    expect(chain).toContain("loadForward0152,loadForward0153,loadForward0171]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
-    expect(loader).toContain('const VERSION = "security-review-hardening-forward0154-v1";');
-    expect(loader).toContain('const MANIFEST_PATH = "lineage/security-review-hardening-forward0154.json";');
+    expect(loader).toContain('const VERSION = "security-review-hardening-forward0171-v1";');
+    expect(loader).toContain('const MANIFEST_PATH = "lineage/security-review-hardening-forward0171.json";');
     expect(loader).toContain('const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";');
     expect(loader).toContain(`const PREVIOUS = "${PREVIOUS}";`);
-    expect(loader).toContain("MIGRATION_FORWARD0154_");
-    expect(loader).toContain("export async function loadForward0154(");
+    expect(loader).toContain("MIGRATION_FORWARD0171_");
+    expect(loader).toContain("export async function loadForward0171(");
     for (const { signature } of ADDED) expect(loader, signature).toContain(`"${signature}"`);
     for (const { relation } of TABLES) expect(loader, relation).toContain(`"${relation}"`);
     // An earlier function it changes that no earlier step's postcondition digests is digested by its own: 0040's lock of a request's own runs (F5),
@@ -827,7 +827,7 @@ describe("0154: the security review's fixes in the database", () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string };
     expect(manifest).toEqual({
-      version: "security-review-hardening-forward0154-v1",
+      version: "security-review-hardening-forward0171-v1",
       baseRecipeSha256: previous.baseRecipeSha256,
       previous: { name: PREVIOUS, manifestSha256: sha256(read(PREVIOUS_MANIFEST_PATH)), verifierSha256: VERIFIER_130 },
       migration: { name: NAME, sha256: sha256(read(SQL_PATH)) },
@@ -1054,7 +1054,7 @@ describe("0154: the security review's fixes in the database", () => {
     for (const { signature, scope } of GUARDS) expect(contract, signature).toContain(`('${signature}', '${scope}', 'guard')`);
     for (const { signature, scopes } of SETTERS) for (const scope of scopes) expect(contract, signature).toContain(`('${signature}', '${scope}', 'definer')`);
     for (const refusal of ["F4a scope table", "F4a reachable %", "F4a guard % %", "F4a definer % %", "F4a setting still read"]) {
-      expect(contract, refusal).toContain(`'SECURITY_REVIEW_0154_CONTRACT ${refusal}'`);
+      expect(contract, refusal).toContain(`'SECURITY_REVIEW_0171_CONTRACT ${refusal}'`);
     }
   });
 
@@ -1282,11 +1282,11 @@ describe("0154: the security review's fixes in the database", () => {
     for (const stale of ["Still open, a known exposure older than this step", "closing 0144's alone would leave the two doors beside it",
       "a member's own session can still charge"]) expect(flat, stale).not.toContain(stale);
     // And the flag's: the settlement believed the verdict it was handed, so it moves to the marker and the API's press calls it after the judge on its
-    // system login (X29), so no request login records a verdict or hides a debate; the opening counts against the lower of the limits it is handed
+    // system login (X38), so no request login records a verdict or hides a debate; the opening counts against the lower of the limits it is handed
     // and the site's own sealed row, and refuses on a CURRENT release with none; a flag staff dismissed hides nothing; and what stays open: a
     // deployment that never switched to a release keeps the caller's numbers, and a flag a request opens outside the press stays CHECKING. The staff
     // notice of an automatic hide is no request login's to claim (the loops moved below).
-    for (const needle of ["believed the verdict of whoever called it", "no request login records a verdict", "X29", "after the judge",
+    for (const needle of ["believed the verdict of whoever called it", "no request login records a verdict", "X38", "after the judge",
       "identity.public_flag_site_limits", "the lower of the limits it is handed and the site's own", "PUBLIC_FLAG_LIMITS_UNRESOLVED", "never switched to a release",
       "staff dismissed", "stays CHECKING", "staff.claim_public_flag_notices"]) expect(flat, needle).toContain(needle);
     // And the engine's: its older run-keyed questions ask, what only the runner or the worker calls moves, and the two left alone on purpose are
@@ -1355,7 +1355,7 @@ describe("0154: the security review's fixes in the database", () => {
     }
     for (const refusal of ["F5 helper", "F5 reservation", "F5 reservation sweep", "F5 reservation reachable %", "F5 % grants % %", "F5 asks % %", "F5 owner believed",
       "F5 alert release %", "F5 account hold %", "F5 probe reader", "F5 day table %", "F5 day writers %", "F5 sequence %", "F5 work queue", "F5 clarify charge"]) {
-      expect(contract, refusal).toContain(`'SECURITY_REVIEW_0154_CONTRACT ${refusal}'`);
+      expect(contract, refusal).toContain(`'SECURITY_REVIEW_0171_CONTRACT ${refusal}'`);
     }
     // The contract pins the writer's question as the inventory writes it, asks that its owner may read the grants and still delete the reservations,
     // and pins the reservation's, the prune's and the sweep's text with the one window.
@@ -1422,7 +1422,7 @@ describe("0154: the security review's fixes in the database", () => {
     expect(contract).toContain(`v_definition := pg_catalog.pg_get_functiondef('${CHARGE.signature}'::regprocedure);`);
     for (const needle of ["OR pg_catalog.strpos(v_definition, 'request_owner_matches') > 0", "OR pg_catalog.strpos(v_definition, 'REQUEST_OWNER_MISMATCH') > 0",
       "OR pg_catalog.strpos(v_definition, 'UNOWNED') > 0", "pg_catalog.has_table_privilege(v_proowner, 'identity.ask_clarify_reservation', 'DELETE')",
-      "pg_catalog.has_table_privilege(v_proowner, 'billing.internal_grant', 'SELECT')", "RAISE EXCEPTION 'SECURITY_REVIEW_0154_CONTRACT F5 clarify charge';"]) {
+      "pg_catalog.has_table_privilege(v_proowner, 'billing.internal_grant', 'SELECT')", "RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 clarify charge';"]) {
       expect(contract, needle).toContain(needle);
     }
     expect(contract).not.toContain(`('${CHARGE.signature}', 'p_owner', `);
@@ -1453,7 +1453,7 @@ describe("0154: the security review's fixes in the database", () => {
     }
     for (const needle of ["an owner question would read a connection that is not the owner's", "every connection of a legacy debate (it names no owner)",
       "turn each refusal into an allowance"]) expect(flat, needle).toContain(needle);
-    expect(contract).toContain("'SECURITY_REVIEW_0154_CONTRACT F5 refusal asks %'");
+    expect(contract).toContain("'SECURITY_REVIEW_0171_CONTRACT F5 refusal asks %'");
     expect(contract).toContain("pg_catalog.strpos(pg_catalog.pg_get_functiondef(v_item.signature::regprocedure), 'identity.request_owner_matches(') > 0");
   });
 
@@ -1513,7 +1513,7 @@ describe("0154: the security review's fixes in the database", () => {
       expect(contract, signature).toContain(`('${signature}',`);
       expect(contract, signature).toMatch(new RegExp(`,\\s*${owner === null ? "NULL" : `'${owner.replace(/[()[\]{}.*+?^$|\\]/gu, "\\$&").replace(/'/gu, "''")}'`}\\)`, "u"));
     }
-    for (const refusal of ["F5 billing asks %", "F5 billing owner believed"]) expect(contract, refusal).toContain(`'SECURITY_REVIEW_0154_CONTRACT ${refusal}'`);
+    for (const refusal of ["F5 billing asks %", "F5 billing owner believed"]) expect(contract, refusal).toContain(`'SECURITY_REVIEW_0171_CONTRACT ${refusal}'`);
     expect(contract).toContain("p.proargnames && ARRAY['p_owner_ref','p_owner','p_run']::text[]");
     for (const exception of ["billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)", "billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)",
       "billing.consume_withdrawal_grant(uuid,uuid,uuid,text)", ...REFUSALS_LEFT.map(({ signature }) => signature).filter((signature) => signature.startsWith("billing."))]) {
@@ -1578,8 +1578,8 @@ describe("0154: the security review's fixes in the database", () => {
       expect(contract, signature).toContain(`('${signature}',`);
       expect(contract, signature).toMatch(new RegExp(`,\\s*${owner === null ? "NULL" : `'${owner.replace(/[()[\]{}.*+?^$|\\]/gu, "\\$&").replace(/'/gu, "''")}'`}\\)`, "u"));
     }
-    expect(contract).toContain("'SECURITY_REVIEW_0154_CONTRACT F5 account asks %'");
-    expect(contract).toContain("'SECURITY_REVIEW_0154_CONTRACT F5 delivery %'");
+    expect(contract).toContain("'SECURITY_REVIEW_0171_CONTRACT F5 account asks %'");
+    expect(contract).toContain("'SECURITY_REVIEW_0171_CONTRACT F5 delivery %'");
     // The delivery's overload: 0085's body, and before it touches the channel, the mail's own token among the account's verification credentials.
     const overload = bodyOf(sql, "identity.record_verification_delivery_with_audit");
     const original = bodyOf(code(read("migrations/0085_staff_access_foundation.sql")), "identity.record_verification_delivery_with_audit");
@@ -1663,7 +1663,7 @@ describe("0154: the security review's fixes in the database", () => {
     for (const { signature } of REFUSING) expect(contract, signature).toContain(`('${signature}', `);
     for (const refusal of ["F2 refuses %", "F2 Free path %", "F2 re-admission", "F2 key provision order", "F2 review order", "F2 dig row", "F2 dig row reachable %",
       "F2 dig row at creation", "F2 dig row backfill", "F2 dig row forget"]) {
-      expect(contract, refusal).toContain(`'SECURITY_REVIEW_0154_CONTRACT ${refusal}'`);
+      expect(contract, refusal).toContain(`'SECURITY_REVIEW_0171_CONTRACT ${refusal}'`);
     }
     // The API: the publish route asks right after the grant's check, before the answer is read under the content lease and before the synthesis gate.
     const api = read("apps/api/src/index.ts");
@@ -1783,7 +1783,7 @@ describe("0154: the security review's fixes in the database", () => {
     expect(contract).toContain("pg_catalog.has_table_privilege(v_proowner, 'identity.dig_run', 'INSERT')");
     expect(contract).toContain("pg_catalog.has_function_privilege(v_proowner, 'identity.run_is_dig(uuid)', 'EXECUTE')");
     expect(contract).toContain("'identity.forget_erased_debate_page_memory(uuid)'::regprocedure");
-    expect(contract).toContain("RAISE NOTICE 'SECURITY_REVIEW_0154 F2 % digs published before this step stay published");
+    expect(contract).toContain("RAISE NOTICE 'SECURITY_REVIEW_0171 F2 % digs published before this step stay published");
   });
 
   it("F5: the site's day is the system's to write: the runless writers and the day's tables move to the marker, the counter's allocator becomes a definer, and the contract checks each", () => {
@@ -1837,7 +1837,7 @@ describe("0154: the security review's fixes in the database", () => {
     }
     expect(contract).toContain(`ARRAY[${ROLES.map((role) => `'${role}'`).join(",")}]`);
     expect(contract).toContain("pg_catalog.has_function_privilege(v_role, v_item.signature, 'EXECUTE')");
-    expect(contract).toContain("'SECURITY_REVIEW_0154_CONTRACT F4b read_public_review'");
+    expect(contract).toContain("'SECURITY_REVIEW_0171_CONTRACT F4b read_public_review'");
     expect(sql.trimEnd().endsWith("$security_review_contract$;")).toBe(true);
   });
 
@@ -1862,12 +1862,12 @@ describe("0154: the security review's fixes in the database", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain(LOADER_PATH);
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/security-review-hardening-database.test.ts");
     const readme = read("migrations/lineage/README.md");
-    expect(readme.replace(/\s+/gu, " ")).toContain("(0154, below) the forty-fourth");
-    const heading = "## The security review's fixes in the database (0154)";
+    expect(readme.replace(/\s+/gu, " ")).toContain("(0171, below) the forty-fourth");
+    const heading = "## The security review's fixes in the database (0171)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(-1);
     const section = readme.slice(at, readme.indexOf("\n## ", at + heading.length)).replace(/\s+/gu, " ");
-    for (const needle of ["forty-fourth", NAME, "security-review-hardening-forward0154.json", LOADER_PATH, "`loadForward0154`", "MIGRATION_FORWARD0154_",
+    for (const needle of ["forty-fourth", NAME, "security-review-hardening-forward0171.json", LOADER_PATH, "`loadForward0171`", "MIGRATION_FORWARD0171_",
       "-- n1: drained", "-- n1: keeps-verifier", "amendsPostconditionsOf", "function_definition", "privilegeRevocations", "F3", "F4a", "F4b",
       "`identity.private_forget_scope`", "`open_forget_scope`", "`close_forget_scope`", "`forget_scope_open`", "0080", "0084",
       "F2", "`identity.run_is_dig`", "`identity.read_run_is_dig`", "`identity.dig_run`", "`core.create_encrypted_run`", "`digRun`", "`serve.prepare_publication_key_provision`", "`read_free_debates_to_publish`", "`DIG_NOT_PUBLISHABLE`",
@@ -1876,7 +1876,7 @@ describe("0154: the security review's fixes in the database", () => {
       "F5", "`identity.request_owner_matches`", "`identity.reserve_ask_clarify_charge`", "`identity.ask_clarify_reservation`", "`rls.context_owner_ref()`", "`debateai_rls_all_accounts`",
       "`REQUEST_OWNER_MISMATCH`", "`page_memory_run_owned`", "`identity.delete_ask_clarify_reservations_due`", "`ASK_CLARIFY_CHARGE_TAKEN`",
       "`billing.internal_grant`", "`ledger.record_language_check_spend`", "`ledger.record_question_check_spend`",
-      "`identity.public_flag_site_limits`", "`PUBLIC_FLAG_LIMITS_UNRESOLVED`", "X29", "stays `CHECKING`", "`record_provider_probe`", "X37",
+      "`identity.public_flag_site_limits`", "`PUBLIC_FLAG_LIMITS_UNRESOLVED`", "X38", "stays `CHECKING`", "`record_provider_probe`", "X37",
       "`release_alert_delivery` stays `debateai_runtime`'s", "`legal.purge_expired_acceptance`", "X14", "`mappingPool`", "`ELEVATION`", "`read_account_security_hold`",
       ...TAKEN.map(({ signature }) => `\`${nameOf(signature).slice(nameOf(signature).indexOf(".") + 1)}\``),
       ...SPEND_READERS.map((name) => `\`${name}\``),
@@ -1922,7 +1922,7 @@ describe("0154: the security review's fixes in the database", () => {
     }
     const preview = read("deploy/preview-auth-dev/v1/README.md");
     expect(preview).toContain(`\`migrations/${NAME}\` (after \`${PREVIOUS}\`, \`n1: drained\`)`);
-    for (const needle of ["`identity.delete_ask_clarify_reservations_due`", "the person's own grant", "within the hour", "X29", "`identity.public_flag_site_limits`", "X14",
+    for (const needle of ["`identity.delete_ask_clarify_reservations_due`", "the person's own grant", "within the hour", "X38", "`identity.public_flag_site_limits`", "X14",
       "0112's release stays the runtime's", "the billing functions keyed by a run or an owner ask too", "X22", "X11", "the site's day of spend is the system's to write",
       "X30 to X32", "X33", "`ledger.allocate_sequence()`", "`core.record_provider_probe`", "X37"]) {
       expect(preview, needle).toContain(needle);
