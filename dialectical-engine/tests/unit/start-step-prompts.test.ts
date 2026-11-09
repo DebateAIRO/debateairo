@@ -83,7 +83,10 @@ describe("the five drafted contracts", () => {
       + "already said about it. Then pick up to three other ways to read the question that the suggestions show and the asker may not have "
       + "weighed, each with one sentence saying what kind of surprise it is and a path that would look into it. Last, suggest up to nine changes: "
       + "two paths that ask almost the same thing and could be combined into one path (but you decided not to, because they do contain separate "
-      + "angles), with a short reason, or a path that fits inside another.");
+      + "angles), with a short reason, or a path that fits inside another. Write it in the question's language.");
+    // Task 91h (owner, 9 Nov: "Approve the words"): the "Combine?" reason's language, one sentence after the sentence that asks for it.
+    expect(START_STEP_DRAFT_CONTRACTS.merge.instruction.endsWith("with a short reason, or a path that fits inside another. "
+      + "Write it in the question's language.")).toBe(true);
     expect(START_STEP_DRAFT_CONTRACTS.mergeLate.instruction).toBe("More suggestions arrived for this question after its list of paths was made. "
       + "You are given the list so far, and the new suggestions, each with an id. Never change, reorder or remove a path of the list so far. Mark "
       + "every new suggestion that says the same as a suggestion already listed, or as another new one, as a repeat of it. Put the other new "
@@ -365,5 +368,69 @@ describe("review fixes: every rule holds whatever the reply's slips", () => {
     const late = startMergeLateSpec(CTX_EN, { said: [], prior: PRIOR, viewpoints: [viewpoint("pt21", "Ferry crews"), viewpoint("pt22", "Night")] })
       .read(reply({ repeats: [], paths: [{ ids: ["pt21", "pt22"], title: "Like kp00, but at night", question: "Would night crews change it?" }], fits: [] }));
     expect(late.paths).toEqual([{ ids: ["pt21", "pt22"], title: null, question: null }]);
+  });
+});
+
+// Task 91h (owner, 9 Nov: "Build them"): the start step's two most common list slips, recovered in code before the schema.
+describe("a list writer's common slips (Task 91h)", () => {
+  const parsedError = (classification: Readonly<{ parseStatus: string; parseError?: string | null }>): Array<{ path: unknown[]; message: string }> =>
+    classification.parseStatus === "PARSED" ? [] : JSON.parse(classification.parseError ?? "[]") as Array<{ path: unknown[]; message: string }>;
+  const withoutAngle = (title: string, at: number): Record<string, string> => {
+    const { angle_id: _angle, ...rest } = entry("g1", title, at);
+    return rest;
+  };
+  const ro = (title: string, question: string) => ({ angle_id: "g1", title, question,
+    why: "Dacă biletele nu acoperă costul, orașul plătește debarcaderul în fiecare an." });
+  const RO_PATHS = [
+    ro("Costul anual al debarcaderului", "Ar acoperi biletele de vară costul anual al personalului, al reparațiilor și al dragării?"),
+    ro("Cozile din timpul verii", "Ar scurta un al doilea debarcader cozile de la feribot în lunile cele mai aglomerate?"),
+    ro("Iarna fără turiști", "Ce ar face orașul cu al doilea debarcader în lunile de iarnă, când vin puțini turiști?"),
+    ro("Echipajele de noapte", "Ar trebui echipajele să lucreze ture mai lungi de noapte pentru al doilea debarcader?")
+  ];
+  // GLM's slip (practice 9 Nov, the kind only): one Chinese letter between two Romanian words.
+  const STRAY = ro("Locurile de parcare", "Ar avea orașul destule locuri de parcare 毙 lângă al doilea debarcader în timpul verii?");
+
+  it("A1: with one angle given, a path that leaves out angle_id (or sends null) is that angle's; the list is read whole", () => {
+    const spec = startListSpec(CTX_EN, [G1], 1);
+    const read = spec.read(reply({ paths: [entry("g1", "Whole-system costs", 0), withoutAngle("Winter traffic", 1),
+      { ...withoutAngle("The town's budget", 2), angle_id: null }] }));
+    expect(read.paths.map((path) => [path.angle_id, path.title])).toEqual([["g1", "Whole-system costs"], ["g1", "Winter traffic"], ["g1", "The town's budget"]]);
+    expect(spec.classify(reply({ paths: [withoutAngle("Winter traffic", 1)] })).parseStatus).not.toMatch(/FAILED/u);
+    // The same when the structure fixer repairs another slip of the reply.
+    expect(spec.read(reply({ notes: "Some thoughts.", paths: [withoutAngle("Winter traffic", 1)] })).paths.map((path) => path.angle_id)).toEqual(["g1"]);
+  });
+
+  it("A1: with two or more angles nothing changes: a path with no angle_id is still refused at its place", () => {
+    const issues = parsedError(startListSpec(CTX_EN, [G1, G2], 1).classify(reply({ paths: [entry("g1", "Whole-system costs", 0),
+      withoutAngle("Winter traffic", 1)] })));
+    expect(issues.map((one) => one.path)).toEqual([["paths", 1, "angle_id"]]);
+    // A wrong id is not a missing one: still left out, as before.
+    expect(issuesOf(startListSpec(CTX_EN, [G1], 1).classify(reply({ paths: [entry("g7", "Nobody's angle")] })))).toContain("START_LIST_EMPTY");
+  });
+
+  it("C1: a path with a stray Chinese, Japanese or Korean letter is left out whole; the rest of the list is kept", () => {
+    const spec = startListSpec(CTX_RO_LOCKED, [G1], 1);
+    expect(spec.read(reply({ paths: [RO_PATHS[0], STRAY, ...RO_PATHS.slice(1)] })).paths.map((path) => path.title))
+      .toEqual(RO_PATHS.map((path) => path.title));
+    // Up to six are still kept: a seventh path moves up when a stray one is left out.
+    const seven = [RO_PATHS[0], STRAY, ...RO_PATHS.slice(1), ro("Vântul de toamnă", "Ar putea vântul de toamnă să oprească feriboturile la al doilea debarcader?"),
+      ro("Prețul biletelor", "Ar crește prețul biletelor de feribot dacă orașul construiește al doilea debarcader?")];
+    expect(spec.read(reply({ paths: seven })).paths).toHaveLength(START_STEP_LIMITS.viewpointsPerListMax);
+  });
+
+  it("C1: with nothing left but stray paths the list is refused as today; the whole-list language reading is unchanged", () => {
+    const spec = startListSpec(CTX_RO_LOCKED, [G1], 1);
+    expect(parsedError(spec.classify(reply({ paths: [STRAY] })))).toEqual([{ code: "custom", path: ["paths"], message: "MAP_WRONG_LANGUAGE" }]);
+    const strayTwice = { ...RO_PATHS[1]!, why: "Cozile 毙 lungi alungă turiștii spre alte porturi în fiecare vară." };
+    expect(parsedError(spec.classify(reply({ paths: [STRAY, strayTwice] })))).toEqual([{ code: "custom", path: ["paths"], message: "MAP_WRONG_LANGUAGE" }]);
+    // A list in another language is still refused whole, stray letters or not.
+    const english = [0, 1, 2].map((at) => ({ angle_id: "g1", title: `The real yearly cost of running the second pier ${at}`,
+      question: "Would the yearly cost of staff, repairs and dredging be paid back by the extra summer fares the second pier brings in?",
+      why: "If the running costs are larger than the extra fares, the town pays for the pier every single year." }));
+    expect(parsedError(spec.classify(reply({ paths: [...english, STRAY] })))).toEqual([{ code: "custom", path: ["paths"], message: "MAP_WRONG_LANGUAGE" }]);
+    // A question that holds such letters itself turns the stray rule off: nothing is left out.
+    const quoting = startListSpec({ ...CTX_RO_LOCKED, questionLine: `${Q_RO} (毙)`,
+      replyLanguage: lockedReplyLanguageExpectation(RO, `${Q_RO} (毙)`) }, [G1], 1);
+    expect(quoting.read(reply({ paths: [RO_PATHS[0], STRAY] })).paths).toHaveLength(2);
   });
 });
