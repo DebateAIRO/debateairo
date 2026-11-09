@@ -16,10 +16,8 @@ vi.mock("next/link", () => ({
  * Owner's screen review, 3 Nov 2026 (journey-d2 A): the one waiting card, its parts in their order, and the fixes it
  * carries: clock times and nothing ticking (journey-f16), the shared state words (journey-f22), chips and no counts
  * (journey-f23), "taking longer" only past a measured time (wait-f8), the back link and level trail (wait-f12), the
- * reduced-motion line (wait-f17), [Try now] (wait-f19) and the classic link once at the bottom (wait-f23), drawn only when
- * the page hands one. The owner's answers of 5 Nov (question 12 B, journey-f19) put "Open in the classic view" in the account
- * menu only: that lands with the page's own wiring (the start-step's V4DebateClient and V4RunPaths stop handing it to the
- * screens and give it to the header), so no screen goes without it before then.
+ * reduced-motion line (wait-f17) and [Try now] (wait-f19). The card draws no classic-view link: the owner's answers of 5 Nov
+ * (question 12 B, journey-f19) put "Open in the classic view" in the account menu only.
  */
 const V4 = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
 const word = (key: string, values: Record<string, string> = {}): string =>
@@ -72,14 +70,13 @@ afterEach(() => {
 });
 
 describe("the one waiting card", () => {
-  it("shows its parts in the owner's order: question, the true state, Started, the choices, the page's part, leave, the classic link last", async () => {
+  it("shows its parts in the owner's order: question, the true state, Started, the choices, the page's part, leave last", async () => {
     await mount({
       question: "Should Romania build new nuclear plants?",
       startedAt: STARTED,
       choices: ["Romania", "Up to 2050", "To decide how I vote"],
       children: <p data-page-part="">The page's own part</p>,
-      notify: <button type="button" data-notify="">Tell me when it's ready</button>,
-      classicHref: "/debate/r-1"
+      notify: <button type="button" data-notify="">Tell me when it's ready</button>
     });
     const section = card();
     expect(section.getAttribute("data-wait-state")).toBe("LOOKING");
@@ -87,7 +84,7 @@ describe("the one waiting card", () => {
     expect(stateLine().getAttribute("role")).toBe("status");
     expect(stateLine().textContent).toBe("Looking into it");
     const order = [
-      "h1", "[data-wait-word]", "[data-wait-started]", ".v4ChoiceChips", "[data-page-part]", "[data-wait-leave]", ".v4WaitClassic"
+      "h1", "[data-wait-word]", "[data-wait-started]", ".v4ChoiceChips", "[data-page-part]", "[data-wait-leave]"
     ].map((selector) => section.querySelector(selector)!);
     for (let at = 1; at < order.length; at += 1) {
       expect(order[at - 1]!.compareDocumentPosition(order[at]!) & Node.DOCUMENT_POSITION_FOLLOWING, `${String(at)}`).toBeTruthy();
@@ -96,9 +93,8 @@ describe("the one waiting card", () => {
     const leave = section.querySelector("[data-wait-leave]")!;
     expect(leave.textContent).toContain("You can leave this page. It keeps going.");
     expect(leave.querySelector("[data-notify]")).not.toBeNull();
-    // The classic link once, at the very bottom, while the page hands one (question 12 B: until its wiring stops handing it).
-    expect(section.querySelectorAll("a[href='/debate/r-1']")).toHaveLength(1);
-    expect(section.lastElementChild!.classList.contains("v4WaitClassic")).toBe(true);
+    // The leave line is the card's last part: no classic link follows it (question 12 B: the account menu holds it).
+    expect(section.lastElementChild!.hasAttribute("data-wait-leave")).toBe(true);
   });
 
   it("says when it started as a clock time, and nothing ticks: no 'minutes ago', the same words an hour later", async () => {
@@ -225,7 +221,7 @@ describe("reduced motion (wait-f17)", () => {
   });
 });
 
-describe("lost touch, the way back and the classic link", () => {
+describe("lost touch and the way back", () => {
   it("'Trying again…' carries [Try now] (wait-f19)", async () => {
     const onTryNow = vi.fn();
     await mount({ reconnecting: true, onTryNow });
@@ -293,16 +289,9 @@ describe("lost touch, the way back and the classic link", () => {
     expect(card().querySelector("h1, h2, h3")).toBeNull();
   });
 
-  it("no classic link unless the page passes one, and never two (question 12 B: the page stops passing it, the menu has it)", async () => {
-    await mount();
-    expect(host!.querySelector(".v4WaitClassic")).toBeNull();
+  it("draws no classic-view link (question 12 B: the account menu holds it), and v4-wait.css keeps no rule for one", async () => {
+    await mount({ question: "Should Romania build new nuclear plants?", startedAt: STARTED, reconnecting: true });
     expect(host!.textContent).not.toContain(V4["v4.common.classicView"]);
-    await mount({ classicHref: null });
-    expect(host!.querySelector(".v4WaitClassic")).toBeNull();
-    await mount({ classicHref: "/debate/r-1" });
-    expect(host!.querySelectorAll("a").length).toBe(1);
-    expect(host!.querySelector(".v4WaitClassic a")!.textContent).toBe(V4["v4.common.classicView"]);
-    // Its small rule stays while a screen may still draw it (the start-step's V4RunPaths uses it too).
-    expect(readFileSync(resolve(process.cwd(), "apps/ui/app/v4/v4-wait.css"), "utf8")).toMatch(/\.v4WaitClassic \.v4Link \{[^}]*min-height: 44px/u);
+    expect(readFileSync(resolve(process.cwd(), "apps/ui/app/v4/v4-wait.css"), "utf8")).not.toContain(".v4WaitClassic");
   });
 });

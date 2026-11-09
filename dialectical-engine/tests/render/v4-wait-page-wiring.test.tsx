@@ -117,7 +117,7 @@ describe("Open in the classic view while the question waits (wait-f23)", () => {
   });
 });
 
-describe("question 12 B on the screens themselves: the classic link only when the page hands one", () => {
+describe("question 12 B on the screens themselves: the failed and paused screens draw no classic link", () => {
   const HOME: Record<string, string> = {};
   async function draw(node: ReactNode): Promise<HTMLElement> {
     const box = document.body.appendChild(document.createElement("div"));
@@ -131,21 +131,20 @@ describe("question 12 B on the screens themselves: the classic link only when th
   const classicIn = (box: HTMLElement): Element[] =>
     [...box.querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
 
-  it("the failed screen and the paused screen draw none without one, and one when handed one", async () => {
+  it("the failed screen and the paused screen draw no classic link (the account menu holds it)", async () => {
     const runId = crypto.randomUUID();
     const failed = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" } as RunProjection;
     const pausedRun = { ...running(runId), month_pause: { until: "2026-12-01T00:00:00.000Z", can_continue: false } } as RunProjection;
-    const failedScreen = (classicHref?: string) => (
-      <V4FailedScreen run={failed} askAgainHref="/v4?again=1" askHref="/v4" dig={null} catalog={CATALOG} homeCatalog={HOME}
-        {...(classicHref === undefined ? {} : { classicHref })} />
+    // Each screen must have drawn itself (so an empty box cannot pass), and still hold no classic-view link.
+    const failedBox = await draw(
+      <V4FailedScreen run={failed} askAgainHref="/v4?again=1" askHref="/v4" dig={null} catalog={CATALOG} homeCatalog={HOME} />
     );
-    const pausedScreen = (classicHref?: string) => (
-      <V4PausedScreen run={pausedRun} runId={runId} reconnecting={false} catalog={CATALOG} locale="en"
-        {...(classicHref === undefined ? {} : { classicHref })} />
+    expect(failedBox.querySelector(".v4DebFailed")).not.toBeNull();
+    expect(classicIn(failedBox)).toEqual([]);
+    const pausedBox = await draw(
+      <V4PausedScreen run={pausedRun} runId={runId} reconnecting={false} catalog={CATALOG} locale="en" />
     );
-    expect(classicIn(await draw(failedScreen()))).toEqual([]);
-    expect(classicIn(await draw(pausedScreen()))).toEqual([]);
-    expect(classicIn(await draw(failedScreen(`/debate/${runId}`))).map((link) => link.getAttribute("href"))).toEqual([`/debate/${runId}`]);
-    expect(classicIn(await draw(pausedScreen(`/debate/${runId}`))).map((link) => link.getAttribute("href"))).toEqual([`/debate/${runId}`]);
+    expect(pausedBox.querySelector(".v4DebPausedCard")).not.toBeNull();
+    expect(classicIn(pausedBox)).toEqual([]);
   });
 });
