@@ -15,6 +15,8 @@ import { ReportRenderGate } from "../../apps/ui/lib/report/reportRenderGate.js";
  * question's language. What the words prove: every part prints, the sources' addresses are real links, nothing beyond what the
  * version holds. What the drawing proves, for each script the site prints: real pages, no empty box (a glyph 0 is the font's
  * .notdef), its own face embedded. Arabic stays refused, as the debate's own report is. Made-up texts only.
+ * Round 2 (owner, 3 Nov 2026): r2-20, each path prints ONE trust word from its points, never an outcome tag; r2-13, a Free
+ * debate's PDF says "Not checked on the web.".
  */
 const LINK = "https://city.example.org/ferry-ridership?year=2025";
 
@@ -97,21 +99,33 @@ describe("what the report's PDF prints", () => {
   it("the question, what the debate points to, the paths by level, the parts of the story, the sources", () => {
     const model = buildInvestigationReportPdfModel({ question: "Should the city build a pier?", version: versionWith(words), catalogs: english });
     expect(model).toMatchObject({
-      question: "Should the city build a pier?", versionLine: "Version 2 · October 31, 2026", shortened: null,
+      question: "Should the city build a pier?", versionLine: "Version 2 · 31 October 2026", shortened: null,
       pointsTo: { title: "What the debate points to", lead: words.path, paragraphs: [words.answer], reservation: null },
       wouldChange: { title: "What would change the answer", text: words.note },
       paths: { title: "The paths", items: [
-        { level: 0, fateWords: "Partly held", line: words.path, summary: words.note, dig: null, points: [
+        { level: 0, trustWords: "Still argued", line: words.path, summary: words.note, dig: null, points: [
           { trustWords: "Sure", sideWords: "For", text: words.answer, marks: "[1]" }, { trustWords: "Still argued", sideWords: "Against", text: words.note, marks: null }] },
-        { level: 1, fateWords: "Held up", line: words.note, summary: null,
+        { level: 1, trustWords: "Sure, for the case named", line: words.note, summary: null,
           points: [{ trustWords: "Sure, for the case named", sideWords: "For", text: words.path, marks: null }, { trustWords: "Didn't hold", sideWords: null, text: words.note, marks: null }, { trustWords: null, sideWords: "Against", text: words.answer, marks: null }],
           dig: { title: "Follow-up debate", picks: [words.note], ownView: { title: "The person's own view", words: [words.path], verdict: `It helped. ${words.note}` }, changed: { title: "What it changed", items: [words.answer] } } },
-        { level: 2, fateWords: null, line: words.answer, points: [], dig: { ownView: { verdict: `It did not help. ${words.path}` }, changed: null } },
-        { level: 3, fateWords: "Fell", points: [], dig: { ownView: { verdict: `It was not settled. ${words.note}` } } }] },
+        { level: 2, trustWords: null, line: words.answer, points: [], dig: { ownView: { verdict: `It did not help. ${words.path}` }, changed: null } },
+        { level: 3, trustWords: "Didn't hold", points: [], dig: { ownView: { verdict: `It was not settled. ${words.note}` } } }] },
       howItWent: { title: "How the investigation went", paragraphs: [words.note] },
       stillOpen: { title: "What is still open", items: [words.note] },
       sources: { title: "Sources", items: [{ number: "1", site: "city.example.org", title: "Ferry ridership", note: words.path, quote: words.note, link: LINK }] }
     });
+    expect(model.webNote).toBeNull();
+    // r2-20: no outcome tag anywhere in the PDF's words.
+    const printed = JSON.stringify(model);
+    for (const tag of ["Held up", "Partly held", "Set aside", "Fell"]) expect(printed, tag).not.toContain(tag);
+  });
+
+  it("r2-13: a Free debate's PDF says it was not checked on the web, in the question's language", async () => {
+    expect(buildInvestigationReportPdfModel({ question: "Q?", version: versionWith(words), catalogs: english, free: true }).webNote)
+      .toBe("Not checked on the web.");
+    const romanian = await catalogsOf("ro");
+    expect(buildInvestigationReportPdfModel({ question: "Q?", version: versionWith(words), catalogs: romanian, free: true }).webNote)
+      .toBe("Nu a fost verificat pe web.");
   });
 
   it("says when a version kept a reservation or was shortened; a version from before R22 has no paths and no addresses, and still prints", async () => {
@@ -177,7 +191,7 @@ describe("a big tree in the PDF (decision 27)", () => {
   it("keeps a deep tree's model plain: all 41 paths, indented by their level, the point's numbers its sources' places", async () => {
     const model = buildInvestigationReportPdfModel({ question: "Q?", version: bigTree(words), catalogs: await catalogsOf("en") });
     expect(model.paths!.items).toHaveLength(41);
-    expect(model.paths!.items.at(-1)).toMatchObject({ level: 10, fateWords: "Fell" });
+    expect(model.paths!.items.at(-1)).toMatchObject({ level: 10, trustWords: "Didn't hold" });
     expect(model.paths!.items[1]!.points.map((point) => point.marks)).toEqual(["[1]", "[2]", "[3]", "[4]"]);
     expect(model.sources!.items[11]!.number).toBe("12");
   });
@@ -214,6 +228,15 @@ describe("GET and HEAD /v4/debate/{id}/report/pdf", () => {
     expect(rendered!.question).toBe("Should the city build a pier?");
     expect(rendered!.version.report_version).toBe(2);
     expect(rendered!.version.answer.segments).toEqual(["Newest answer."]);
+  });
+
+  it("r2-13: tells the PDF whether the first debate ran on Free", async () => {
+    const madeWith: boolean[] = [];
+    const render = async (made: { free: boolean }) => { madeWith.push(made.free); return Buffer.from("%PDF-"); };
+    await handleInvestigationReportRequest(input({ render }));
+    const free = reader({ readRunAnswer: async (id: string) => ({ ...answerOf(id, "Should the city build a pier?"), web: { paths: [{ search: { status: "NOT_ON_PLAN" } }] } }) as unknown as Answer });
+    await handleInvestigationReportRequest(input({ client: () => free, render }));
+    expect(madeWith).toEqual([false, true]);
   });
 
   it("refuses without a session (401), with no finished version (404), and for another account's debate (404), in plain words", async () => {

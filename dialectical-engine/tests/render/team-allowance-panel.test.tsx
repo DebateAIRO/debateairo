@@ -89,7 +89,7 @@ describe("what the Owner reads", () => {
     expect(text()).toContain("Spent $1.25 of $30.00. Up to $3.00 a day and $10.00 a week.");
     expect(text()).toContain("The most you can give: $50.00 in total, $5.00 a day, $20.00 a week, for 30 days.");
     expect(text()).toContain(`${name(HOLDER)} was given $30.00, up to $3.00 a day and $10.00 a week`);
-    expect(text()).toContain(`${name(MEMBER)}'s allowance ended: they left the team or were disabled`);
+    expect(text()).toContain(`${name(MEMBER)}'s quota ended: they left the team or were disabled`);
     expect(text()).toContain(english["staff.teamAllowance.notice.FAILED"]);
     expect([...host.querySelectorAll("option")].map(option => option.getAttribute("value"))).toEqual(["", OWNER, MEMBER]);
   });
@@ -151,7 +151,7 @@ describe("taking back", () => {
     const api = server(basePage);
     await mount(api);
     await act(async () => button(english["staff.teamAllowance.takeBack"])!.click());
-    expect(text()).toContain(`Take back ${name(HOLDER)}'s allowance?`);
+    expect(text()).toContain(`Take back ${name(HOLDER)}'s quota?`);
     await confirm();
     expect(api.proofs()[0]).toMatchObject({ action: "TEAM_ALLOWANCE_REVOKE", target_staff_id: HOLDER, grant_id: GRANT, expected_revision: 4 });
     expect(api.calls.some(call => call.method === "DELETE" && call.path === `/v1/admin/team-allowances/${HOLDER}/${GRANT}`)).toBe(true);

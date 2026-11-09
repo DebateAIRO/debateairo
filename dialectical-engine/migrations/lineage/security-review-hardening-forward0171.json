@@ -2,13 +2,13 @@
   "version": "security-review-hardening-forward0171-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0153_dig_tree_settled.sql",
-    "manifestSha256": "18acdf49bf4b4b8586f29af9be719d7eefe4771afd57e271aa2a996b9b2f5050",
+    "name": "0170_outbound_mail_limit.sql",
+    "manifestSha256": "8182b49090d9601a2b366fb2f78494713b313e991e67707dfe3551a32494c6f6",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
     "name": "0171_security_review_hardening.sql",
-    "sha256": "136e48bb0eaa7fd460214a0ecd20d01bc3a336e450f334000bafd8ae86f695d3"
+    "sha256": "a00d8a41232985a0ad9433d3bd5f8b0cda0e08187d33896c98f65cc27129caae"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

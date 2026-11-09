@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.12 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.17 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.12
+endMarker: SĄLYGŲ PABAIGA · v2.17
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.12 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.17 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Nemokamame plane jūsų debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane jie yra privatūs, nebent juos paskelbiate. Viešus tapusius debatus gali skaityti bet kas, ir jie lieka vieši. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -170,9 +170,9 @@ Mokamame plane debatai yra **privatūs pagal numatytuosius nustatymus**: niekas,
 
 ## 10. Pranešimai apie turinį, moderavimas ir skundai
 
-**Apie turinį gali pranešti bet kas.** Paskyros turėti nereikia. Rašykite adresu support@dezbatere.ro. Jei esate prisijungę, taip pat galite naudoti mygtuką **Pranešti** bet kuriame viešame debate. DI perskaito pranešimą, pateiktą naudojant mygtuką, šalia viešo teksto. Jei DI sutinka, debatas iš karto paslepiamas, o asmuo jį peržiūri. Jei DI nesutinka, galite pranešti dar kartą nurodydami daugiau detalių, ir asmuo tai perskaitys. Kad galėtume imtis veiksmų, nurodykite: kodėl manote, kad turinys yra neteisėtas arba pažeidžia šias Sąlygas, ir pateikite pakankamai informacijos teiginiui suprasti; tikslią vietą — visą URL ir, jei galite, ištrauką; savo vardą, pavardę ir el. pašto adresą (jų nereikia pranešant apie seksualinės prievartos prieš vaikus medžiagą); ir patvirtinkite, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus.
+**Apie turinį gali pranešti bet kas.** Paskyros turėti nereikia. Rašykite adresu support@dezbatere.ro. Jei esate prisijungę, taip pat galite naudoti mygtuką **Pranešti** bet kuriame viešame debate; jis paprašo patvirtinti, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus. DI paprastai perskaito pranešimą, pateiktą naudojant mygtuką, šalia viešo teksto. Jei DI sutinka, o debatas dar niekada nebuvo paslėptas, debatas iš karto paslepiamas, nedalyvaujant jokiam asmeniui, o paskui asmuo jį peržiūri. Pranešimas vietoj to iš karto perduodamas asmeniui, kai debatas jau buvo paslėptas anksčiau, kai jau esate apie jį pranešę arba kai tos dienos automatinės patikros yra išnaudotos. Jei DI nesutinka arba pranešimas sustabdomas automatiškai (pavyzdžiui, todėl, kad per valandą išsiuntėte daug pranešimų, arba debatas nėra viešas), jo neperskaito joks asmuo: galite rašyti adresu support@dezbatere.ro ir asmuo jį perskaitys arba pateikti skundą toliau aprašyta tvarka. Kad galėtume imtis veiksmų, nurodykite: kodėl manote, kad turinys yra neteisėtas arba pažeidžia šias Sąlygas, ir pateikite pakankamai informacijos teiginiui suprasti; tikslią vietą — visą URL ir, jei galite, ištrauką; savo vardą, pavardę ir el. pašto adresą (jų nereikia pranešant apie seksualinės prievartos prieš vaikus medžiagą); ir patvirtinkite, kad sąžiningai manote, jog jūsų pranešimas tikslus ir išsamus.
 
-Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Pranešimus nagrinėjame laiku, rūpestingai, nešališkai ir objektyviai, pranešame jums savo sprendimą ir paaiškiname, kaip jį apskųsti. Jei pranešimui nagrinėti arba sprendimui priimti naudojame automatizuotas priemones, apie tai informuojame. Gavę pagrįstą prašymą, dėl be sutikimo bendrintų intymių atvaizdų imamės veiksmų **per 48 valandas**.
+Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami: iš karto ekrane, o dėl pranešimo, kurį perskaitys asmuo, — ir el. paštu. Pranešimus nagrinėjame laiku, rūpestingai, nešališkai ir objektyviai, el. paštu pranešame jums savo sprendimą ir paaiškiname, kaip jį apskųsti. Jei pranešimui nagrinėti arba sprendimui priimti naudojame automatizuotas priemones, apie tai informuojame. Gavę pagrįstą prašymą, dėl be sutikimo bendrintų intymių atvaizdų imamės veiksmų **per 48 valandas**.
 
 **Dviejų rūšių automatizuoti sprendimai, kurie atskiriami vieni nuo kitų.**
 
@@ -183,7 +183,7 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 
 **Kur priklauso klausimų patikra.** 8 skyriuje nurodyta klausimų patikra taip pat nėra variklio viduje priimamas sprendimas. Tai automatizuota priemonė, kuri atsisako pradėti debatus be žmogaus dalyvavimo. Klausimas, kuris primena krizę patiriančio žmogaus žodžius arba kuriame klausiama apie savižudybės ar savęs žalojimo būdus ar prašoma paskatinimo tai daryti, vietoje atsisakymo gauna ekraną su pagalbos telefonų numeriais.
 
-**Motyvų pareiškimas.** Kai pašaliname jūsų turinį ar apribojame jo matomumą arba sustabdome ar uždarome jūsų paskyrą, pateikiame motyvų pareiškimą: ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės ir ar jie gauti iš pranešimo, ar nustatyti mūsų pačių patikros metu, ar naudotos automatizuotos priemonės, koks yra teisinis ar sutartinis pagrindas ir kaip galite užginčyti sprendimą: pasinaudodami toliau aprašyta skundų teikimo tvarka, kreipdamiesi į pagal ES Skaitmeninių paslaugų aktą sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą. Kai mūsų klausimų patikra atmeta klausimą pagal 7 skyriaus pastraipą „Klausimai, dėl kurių debatai neprasideda“, ekranas, kuris jums tai praneša, yra mūsų motyvų pareiškimas dėl jo: jame nurodoma, kad debatai neprasidėjo, kad mūsų automatinė patikra klausimą atmetė be žmogaus dalyvavimo, kuria šių Sąlygų taisykle remiantis klausimas atmestas ir kaip skųstis pagal toliau aprašytą skundų teikimo tvarką. Dėl atmesto klausimo nežadame nieko daugiau. Kai mūsų patikra ištrina debatus (9 skyrius), pranešimas, kurį matote, yra mūsų motyvų pareiškimas dėl to: jame nurodoma, ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės, kad joks žmogus nedalyvavo, kuri šių Sąlygų taisyklė taikoma ir kaip skųstis pagal toliau aprašytą skundų teikimo tvarką; kitos dvi šioje pastraipoje nurodytos galimybės jums lieka atviros. Ekranas su pagalbos telefonų numeriais, kurį gauna klausimas, kuris primena krizę patiriančio žmogaus žodžius, yra pagalba, o ne motyvų pareiškimas.
+**Motyvų pareiškimas.** Kai pašaliname jūsų turinį ar apribojame jo matomumą arba sustabdome ar uždarome jūsų paskyrą, pateikiame motyvų pareiškimą: ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės ir ar jie gauti iš pranešimo, ar nustatyti mūsų pačių patikros metu, ar naudotos automatizuotos priemonės, koks yra teisinis ar sutartinis pagrindas ir kaip galite užginčyti sprendimą: pasinaudodami toliau aprašyta skundų teikimo tvarka, kreipdamiesi į pagal ES Skaitmeninių paslaugų aktą sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą. Jį išsiunčiame jums el. paštu kartu su nuoroda į visą motyvų pareiškimą jūsų paskyroje, skiltyje Nustatymai, Moderavimo pranešimai, kur jis ir lieka. Jį gaunate ir tada, kai jūsų turinys pašalinamas iš viešo puslapio kartu su kitu mūsų peržiūrimu turiniu, net jei nenustatyta, kad jūsų turinys pažeidė kokią nors taisyklę. Kai mūsų klausimų patikra atmeta klausimą pagal 7 skyriaus pastraipą „Klausimai, dėl kurių debatai neprasideda“, ekranas, kuris jums tai praneša, yra mūsų motyvų pareiškimas dėl jo: jame nurodoma, kad debatai neprasidėjo, kad mūsų automatinė patikra klausimą atmetė be žmogaus dalyvavimo, kuria šių Sąlygų taisykle remiantis klausimas atmestas ir kaip skųstis pagal toliau aprašytą skundų teikimo tvarką. Dėl atmesto klausimo nežadame nieko daugiau. Kai mūsų patikra ištrina debatus (9 skyrius), pranešimas, kurį matote, yra mūsų motyvų pareiškimas dėl to: jame nurodoma, ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės, kad joks žmogus nedalyvavo, kuri šių Sąlygų taisyklė taikoma ir kaip skųstis pagal toliau aprašytą skundų teikimo tvarką; kitos dvi šioje pastraipoje nurodytos galimybės jums lieka atviros. Ekranas su pagalbos telefonų numeriais, kurį gauna klausimas, kuris primena krizę patiriančio žmogaus žodžius, yra pagalba, o ne motyvų pareiškimas.
 
 **Skundas dėl sprendimo.** Jei nesutinkate su moderavimo sprendimu, per **šešis mėnesius** atsakykite į motyvų pareiškimą arba rašykite adresu office@dezbatere.ro. Sprendimą peržiūrės priimant pirminį sprendimą nedalyvavęs žmogus, o mes pranešime jums motyvuotą rezultatą. Tai neturi įtakos jūsų teisei kreiptis į teismą ar naudotis alternatyviu ginčų sprendimu pagal 18 skyrių. Pagal skundų teikimo tvarką taip pat galima skųstis dėl to, kad nesiėmėme veiksmų gavę pranešimą, kad turinys buvo pašalintas neteisingai, kad paskyra buvo nepagrįstai apribota arba kad automatizuota priemonė netinkamai paveikė jūsų turinį, pavyzdžiui, atmesdama klausimą.
 
@@ -211,11 +211,9 @@ Nutraukus sutartį toliau taikomi 8 skyrius (jau paskelbtam turiniui), 15, 16 ir
 
 ## 12. Mokami planai
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine siūlo nemokamą planą. Bus prieinami trys mokami planai, **Plus**, **Pro** ir **Max**; kiekvienas iš jų suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
 
-Dialectical Engine siūlo nemokamą planą. Mokamas planas **Premium** bus prieinamas; jis suteikia prieigą prie viso modelių sąrašo ir leidžia patiems nustatyti debatų parametrus.
-
-**Prieš jums mokant** tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta **Prenumeruoti ir mokėti** (rumunų kalba — *Comandă cu obligație de plată*). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma.
+**Prieš jums mokant** tiesiai virš mokėjimo mygtuko parodome: planą; bendrą kainą su taikomais mokesčiais; atsiskaitymo laikotarpį; tai, kad planas automatiškai atnaujinamas, kol jo neatšaukiate; nemokamo bandomojo laikotarpio pabaigos datą ir po jos mokėtiną sumą; ir kaip atšaukti planą. Atnaujinimo sąlygas patvirtinate pažymėdami atskirą langelį. Ant mygtuko parašyta **Prenumeruoti ir mokėti** (rumunų kalba — *Abonați-vă și plătiți*). Patvariojoje laikmenoje atsiunčiame patvirtinimą su ta pačia informacija, šiomis Sąlygomis ir sutarties atsisakymo forma.
 
 **Priminimai.** El. paštu jums primename bent prieš 5 dienas iki nemokamo bandomojo laikotarpio pakeitimo mokamu planu; bent kartą per metus, jei planas tęstinis; ir likus 30–45 dienoms iki dvylikos mėnesių ar ilgesnio laikotarpio atnaujinimo. Kiekviename priminime nurodoma kaina, data ir pateikiama atšaukimo nuoroda.
 
@@ -225,7 +223,7 @@ Dialectical Engine siūlo nemokamą planą. Mokamas planas **Premium** bus priei
 
 **Nepavykę mokėjimai.** Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname.
 
-**Mokesčiai ir kam mokate.** Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
+**Mokesčiai ir kam mokate.** Mūsų kainos rodomos be mokesčių, kaip kaina + PVM (arba GST ar pardavimo mokestis, priklausomai nuo jūsų gyvenamosios vietos). Jūsų atsiskaitymo adresui taikomas mokestis pridedamas apmokėjimo metu, o atsiskaitymo puslapyje prieš jums mokant parodoma bendra mokėtina suma su mokesčiais. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
 
 **Mokėjimo būdai.** Mokate kortele. Priimame Visa ir Mastercard korteles; American Express kortelių nepriimame. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com), o visas jūsų kortelės numeris niekada nepasiekia mūsų.
 
@@ -233,7 +231,7 @@ Dialectical Engine siūlo nemokamą planą. Mokamas planas **Premium** bus priei
 
 **Mokėjimo grąžinimo ginčai.** Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome.
 
-**Pirmiausia — įstatymų nustatytos teisės.** Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, jei mokamą planą nutraukiate atsiskaitymo laikotarpiu, grąžiname tą laikotarpio kainos dalį, kurios nepanaudojote, matuojamą pagal plano naudojimą, nepaisant to, kiek dienų praėjo: jei panaudojote 30 %, grąžiname 70 %; jei nepanaudojote nieko, grąžiname visą kainą. Prašymą teikite adresu support@dezbatere.ro; kai grąžiname pinigus, planas baigiasi. Jei taikoma ir 13 skyriuje nustatyta atsisakymo teisė, gaunate didesnę iš šių grąžinamų sumų. Abiejų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame.
+**Pirmiausia — įstatymų nustatytos teisės.** Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, jei mokamą planą nutraukiate atsiskaitymo laikotarpiu, grąžiname tą laikotarpio kainos dalį, kurios nepanaudojote, matuojamą pagal plano naudojimą, nepaisant to, kiek dienų praėjo: jei panaudojote 30 %, grąžiname 70 %; jei nepanaudojote nieko, grąžiname visą kainą. Prašymą teikite adresu support@dezbatere.ro; kai grąžiname pinigus, planas baigiasi. Jei taikoma ir 13 skyriuje nustatyta atsisakymo teisė, gaunate didesnę iš šių grąžinamų sumų. Visų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame.
 
 ## 13. Jūsų teisė atsisakyti sutarties
 
@@ -250,6 +248,16 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
+
+2.17 versija pakeitė 2.16 versiją: 10 skyriuje nurodyta, kada mygtuku Pranešti pateiktą pranešimą skaito DI, o kada asmuo, kad mygtukas prašo jūsų sąžiningumo patvirtinimo, kad pranešimo gavimą patvirtiname ir savo sprendimą pranešame el. paštu ir kad motyvų pareiškimai siunčiami el. paštu ir saugomi jūsų paskyroje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
+
+2.16 versija pakeitė 2.15 versiją: 12 skyriuje nurodyti mokami planai, Plus, Pro ir Max, o 12 ir 15 skyriuose nebėra rengimo pastabų; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
+
+2.15 versija pakeitė 2.14 versiją: 12 skyriuje nurodyta, kad mūsų kainos rodomos be mokesčių, kaip kaina + PVM, ir kad mokestis pridedamas apmokėjimo metu.
+
+2.14 versija pakeitė 2.13 versiją: 18 skyriuje ir A priede alternatyvaus ginčų sprendimo keliu nurodyta ANPC (SAL).
+
+2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodytas mokėjimo mygtuko užrašas rumunų kalba.
 
 2.12 versija pakeitė 2.11 versiją: 10 skyriuje nurodyta, kad prisijungęs asmuo taip pat gali naudoti mygtuką Pranešti bet kuriame viešame debate, kad DI perskaito pranešimą, pateiktą jį naudojant, šalia viešo teksto, ir kas tada įvyksta.
 
@@ -273,8 +281,6 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 **Nuo mūsų nepriklausantys įvykiai.** Sutarties nepažeidžiame, kai negalime jos vykdyti dėl pagrįstai mūsų nekontroliuojamų aplinkybių. Trečiosios šalies modelio teikėjo veiklos sutrikimas ar pasitraukimas savaime nėra tokia aplinkybė; jei dėl to paslauga tampa neprieinama, taikomas 14 skyrius, todėl galite nutraukti sutartį ir susigrąžinti pinigus jame nustatyta tvarka.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Intelektinė nuosavybė
 
 Pati paslauga — programinė įranga, variklis, vertinimo metodas, sąsaja, pavadinimai Dialectical Engine ir DebateAIRO bei mūsų logotipai — priklauso mums arba mūsų licencijų davėjams. Šios Sąlygos suteikia jums leidimą naudotis paslauga, o ne nuosavybės teisę į ją.
@@ -297,7 +303,7 @@ Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbate
 
 **Kitur gyvenantys vartotojai.** Jei gyvenate ne ES ar EEE, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal *Código de Defesa do Consumidor* ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus.
 
-**Prieš kreipiantis į teismą.** Susisiekite su mumis adresu support@dezbatere.ro; daugumą dalykų galima išspręsti ir siekiame atsakyti per 5 darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per www.onoratainstanta.ro; mes neįsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
+**Prieš kreipiantis į teismą.** Susisiekite su mumis adresu support@dezbatere.ro; daugumą dalykų galima išspręsti ir siekiame atsakyti per 5 darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per ANPC (SAL), reclamatiisal.anpc.ro; mes neįsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
 
 ## 19. Kitos sąlygos
 
@@ -319,7 +325,7 @@ Kiekvienas įrašas taikomas žmonėms, gyvenantiems jo regione, ir jame nurodom
 
 ### A.1 Europos Sąjunga ir Europos ekonominė erdvė
 
-Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. **Italija:** sustabdymo ir nutraukimo (11), mokamų planų ir jų atnaujinimo (12), pakeitimų (14), atsakomybės (15) bei taikytinos teisės ir ginčų nagrinėjimo vietos (18) nuostatoms pagal Italijos civilinio kodekso 1341 ir 1342 straipsnius būtinas konkretus jūsų pritarimas. Jį duodate registruodamiesi pažymėdami atskirą langelį; jis rodomas kiekvienam, kuris lauke „Regionas“ pasirenka Italiją arba jungiasi iš Italijos. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski.
+Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per ANPC (SAL), reclamatiisal.anpc.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. **Italija:** sustabdymo ir nutraukimo (11), mokamų planų ir jų atnaujinimo (12), pakeitimų (14), atsakomybės (15) bei taikytinos teisės ir ginčų nagrinėjimo vietos (18) nuostatoms pagal Italijos civilinio kodekso 1341 ir 1342 straipsnius būtinas konkretus jūsų pritarimas. Jį duodate registruodamiesi pažymėdami atskirą langelį; jis rodomas kiekvienam, kuris lauke „Regionas“ pasirenka Italiją arba jungiasi iš Italijos. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski.
 
 ### A.2 Jungtinės Amerikos Valstijos
 
@@ -331,7 +337,7 @@ Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą ša
 
 ### A.3 Kanada ir Kvebekas
 
-Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
+Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
 
 ### A.4 Australija ir Naujoji Zelandija
 

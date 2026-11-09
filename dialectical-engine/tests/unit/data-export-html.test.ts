@@ -14,11 +14,11 @@ describe("data export readable page", () => {
   it("H-2 shows localized heading, generation time, and account", () => {
     const html = page();
     expect(html).toContain("Your Dialectical Engine data");
-    expect(html).toContain("Prepared on October 9, 2026 at 12:15 AM UTC for Ada.");
+    expect(html).toContain("Prepared on 9 October 2026 at 00:15 UTC for Ada.");
     expect(html).toContain("Ada");
     expect(html).toContain("ada@example.test");
     expect(html).toContain("Member since");
-    expect(html).toContain("Jan 2, 2024");
+    expect(html).toContain("2 Jan 2024");
   });
   it("H-3 orders debate questions newest first", () => {
     const html = page();
@@ -31,7 +31,7 @@ describe("data export readable page", () => {
     expect(html).toMatch(/MARK-Q1[\s\S]*?Published/);
     for (const n of [1, 2]) {
       expect(html).toContain(`MARK-Q${n}`);
-      expect(html).toContain(n === 1 ? "Oct 8, 2026" : "Oct 9, 2026");
+      expect(html).toContain(n === 1 ? "8 Oct 2026" : "9 Oct 2026");
       expect(html).toContain(n === 1 ? "Published" : "Private");
       expect(html).toContain(n === 1 ? "Supported" : "Close call");
       for (const path of ["headline", "summary", "confidence", "paths.line", "change.text", "why.reasons.text", "long.sections.title", "long.sections.paragraphs.text", "reviewer_note.text"]) {

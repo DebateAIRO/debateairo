@@ -90,6 +90,12 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "main_answer_update", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
+      // 0156 the moderation notice: its queue and when it started. 0157 the statements of reasons: a hidden debate's final
+      // ground, each step's grounds, the statement, what the queue has read and when it started.
+      "moderation_decision", "moderation_ground", "moderation_notice", "moderation_notice_since",
+      "moderation_statement", "moderation_statement_seen", "moderation_statement_since",
+      // 0170 the daily outbound mail limit.
+      "outbound_mail_daily_count", "outbound_mail_suppression",
       "page_reading_level",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
@@ -113,7 +119,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "public_check_usage",
       "public_climb_done", "public_contribution", "public_contribution_check", "public_debate_report", "public_debate_update", "public_dig_input",
       // 0151: a report on a public debate and the queue's log; public_review_purged, below, is the receipt of what six months removed.
-      "public_flag", "public_flag_event",
+      // 0157: a person's close of a report, the mails to the reporter (and when they started), the words an automatic hide copied.
+      "public_flag", "public_flag_answer", "public_flag_event", "public_flag_mail", "public_flag_mail_since", "public_flag_quote",
       "public_material", "public_page_skip", "public_report", "public_report_charge",
       // 0149: a report's publication-check record and the public reference of each update on the page.
       "public_report_check", "public_report_writer",

@@ -124,6 +124,22 @@ async function readPackagePolicy(sourceRoot) {
   const root = join(sourceRoot, 'dialectical-engine');
   return { workspace: await readFile(join(root, 'pnpm-workspace.yaml'), 'utf8'), lock: await readFile(join(root, 'pnpm-lock.yaml'), 'utf8') };
 }
+/**
+ * The whole environment of the website build for the release root <sourceRoot>: buildEnvironment plus the owner's early
+ * use, as the helper decides it from the root's own package rules. ui-build uses it, and so does the pre-upload checker
+ * (tools/upload-check/website-build.mjs), so the Mac builds with exactly what the server will. A missing or tampered
+ * package rule refuses UI_BUILD_PACKAGE_POLICY_REFUSED. <now> and <readPackagePolicy> are there for tests.
+ */
+export async function uiBuildEnvironment(sourceRoot, releaseKey, execPath = process.execPath, { models = DEFAULT_MODEL_ROSTER, now = Date.now(), readPackagePolicy: read = readPackagePolicy } = {}) {
+  const base = buildEnvironment(releaseKey, execPath, models);
+  const policy = await read(sourceRoot).catch(() => refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'));
+  // Loaded here only: the shared server-tools folder (operator/lifecycle-v1) holds deploy/ alone, and caddy-slots.mjs
+  // imports this file, so a top-level import of tools/ stopped release-switch.mjs there (R22 staging, 2026-11-02).
+  try {
+    const { childEnvironment } = await import('../../../tools/source-map-hotfix.mjs');
+    return childEnvironment({ environment: base, now, workspace: policy.workspace, lock: policy.lock });
+  } catch { return refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'); }
+}
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -288,14 +304,7 @@ async function uiBuildCommand(options, { layout, deps }) {
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const policy = await (deps.readPackagePolicy ?? readPackagePolicy)(source.value.sourceRoot).catch(() => refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'));
-  // Loaded here only: the shared server-tools folder (operator/lifecycle-v1) holds deploy/ alone, and caddy-slots.mjs
-  // imports this file, so a top-level import of tools/ stopped release-switch.mjs there (R22 staging, 2026-11-02).
-  let environment;
-  try {
-    const { childEnvironment } = await import('../../../tools/source-map-hotfix.mjs');
-    environment = childEnvironment({ environment: buildEnvironment(releaseKey, deps.execPath, models), now: deps.now ?? Date.now(), workspace: policy.workspace, lock: policy.lock });
-  } catch { refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'); }
+  const environment = await uiBuildEnvironment(source.value.sourceRoot, releaseKey, deps.execPath, { models, now: deps.now ?? Date.now(), readPackagePolicy: deps.readPackagePolicy ?? readPackagePolicy });
   const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, environment);
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);

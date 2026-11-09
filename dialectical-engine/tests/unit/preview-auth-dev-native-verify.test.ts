@@ -54,8 +54,7 @@ describe('native verify and pending forward steps',()=>{
 // Side-by-side spec §5 ("database ahead", G6): an older release's verify accepts a database a newer release moved forward
 // by n1-expand steps only against the newer release's root-pinned database-ahead file, and says so in its proof.
 const H='e'.repeat(64),S1='1'.repeat(64),S2='2'.repeat(64);
-// Probe names after this source's chain head (0171, the security review's fixes, after a finished dig's mark 0153, a reporter's reports in their export 0152, the Report button 0151, a public debate under review 0150, a funded person's public report in the team's month 0149, an erased account keeping a public debate 0148, the public tree 0147, the Owner's allowances for team members 0146, the pages waiting after "Add to researched" 0145, the small AI's quota charge 0144, the hand-over 0143, the team's one limit 0142, the path suggestions 0141 and the funded spend
-// kinds 0140): a newer release's steps.
+// Probe names after this source's chain head (0171, the security review's fixes, after the daily outbound mail limit 0170 and the moderation statements 0157): a newer release's steps.
 const NEXT='0172_side_next.sql',MORE='0173_more.sql';
 const ROW={rowKey:'fixtureRow',valueJsonText:'1',sourceRef:'native verify fixture'};
 const SNAPSHOT=computeRegisterSnapshotSha256([ROW] as unknown as Parameters<typeof computeRegisterSnapshotSha256>[0]);

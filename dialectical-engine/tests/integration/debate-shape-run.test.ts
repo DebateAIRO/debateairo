@@ -38,7 +38,7 @@ let database: TestDatabase;
 /** A connection to the cluster's maintenance database, for making and dropping the per-run copies. */
 let admin: Pool;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 const SHAPE_SETTINGS = { debateShape: { mapContractHash: mapPromptContractHash() } } as const;
 const STANDARD = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
 const DEEP = { depthMode: "adaptive", scrutiny: "deep", answerLength: "standard" } as const;

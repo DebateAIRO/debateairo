@@ -261,6 +261,7 @@ systemd-analyze verify /etc/systemd/system/debateai-preview-perplexity-budget.se
 systemctl show -p ExecStart,ExecStartPre,IPAddressAllow,RestrictAddressFamilies debateai-preview-perplexity-budget
 systemctl start debateai-preview-perplexity-budget
 systemctl is-active debateai-preview-perplexity-budget
+for i in $(seq 1 30); do [ -S /run/debateai-v3-preview/perplexity-budget-v1.sock ] && break; sleep 1; done
 journalctl -u debateai-preview-perplexity-budget -n 4 -o cat
 stat -c '%a %U:%G %F' /run/debateai-v3-preview/perplexity-budget-v1.sock
 ```
@@ -268,7 +269,8 @@ stat -c '%a %U:%G %F' /run/debateai-v3-preview/perplexity-budget-v1.sock
 What to expect: `verify` prints nothing about this unit; `IPAddressAllow` shows `127.0.0.53/32` and the drop-in's /32s;
 `RestrictAddressFamilies` shows `AF_UNIX AF_INET`; `active`; the journal shows the address check's `"status": "ok"`,
 then `"status": "serving"` with `"provider": "perplexity"` and `"max_concurrent_calls": 10`; the socket is
-`666 root:root socket` (the gate answers only uids 994 and 992).
+`666 root:root socket` (the gate answers only uids 994 and 992). `active` comes before the socket: the gate checks its
+addresses first, so the loop waits up to 30 s for it (R22, 2 November 2026: a `stat` straight after `start` found none).
 
 **8. Probe (one paid search, $0.001). It must pass before web search is switched on.** Probe when nobody is using the
 preview. The command runs the probe inside its own fence: its own unit name (`debateai-preview-probe-perplexity`), the
@@ -282,7 +284,8 @@ systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-perple
 ```
 
 It sends one fast search for "European Parliament" with one result and short page text, through the normal set-aside,
-charge and halt path. How to read the line it prints:
+charge and halt path. It prints two JSON lines; the result is the last one (R22, 2 November 2026: a check that read the
+whole file as one answer failed on a good probe; read it with `tail -n 1`). How to read that line:
 
 | Field | Good | If not |
 |---|---|---|

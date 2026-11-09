@@ -752,11 +752,11 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
   }, 60_000);
 
-  // Row-level security S01, PRD-N1 (t_f667b6ff): under the real logins the ten-route test above stops at its owner gap
-  // write (V-13: no API login holds INSERT on core.investigation_request nor UPDATE on memory.memory_link, so the
-  // owner's writes answer 500), and the routes after it went unmeasured there. V-13 keeps that test as it is; this one
-  // pins those routes again, foreign-valid against absent plus the owner's reads, with none of the owner writes, so it
-  // runs in both modes.
+  // Row-level security S01, PRD-N1 (t_f667b6ff): under the real logins the ten-route test above once stopped at its
+  // owner gap write (no API login holds INSERT on core.investigation_request nor UPDATE on memory.memory_link, the gap
+  // that work labelled V-13), and the routes after it went unmeasured there. Since upload check Task 9 both owner writes
+  // go through 0155's definers and the ten-route test runs in full on the logins. This one still pins those routes
+  // without the owner writes, foreign-valid against absent plus the owner's reads, in both modes.
   it("keeps memory-link unlink and the run, events and answer routes indistinguishable for foreign-valid and absent resources, without the owner writes V-13 lists", async () => {
     const absentRunId = randomUUID();
     const absentAnswerId = randomUUID();
@@ -813,6 +813,100 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(noServedAnswer.statusCode).toBe(404);
     expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
   }, 60_000);
+
+  // Upload check Task 9, 0155: the two owner definers, called directly on the runtime login. Over HTTP row security hides
+  // a foreign answer before either definer runs, so their own refusals and the argument mixes HTTP cannot send are
+  // pinned here: the owner writes, every refusal is NULL with nothing written, a null id raises 22023, and only
+  // debateai_runtime may call them.
+  it("0155's two definers on debateai_runtime: the owner writes, foreign, absent and cross-run calls are NULL and write nothing", async () => {
+    apiLogins ??= await provisionRlsLogins(database);
+    const runtime = apiLogins.loginPool("DATABASE_URL", 2);
+    expect((await runtime.query<{ user: string }>("SELECT current_user AS user")).rows[0]!.user).toBe("debateai_dev_runtime");
+    const a = await createOwnedTerminalRun(owner, "definer-a");
+    const b = await createOwnedTerminalRun(owner, "definer-b");
+    const theirs = await createOwnedTerminalRun(foreign, "definer-foreign");
+    const gap = (runId: string, gapRef: string) => new RunRepository(database.pool).recordInvestigationGapOpened({ runId, gap: {
+      gap_ref: gapRef, gap: "A bounded definer fixture gap.", verdict: "UNDER-EXPLORED", why: "The 0155 fixture leaves one question open.",
+      effort_grade: "bounded", constructed_prompt: "Investigate the 0155 fixture gap.", accepts_user_input: true, model_authored: true } });
+    await gap(a.runId, "gap:0155-a");
+    await gap(b.runId, "gap:0155-b");
+    await gap(theirs.runId, "gap:0155-foreign");
+    const requestsOf = async (runId: string) => (await database.pool.query<Record<string, unknown>>(
+      `SELECT investigation_request_id,run_id,answer_id,answer_version,gap_ref,user_input,input_kind,status,replay_handle,at_seq
+       FROM core.investigation_request WHERE run_id=$1 ORDER BY at_seq`, [runId])).rows;
+    const record = async (runId: string, answerId: string, gapRef: string, ownerRef: string | null, legacy: string | null = null) => {
+      const requestId = randomUUID();
+      const row = (await runtime.query<{ id: string | null }>(
+        "SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) AS id",
+        [requestId, runId, answerId, gapRef, ownerRef, legacy, null, `investigation-request:${requestId}`, null, null])).rows[0]!;
+      return { requestId, id: row.id };
+    };
+
+    // The owner: one row, with every column the old direct write set.
+    const written = await record(a.runId, a.answerId, "gap:0155-a", owner.ownerRef);
+    expect(written.id).toBe(written.requestId);
+    const rows = await requestsOf(a.runId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ investigation_request_id: written.requestId, run_id: a.runId, answer_id: a.answerId, answer_version: 1,
+      gap_ref: "gap:0155-a", user_input: null, input_kind: "HUMAN_STEER", status: "RECORDED", replay_handle: `investigation-request:${written.requestId}` });
+    expect(Number(rows[0]!.at_seq)).toBeGreaterThan(0);
+
+    // Refusals: NULL, and no row anywhere.
+    const before = Number((await database.pool.query<{ count: string }>("SELECT count(*) FROM core.investigation_request")).rows[0]!.count);
+    const refused = [
+      await record(theirs.runId, theirs.answerId, "gap:0155-foreign", owner.ownerRef), // another account's run
+      await record(randomUUID(), randomUUID(), "gap:0155-a", owner.ownerRef), // an absent run
+      // Own run, another run's answer with the gap really open on that answer's run: only the answer-run check refuses.
+      await record(a.runId, b.answerId, "gap:0155-b", owner.ownerRef),
+      // Own run, the foreign account's answer with its own open gap: the same check, across accounts.
+      await record(a.runId, theirs.answerId, "gap:0155-foreign", owner.ownerRef),
+      await record(a.runId, a.answerId, "gap:0155-b", owner.ownerRef), // own run, a gap opened only on another run
+      await record(a.runId, a.answerId, "gap:0155-absent", owner.ownerRef) // own run, no such gap
+    ];
+    expect(refused.map(({ id }) => id)).toEqual([null, null, null, null, null, null]);
+    expect(Number((await database.pool.query<{ count: string }>("SELECT count(*) FROM core.investigation_request")).rows[0]!.count)).toBe(before);
+    expect(await requestsOf(theirs.runId)).toEqual([]);
+    expect(await requestsOf(b.runId)).toEqual([]);
+
+    // The unlink: a's link (prior b), the foreign run's own link (prior: the foreign fixture run), b has none of its own.
+    const linkA = await seedMemoryLink(a, b, owner.ownerRef);
+    const linkTheirs = await seedMemoryLink(theirs, foreignRun, foreign.ownerRef);
+    const eventsOf = async (linkId: string) => (await database.pool.query<{ state: string; actor_ref: string; reason: string }>(
+      "SELECT state,actor_ref,reason FROM memory.memory_link_event WHERE memory_link_id=$1 ORDER BY at_seq", [linkId])).rows;
+    const unlink = async (runId: string, ownerRef: string | null) => (await runtime.query<{ id: string | null }>(
+      "SELECT memory.unlink_owned_memory_link($1,$2,$3,$4) AS id", [runId, ownerRef, null, "owner:0155-test"])).rows[0]!.id;
+    expect(await unlink(theirs.runId, owner.ownerRef)).toBeNull(); // another account's run
+    expect(await unlink(randomUUID(), owner.ownerRef)).toBeNull(); // an absent run
+    expect(await unlink(b.runId, owner.ownerRef)).toBeNull(); // own run, no link of its own: a's link stays
+    expect(await eventsOf(linkTheirs)).toEqual([{ state: "LINKED", actor_ref: "s7:database-match", reason: "S7_REAL_PG_FIXTURE" }]);
+    expect(await eventsOf(linkA)).toHaveLength(1);
+    expect(await unlink(a.runId, owner.ownerRef)).toBe(linkA);
+    expect(await eventsOf(linkA)).toEqual([
+      { state: "LINKED", actor_ref: "s7:database-match", reason: "S7_REAL_PG_FIXTURE" },
+      { state: "UNLINKED", actor_ref: "owner:0155-test", reason: "ASKER_UNLINK_CONTROL" }
+    ]);
+    expect(await unlink(a.runId, owner.ownerRef)).toBeNull(); // already unlinked: no second event
+    expect(await eventsOf(linkA)).toHaveLength(2);
+
+    // A null id is a malformed call: SQLSTATE 22023, not a NULL answer.
+    await expect(runtime.query("SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)",
+      [null, a.runId, a.answerId, "gap:0155-a", owner.ownerRef, null, null, "investigation-request:null-id", null, null]))
+      .rejects.toMatchObject({ code: "22023", message: "OWNED_INVESTIGATION_REQUEST_INVALID" });
+    await expect(runtime.query("SELECT memory.unlink_owned_memory_link($1,$2,$3,$4)", [null, owner.ownerRef, null, "owner:0155-test"]))
+      .rejects.toMatchObject({ code: "22023", message: "OWNED_MEMORY_UNLINK_INVALID" });
+
+    // Who may call them: debateai_runtime; not PUBLIC, not the erasure or replay logins' roles.
+    const signatures = ["core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)", "memory.unlink_owned_memory_link(uuid,uuid,text,text)"];
+    for (const signature of signatures) {
+      const may = (await database.pool.query<{ runtime: boolean; erasure: boolean; replay: boolean; public: boolean }>(
+        `SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS runtime,
+                has_function_privilege('debateai_erasure_runtime',$1,'EXECUTE') AS erasure,
+                has_function_privilege('debateai_replay',$1,'EXECUTE') AS replay,
+                EXISTS (SELECT 1 FROM pg_proc AS p, aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) AS acl
+                        WHERE p.oid=$1::regprocedure AND acl.grantee=0) AS public`, [signature])).rows[0]!;
+      expect({ signature, ...may }).toEqual({ signature, runtime: true, erasure: false, replay: false, public: false });
+    }
+  });
 
   it("serializes a rejected encrypted ownership transfer on the run lock without changing the owner", async () => {
     const claimedRunId = await createOwnedRunHead(owner, "claim-race");

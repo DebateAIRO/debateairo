@@ -157,7 +157,9 @@ describe("sources under a point (V4SourceList)", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer nofollow");
     expect(item.querySelector(".v4SourceSite")!.textContent).toBe("grid-costs.example");
     expect(item.querySelector("time")!.getAttribute("dateTime")).toBe("2025-06-12");
-    expect(item.querySelector("time")!.textContent).toBe("Jun 12, 2025");
+    // Day first on English pages (question 5). TEMPORARY short form: question 4 A gives a point's evidence date the long form
+    // with the year ("12 June 2025"), which comes with the map's dates item (V4Sources, coordinated).
+    expect(item.querySelector("time")!.textContent).toBe("12 Jun 2025");
   });
 
   it("marks preview-only and abstract-only pages, and a page fewer AIs read, and nothing on a whole page", () => {
@@ -365,24 +367,32 @@ describe("the panel (V4Panel) with a web part", () => {
 
 describe("the report (V4ReportClient) shows the same", () => {
   const report = async (answer: Answer, level: ReadingLevel) => {
-    mocks.load = { kind: "SERVED", runId: "run-1", answer, story: storyFixture("READY") };
+    // The report shows the level its debate's run read names (the map's loader hands it on as `level`), never the address's.
+    mocks.load = { kind: "SERVED", runId: "run-1", answer, story: storyFixture("READY"), level };
     return mount(<V4ReportClient id="run-1" locale="en" initialLevel={level} catalog={catalog} newDebateCatalog={{}} />);
   };
 
   it("drops the old 'no web yet' line for the Free note, shown once above the paths", async () => {
     const node = await report(webAnswer(FREE_PATHS), "background");
     expect(node.textContent).not.toContain("does not search the web");
-    const notes = [...node.querySelectorAll(".v4WebNote")].map((note) => note.textContent);
-    expect(notes).toEqual(["Not checked on the web; paid plans look things up."]);
-    expect(node.querySelector(".v4RepPaths")!.previousElementSibling!.textContent).toBe(notes[0]);
-    // "How this was checked" says what "Sure" means now, in the approved words of its basis.
-    const sure = [...node.querySelectorAll(".v4RepWord")].find((item) => item.querySelector("b")!.textContent === t(catalog, "v4.trust.SURE"))!;
-    expect(sure.querySelector("span")!.textContent).toBe("A second AI agreed, and the point rests on a page we looked up.");
+    // Round 2 r2-13: the screen keeps the full line; paper prints only its first, honest half.
+    const notes = [...node.querySelectorAll(".v4WebNote")];
+    expect(notes.map((note) => note.querySelector(".v4RepScreenOnly")?.textContent)).toEqual(["Not checked on the web; paid plans look things up."]);
+    expect(notes.map((note) => note.querySelector(".v4RepPrintOnly")?.textContent)).toEqual(["Not checked on the web."]);
+    expect(node.querySelector(".v4RepPaths")!.previousElementSibling).toBe(notes[0]);
+    // report-f15 (owner's screen review, 3 Nov): on Free "How this was checked" explains only the words that can appear
+    // there. Free never looks anything up, so "Sure" (a page we looked up) is not explained.
+    const words = [...node.querySelectorAll(".v4RepWord b")].map((item) => item.textContent);
+    expect(words).toEqual(["SURE_FOR_CASE", "STILL_ARGUED", "DIDNT_HOLD"].map((word) => t(catalog, `v4.trust.${word}`)));
+    expect(node.textContent).toContain(t(catalog, "v4.report.checkedWordsIntroFree"));
   });
 
   it("at the expert level: each point's sources, each path's note and other pages, with no buttons", async () => {
     const node = await report(webAnswer(PAID_PATHS), "expert");
     expect(node.textContent).not.toContain("does not search the web");
+    // "How this was checked" says what "Sure" means now, in the approved words of its basis.
+    const sure = [...node.querySelectorAll(".v4RepWord")].find((item) => item.querySelector("b")!.textContent === t(catalog, "v4.trust.SURE"))!;
+    expect(sure.querySelector("span")!.textContent).toBe("A second AI agreed, and the point rests on a page we looked up.");
     expect([...node.querySelectorAll(".v4RepPoint blockquote")].map((quote) => quote.textContent)).toEqual([
       "The offer is about a third above the current pay after tax.", "A made-up line from page S2-2."
     ]);

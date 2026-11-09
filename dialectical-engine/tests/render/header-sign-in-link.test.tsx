@@ -38,8 +38,8 @@ describe("signed-out visitors can sign in from the header", () => {
     session.read = () => Promise.reject(new Error("SESSION_REQUIRED"));
     setPathname("/pricing");
     const host = await render(<TopBar />);
-    // /pricing is not a sign-in return path, so the link carries the default one (safeReturnPath).
-    expect(logIn(host)?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    // /pricing is not a sign-in return path, so the link carries the default one (safeReturnPath): the new ask page.
+    expect(logIn(host)?.getAttribute("href")).toBe("/login?next=%2Fv4");
     expect(accountTrigger(host)).toBeNull();
   });
 

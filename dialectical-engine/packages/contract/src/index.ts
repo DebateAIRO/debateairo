@@ -623,21 +623,67 @@ export const BillingPricesSchema = z.object({
 }).strict();
 export type BillingPrices = z.infer<typeof BillingPricesSchema>;
 
+const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
+
 /**
- * GET /v1/billing/plans (public). Every plan's price in each currency, and `currency`, the one the caller's connection
- * pays in (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance".
+ * Terms §12: "Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live)". The
+ * tax the connection's country adds to every plan, as the tax engine the quote asks answers it for that country alone
+ * (no address yet).
+ */
+export const BillingPlansTaxSchema = z.object({
+  country: BillingIso2Schema,
+  tax_name: z.string().min(1).max(64),
+  /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
+  tax_rate_bp: z.number().min(0).max(10_000),
+  tax_status: z.enum(["TAXABLE", "NON_TAXABLE", "NOT_REGISTERED", "REVERSE_CHARGE"])
+}).strict();
+export type BillingPlansTax = z.infer<typeof BillingPlansTaxSchema>;
+
+/**
+ * GET /v1/billing/plans' optional query: the place the visitor says they live, as the checkout's country (and, in the
+ * US and Canada, where the state's or province's tax comes from it, the postal code). Absent, the connection's country.
+ */
+export const BillingPlansQuerySchema = z.object({
+  country: z.string().trim().toUpperCase().pipe(BillingIso2Schema).optional(),
+  postal_code: z.string().trim().min(1).max(16).optional()
+}).strip();
+export type BillingPlansQuery = z.infer<typeof BillingPlansQuerySchema>;
+
+/**
+ * Where the list's prices are for, and whether they could be priced there. PRICED: `tax` and every `total_price` are
+ * that place's. COUNTRY_NEEDED: no country is known (no country chosen, and the connection's is unknown or a Tor
+ * exit). POSTAL_CODE_NEEDED / POSTAL_CODE_INVALID: a US or Canadian price needs a postal code that fits the country.
+ * TAX_UNAVAILABLE: the tax service has not answered for that place. Only PRICED shows a price.
+ */
+export const BillingPlansPlaceSchema = z.object({
+  country: BillingIso2Schema.nullable(),
+  postal_code: z.string().max(16).nullable(),
+  status: z.enum(["PRICED", "COUNTRY_NEEDED", "POSTAL_CODE_NEEDED", "POSTAL_CODE_INVALID", "TAX_UNAVAILABLE"])
+}).strict();
+export type BillingPlansPlace = z.infer<typeof BillingPlansPlaceSchema>;
+
+/**
+ * GET /v1/billing/plans (public). Every plan's net price in each currency, and `currency`, the one the place pays in
+ * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance". Terms §12: `tax` is
+ * the place's tax and each plan's `total_price` its price in `currency` with that tax; both are present exactly when
+ * `place.status` is PRICED, so a net price is never offered as the price.
  */
 export const BillingPlansResponseSchema = z.object({
   currency: BillingCurrencySchema,
+  place: BillingPlansPlaceSchema,
+  tax: BillingPlansTaxSchema.nullable(),
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
     net_prices: BillingPricesSchema,
+    total_price: BillingDecimalMoneySchema.nullable(),
     allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
   }).strict()).min(1)
-}).strict();
+}).strict().refine(
+  (answer) => (answer.tax !== null) === (answer.place.status === "PRICED")
+    && answer.plans.every((plan) => (plan.total_price === null) === (answer.tax === null)),
+  { message: "TOTAL_PRICE_WITHOUT_TAX" }
+);
 export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
-
-const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
 
 /** POST /v1/billing/quote (paid-plans spec §2.5.3; P19's pre-fill makes `country` optional; R-15 adds `name`). */
 export const BillingQuoteRequestSchema = z.object({
@@ -830,8 +876,8 @@ export const BillingUpgradePendingErrorSchema = z.object({
 }).strict();
 /** What `upgradeSubscription` resolves to for that 409, beside NETOPIA's page. */
 export type BillingUpgradePendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
-/** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
-export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
+/** OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up grant. */
+export const BillingWithdrawRequestSchema = z.object({}).strict();
 /**
  * `refund`: what goes back to the card. Null when a refund made in NETOPIA's admin already touched a payment:
  * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
@@ -1895,6 +1941,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/reading-level",
     "POST /v1/account/reading-level",
     "GET /v1/account/legal-status",
+    // 0157 (DSA Art 17; D1): the person's own statements of reasons.
+    "GET /v1/account/moderation-statements",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
     "GET /v1/account/profile",

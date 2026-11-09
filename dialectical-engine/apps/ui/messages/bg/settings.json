@@ -196,6 +196,7 @@
   "settings.emailLink.continue": "Към Настройки",
   "settings.account.title": "Профил",
   "settings.security.title": "Сигурност",
+  "settings.notices.title": "Известия за модериране",
   "settings.phone.reveal": "Показване на телефона",
   "settings.phone.change": "Промяна на телефона",
   "settings.phone.purpose": "В бъдеще може да ви изпратим код с SMS, който да ви помогне да влезете отново в акаунта си, а ако ни помолите за помощ, можем да ви се обадим или да ви пишем с SMS. Съхранява се криптиран; никога не се споделя и не се използва за маркетинг.",

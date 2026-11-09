@@ -2,10 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { shortText } from "../../apps/ui/components/v4/V4MapTree.js";
+import { cardLabel } from "../../apps/ui/lib/v4/mapLooks.js";
 import { AnswerSchema, DIG_LEVEL_MAX, type Answer, type PathRewrite } from "../../packages/contract/src/index.js";
 import { DEEPEST_DIG, DIG_ANSWERS, DIG_RUNS, PATH_REWRITES } from "../../tools/v4-mock-api/rewrite-seed.js";
 import {
-  branch, buttonNamed, buttonsNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer, unmountMap
+  branch, buttonNamed, buttonsNamed, CATALOG, click, expandBranch, harness, mountMap, openPath, page, panel, PATHS, resetHarness, seededAnswer,
+  unmountMap
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -59,7 +61,7 @@ describe("the breadcrumb on a dig's map", () => {
   it("goes from the main question down each dug path, with the level, every part opening that map at that path", async () => {
     seedTrail();
     harness.answer = trailAnswer(DIG_RUNS.levelThree);
-    await mountMap(1280, DIG_RUNS.levelThree);
+    await mountMap(1600, DIG_RUNS.levelThree);
     const trail = page().querySelector<HTMLElement>(".v4Trail")!;
     expect(trail.getAttribute("aria-label")).toBe(CATALOG["v4.nest.trailLabel"]);
     expect(trail.querySelector(".v4TrailLevel")!.textContent).toBe(word("v4.nest.level", { n: 3 }));
@@ -67,9 +69,10 @@ describe("the breadcrumb on a dig's map", () => {
     expect(parts.map((part) => part.textContent)).toEqual([
       CATALOG["v4.nest.trailRoot"],
       // 1111's n-renew, as 8888 rewrote it; 8888's n-renew, as d200 rewrote it; d200's own n-nuclear (its rewrite's line).
-      shortText(ready(DIG_ANSWERS[DIG_RUNS.levelOne]!.rewrite).text.line, 40),
-      shortText(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).text.line, 40),
-      shortText(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).dig_paths.find((path) => path.position_ref === "n-nuclear")!.line, 40)
+      // Each path by its short label (map-f25 / r2-20 A): no outcome words such as "partly held".
+      shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelOne]!.rewrite).text.line), 40),
+      shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).text.line), 40),
+      shortText(cardLabel(ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).dig_paths.find((path) => path.position_ref === "n-nuclear")!.line), 40)
     ]);
     expect(parts.map((part) => part.getAttribute("href"))).toEqual([
       `/v4/debate/${DIG_RUNS.root}?level=background`,
@@ -83,7 +86,7 @@ describe("the breadcrumb on a dig's map", () => {
     seedTrail();
     delete harness.ancestors[DIG_RUNS.root];
     harness.answer = trailAnswer(DIG_RUNS.levelThree);
-    await mountMap(1280, DIG_RUNS.levelThree);
+    await mountMap(1600, DIG_RUNS.levelThree);
     const trail = page().querySelector<HTMLElement>(".v4Trail")!;
     expect(trail.textContent).not.toContain(CATALOG["v4.nest.trailRoot"]);
     expect(trail.querySelectorAll(".v4TrailParts a")).toHaveLength(2);
@@ -92,25 +95,28 @@ describe("the breadcrumb on a dig's map", () => {
 
   it("a first debate has no breadcrumb", async () => {
     harness.answer = trailAnswer(DIG_RUNS.root);
-    await mountMap(1280, DIG_RUNS.root);
+    await mountMap(1600, DIG_RUNS.root);
     expect(page().querySelector(".v4Trail")).toBeNull();
   });
 });
 
 describe("a dig's own map", () => {
-  it("shows every path of the dig with its line and fate, and offers \"Dig here too\" on each", async () => {
+  it("shows every path of the dig with its label and no outcome tag, and offers a way to dig again on each", async () => {
     seedTrail();
     harness.answer = trailAnswer(DIG_RUNS.levelOne);
-    await mountMap(1280, DIG_RUNS.levelOne);
+    await mountMap(1600, DIG_RUNS.levelOne);
     const own = ready(DIG_ANSWERS[DIG_RUNS.levelOne]!.rewrite).dig_paths;
     // n-renew of this dig was rewritten in turn by d200 (level 2): it shows that newer text and fate.
     const newer = ready(DIG_ANSWERS[DIG_RUNS.levelTwo]!.rewrite).text;
     const expected = own.map((path) => (path.position_ref === "n-renew" ? { line: newer.line, fate: newer.fate } : path));
     for (const [index, path] of expected.entries()) {
       const card = branch(index).querySelector<HTMLElement>(".v4MapPath")!;
-      expect(card.querySelector(".v4MapPathTitle")!.textContent, `path ${index}`).toBe(shortText(path.line));
-      expect(card.querySelector(".v4MapFate")!.textContent, `path ${index}`).toBe(CATALOG[`v4.fate.${path.fate}`]);
-      expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index)), `path ${index}`).toHaveLength(1);
+      // map-f25 / r2-20 A: the card's title is the line's own label; its outcome is said in the panel, never as a tag.
+      expect(card.querySelector(".v4MapPathTitle")!.textContent, `path ${index}`).toBe(shortText(cardLabel(path.line)));
+      expect(card.querySelector(".v4MapFate"), `path ${index}`).toBeNull();
+      // map-f22: a path's leaves past the first 12 or so cards wait behind its "+N more".
+      await expandBranch(index);
+      expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(index)), `path ${index}`).toHaveLength(1);
     }
     expect(page().querySelectorAll(".v4MapBranch")).toHaveLength(own.length);
     // The deeper rewrite's whole text (the card cuts it), and its line on the card.
@@ -125,22 +131,25 @@ describe("a dig's own map", () => {
   it("before its rewrite is written, shows the positions it argued, with no fate made up", async () => {
     seedTrail();
     harness.answer = trailAnswer(DIG_RUNS.levelThree);
-    await mountMap(1280, DIG_RUNS.levelThree);
+    await mountMap(1600, DIG_RUNS.levelThree);
     expect(page().querySelectorAll(".v4MapBranch")).toHaveLength(4);
     expect(page().querySelectorAll(".v4MapBranch .v4MapFate")).toHaveLength(0);
-    for (const index of Object.values(PATHS)) expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(index))).toHaveLength(1);
+    for (const index of Object.values(PATHS)) {
+      await expandBranch(index);
+      expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(index))).toHaveLength(1);
+    }
   });
 
-  it("at level 10 says so, and offers no \"Dig here too\" and no dig anywhere", async () => {
+  it("at level 10 says so, and offers no way to dig again and no dig anywhere", async () => {
     seedTrail();
     const runId = DEEPEST_DIG.runRef;
     harness.answer = AnswerSchema.parse(seededAnswer(runId, { dig: DEEPEST_DIG.dig }));
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(page().querySelector(".v4TrailLevel")!.textContent).toBe(word("v4.nest.level", { n: DIG_LEVEL_MAX }));
     expect(page().textContent).toContain(CATALOG["v4.nest.deepest"]);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!)).toHaveLength(0);
     await openPath(PATHS.renew);
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!)).toHaveLength(0);
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!)).toHaveLength(0);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!)).toHaveLength(0);
     expect(panel().textContent).toContain(CATALOG["v4.nest.deepest"]);
   });
@@ -154,13 +163,14 @@ describe("changed further down (owner Q-D5: marked, never rewritten)", () => {
   it("three levels up, the path shows the mark on the tree, the outline and the panel", async () => {
     const root = PATH_REWRITES[DIG_RUNS.root]!;
     harness.answer = marked(DIG_RUNS.root, { ...root, paths: [...root.paths.filter((path) => path.position_ref !== "n-smr"), BELOW_ONLY] });
-    await mountMap(1280, DIG_RUNS.root);
+    await mountMap(1600, DIG_RUNS.root);
     // n-renew: rewritten by 8888 and marked; n-smr: only marked (no dig rewrote it).
     expect(branch(PATHS.renew).querySelector(".v4RewriteNoteBelow")!.textContent).toBe(CATALOG["v4.rewrite.changedBelow"]);
     const smr = branch(PATHS.smr).querySelector<HTMLElement>(".v4RewriteNote")!;
     expect(smr.textContent).toBe(CATALOG["v4.rewrite.changedBelow"]);
-    // Only marked: the path's own text and fate stay as they were.
-    expect(branch(PATHS.smr).querySelector(".v4MapFate")!.textContent).toBe(CATALOG["v4.fate.SET_ASIDE"]);
+    // Only marked: the path's own text stays as it was (and no outcome tag is drawn, r2-20 A).
+    expect(branch(PATHS.smr).querySelector(".v4MapPathTitle")!.textContent).toBe("Wait for small modular reactors");
+    expect(branch(PATHS.smr).querySelector(".v4MapFate")).toBeNull();
     await openPath(PATHS.smr);
     expect(panel().querySelector(".v4RewriteBelow")!.textContent).toBe(CATALOG["v4.rewrite.changedBelow"]);
     expect(panel().querySelector(".v4RewriteState")).toBeNull();
@@ -183,7 +193,7 @@ describe("a dig's own page (in place of its short answer)", () => {
   it("says what it looked into and the path it rewrote, links back to that path, and shows its answer text", async () => {
     seedTrail();
     harness.answer = trailAnswer(DIG_RUNS.levelOne);
-    await mountMap(1280, DIG_RUNS.levelOne);
+    await mountMap(1600, DIG_RUNS.levelOne);
     const intro = panel().querySelector<HTMLElement>(".v4DigPage")!;
     const dig = DIG_ANSWERS[DIG_RUNS.levelOne]!;
     expect(intro.textContent).toContain(word("v4.digPage.lookedInto", { picks: "" }).trim());
@@ -191,30 +201,32 @@ describe("a dig's own page (in place of its short answer)", () => {
     expect(intro.textContent).toContain(word("v4.digPage.rewrote", { line: ready(dig.rewrite).text.line }));
     expect(linkNamed(CATALOG["v4.digPage.backToPath"]!, intro)!.getAttribute("href"))
       .toBe(`/v4/debate/${DIG_RUNS.root}?path=n-renew&level=background`);
-    // Its own answer text, as usual; nothing says a short answer is missing or still being written.
-    expect(panel().textContent).toContain(harness.answer.composed_text[0]!.text);
-    for (const key of ["v4.panel.fallbackMissing", "v4.panel.fallbackWriting", "v4.panel.storyMissing", "v4.panel.storyWriting"]) {
-      expect(panel().textContent, key).not.toContain(CATALOG[key]);
+    // Its own answer text, as usual, in the answer card above the map (map-d1); nothing says a short answer is missing or
+    // still being written.
+    const card = page().querySelector<HTMLElement>(".v4AnswerCard")!;
+    expect(card.textContent).toContain(harness.answer.composed_text[0]!.text);
+    for (const key of ["v4.panel.fallbackMissing", "v4.panel.fallbackWriting", "v4.panel.storyMissing", "v4.panel.storyWriting", "v4.panel.noShortAnswerNoDig"]) {
+      expect(page().textContent, key).not.toContain(CATALOG[key]);
     }
   });
 
   it("while it rewrites the path it came from, says so", async () => {
     seedTrail();
     harness.answer = trailAnswer(DIG_RUNS.levelThree);
-    await mountMap(1280, DIG_RUNS.levelThree);
+    await mountMap(1600, DIG_RUNS.levelThree);
     expect(panel().querySelector(".v4DigPage .v4RewriteState")!.textContent).toBe(CATALOG["v4.digPage.rewriting"]);
   });
 
   it("the person's own view, quoted, with the verdict, on the dig that carried it", async () => {
     seedTrail();
     harness.answer = AnswerSchema.parse(seededAnswer(DIG_RUNS.ownView, { dig: DIG_ANSWERS[DIG_RUNS.ownView] }));
-    await mountMap(1280, DIG_RUNS.ownView);
+    await mountMap(1600, DIG_RUNS.ownView);
     expect(panel().querySelector(".v4DigPage .v4RewriteVerdict")!.textContent).toBe(CATALOG["v4.view.HELPED.MAIN_QUESTION"]);
   });
 
   it("the link back opens the map above at that path", async () => {
     harness.answer = trailAnswer(DIG_RUNS.root);
-    await mountMap(1280, DIG_RUNS.root, "n-renew");
+    await mountMap(1600, DIG_RUNS.root, "n-renew");
     expect(panel().classList.contains("v4Panel-path")).toBe(true);
     expect(panel().querySelector(".v4Rewrite")).not.toBeNull();
   });

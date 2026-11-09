@@ -98,14 +98,15 @@ const PROVIDERS_REFUSE: RuleValue = Object.freeze({ signup: false, pay: false, r
 type RegionRuleValue = z.infer<typeof regionRuleSchema>;
 const REGION_TAX_NOT_READY: RegionRuleValue = Object.freeze({ pay: false, reason: "TAX_NOT_READY" });
 const REGION_TAX_NOT_READY_FOR_BUSINESS: RegionRuleValue = Object.freeze({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
+const REGION_EXCLUDED: RegionRuleValue = Object.freeze({ pay: false, reason: "TERMS_EXCLUDED" });
 
 /**
  * The §1.5 table, every code spelled out. EU 27 + Norway and Iceland (Terms Annex A.1; one EU
- * return for the whole EU); US, Canada, Australia, New Zealand, Singapore, Japan (tax only past
- * thresholds Quaderno watches); Liechtenstein (shares Switzerland's VAT, which needs a Swiss tax
- * representative), the tax-from-first-sale country the Terms list, South Korea, and,
- * since the owner's amendment of 1 October 2026, Switzerland, Taiwan and Moldova (Terms
- * Annex A.5, A.7, A.6; each has its own tax rule for foreign digital sellers, not yet checked):
+ * return for the whole EU); since the owner's amendment of 4 November 2026, Liechtenstein and
+ * Switzerland (one shared VAT); US, Canada, Australia, New Zealand, Singapore, Japan (tax only past
+ * thresholds Quaderno watches); the tax-from-first-sale country the Terms list, South Korea, and,
+ * since the owner's amendment of 1 October 2026, Taiwan and Moldova (Terms Annex A.7, A.6; each
+ * has its own tax rule for foreign digital sellers, not yet checked):
  * sign-up yes, pay not until the owner registers there; Ukraine: closed until the occupied regions
  * can be blocked; since the owner's amendment of 2 October 2026, the United Kingdom: not offered for
  * now, to open after launch; Turkey, Brazil, Indonesia and,
@@ -126,9 +127,9 @@ const US_STATE_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = 
 const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = Object.freeze([
   [["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT",
     "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "NO", "IS"], OFFERED],
-  [["LI"], SIGN_UP_ONLY],
+  [["LI", "CH"], OFFERED],
   [["US", "CA", "AU", "NZ", "SG", "JP"], OFFERED],
-  [["KR", "CH", "TW", "MD"], SIGN_UP_ONLY],
+  [["KR", "TW", "MD"], SIGN_UP_ONLY],
   [["GB", "UA"], NOT_YET],
   [["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL"], EXCLUDED],
   [["RU", "BY", "KP"], SANCTIONED],
@@ -138,23 +139,29 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
 /**
  * The owner's decision of 20 October 2026 (the research is in the payment region blocks spec, 2026-10-20 §2):
  * payment is closed, until the company registers for tax there, in Saskatchewan and Manitoba; in DC, Hawaii,
- * Maryland, Rhode Island, Vermont, West Virginia and New Jersey; in Ohio for business buyers only (Ohio taxes
- * SaaS only when it is bought for business use); and in the EU territories outside the EU VAT area: the Canary
- * Islands, Ceuta, Melilla, the five French overseas departments, Åland, Mount Athos, Livigno, Campione d'Italia,
- * Heligoland and Büsingen. Sign-up is open in all of them. Opening one is publishing a version without its entry.
+ * Maryland, Rhode Island, Vermont and West Virginia; in Ohio for business buyers only (Ohio taxes SaaS only when it
+ * is bought for business use); and in the EU territories outside the EU VAT area: the Canary Islands, Ceuta,
+ * Melilla, the five French overseas departments, Åland, Mount Athos, Livigno, Campione d'Italia, Heligoland and
+ * Büsingen. Sign-up is open in all of them. Opening one is publishing a version without its entry.
+ * New Jersey was on that list too until the owner's amendment of 4 November 2026 opened it: its bulletin TB-72 treats
+ * SaaS as a service it does not tax, and a seller with no taxable sales there need not register.
+ * Tennessee is closed for payment too, for every buyer, because the Terms exclude it (section 2, Annex A.2; the
+ * owner's amendment of 8 October 2026, see US_STATE_GROUPS): sign-up refuses a person who declares Tennessee, and this
+ * entry refuses a Tennessee billing address, so a person who declared another state still cannot pay from there.
  */
 const REGION_GROUPS: ReadonlyArray<readonly [readonly PaymentRegionId[], RegionRuleValue]> = Object.freeze([
-  [["CA-SK", "CA-MB", "US-DC", "US-HI", "US-MD", "US-RI", "US-VT", "US-WV", "US-NJ",
+  [["CA-SK", "CA-MB", "US-DC", "US-HI", "US-MD", "US-RI", "US-VT", "US-WV",
     "ES-CN", "ES-CE", "ES-ML", "FR-971", "FR-972", "FR-973", "FR-974", "FR-976", "FI-01", "GR-69",
     "IT-LIVIGNO", "IT-CAMPIONE", "DE-HELGOLAND", "DE-BUESINGEN"], REGION_TAX_NOT_READY],
-  [["US-OH"], REGION_TAX_NOT_READY_FOR_BUSINESS]
+  [["US-OH"], REGION_TAX_NOT_READY_FOR_BUSINESS],
+  [["US-TN"], REGION_EXCLUDED]
 ]);
 
 export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COUNTRY_POLICY_ROW_KEY,
-  sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2, 8 and 9 October 2026):"
+  sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2, 8 and 9 October and 4 November 2026):"
     + " the Terms Annex A, sanctions and the AI providers' country lists; payment region blocks spec 2026-10-20 §2"
-    + " (owner decision 20 October 2026): the regions closed for payment",
+    + " (owner decision 20 October 2026, amended 4 November 2026): the regions closed for payment",
   value: Object.freeze({
     kind: "COUNTRY_POLICY" as const,
     default_rule: NOT_YET,

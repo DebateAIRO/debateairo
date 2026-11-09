@@ -17,7 +17,7 @@ const NAME = "0171_security_review_hardening.sql";
 const VERSION = "security-review-hardening-forward0171-v1";
 const MANIFEST_PATH = "lineage/security-review-hardening-forward0171.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0153_dig_tree_settled.sql";
+const PREVIOUS = "0170_outbound_mail_limit.sql";
 const TABLES: readonly string[] = [
   // F4a: the forget scopes, one row while a definer's deletes run under a guard.
   "identity.private_forget_scope",

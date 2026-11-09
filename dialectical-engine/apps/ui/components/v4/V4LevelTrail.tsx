@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigTrail } from "@/lib/v4/load";
+import { cardLabel } from "@/lib/v4/mapLooks";
 import { levelHref } from "@/lib/v4/storage";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { shortText } from "./V4MapTree";
 
 /*
  * Dig model revision W4-6 (draft 5.5, "Nesting"): on a dig's own map, where it sits: the main question, then each path
- * that was dug on the way down ("Main question › {path} › …"), and "Level {n} of 10". Each part opens that map at that
- * path. The dig level counts the digs above this debate (owner Q-D12), never how far one debate's argument tree grows.
+ * that was dug on the way down ("Your question › {path} › …", the record's name for the question's own place: map-d1,
+ * map-f7), and "Level {n} of 10". Each part opens that map at that path. The dig level counts the digs above this debate
+ * (owner Q-D12), never how far one debate's argument tree grows.
  * Until the debates above are read (or when one cannot be), the trail shows what it knows: the level, and "…" for the
  * part it could not read.
  */
@@ -43,7 +45,8 @@ export function V4LevelTrail(props: Readonly<{
               <Link className="v4Link" href={mapHref(step.runId, step.pathRef, props.linkLevel)}>
                 {step.line === null || step.line.trim().length === 0
                   ? t(catalog, "v4.map.pathUntitled")
-                  : <span data-ai-generated="true">{shortText(step.line, 40)}</span>}
+                  // map-f25 / r2-20 A: a path in the trail is named by its short label, never with its outcome words.
+                  : <span data-ai-generated="true" dir="auto">{shortText(cardLabel(step.line), 40)}</span>}
               </Link>
             </li>
           ))}

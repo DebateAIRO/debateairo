@@ -362,6 +362,25 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     expect(narrowed).toBeGreaterThan(0); expect(keyed).toBeGreaterThan(narrowed);
   });
 
+  // R22 (2026-11-02): the runner login's role set (0130's debateai_rls_all_accounts) refused only at --start, with the
+  // site down. Prepare-only runs the start's own connection check, in the start's order, before it reports anything.
+  it('prepare-only runs the selected runner connection check, as the start does, between the narrowed environment and the release key', async () => {
+    const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
+    const prepare = code.slice(code.indexOf('export async function prepareRunner'), code.indexOf('export async function launchRunner'));
+    const steps = ["narrowEnvironment('runner',configured,runtime,plan.publication,plan)", "tsImport('./verify-native.ts',import.meta.url)",
+      'await verify.assertSelectedRunnerConnection(configured,plan.publication)', 'assertRunnerReleaseKey(configured,plan,source)', 'return {'];
+    const at = steps.map(step => prepare.indexOf(step));
+    expect(at.every(index => index > 0), JSON.stringify(at)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(prepare.match(/assertSelectedRunnerConnection\(/g)).toHaveLength(1);
+    // Its line now says the connection was checked.
+    expect(prepare).toContain('runtimeSelectionVerified:true');
+    expect(prepare).not.toContain('runtimeSelectionVerified:false');
+    // The same check, by name, that the start runs (verify-native.ts: the exact role set the principals manifest's runner row pins).
+    const start = code.slice(code.indexOf('export async function launchRunner'));
+    expect(start).toContain('await verify.assertSelectedRunnerConnection(configured,plan.publication)');
+  });
+
   // Side-by-side spec §1: the preview launcher ties RELEASE_KEY to the plan's register pin and source revision.
   it('assertRunnerReleaseKey admits only r<plan register>-<first 12 hex of the plan source revision>', () => {
     const plan = { publication: { registerVersion: '12' } }, source = { sourceRevision: '0123456789ab'.padEnd(40, 'c') };

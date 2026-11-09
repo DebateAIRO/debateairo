@@ -2,6 +2,7 @@
 --
 -- Plain words. One drained step for every fix of the review that the database must make, F2 to F5. Each fix is named by its letter in every section
 -- below, and the contract at the end checks each one's end state as the step applies. Once applied, this file is fixed: any later change is a step of its own.
+-- It comes last in the chain, after 0170: it was built as 0154 and took this number at the merge of feat/2026-10-28-v4-initial (2026-11-09), whose 0154 to 0157 and 0170 came first.
 -- F3. 0137's identity.join_public_investigation, the first public join, has had no caller in the code since 0147's join_public_tree took its place, yet the API's
 --   billing role could still call it, and it writes an investigation in the first author's name. Its one grant is taken back. The function stays: 0137's
 --   postcondition digests it, so a DROP would fail that step's receipt on every later migrate().
@@ -2391,10 +2392,13 @@ BEGIN
       RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 refusal asks %', v_item.signature;
     END IF;
   END LOOP;
-  -- F5: and no other identity definer the API's billing role may call with an owner believes it, the two spend readers of 0144 and 0149 included.
+  -- F5: and no other identity definer the API's billing role may call with an owner believes it, the two spend readers of 0144 and 0149 included. But the two
+  -- named here, which arrived with the merge of the V4 line and do believe the owner they are handed (0157's reader of a person's own statements of reasons and of
+  -- their contribution's review state): this step does not change them, and a step of its own is to ask them. A new definer that is not named still refuses.
   IF EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
       WHERE n.nspname = 'identity' AND p.prosecdef AND p.proargnames && ARRAY['p_owner_ref','p_owner']::text[]
         AND pg_catalog.has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
+        AND p.oid NOT IN ('identity.read_own_moderation_statements(uuid)'::regprocedure, 'identity.read_own_contribution_review(uuid,uuid)'::regprocedure)
         AND p.prosrc !~ 'identity\.(request_owner_matches|page_memory_run_owned)\(') THEN
     RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 owner believed';
   END IF;

@@ -65,6 +65,16 @@ describe("registration region on real PostgreSQL", () => {
     const codes = (name: string) => [...(result.rows.find((row) => row.conname === name)?.definition.matchAll(/'([A-Z]{2})'/g) ?? [])].map((match) => match[1]!);
     expect([...new Set(codes("registration_region_country_code_check"))].sort()).toEqual([...REGION_COUNTRY_CODES].sort());
     expect([...new Set(codes("registration_region_us_state_check").filter((code) => code !== "US"))].sort()).toEqual([...US_STATE_CODES].sort());
+    // 0154's CHECK is the one in force: 0095's list plus Iceland and Liechtenstein, added NOT VALID.
+    expect(codes("registration_region_country_code_check")).toEqual(expect.arrayContaining(["IS", "LI"]));
+    expect(result.rows.find((row) => row.conname === "registration_region_country_code_check")?.definition).toMatch(/ NOT VALID$/);
+  });
+  it("B2b stores Iceland and Liechtenstein, the two codes 0154 added", async () => {
+    for (const country of ["IS", "LI"]) {
+      const userId = await bareAccount();
+      await database.pool.query("SELECT identity.record_registration_region($1,$2,NULL)", [userId, country]);
+      expect(await regionRows(userId)).toEqual([{ country_code: country, us_state: null }]);
+    }
   });
   it("B3 refuses an unknown country, absent US state, foreign state, and duplicate row", async () => {
     const userId = await bareAccount();

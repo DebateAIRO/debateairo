@@ -11,7 +11,7 @@ import english from "../../apps/ui/messages/en/billing.json";
 
 /** Decisions 14 and 24: a funded person waiting on the team's month reads one plain sentence, and their own room stays percent bars with no price. */
 const KEY = "newDebate.room.internalTeamFull";
-const SENTENCE = "The team's room for this month is used up. New questions wait until one of the owners raises it, or the month starts again.";
+const SENTENCE = "The team's quota for this month is used up. New questions wait until one of the owners raises it, or the month starts again.";
 const EXPIRY = "2099-01-01T00:00:00.000Z";
 const funded = (room: string, scope: string) => ({ room, scope, resets_at: EXPIRY, waiting_run_ref: null, plan_id: null, funding: { kind: "INTERNAL", expires_at: EXPIRY } }) as never;
 

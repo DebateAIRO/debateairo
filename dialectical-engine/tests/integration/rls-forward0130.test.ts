@@ -45,8 +45,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * T1-T16 are PLAN S1.2's; every title starts with its id. CI skips this directory; run it alone (two embedded clusters).
  */
 const HEAD = "0130_row_level_security.sql";
-/** The chain's last step since the merge into the V4 branch (2026-10-30): the V4 account memory follows 0130, so a
- *  migrate() that reaches 0130 ends at it. */
+/** The chain's last step since the security review's fixes reached the database (0171, 2026-11-09): the V4 account memory and the
+ *  later V4 steps follow 0130, then 0170 and 0171, so a migrate() that reaches 0130 ends at 0171. */
 const CHAIN_END = "0171_security_review_hardening.sql";
 const PREVIOUS = "0129_support_answer_scope.sql";
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);

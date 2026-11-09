@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.12 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.17 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.12
+endMarker: KOŞULLARIN SONU · v2.17
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.12 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.17 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -170,9 +170,9 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 
 ## 10. İçerik bildirimi, moderasyon ve şikâyetler
 
-**Herkes içerik bildirebilir.** Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın. Oturum açmışsanız herhangi bir herkese açık tartışmada **Bildir** düğmesini de kullanabilirsiniz. Bir yapay zekâ, düğmeyle yapılan bildirimi herkese açık metnin yanında okur. Yapay zekâ katılırsa, tartışma hemen görünmez hâle getirilir ve bir kişi onu inceler. Katılmazsa, daha fazla ayrıntıyla yeniden bildirimde bulunabilirsiniz ve bir kişi onu okuyacaktır. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı.
+**Herkes içerik bildirebilir.** Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın. Oturum açmışsanız herhangi bir herkese açık tartışmada **Bildir** düğmesini de kullanabilirsiniz; düğme, bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı onaylamanızı ister. Düğmeyle yapılan bir bildirimi genellikle bir yapay zekâ, herkese açık metnin yanında okur. Yapay zekâ katılırsa ve tartışma daha önce hiç görünmez hâle getirilmemişse, tartışma hiçbir kişi müdahil olmadan hemen görünmez hâle getirilir ve ardından bir kişi onu inceler. Tartışma daha önce görünmez hâle getirilmişse, onu zaten bildirmişseniz veya o gün için otomatik kontrollerin hakkı dolmuşsa bildirim bunun yerine doğrudan bir kişiye gider. Yapay zekâ katılmazsa veya bildirim otomatik olarak durdurulursa (örneğin bir saat içinde çok sayıda bildirim gönderdiğiniz için ya da tartışma herkese açık olmadığı için), bildirimi hiçbir kişi okumaz: support@dezbatere.ro adresine yazabilirsiniz ve yazdığınızı bir kişi okur ya da aşağıdaki şikâyet yolumuz üzerinden şikâyette bulunabilirsiniz. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı.
 
-Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildirimleri zamanında, özenli, keyfî olmayan ve nesnel bir biçimde ele alır; kararımızı ve buna nasıl itiraz edebileceğinizi size bildiririz. Bir bildirimi işlemek veya karara bağlamak için otomatik araçlar kullandığımızda bunu belirtiriz. Rıza olmaksızın paylaşılan mahrem görüntülere ilişkin bildirimler, geçerli bir talepten itibaren **48 saat içinde** işleme alınır.
+Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz: hemen ekranda ve bir kişinin okuyacağı bir bildirim için ayrıca e-postayla. Bildirimleri zamanında, özenli, keyfî olmayan ve nesnel bir biçimde ele alır; kararımızı size e-postayla bildirir ve buna nasıl itiraz edebileceğinizi size söyleriz. Bir bildirimi işlemek veya karara bağlamak için otomatik araçlar kullandığımızda bunu belirtiriz. Rıza olmaksızın paylaşılan mahrem görüntülere ilişkin bildirimler, geçerli bir talepten itibaren **48 saat içinde** işleme alınır.
 
 **Birbirinden ayrı tutulan iki tür otomatik karar.**
 
@@ -183,7 +183,7 @@ Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildir
 
 **Soru kontrolünün yeri.** 8. bölümdeki soru kontrolü de motorun içindeki bir karar değildir. Hiçbir kişi olmadan bir tartışmanın başlamasını reddeden otomatik bir araçtır. Kriz içindeki bir kişinin sözleri gibi okunan veya intihar ya da kendine zarar verme yöntemlerini ya da buna teşviki isteyen bir soru, ret yerine yardım numaralarının bulunduğu bir ekran alır.
 
-**Gerekçe bildirimi.** İçeriğinizi kaldırdığımızda veya görünürlüğünü kısıtladığımızda ya da hesabınızı askıya aldığımızda veya kapattığımızda size bir gerekçe bildirimi sunarız: ne yaptığımız ve bunun kapsamı, dayandığımız olgular ve bunların bir bildirimden mi yoksa kendi kontrollerimizden mi kaynaklandığı, otomatik araçların kullanılıp kullanılmadığı, hukuki veya sözleşmesel dayanak ve karara nasıl itiraz edebileceğiniz — aşağıda açıklanan şikâyet yolumuz, AB Dijital Hizmetler Yasası kapsamında sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organı veya mahkeme yoluyla. Soru kontrolümüz bir soruyu 7. bölümdeki "Tartışma başlatmayan sorular" paragrafı uyarınca reddettiğinde, size bunu bildiren ekran bunun gerekçe bildirimimizdir: tartışmanın başlamadığını, otomatik kontrolümüzün soruyu hiçbir kişi olmadan reddettiğini, sorunun bu Koşulların hangi kuralına girdiğini ve aşağıdaki yoldan nasıl şikâyette bulunacağınızı belirtir. Reddedilen bir soru için bundan fazlasını vaat etmeyiz. Kontrolümüz bir tartışmayı sildiğinde (9. bölüm), size gösterilen bildirim bunun gerekçe bildirimimizdir: ne yaptığımızı ve bunun kapsamını, dayandığımız olguları, hiçbir kişinin devreye girmediğini, bu Koşulların hangi kuralının geçerli olduğunu ve aşağıdaki yoldan nasıl şikâyette bulunacağınızı belirtir; bu paragrafın andığı diğer iki yol size açık kalır. Kriz içindeki bir kişinin sözleri gibi okunan bir sorunun aldığı yardım numaralı ekran yardımdır, gerekçe bildirimi değildir.
+**Gerekçe bildirimi.** İçeriğinizi kaldırdığımızda veya görünürlüğünü kısıtladığımızda ya da hesabınızı askıya aldığımızda veya kapattığımızda size bir gerekçe bildirimi sunarız: ne yaptığımız ve bunun kapsamı, dayandığımız olgular ve bunların bir bildirimden mi yoksa kendi kontrollerimizden mi kaynaklandığı, otomatik araçların kullanılıp kullanılmadığı, hukuki veya sözleşmesel dayanak ve karara nasıl itiraz edebileceğiniz — aşağıda açıklanan şikâyet yolumuz, AB Dijital Hizmetler Yasası kapsamında sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organı veya mahkeme yoluyla. Gerekçe bildirimini size, hesabınızda Ayarlar, Moderasyon bildirimleri altında yer alan ve orada kalan tam gerekçe bildirimine bir bağlantıyla birlikte e-postayla göndeririz. İçeriğiniz, incelediğimiz başka içerikle birlikte herkese açık bir sayfadan çıktığında da, sizin içeriğinizin herhangi bir kuralı ihlal ettiği tespit edilmemiş olsa bile, bir gerekçe bildirimi alırsınız. Soru kontrolümüz bir soruyu 7. bölümdeki "Tartışma başlatmayan sorular" paragrafı uyarınca reddettiğinde, size bunu bildiren ekran bunun gerekçe bildirimimizdir: tartışmanın başlamadığını, otomatik kontrolümüzün soruyu hiçbir kişi olmadan reddettiğini, sorunun bu Koşulların hangi kuralına girdiğini ve aşağıdaki yoldan nasıl şikâyette bulunacağınızı belirtir. Reddedilen bir soru için bundan fazlasını vaat etmeyiz. Kontrolümüz bir tartışmayı sildiğinde (9. bölüm), size gösterilen bildirim bunun gerekçe bildirimimizdir: ne yaptığımızı ve bunun kapsamını, dayandığımız olguları, hiçbir kişinin devreye girmediğini, bu Koşulların hangi kuralının geçerli olduğunu ve aşağıdaki yoldan nasıl şikâyette bulunacağınızı belirtir; bu paragrafın andığı diğer iki yol size açık kalır. Kriz içindeki bir kişinin sözleri gibi okunan bir sorunun aldığı yardım numaralı ekran yardımdır, gerekçe bildirimi değildir.
 
 **Bir karara ilişkin şikâyet.** Bir moderasyon kararına katılmıyorsanız gerekçe bildirimine yanıt verin veya **altı ay** içinde office@dezbatere.ro adresine yazın. İlk kararda görev almamış bir kişi kararı inceler ve sonucu gerekçeleriyle size bildiririz. Bu, mahkemeye başvurma veya 18. bölüm kapsamındaki alternatif uyuşmazlık çözümünü kullanma hakkınızı etkilemez. Şikâyet yolu; bir bildirim üzerine işlem yapmadığımız, içeriğin haksız biçimde kaldırıldığı, bir hesabın haksız biçimde kısıtlandığı veya otomatik bir aracın içeriğinizi haksız biçimde etkilediği yönündeki şikâyetleri de kabul eder; bir soruyu reddetmesi buna örnektir.
 
@@ -211,11 +211,9 @@ Hizmeti tamamen kapatırsak veya ülkenizden çekersek en az **30 gün önceden 
 
 ## 12. Ücretli planlar
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine ücretsiz bir plan sunar. **Plus**, **Pro** ve **Max** adlı ücretli üç plan sunulacaktır; her biri model listesinin tamamının kilidini açar ve tartışma göstergelerini kendiniz belirlemenize olanak tanır.
 
-Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir **Premium** plan sunulacaktır.
-
-**Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Comandă cu obligație de plată*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
+**Ödeme yapmadan önce** size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde **Abone ol ve öde** (Romence, *Abonați-vă și plătiți*) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz.
 
 **Hatırlatmalar.** Ücretsiz denemenin ücretli plana dönüşmesinden en az 5 gün önce; devam eden planlar için yılda en az bir kez ve on iki ay veya daha uzun süreli bir dönemin yenilenmesinden 30 ila 45 gün önce size e-posta göndeririz. Her hatırlatma fiyatı, tarihi ve iptal bağlantısını içerir.
 
@@ -225,7 +223,7 @@ Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidi
 
 **Başarısız ödemeler.** Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz.
 
-**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
+**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlarımız vergi hariç olarak, fiyat + KDV (ya da yaşadığınız yere bağlı olarak GST veya satış vergisi) şeklinde gösterilir. Fatura adresiniz için geçerli vergi ödeme sayfasında eklenir ve ödeme sayfası, ödeme yapmadan önce size vergi dahil ödeyeceğiniz toplam tutarı gösterir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
 
 **Ödeme yöntemleri.** Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz.
 
@@ -233,7 +231,7 @@ Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidi
 
 **Ters ibrazlar.** Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız.
 
-**Öncelik kanuni haklardadır.** Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz.
+**Öncelik kanuni haklardadır.** Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Tüm planların kullanım sınırları üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz.
 
 ## 13. Cayma hakkınız
 
@@ -250,6 +248,16 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.17, sürüm 2.16'nın yerine geçmiştir: 10. bölüm, Bildir düğmesiyle yapılan bir bildirimi ne zaman bir yapay zekânın, ne zaman bir kişinin okuduğunu, düğmenin sizden iyi niyet beyanı istediğini, bir bildirimi aldığımızı teyit ettiğimizi ve kararımızı size e-postayla bildirdiğimizi ve gerekçe bildirimlerinin e-postayla gönderildiğini ve hesabınızda saklandığını belirtir; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir.
+
+Sürüm 2.16, sürüm 2.15'in yerine geçmiştir: 12. bölüm ücretli planları, yani Plus, Pro ve Max'i adlarıyla belirtir ve 12. ile 15. bölümler artık taslak notları içermez; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir.
+
+Sürüm 2.15, sürüm 2.14'ün yerine geçmiştir: 12. bölüm, fiyatlarımızın vergi hariç olarak, fiyat + KDV şeklinde gösterildiğini ve verginin ödeme sayfasında eklendiğini söyler.
+
+Sürüm 2.14, sürüm 2.13'ün yerine geçmiştir: 18. bölüm ve Ek A, alternatif uyuşmazlık çözümü yolu olarak ANPC (SAL)'ı belirtir.
+
+Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinin Romence metnini belirtir.
 
 Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler.
 
@@ -273,8 +281,6 @@ Sürüm 2.7, sürüm 2.6'ün yerine geçmiştir: her soruyu bir tartışma başl
 
 **Denetimimiz dışındaki olaylar.** Makul denetimimiz dışındaki bir hususun ifamızı engellediği durumlarda sözleşmeyi ihlal etmiş sayılmayız. Üçüncü taraf bir model sağlayıcısının başarısız olması veya hizmeti geri çekmesi kendiliğinden böyle bir olay sayılmaz; bu durum hizmeti kullanılamaz hâle getirirse 14. bölüm uygulanır ve orada açıklandığı üzere sözleşmeyi sona erdirip geri ödeme alabilirsiniz.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Fikrî mülkiyet
 
 Hizmetin kendisi — yazılım, motor, puanlama yöntemi, arayüz, Dialectical Engine ve DebateAIRO adları ve logolarımız — bize veya lisans verenlerimize aittir. Bu Koşullar size hizmeti kullanma izni verir; hizmet üzerinde mülkiyet hakkı vermez.
@@ -297,7 +303,7 @@ Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlil
 
 **Başka yerlerdeki tüketiciler.** AB ve AEA dışında yaşıyorsanız bu Koşullardaki hiçbir hüküm, ülkenizin hukuku uyarınca o ülkenin mahkemelerinde talepte bulunma hakkınızı veya o hukuk uyarınca vazgeçilemeyecek herhangi bir hakkınızı sınırlandırmaz — Avustralya veya Yeni Zelanda'da yaşıyorsanız tüketici güvencesi haklarınız; Brezilya'da yaşıyorsanız Código de Defesa do Consumidor ve Amerika Birleşik Devletleri'nde yaşıyorsanız eyaletinizin tüketiciyi koruma kanunları buna dahildir.
 
-**Mahkemeye gitmeden önce.** support@dezbatere.ro adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve 5 iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı taahhüt etmiyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir.
+**Mahkemeye gitmeden önce.** support@dezbatere.ro adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve 5 iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz ANPC (SAL), reclamatiisal.anpc.ro üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı taahhüt etmiyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir.
 
 ## 19. Diğer hükümler
 
@@ -319,7 +325,7 @@ Her bir madde, bölgesinde yaşayan kişilere uygulanır ve yalnızca ana metind
 
 ### A.1 Avrupa Birliği ve Avrupa Ekonomik Alanı
 
-Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. **Almanya:** dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. **Fransa:** dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. **İtalya:** askıya alma ve sona erdirme (11), ücretli planlar ve yenilenmeleri (12), değişiklikler (14), sorumluluk (15) ile uygulanacak hukuk ve uyuşmazlıkların görüleceği yer (18) hakkındaki hükümler, İtalyan Medeni Kanunu'nun 1341 ve 1342. maddeleri uyarınca özel onayınızı gerektirir. Bu onayı kayıt sırasında ayrı bir kutuyla verirsiniz; kutu, Bölge alanında İtalya'yı seçen veya bağlantısı İtalya'dan gelen herkese gösterilir. **Hollanda:** bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. **Polonya:** Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin.
+Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; ANPC (SAL), reclamatiisal.anpc.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. **Almanya:** dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. **Fransa:** dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. **İtalya:** askıya alma ve sona erdirme (11), ücretli planlar ve yenilenmeleri (12), değişiklikler (14), sorumluluk (15) ile uygulanacak hukuk ve uyuşmazlıkların görüleceği yer (18) hakkındaki hükümler, İtalyan Medeni Kanunu'nun 1341 ve 1342. maddeleri uyarınca özel onayınızı gerektirir. Bu onayı kayıt sırasında ayrı bir kutuyla verirsiniz; kutu, Bölge alanında İtalya'yı seçen veya bağlantısı İtalya'dan gelen herkese gösterilir. **Hollanda:** bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. **Polonya:** Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin.
 
 ### A.2 Amerika Birleşik Devletleri
 
@@ -331,7 +337,7 @@ Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: ya�
 
 ### A.3 Kanada ve Quebec
 
-Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. **Quebec:** bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz.
+Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. **Quebec:** bu Koşullar Fransızca olarak sunulur; kaydolurken Kanada'yı seçerseniz Koşullar size önce Fransızca gösterilir ve bunun yerine İngilizceyi seçebilirsiniz; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz.
 
 ### A.4 Avustralya ve Yeni Zelanda
 

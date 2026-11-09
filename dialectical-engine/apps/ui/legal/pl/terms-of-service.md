@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.12 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.17 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.12
+endMarker: KONIEC WARUNKÓW · v2.17
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.12 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.17 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -170,9 +170,9 @@ W płatnym planie debaty są **domyślnie prywatne**: żadna treść utworzona t
 
 ## 10. Zgłaszanie treści, moderowanie i skargi
 
-**Każdy może zgłosić treść.** Konto nie jest wymagane. Napisz na adres support@dezbatere.ro. Jeśli jesteś zalogowany, możesz także użyć przycisku **Zgłoś** przy dowolnej publicznej debacie. AI czyta zgłoszenie złożone przyciskiem, obok publicznego tekstu. Jeśli AI się zgadza, debata zostaje od razu ukryta, a człowiek ją przegląda. Jeśli się nie zgadza, możesz zgłosić ponownie, podając więcej szczegółów, a człowiek przeczyta zgłoszenie. Aby umożliwić nam podjęcie działań, wskaż: dlaczego uważasz, że treść jest niezgodna z prawem lub narusza niniejsze Warunki, podając szczegóły pozwalające zrozumieć zarzut; dokładną lokalizację — pełny adres URL i, jeżeli to możliwe, dany fragment; swoje imię i nazwisko oraz adres e-mail (nie jest to wymagane przy zgłoszeniach materiałów przedstawiających seksualne wykorzystywanie dzieci); a także potwierdź, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne.
+**Każdy może zgłosić treść.** Konto nie jest wymagane. Napisz na adres support@dezbatere.ro. Jeśli jesteś zalogowany, możesz także użyć przycisku **Zgłoś** przy dowolnej publicznej debacie; prosi on o potwierdzenie, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne. Zgłoszenie złożone przyciskiem zwykle czyta AI, obok publicznego tekstu. Jeśli AI się zgadza, a debata nigdy wcześniej nie była ukryta, debata zostaje od razu ukryta, bez udziału człowieka, a następnie człowiek ją przegląda. Zgłoszenie trafia natomiast bezpośrednio do człowieka, gdy debata była już wcześniej ukryta, gdy już ją zgłosiłeś lub gdy wyczerpały się automatyczne kontrole na dany dzień. Jeśli AI się nie zgadza albo zgłoszenie zostaje automatycznie zatrzymane (na przykład dlatego, że w ciągu godziny wysłałeś wiele zgłoszeń, lub dlatego, że debata nie jest publiczna), żaden człowiek go nie czyta: możesz napisać na adres support@dezbatere.ro, a człowiek przeczyta zgłoszenie, albo złożyć skargę za pośrednictwem poniższej procedury. Aby umożliwić nam podjęcie działań, wskaż: dlaczego uważasz, że treść jest niezgodna z prawem lub narusza niniejsze Warunki, podając szczegóły pozwalające zrozumieć zarzut; dokładną lokalizację — pełny adres URL i, jeżeli to możliwe, dany fragment; swoje imię i nazwisko oraz adres e-mail (nie jest to wymagane przy zgłoszeniach materiałów przedstawiających seksualne wykorzystywanie dzieci); a także potwierdź, że w dobrej wierze uważasz zgłoszenie za dokładne i kompletne.
 
-Niezwłocznie potwierdzamy otrzymanie każdego zgłoszenia. Zgłoszenia rozpatrujemy terminowo, starannie, bez arbitralności i obiektywnie, informujemy Cię o decyzji oraz o sposobie jej zakwestionowania. Jeżeli używamy zautomatyzowanych środków do rozpatrzenia zgłoszenia lub podjęcia decyzji, informujemy o tym. W odniesieniu do zgłoszeń intymnego wizerunku udostępnionego bez zgody podejmujemy działania **w ciągu 48 godzin** od otrzymania ważnego żądania.
+Niezwłocznie potwierdzamy otrzymanie każdego zgłoszenia: od razu na ekranie oraz, w przypadku zgłoszenia, które przeczyta człowiek, e-mailem. Zgłoszenia rozpatrujemy terminowo, starannie, bez arbitralności i obiektywnie, przekazujemy Ci decyzję e-mailem i informujemy o sposobie jej zakwestionowania. Jeżeli używamy zautomatyzowanych środków do rozpatrzenia zgłoszenia lub podjęcia decyzji, informujemy o tym. W odniesieniu do zgłoszeń intymnego wizerunku udostępnionego bez zgody podejmujemy działania **w ciągu 48 godzin** od otrzymania ważnego żądania.
 
 **Dwa odrębne rodzaje zautomatyzowanych decyzji.**
 
@@ -183,7 +183,7 @@ Niezwłocznie potwierdzamy otrzymanie każdego zgłoszenia. Zgłoszenia rozpatru
 
 **Miejsce kontroli pytań.** Kontrola pytań opisana w sekcji 8 również nie jest decyzją podejmowaną wewnątrz silnika. Jest to zautomatyzowane narzędzie, które odmawia rozpoczęcia debaty, bez udziału człowieka. Pytanie, które brzmi jak słowa osoby w kryzysie albo które prosi o metody samobójstwa lub samookaleczenia lub o zachętę do nich, powoduje wyświetlenie ekranu z numerami pomocy zamiast odmowy.
 
-**Uzasadnienie.** Za każdym razem, gdy usuwamy Twoją treść lub ograniczamy jej widoczność albo zawieszamy lub zamykamy Twoje konto, przekazujemy Ci uzasadnienie: opis podjętego działania i jego zakresu, fakty, na których się oparliśmy, oraz informację, czy pochodziły ze zgłoszenia, czy z naszych własnych ustaleń, informację o wykorzystaniu zautomatyzowanych środków, podstawę prawną lub umowną oraz sposób zakwestionowania decyzji: za pośrednictwem naszej procedury składania skarg opisanej poniżej, przed organem pozasądowego rozstrzygania sporów certyfikowanym na podstawie unijnego aktu o usługach cyfrowych, albo przed sądem. Gdy nasza kontrola pytań odrzuca pytanie na podstawie akapitu „Pytania, które nie rozpoczynają debaty” w sekcji 7, ekran, który Cię o tym informuje, jest naszym uzasadnieniem: wskazuje, że debata się nie rozpoczęła, że nasza automatyczna kontrola odrzuciła pytanie bez udziału człowieka, pod którą zasadę niniejszych Warunków pytanie podpada oraz jak złożyć skargę za pośrednictwem poniższej procedury. W przypadku odrzuconego pytania nie obiecujemy nic więcej. Gdy nasza kontrola usuwa debatę (sekcja 9), komunikat, który widzisz, jest naszym uzasadnieniem: wskazuje, co zrobiliśmy i jak daleko to sięga, fakty, na których się oparliśmy, że nie brał w tym udziału żaden człowiek, jaka zasada niniejszych Warunków ma zastosowanie oraz jak złożyć skargę za pośrednictwem poniższej procedury; dwie pozostałe drogi, o których mówi ten akapit, nadal pozostają dla Ciebie otwarte. Ekran z numerami pomocy, który otrzymuje pytanie, które brzmi jak słowa osoby w kryzysie, jest pomocą, a nie uzasadnieniem.
+**Uzasadnienie.** Za każdym razem, gdy usuwamy Twoją treść lub ograniczamy jej widoczność albo zawieszamy lub zamykamy Twoje konto, przekazujemy Ci uzasadnienie: opis podjętego działania i jego zakresu, fakty, na których się oparliśmy, oraz informację, czy pochodziły ze zgłoszenia, czy z naszych własnych ustaleń, informację o wykorzystaniu zautomatyzowanych środków, podstawę prawną lub umowną oraz sposób zakwestionowania decyzji: za pośrednictwem naszej procedury składania skarg opisanej poniżej, przed organem pozasądowego rozstrzygania sporów certyfikowanym na podstawie unijnego aktu o usługach cyfrowych, albo przed sądem. Wysyłamy Ci je e-mailem, z linkiem do pełnego uzasadnienia na Twoim koncie, w sekcji Ustawienia, Powiadomienia o moderacji, gdzie pozostaje dostępne. Otrzymujesz je również wtedy, gdy Twoja treść znika ze strony publicznej razem z inną treścią, którą przeglądamy, nawet jeśli nie stwierdzono, że Twoja treść narusza jakąkolwiek zasadę. Gdy nasza kontrola pytań odrzuca pytanie na podstawie akapitu „Pytania, które nie rozpoczynają debaty” w sekcji 7, ekran, który Cię o tym informuje, jest naszym uzasadnieniem: wskazuje, że debata się nie rozpoczęła, że nasza automatyczna kontrola odrzuciła pytanie bez udziału człowieka, pod którą zasadę niniejszych Warunków pytanie podpada oraz jak złożyć skargę za pośrednictwem poniższej procedury. W przypadku odrzuconego pytania nie obiecujemy nic więcej. Gdy nasza kontrola usuwa debatę (sekcja 9), komunikat, który widzisz, jest naszym uzasadnieniem: wskazuje, co zrobiliśmy i jak daleko to sięga, fakty, na których się oparliśmy, że nie brał w tym udziału żaden człowiek, jaka zasada niniejszych Warunków ma zastosowanie oraz jak złożyć skargę za pośrednictwem poniższej procedury; dwie pozostałe drogi, o których mówi ten akapit, nadal pozostają dla Ciebie otwarte. Ekran z numerami pomocy, który otrzymuje pytanie, które brzmi jak słowa osoby w kryzysie, jest pomocą, a nie uzasadnieniem.
 
 **Skarga na decyzję.** Jeżeli nie zgadzasz się z decyzją moderacyjną, odpowiedz na jej uzasadnienie albo napisz na adres office@dezbatere.ro w terminie **sześciu miesięcy**. Decyzję rozpatrzy osoba, która nie uczestniczyła w jej pierwotnym podjęciu, a my przekażemy Ci wynik wraz z uzasadnieniem. Nie narusza to Twojego prawa do wystąpienia na drogę sądową ani skorzystania z alternatywnych metod rozstrzygania sporów zgodnie z sekcją 18. W ramach tej procedury możesz również złożyć skargę na brak działania po otrzymaniu zgłoszenia, niesłuszne usunięcie treści, niesłuszne ograniczenie konta albo nieprawidłowy wpływ zautomatyzowanego narzędzia na Twoją treść, na przykład przez odrzucenie pytania.
 
@@ -211,11 +211,9 @@ Sekcje 8 (w zakresie treści już opublikowanych), 15, 16 i 18 zachowują moc po
 
 ## 12. Plany płatne
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine oferuje plan bezpłatny. Dostępne będą trzy płatne plany, **Plus**, **Pro** i **Max**; każdy z nich odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
 
-Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Premium**, który odblokowuje pełną listę modeli i umożliwia samodzielne ustawianie wskaźników debaty.
-
-**Przed dokonaniem płatności** bezpośrednio nad przyciskiem płatności wyświetlamy: plan; łączną cenę z uwzględnieniem należnego podatku; okres rozliczeniowy; informację, że plan odnawia się automatycznie do czasu anulowania; datę zakończenia ewentualnego bezpłatnego okresu próbnego i kwotę, która zostanie następnie pobrana; oraz sposób anulowania. Potwierdzasz warunki odnowienia, zaznaczając odrębne pole. Przycisk ma treść **Subskrybuj i zapłać** (po rumuńsku *Comandă cu obligație de plată*). Przekazujemy Ci na trwałym nośniku potwierdzenie zawierające te same informacje, niniejsze Warunki oraz formularz odstąpienia.
+**Przed dokonaniem płatności** bezpośrednio nad przyciskiem płatności wyświetlamy: plan; łączną cenę z uwzględnieniem należnego podatku; okres rozliczeniowy; informację, że plan odnawia się automatycznie do czasu anulowania; datę zakończenia ewentualnego bezpłatnego okresu próbnego i kwotę, która zostanie następnie pobrana; oraz sposób anulowania. Potwierdzasz warunki odnowienia, zaznaczając odrębne pole. Przycisk ma treść **Subskrybuj i zapłać** (po rumuńsku *Abonați-vă și plătiți*). Przekazujemy Ci na trwałym nośniku potwierdzenie zawierające te same informacje, niniejsze Warunki oraz formularz odstąpienia.
 
 **Przypomnienia.** Wysyłamy Ci wiadomość e-mail co najmniej 5 dni przed przekształceniem bezpłatnego okresu próbnego w plan płatny; co najmniej raz w roku w przypadku planów kontynuowanych; oraz od 30 do 45 dni przed każdym odnowieniem na okres co najmniej dwunastu miesięcy. Każde przypomnienie zawiera cenę, datę i link do anulowania.
 
@@ -225,7 +223,7 @@ Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Pre
 
 **Nieudane płatności.** Jeżeli płatność nie powiedzie się, ponawiamy próbę przez 7 dni i przed obniżeniem planu Twojego konta do planu bezpłatnego wysyłamy ostrzeżenie pocztą elektroniczną. Nie usuwamy debat z powodu nieudanej płatności.
 
-**Podatki i odbiorca płatności.** Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki.
+**Podatki i odbiorca płatności.** Nasze ceny są podawane bez podatku, jako cena + VAT (lub GST albo podatek od sprzedaży, zależnie od miejsca zamieszkania). Podatek dla Twojego adresu rozliczeniowego jest doliczany na stronie płatności, która przed dokonaniem płatności pokazuje łączną kwotę do zapłaty wraz z podatkiem. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki.
 
 **Metody płatności.** Płacisz kartą. Akceptujemy karty Visa i Mastercard; nie akceptujemy kart American Express. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com), a pełny numer Twojej karty nigdy do nas nie trafia.
 
@@ -233,7 +231,7 @@ Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Pre
 
 **Obciążenia zwrotne.** Jeżeli zakwestionujesz obciążenie u wystawcy karty, możemy zawiesić funkcje płatne do czasu rozstrzygnięcia sporu. Nie pobieramy z tego tytułu opłat.
 
-**Pierwszeństwo praw ustawowych.** Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto, jeżeli zrezygnujesz z planu płatnego w trakcie okresu rozliczeniowego, zwrócimy Ci tę część ceny za ten okres, która nie została wykorzystana, mierzoną zużyciem planu, niezależnie od tego, ile dni minęło: jeżeli wykorzystano 30%, zwrócimy 70%; jeżeli nic nie wykorzystano, zwrócimy całą cenę. Wniosek o zwrot wyślij na support@dezbatere.ro; po dokonaniu zwrotu plan wygasa. Jeżeli ma zastosowanie także prawo odstąpienia opisane w sekcji 13, otrzymasz wyższy z dwóch zwrotów. Limity korzystania w obu planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ.
+**Pierwszeństwo praw ustawowych.** Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto, jeżeli zrezygnujesz z planu płatnego w trakcie okresu rozliczeniowego, zwrócimy Ci tę część ceny za ten okres, która nie została wykorzystana, mierzoną zużyciem planu, niezależnie od tego, ile dni minęło: jeżeli wykorzystano 30%, zwrócimy 70%; jeżeli nic nie wykorzystano, zwrócimy całą cenę. Wniosek o zwrot wyślij na support@dezbatere.ro; po dokonaniu zwrotu plan wygasa. Jeżeli ma zastosowanie także prawo odstąpienia opisane w sekcji 13, otrzymasz wyższy z dwóch zwrotów. Limity korzystania we wszystkich planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ.
 
 ## 13. Prawo odstąpienia od umowy
 
@@ -250,6 +248,16 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+
+Wersja 2.17 zastąpiła wersję 2.16: sekcja 10 określa, kiedy zgłoszenie złożone przyciskiem Zgłoś czyta AI, a kiedy człowiek, że przycisk prosi o Twoje oświadczenie złożone w dobrej wierze, że potwierdzamy zgłoszenie i przekazujemy Ci decyzję e-mailem oraz że uzasadnienia są wysyłane e-mailem i przechowywane na Twoim koncie; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
+
+Wersja 2.16 zastąpiła wersję 2.15: sekcja 12 wymienia płatne plany, Plus, Pro i Max, a sekcje 12 i 15 nie zawierają już uwag redakcyjnych; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
+
+Wersja 2.15 zastąpiła wersję 2.14: sekcja 12 mówi, że nasze ceny są podawane bez podatku, jako cena + VAT, oraz że podatek jest doliczany na stronie płatności.
+
+Wersja 2.14 zastąpiła wersję 2.13: sekcja 18 i załącznik A wskazują ANPC (SAL) jako drogę alternatywnego rozstrzygania sporów.
+
+Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 podaje rumuński napis na przycisku płatności.
 
 Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje.
 
@@ -273,8 +281,6 @@ Wersja 2.7 zastąpiła wersję 2.6: dodaje kontrolę pytań, która odczytuje ka
 
 **Zdarzenia pozostające poza naszą kontrolą.** Nie naruszamy umowy, jeżeli wykonanie zobowiązań uniemożliwia nam okoliczność pozostająca poza naszą rozsądną kontrolą. Awaria lub wycofanie się zewnętrznego dostawcy modelu nie jest automatycznie taką okolicznością; jeżeli powoduje niedostępność usługi, zastosowanie ma sekcja 14 i możesz rozwiązać umowę oraz otrzymać zwrot na opisanych w niej zasadach.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Własność intelektualna
 
 Sama usługa — oprogramowanie, silnik, metoda oceny, interfejs, nazwy Dialectical Engine i DebateAIRO oraz nasze logo — należy do nas lub naszych licencjodawców. Niniejsze Warunki udzielają Ci pozwolenia na korzystanie z usługi, a nie prawa własności do niej.
@@ -297,7 +303,7 @@ Sposób przetwarzania przez nas danych osobowych określa **Polityka prywatnośc
 
 **Konsumenci w innych miejscach.** Jeżeli mieszkasz poza UE i EOG, żadne postanowienie niniejszych Warunków nie ogranicza przysługującego Ci na mocy prawa Twojego państwa prawa do dochodzenia roszczeń przed jego sądami ani żadnego prawa, którego na mocy tych przepisów nie można się zrzec — w tym, jeżeli mieszkasz w Australii lub Nowej Zelandii, praw z tytułu gwarancji konsumenckich; jeżeli mieszkasz w Brazylii, praw wynikających z Código de Defesa do Consumidor; a jeżeli mieszkasz w Stanach Zjednoczonych, praw wynikających z przepisów ochrony konsumentów Twojego stanu.
 
-**Przed skierowaniem sprawy do sądu.** Skontaktuj się z nami pod adresem support@dezbatere.ro; większość problemów można rozwiązać, a naszym celem jest udzielenie odpowiedzi w ciągu 5 dni roboczych. Jeżeli jesteś konsumentem w Rumunii lub UE, możesz skorzystać z alternatywnego rozstrzygania sporów za pośrednictwem www.onoratainstanta.ro; nie zobowiązujemy się uczestniczyć w tej procedurze. Skargi dotyczące decyzji moderacyjnych podlegają odrębnej ścieżce opisanej w sekcji 10.
+**Przed skierowaniem sprawy do sądu.** Skontaktuj się z nami pod adresem support@dezbatere.ro; większość problemów można rozwiązać, a naszym celem jest udzielenie odpowiedzi w ciągu 5 dni roboczych. Jeżeli jesteś konsumentem w Rumunii lub UE, możesz skorzystać z alternatywnego rozstrzygania sporów za pośrednictwem ANPC (SAL), reclamatiisal.anpc.ro; nie zobowiązujemy się uczestniczyć w tej procedurze. Skargi dotyczące decyzji moderacyjnych podlegają odrębnej ścieżce opisanej w sekcji 10.
 
 ## 19. Pozostałe postanowienia
 
@@ -319,7 +325,7 @@ Każdy wpis ma zastosowanie do osób mieszkających w danym regionie i określa 
 
 ### A.1 Unia Europejska i Europejski Obszar Gospodarczy
 
-Część główna niniejszych Warunków została opracowana z myślą o Tobie. Ponadto: możesz wszcząć postępowanie przed sądami państwa, w którym mieszkasz; ma zastosowanie prawo odstąpienia określone w sekcji 13; alternatywne metody rozstrzygania sporów są dostępne za pośrednictwem www.onoratainstanta.ro. **Niemcy:** przycisk anulowania pod adresem dezbatere.ro/cancel umożliwia zakończenie subskrypcji bez logowania; okresy subskrypcji i odnowienia oraz terminy wypowiedzenia są zgodne z §309(9) BGB: każdy plan obowiązuje przez jeden miesiąc i odnawia się co miesiąc do czasu anulowania, a anulować można w dowolnym momencie ze skutkiem na koniec bieżącego miesiąca. **Francja:** możesz zakończyć subskrypcję online w trzech krokach pod adresem dezbatere.ro/cancel. **Włochy:** postanowienia dotyczące zawieszenia i rozwiązania umowy (11), planów płatnych i ich odnawiania (12), zmian (14), odpowiedzialności (15) oraz prawa właściwego i sądów rozpatrujących spory (18) wymagają Twojej szczególnej akceptacji na podstawie art. 1341 i 1342 włoskiego Kodeksu cywilnego. Udzielasz jej w odrębnym polu wyboru podczas rejestracji; pole to jest wyświetlane każdemu, kto w polu „Region” wybierze Włochy lub którego połączenie pochodzi z Włoch. **Niderlandy:** niniejsze Warunki są udostępniane przed zawarciem umowy w formie umożliwiającej ich przechowywanie. **Polska:** polska wersja jest dostępna; wybierz Polski w przełączniku języka.
+Część główna niniejszych Warunków została opracowana z myślą o Tobie. Ponadto: możesz wszcząć postępowanie przed sądami państwa, w którym mieszkasz; ma zastosowanie prawo odstąpienia określone w sekcji 13; alternatywne metody rozstrzygania sporów są dostępne za pośrednictwem ANPC (SAL), reclamatiisal.anpc.ro. **Niemcy:** przycisk anulowania pod adresem dezbatere.ro/cancel umożliwia zakończenie subskrypcji bez logowania; okresy subskrypcji i odnowienia oraz terminy wypowiedzenia są zgodne z §309(9) BGB: każdy plan obowiązuje przez jeden miesiąc i odnawia się co miesiąc do czasu anulowania, a anulować można w dowolnym momencie ze skutkiem na koniec bieżącego miesiąca. **Francja:** możesz zakończyć subskrypcję online w trzech krokach pod adresem dezbatere.ro/cancel. **Włochy:** postanowienia dotyczące zawieszenia i rozwiązania umowy (11), planów płatnych i ich odnawiania (12), zmian (14), odpowiedzialności (15) oraz prawa właściwego i sądów rozpatrujących spory (18) wymagają Twojej szczególnej akceptacji na podstawie art. 1341 i 1342 włoskiego Kodeksu cywilnego. Udzielasz jej w odrębnym polu wyboru podczas rejestracji; pole to jest wyświetlane każdemu, kto w polu „Region” wybierze Włochy lub którego połączenie pochodzi z Włoch. **Niderlandy:** niniejsze Warunki są udostępniane przed zawarciem umowy w formie umożliwiającej ich przechowywanie. **Polska:** polska wersja jest dostępna; wybierz Polski w przełączniku języka.
 
 ### A.2 Stany Zjednoczone
 
@@ -331,7 +337,7 @@ Część główna niniejszych Warunków została opracowana z myślą o Tobie. P
 
 ### A.3 Kanada i Quebec
 
-Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. **Quebec:** niniejsze Warunki są dostępne w języku francuskim; wybierz język francuski w przełączniku języka; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą.
+Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. **Quebec:** niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą.
 
 ### A.4 Australia i Nowa Zelandia
 

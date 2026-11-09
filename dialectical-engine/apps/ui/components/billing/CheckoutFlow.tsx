@@ -318,7 +318,7 @@ export function CheckoutFlow({
   // The server refuses 422 BILLING_ADDRESS_REQUIRED for a quote that still lacks a payer field, so it never goes on.
   const canContinue = !busy && quote !== null && consents !== null && renewalAccepted && immediateAccepted
     && !quote.address_required && (!quote.country_confirm_needed || countryConfirmed);
-  // "Continue to payment" stays focusable too: while it is locked, this says why (as its description and
+  // "Subscribe and pay" stays focusable too: while it is locked, this says why (as its description and
   // when pressed), and a press moves focus to the first thing still missing.
   const continueBlocker: { key: string; target: string } | null = busy || quote === null || consents === null ? null
     : quote.address_required ? { key: "billing.checkout.detailsRequired", target: `checkout-${FIELD_ORDER.find((field) => missing[field] !== undefined) ?? FIELD_ORDER[0]}` }

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MailTemplateError, ORDER_TEXT_KINDS, renderOrderText, type OrderTextKindId } from "@debateai/mail-templates";
 import { catalogueOrderText } from "../../apps/api/src/billing/order-text-catalogue.js";
-import { englishOrderText, planName, type OrderTextKind } from "../../apps/api/src/billing/order-text.js";
+import { englishOrderText, invoiceDate, planName, type OrderTextKind } from "../../apps/api/src/billing/order-text.js";
 
 // D6a declared its port before these catalogues existed; these lines stop compiling the day the two drift apart.
 type SameKinds = [OrderTextKind] extends [OrderTextKindId]
@@ -13,7 +13,7 @@ const SAME_KINDS: SameKinds = true;
 const PARAMS: Readonly<Record<OrderTextKindId, Readonly<Record<string, string>>>> = Object.freeze({
   ORDER_PLAN: Object.freeze({ plan: planName("PLUS") }),
   CARD_CHECK: Object.freeze({}),
-  INVOICE_LINE: Object.freeze({ plan: planName("PRO"), from: "October 1, 2026", to: "November 1, 2026" })
+  INVOICE_LINE: Object.freeze({ plan: planName("PRO"), from: "1 October 2026", to: "1 November 2026" })
 });
 
 function codeOf(run: () => unknown): string {
@@ -35,12 +35,22 @@ describe("P17 the order and invoice sentences (D6a's orderText port)", () => {
     }
   });
 
+  it("writes an invoice line's dates day first in every English, as the pages do (owner's answer to question 5, 5 Nov 2026)", () => {
+    for (const english of ["en", "en-US", "en-GB"]) {
+      expect(invoiceDate(new Date("2026-10-01T00:00:00.000Z"), english)).toBe("1 October 2026");
+      expect(invoiceDate(new Date("2026-11-30T23:59:59.000Z"), english)).toBe("30 November 2026");
+    }
+    // Other languages keep their own order.
+    expect(invoiceDate(new Date("2026-10-01T00:00:00.000Z"), "ro")).toBe("1 octombrie 2026");
+    expect(invoiceDate(new Date("2026-10-01T00:00:00.000Z"), "de")).toBe("1. Oktober 2026");
+  });
+
   it("speaks the buyer's language, keeps the product names, and falls back to English", () => {
     const romanian = renderOrderText("ORDER_PLAN", "ro", { plan: "Plus" });
     expect(romanian).not.toBe("Dialectical Engine Plus monthly plan");
     expect(romanian).toContain("Dialectical Engine");
     expect(romanian).toContain("Plus");
-    expect(renderOrderText("INVOICE_LINE", "de", PARAMS.INVOICE_LINE)).toContain("October 1, 2026");
+    expect(renderOrderText("INVOICE_LINE", "de", PARAMS.INVOICE_LINE)).toContain("1 October 2026");
     expect(renderOrderText("CARD_CHECK", "xx", {})).toBe("Dialectical Engine card check");
   });
 

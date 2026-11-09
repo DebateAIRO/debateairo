@@ -4,20 +4,35 @@ import { describe, expect, it } from "vitest";
 import * as fixture from "../../apps/ui/lib/v3/storyFixture.js";
 import {
   AnswerDigSchema, AnswerPathRewritesSchema, AnswerSchema, AnswerWebSchema, AskParentSchema, AskRoomResponseSchema, AskRequestSchema,
-  AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
-  InvestigationReportsSchema, MonthPauseSchema, NodeSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema
+  AnswerIndexSchema, AskRoomQuerySchema, BillingUsageResponseSchema, cutQuoteAtWordEdge, DebateInvestigationSchema, DIG_LEVEL_MAX, DigSuggestionSchema,
+  InvestigationReportsSchema, MonthPauseSchema, NodeSchema, PathRewriteSchema, RunProjectionSchema, UsageBorrowSchema, WebOtherPageSchema, WebPathSchema,
+  WebSourceSchema
 } from "../../packages/contract/src/index.js";
 import { createSeed, SEED_NODE_IDS } from "../../tools/v4-mock-api/seed.js";
 import {
   answerDraftProblems, contractOrDraft, cutQuote, DraftAnswerWebSchema, DraftAskParentSchema, DraftDigSuggestionSchema,
   DraftInvestigationSchema, DraftOtherPageSchema, DraftRoomPartSchema, DraftSourceSchema, DraftWebPathSchema,
   DraftRoomQueryPartSchema, READ_DEPTHS, RESEARCHED_STATES, splitAsk, splitRoomQuery, stripAnswer, stripRoom, stripRun, stripUsage,
-  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftUsageBorrowsSchema
+  SUGGESTION_KINDS, SUGGESTION_SIDES, DraftPathRewritesSchema, DraftAnswerDigSchema, DraftMonthPauseSchema, DraftRunQuotaUsedSchema,
+  DraftUsageBorrowsSchema, DraftRunStartedAtSchema, answerIndexDraftProblems, DraftShelfRowPartSchema, stripAnswerIndex,
+  DraftQuestionShareSchema, DraftShareScopeSchema, DraftReportSharePartSchema, reportShareProblems, stripReportShare
 } from "../../tools/v4-mock-api/web-draft.js";
 import {
-  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
+  borrowNotice, DEEPEST_DIG, DIG_ANSWERS, DIG_FINISHED_AT, DIG_RUNS, mainAnswerAt, monthPause, PATH_REWRITES, reportVersionBody, SEEDED_NEW_DIGS
 } from "../../tools/v4-mock-api/rewrite-seed.js";
 import { WEB_CASES, type WebCase } from "../../tools/v4-mock-api/web-seed.js";
+import { digProgressAt, DraftDigProgressSchema, LIVE_MODES, LIVE_STEPS_NO_WEB, LIVE_STEPS_WEB } from "../../tools/v4-mock-api/live-seed.js";
+import { climbAt, CLIMB_MODES, CLIMB_STEP_MS } from "../../tools/v4-mock-api/climb-seed.js";
+import { FAILED_DIGS, FAILED_DIGS_PARENT, RUN_FAILED_SOME } from "../../tools/v4-mock-api/failed-seed.js";
+import { windowsForPlan } from "../../tools/v4-mock-api/plan-windows.js";
+import { RUN_FAILURE_KINDS, runFailureKind } from "../../apps/ui/lib/v3/runFailure.js";
+import { failedQuotaKey } from "../../apps/ui/lib/v4/failedRun.js";
+import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
+import { digRetryOf, rebuildDigTarget, sameDig } from "../../apps/ui/lib/v4/digRetry.js";
+import { buildV4Map, findOpenQuestion, findPath } from "../../apps/ui/lib/v4/mapModel.js";
+import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
+import { parseDigProgress } from "../../apps/ui/lib/v4/digProgress.js";
+import { belowStateOf, type BelowDig } from "../../apps/ui/lib/v4/digsBelow.js";
 
 /*
  * These checks hold before and after W1-6 merges: they never assert that today's contract refuses a draft field.
@@ -313,6 +328,28 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(Date.parse(DEEPEST_DIG.settledAt)).toBeGreaterThan(Date.parse(DEEPEST_DIG.askedAt));
   });
 
+  it("dig-f1: the first debate's main answer is still being rewritten, then has its newest version; both pass the contract", () => {
+    const readyAt = Date.parse("2026-11-04T10:00:00.000Z");
+    const writing = mainAnswerAt(readyAt - 1, readyAt);
+    const done = mainAnswerAt(readyAt, readyAt);
+    expect(writing.writing).toBe(true);
+    expect(writing.current!.version).toBe(1);
+    expect(done.writing).toBeUndefined();
+    expect(done.current!.version).toBe(2);
+    expect(done.history.map((version) => version.version)).toEqual([1, 2]);
+    // Each version names a path a seeded dig rewrote, and came after that dig finished.
+    for (const version of done.history) {
+      const path = PATH_REWRITES[DIG_RUNS.root]!.paths.find((candidate) => candidate.position_ref === version.position_ref)!;
+      expect(Date.parse(version.updated_at)).toBeGreaterThan(Date.parse(path.history[0]!.dig_finished_at));
+    }
+    for (const main of [writing, done]) {
+      const answer = { ...answerOf("PAID"), path_rewrites: PATH_REWRITES[DIG_RUNS.root], main_answer: main };
+      expect(AnswerSchema.safeParse(answer).success).toBe(true);
+      // An older contract gets the answer without it.
+      expect(Object.keys(stripAnswer(answer))).not.toContain("main_answer");
+    }
+  });
+
   it("a paused debate, the borrow notice and a room whose new starts wait fall back to today's reads", () => {
     const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
     const paused = { ...run, month_pause: monthPause("2026-11-01T00:00:00.000Z", false) };
@@ -336,13 +373,366 @@ describe("V4 mock API: the new dig model and the money rule", () => {
     expect(Object.keys(stripRoom(wait))).not.toContain("new_starts");
   });
 
+  it("the waiting card's draft start time (journey-d2) is an ISO time, held back with the pause from a contract that lacks it", () => {
+    expect(DraftRunStartedAtSchema.safeParse("2026-11-04T09:31:00.000Z").success).toBe(true);
+    expect(DraftRunStartedAtSchema.safeParse("14:31").success).toBe(false);
+    const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "RUNNING", terminal_reason: null, hold_until: null };
+    const started = { ...run, started_at: "2026-11-04T09:31:00.000Z" };
+    // Today's run read has no `started_at`: the website never receives it until the contract knows it.
+    expect(stripRun(started)).toEqual(run);
+    expect(stripRun({ ...started, month_pause: monthPause("2026-12-01T00:00:00.000Z", false) })).toEqual(run);
+    expect(RunProjectionSchema.safeParse(stripRun(started)).success).toBe(true);
+  });
+
+  it("a failed run's quota_used (owner review 3 Nov) passes its draft schema and falls back to today's run read", () => {
+    const run = {
+      run_ref: "44444444-4444-4444-8444-444444444444", question_line: "Will AI tutors replace homework help?", state: "FAILED",
+      terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", hold_until: null
+    };
+    for (const quota of ["NONE", "SOME"] as const) {
+      expect(DraftRunQuotaUsedSchema.safeParse(quota).success).toBe(true);
+      const full = { ...run, quota_used: quota };
+      expect(stripRun(full)).toEqual(run);
+      expect(RunProjectionSchema.safeParse(contractOrDraft(RunProjectionSchema, full, stripRun).body).success).toBe(true);
+    }
+    expect(DraftRunQuotaUsedSchema.safeParse("ALL").success).toBe(false);
+    expect(["v4.debate.failedNothingTaken", "v4.digFailed.nothingTaken", "v4.digFailed.retry", "v4.digFailed.keepsFailing",
+      "v4.pause.digCard", "v4.pause.digCardReady"].filter((key) => !(key in catalog))).toEqual([]);
+  });
+
+  it("the owner's 5 Nov answers (questions 3 A, 20 A): a failed dig for every reason group, and a failed question that used some", () => {
+    // Question 3 A: every one of the seven reason groups has one seeded failed dig, each with a code of its group.
+    expect(FAILED_DIGS.map((dig) => dig.kind).sort()).toEqual([...RUN_FAILURE_KINDS].sort());
+    for (const dig of FAILED_DIGS) {
+      expect(runFailureKind(dig.reason), dig.runRef).toBe(dig.kind);
+      expect(dig.place, dig.runRef).toMatch(/^(?:path:n-(?:mix|renew|nuclear|smr)|p:n-renew-storage|o:0|w)$/u);
+      expect(DraftRunQuotaUsedSchema.safeParse(dig.quotaUsed).success, dig.runRef).toBe(true);
+      // Each dig's own line is in the catalogue (the page never shows the code).
+      expect(catalog[`v4.digFailed.reason.${dig.kind}`], dig.kind).toBeTruthy();
+      const run = { run_ref: dig.runRef, question_line: dig.question, state: "FAILED", terminal_reason: dig.reason, hold_until: null };
+      expect(stripRun({ ...run, quota_used: dig.quotaUsed })).toEqual(run);
+      expect(RunProjectionSchema.safeParse(run).success, dig.runRef).toBe(true);
+    }
+    expect(new Set([FAILED_DIGS_PARENT.runRef, ...FAILED_DIGS.map((dig) => dig.runRef), RUN_FAILED_SOME.runRef]).size).toBe(FAILED_DIGS.length + 2);
+    expect(new Set(FAILED_DIGS.map((dig) => dig.seq)).size).toBe(FAILED_DIGS.length);
+    // Only the dig that ran partway used some; the waived ones say so in their own line, so the page adds nothing.
+    const quota = Object.fromEntries(FAILED_DIGS.map((dig) => [dig.kind, dig.quotaUsed]));
+    expect(quota).toMatchObject({ STOPPED: "SOME", SET_ASIDE: "NONE", CHOICE_GONE: "NONE", NOT_STARTED: "NONE" });
+    const shown = (dig: (typeof FAILED_DIGS)[number]) => failedQuotaKey(
+      { run_ref: dig.runRef, question_line: dig.question, state: "FAILED", terminal_reason: dig.reason, hold_until: null, quota_used: dig.quotaUsed } as never, true);
+    expect(Object.fromEntries(FAILED_DIGS.map((dig) => [dig.kind, shown(dig)]))).toEqual({
+      STOPPED: null, NOT_STARTED: "v4.digFailed.nothingTaken", MODELS_UNAVAILABLE: "v4.digFailed.nothingTaken",
+      RUN_LIMIT_REACHED: "v4.digFailed.nothingTaken", PLAN_ENDED: "v4.digFailed.nothingTaken", SET_ASIDE: null, CHOICE_GONE: null
+    });
+    // Question 20 A: the second failed question's draft view says SOME, so its page would say the "used some" line.
+    expect(RUN_FAILED_SOME.quotaUsed).toBe("SOME");
+    expect(failedQuotaKey({ run_ref: RUN_FAILED_SOME.runRef, question_line: RUN_FAILED_SOME.question, state: "FAILED",
+      terminal_reason: RUN_FAILED_SOME.reason, hold_until: null, quota_used: "SOME" } as never, false)).toBe("v4.debate.failedSomeTaken");
+    expect(catalog["v4.debate.failedSomeTaken"]).toBeTruthy();
+  });
+
+  it("the 5 Nov seed (wave-4 browser check): each failed dig digs its own place, asked as the website asks it, so its panel offers a retry", () => {
+    const parent = FAILED_DIGS_PARENT;
+    const answer = seed.answer({ answerId: parent.answerId, runRef: parent.runRef, question: parent.question, askedAt: parent.askedAt, servedAt: parent.settledAt, web: "PAID" });
+    const map = buildV4Map({ runId: parent.runRef, answer, story: seed.story(parent.answerId, "READY", parent.settledAt) });
+    // As the map reads a recorded dig: its places, and the map's own words at them (lib/v4/accountMemory.ts linkOfRecord).
+    const textAt = (place: string): string | undefined =>
+      place.startsWith("path:") ? findPath(map, place.slice("path:".length))?.line : findOpenQuestion(map, place)?.text;
+    const views: DigView[] = FAILED_DIGS.map((dig) => {
+      const link: DigLink = {
+        parentRunId: parent.runRef, childRunId: dig.runRef, openQuestionIds: [dig.place], questions: [textAt(dig.place)!], mode: dig.mode, startedAt: dig.askedAt
+      };
+      expect(link.questions[0], dig.runRef).toBeTruthy();
+      return { link, state: "FAILED", headline: null, counts: null, terminalReason: dig.reason, questionLine: dig.question };
+    });
+    for (const view of views) {
+      const target = rebuildDigTarget(view.link, map);
+      expect(target, view.link.childRunId).not.toBeNull();
+      // Word for word what the website sends for that dig, so the page offers it again (lib/v4/useFailedDigs.ts).
+      expect(digQuestion(target!, parent.question, catalog, "en"), view.link.childRunId).toBe(view.questionLine);
+      const retry = digRetryOf(view, views, map, null, (rebuilt) => digQuestion(rebuilt, parent.question, catalog, "en") === view.questionLine);
+      expect(retry.kind, view.link.childRunId).toBe("OFFER");
+    }
+    // No two are the same dig, so none reads as one dig that failed twice ("This keeps failing").
+    expect(views.flatMap((a, i) => views.slice(i + 1).filter((b) => sameDig(a.link, b.link)).map((b) => [a.link.childRunId, b.link.childRunId]))).toEqual([]);
+    // Four whole paths and three open questions, each dug once.
+    expect(new Set(FAILED_DIGS.map((dig) => dig.place)).size).toBe(FAILED_DIGS.length);
+  });
+
+  it("the usage read names only the windows the plan counts: Free the month alone, a paid plan its day, week and month", () => {
+    // The wave-4 browser check (5 Nov): a Free person's circle opened three bars on the stand-in.
+    const all = [{ scope: "PERSON_DAY", percent: 14 }, { scope: "PERSON_WEEK", percent: 31 }, { scope: "PERSON_MONTH", percent: 9 }] as const;
+    expect(windowsForPlan("FREE", all).map((window) => window.scope)).toEqual(["PERSON_MONTH"]);
+    for (const plan of ["PLUS", "PRO", "MAX"]) expect(windowsForPlan(plan, all).map((window) => window.scope)).toEqual(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+    // Each read still passes the contract's own shape.
+    for (const plan of ["FREE", "PLUS"]) {
+      const read = { plan_id: plan, windows: windowsForPlan(plan, all.map((window) => ({ ...window, resets_at: "2026-12-01T00:00:00.000Z" }))) };
+      expect(BillingUsageResponseSchema.safeParse(read).success, plan).toBe(true);
+    }
+  });
+
+  it("the quota's windows (owner's screen review, 3 Nov): share_scope and question_share pass their draft schemas and fall back", () => {
+    // read-f19 / public-f14 / map-f33: the window a room read's share is of, only beside a share.
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]) expect(DraftShareScopeSchema.safeParse(scope).success).toBe(true);
+    expect(DraftShareScopeSchema.safeParse("SITE_DAY").success).toBe(false);
+    const fits = { room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "FREE", dig_share_percent: 20 };
+    expect(DraftRoomPartSchema.safeParse({ ...fits, share_scope: "PERSON_MONTH" }).success).toBe(true);
+    const { dig_share_percent: _share, ...noShare } = fits;
+    expect(DraftRoomPartSchema.safeParse({ ...noShare, share_scope: "PERSON_MONTH" }).success).toBe(false);
+    // Today's contract never sees it: held back, the room read keeps its share.
+    const held = stripRoom({ ...fits, share_scope: "PERSON_MONTH" });
+    expect(Object.keys(held)).not.toContain("share_scope");
+    expect(AskRoomResponseSchema.safeParse({ ...fits }).success).toBe(true);
+    // map-f9: what a question has used of that window.
+    expect(DraftQuestionShareSchema.safeParse({ scope: "PERSON_DAY", percent: 11 }).success).toBe(true);
+    expect(DraftQuestionShareSchema.safeParse({ scope: "PERSON_DAY", percent: 11.5 }).success).toBe(false);
+    expect(DraftQuestionShareSchema.safeParse({ scope: "PERSON_GRANT", percent: 11 }).success).toBe(false);
+    const run = { run_ref: DIG_RUNS.root, question_line: "Should I move?", state: "SETTLED", terminal_reason: null, hold_until: null };
+    expect(stripRun({ ...run, question_share: { scope: "PERSON_MONTH", percent: 11 } })).toEqual(run);
+    expect(RunProjectionSchema.safeParse(contractOrDraft(RunProjectionSchema, { ...run, question_share: { scope: "PERSON_DAY", percent: 11 } }, stripRun).body).success)
+      .toBe(true);
+    for (const key of ["v4.debate.questionShare.PERSON_DAY", "v4.debate.questionShare.PERSON_MONTH", "v4.room.startShare.PERSON_MONTH", "v4.dig.period.PERSON_MONTH"]) {
+      expect(catalog[key], key).toBeDefined();
+    }
+  });
+
   it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
     const words = [
       "v4.view.heading", "v4.view.HELPED.MAIN_QUESTION", "v4.view.DID_NOT_HELP.PATH", "v4.view.asYours", "v4.view.why",
       "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
-      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.nest.digHereToo", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
+      // V4 screen review (3 Nov 2026): the first debate's report is older than its map (dig-f19), and its main answer is rewritten (dig-f1).
+      "v4.rewrite.reportOlder", "v4.rewrite.updateReport", "v4.rewrite.changedSinceYourReport", "v4.mainAnswer.writing", "v4.digsDid.news.ANSWER",
+      "v4.rewrite.state.WRITING", "v4.nest.level", "v4.dig.chooseWhat", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
       "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);
+  });
+});
+
+describe("V4 mock API: the shelf's draft parts of the answer list (owner's screen review, 3 Nov)", () => {
+  const item = {
+    answer_id: "aaaa1111-1111-4111-8111-111111111111", run_ref: "11111111-1111-4111-8111-111111111111", answer_version: 1,
+    question_line: "Should countries build new nuclear power?", verdict_state: null, abstention: null, serve_state: "COMPOSED",
+    staleness_state: "FRESH", builds_on_previous: false, created_at_sequence: 2
+  };
+  const open = {
+    run_ref: "22222222-2222-4222-8222-222222222222", question_line: "Is a four-day week good?", state: "RUNNING",
+    terminal_reason: null, created_at_sequence: 5
+  };
+  const full = {
+    items: [{ ...item, map_bar: { sure: 4, sure_for_case: 5, still_argued: 2, didnt_hold: 1 }, changed_since_visit: true, dug_from: null }],
+    open_runs: [{ ...open, started_at: "2026-11-04T14:00:00.000Z", dug_from: null }],
+    limit: 50, offset: 0, total: 1
+  };
+
+  it("pass their draft schema, and today's contract once they are held back", () => {
+    expect(answerIndexDraftProblems(full)).toEqual([]);
+    expect(stripAnswerIndex(full)).toEqual({ items: [item], open_runs: [open], limit: 50, offset: 0, total: 1 });
+    expect(AnswerIndexSchema.safeParse(stripAnswerIndex(full)).success).toBe(true);
+  });
+
+  it("a broken part is caught before it is sent", () => {
+    expect(DraftShelfRowPartSchema.safeParse({ map_bar: { sure: 1 } }).success).toBe(false);
+    expect(DraftShelfRowPartSchema.safeParse({ started_at: "at two" }).success).toBe(false);
+    expect(DraftShelfRowPartSchema.safeParse({ dug_from: "not-a-run" }).success).toBe(false);
+    expect(answerIndexDraftProblems({ ...full, items: [{ ...item, changed_since_visit: "yes" }] })).toHaveLength(1);
+  });
+});
+
+/*
+ * Owner's screen review, 3 Nov 2026 (dig-d1 B): the stand-in's DRAFT progress read of a running dig (live-seed.ts), read by
+ * the website's own reader (apps/ui/lib/v4/digProgress.ts); and (dig-f2) the played climb of the seeded level-3 dig up to
+ * the first debate (climb-seed.ts), followed by the website's own rule (apps/ui/lib/v4/digsBelow.ts).
+ */
+describe("V4 mock API: a running dig's steps and checked findings (draft, switch live=ON)", () => {
+  const RUN = "d9000000-0000-4000-8000-000000000009";
+  const START = Date.parse("2026-11-04T10:00:00.000Z");
+  const END = START + 100_000;
+  const at = (share: number, extra: Partial<Parameters<typeof digProgressAt>[0]> = {}) =>
+    digProgressAt({ runRef: RUN, startedAt: START, settleAt: END, web: true, free: false, waiting: false, ...extra }, START + share * 100_000);
+
+  it("moves through the web steps, each checked finding listed once it passed, in the order it passed", () => {
+    expect([at(0.1), at(0.3), at(0.6), at(0.9), at(1.2)].map((body) => [body.now, body.findings.length]))
+      .toEqual([["FINDING_SOURCES", 0], ["READING", 0], ["CHECKING", 2], ["WRITING", 3], ["WRITING", 3]]);
+    expect(at(0.5).steps).toEqual([...LIVE_STEPS_WEB]);
+    expect(at(0.5, { waiting: true })).toEqual({ run_ref: RUN, steps: [...LIVE_STEPS_WEB], now: null, findings: [] });
+  });
+
+  it("without a web search argues first, and on Free never says Sure; never Didn't hold, never an unchecked point", () => {
+    const free = at(0.95, { web: false, free: true });
+    expect(free.steps).toEqual([...LIVE_STEPS_NO_WEB]);
+    expect(at(0.1, { web: false }).now).toBe("ARGUING");
+    expect(free.findings.map((finding) => finding.trust)).not.toContain("SURE");
+    for (const body of [at(0.95), free]) expect(body.findings.every((finding) => ["SURE", "SURE_FOR_CASE", "STILL_ARGUED"].includes(finding.trust))).toBe(true);
+  });
+
+  it("every body passes its draft schema, and the website reads exactly what it says", () => {
+    for (const body of [at(0), at(0.4), at(0.8), at(1), at(0.5, { waiting: true }), at(0.9, { web: false, free: true })]) {
+      expect(DraftDigProgressSchema.safeParse(body).success, JSON.stringify(body)).toBe(true);
+      expect(parseDigProgress(body, RUN)).toEqual({
+        steps: body.steps, now: body.now, findings: body.findings.map((finding) => ({ id: finding.finding_id, text: finding.text, trust: finding.trust }))
+      });
+    }
+    expect(DraftDigProgressSchema.safeParse({ ...at(0.5), now: "ARGUING" }).success).toBe(false);
+    expect(DraftDigProgressSchema.safeParse({ ...at(0.5), steps: ["READING", "FINDING_SOURCES"] }).success).toBe(false);
+  });
+
+  it("the switch's words are the mock's own: OFF answers 404 as today's API", () => {
+    expect(LIVE_MODES).toEqual(["OFF", "ON"]);
+  });
+});
+
+describe("V4 mock API: the played climb three levels up (draft, switch climb=PLAY)", () => {
+  const PLAYED = Date.parse("2026-11-04T10:00:00.000Z");
+  const stepAt = (step: number) => climbAt(PLAYED + step * CLIMB_STEP_MS + 1, PLAYED);
+  const d300: BelowDig = {
+    link: { parentRunId: DIG_RUNS.levelTwo, childRunId: DIG_RUNS.levelThree, openQuestionIds: ["path:n-nuclear"], questions: [], mode: "thorough", startedAt: null },
+    depth: 3, above: [DIG_RUNS.levelTwo, DIG_RUNS.levelOne, DIG_RUNS.root]
+  };
+  const stateAt = (step: number): string => {
+    const parts = stepAt(step);
+    const answers: Record<string, unknown> = { [DIG_RUNS.levelOne]: { path_rewrites: parts.levelOnePaths }, [DIG_RUNS.root]: { path_rewrites: parts.rootPaths } };
+    const view = { link: d300.link, state: "DONE" as const, headline: null, counts: null, rewrite: parts.levelThreeRewrite };
+    return belowStateOf(d300, view, (runId) => answers[runId] as never, PLAYED + step * CLIMB_STEP_MS + 1);
+  };
+
+  it("before PLAY is the seed: d300 still rewriting, the trail's answers as seeded", () => {
+    const seeded = climbAt(PLAYED + 60_000, null);
+    expect(seeded.levelThreeRewrite.state).toBe("WRITING");
+    expect(seeded.rootPaths).toBe(PATH_REWRITES[DIG_RUNS.root]);
+    expect(stepAt(0)).toEqual(seeded);
+  });
+
+  it("every step passes the contract, each level's row named by d300, the dig that started the climb", () => {
+    for (let step = 0; step <= 4; step += 1) {
+      const parts = stepAt(step);
+      expect(PathRewriteSchema.safeParse(parts.levelThreeRewrite).success, `d300 step ${String(step)}`).toBe(true);
+      for (const [name, paths] of Object.entries({ two: parts.levelTwoPaths, one: parts.levelOnePaths, root: parts.rootPaths })) {
+        const result = AnswerPathRewritesSchema.safeParse(paths);
+        expect(result.success, `${name} step ${String(step)}: ${JSON.stringify(result.error?.issues)}`).toBe(true);
+      }
+      expect(AnswerDigSchema.safeParse({ ...DIG_ANSWERS[DIG_RUNS.levelThree]!, rewrite: parts.levelThreeRewrite }).success).toBe(true);
+      // As the mock serves them (server.ts withClimb): whole answers the contract takes, so the website gets the rewrites.
+      const whole = (runRef: string, extra: Record<string, unknown>) => AnswerSchema.safeParse({
+        ...seed.answer({ answerId: "aaaa1111-1111-4111-8111-111111111111", runRef, question: "Q?", askedAt: "2026-10-27T15:12:00.000Z",
+          servedAt: "2026-10-27T15:40:00.000Z", web: "PAID" }),
+        ...extra
+      }).success;
+      expect(whole(DIG_RUNS.root, { path_rewrites: parts.rootPaths }), `root step ${String(step)}`).toBe(true);
+      expect(whole(DIG_RUNS.levelOne, { path_rewrites: parts.levelOnePaths, dig: DIG_ANSWERS[DIG_RUNS.levelOne] })).toBe(true);
+      expect(whole(DIG_RUNS.levelTwo, { path_rewrites: parts.levelTwoPaths, dig: DIG_ANSWERS[DIG_RUNS.levelTwo] })).toBe(true);
+      expect(whole(DIG_RUNS.levelThree, { dig: { ...DIG_ANSWERS[DIG_RUNS.levelThree]!, rewrite: parts.levelThreeRewrite } })).toBe(true);
+    }
+    const last = stepAt(3);
+    const renew = last.rootPaths.paths.find((path) => path.position_ref === "n-renew")!;
+    expect(renew.history.at(-1)).toMatchObject({ dig_run_id: DIG_RUNS.levelThree, cause: "CHILD_PATH", state: "READY", changed: true });
+    expect(renew.current).toEqual((renew.history.at(-1) as Extract<typeof renew.history[number], { state: "READY" }>).text);
+  });
+
+  it("the website's own rule sees it climbing at every step until it reaches the first debate, then quiet", () => {
+    expect([0, 1, 2, 3].map(stateAt)).toEqual(["CLIMBING", "CLIMBING", "CLIMBING", "QUIET"]);
+    expect(CLIMB_MODES).toEqual(["SEED", "PLAY"]);
+  });
+});
+
+describe("V4 mock API: the report's share of today on the investigation read (owner's screen review, 3 Nov, report-d1)", () => {
+  const reports = {
+    investigation_id: "1a1a1a1a-5555-4555-8555-555555555555", root_run_id: "55555555-5555-4555-8555-555555555555",
+    state: "OPEN", digs: 0, versions: [], current: null
+  };
+
+  it("passes its draft part, and today's contract once it is held back", () => {
+    const full = { ...reports, report_share_percent: 5 };
+    expect(reportShareProblems(full)).toEqual([]);
+    expect(reportShareProblems(reports)).toEqual([]);
+    expect(stripReportShare(full)).toEqual(reports);
+    expect(InvestigationReportsSchema.safeParse(stripReportShare(full)).success).toBe(true);
+    expect(InvestigationReportsSchema.safeParse(contractOrDraft(InvestigationReportsSchema, full, stripReportShare).body).success).toBe(true);
+  });
+
+  it("is a whole percent in the dig share's steps of 5, never 0 and never a price", () => {
+    for (const share of [0, 3, 12.5, "5%", 105]) expect(DraftReportSharePartSchema.safeParse({ report_share_percent: share }).success, String(share)).toBe(false);
+    expect(DraftReportSharePartSchema.safeParse({ report_share_percent: 5 }).success).toBe(true);
+    expect(reportShareProblems({ ...reports, report_share_percent: 7 })).toHaveLength(1);
+    expect(["v4.reportStrip.share", "v4.report.publicToo"].filter((key) => !(key in catalog))).toEqual([]);
+  });
+});
+
+describe("the public dig flow and the public state (owner screen review, 3 Nov: public-d2 A, public-f26)", () => {
+  it("each chip of the public read's draft field is a contract suggestion of a path the page shows; one was dug near, with its day and dig", async () => {
+    const { PUBLIC_DIG_SUGGESTIONS, PUBLIC_UPDATE_REF, seedPublicDebates } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicDebateSchema } = await import("../../packages/contract/src/index.js");
+    const debate = PublicDebateSchema.parse(seedPublicDebates()[0]);
+    const shown = new Set((debate.story_short?.paths ?? []).map((path) => path.position_ref));
+    const chips: Loose[] = PUBLIC_DIG_SUGGESTIONS.flatMap((entry: Loose) => {
+      expect(shown.has(entry.position_ref), entry.position_ref).toBe(true);
+      return entry.suggestions;
+    });
+    for (const { dug_on: _on, dug_ref: _ref, ...suggestion } of chips) expect(DigSuggestionSchema.safeParse(suggestion).success, suggestion.suggestion_id).toBe(true);
+    expect(chips.filter((chip) => chip.dug_on !== undefined)).toEqual([expect.objectContaining({ dug_on: "2026-10-28", dug_ref: PUBLIC_UPDATE_REF })]);
+    // The field is a draft: today's strict public read does not take it, so the website's view never carries it.
+    expect(PublicDebateSchema.safeParse({ ...debate, dig_suggestions: PUBLIC_DIG_SUGGESTIONS }).success).toBe(false);
+  });
+
+  it("the visibility read: PUBLISHED with the page's reference, PRIVATE for every other state; the draft view adds only the stages before or after the check", async () => {
+    const { PUBLIC_REF, PUBLIC_STATES, visibilityOf } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicationTransitionSchema } = await import("../../packages/contract/src/index.js");
+    for (const state of PUBLIC_STATES) expect(PublicationTransitionSchema.safeParse(visibilityOf(state, false)).success, state).toBe(true);
+    expect(visibilityOf("PUBLISHED", false)).toEqual({ state: "PUBLISHED", public_ref: PUBLIC_REF });
+    expect(visibilityOf("BEING_CHECKED", false)).toEqual({ state: "PRIVATE", public_ref: null });
+    expect(visibilityOf("BEING_CHECKED", true)).toEqual({ state: "PRIVATE", public_ref: null, public_stage: "BEING_CHECKED" });
+    expect(visibilityOf("PRIVATE", true)).toEqual({ state: "PRIVATE", public_ref: null });
+    expect(visibilityOf("PUBLISHED", true)).toEqual({ state: "PUBLISHED", public_ref: PUBLIC_REF });
+  });
+
+  it("a public dig on the page gives the digger its new text as `rewrite`; \"#confirm\" gives the path's text as it was, with nothing changed", async () => {
+    const { contributionOf, contributionRewriteOf } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { AnswerContributionSchema } = await import("../../packages/contract/src/web.js");
+    const added = contributionOf("p-fares", null, "f3000000-0000-4000-8000-000000000001", "2026-11-04", "Mine.");
+    const rewrite = contributionRewriteOf(added, null);
+    expect(rewrite).toEqual({ line: added.line, summary: added.summary, fate: added.fate, what_changed: added.what_changed });
+    const same = contributionRewriteOf(null, "Free fares for everyone.");
+    expect(same).toMatchObject({ line: "Free fares for everyone.", what_changed: [] });
+    for (const body of [rewrite, same]) {
+      expect(AnswerContributionSchema.safeParse({ public_ref: "f1000000-0000-4000-8000-000000000001", state: "ON_THE_PAGE", rewrite: body }).success).toBe(true);
+    }
+  });
+});
+
+describe("the Report button on the mock (decision 35; the DSA notices, D5)", () => {
+  it("a press without the good-faith statement is refused as the API refuses it; the pretend check answers one of three states, each with its true line", async () => {
+    const { mockFlagStateOf } = await import("../../tools/v4-mock-api/public-seed.js");
+    const { PublicFlagRequestSchema, PublicFlagAnswerSchema } = await import("../../packages/contract/src/web.js");
+    expect(PublicFlagRequestSchema.safeParse({ where: "The question", claim: "It names a private person." }).success).toBe(false);
+    expect(PublicFlagRequestSchema.safeParse({ where: "The question", claim: "It names a private person.", good_faith: false }).success).toBe(false);
+    expect(PublicFlagRequestSchema.safeParse({ where: "The question", claim: "It names a private person.", good_faith: true }).success).toBe(true);
+    const states = ["Please hide this one.", "Read by #person please.", "Nothing to see here."].map(mockFlagStateOf);
+    expect(states).toEqual(["HIDDEN", "WITH_A_PERSON", "NOT_FOUND"]);
+    for (const state of states) expect(PublicFlagAnswerSchema.safeParse({ state }).success).toBe(true);
+    expect(catalog["v4.public.flag.NOT_FOUND"]).toMatch(/^We have not acted on this report: it was stopped automatically, and no person has read it\./u);
+    const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
+    expect(server).toContain("mockFlagStateOf(body.data.claim)");
+  });
+});
+
+describe("V4 mock API: every switch is named where people look for it (the wave-2 checks)", () => {
+  const server = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/server.ts"), "utf8");
+  const readme = readFileSync(resolve(import.meta.dirname, "../../tools/v4-mock-api/README.md"), "utf8");
+  const handler = server.slice(server.indexOf('if (parts[1] === "set"'), server.indexOf('if (parts[1] === "sign-in"'));
+  const switches = [...handler.matchAll(/url\.searchParams\.get\("([a-z]+)"\)/gu)].map((match) => match[1]!);
+
+  it("the set handler reads the switches the click-test uses, the public dig share among them (W2L-9)", () => {
+    expect(switches).toEqual(expect.arrayContaining(["room", "ask", "plan", "usage", "pause", "public", "publicstate", "publicdigshare", "report", "dig", "live", "climb", "session"]));
+  });
+
+  it("the Known line, the refusal message and the README's Switches table name each one", () => {
+    const known = /Known: ([^"]+)"/u.exec(server)![1]!;
+    const refused = /"Unknown value for ([^;]+);/u.exec(server)![1]!;
+    for (const name of switches.filter((name) => name !== "subscription")) {
+      expect(known, name).toContain(`${name}=`);
+      expect(refused, name).toMatch(new RegExp(`\\b${name}\\b`, "u"));
+      expect(readme, name).toContain(`\`${name}=\``);
+    }
+    expect(known).toContain("subscription=RESET");
   });
 });

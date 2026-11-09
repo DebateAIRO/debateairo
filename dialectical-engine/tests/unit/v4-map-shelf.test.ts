@@ -1,0 +1,425 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import type { AnswerIndex, DigLinks, DigSuggestion } from "@debateai/contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { digPicksOf, digQuestion, parseDigDetail } from "../../apps/ui/lib/v4/askText.js";
+import { mergeShelfRows, readMapShelf, shelfExtrasOf, shelfPicksOf, type ShelfClient } from "../../apps/ui/lib/v4/mapShelf.js";
+import { placesOf } from "../../apps/ui/lib/v4/suggestions.js";
+import type { DigTarget, V4DigPick, V4OpenQuestion, V4Path } from "../../apps/ui/lib/v4/types.js";
+import { usedUpLine } from "../../apps/ui/lib/v4/money.js";
+
+/*
+ * "Your maps" (owner pick ask-d5 B with ask-f10, wait-f13, map-f34 and dig-f30, 3 Nov 2026): the person's own questions,
+ * digs left out of the cards by the account's dig link (never by a first line) and hung under their question in the
+ * person's words, the list read further back until five real questions remain, one state word each, and what the server
+ * may add (the start time, the bar, the "New" dot) read only when it is there.
+ */
+
+const CATALOG = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../apps/ui/messages/en/v4.json"), "utf8")) as Record<string, string>;
+
+type Item = Readonly<{ run: string; seq: number; line?: string; extra?: Record<string, unknown> }>;
+type Open = Item & Readonly<{ state: "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED" }>;
+
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+/** One page of GET /v1/answers: answers paged newest first by limit/offset, every open run on each page (as the API does). */
+function pageOf(items: readonly Item[], open: readonly Open[], limit: number, offset: number): AnswerIndex {
+  return {
+    items: items.slice(offset, offset + limit).map((item) => ({
+      run_ref: item.run, question_line: item.line ?? `Question ${item.run}?`, created_at_sequence: item.seq, ...item.extra
+    })),
+    open_runs: open.map((run) => ({
+      run_ref: run.run, question_line: run.line ?? `Question ${run.run}?`, state: run.state,
+      terminal_reason: run.state === "FAILED" ? "RUN_FAILED" : null, created_at_sequence: run.seq, ...run.extra
+    })),
+    limit, offset, total: items.length
+  } as unknown as AnswerIndex;
+}
+
+/** A fake GET /v1/answers over `items` and `open`. */
+function answerList(items: readonly Item[], open: readonly Open[] = []) {
+  return vi.fn(async (limit: number, offset: number) => pageOf(items, open, limit, offset));
+}
+
+/** A fake GET /v1/runs/{id}/dig-links from child → parent pairs; `failing` runs throw; `places` are each link's map places. */
+function digLinks(parents: Readonly<Record<string, string>>, failing: readonly string[] = [], places: Readonly<Record<string, readonly string[]>> = {}) {
+  return vi.fn(async (runId: string): Promise<DigLinks> => {
+    if (failing.includes(runId)) throw new Error("NOT_FOUND");
+    const parent = parents[runId];
+    return {
+      parent: parent === undefined ? null : {
+        parent_run_id: parent, child_run_id: runId, places: [...(places[runId] ?? [])], mode: "quick", created_at: "2026-11-03T10:00:00.000Z"
+      },
+      children: []
+    };
+  });
+}
+
+const client = (readAnswerIndex: ReturnType<typeof answerList>, readDigLinks: ReturnType<typeof digLinks>): ShelfClient =>
+  ({ readAnswerIndex, readDigLinks }) as unknown as ShelfClient;
+
+describe("what the server may add to a row", () => {
+  it("reads the start time, the four-shade bar, the New dot and the dig link only when they are well formed", () => {
+    const none = { startedAt: null, bar: null, changed: false, dugFrom: undefined, publicDig: false, publicPick: null };
+    expect(shelfExtrasOf({})).toEqual(none);
+    expect(shelfExtrasOf({
+      started_at: "2026-11-04T14:00:00.000Z", map_bar: { sure: 2, sure_for_case: 3, still_argued: 1, didnt_hold: 0 },
+      changed_since_visit: true, dug_from: id(1)
+    })).toEqual({
+      ...none, startedAt: "2026-11-04T14:00:00.000Z", bar: { SURE: 2, SURE_FOR_CASE: 3, STILL_ARGUED: 1, DIDNT_HOLD: 0 }, changed: true, dugFrom: id(1)
+    });
+    expect(shelfExtrasOf({ dug_from: null }).dugFrom).toBeNull();
+    // A broken field is left out, never guessed at.
+    expect(shelfExtrasOf({ started_at: "today", map_bar: { sure: 2 }, changed_since_visit: "yes" })).toEqual(none);
+    expect(shelfExtrasOf({ map_bar: { sure: -1, sure_for_case: 0, still_argued: 0, didnt_hold: 0 } }).bar).toBeNull();
+  });
+
+  it("one row per debate: a served answer wins over its open run, and the state words follow the run", () => {
+    const rows = mergeShelfRows([], pageOf([{ run: id(1), seq: 9 }], [
+      { run: id(1), seq: 4, state: "SETTLED", extra: { started_at: "2026-11-04T09:00:00.000Z" } },
+      { run: id(2), seq: 8, state: "RUNNING" },
+      { run: id(3), seq: 7, state: "WAITING" },
+      { run: id(4), seq: 6, state: "FAILED" },
+      { run: id(5), seq: 5, state: "HOLDING" }
+    ], 32, 0));
+    expect(rows.map((row) => row.runId)).toEqual([id(1), id(2), id(3), id(4), id(5)]);
+    const byRun = Object.fromEntries(rows.map((row) => [row.runId, row]));
+    expect(byRun[id(1)]).toMatchObject({ state: "READY", firstSequence: 4, startedAt: "2026-11-04T09:00:00.000Z" });
+    expect([id(2), id(3), id(4), id(5)].map((run) => byRun[run]!.state)).toEqual(["WORKING", "WAITING", "FAILED", "WORKING"]);
+  });
+});
+
+describe("readMapShelf", () => {
+  it("leaves digs out by the account's dig link and reads further back until five real questions remain", async () => {
+    // Thirty digs of the newest question come first, so the first page holds only two real questions.
+    const digs: Item[] = Array.from({ length: 30 }, (_, at) => ({ run: id(100 + at), seq: 200 - at, line: `Could storage cover week ${at}?` }));
+    const questions: Item[] = Array.from({ length: 8 }, (_, at) => ({ run: id(at + 1), seq: 100 - at, line: `Real question ${at + 1}?` }));
+    const readAnswerIndex = answerList([...digs, ...questions]);
+    const readDigLinks = digLinks(Object.fromEntries(digs.map((dig) => [dig.run, id(1)])));
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, readDigLinks) });
+    expect(shelf.maps.map((map) => map.question)).toEqual(["Real question 1?", "Real question 2?", "Real question 3?", "Real question 4?", "Real question 5?"]);
+    expect(readAnswerIndex).toHaveBeenCalledTimes(2);
+    expect(readAnswerIndex.mock.calls[1]).toEqual([32, 32]);
+    expect(shelf.maps.every((map) => map.state === "READY")).toBe(true);
+    // Every dig hangs under the question it came from, newest first, in the person's words.
+    expect(shelf.maps[0]!.digs).toHaveLength(30);
+    expect(shelf.maps[0]!.digs[0]).toEqual({ runId: id(100), pick: "Could storage cover week 0?", more: false, state: "READY", pause: null });
+    expect(shelf.maps.slice(1).every((map) => map.digs.length === 0)).toBe(true);
+    expect(shelf.more).toBe(true);
+    expect(shelf.anyRows).toBe(true);
+  });
+
+  it("a dig of a dig hangs under the first question; the site's framing comes off and several picks read 'and more'", async () => {
+    const readAnswerIndex = answerList([
+      { run: id(3), seq: 30, line: `${CATALOG["v4.digText.together"]}\n1. Is storage cheap enough for a two-week lull?\n2. What about the grid?` },
+      { run: id(2), seq: 20, line: "Does this hold up, and when? Batteries can cover multi-day lulls." },
+      { run: id(1), seq: 10, line: "Should Romania build new nuclear plants?\n\nThis is about Romania." }
+    ]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({ [id(3)]: id(2), [id(2)]: id(1) })) });
+    expect(shelf.maps).toHaveLength(1);
+    expect(shelf.maps[0]!.question).toBe("Should Romania build new nuclear plants?");
+    expect(shelf.maps[0]!.digs).toEqual([
+      { runId: id(3), pick: "Is storage cheap enough for a two-week lull?", more: true, state: "READY", pause: null },
+      { runId: id(2), pick: "Batteries can cover multi-day lulls.", more: false, state: "READY", pause: null }
+    ]);
+    expect(shelf.more).toBe(false);
+  });
+
+  it("a dig with no recorded link is still known by its context line, never by its first line", async () => {
+    const parent = "Should my town close the centre to cars?";
+    const textDig = `Look deeper into this part of the answer: Shops lose trade.\n\nThis follows from an earlier question: “${parent}”`;
+    const readAnswerIndex = answerList([
+      { run: id(3), seq: 30, line: textDig },
+      // Its first line reads like a dig's, but nothing links it and it carries no context line: a question of its own.
+      { run: id(2), seq: 20, line: "Look deeper into this part of the answer: a question I typed myself" },
+      { run: id(1), seq: 10, line: parent }
+    ]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({}, [id(3)])) });
+    expect(shelf.maps.map((map) => map.runId)).toEqual([id(2), id(1)]);
+    expect(shelf.maps[1]!.digs).toEqual([{ runId: id(3), pick: "Shops lose trade.", more: false, state: "READY", pause: null }]);
+  });
+
+  it("the open runs say their state; a failed dig-link read leaves the row a question", async () => {
+    const readAnswerIndex = answerList([{ run: id(1), seq: 10 }], [
+      { run: id(2), seq: 40, state: "RUNNING", extra: { started_at: "2026-11-04T14:00:00.000Z" } },
+      { run: id(3), seq: 30, state: "WAITING" },
+      { run: id(4), seq: 20, state: "FAILED" }
+    ]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({}, [id(4)])) });
+    expect(shelf.maps.map((map) => [map.runId, map.state, map.startedAt])).toEqual([
+      [id(2), "WORKING", "2026-11-04T14:00:00.000Z"], [id(3), "WAITING", null], [id(4), "FAILED", null], [id(1), "READY", null]
+    ]);
+  });
+
+  it("a question the list calls running but is paused at the month wall reads paused, from its own run read (journey-f22)", async () => {
+    const readAnswerIndex = answerList([{ run: id(1), seq: 10 }], [
+      { run: id(2), seq: 40, state: "RUNNING" },
+      { run: id(3), seq: 30, state: "RUNNING" },
+      { run: id(4), seq: 20, state: "RUNNING" }
+    ]);
+    const readRun = vi.fn(async (runId: string) => {
+      if (runId === id(4)) throw new Error("UNREACHABLE");
+      return {
+        run_ref: runId, question_line: "Q?", state: "RUNNING", terminal_reason: null, hold_until: null,
+        ...(runId === id(2) ? { month_pause: { until: "2026-12-01T00:00:00.000Z", can_continue: false } } : {})
+      };
+    });
+    const shelf = await readMapShelf(5, CATALOG, {
+      client: { ...client(readAnswerIndex, digLinks({})), readRun } as unknown as ShelfClient
+    });
+    // Only what shows as being looked into is read again; a failed read keeps "Looking into it".
+    expect(readRun.mock.calls.map(([runId]) => runId).sort()).toEqual([id(2), id(3), id(4)]);
+    expect(shelf.maps.map((map) => [map.runId, map.state, map.pause])).toEqual([
+      [id(2), "PAUSED", { until: "2026-12-01T00:00:00.000Z", canContinue: false }],
+      [id(3), "WORKING", null], [id(4), "WORKING", null], [id(1), "READY", null]
+    ]);
+  });
+
+  it("when the server says the dig link on the row, no dig-link read is needed; the bar and the New dot pass through", async () => {
+    const bar = { sure: 1, sure_for_case: 2, still_argued: 1, didnt_hold: 1 };
+    const readAnswerIndex = answerList([
+      { run: id(2), seq: 20, extra: { dug_from: id(1) } },
+      { run: id(1), seq: 10, extra: { dug_from: null, map_bar: bar, changed_since_visit: true } }
+    ]);
+    const readDigLinks = digLinks({});
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, readDigLinks) });
+    expect(readDigLinks).not.toHaveBeenCalled();
+    expect(shelf.maps).toHaveLength(1);
+    expect(shelf.maps[0]).toMatchObject({ bar: { SURE: 1, SURE_FOR_CASE: 2, STILL_ARGUED: 1, DIDNT_HOLD: 1 }, changed: true });
+    expect(shelf.maps[0]!.digs.map((dig) => dig.runId)).toEqual([id(2)]);
+  });
+
+  it("a dig is named by its picks: never by the path line a dig of picks names first, a whole path by its short label", () => {
+    const parent = "Should countries build new nuclear power?";
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    const whole: DigTarget = { kind: "path", path };
+    expect(shelfPicksOf(digQuestion(whole, parent, CATALOG, "en"), CATALOG)).toEqual(["Nuclear first"]);
+    const picks: DigTarget = {
+      kind: "picks", path,
+      picks: [
+        { kind: "OWN_VIEW", key: "own:n-nuclear:1", group: "n-nuclear", text: "Small reactors could be built faster." },
+        { kind: "OWN_VIEW", key: "own:n-nuclear:2", group: "n-nuclear", text: "Costs fall with each reactor built." }
+      ]
+    };
+    expect(shelfPicksOf(digQuestion(picks, parent, CATALOG, "en"), CATALOG))
+      .toEqual(["Small reactors could be built faster.", "Costs fall with each reactor built."]);
+  });
+
+  /*
+   * The owner, 7 Nov 2026 (sixth round, "fix it now"): written off English, a dig's question says no item's kind, so its
+   * first line cannot tell the path's line from a pick. The account's dig link can: a dig of a path (or of picks on one)
+   * records that path's place first ("path:<id>", lib/v4/suggestions.ts placesOf), a dig of the main question's own open
+   * questions records only their places. So the person's own digs are named by their pick in every language too. Each dig
+   * below is written and its places recorded by the site's own code (digQuestion, placesOf), as the dig tray does.
+   */
+  it("off English, the dig link's first place says whether the first line is the path's: a dig is still named by its pick", async () => {
+    const parent = "Ar trebui să construim centrale nucleare noi?";
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    const own = (serial: number, text: string): V4DigPick => ({ kind: "OWN_VIEW", key: `own:n-nuclear:${serial}`, group: "n-nuclear", text });
+    const open = (at: number, text: string): V4OpenQuestion => ({ id: `o:${at}`, kind: "OBJECTION", text, star: false, pathId: null });
+    const suggestion: V4DigPick = {
+      kind: "SUGGESTION", key: "sug:s-1", group: "n-nuclear", text: "Check the newest build times.",
+      suggestion: { suggestion_id: "s-1", kind: "UNDOCUMENTED", side: null, text: "Check the newest build times.", places: ["p:node-7"] } satisfies DigSuggestion
+    };
+    const digs: ReadonlyArray<readonly [number, DigTarget]> = [
+      [7, { kind: "picks", path, picks: [own(1, "Small reactors could be built faster."), own(2, "Costs fall with each reactor built.")] }],
+      [6, { kind: "picks", path, picks: [own(1, "Small reactors could be built faster.")] }],
+      [5, { kind: "path", path }],
+      [4, { kind: "picks", path, picks: [suggestion] }],
+      [3, { kind: "open", questions: [open(1, "Storage is still too dear."), open(2, "Grids need years.")] }],
+      // Picks of the main question's own open questions: no path, so no path's line first.
+      [2, { kind: "picks", path: null, picks: [{ kind: "OPEN", key: "open:o:1", group: null, question: open(1, "Storage is still too dear.") }] }]
+    ];
+    const written = digs.map(([at, target]) => ({ at, line: digQuestion(target, parent, CATALOG, "ro") }));
+    expect(parseDigDetail(written[0]!.line, CATALOG)?.english).toBe(false);
+    const readAnswerIndex = answerList([
+      ...written.map(({ at, line }) => ({ run: id(at), seq: at * 10, line })),
+      { run: id(1), seq: 10, line: parent }
+    ]);
+    const readDigLinks = digLinks(
+      Object.fromEntries(digs.map(([at]) => [id(at), id(1)])), [],
+      Object.fromEntries(digs.map(([at, target]) => [id(at), placesOf(target)]))
+    );
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, readDigLinks) });
+    expect(shelf.maps.map((map) => map.runId)).toEqual([id(1)]);
+    expect(shelf.maps[0]!.digs.map((dig) => [dig.runId, dig.pick, dig.more])).toEqual([
+      [id(7), "Small reactors could be built faster.", true],
+      [id(6), "Small reactors could be built faster.", false],
+      // A whole path: its short label, as in English (map-f25), never its outcome words.
+      [id(5), "Nuclear first", false],
+      [id(4), "Check the newest build times.", false],
+      // The main question's own open questions name no path: the first line is a pick.
+      [id(3), "Storage is still too dear.", true],
+      [id(2), "Storage is still too dear.", false]
+    ]);
+    expect(shelf.maps[0]!.digs.every((dig) => !dig.pick.includes("did not hold"))).toBe(true);
+  });
+
+  it("off English with no place recorded, nothing tells the lines apart: every line is read as a pick, as before", () => {
+    const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
+    const line = digQuestion({
+      kind: "picks", path, picks: [{ kind: "OWN_VIEW", key: "own:n-nuclear:1", group: "n-nuclear", text: "Small reactors could be built faster." }]
+    } as DigTarget, "Q?", CATALOG, "ro");
+    expect(shelfPicksOf(line, CATALOG)).toEqual([path.line, "Small reactors could be built faster."]);
+    expect(shelfPicksOf(line, CATALOG, false)).toEqual([path.line, "Small reactors could be built faster."]);
+    expect(shelfPicksOf(line, CATALOG, true)).toEqual(["Small reactors could be built faster."]);
+  });
+
+  it("an account with no debate at all is a first visit; the dig links read once are kept for the next read", async () => {
+    const empty = await readMapShelf(5, CATALOG, { client: client(answerList([]), digLinks({})) });
+    expect(empty).toEqual({ maps: [], more: false, anyRows: false });
+    const cache = new Map();
+    const readDigLinks = digLinks({});
+    const readAnswerIndex = answerList([{ run: id(2), seq: 20 }, { run: id(1), seq: 10 }]);
+    await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, readDigLinks), cache });
+    await readMapShelf(20, CATALOG, { client: client(readAnswerIndex, readDigLinks), cache });
+    expect(readDigLinks).toHaveBeenCalledTimes(2);
+  });
+
+  it("a failed answer-list read is the page's to handle", async () => {
+    const failing = vi.fn(async () => { throw new Error("SERVER_FAILURE"); });
+    await expect(readMapShelf(5, CATALOG, { client: { readAnswerIndex: failing, readDigLinks: digLinks({}) } as unknown as ShelfClient })).rejects.toThrow();
+  });
+});
+
+/*
+ * The owner's answer to question 33 (5 Nov 2026, A): a dig made on someone else's public page shows on "My questions" as a
+ * card of its own, "Dig: {its pick}" (dig-f30's words), the one case of a dig card of its own. The fourth round (6 Nov) put
+ * it before any upload. The fifth round (7 Nov): a dig of a whole path, which has no pick, reads "Dig: a closer look at a
+ * path". The server says which rows these are (`dug_on_public`, and `dig_pick`, the first pick's words as the person sent
+ * them, only on such a row: the start-step session's Task 79c), so the shelf reads no dig link for them.
+ */
+describe("question 33 A: a dig made on someone else's public page is a card of its own", () => {
+  const publicQuestion = "Should cities make public transport free?";
+  const path = { id: "n-free", line: "Free fares: did not hold. Buses fill with people who used to walk." } as unknown as V4Path;
+  const own = (serial: number, text: string) => ({ kind: "OWN_VIEW", key: `own:n-free:${serial}`, group: "n-free", text });
+  const onePick = digQuestion({ kind: "picks", path, picks: [own(1, "Cars pollute city air")] } as DigTarget, publicQuestion, CATALOG, "en");
+  const twoPicks = digQuestion({
+    kind: "picks", path, picks: [own(1, "Cars pollute city air"), own(2, "Fares pay the drivers")]
+  } as DigTarget, publicQuestion, CATALOG, "en");
+  const wholePath = digQuestion({ kind: "path", path } as DigTarget, publicQuestion, CATALOG, "en");
+  // Someone else's public debate: never among the person's own rows.
+  const elsewhere = id(900);
+  const onPublic = (pick?: string) => ({ dug_on_public: true, ...(pick === undefined ? {} : { dig_pick: pick }) });
+
+  it("reads dug_on_public and dig_pick only when well formed; a pick on a row without the public mark is left out", () => {
+    expect(shelfExtrasOf(onPublic("Cars pollute city air"))).toMatchObject({ publicDig: true, publicPick: "Cars pollute city air" });
+    expect(shelfExtrasOf(onPublic(" Cars pollute city air "))).toMatchObject({ publicDig: true, publicPick: "Cars pollute city air" });
+    expect(shelfExtrasOf(onPublic())).toMatchObject({ publicDig: true, publicPick: null });
+    expect(shelfExtrasOf({ dug_on_public: true, dig_pick: "   " })).toMatchObject({ publicDig: true, publicPick: null });
+    expect(shelfExtrasOf({ dug_on_public: false, dig_pick: "Cars pollute city air" })).toMatchObject({ publicDig: false, publicPick: null });
+    expect(shelfExtrasOf({ dug_on_public: "yes", dig_pick: "Cars pollute city air" })).toMatchObject({ publicDig: false, publicPick: null });
+  });
+
+  it("shows as 'Dig: {its pick}' among the questions, newest first, with its own state, and needs no dig-link read", async () => {
+    const readAnswerIndex = answerList([
+      { run: id(3), seq: 30, line: onePick, extra: onPublic("Cars pollute city air") },
+      { run: id(1), seq: 10, line: "Should my town close the centre to cars?" }
+    ], [{ run: id(2), seq: 20, state: "RUNNING", line: twoPicks, extra: onPublic("Cars pollute city air") }]);
+    const readDigLinks = digLinks({ [id(3)]: elsewhere, [id(2)]: elsewhere });
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, readDigLinks) });
+    expect(shelf.maps.map((map) => [map.runId, map.kind, map.question, map.state])).toEqual([
+      [id(3), "PUBLIC_DIG", "Dig: Cars pollute city air", "READY"],
+      // dig-f30: several picks read "and more", counted from the dig's own question line.
+      [id(2), "PUBLIC_DIG", "Dig: Cars pollute city air and more", "WORKING"],
+      [id(1), "QUESTION", "Should my town close the centre to cars?", "READY"]
+    ]);
+    expect(readDigLinks.mock.calls.map(([runId]) => runId)).toEqual([id(1)]);
+  });
+
+  it("the fifth round (7 Nov): a dig of a whole path, with no pick, reads 'Dig: a closer look at a path'", async () => {
+    const readAnswerIndex = answerList([{ run: id(2), seq: 20, line: wholePath, extra: onPublic() }]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({ [id(2)]: elsewhere })) });
+    expect(shelf.maps.map((map) => [map.kind, map.question])).toEqual([["PUBLIC_DIG", "Dig: a closer look at a path"]]);
+    expect(CATALOG["v4.maps.digWholePath"]).toBe("Dig: a closer look at a path");
+  });
+
+  it("written off English, the path's line (first) is never taken for a pick: 'and more' counts only the picks after it", async () => {
+    const offEnglish = (target: DigTarget) => digQuestion(target, publicQuestion, CATALOG, "ro");
+    const one = offEnglish({ kind: "picks", path, picks: [own(1, "Cars pollute city air")] } as DigTarget);
+    const two = offEnglish({ kind: "picks", path, picks: [own(1, "Cars pollute city air"), own(2, "Fares pay the drivers")] } as DigTarget);
+    const whole = offEnglish({ kind: "path", path } as DigTarget);
+    expect(parseDigDetail(one, CATALOG)?.english).toBe(false);
+    const readAnswerIndex = answerList([
+      { run: id(5), seq: 50, line: one, extra: onPublic("Cars pollute city air") },
+      { run: id(4), seq: 40, line: two, extra: onPublic("Cars pollute city air") },
+      // No pick from the server: the line's own words are not trusted off English.
+      { run: id(3), seq: 30, line: one, extra: onPublic() },
+      { run: id(2), seq: 20, line: whole, extra: onPublic() },
+      // A line no dig parse reads: the server's pick alone.
+      { run: id(1), seq: 10, line: "Cars and cities", extra: onPublic("Cars pollute city air") }
+    ]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({})) });
+    expect(shelf.maps.map((map) => map.question)).toEqual([
+      "Dig: Cars pollute city air",
+      "Dig: Cars pollute city air and more",
+      "Dig: a closer look at a path",
+      "Dig: a closer look at a path",
+      "Dig: Cars pollute city air"
+    ]);
+    expect(shelf.maps.every((map) => !map.question.includes("did not hold"))).toBe(true);
+  });
+
+  it("before the server marks such a row, the dig still hangs nowhere (today's behaviour, never a guess)", async () => {
+    const readAnswerIndex = answerList([
+      { run: id(2), seq: 20, line: onePick },
+      { run: id(1), seq: 10, line: "Should my town close the centre to cars?" }
+    ]);
+    const shelf = await readMapShelf(5, CATALOG, { client: client(readAnswerIndex, digLinks({ [id(2)]: elsewhere })) });
+    expect(shelf.maps.map((map) => [map.runId, map.kind])).toEqual([[id(1), "QUESTION"]]);
+  });
+
+  it("a dig made on the person's own public dig hangs under its card, and the card counts as one of the questions shown", async () => {
+    const readAnswerIndex = answerList([
+      { run: id(6), seq: 60, line: "Would this change the answer? Bucharest's buses are already full.", extra: { dug_from: id(5) } },
+      { run: id(5), seq: 50, line: onePick, extra: onPublic("Cars pollute city air") },
+      { run: id(1), seq: 10, line: "Should my town close the centre to cars?" }
+    ]);
+    const shelf = await readMapShelf(1, CATALOG, { client: client(readAnswerIndex, digLinks({ [id(5)]: elsewhere })) });
+    expect(shelf.maps.map((map) => map.runId)).toEqual([id(5)]);
+    expect(shelf.maps[0]!.digs.map((dig) => [dig.runId, dig.pick])).toEqual([[id(6), "Bucharest's buses are already full."]]);
+    expect(shelf.more).toBe(true);
+  });
+});
+
+describe("a dig in the person's own words (dig-f30)", () => {
+  it("takes the site's framing off, with or without the context line", () => {
+    expect(digPicksOf("Would this change the answer? Cheap gas for twenty years.", CATALOG)).toEqual(["Cheap gas for twenty years."]);
+    expect(digPicksOf("Could pumped hydro carry a windless week?", CATALOG)).toEqual(["Could pumped hydro carry a windless week?"]);
+    expect(digPicksOf(`${CATALOG["v4.digText.together"]}\n1. First?\n2. Second?\n\nThis follows from an earlier question: “Q?”`, CATALOG))
+      .toEqual(["First?", "Second?"]);
+  });
+});
+
+describe("the used-up line above the box (ask-f18, ask-d4 C)", () => {
+  const room = (scope: string, resets: string) => ({
+    room: "FULL", scope, resets_at: resets, waiting_run_ref: null, plan_id: "PLUS", new_starts: "BLOCKED_UNTIL_RESET"
+  }) as never;
+
+  it("names today's quota with a clock time, this month's (Free) with a date", () => {
+    const day = usedUpLine(room("PERSON_DAY", "2026-11-05T08:00:00.000Z"), "en");
+    expect(day?.key).toBe("v4.ask.usedUp.PERSON_DAY");
+    expect(String(day?.values.time)).toMatch(/^\d{2}:\d{2}$/u);
+    const month = usedUpLine(room("PERSON_MONTH", "2026-12-01T12:00:00.000Z"), "en");
+    expect(month).toEqual({ key: "v4.ask.usedUp.PERSON_MONTH", values: { date: "1 December" } }); // day first (question 5)
+    expect(CATALOG["v4.ask.usedUp.PERSON_DAY"]).toBe("You've used today's quota. New questions start after {time}.");
+    expect(CATALOG["v4.ask.usedUp.PERSON_MONTH"]).toBe("You've used this month's quota. New questions start on {date}.");
+  });
+
+  it("says nothing while new questions can start", () => {
+    expect(usedUpLine(null, "en")).toBeNull();
+    expect(usedUpLine({ room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: "PLUS" } as never, "en")).toBeNull();
+    // Only the person's own running debates fill the window: no reset to name, nothing used up.
+    expect(usedUpLine({
+      room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS", waits_for: "OWN_DEBATES"
+    } as never, "en")).toBeNull();
+    expect(usedUpLine({ room: "FULL", scope: "SITE_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS" } as never, "en")).toBeNull();
+  });
+
+  it("public-f24 (owner's screen review): a full person window reads the same line under the older server switch", () => {
+    const full = { room: "FULL", scope: "PERSON_DAY", resets_at: "2026-11-05T08:00:00.000Z", waiting_run_ref: null, plan_id: "PLUS" };
+    expect(usedUpLine(full as never, "en")).toEqual(usedUpLine({ ...full, new_starts: "BLOCKED_UNTIL_RESET" } as never, "en"));
+    expect(usedUpLine(full as never, "en")?.key).toBe("v4.ask.usedUp.PERSON_DAY");
+  });
+});

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.12 · VELJAVNI OD 1. NOVEMBRA 2026
+eyebrow: POGOJI UPORABE · v2.17 · VELJAVNI OD 1. NOVEMBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.12
+endMarker: KONEC POGOJEV · v2.17
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.12 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.17 · Effective 1. novembra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Na brezplačnem paketu so vaše razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Ko je razprava javna, jo lahko prebere vsakdo, in ostane javna. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -170,9 +170,9 @@ Na plačljivem paketu so razprave **privzeto zasebne**: nič, kar tam ustvarite,
 
 ## 10. Prijava vsebine, moderiranje in pritožbe
 
-**Vsebino lahko prijavi vsakdo.** Računa ne potrebujete. Pišite na support@dezbatere.ro. Če ste prijavljeni, lahko uporabite tudi gumb **Prijavi** pri kateri koli javni razpravi. Umetna inteligenca prebere prijavo, oddano z gumbom, poleg javnega besedila. Če se z njo strinja, se razprava takoj skrije in jo pregleda človek. Če se ne strinja, lahko ponovno prijavite z več podrobnostmi, človek pa jo bo prebral. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna.
+**Vsebino lahko prijavi vsakdo.** Računa ne potrebujete. Pišite na support@dezbatere.ro. Če ste prijavljeni, lahko uporabite tudi gumb **Prijavi** pri kateri koli javni razpravi; gumb vas prosi, da potrdite, da v dobri veri menite, da je vaša prijava točna in popolna. Prijavo, oddano z gumbom, praviloma prebere umetna inteligenca poleg javnega besedila. Če se z njo strinja in razprava še nikoli ni bila skrita, se razprava takoj skrije brez sodelovanja človeka, nato pa jo pregleda človek. Prijava gre namesto tega neposredno k človeku, kadar je bila razprava že skrita, kadar ste jo že prijavili ali kadar so samodejna preverjanja za ta dan izčrpana. Če se umetna inteligenca ne strinja ali če se prijava samodejno ustavi (na primer ker ste v eni uri poslali veliko prijav ali ker razprava ni javna), je človek ne prebere: pišete lahko na support@dezbatere.ro in človek bo vaše sporočilo prebral, ali pa se pritožite prek našega pritožbenega postopka spodaj. Da bomo lahko ukrepali, nam sporočite: zakaj menite, da je vsebina nezakonita ali krši te Pogoje, in sicer dovolj podrobno, da bomo razumeli trditev; točno lokacijo — celoten URL in po možnosti odlomek; svoje ime in e-poštni naslov (to ni potrebno pri prijavah gradiva s spolno zlorabo otrok); ter izjavo, da v dobri veri menite, da je vaša prijava točna in popolna.
 
-Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravočasno, skrbno, nearbitrarno in objektivno, obvestimo vas o svoji odločitvi ter vam povemo, kako jo lahko izpodbijate. Če za obdelavo prijave ali odločitev o njej uporabljamo avtomatizirana sredstva, to navedemo. Na prijave intimnih posnetkov, objavljenih brez privolitve, ukrepamo **v 48 urah** od veljavne zahteve.
+Vsako prijavo potrdimo brez nepotrebnega odlašanja: takoj na zaslonu, za prijavo, ki jo bo prebral človek, pa tudi po e-pošti. Prijave obravnavamo pravočasno, skrbno, nearbitrarno in objektivno, o svoji odločitvi vas obvestimo po e-pošti ter vam povemo, kako jo lahko izpodbijate. Če za obdelavo prijave ali odločitev o njej uporabljamo avtomatizirana sredstva, to navedemo. Na prijave intimnih posnetkov, objavljenih brez privolitve, ukrepamo **v 48 urah** od veljavne zahteve.
 
 **Dve vrsti avtomatiziranih odločitev, ki ju ločujemo.**
 
@@ -183,7 +183,7 @@ Vsako prijavo potrdimo brez nepotrebnega odlašanja. Prijave obravnavamo pravoč
 
 **Kam spada preverjanje vprašanja.** Preverjanje vprašanja iz razdelka 8 tudi ni odločitev znotraj sistema. Je avtomatizirano orodje, ki zavrne začetek razprave, brez sodelovanja osebe. Vprašanje, ki se bere kot besede osebe v krizi ali ki zahteva metode samomora ali samopoškodovanja ali spodbudo k njima, dobi namesto zavrnitve zaslon s številkami za pomoč.
 
-**Obrazložitev.** Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve: prek našega pritožbenega postopka spodaj, prek organa za izvensodno reševanje sporov, certificiranega v skladu z Aktom EU o digitalnih storitvah, ali na sodišču. Kadar naše preverjanje vprašanja zavrne vprašanje na podlagi odstavka »Vprašanja, ki ne začnejo razprave« v razdelku 7, je zaslon, ki vam to sporoči, naša obrazložitev zanj: navaja, da se razprava ni začela, da je naše samodejno preverjanje vprašanje zavrnilo brez sodelovanja osebe, pod katero pravilo teh Pogojev vprašanje spada in kako se pritožiti po postopku spodaj. Za zavrnjeno vprašanje ne obljubimo nič več. Kadar naše preverjanje izbriše razpravo (razdelek 9), je obvestilo, ki ga vidite, naša obrazložitev zanjo: navaja, kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, da pri tem ni sodelovala nobena oseba, katero pravilo teh Pogojev velja in kako se pritožiti po postopku spodaj; drugi dve poti, ki ju ta odstavek navaja, vam ostaneta odprti. Zaslon s številkami za pomoč, ki ga dobi vprašanje, ki se bere kot besede osebe v krizi, je pomoč, ne obrazložitev.
+**Obrazložitev.** Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve: prek našega pritožbenega postopka spodaj, prek organa za izvensodno reševanje sporov, certificiranega v skladu z Aktom EU o digitalnih storitvah, ali na sodišču. Pošljemo vam jo po e-pošti, s povezavo do celotne obrazložitve v vašem računu pod Nastavitve, Obvestila o moderiranju, kjer ostane. Obrazložitev prejmete tudi, kadar vaša vsebina izgine z javne strani skupaj z drugo vsebino, ki jo pregledujemo, tudi če ni bilo ugotovljeno, da vaša vsebina krši katero koli pravilo. Kadar naše preverjanje vprašanja zavrne vprašanje na podlagi odstavka »Vprašanja, ki ne začnejo razprave« v razdelku 7, je zaslon, ki vam to sporoči, naša obrazložitev zanj: navaja, da se razprava ni začela, da je naše samodejno preverjanje vprašanje zavrnilo brez sodelovanja osebe, pod katero pravilo teh Pogojev vprašanje spada in kako se pritožiti po postopku spodaj. Za zavrnjeno vprašanje ne obljubimo nič več. Kadar naše preverjanje izbriše razpravo (razdelek 9), je obvestilo, ki ga vidite, naša obrazložitev zanjo: navaja, kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, da pri tem ni sodelovala nobena oseba, katero pravilo teh Pogojev velja in kako se pritožiti po postopku spodaj; drugi dve poti, ki ju ta odstavek navaja, vam ostaneta odprti. Zaslon s številkami za pomoč, ki ga dobi vprašanje, ki se bere kot besede osebe v krizi, je pomoč, ne obrazložitev.
 
 **Pritožba zoper odločitev.** Če se z odločitvijo o moderiranju ne strinjate, odgovorite na obrazložitev ali v **šestih mesecih** pišite na office@dezbatere.ro. Odločitev pregleda oseba, ki pri prvotni odločitvi ni sodelovala, mi pa vas o izidu obvestimo skupaj z razlogi. To ne vpliva na vašo pravico do sodnega postopka ali uporabe alternativnega reševanja sporov po razdelku 18. Pritožbeni postopek sprejema tudi pritožbe, da nismo ukrepali na podlagi prijave, da je bila vsebina neupravičeno odstranjena, da je bil račun neupravičeno omejen ali da je avtomatizirano orodje neupravičeno vplivalo na vašo vsebino, na primer s zavrnitvijo vprašanja.
 
@@ -211,11 +211,9 @@ Razdelki 8 (glede že objavljene vsebine), 15, 16 in 18 ostanejo v veljavi tudi 
 
 ## 12. Plačljivi paketi
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine ponuja brezplačen paket. Na voljo bodo trije plačljivi paketi, **Plus**, **Pro** in **Max**; vsak od njih bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave.
 
-Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Premium**, ki bo odklenil celoten nabor modelov in vam omogočil, da sami nastavite parametre razprave.
-
-**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Comandă cu obligație de plată*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
+**Pred plačilom** vam neposredno nad gumbom za plačilo prikažemo: paket; skupno ceno z veljavnim davkom; obračunsko obdobje; dejstvo, da se paket samodejno obnavlja do preklica; datum, ko se konča morebitno brezplačno preskusno obdobje, in znesek, ki vam bo nato zaračunan; ter način preklica. Pogoje obnavljanja potrdite z označitvijo ločenega polja. Na gumbu piše **Naroči in plačaj** (v romunščini *Abonați-vă și plătiți*). Na trajnem nosilcu vam pošljemo potrdilo, ki vsebuje iste informacije, te Pogoje in obrazec za odstop.
 
 **Opomniki.** E-poštno sporočilo vam pošljemo najmanj 5 dni pred pretvorbo brezplačnega preskusnega obdobja v plačljivi paket; najmanj enkrat letno pri trajajočih paketih; ter od 30 do 45 dni pred vsakim podaljšanjem za obdobje dvanajstih mesecev ali več. Vsak opomnik vključuje ceno, datum in povezavo za preklic.
 
@@ -225,7 +223,7 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 
 **Neuspela plačila.** Če plačilo ne uspe, ga ponovno poskušamo izvesti 7 dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo.
 
-**Davki in prejemnik plačila.** Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje.
+**Davki in prejemnik plačila.** Naše cene so prikazane brez davka, kot cena + DDV (ali GST oziroma prometni davek, odvisno od kraja, kjer živite). Davek za vaš naslov za račun se doda v blagajni, ki vam pred plačilom prikaže skupni znesek za plačilo z vključenim davkom. Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje.
 
 **Načini plačila.** Plačate s kartico. Sprejemamo kartice Visa in Mastercard; kartic American Express ne sprejemamo. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com), celotna številka vaše kartice pa nikoli ne pride do nas.
 
@@ -233,7 +231,7 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 
 **Povratne bremenitve.** Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin.
 
-**Najprej zakonske pravice.** Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za oba paketa so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo.
+**Najprej zakonske pravice.** Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za vse pakete so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo.
 
 ## 13. Vaša pravica do odstopa
 
@@ -250,6 +248,16 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bo plačljivi paket **Prem
 Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v **30 dneh** od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje.
 
 **Spremembe teh Pogojev.** Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj **30 dni** pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions.
+
+Različica 2.17 je nadomestila različico 2.16: razdelek 10 navaja, kdaj prijavo, oddano z gumbom Prijavi, prebere umetna inteligenca in kdaj človek, da gumb zahteva vašo izjavo o dobri veri, da prijavo potrdimo in vas o odločitvi obvestimo po e-pošti ter da se obrazložitve pošiljajo po e-pošti in hranijo v vašem računu; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni.
+
+Različica 2.16 je nadomestila različico 2.15: razdelek 12 navaja plačljive pakete, Plus, Pro in Max, razdelka 12 in 15 pa ne vsebujeta več opomb iz priprave osnutka; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni.
+
+Različica 2.15 je nadomestila različico 2.14: razdelek 12 navaja, da so naše cene prikazane brez davka, kot cena + DDV, in da se davek doda v blagajni.
+
+Različica 2.14 je nadomestila različico 2.13: razdelek 18 in Priloga A navajata ANPC (SAL) kot pot za alternativno reševanje sporov.
+
+Različica 2.13 je nadomestila različico 2.12: razdelek 12 navaja romunski napis na gumbu za plačilo.
 
 Različica 2.12 je nadomestila različico 2.11: razdelek 10 navaja, da lahko prijavljena oseba tudi uporabi gumb Prijavi pri kateri koli javni razpravi, da umetna inteligenca prebere prijavo, oddano z njim, poleg javnega besedila, in kaj se nato zgodi.
 
@@ -273,8 +281,6 @@ Različica 2.7 je nadomestila različico 2.6: doda preverjanje vprašanja, ki pr
 
 **Dogodki zunaj našega nadzora.** Pogodbe ne kršimo, kadar nam njeno izpolnjevanje prepreči nekaj zunaj našega razumnega nadzora. Neuspeh ali umik ponudnika modela tretje osebe samodejno ne pomeni takega dogodka; če storitev zaradi tega postane nedostopna, se uporablja razdelek 14, vi pa lahko pogodbo odpoveste in prejmete vračilo, kot je tam opisano.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Intelektualna lastnina
 
 Sama storitev — programska oprema, sistem, način ocenjevanja, vmesnik, imeni Dialectical Engine in DebateAIRO ter naši logotipi — pripada nam ali našim dajalcem licenc. Ti Pogoji vam dajejo dovoljenje za uporabo storitve, ne pa lastništva nad njo.
@@ -297,7 +303,7 @@ Način ravnanja z osebnimi podatki je opisan v **Pravilniku o zasebnosti** na de
 
 **Potrošniki drugje.** Če živite zunaj EU in EGP, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike.
 
-**Pred sodnim postopkom.** Obrnite se na nas na support@dezbatere.ro; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v 5 delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek www.onoratainstanta.ro; k sodelovanju v tem postopku se ne zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek.
+**Pred sodnim postopkom.** Obrnite se na nas na support@dezbatere.ro; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v 5 delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek ANPC (SAL), reclamatiisal.anpc.ro; k sodelovanju v tem postopku se ne zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek.
 
 ## 19. Drugi pogoji
 
@@ -319,7 +325,7 @@ Vsak vnos velja za osebe, ki živijo v njegovi regiji, in navaja samo razlike od
 
 ### A.1 Evropska unija in Evropski gospodarski prostor
 
-Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek www.onoratainstanta.ro. **Nemčija:** gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB: vsak paket traja en mesec in se vsak mesec podaljša, dokler ga ne odpoveste, odpoveste pa ga lahko kadar koli z učinkom ob koncu tekočega meseca. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na dezbatere.ro/cancel. **Italija:** določbe o začasni onemogočitvi in prenehanju (11), plačljivih paketih in njihovem podaljšanju (12), spremembah (14), odgovornosti (15) in pravu, ki se uporablja, ter pristojnosti za spore (18) zahtevajo vašo posebno odobritev na podlagi 1341. in 1342. člena italijanskega civilnega zakonika. Podate jo z ločenim poljem ob registraciji, ki se prikaže vsakomur, ki v polju Regija izbere Italijo ali se povezuje iz Italije. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na voljo; v izbirniku jezikov izberite Polski.
+Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek ANPC (SAL), reclamatiisal.anpc.ro. **Nemčija:** gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB: vsak paket traja en mesec in se vsak mesec podaljša, dokler ga ne odpoveste, odpoveste pa ga lahko kadar koli z učinkom ob koncu tekočega meseca. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na dezbatere.ro/cancel. **Italija:** določbe o začasni onemogočitvi in prenehanju (11), plačljivih paketih in njihovem podaljšanju (12), spremembah (14), odgovornosti (15) in pravu, ki se uporablja, ter pristojnosti za spore (18) zahtevajo vašo posebno odobritev na podlagi 1341. in 1342. člena italijanskega civilnega zakonika. Podate jo z ločenim poljem ob registraciji, ki se prikaže vsakomur, ki v polju Regija izbere Italijo ali se povezuje iz Italije. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na voljo; v izbirniku jezikov izberite Polski.
 
 ### A.2 Združene države Amerike
 
@@ -331,7 +337,7 @@ Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko za�
 
 ### A.3 Kanada in Quebec
 
-Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. **Quebec:** ti Pogoji so na voljo v francoščini; francoščino izberite v izbirniku jezika; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja.
+Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. **Quebec:** ti Pogoji so na voljo v francoščini; če ob registraciji izberete Kanado, jih najprej prejmete v francoščini, namesto tega pa lahko izberete angleščino; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja.
 
 ### A.4 Avstralija in Nova Zelandija
 

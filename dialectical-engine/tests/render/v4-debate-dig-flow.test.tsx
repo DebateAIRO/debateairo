@@ -2,8 +2,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX } from "../../packages/contract/src/index.js";
+import { readDigUndo, undoDig } from "../../apps/ui/lib/v4/digUndo.js";
 import {
-  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
+  advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
   seededAnswer, seededStory, settle, text, tray, typeInto, unmountMap
 } from "./v4-debate-harness.js";
 
@@ -26,6 +27,9 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 const word = (key: string, values: Record<string, string | number> = {}): string =>
   Object.entries(values).reduce((line, [name, value]) => line.replaceAll(`{${name}}`, String(value)), CATALOG[key]!);
 const panelBoxes = (): HTMLInputElement[] => [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
+/** The picks still ticked on the tree's renewables path (one pick shows no tray, dig-f4). */
+const pickedOnTree = (): HTMLInputElement[] =>
+  [...branch(PATHS.renew).querySelectorAll<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")].filter((box) => box.checked);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -52,7 +56,10 @@ describe("V4DebateClient's dig flow", () => {
     // The room read is for this dig, so it can say the dig's share of today.
     expect(harness.digRooms.at(-1)).toEqual({ parentRunId: runId, picks: 3 });
 
-    await click(buttonNamed(word("v4.dig.trayDig.other", { count: 3 }), tray()!));
+    // dig-f4 / map-d4 A: on the picks' own path the panel's pinned button digs them ("Dig into your picks", dig-f5), so
+    // the docked tray offers no second one.
+    expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(0);
+    await click(buttonNamed(CATALOG["v4.dig.yourPicks.other"]!, panel()));
     await advance(9_500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
@@ -82,10 +89,13 @@ describe("V4DebateClient's dig flow", () => {
 
     await settle();
     expect(tray()).toBeNull();
-    expect(text()).toContain(CATALOG["v4.dig.started"]);
+    // dig-f10: the note says it started, with its clock time; the person stays on the path they were reading.
+    expect(text()).toMatch(/Started \d{2}:\d{2}/u);
+    expect(text()).toContain(CATALOG["v4.dig.started"]!.split("{time}")[1]);
+    expect(panel().classList.contains("v4Panel-path")).toBe(true);
     expect(branch(PATHS.renew).querySelector(".v4MapDig")).not.toBeNull();
-    // A path that now has a dig offers "Dig here too".
-    expect(buttonsNamed(CATALOG["v4.nest.digHereToo"]!, branch(PATHS.renew))).toHaveLength(1);
+    // A path that now has a dig offers a way to dig there again (journey-f13: "Choose what to dig ›", not "Dig here too").
+    expect(buttonsNamed(CATALOG["v4.dig.chooseWhat"]!, branch(PATHS.renew))).toHaveLength(1);
   });
 
   it("a whole path dug as before sends its place and no picks", async () => {
@@ -97,11 +107,28 @@ describe("V4DebateClient's dig flow", () => {
     expect(harness.submit.mock.calls[0]![3]).toEqual({ parent_run_id: runId, places: ["path:n-smr"], mode: "quick" });
   });
 
-  it("leaving the page during the Undo time sends nothing", async () => {
+  // dig-d3 (owner pick B, 3 Nov): leaving the map no longer cancels the dig in silence. It keeps its 10 seconds and its
+  // Undo on the next page (the site-wide note), and is sent only when they are over.
+  it("leaving the map during the Undo time keeps the dig: it is sent once its 10 seconds are over, not before", async () => {
+    const runId = await mountMap();
+    await openPath(PATHS.smr);
+    await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
+    await advance(3_000);
+    await unmountMap();
+    await advance(6_800);
+    expect(harness.submit).not.toHaveBeenCalled();
+    await advance(400);
+    expect(harness.submit).toHaveBeenCalledTimes(1);
+    expect(harness.submit.mock.calls[0]![3]).toEqual({ parent_run_id: runId, places: ["path:n-smr"], mode: "quick" });
+    expect(readDigUndo().map((entry) => entry.phase)).toEqual(["STARTED"]);
+  });
+
+  it("Undo pressed on the next page still means nothing is sent", async () => {
     await mountMap();
     await openPath(PATHS.smr);
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
     await unmountMap();
+    expect(undoDig(readDigUndo()[0]!.id)).toBe(true);
     await advance(30_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
@@ -109,12 +136,17 @@ describe("V4DebateClient's dig flow", () => {
   it("a refused dig (two quick clicks past level 10) says so, and the picks stay", async () => {
     harness.submit = vi.fn(async () => ({ kind: "REFUSED" as const, message: CATALOG["v4.nest.tooDeep"]! }));
     await mountMap();
+    // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+    await expandBranch(PATHS.renew);
     await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-    await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+    // dig-f4: one pick has no tray; its path's panel digs it, "Dig into this" (map-f14, question 1 B of 5 Nov).
+    expect(tray()).toBeNull();
+    await openPath(PATHS.renew);
+    await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));
     await advance(10_100);
     await settle();
     expect(text()).toContain(CATALOG["v4.nest.tooDeep"]);
-    expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+    expect(pickedOnTree()).toHaveLength(1);
   });
 
   // R22 W3-8: the two dig refusals with their own codes are said where DIG_TOO_DEEP is, and the picks stay too.
@@ -122,12 +154,15 @@ describe("V4DebateClient's dig flow", () => {
     "a dig refused with its own code (%s) says so, and the picks stay", async (key, values) => {
       harness.submit = vi.fn(async () => ({ kind: "REFUSED" as const, message: word(key, values) }));
       await mountMap();
+      // map-f22: the path's suggestions show once its leaves are unfolded (about 12 cards at once).
+      await expandBranch(PATHS.renew);
       await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
-      await click(buttonNamed(CATALOG["v4.panel.dig"]!, tray()!));
+      await openPath(PATHS.renew);
+      await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));
       await advance(10_100);
       await settle();
       expect(text()).toContain(word(key, values));
-      expect(tray()?.textContent).toContain(word("v4.dig.trayPicked.one", { count: 1 }));
+      expect(pickedOnTree()).toHaveLength(1);
     });
 
   // Dig model revision W4-6 (owner Q-D13): a dig keeps its points and its answer text and writes no story, so its page never
@@ -146,7 +181,7 @@ describe("V4DebateClient's dig flow", () => {
       dig: { parent_run_id: parentRunId, position_ref: "n-smr", places: ["path:n-smr"], level: 1, picks: [], rewrite: null }
     });
     harness.loadStory.mockClear();
-    await mountMap(1280, childRunId);
+    await mountMap(1600, childRunId);
     await advance(60_000);
     expect(harness.loadStory).not.toHaveBeenCalled();
     expect(text()).not.toContain(CATALOG["v4.debate.storyWriting"]);
@@ -159,7 +194,7 @@ describe("V4DebateClient's dig flow", () => {
     harness.answer = null;
     harness.story = seededStory();
     harness.digView = (link) => ({ link, state: "DONE", headline: null, counts: null, rewrite: null, points: [] });
-    await mountMap(1280, parentRunId);
+    await mountMap(1600, parentRunId);
     expect(branch(PATHS.smr).querySelector(".v4MapDig")!.textContent).toContain(CATALOG["v4.rewrite.digCard.DONE"]);
     await click(branch(PATHS.smr).querySelector<HTMLButtonElement>(".v4MapDig")!);
     expect(panel().textContent).not.toContain(CATALOG["v4.panel.digNoHeadline"]);
@@ -168,7 +203,7 @@ describe("V4DebateClient's dig flow", () => {
   it("the deepest level reads no dig room and offers no dig at all", async () => {
     const runId = crypto.randomUUID();
     harness.answer = seededAnswer(runId, { dig: digPart(crypto.randomUUID(), DIG_LEVEL_MAX) });
-    await mountMap(1280, runId);
+    await mountMap(1600, runId);
     expect(harness.digRooms.at(-1)).toBeNull();
     await openPath(PATHS.smr);
     expect(buttonsNamed(CATALOG["v4.panel.dig"]!)).toHaveLength(0);

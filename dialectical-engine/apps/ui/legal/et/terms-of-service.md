@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.12 · KEHTIB ALATES 1. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.17 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.12
+endMarker: TINGIMUSTE LÕPP · v2.17
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.12 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.17 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -170,9 +170,9 @@ Tasulise paketi väitlused on **vaikimisi privaatsed**: miski, mida seal loote, 
 
 ## 10. Sisust teatamine, modereerimine ja kaebused
 
-**Sisust võib teatada igaüks.** Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro. Kui olete sisse logitud, saate kasutada ka mis tahes avaliku väitluse juures nuppu **Teatage**. Tehisintellekt loeb nupu abil tehtud teadet avaliku teksti kõrval. Kui tehisintellekt nõustub, peidetakse väitlus kohe ning isik vaatab selle üle. Kui tehisintellekt ei nõustu, saate teatada uuesti täpsemate andmetega ja isik loeb teate läbi. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse.
+**Sisust võib teatada igaüks.** Kontot ei ole vaja. Kirjutage aadressil support@dezbatere.ro. Kui olete sisse logitud, saate kasutada ka mis tahes avaliku väitluse juures nuppu **Teatage**; see palub teil kinnitada, et usute heas usus oma teate õigsusesse ja täielikkusse. Tehisintellekt loeb nupu abil tehtud teadet tavaliselt avaliku teksti kõrval. Kui tehisintellekt nõustub ja väitlust ei ole kunagi varem peidetud, peidetakse väitlus kohe, ilma et ükski isik oleks kaasatud, ning seejärel vaatab isik selle üle. Teade läheb selle asemel otse isikule, kui väitlus on varem peidetud, kui olete sellest juba teatanud või kui päeva automaatsed kontrollid on otsa saanud. Kui tehisintellekt ei nõustu või teade peatatakse automaatselt (näiteks seetõttu, et olete tunni jooksul saatnud palju teateid, või väitlus ei ole avalik), ei loe seda ükski isik: võite kirjutada aadressil support@dezbatere.ro ja isik loeb teie kirja läbi, või esitada kaebuse allpool kirjeldatud kanali kaudu. Et saaksime tegutseda, öelge meile: miks on sisu teie arvates ebaseaduslik või rikub neid Tingimusi, piisavalt üksikasjalikult, et saaksime väitest aru; täpne asukoht — täielik URL ja võimaluse korral vastav lõik; teie nimi ja e-posti aadress (ei ole nõutav laste seksuaalset väärkohtlemist kujutavast materjalist teatamisel); ning kinnitus, et usute heas usus oma teate õigsusesse ja täielikkusse.
 
-Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid aegsasti, hoolikalt, mittemeelevaldselt ja objektiivselt, teatame teile oma otsuse ning selgitame, kuidas seda vaidlustada. Kui kasutame teate töötlemiseks või selle üle otsustamiseks automatiseeritud vahendeid, anname sellest teada. Nõusolekuta jagatud intiimkujutiste teadete alusel tegutsetakse **48 tunni jooksul** pärast kehtiva taotluse saamist.
+Kinnitame iga teate kättesaamist põhjendamatu viivituseta: kohe ekraanil ja teate puhul, mida loeb isik, ka e-postiga. Käsitleme teateid aegsasti, hoolikalt, mittemeelevaldselt ja objektiivselt, teatame teile oma otsuse e-postiga ning selgitame, kuidas seda vaidlustada. Kui kasutame teate töötlemiseks või selle üle otsustamiseks automatiseeritud vahendeid, anname sellest teada. Nõusolekuta jagatud intiimkujutiste teadete alusel tegutsetakse **48 tunni jooksul** pärast kehtiva taotluse saamist.
 
 **Kaks liiki automatiseeritud otsuseid, mida hoitakse lahus.**
 
@@ -183,7 +183,7 @@ Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid 
 
 **Kuhu küsimuse kontroll kuulub.** Jaotise 8 küsimuse kontroll ei ole samuti otsus mootori sees. See on automatiseeritud tööriist, mis keeldub väitlust alustamast, ilma et ükski inimene oleks kaasatud. Küsimus, mis kõlab nagu kriisis oleva inimese sõnad või mis küsib enesetapu või enesevigastamise viise või õhutust sellele, saab tagasilükkamise asemel ekraani abinumbritega.
 
-**Põhjendus.** Kui eemaldame teie sisu või piirame selle nähtavust või peatame või lõpetame teie konto, esitame teile põhjenduse: mida tegime ja millises ulatuses, asjaolud, millele tuginesime, ja kas need pärinesid teatest või meie enda kontrollist, kas kasutati automatiseeritud vahendeid, õiguslik või lepinguline alus ning viis, kuidas saate otsuse vaidlustada: allpool kirjeldatud kaebuste esitamise kanali kaudu, ELi digiteenuste määruse alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi kaudu või kohtus. Kui meie küsimuse kontroll lükkab küsimuse tagasi jaotise 7 lõigu „Küsimused, mis ei lase väitlusel alata“ alusel, on ekraan, mis teile sellest teatab, meie põhjendus tagasilükkamise kohta: see ütleb, et väitlus ei alanud, et meie automaatne kontroll lükkas küsimuse tagasi ilma, et ükski inimene oleks kaasatud, millise nende Tingimuste reegli alla küsimus kuulub ja kuidas saate allpool kirjeldatud kaebuste esitamise kanali kaudu kaevata. Tagasilükatud küsimuse kohta ei luba me midagi enamat. Kui meie kontroll kustutab väitluse (jaotis 9), on teade, mille näete, meie põhjendus selle kohta: see ütleb, mida tegime ja millises ulatuses, millistele asjaoludele tuginesime, et ükski inimene ei olnud kaasatud, milline nende Tingimuste reegel kehtib ja kuidas saate allpool kirjeldatud kaebuste esitamise kanali kaudu kaevata; ülejäänud kaks selles lõigus nimetatud teed on teile endiselt avatud. Abinumbritega ekraan, mille saab küsimus, mis kõlab nagu kriisis oleva inimese sõnad, on abi, mitte põhjendus.
+**Põhjendus.** Kui eemaldame teie sisu või piirame selle nähtavust või peatame või lõpetame teie konto, esitame teile põhjenduse: mida tegime ja millises ulatuses, asjaolud, millele tuginesime, ja kas need pärinesid teatest või meie enda kontrollist, kas kasutati automatiseeritud vahendeid, õiguslik või lepinguline alus ning viis, kuidas saate otsuse vaidlustada: allpool kirjeldatud kaebuste esitamise kanali kaudu, ELi digiteenuste määruse alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi kaudu või kohtus. Saadame selle teile e-postiga koos lingiga täielikule põhjendusele teie kontol jaotises Seaded, Modereerimisteated, kus see alles jääb. Saate põhjenduse ka siis, kui teie sisu kaob avalikult lehelt koos muu sisuga, mida läbi vaatame, isegi kui teie sisu puhul ühegi reegli rikkumist ei tuvastatud. Kui meie küsimuse kontroll lükkab küsimuse tagasi jaotise 7 lõigu „Küsimused, mis ei lase väitlusel alata“ alusel, on ekraan, mis teile sellest teatab, meie põhjendus tagasilükkamise kohta: see ütleb, et väitlus ei alanud, et meie automaatne kontroll lükkas küsimuse tagasi ilma, et ükski inimene oleks kaasatud, millise nende Tingimuste reegli alla küsimus kuulub ja kuidas saate allpool kirjeldatud kaebuste esitamise kanali kaudu kaevata. Tagasilükatud küsimuse kohta ei luba me midagi enamat. Kui meie kontroll kustutab väitluse (jaotis 9), on teade, mille näete, meie põhjendus selle kohta: see ütleb, mida tegime ja millises ulatuses, millistele asjaoludele tuginesime, et ükski inimene ei olnud kaasatud, milline nende Tingimuste reegel kehtib ja kuidas saate allpool kirjeldatud kaebuste esitamise kanali kaudu kaevata; ülejäänud kaks selles lõigus nimetatud teed on teile endiselt avatud. Abinumbritega ekraan, mille saab küsimus, mis kõlab nagu kriisis oleva inimese sõnad, on abi, mitte põhjendus.
 
 **Otsuse peale kaebamine.** Kui te ei nõustu modereerimisotsusega, vastake põhjendusele või kirjutage **kuue kuu** jooksul aadressil office@dezbatere.ro. Otsuse vaatab läbi isik, kes ei osalenud algse otsuse tegemises, ning teatame teile põhjendatud tulemuse. See ei mõjuta teie õigust pöörduda kohtusse või kasutada jaotise 18 kohast alternatiivset vaidluste lahendamist. Kaebuste esitamise kanalisse võib esitada ka kaebusi selle kohta, et me ei ole teate alusel tegutsenud, et sisu eemaldati alusetult, et kontot piirati alusetult või et automatiseeritud tööriist mõjutas teie sisu ekslikult, näiteks lükates küsimuse tagasi.
 
@@ -211,11 +211,9 @@ Jaotised 8 (juba avaldatud sisu kohta), 15, 16 ja 18 jäävad pärast lõpetamis
 
 ## 12. Tasulised paketid
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval kolm tasulist paketti, **Plus**, **Pro** ja **Max**; igaüks neist annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata.
 
-Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premium**-pakett, mis annab juurdepääsu mudelite täielikule valikule ja võimaldab teil väitluse seadeid ise määrata.
-
-**Enne maksmist** näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri **Tellige ja makske** (rumeenia keeles *Comandă cu obligație de plată*). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi.
+**Enne maksmist** näitame otse maksenupu kohal: paketti; koguhinda koos kohalduvate maksudega; arveldusperioodi; asjaolu, et pakett uueneb automaatselt kuni tühistamiseni; tasuta prooviperioodi lõppkuupäeva ja pärast seda võetavat tasu; ning tühistamise viisi. Kinnitate uuendamistingimused eraldi ruudu märkimisega. Nupul on kiri **Tellige ja makske** (rumeenia keeles *Abonați-vă și plătiți*). Saadame teile püsival andmekandjal kinnituse, mis sisaldab sama teavet, neid Tingimusi ja taganemisvormi.
 
 **Meeldetuletused.** Saadame teile e-kirja vähemalt 5 päeva enne tasuta prooviperioodi muutumist tasuliseks paketiks; jätkuvate pakettide puhul vähemalt kord aastas; ning 30–45 päeva enne vähemalt kaheteistkuulise tähtaja uuendamist. Igas meeldetuletuses on hind, kuupäev ja tühistamislink.
 
@@ -225,7 +223,7 @@ Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premiu
 
 **Ebaõnnestunud maksed.** Kui makse ebaõnnestub, proovime seda 7 päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu.
 
-**Maksud ja makse saaja.** Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest.
+**Maksud ja makse saaja.** Meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks (või GST või müügimaks, sõltuvalt teie elukohast). Teie arveldusaadressile kohalduv maks lisatakse kassas ning kassa näitab enne maksmist teie makstavat kogusummat koos maksudega. Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest.
 
 **Makseviisid.** Maksate kaardiga. Aktsepteerime Visa ja Mastercardi kaarte; American Expressi kaarte me ei aktsepteeri. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com) ja teie kaardi täielik number ei jõua kunagi meieni.
 
@@ -233,7 +231,7 @@ Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premiu
 
 **Makse tagasinõuded.** Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu.
 
-**Seadusest tulenevad õigused on esikohal.** Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab.
+**Seadusest tulenevad õigused on esikohal.** Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Kõigi pakettide kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab.
 
 ## 13. Teie taganemisõigus
 
@@ -250,6 +248,16 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+
+Versioon 2.17 asendas versiooni 2.16: jaotis 10 ütleb, millal loeb nupuga Teatage tehtud teadet tehisintellekt ja millal isik, et nupp küsib teie heauskset kinnitust, et kinnitame teate kättesaamist ja teatame teile oma otsuse e-postiga ning et põhjendused saadetakse e-postiga ja säilitatakse teie kontol; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
+
+Versioon 2.16 asendas versiooni 2.15: jaotis 12 nimetab tasulised paketid, Plus, Pro ja Max, ning jaotistes 12 ja 15 ei ole enam koostamismärkusi; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
+
+Versioon 2.15 asendas versiooni 2.14: jaotis 12 ütleb, et meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks, ja et maks lisatakse kassas.
+
+Versioon 2.14 asendas versiooni 2.13: jaotis 18 ja lisa A nimetavad vaidluste kohtuvälise lahendamise teeks ANPC (SAL).
+
+Versioon 2.13 asendas versiooni 2.12: jaotis 12 esitab maksenupu rumeeniakeelse teksti.
 
 Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub.
 
@@ -273,8 +281,6 @@ Versioon 2.7 asendas versiooni 2.6: see lisab küsimuse kontrolli, mis loeb iga 
 
 **Meie kontrolli alt väljas olevad sündmused.** Me ei riku lepingut, kui meid takistab kohustust täitmast miski, mis ei allu mõistlikult meie kontrollile. Kolmandast isikust mudelipakkuja rikkumine või teenusest loobumine ei ole automaatselt selline sündmus; kui see muudab teenuse kättesaamatuks, kohaldatakse jaotist 14 ning võite seal kirjeldatud viisil lepingu lõpetada ja saada tagasimakse.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Intellektuaalomand
 
 Teenus ise — tarkvara, mootor, hindamismeetod, kasutajaliides, nimed Dialectical Engine ja DebateAIRO ning meie logod — kuulub meile või meie litsentsiandjatele. Need Tingimused annavad teile loa teenust kasutada, mitte selle omandiõigust.
@@ -297,7 +303,7 @@ Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezba
 
 **Mujal elavad tarbijad.** Kui elate väljaspool ELi ja EMPd, ei piira miski neis Tingimustes teie riigi õigusest tulenevat õigust esitada nõue selle riigi kohtule ega õigust, millest selle õiguse alusel ei saa loobuda — sealhulgas Austraalias või Uus-Meremaal elades teie tarbijagarantii õigusi; Brasiilias elades *Código de Defesa do Consumidori* kohaseid õigusi; ja Ameerika Ühendriikides elades teie osariigi tarbijakaitseõiguse kohaseid õigusi.
 
-**Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil support@dezbatere.ro; enamik probleeme on lahendatavad ja meie eesmärk on vastata 5 tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist veebisaidi www.onoratainstanta.ro kaudu; me ei kohustu selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
+**Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil support@dezbatere.ro; enamik probleeme on lahendatavad ja meie eesmärk on vastata 5 tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist veebisaidi ANPC (SAL), reclamatiisal.anpc.ro kaudu; me ei kohustu selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
 
 ## 19. Muud tingimused
 
@@ -319,7 +325,7 @@ Iga kirjet kohaldatakse inimestele, kes elavad vastavas piirkonnas, ning selles 
 
 ### A.1 Euroopa Liit ja Euroopa Majanduspiirkond
 
-Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. **Saksamaa:** tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. **Itaalia:** peatamise ja lõpetamise (11), tasuliste pakettide ja nende uuendamise (12), muudatuste (14), vastutuse (15) ning kohaldatava õiguse ja vaidluste lahendamise koha (18) klauslid nõuavad teie eraldi heakskiitu Itaalia tsiviilkoodeksi artiklite 1341 ja 1342 alusel. Annate selle registreerumisel eraldi ruuduga, mis kuvatakse igaühele, kes valib väljal Piirkond Itaalia või kelle ühendus pärineb Itaaliast. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon on saadaval; valige keelemenüüst Polski.
+Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi ANPC (SAL), reclamatiisal.anpc.ro kaudu. **Saksamaa:** tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. **Itaalia:** peatamise ja lõpetamise (11), tasuliste pakettide ja nende uuendamise (12), muudatuste (14), vastutuse (15) ning kohaldatava õiguse ja vaidluste lahendamise koha (18) klauslid nõuavad teie eraldi heakskiitu Itaalia tsiviilkoodeksi artiklite 1341 ja 1342 alusel. Annate selle registreerumisel eraldi ruuduga, mis kuvatakse igaühele, kes valib väljal Piirkond Itaalia või kelle ühendus pärineb Itaaliast. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon on saadaval; valige keelemenüüst Polski.
 
 ### A.2 Ameerika Ühendriigid
 
@@ -331,7 +337,7 @@ Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma e
 
 ### A.3 Kanada ja Quebec
 
-Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. **Quebec:** need Tingimused on kättesaadavad prantsuse keeles; valige keelevalijast prantsuse keel; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist.
+Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. **Quebec:** need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist.
 
 ### A.4 Austraalia ja Uus-Meremaa
 

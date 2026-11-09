@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.12 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.17 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.12
+endMarker: A FELTÉTELEK VÉGE · v2.17
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.12 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.17 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -170,9 +170,9 @@ Fizetős csomagon a viták **alapértelmezés szerint bizalmasak**. Az Ön ott l
 
 ## 10. Tartalom bejelentése, moderálás és panaszok
 
-**Bárki bejelenthet tartalmat.** Ehhez nincs szükség fiókra. Írjon a support@dezbatere.ro címre. Ha be van jelentkezve, bármely nyilvános vitánál a **Bejelentés** gombot is használhatja. Egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa. Ha az MI egyetért, a vitát azonnal elrejtjük, és egy személy felülvizsgálja. Ha nem ért egyet, részletesebben újra bejelentheti, és egy személy elolvassa. Ahhoz, hogy intézkedhessünk, közölje velünk: kellő részletességgel, miért véli úgy, hogy a tartalom jogellenes vagy sérti e Feltételeket; a pontos helyet — a teljes URL-t, és ha lehetséges, az érintett szövegrészt; nevét és e-mail-címét (a gyermekek szexuális bántalmazását ábrázoló anyag bejelentésénél ez nem szükséges); továbbá azt, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes.
+**Bárki bejelenthet tartalmat.** Ehhez nincs szükség fiókra. Írjon a support@dezbatere.ro címre. Ha be van jelentkezve, bármely nyilvános vitánál a **Bejelentés** gombot is használhatja; a gomb arra kéri, erősítse meg, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes. Egy MI a gombbal tett bejelentést általában a nyilvános szöveg mellett olvassa. Ha az MI egyetért, és a vitát korábban még soha nem rejtettük el, a vitát azonnal, személy közreműködése nélkül elrejtjük, majd egy személy felülvizsgálja. A bejelentés ehelyett közvetlenül egy személyhez kerül, ha a vitát korábban már elrejtettük, ha Ön már bejelentette, vagy ha az aznapi automatikus ellenőrzések elfogytak. Ha az MI nem ért egyet, vagy a bejelentést automatikusan leállítjuk (például mert egy órán belül sok bejelentést küldött, vagy a vita nem nyilvános), azt egyetlen személy sem olvassa el: írhat a support@dezbatere.ro címre, és egy személy elolvassa, vagy panaszt tehet az alább ismertetett úton. Ahhoz, hogy intézkedhessünk, közölje velünk: kellő részletességgel, miért véli úgy, hogy a tartalom jogellenes vagy sérti e Feltételeket; a pontos helyet — a teljes URL-t, és ha lehetséges, az érintett szövegrészt; nevét és e-mail-címét (a gyermekek szexuális bántalmazását ábrázoló anyag bejelentésénél ez nem szükséges); továbbá azt, hogy jóhiszeműen úgy véli, bejelentése pontos és teljes.
 
-Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk. A bejelentéseket időben, gondosan, önkényességtől mentesen és tárgyilagosan kezeljük, közöljük Önnel döntésünket, és tájékoztatjuk annak megtámadási módjáról. Ha egy bejelentés feldolgozásához vagy eldöntéséhez automatizált eszközöket használunk, ezt közöljük. A hozzájárulás nélkül megosztott intim képfelvételekre vonatkozó bejelentések esetén az érvényes kérelemtől számított **48 órán belül** intézkedünk.
+Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk: azonnal a képernyőn, és ha a bejelentést egy személy fogja elolvasni, e-mailben is. A bejelentéseket időben, gondosan, önkényességtől mentesen és tárgyilagosan kezeljük, e-mailben közöljük Önnel döntésünket, és tájékoztatjuk annak megtámadási módjáról. Ha egy bejelentés feldolgozásához vagy eldöntéséhez automatizált eszközöket használunk, ezt közöljük. A hozzájárulás nélkül megosztott intim képfelvételekre vonatkozó bejelentések esetén az érvényes kérelemtől számított **48 órán belül** intézkedünk.
 
 **Az automatizált döntések két, egymástól elkülönített típusa.**
 
@@ -183,7 +183,7 @@ Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk. A bejelent
 
 **Hová tartozik a kérdésellenőrzés.** A 8. szakaszban szereplő kérdésellenőrzés sem a motoron belüli döntés. Ez egy automatizált eszköz, amely megtagadja egy vita elindítását, személy közreműködése nélkül. Az a kérdés, amely válságban lévő személy szavainak tűnik, vagy amely az öngyilkosság vagy az önsértés módszereit, illetve annak ösztönzését kéri, elutasítás helyett segítő telefonszámokat tartalmazó képernyőt kap.
 
-**Indokolás.** Valahányszor eltávolítjuk az Ön tartalmát vagy korlátozzuk annak láthatóságát, illetve felfüggesztjük vagy megszüntetjük a fiókját, indokolást adunk: mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk és azok bejelentésből vagy saját ellenőrzéseinkből származtak-e, alkalmaztunk-e automatizált eszközt, mi a jogi vagy szerződéses jogalap, és hogyan támadhatja meg a döntést: az alább ismertetett panaszkezelési utunkon, a digitális szolgáltatásokról szóló uniós rendelet alapján tanúsított peren kívüli vitarendezési testület útján, vagy bírósági úton. Amikor kérdésellenőrzésünk egy kérdést a 7. szakasz „Kérdések, amelyekből nem indul el vita” című bekezdése alapján utasít el, az erről tájékoztató képernyő a mi indokolásunk: közli, hogy a vita nem indult el, hogy automatikus ellenőrzésünk személy közreműködése nélkül utasította el a kérdést, hogy a kérdés e Feltételek melyik szabálya alá tartozik, és hogyan tehet panaszt az alábbi panaszkezelési úton. Elutasított kérdés esetén ennél többet nem ígérünk. Amikor ellenőrzésünk töröl egy vitát (9. szakasz), a látott értesítés a mi indokolásunk erről: közli, mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk, hogy személy közreműködése nélkül történt, e Feltételek melyik szabálya vonatkozik rá, és hogyan tehet panaszt az alábbi panaszkezelési úton; az e bekezdésben megnevezett másik két út továbbra is nyitva áll Ön előtt. A válságban lévő személy szavainak tűnő kérdés által kapott, segítő telefonszámokat tartalmazó képernyő segítség, nem indokolás.
+**Indokolás.** Valahányszor eltávolítjuk az Ön tartalmát vagy korlátozzuk annak láthatóságát, illetve felfüggesztjük vagy megszüntetjük a fiókját, indokolást adunk: mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk és azok bejelentésből vagy saját ellenőrzéseinkből származtak-e, alkalmaztunk-e automatizált eszközt, mi a jogi vagy szerződéses jogalap, és hogyan támadhatja meg a döntést: az alább ismertetett panaszkezelési utunkon, a digitális szolgáltatásokról szóló uniós rendelet alapján tanúsított peren kívüli vitarendezési testület útján, vagy bírósági úton. Az indokolást e-mailben elküldjük Önnek, a teljes indokolásra mutató hivatkozással, amely a fiókjában a Beállítások, Moderálási értesítések alatt található, és ott meg is marad. Akkor is kap indokolást, ha az Ön tartalma más, általunk felülvizsgált tartalommal együtt kerül le egy nyilvános oldalról, még akkor is, ha nem állapítottuk meg, hogy az Ön tartalma bármely szabályt megsértene. Amikor kérdésellenőrzésünk egy kérdést a 7. szakasz „Kérdések, amelyekből nem indul el vita” című bekezdése alapján utasít el, az erről tájékoztató képernyő a mi indokolásunk: közli, hogy a vita nem indult el, hogy automatikus ellenőrzésünk személy közreműködése nélkül utasította el a kérdést, hogy a kérdés e Feltételek melyik szabálya alá tartozik, és hogyan tehet panaszt az alábbi panaszkezelési úton. Elutasított kérdés esetén ennél többet nem ígérünk. Amikor ellenőrzésünk töröl egy vitát (9. szakasz), a látott értesítés a mi indokolásunk erről: közli, mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk, hogy személy közreműködése nélkül történt, e Feltételek melyik szabálya vonatkozik rá, és hogyan tehet panaszt az alábbi panaszkezelési úton; az e bekezdésben megnevezett másik két út továbbra is nyitva áll Ön előtt. A válságban lévő személy szavainak tűnő kérdés által kapott, segítő telefonszámokat tartalmazó képernyő segítség, nem indokolás.
 
 **Döntéssel kapcsolatos panasz.** Ha nem ért egyet egy moderálási döntéssel, **hat hónapon** belül válaszoljon az indokolásra, vagy írjon a office@dezbatere.ro címre. Az ügyet egy, az eredeti döntésben részt nem vevő személy vizsgálja felül, az eredményt pedig indokolással együtt közöljük Önnel. Ez nem érinti az Ön jogát arra, hogy bírósághoz forduljon, vagy igénybe vegye a 18. szakasz szerinti alternatív vitarendezést. A panaszkezelési út azon panaszokra is kiterjed, amelyek szerint nem intézkedtünk egy bejelentés alapján, jogtalanul távolítottunk el tartalmat, jogtalanul korlátoztunk fiókot, vagy valamely automatizált eszköz tévesen érintette az Ön tartalmát, például egy kérdés elutasításával.
 
@@ -211,11 +211,9 @@ A 8. szakasz (a már közzétett tartalom tekintetében), valamint a 15., 16. é
 
 ## 12. Fizetős csomagok
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+A Dialectical Engine ingyenes csomagot kínál. Három fizetős csomag lesz elérhető, a **Plus**, a **Pro** és a **Max**; mindegyik hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
 
-A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag lesz elérhető, amely hozzáférést biztosít a modellek teljes választékához, és lehetővé teszi, hogy Ön állítsa be a vita mérőit.
-
-**Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Comandă cu obligație de plată*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
+**Fizetés előtt** közvetlenül a fizetési gomb felett megjelenítjük Önnek: a csomagot; az alkalmazandó adóval növelt teljes árat; a számlázási időszakot; azt, hogy a csomag lemondásig automatikusan megújul; az esetleges ingyenes próbaidőszak végét és az azt követően felszámítandó összeget; valamint a lemondás módját. A megújítási feltételeket külön jelölőnégyzet bejelölésével erősíti meg. A gomb felirata **Előfizetés és fizetés** (románul *Abonați-vă și plătiți*). Ugyanezeket az információkat, e Feltételeket és az elállási nyomtatványt tartalmazó visszaigazolást tartós adathordozón küldjük meg Önnek.
 
 **Emlékeztetők.** E-mailben emlékeztetjük Önt legalább 5 nappal azelőtt, hogy egy ingyenes próbaidőszak fizetős csomaggá alakul; folyamatos csomagok esetén évente legalább egyszer; továbbá a legalább tizenkét hónapos időszak minden megújítása előtt 30–45 nappal. Minden emlékeztető tartalmazza az árat, a dátumot és a lemondási hivatkozást.
 
@@ -225,7 +223,7 @@ A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag
 
 **Sikertelen fizetések.** Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit.
 
-**Adók és a fizetés kedvezményezettje.** Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
+**Adók és a fizetés kedvezményezettje.** Árainkat adó nélkül, ár + héa formában tüntetjük fel (az Ön lakóhelyétől függően a héa helyett az áruk és szolgáltatások adója vagy a forgalmi adó is lehet). A számlázási címére vonatkozó adót a fizetési oldalon adjuk hozzá, és a fizetési oldal fizetés előtt megmutatja az Ön által fizetendő végösszeget, adóval együtt. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
 
 **Fizetési módok.** Ön bankkártyával fizet. Visa és Mastercard kártyát fogadunk el; American Express kártyát nem fogadunk el. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel, és az Ön teljes kártyaszáma soha nem jut el hozzánk.
 
@@ -233,7 +231,7 @@ A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag
 
 **Visszaterhelések.** Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat.
 
-**A törvényes jogok elsőbbsége.** Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően, ha a számlázási időszak közben lemondja a fizetős csomagot, visszatérítjük az időszak díjának azt a részét, amelyet Ön nem használt fel, a csomag használata alapján mérve, függetlenül attól, hogy hány nap telt el: ha a díj 30%-át használta fel, 70%-át térítjük vissza; ha semmit nem használt fel, a teljes díjat visszatérítjük. Kérje a support@dezbatere.ro címen; amint visszatérítjük a díjat, a csomag megszűnik. Ha a 13. szakasz szerinti elállási jog is alkalmazandó, a kettő közül a nagyobb visszatérítést kapja. Mindkét csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat.
+**A törvényes jogok elsőbbsége.** Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően, ha a számlázási időszak közben lemondja a fizetős csomagot, visszatérítjük az időszak díjának azt a részét, amelyet Ön nem használt fel, a csomag használata alapján mérve, függetlenül attól, hogy hány nap telt el: ha a díj 30%-át használta fel, 70%-át térítjük vissza; ha semmit nem használt fel, a teljes díjat visszatérítjük. Kérje a support@dezbatere.ro címen; amint visszatérítjük a díjat, a csomag megszűnik. Ha a 13. szakasz szerinti elállási jog is alkalmazandó, a kettő közül a nagyobb visszatérítést kapja. Valamennyi csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat.
 
 ## 13. Az Ön elállási joga
 
@@ -250,6 +248,16 @@ Ha Ön máshol él, az A. melléklet határozza meg a régiójában esetlegesen 
 Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított **30 napon** belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget.
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
+
+A 2.17-es verzió a 2.16-os verzió helyébe lépett: a 10. szakasz leírja, mikor olvassa egy MI a Bejelentés gombbal tett bejelentést, és mikor egy személy, hogy a gomb az Ön jóhiszeműségi nyilatkozatát kéri, hogy visszaigazoljuk a bejelentést, és döntésünket e-mailben közöljük, valamint hogy az indokolásokat e-mailben elküldjük és a fiókjában megőrizzük; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
+
+A 2.16-os verzió a 2.15-ös verzió helyébe lépett: a 12. szakasz megnevezi a fizetős csomagokat, a Plus, a Pro és a Max csomagot, a 12. és a 15. szakasz pedig már nem tartalmaz szerkesztési megjegyzéseket; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
+
+A 2.15-ös verzió a 2.14-es verzió helyébe lépett: a 12. szakasz kimondja, hogy árainkat adó nélkül, ár + héa formában tüntetjük fel, és hogy az adót a fizetési oldalon adjuk hozzá.
+
+A 2.14-es verzió a 2.13-as verzió helyébe lépett: a 18. szakasz és az A. melléklet az ANPC (SAL) szervet nevezi meg az alternatív vitarendezés útjaként.
+
+A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 12. szakasz megadja a fizetési gomb román nyelvű feliratát.
 
 A 2.12-es verzió a 2.11-es verzió helyébe lépett: a 10. szakasz kimondja, hogy egy bejelentkezett személy a nyilvános vitáknál a Bejelentés gombot is használhatja, hogy egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa, és hogy ezután mi történik.
 
@@ -273,8 +281,6 @@ A 2.7-es verzió a 2.6-as verzió helyébe lépett: hozzáadja a kérdésellenő
 
 **Ellenőrzési körünkön kívüli események.** Nem követünk el szerződésszegést, ha kötelezettségünk teljesítésében észszerű ellenőrzési körünkön kívüli körülmény akadályoz. Egy harmadik fél modellszolgáltatójának hibája vagy kivonulása nem minősül automatikusan ilyen eseménynek; ha emiatt a szolgáltatás elérhetetlenné válik, a 14. szakasz alkalmazandó, és az ott leírtak szerint Ön megszüntetheti a szerződést és visszatérítést kaphat.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Szellemi tulajdon
 
 Maga a szolgáltatás — a szoftver, a motor, a pontozási módszer, a felület, a Dialectical Engine és a DebateAIRO név, valamint logóink — a mi vagy licencadóink tulajdonát képezi. E Feltételek engedélyt adnak Önnek a szolgáltatás használatára, tulajdonjogot azonban nem.
@@ -297,7 +303,7 @@ A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhe
 
 **Máshol élő fogyasztók.** Ha Ön az EU-n és az EGT-n kívül él, e Feltételek egyetlen rendelkezése sem korlátozza az Ön országának joga alapján fennálló jogát arra, hogy annak bíróságai előtt igényt érvényesítsen, sem bármely, e jog alapján le nem mondható jogát — ideértve, ha Ön Ausztráliában vagy Új-Zélandon él, a fogyasztói garanciákhoz fűződő jogait; ha Brazíliában él, a Código de Defesa do Consumidor rendelkezéseit; ha pedig az Egyesült Államokban él, az állama fogyasztóvédelmi jogszabályait.
 
-**Bírósághoz fordulás előtt.** Lépjen velünk kapcsolatba a support@dezbatere.ro címen; a legtöbb probléma orvosolható, és célunk, hogy 5 munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a www.onoratainstanta.ro útján elérhető alternatív vitarendezést; nem vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó.
+**Bírósághoz fordulás előtt.** Lépjen velünk kapcsolatba a support@dezbatere.ro címen; a legtöbb probléma orvosolható, és célunk, hogy 5 munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a ANPC (SAL), reclamatiisal.anpc.ro útján elérhető alternatív vitarendezést; nem vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó.
 
 ## 19. Egyéb feltételek
 
@@ -319,7 +325,7 @@ Minden bejegyzés az adott régióban élő személyekre alkalmazandó, és csak
 
 ### A.1 Európai Unió és Európai Gazdasági Térség
 
-E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. **Németország:** a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. **Franciaország:** előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. **Olaszország:** a felfüggesztésre és megszüntetésre (11), a fizetős csomagokra és azok megújítására (12), a módosításokra (14), a felelősségre (15), valamint az irányadó jogra és a jogviták elbírálásának helyére (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges az olasz Polgári Törvénykönyv 1341. és 1342. cikke alapján. Ezt a regisztrációkor megjelenő külön négyzettel adja meg, amely mindenkinek megjelenik, aki a Régió mezőben Olaszországot választja, vagy akinek a kapcsolata Olaszországból érkezik. **Hollandia:** e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. **Lengyelország:** lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban.
+E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a ANPC (SAL), reclamatiisal.anpc.ro útján érhető el. **Németország:** a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. **Franciaország:** előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. **Olaszország:** a felfüggesztésre és megszüntetésre (11), a fizetős csomagokra és azok megújítására (12), a módosításokra (14), a felelősségre (15), valamint az irányadó jogra és a jogviták elbírálásának helyére (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges az olasz Polgári Törvénykönyv 1341. és 1342. cikke alapján. Ezt a regisztrációkor megjelenő külön négyzettel adja meg, amely mindenkinek megjelenik, aki a Régió mezőben Olaszországot választja, vagy akinek a kapcsolata Olaszországból érkezik. **Hollandia:** e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. **Lengyelország:** lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban.
 
 ### A.2 Egyesült Államok
 
@@ -331,7 +337,7 @@ E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye sz
 
 ### A.3 Kanada és Québec
 
-Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. **Québec:** e Feltételek francia nyelven is elérhetők; a franciát a nyelvválasztóban választhatja ki; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását.
+Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. **Québec:** e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását.
 
 ### A.4 Ausztrália és Új-Zéland
 

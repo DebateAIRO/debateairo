@@ -28,7 +28,9 @@ describe("branded verification alternatives", () => {
     expect(mail.text).toContain("07:41"); expect(mail.text).toContain("UTC");
   });
   it("uses served locale for date ordering without inferring timezone", () => {
-    expect(render("en-US", null).text).toContain("October 5, 2026");
+    // Every English writes the day first (owner's answer to question 5, 5 Nov 2026).
+    expect(render("en-US", null).text).toContain("5 October 2026");
+    expect(render("en-US", null).text).not.toContain("October 5, 2026");
     expect(render("en-GB", null).text).toContain("5 October 2026");
     expect(render("ro", "Europe/Bucharest").text).toContain("5 octombrie 2026");
   });

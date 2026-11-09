@@ -17,6 +17,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
 import { createContractClient, type ContractClient, type PublicDebate } from "@debateai/contract";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
@@ -30,11 +31,11 @@ import {
   EntitlementRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInternalAllowanceRepository, PostgresInvestigationReportRepository,
   PostgresInvestigationRepository, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicFlagRepository, PostgresPublicPageRepository,
   PostgresPublicReviewRepository, PostgresPublicTreeRepository, PostgresPublicationRepository, PostgresWebResearchedRepository, ProviderProbeRepository, RunWaitRepository,
-  ServeDisclosureRepository, configureContentEncryption, createPool, migrate, type Pool
+  ServeDisclosureRepository, configureContentEncryption, contentCipherFor, createPool, crossAccountPool, migrate, type Pool
 } from "@debateai/db";
 import { MapChoiceRepository } from "@debateai/map";
 import {
-  createPreviewBudgetRpcPort, createPreviewGuardedFetch, PREVIEW_GLM_DEADLINE_MS, PREVIEW_REVIEWED_PROVIDER_REFS, previewProbeControls, previewTargetJsonRow,
+  createPreviewBudgetRpcPort, createPreviewGuardedFetch, PREVIEW_GLM_DEADLINE_MS, PREVIEW_REVIEWED_PROVIDER_REFS, previewProbeControls, previewProviderSocket, previewTargetJsonRow,
   resolveProviderTargetCredentials
 } from "@debateai/providers";
 import {
@@ -67,8 +68,8 @@ import { questionLanguageSiteRoute } from "../../apps/api/src/question-language/
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import { PostgresAskAdmissionGate, settingsVersionPassed } from "../../apps/api/src/release-state.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
-import { recordAskClarifyCharge, reserveAskClarifyCharge } from "@debateai/budget";
-import { closingReservesOf, readAbuseLimits } from "@debateai/register";
+import { questionCheckSpendWriterPresent, recordAskClarifyCharge, recordQuestionCheckSpend, reserveAskClarifyCharge } from "@debateai/budget";
+import { closingReservesOf, readAbuseLimits, readQuestionCheckPolicy } from "@debateai/register";
 import { sweepInvestigationClosings } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
 import { sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
@@ -84,11 +85,14 @@ import { composePracticeRunner } from "../../tools/preview-practice/practice-run
 import { practiceMadeUpSearchReplies, practiceSearchStandIn, practiceWithSearchStandIn } from "../../tools/preview-practice/practice-search-stand-in.js";
 import { parsePracticeSettings, practiceReleaseKeyAt, practiceSettingsWithLineUp } from "../../tools/preview-practice/practice-settings.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
-import { questionCheckPass } from "./questionCheckPass.js";
+import { composeQuestionCheck } from "../../apps/api/src/question-check/compose.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { seedNetopiaSubscription } from "./billingSubscriptionFixtures.js";
 import { TEST_OWNER_LIMIT_ROWS } from "./hostedRegisterRows.js";
 import { TEST_APP_ORIGIN, persistLiveSession, testHttpIdentity, testSessionApplication, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
 import { startPreviewGateStubs, type GateOverride, type GateRequest } from "./preview-gate-stubs.js";
+import { currentTestFile } from "./master-key-guard.js";
+import { apiTestPools, endProvisionedRlsLogins, runnerTestPool, type ApiTestPools } from "./rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 
 const FIVE = ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", "claude-haiku-5-5"];
@@ -141,12 +145,14 @@ export type R22World = Awaited<ReturnType<typeof startR22World>>;
 
 export async function startR22World(options: Readonly<{ log?: (line: string) => void }> = {}) {
   const log = options.log ?? (() => undefined);
+  // The test file that builds this world (read before the first wait): apiTestPools keys the login mode on it.
+  const testFile = currentTestFile();
+  if (testFile === undefined) throw new TypeError("R22_WORLD_OUTSIDE_A_TEST_FILE");
   const document = parsePracticeRegisterExport(await exportedRegister());
   const database: TestDatabase = await startTestDatabase();
   await migrate(database.pool);
   const pools: Pool[] = [];
   const open = (): Pool => { const pool = createPool(database.connectionString); pools.push(pool); return pool; };
-  const pool = open();
   // The register: kit v3's next version on the export, hosted with billing on, with the engine, length and shape rows the code starts from.
   const inputs = await parsePracticeNextRegisterInputs({ hostedBilling: JSON.stringify(HOSTED_BILLING), debateShape: debateShapePolicyStartValues(), lengthGuidance: lengthGuidancePolicyStartValues(),
     engineVersion: engineVersionPolicyStartValues() } as never);
@@ -168,10 +174,31 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   });
   const cipher = new ContentCipher(runKeys);
   const encrypted = (): Pool => { const each = open(); configureContentEncryption(each, cipher); return each; };
-  const apiPool = encrypted();
-  configureContentEncryption(pool, cipher);
+  // The test's own pool, on the harness superuser: fixtures and read-backs outside any request (exported as
+  // `fixtureSuperuserPool`; the API's real runtime pool goes out as `runtimePool`).
+  const fixturePool = encrypted();
   configureContentEncryption(database.pool, cipher);
-  const runnerPool = encrypted();
+  // THE API's pools, field for field as apps/api/src/main.ts builds them (tests/support/rls-logins.ts, apiTestPools): the
+  // product's own logins by default; with DEBATEAI_TEST_API_LOGINS=0 (or the file on the master-key list) every field is
+  // the superuser pool, and then each piece gets its own superuser pool as before (PostgresAskApplication refuses one
+  // pool in two of its roles). Only the runtime pool carries the content cipher, as in main.ts (CONTENT_ENCRYPTION_ENABLED).
+  const loginPools: ApiTestPools = await apiTestPools(database, pathToFileURL(testFile).href);
+  const apiPoolOf = (field: keyof ApiTestPools, withCipher = false): Pool => {
+    const each = loginPools[field];
+    if (each === database.pool) return encrypted();
+    if (withCipher && contentCipherFor(each) === undefined) configureContentEncryption(each, cipher);
+    return each;
+  };
+  const apiPool = apiPoolOf("runtime", true);
+  // The runner's pools: on the production runner login in login mode (the default), on the superuser as before with
+  // DEBATEAI_TEST_API_LOGINS=0 (tests/support/rls-logins.ts, runnerTestPool).
+  const runnerOwn = async (budget: "runtime" | "keepAlive"): Promise<Pool> => {
+    const login = await runnerTestPool(database, budget);
+    if (login === undefined) return encrypted();
+    configureContentEncryption(login, cipher);
+    return login;
+  };
+  const runnerPool = await runnerOwn("runtime");
 
   // The gates: AIs scripted, nothing leaves this computer.
   const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
@@ -195,7 +222,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV });
   const resolveProviderPanel = createProviderDiscoveryResolver({ configuredProviders: deploymentMakers.configuredProviders,
     targets: resolveProviderTargetCredentials(declaredProviderTargets, () => { throw new TypeError("R22_TARGET_DECLARES_A_CREDENTIAL"); }),
-    probes: new ProviderProbeRepository(apiPool), probeFreshnessMs: discoveryPolicy.probeFreshnessMs, probeTimeoutMs: PREVIEW_GLM_DEADLINE_MS, probeControlsFor: previewProbeControls,
+    probes: { readLatest: (providerRefs) => new ProviderProbeRepository(apiPool).readLatest(providerRefs), record: (observation) => new ProviderProbeRepository(crossAccountPool(apiPool, "X37")).record(observation) }, probeFreshnessMs: discoveryPolicy.probeFreshnessMs, probeTimeoutMs: PREVIEW_GLM_DEADLINE_MS, probeControlsFor: previewProbeControls,
     fetchImplementation: previewFetch, previewRound: true });
   const money = (await composePracticeAskMoney({ pool: apiPool, registerVersion: nextVersion, deploymentMode: "hosted" }))!;
   const readiness = money.readiness!;
@@ -215,7 +242,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   const personAllowance = new FundingAwarePersonAllowanceSource({ allowances: new PostgresInternalAllowanceRepository(apiPool), entitlements, plans: billingPlans, closeBasisPoints });
   const estimator = siteAdmission.estimator!;
   const estimatorFor = async (version: number) => (await admissionCache.admissionSettingsFor(version)).estimator!;
-  const askRoom = new AskRoom({ lockPool: encrypted(), spend, line: new RunWaitRepository(apiPool), estimator, estimatorFor, personAllowance, entitlements, billingPlans, funding: personAllowance,
+  const askRoom = new AskRoom({ lockPool: apiPoolOf("roomDecision"), spend, line: new RunWaitRepository(apiPool), estimator, estimatorFor, personAllowance, entitlements, billingPlans, funding: personAllowance,
     dailyCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros, closeBasisPoints, waitingLinePerPerson: readiness.band.waitingLinePerPerson,
     gate: new PostgresAskAdmissionGate({ releaseKey: environment.RELEASE_KEY, hosted: false, siteVersion: nextVersion }) });
   const askBilling = Object.freeze({ plans: billingPlans, funding: personAllowance, entitlements, coarseFit: Object.freeze({ personAllowance, spend, estimator, estimatorFor }), clock: () => new Date() });
@@ -226,12 +253,13 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   const runSettings = { ...admissionSettingsOfVersion(siteAdmission), previewTeamUserIds, strangerSampleRate: settings.strangerSampleRate, releaseKey: environment.RELEASE_KEY,
     batteryVersion: settings.batteryVersion, settlementWatchHandle: settings.settlementWatchHandle, room: askRoom, waitingLine: askRoom, billing: askBilling, resolveDiscoveredPanel: resolveProviderPanel,
     admissionSettings: { activeSettingsVersion: () => activeSettings.current(), admissionSettingsFor: async (version: number) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)) } } as unknown as RunCreationSettings;
-  const application = new PostgresAskApplication(apiPool, dispatcher, runSettings, undefined, encrypted(), Object.freeze({ server: encrypted(), legacy: encrypted() }));
+  const application = new PostgresAskApplication(apiPool, dispatcher, runSettings, undefined, apiPoolOf("contentProvision"),
+    Object.freeze({ server: apiPoolOf("serverAskAdmission"), legacy: apiPoolOf("legacyAskAdmission") }));
   const storyRepository = new StoryRepository(apiPool);
   const mapViews = new RepositoryAnswerMapViewApplication(new MapChoiceRepository(apiPool), runOwnerCheckFrom((text, values) => apiPool.query<{ owned?: boolean; run_id?: string }>(text, values)));
   const hasher = { hash: () => "sha256:0" } as never;
   const publications = new PostgresPublicationApplication(new PostgresPublicationRepository(apiPool, hasher), new PublicationCipher(new MemoryPublicationKeyStore(loadKek(generateDek()))), undefined,
-    new PostgresPublicationRepository(apiPool, hasher), new RepositoryPublicationStoryReader(storyRepository), mapViews, { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }, {
+    new PostgresPublicationRepository(apiPoolOf("publicationCleanup"), hasher), new RepositoryPublicationStoryReader(storyRepository), mapViews, { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }, {
       readUpdates: (ref) => new PostgresPublicDebateRunnerRepository(apiPool).readPageUpdates(ref),
       readReports: (ref) => new PostgresPublicPageRepository(apiPool).readReports(ref),
       authorNameGone: (ref) => new PostgresPublicDebateRunnerRepository(apiPool).isAuthorNameGone(ref),
@@ -255,9 +283,20 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     transportFor: askClarifyTransportFor(await questionLanguageSiteRoute({ mode: environment.DEPLOYMENT_MODE, policy: ASK_CLARIFY_ROUTE_POLICY, dayCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros,
       previewGate: gate, previewFetch, readCredential: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, spend: { writerPresent: async () => true, record: async () => undefined },
       daySpentMicros: (day: string) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day), report: () => undefined } as never)),
-    record: (entry) => recordAskClarifyCharge(apiPool, entry), reserve: (entry) => reserveAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
+    record: (entry) => recordAskClarifyCharge(crossAccountPool(apiPool, "X32"), entry), reserve: (entry) => reserveAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
+  // 2026-11-02: the question check exactly as main.ts composes it on the preview, through the Anthropic gate's stand-in (it was a stub
+  // that always passed, and R22 reached the test site with a check that could never run). A world where it is off refuses to start.
+  const questionCheckOff: string[] = [];
+  const questionCheck = await composeQuestionCheck({ mode: "hosted", apiPort: 0, target: undefined,
+    readAuthorizationHeader: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, reportDiagnostic: () => undefined,
+    policy: await readQuestionCheckPolicy(apiPool, nextVersion), subjects: readQuestionSubjects(),
+    spend: { writerPresent: () => questionCheckSpendWriterPresent(crossAccountPool(apiPool, "X31")), record: (entry) => recordQuestionCheckSpend(crossAccountPool(apiPool, "X31"), entry) },
+    dayPot: { ceilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros, spentMicros: (day) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day) },
+    clock: () => new Date(), report: (line) => { if (line.event === "api.question_check.not_configured") questionCheckOff.push(line.code); },
+    preview: { fetch: previewFetch, anthropicSocket: previewProviderSocket(gate, "anthropic") } });
+  if (questionCheckOff.length > 0) throw new Error("R22_WORLD_QUESTION_CHECK_OFF");
   const api: FastifyInstance = buildApi({
-    questionCheck: questionCheckPass, previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds, application, sessions, allowedOrigin: TEST_APP_ORIGIN,
+    questionCheck, previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds, application, sessions, allowedOrigin: TEST_APP_ORIGIN,
     stories: new RepositoryAnswerStoryApplication(storyRepository), disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(apiPool)), mapViews, accountMemory,
     digModel: new PostgresDigModelRepository(apiPool), investigations,
     investigationReports: { reports: new PostgresInvestigationReportRepository(apiPool), investigations, owns: async (ownerRef: string, runId: string) => (await accountMemory.readLastVisit(ownerRef, runId)) !== null,
@@ -265,8 +304,8 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
     webResearched: { record: (ownerRef: string, runId: string, pageId: string) => new PostgresWebResearchedRepository(apiPool).record(ownerRef, runId, pageId),
       markActivity: async (ownerRef: string, runId: string) => { if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId); } },
     digPicks: new PostgresDigPicksRepository(apiPool), purposeLines: postgresPurposeLines(apiPool),
-    // The settlement on the same pool: the harness's login is a superuser, so it holds the cross-account marker that 0171 makes it need (main.ts: X38).
-    publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), settlement: new PostgresPublicFlagRepository(apiPool), judge: () => flagJudge,
+    // The settlement on the pool's system login, as main.ts builds it (X38): 0171 makes it the cross-account marker's alone.
+    publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), settlement: new PostgresPublicFlagRepository(crossAccountPool(apiPool, "X38")), judge: () => flagJudge,
       seal: (ref: string, runId: string, value: unknown) => publications.withReviewKey(ref, runId, (each) => each.encrypt(value)), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     publicTree: { pool: apiPool, tree: new PostgresPublicTreeRepository(apiPool), contributions: new PostgresPublicDebateRepository(apiPool), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     askClarify, monthRoom: askRoom,
@@ -282,7 +321,7 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
 
   // THE RUNNER, by the practice's composition (kept equal to the runner's main.ts by the drift test), with the stand-in in the search gate's place.
   const standIn = practiceWithSearchStandIn(environment, budgetPorts, search);
-  const composed = await composePracticeRunner({ pool: runnerPool, environment: standIn.environment, budgetPorts: standIn.budgetPorts, remaining, keepAlivePool: encrypted(),
+  const composed = await composePracticeRunner({ pool: runnerPool, environment: standIn.environment, budgetPorts: standIn.budgetPorts, remaining, keepAlivePool: await runnerOwn("keepAlive"),
     wait: async () => undefined, sleep: async () => undefined, storyLog: (event, detail) => { log(`story ${event} ${JSON.stringify(detail)}`); } });
   const members = [composed.providerTopology.primary, ...(composed.providerTopology.critique === undefined ? [] : [composed.providerTopology.critique]), ...composed.providerTopology.additionalMakers];
   const runnerLog = (event: string, detail: Record<string, unknown>): void => { log(`runner ${event} ${JSON.stringify(detail)}`); };
@@ -376,12 +415,13 @@ export async function startR22World(options: Readonly<{ log?: (line: string) => 
   /** The public page as the review read sees it, for the staff seam (tests/integration/public-tree-flow.test.ts's). */
   const withReviewKey = publications.withReviewKey.bind(publications);
   return {
-    base, database, apiPool, runnerPool, stubs, search, queue, content, flag, account, signedIn, stranger, settle, composed, askRoom, publications, nextVersion, environment, withReviewKey, api, identities,
+    base, database, fixtureSuperuserPool: fixturePool, runtimePool: apiPool, runnerPool, stubs, search, queue, content, flag, account, signedIn, stranger, settle, composed, askRoom, publications, nextVersion, environment, withReviewKey, api, identities,
     setScript: (next: R22Script | null) => { script = next; },
     async stop(): Promise<void> {
       await api.close();
       await stubs.close();
       await Promise.all(pools.map((each) => each.end().catch(() => undefined)));
+      await endProvisionedRlsLogins(database);
       await database.stop();
       await rm(secretRoot, { recursive: true, force: true });
     }

@@ -45,6 +45,8 @@ export const PREVIEW_GLM_BASE_URL = PREVIEW_DEEPINFRA_BASE_URL;
 export const PREVIEW_GLM_DEADLINE_MS = 1_260_000 as const;
 /** The gate socket's own idle timeout: past the app's deadline, so the app's abort always ends a call first. */
 export const PREVIEW_GATE_IPC_TIMEOUT_MS = PREVIEW_GLM_DEADLINE_MS + 30_000;
+/** How long a gate queues a call for one of its slots before refusing it (preview_budget_authority.py SLOT_WAIT_SECONDS). */
+export const PREVIEW_GATE_SLOT_WAIT_MS = 60_000 as const;
 export const PREVIEW_GLM_GENERATION_TOKEN_FLOOR = 8192 as const;
 /** GLM's row bound; every row's own bound is PreviewModelRow.outputBound. */
 export const PREVIEW_GLM_OUTPUT_RESERVATION = 32_768 as const;

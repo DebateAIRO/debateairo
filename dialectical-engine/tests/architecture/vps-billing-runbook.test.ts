@@ -768,11 +768,11 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–75 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–77 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
     // Numbered in order with no gap: a void row keeps its number so the later lines keep theirs.
-    expect(rows).toEqual(Array.from({ length: 75 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 77 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -1048,7 +1048,7 @@ describe("P22 the Billing runbook", () => {
       // C5a fix round 1 (go-live row 74): Quaderno's RON calculation is one unpaid Romanian quote on this server, and
       // the server is kept, or built again, for step 7's RON and EUR payments.
       "ask once for a quote as a Romanian buyer and do not pay",
-      "leave without pressing **Continue to payment**",
+      "leave without pressing **Subscribe and pay**",
       "Keep the server until step 7's RON and EUR runs (`start --currency RON` and `start --currency EUR`) are done",
       "build a sandbox server again as above for those runs (go-live row 74)",
       "pay for Plus first: a cancel link is sent only for a plan that is paid",

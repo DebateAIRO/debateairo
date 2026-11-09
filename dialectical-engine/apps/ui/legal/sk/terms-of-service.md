@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.12 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.17 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.12
+endMarker: KONIEC PODMIENOK · v2.17
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.12 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.17 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -170,9 +170,9 @@ V platenom programe sú debaty **v predvolenom nastavení súkromné**: nič, č
 
 ## 10. Hlásenie obsahu, moderovanie a sťažnosti
 
-**Obsah môže nahlásiť ktokoľvek.** Účet nepotrebujete. Napíšte na support@dezbatere.ro. Ak ste prihlásení, môžete tiež použiť tlačidlo **Nahlásiť** pri ktorejkoľvek verejnej debate. Umelá inteligencia číta hlásenie podané tlačidlom vedľa verejného textu. Ak umelá inteligencia s hlásením súhlasí, debata sa okamžite skryje a človek ju posúdi. Ak nesúhlasí, môžete hlásiť znovu s ďalšími podrobnosťami a človek ho prečíta. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné.
+**Obsah môže nahlásiť ktokoľvek.** Účet nepotrebujete. Napíšte na support@dezbatere.ro. Ak ste prihlásení, môžete tiež použiť tlačidlo **Nahlásiť** pri ktorejkoľvek verejnej debate; tlačidlo vás požiada, aby ste potvrdili, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné. Hlásenie podané tlačidlom zvyčajne číta umelá inteligencia vedľa verejného textu. Ak umelá inteligencia s hlásením súhlasí a debata ešte nikdy nebola skrytá, debata sa okamžite skryje bez účasti človeka a človek ju následne posúdi. Hlásenie namiesto toho ide priamo k človeku, ak už debata bola skrytá, ak ste ju už nahlásili alebo ak sú automatické kontroly na daný deň vyčerpané. Ak umelá inteligencia nesúhlasí alebo sa hlásenie automaticky zastaví (napríklad preto, že ste v priebehu hodiny poslali veľa hlásení, alebo preto, že debata nie je verejná), človek ho nečíta: môžete napísať na support@dezbatere.ro a človek vašu správu prečíta, alebo podať sťažnosť prostredníctvom nášho postupu vybavovania sťažností nižšie. Aby sme mohli konať, oznámte nám: prečo sa domnievate, že je obsah nezákonný alebo porušuje tieto Podmienky, a to dostatočne podrobne, aby sme tvrdenie pochopili; presné umiestnenie — úplnú adresu URL a podľa možnosti príslušnú pasáž; svoje meno a e-mailovú adresu (nevyžaduje sa pri hlásení materiálu zobrazujúceho sexuálne zneužívanie detí); a vyhlásenie, že sa v dobrej viere domnievate, že je vaše hlásenie presné a úplné.
 
-Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme včas, starostlivo, objektívne a bez svojvôle, oznámime vám svoje rozhodnutie a spôsob, ako ho napadnúť. Ak na vybavenie hlásenia alebo rozhodnutie o ňom použijeme automatizované prostriedky, informujeme vás o tom. Hlásenia intímnych snímok zdieľaných bez súhlasu vybavíme **do 48 hodín** od platnej žiadosti.
+Každé hlásenie potvrdíme bez zbytočného odkladu: okamžite na obrazovke a pri hlásení, ktoré bude čítať človek, aj e-mailom. Hlásenia vybavujeme včas, starostlivo, objektívne a bez svojvôle, e-mailom vám oznámime svoje rozhodnutie a oznámime vám spôsob, ako ho napadnúť. Ak na vybavenie hlásenia alebo rozhodnutie o ňom použijeme automatizované prostriedky, informujeme vás o tom. Hlásenia intímnych snímok zdieľaných bez súhlasu vybavíme **do 48 hodín** od platnej žiadosti.
 
 **Dva druhy automatizovaného rozhodovania, ktoré oddeľujeme.**
 
@@ -183,7 +183,7 @@ Každé hlásenie potvrdíme bez zbytočného odkladu. Hlásenia vybavujeme vča
 
 **Kam patrí kontrola otázky.** Kontrola otázky v časti 8 tiež nie je rozhodnutím v rámci systému. Je to automatizovaný nástroj, ktorý odmietne začať debatu, bez účasti človeka. Otázka, ktorá znie ako slová osoby v kríze alebo ktorá žiada o metódy samovraždy či sebapoškodenia alebo o povzbudenie k nim, dostane namiesto zamietnutia obrazovku s číslami pomoci.
 
-**Odôvodnenie.** Vždy, keď odstránime váš obsah alebo obmedzíme jeho viditeľnosť či pozastavíme alebo odstránime váš účet, poskytneme vám odôvodnenie: čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali a či pochádzali z hlásenia alebo z našich vlastných kontrol, či boli použité automatizované prostriedky, aký bol právny alebo zmluvný dôvod a ako môžete rozhodnutie napadnúť: prostredníctvom nášho postupu vybavovania sťažností nižšie, prostredníctvom orgánu mimosúdneho riešenia sporov certifikovaného podľa aktu EÚ o digitálnych službách alebo na súde. Keď naša kontrola otázky zamietne otázku podľa odseku „Otázky, ktoré nezačnú debatu“ v časti 7, je obrazovka, ktorá vám to oznámi, naším odôvodnením: uvádza, že debata nezačala, že naša automatická kontrola otázku zamietla bez účasti človeka, pod ktoré pravidlo týchto Podmienok otázka spadá a ako podať sťažnosť postupom nižšie. Pri zamietnutej otázke nič viac nesľubujeme. Keď naša kontrola odstráni debatu (časť 9), je oznámenie, ktoré vidíte, naším odôvodnením: uvádza, čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali, že sa na tom nepodieľal žiadny človek, ktoré pravidlo týchto Podmienok sa uplatní a ako podať sťažnosť postupom nižšie; ostatné dva postupy, ktoré tento odsek uvádza, vám zostávajú otvorené. Obrazovka s číslami pomoci, ktorú dostane otázka, ktorá znie ako slová osoby v kríze, je pomoc, nie odôvodnenie.
+**Odôvodnenie.** Vždy, keď odstránime váš obsah alebo obmedzíme jeho viditeľnosť či pozastavíme alebo odstránime váš účet, poskytneme vám odôvodnenie: čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali a či pochádzali z hlásenia alebo z našich vlastných kontrol, či boli použité automatizované prostriedky, aký bol právny alebo zmluvný dôvod a ako môžete rozhodnutie napadnúť: prostredníctvom nášho postupu vybavovania sťažností nižšie, prostredníctvom orgánu mimosúdneho riešenia sporov certifikovaného podľa aktu EÚ o digitálnych službách alebo na súde. Pošleme vám ho e-mailom spolu s odkazom na úplné odôvodnenie vo vašom účte v časti Nastavenia, Oznámenia o moderovaní, kde zostáva. Odôvodnenie dostanete aj vtedy, keď váš obsah zmizne z verejnej stránky spolu s iným obsahom, ktorý posudzujeme, aj keď sa nezistilo, že by váš obsah porušoval akékoľvek pravidlo. Keď naša kontrola otázky zamietne otázku podľa odseku „Otázky, ktoré nezačnú debatu“ v časti 7, je obrazovka, ktorá vám to oznámi, naším odôvodnením: uvádza, že debata nezačala, že naša automatická kontrola otázku zamietla bez účasti človeka, pod ktoré pravidlo týchto Podmienok otázka spadá a ako podať sťažnosť postupom nižšie. Pri zamietnutej otázke nič viac nesľubujeme. Keď naša kontrola odstráni debatu (časť 9), je oznámenie, ktoré vidíte, naším odôvodnením: uvádza, čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali, že sa na tom nepodieľal žiadny človek, ktoré pravidlo týchto Podmienok sa uplatní a ako podať sťažnosť postupom nižšie; ostatné dva postupy, ktoré tento odsek uvádza, vám zostávajú otvorené. Obrazovka s číslami pomoci, ktorú dostane otázka, ktorá znie ako slová osoby v kríze, je pomoc, nie odôvodnenie.
 
 **Sťažnosť proti rozhodnutiu.** Ak nesúhlasíte s moderátorským rozhodnutím, odpovedzte na odôvodnenie alebo napíšte na office@dezbatere.ro do **šiestich mesiacov**. Rozhodnutie preskúma osoba, ktorá sa na pôvodnom rozhodnutí nepodieľala, a výsledok vám oznámime s odôvodnením. Tým nie je dotknuté vaše právo obrátiť sa na súd alebo využiť alternatívne riešenie sporov podľa časti 18. Postup vybavovania sťažností prijíma aj sťažnosti na to, že sme hlásenie nevybavili, že bol obsah odstránený nesprávne, že bol účet nesprávne obmedzený alebo že automatizovaný nástroj nesprávne ovplyvnil váš obsah, napríklad zamietnutím otázky.
 
@@ -211,11 +211,9 @@ Ak službu úplne ukončíme alebo ju prestaneme poskytovať vo vašej krajine, 
 
 ## 12. Platené programy
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine ponúka bezplatný program. K dispozícii budú tri platené programy, **Plus**, **Pro** a **Max**; každý z nich sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty.
 
-Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený program **Premium**, ktorý sprístupní úplný výber modelov a umožní vám samostatne nastavovať parametre debaty.
-
-**Pred zaplatením** vám priamo nad platobným tlačidlom zobrazíme: program; celkovú cenu vrátane príslušnej dane; fakturačné obdobie; skutočnosť, že sa program automaticky obnovuje až do zrušenia; dátum skončenia prípadného bezplatného skúšobného obdobia a sumu, ktorá vám potom bude účtovaná; a spôsob zrušenia. Podmienky obnovenia potvrdíte začiarknutím samostatného políčka. Tlačidlo je označené slovami **Predplatiť a zaplatiť** (v rumunčine *Comandă cu obligație de plată*). Na trvanlivom médiu vám zašleme potvrdenie obsahujúce rovnaké informácie, tieto Podmienky a formulár na odstúpenie.
+**Pred zaplatením** vám priamo nad platobným tlačidlom zobrazíme: program; celkovú cenu vrátane príslušnej dane; fakturačné obdobie; skutočnosť, že sa program automaticky obnovuje až do zrušenia; dátum skončenia prípadného bezplatného skúšobného obdobia a sumu, ktorá vám potom bude účtovaná; a spôsob zrušenia. Podmienky obnovenia potvrdíte začiarknutím samostatného políčka. Tlačidlo je označené slovami **Predplatiť a zaplatiť** (v rumunčine *Abonați-vă și plătiți*). Na trvanlivom médiu vám zašleme potvrdenie obsahujúce rovnaké informácie, tieto Podmienky a formulár na odstúpenie.
 
 **Pripomenutia.** E-mail vám zašleme najmenej 5 dní pred prechodom bezplatného skúšobného obdobia na platený program; najmenej raz ročne pri pokračujúcich programoch; a 30 až 45 dní pred obnovením akéhokoľvek obdobia v dĺžke dvanástich mesiacov alebo viac. Každé pripomenutie obsahuje cenu, dátum a odkaz na zrušenie.
 
@@ -225,7 +223,7 @@ Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený progr
 
 **Neúspešné platby.** Ak platba zlyhá, budeme ju opakovať počas 7 dní a pred prevedením účtu na bezplatný program vás upozorníme e-mailom. Pre neúspešnú platbu vaše debaty nemažeme.
 
-**Dane a komu platíte.** Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
+**Dane a komu platíte.** Naše ceny zobrazujeme bez dane, v tvare cena + DPH (alebo GST či daň z predaja v závislosti od miesta vášho bydliska). Daň pre vašu fakturačnú adresu sa pripočíta v pokladni a pokladňa vám pred zaplatením ukáže celkovú sumu na úhradu vrátane dane. Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
 
 **Platobné metódy.** Platíte kartou. Prijímame karty Visa a Mastercard; karty American Express neprijímame. Platby kartou spracúva NETOPIA Payments (netopia-payments.com) a celé číslo vašej karty sa k nám nikdy nedostane.
 
@@ -233,7 +231,7 @@ Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený progr
 
 **Spätné zúčtovanie.** Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky.
 
-**Zákonné práva majú prednosť.** Ak služba nezodpovedá tomu, čo sme sľúbili, máte právo na uvedenie do súladu alebo na primerané zníženie ceny či vrátenie peňazí podľa zákona. Nad tento rámec, ak platený program zrušíte počas fakturačného obdobia, vrátime vám tú časť ceny tohto obdobia, ktorú ste nevyužili, meranú využívaním programu, bez ohľadu na to, koľko dní uplynulo: ak ste využili 30 % programu, vrátime vám 70 %; ak ste nevyužili nič, vrátime vám celú cenu. Požiadajte o to na support@dezbatere.ro; po vrátení peňazí program zaniká. Ak sa uplatní aj právo na odstúpenie podľa časti 13, dostanete to z oboch vrátení, ktoré je vyššie. Limity používania jednotlivých programov sú zverejnené v produkte; pred ich sprísnením spôsobom, ktorý vás podstatne ovplyvní, vás upozorníme.
+**Zákonné práva majú prednosť.** Ak služba nezodpovedá tomu, čo sme sľúbili, máte právo na uvedenie do súladu alebo na primerané zníženie ceny či vrátenie peňazí podľa zákona. Nad tento rámec, ak platený program zrušíte počas fakturačného obdobia, vrátime vám tú časť ceny tohto obdobia, ktorú ste nevyužili, meranú využívaním programu, bez ohľadu na to, koľko dní uplynulo: ak ste využili 30 % programu, vrátime vám 70 %; ak ste nevyužili nič, vrátime vám celú cenu. Požiadajte o to na support@dezbatere.ro; po vrátení peňazí program zaniká. Ak sa uplatní aj právo na odstúpenie podľa časti 13, dostanete to z oboch vrátení, ktoré je vyššie. Limity používania všetkých programov sú zverejnené v produkte; pred ich sprísnením spôsobom, ktorý vás podstatne ovplyvní, vás upozorníme.
 
 ## 13. Vaše právo na odstúpenie
 
@@ -250,6 +248,16 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.17 nahradila verziu 2.16: časť 10 uvádza, kedy hlásenie podané tlačidlom Nahlásiť číta umelá inteligencia a kedy človek, že tlačidlo od vás žiada vyhlásenie o dobrej viere, že hlásenie potvrdzujeme a rozhodnutie vám oznamujeme e-mailom a že odôvodnenia sa posielajú e-mailom a uchovávajú vo vašom účte; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
+
+Verzia 2.16 nahradila verziu 2.15: časť 12 uvádza platené programy, Plus, Pro a Max, a časti 12 a 15 už neobsahujú poznámky k návrhu; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
+
+Verzia 2.15 nahradila verziu 2.14: časť 12 uvádza, že naše ceny zobrazujeme bez dane, v tvare cena + DPH, a že sa daň pripočíta v pokladni.
+
+Verzia 2.14 nahradila verziu 2.13: časť 18 a príloha A uvádzajú ANPC (SAL) ako cestu k alternatívnemu riešeniu sporov.
+
+Verzia 2.13 nahradila verziu 2.12: časť 12 uvádza rumunský text platobného tlačidla.
 
 Verzia 2.12 nahradila verziu 2.11: časť 10 uvádza, že prihlásená osoba môže tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate, že umelá inteligencia číta hlásenie podané týmto tlačidlom vedľa verejného textu a čo sa potom stane.
 
@@ -273,8 +281,6 @@ Verzia 2.7 nahradila verziu 2.6: pridáva kontrolu otázky, ktorá číta každ�
 
 **Udalosti mimo našej kontroly.** Neporušujeme svoje povinnosti, ak nám plnenie znemožní okolnosť mimo našej primeranej kontroly. Zlyhanie alebo odstúpenie poskytovateľa modelu tretej strany automaticky nepredstavuje takúto udalosť; ak spôsobí nedostupnosť služby, uplatní sa časť 14 a môžete zmluvu ukončiť a získať vrátenie peňazí, ako je v nej opísané.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Duševné vlastníctvo
 
 Samotná služba — softvér, systém, metóda hodnotenia, rozhranie, názvy Dialectical Engine a DebateAIRO a naše logá — patrí nám alebo našim poskytovateľom licencií. Tieto Podmienky vám udeľujú oprávnenie službu používať, nie ju vlastniť.
@@ -296,7 +302,7 @@ Spôsob, akým nakladáme s osobnými údajmi, stanovujú **Zásady ochrany osob
 
 **Spotrebitelia inde.** Ak žijete mimo EÚ a EHP, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch.
 
-**Pred podaním žaloby.** Kontaktujte nás na support@dezbatere.ro; väčšinu vecí možno napraviť a snažíme sa odpovedať do 5 pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom www.onoratainstanta.ro; k účasti na tomto postupe sa nezaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
+**Pred podaním žaloby.** Kontaktujte nás na support@dezbatere.ro; väčšinu vecí možno napraviť a snažíme sa odpovedať do 5 pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom ANPC (SAL), reclamatiisal.anpc.ro; k účasti na tomto postupe sa nezaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
 
 ## 19. Ostatné ustanovenia
 
@@ -318,7 +324,7 @@ Každá položka sa uplatňuje na osoby, ktoré žijú v jej regióne, a stanovu
 
 ### A.1 Európska únia a Európsky hospodársky priestor
 
-Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie môžete začať na súdoch krajiny, v ktorej žijete; uplatní sa právo na odstúpenie podľa časti 13; alternatívne riešenie sporov je dostupné prostredníctvom www.onoratainstanta.ro. **Nemecko:** tlačidlo na zrušenie na adrese dezbatere.ro/cancel vám umožňuje ukončiť predplatné bez prihlásenia; podmienky predplatného, obdobia obnovenia a výpovedné lehoty sú v súlade s § 309 bod 9 BGB: každý program platí jeden mesiac a obnovuje sa mesačne, kým ho nezrušíte, pričom ho môžete zrušiť kedykoľvek s účinnosťou od konca prebiehajúceho mesiaca. **Francúzsko:** predplatné môžete ukončiť online v troch krokoch na adrese dezbatere.ro/cancel. **Taliansko:** ustanovenia o pozastavení a ukončení (11), platených programoch a ich obnovení (12), zmenách (14), zodpovednosti (15) a rozhodnom práve a príslušnosti súdov (18) vyžadujú váš osobitný súhlas podľa článkov 1341 a 1342 talianskeho Občianskeho zákonníka. Udeľujete ho prostredníctvom samostatného políčka pri registrácii, ktoré sa zobrazí každému, kto v poli Región zvolí Taliansko alebo sa pripája z Talianska. **Holandsko:** tieto Podmienky sa pred uzavretím poskytujú v podobe, ktorú možno uložiť. **Poľsko:** poľská verzia je dostupná; zvoľte Polski v prepínači jazykov.
+Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie môžete začať na súdoch krajiny, v ktorej žijete; uplatní sa právo na odstúpenie podľa časti 13; alternatívne riešenie sporov je dostupné prostredníctvom ANPC (SAL), reclamatiisal.anpc.ro. **Nemecko:** tlačidlo na zrušenie na adrese dezbatere.ro/cancel vám umožňuje ukončiť predplatné bez prihlásenia; podmienky predplatného, obdobia obnovenia a výpovedné lehoty sú v súlade s § 309 bod 9 BGB: každý program platí jeden mesiac a obnovuje sa mesačne, kým ho nezrušíte, pričom ho môžete zrušiť kedykoľvek s účinnosťou od konca prebiehajúceho mesiaca. **Francúzsko:** predplatné môžete ukončiť online v troch krokoch na adrese dezbatere.ro/cancel. **Taliansko:** ustanovenia o pozastavení a ukončení (11), platených programoch a ich obnovení (12), zmenách (14), zodpovednosti (15) a rozhodnom práve a príslušnosti súdov (18) vyžadujú váš osobitný súhlas podľa článkov 1341 a 1342 talianskeho Občianskeho zákonníka. Udeľujete ho prostredníctvom samostatného políčka pri registrácii, ktoré sa zobrazí každému, kto v poli Región zvolí Taliansko alebo sa pripája z Talianska. **Holandsko:** tieto Podmienky sa pred uzavretím poskytujú v podobe, ktorú možno uložiť. **Poľsko:** poľská verzia je dostupná; zvoľte Polski v prepínači jazykov.
 
 ### A.2 Spojené štáty
 
@@ -330,7 +336,7 @@ Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie m�
 
 ### A.3 Kanada a Quebec
 
-Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
+Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; ak pri registrácii zvolíte Kanadu, zobrazia sa vám najprv vo francúzštine a namiesto toho si môžete zvoliť angličtinu; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
 
 ### A.4 Austrália a Nový Zéland
 

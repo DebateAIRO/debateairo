@@ -8,7 +8,7 @@ import { API_BASE } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 import { totpQrMatrix } from "@/lib/totpQr";
 import type { LocaleCode } from "@/lib/i18n/locales";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { dateLocale as sharedDateLocale, t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/mfa-recovery.json";
 const browserClient = createMfaRecoveryClient(fetch, API_BASE);
 // Owner ruling 2026-10-09: "waiting" follows Continue on the ready screen; the finish_* phases come from the emailed finish link.
@@ -90,8 +90,8 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
     catch (failure) { if (failure instanceof ContractHttpError && failure.serverCode === "MFA_RECOVERY_TOO_EARLY") { setPassword(""); await loadFinish(); return; } throw failure; }
     if (mounted.current) { clear(); setPhase("completed"); }
   }
-  // Dates follow the reader's locale; plain English and Romanian keep the formats they always had.
-  const dateLocale = locale === "en" ? "en-GB" : locale === "ro" ? "ro-RO" : locale;
+  // Dates follow the reader's locale; every English writes the day first on the 24-hour clock (question 5), Romanian keeps the format it always had.
+  const dateLocale = locale === "ro" ? "ro-RO" : sharedDateLocale(locale);
   const when = (value: string) => new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   const submit = (operation: () => Promise<void>) => (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (phase === "email_link" && !ready) return; void perform(operation); };
   function showConfirmedCancellation() { clear(); switching.current = false; setPhase("cancelled"); setUnknown(false); setSwitchConfirm(false); setNotice(text("cancel.pause")); }

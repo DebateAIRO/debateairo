@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.12 · EFFETTIVI 1 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.17 · EFFETTIVI 1 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.12
+endMarker: TMIEM IT-TERMINI · v2.17
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.12 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.17 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -170,9 +170,9 @@ Id-dibattiti fuq pjan bi ħlas huma **privati b’mod awtomatiku**: xejn minn da
 
 ## 10. Rapportar ta’ kontenut, moderazzjoni u lmenti
 
-**Kulħadd jista’ jirrapporta kontenut.** Ma għandekx bżonn kont. Ikteb lil support@dezbatere.ro. Jekk int imdaħħal fil-kont tiegħek, tista’ wkoll tuża l-buttuna **Irrapporta** fuq kwalunkwe dibattitu pubbliku. IA taqra rapport magħmul bil-buttuna, ħdejn it-test pubbliku. Jekk l-IA taqbel, id-dibattitu jiġi moħbi minnufih u persuna tirrieżaminah. Jekk l-IA ma taqbilx, tista’ tirrapporta mill-ġdid b’aktar dettalji, u persuna taqrah. Sabiex inkunu nistgħu naġixxu, għidilna: għaliex temmen li l-kontenut huwa illegali jew jikser dawn it-Termini, b’dettall biżżejjed biex nifhmu l-pretensjoni; il-post eżatt — il-URL sħiħ u, jekk tista’, is-silta; ismek u l-indirizz elettroniku tiegħek (mhux meħtieġa għal rapporti ta’ materjal ta’ abbuż sesswali tat-tfal); u li temmen b’rieda tajba li r-rapport tiegħek huwa preċiż u komplut.
+**Kulħadd jista’ jirrapporta kontenut.** Ma għandekx bżonn kont. Ikteb lil support@dezbatere.ro. Jekk int imdaħħal fil-kont tiegħek, tista’ wkoll tuża l-buttuna **Irrapporta** fuq kwalunkwe dibattitu pubbliku; din titolbok tikkonferma li temmen b’rieda tajba li r-rapport tiegħek huwa preċiż u komplut. Normalment IA taqra rapport magħmul bil-buttuna, ħdejn it-test pubbliku. Jekk l-IA taqbel, u d-dibattitu qatt ma kien moħbi qabel, id-dibattitu jiġi moħbi minnufih, mingħajr l-involviment ta’ ebda persuna, u mbagħad persuna tirrieżaminah. Minflok, rapport imur dritt għand persuna meta d-dibattitu kien moħbi qabel, meta int diġà rrapportajtu, jew meta l-verifiki awtomatiċi għal dik il-ġurnata jkunu ntużaw kollha. Jekk l-IA ma taqbilx, jew ir-rapport jitwaqqaf awtomatikament (pereżempju għax bgħatt ħafna rapporti fi żmien siegħa, jew id-dibattitu mhuwiex pubbliku), ebda persuna ma taqrah: tista’ tikteb lil support@dezbatere.ro u persuna taqrah, jew tressaq ilment permezz tal-proċedura hawn taħt. Sabiex inkunu nistgħu naġixxu, għidilna: għaliex temmen li l-kontenut huwa illegali jew jikser dawn it-Termini, b’dettall biżżejjed biex nifhmu l-pretensjoni; il-post eżatt — il-URL sħiħ u, jekk tista’, is-silta; ismek u l-indirizz elettroniku tiegħek (mhux meħtieġa għal rapporti ta’ materjal ta’ abbuż sesswali tat-tfal); u li temmen b’rieda tajba li r-rapport tiegħek huwa preċiż u komplut.
 
-Nikkonfermaw li rċevejna kull rapport mingħajr dewmien żejjed. Nittrattaw ir-rapporti fil-ħin, b’diliġenza, b’mod mhux arbitrarju u oġġettiv, ngħidulek id-deċiżjoni tagħna, u ngħidulek kif tista’ tikkontestaha. Fejn nużaw mezzi awtomatizzati biex nipproċessaw jew niddeċiedu rapport, ngħidu dan. Aħna naġixxu fuq rapporti ta’ stampi intimi kondiviżi mingħajr kunsens **fi żmien 48 siegħa** minn talba valida.
+Nikkonfermaw li rċevejna kull rapport mingħajr dewmien żejjed: fuq l-iskrin minnufih u, għal rapport li se taqrah persuna, bl-email. Nittrattaw ir-rapporti fil-ħin, b’diliġenza, b’mod mhux arbitrarju u oġġettiv, ngħidulek id-deċiżjoni tagħna bl-email, u ngħidulek kif tista’ tikkontestaha. Fejn nużaw mezzi awtomatizzati biex nipproċessaw jew niddeċiedu rapport, ngħidu dan. Aħna naġixxu fuq rapporti ta’ stampi intimi kondiviżi mingħajr kunsens **fi żmien 48 siegħa** minn talba valida.
 
 **Żewġ tipi ta’ deċiżjoni awtomatizzata, miżmuma separati.**
 
@@ -183,7 +183,7 @@ Nikkonfermaw li rċevejna kull rapport mingħajr dewmien żejjed. Nittrattaw ir-
 
 **Fejn jappartjeni l-verifika tal-mistoqsijiet.** Il-verifika tal-mistoqsijiet fit-taqsima 8 lanqas mhi deċiżjoni fi ħdan il-magna. Hija għodda awtomatizzata li tirrifjuta li tibda dibattitu, mingħajr persuna involuta. Mistoqsija li tinqara bħal kliem persuna f’kriżi, jew li titlob metodi ta’ suwiċidju jew ta’ ħsara lilek innifsek jew inkoraġġiment biex dan isir, tikseb skrin b’numri ta’ għajnuna minflok rifjut.
 
-**Dikjarazzjoni tar-raġunijiet.** Kull meta nneħħu jew nirrestrinġu l-viżibbiltà tal-kontenut tiegħek, jew nissospendu jew intemmu l-kont tiegħek, nagħtuk dikjarazzjoni tar-raġunijiet: x’għamilna u safejn tapplika, il-fatti li bbażajna ruħna fuqhom u jekk ġewx minn rapport jew mill-kontrolli tagħna stess, jekk intużawx mezzi awtomatizzati, il-bażi legali jew kuntrattwali, u kif tista’ tikkontesta d-deċiżjoni: permezz tal-proċedura tal-ilmenti tagħna hawn taħt, permezz ta’ korp iċċertifikat għas-soluzzjoni tat-tilwim barra mill-qorti skont l-Att dwar is-Servizzi Diġitali tal-UE, jew quddiem il-qorti. Meta l-verifika tal-mistoqsijiet tagħna tirrifjuta mistoqsija taħt il-paragrafu “Mistoqsijiet li ma jibdewx dibattitu” fit-taqsima 7, l-iskrin li jgħidlek huwa d-dikjarazzjoni tar-raġunijiet tagħna għaliha: jgħid li d-dibattitu ma bediex, li l-verifika awtomatika tagħna rrifjutat il-mistoqsija mingħajr persuna involuta, taħt liema regola ta’ dawn it-Termini taqa’ l-mistoqsija, u kif tilmenta permezz tal-proċedura hawn taħt. Għal mistoqsija rifjutata ma nwiegħdu xejn aktar. Meta l-verifika tagħna tħassar dibattitu (taqsima 9), l-avviż li tara huwa d-dikjarazzjoni tar-raġunijiet tagħna għalih: jgħid x’għamilna u safejn tapplika, il-fatti li bbażajna ruħna fuqhom, li ma kienet involuta ebda persuna, taħt liema regola ta’ dawn it-Termini taqa’, u kif tilmenta permezz tal-proċedura hawn taħt; iż-żewġ għażliet l-oħra li jsemmi dan il-paragrafu jibqgħu miftuħa għalik. L-iskrin b’numri ta’ għajnuna li tikseb mistoqsija li tinqara bħal kliem persuna f’kriżi huwa għajnuna, mhux dikjarazzjoni tar-raġunijiet.
+**Dikjarazzjoni tar-raġunijiet.** Kull meta nneħħu jew nirrestrinġu l-viżibbiltà tal-kontenut tiegħek, jew nissospendu jew intemmu l-kont tiegħek, nagħtuk dikjarazzjoni tar-raġunijiet: x’għamilna u safejn tapplika, il-fatti li bbażajna ruħna fuqhom u jekk ġewx minn rapport jew mill-kontrolli tagħna stess, jekk intużawx mezzi awtomatizzati, il-bażi legali jew kuntrattwali, u kif tista’ tikkontesta d-deċiżjoni: permezz tal-proċedura tal-ilmenti tagħna hawn taħt, permezz ta’ korp iċċertifikat għas-soluzzjoni tat-tilwim barra mill-qorti skont l-Att dwar is-Servizzi Diġitali tal-UE, jew quddiem il-qorti. Nibagħtuhielek bl-email, b’link għad-dikjarazzjoni sħiħa fil-kont tiegħek taħt Issettjar, Avviżi ta’ moderazzjoni, fejn tibqa’. Tirċievi waħda wkoll meta l-kontenut tiegħek jitlaq minn paġna pubblika flimkien ma’ kontenut ieħor li qed nirrieżaminaw, anke jekk ma nstabx li l-kontenut tiegħek kiser xi regola. Meta l-verifika tal-mistoqsijiet tagħna tirrifjuta mistoqsija taħt il-paragrafu “Mistoqsijiet li ma jibdewx dibattitu” fit-taqsima 7, l-iskrin li jgħidlek huwa d-dikjarazzjoni tar-raġunijiet tagħna għaliha: jgħid li d-dibattitu ma bediex, li l-verifika awtomatika tagħna rrifjutat il-mistoqsija mingħajr persuna involuta, taħt liema regola ta’ dawn it-Termini taqa’ l-mistoqsija, u kif tilmenta permezz tal-proċedura hawn taħt. Għal mistoqsija rifjutata ma nwiegħdu xejn aktar. Meta l-verifika tagħna tħassar dibattitu (taqsima 9), l-avviż li tara huwa d-dikjarazzjoni tar-raġunijiet tagħna għalih: jgħid x’għamilna u safejn tapplika, il-fatti li bbażajna ruħna fuqhom, li ma kienet involuta ebda persuna, taħt liema regola ta’ dawn it-Termini taqa’, u kif tilmenta permezz tal-proċedura hawn taħt; iż-żewġ għażliet l-oħra li jsemmi dan il-paragrafu jibqgħu miftuħa għalik. L-iskrin b’numri ta’ għajnuna li tikseb mistoqsija li tinqara bħal kliem persuna f’kriżi huwa għajnuna, mhux dikjarazzjoni tar-raġunijiet.
 
 **Ilment dwar deċiżjoni.** Jekk ma taqbilx ma’ deċiżjoni ta’ moderazzjoni, wieġeb għad-dikjarazzjoni tar-raġunijiet jew ikteb lil office@dezbatere.ro fi żmien **sitt xhur**. Persuna li ma kinitx involuta fid-deċiżjoni oriġinali tirrieżaminaha, u ngħidulek ir-riżultat bir-raġunijiet. Dan ma jaffettwax id-dritt tiegħek li tmur il-qorti jew tuża soluzzjoni alternattiva għat-tilwim skont it-taqsima 18. Il-proċedura tal-ilmenti taċċetta wkoll ilmenti li ma nkunux aġixxejna fuq rapport, li kontenut tneħħa bi żball, li kont ġie ristrett bi żball, jew li għodda awtomatizzata affettwat il-kontenut tiegħek bi żball, per eżempju billi rrifjutat mistoqsija.
 
@@ -211,11 +211,9 @@ It-taqsimiet 8 (fir-rigward ta’ kontenut diġà ppubblikat), 15, 16 u 18 jibqg
 
 ## 12. Pjanijiet bi ħlas
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine toffri pjan bla ħlas. Se jkunu disponibbli tliet pjanijiet bi ħlas, **Plus**, **Pro** u **Max**; kull wieħed minnhom jiftaħ il-lista sħiħa tal-mudelli u jħallik tistabbilixxi l-kontrolli tad-dibattitu int stess.
 
-Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disponibbli, li jiftaħ il-lista sħiħa tal-mudelli u jħallik tistabbilixxi l-kontrolli tad-dibattitu int stess.
-
-**Qabel ma tħallas** nuruk, direttament fuq il-buttuna tal-ħlas: il-pjan; il-prezz totali inkluża t-taxxa applikabbli; il-perjodu tal-fatturazzjoni; li l-pjan jiġġedded awtomatikament sakemm jiġi kkanċellat; id-data meta jintemm kwalunkwe perjodu ta’ prova bla ħlas u kemm imbagħad ikollok tħallas; u kif tikkanċella. Tikkonferma t-termini tat-tiġdid billi timmarka kaxxa separata. Fuq il-buttuna jkun hemm **Abbona u ħallas** (bir-Rumen, *Comandă cu obligație de plată*). Nibagħtulek konferma fuq mezz durabbli li jkun fiha l-istess informazzjoni, dawn it-Termini, u l-formola tal-irtirar.
+**Qabel ma tħallas** nuruk, direttament fuq il-buttuna tal-ħlas: il-pjan; il-prezz totali inkluża t-taxxa applikabbli; il-perjodu tal-fatturazzjoni; li l-pjan jiġġedded awtomatikament sakemm jiġi kkanċellat; id-data meta jintemm kwalunkwe perjodu ta’ prova bla ħlas u kemm imbagħad ikollok tħallas; u kif tikkanċella. Tikkonferma t-termini tat-tiġdid billi timmarka kaxxa separata. Fuq il-buttuna jkun hemm **Abbona u ħallas** (bir-Rumen, *Abonați-vă și plătiți*). Nibagħtulek konferma fuq mezz durabbli li jkun fiha l-istess informazzjoni, dawn it-Termini, u l-formola tal-irtirar.
 
 **Tfakkiriet.** Nibagħtulek messaġġ elettroniku mill-inqas 5 ijiem qabel ma perjodu ta’ prova bla ħlas jinbidel fi pjan bi ħlas; mill-inqas darba fis-sena għall-pjanijiet kontinwi; u bejn 30 u 45 jum qabel kwalunkwe tiġdid ta’ terminu ta’ tnax-il xahar jew aktar. Kull tfakkira tinkludi l-prezz, id-data, u ħolqa għall-kanċellazzjoni.
 
@@ -225,7 +223,7 @@ Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disp
 
 **Ħlasijiet li jfallu.** Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla.
 
-**Taxxi, u lil min tħallas.** Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
+**Taxxi, u lil min tħallas.** Il-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT (jew GST jew taxxa fuq il-bejgħ, skont fejn tgħix). It-taxxa għall-indirizz tal-kontijiet tiegħek tiżdied fil-checkout, u l-checkout jurik it-total li se tħallas, bit-taxxa inkluża, qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
 
 **Metodi ta’ ħlas.** Tħallas bil-karta. Naċċettaw Visa u Mastercard; ma naċċettawx American Express. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com), u n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna.
 
@@ -233,7 +231,7 @@ Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disp
 
 **Treġġigħ lura ta’ ħlasijiet.** Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan.
 
-**L-ewwel id-drittijiet statutorji.** Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, jekk tikkanċella pjan bi ħlas matul perjodu tal-kontijiet, nagħtuk ħlas lura tas-sehem mill-prezz ta’ dak il-perjodu li ma użajtx, imkejjel skont l-użu tal-pjan, ikun xi jkun in-numru ta’ jiem li jkunu għaddew: jekk użajt 30 %, nagħtuk ħlas lura ta’ 70 %; jekk ma użajt xejn, nagħtuk ħlas lura tal-prezz kollu. Itlob il-ħlas lura fuq support@dezbatere.ro; ladarba nagħtu ħlas lura, il-pjan jintemm. Jekk japplika wkoll id-dritt ta’ rtirar fit-taqsima 13, tieħu l-akbar wieħed mill-ħlasijiet lura. Il-limiti tal-użu ta’ kull pjan jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment.
+**L-ewwel id-drittijiet statutorji.** Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, jekk tikkanċella pjan bi ħlas matul perjodu tal-kontijiet, nagħtuk ħlas lura tas-sehem mill-prezz ta’ dak il-perjodu li ma użajtx, imkejjel skont l-użu tal-pjan, ikun xi jkun in-numru ta’ jiem li jkunu għaddew: jekk użajt 30 %, nagħtuk ħlas lura ta’ 70 %; jekk ma użajt xejn, nagħtuk ħlas lura tal-prezz kollu. Itlob il-ħlas lura fuq support@dezbatere.ro; ladarba nagħtu ħlas lura, il-pjan jintemm. Jekk japplika wkoll id-dritt ta’ rtirar fit-taqsima 13, tieħu l-akbar wieħed mill-ħlasijiet lura. Il-limiti tal-użu tal-pjanijiet kollha jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment.
 
 ## 13. Id-dritt tiegħek għall-irtirar
 
@@ -250,6 +248,16 @@ Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perj
 Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien **30 jum** minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat.
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
+
+Il-Verżjoni 2.17 issostitwiet il-Verżjoni 2.16: it-taqsima 10 tgħid meta IA taqra rapport magħmul bil-buttuna Irrapporta u meta taqrah persuna, li l-buttuna titlob id-dikjarazzjoni tiegħek b’rieda tajba, li nikkonfermaw rapport u ngħidulek id-deċiżjoni tagħna bl-email, u li d-dikjarazzjonijiet tar-raġunijiet jintbagħtu bl-email u jinżammu fil-kont tiegħek; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
+
+Il-Verżjoni 2.16 issostitwiet il-Verżjoni 2.15: it-taqsima 12 issemmi l-pjanijiet bi ħlas, Plus, Pro u Max, u t-taqsimiet 12 u 15 m’għadx fihom noti tal-abbozzar; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
+
+Il-Verżjoni 2.15 issostitwiet il-Verżjoni 2.14: it-taqsima 12 tgħid li l-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT, u li t-taxxa tiżdied fil-checkout.
+
+Il-Verżjoni 2.14 issostitwiet il-Verżjoni 2.13: it-taqsima 18 u l-Anness A jsemmu lill-ANPC (SAL) bħala r-rotta għas-soluzzjoni alternattiva tat-tilwim.
+
+Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 12 tagħti l-kliem bir-Rumen tal-buttuna tal-ħlas.
 
 Il-Verżjoni 2.12 issostitwiet il-Verżjoni 2.11: it-taqsima 10 tgħid li persuna mdaħħla fil-kont tagħha tista’ wkoll tuża l-buttuna Irrapporta fuq kwalunkwe dibattitu pubbliku, li IA taqra rapport magħmul biha ħdejn it-test pubbliku, u x’jiġri wara.
 
@@ -273,8 +281,6 @@ Il-Verżjoni 2.7 issostitwiet il-verżjoni 2.6: iżżid il-verifika tal-mistoqsi
 
 **Avvenimenti barra mill-kontroll tagħna.** Ma nkunux fi ksur meta xi ħaġa barra mill-kontroll raġonevoli tagħna żżommna milli nwettqu l-obbligi tagħna. Nuqqas jew irtirar minn fornitur ta’ mudell ta’ parti terza ma jkunx awtomatikament avveniment bħal dan; meta dan jagħmel is-servizz mhux disponibbli, tapplika t-taqsima 14 u tista’ tittermina u tirċievi ħlas lura kif tiddeskrivi hi.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Proprjetà intellettwali
 
 Is-servizz innifsu — is-software, il-magna, il-metodu tal-punteġġ, l-interfaċċa, l-ismijiet Dialectical Engine u DebateAIRO u l-logos tagħna — jappartjeni lilna jew lil-liċenzjanti tagħna. Dawn it-Termini jagħtuk permess tuża s-servizz, mhux sjieda tiegħu.
@@ -297,7 +303,7 @@ Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Pr
 
 **Konsumaturi band’oħra.** Jekk tgħix barra l-UE u ż-ŻEE, xejn f’dawn it-Termini ma jillimita xi dritt li għandek skont il-liġi ta’ pajjiżek li tressaq pretensjoni fil-qrati tiegħu, jew xi dritt skont dik il-liġi li ma jistax jiġi rrinunzjat — inkluż, jekk tgħix fl-Awstralja jew fiż-Żelanda l-Ġdida, id-drittijiet tiegħek għall-garanziji tal-konsumatur; jekk tgħix fil-Brażil, il-Código de Defesa do Consumidor; u jekk tgħix fl-Istati Uniti, il-liġijiet tal-istat tiegħek dwar il-protezzjoni tal-konsumatur.
 
-**Qabel tmur il-qorti.** Ikkuntattjana fuq support@dezbatere.ro; il-biċċa l-kbira tal-affarijiet jistgħu jiġu solvuti, u nimmiraw li nwieġbu fi żmien 5 ijiem tax-xogħol. Jekk int konsumatur fir-Rumanija jew fl-UE, tista’ tuża s-soluzzjoni alternattiva għat-tilwim permezz ta’ www.onoratainstanta.ro; aħna ma nintrabtux li nipparteċipaw f’dik il-proċedura. Ilmenti dwar deċiżjonijiet ta’ moderazzjoni jsegwu t-taqsima 10, li hija rotta separata.
+**Qabel tmur il-qorti.** Ikkuntattjana fuq support@dezbatere.ro; il-biċċa l-kbira tal-affarijiet jistgħu jiġu solvuti, u nimmiraw li nwieġbu fi żmien 5 ijiem tax-xogħol. Jekk int konsumatur fir-Rumanija jew fl-UE, tista’ tuża s-soluzzjoni alternattiva għat-tilwim permezz ta’ ANPC (SAL), reclamatiisal.anpc.ro; aħna ma nintrabtux li nipparteċipaw f’dik il-proċedura. Ilmenti dwar deċiżjonijiet ta’ moderazzjoni jsegwu t-taqsima 10, li hija rotta separata.
 
 ## 19. Termini oħra
 
@@ -319,7 +325,7 @@ Kull entrata tapplika għall-persuni li jgħixu fir-reġjun tagħha, u tiddikjar
 
 ### A.1 L-Unjoni Ewropea u ż-Żona Ekonomika Ewropea
 
-Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ www.onoratainstanta.ro. **Il-Ġermanja:** il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. **Franza:** tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. **L-Italja:** il-klawżoli dwar is-sospensjoni u t-terminazzjoni (11), il-pjanijiet bi ħlas u t-tiġdid tagħhom (12), il-bidliet (14), ir-responsabbiltà (15) u l-liġi applikabbli u fejn jinstema’ t-tilwim (18) jeħtieġu l-approvazzjoni speċifika tiegħek skont l-artikoli 1341 u 1342 tal-Kodiċi Ċivili Taljan. Tagħtiha b’kaxxa separata waqt ir-reġistrazzjoni, murija lil kull min jagħżel l-Italja fil-qasam “Reġjun” jew li l-konnessjoni tiegħu tiġi mill-Italja. **Il-Pajjiżi l-Baxxi:** dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. **Il-Polonja:** verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa.
+Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ ANPC (SAL), reclamatiisal.anpc.ro. **Il-Ġermanja:** il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. **Franza:** tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. **L-Italja:** il-klawżoli dwar is-sospensjoni u t-terminazzjoni (11), il-pjanijiet bi ħlas u t-tiġdid tagħhom (12), il-bidliet (14), ir-responsabbiltà (15) u l-liġi applikabbli u fejn jinstema’ t-tilwim (18) jeħtieġu l-approvazzjoni speċifika tiegħek skont l-artikoli 1341 u 1342 tal-Kodiċi Ċivili Taljan. Tagħtiha b’kaxxa separata waqt ir-reġistrazzjoni, murija lil kull min jagħżel l-Italja fil-qasam “Reġjun” jew li l-konnessjoni tiegħu tiġi mill-Italja. **Il-Pajjiżi l-Baxxi:** dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. **Il-Polonja:** verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa.
 
 ### A.2 L-Istati Uniti
 
@@ -331,7 +337,7 @@ Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista�
 
 ### A.3 Il-Kanada u Quebec
 
-L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. **Quebec:** dawn it-Termini huma disponibbli bil-Franċiż; agħżel il-Franċiż bis-selettur tal-lingwa; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek.
+L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. **Quebec:** dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek.
 
 ### A.4 L-Awstralja u ż-Żelanda l-Ġdida
 

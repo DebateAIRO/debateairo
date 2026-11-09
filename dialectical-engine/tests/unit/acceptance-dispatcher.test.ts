@@ -60,7 +60,9 @@ describe("AcceptanceDispatcher", () => {
     // against a database in tests/integration/release-fences.test.ts; this checks only the wiring in the source.
     expect(acceptanceFailureRecorder({} as Pool)).toBeInstanceOf(WorkItemRepository);
     const source = readFileSync(new URL("../../acceptance/main.ts", import.meta.url), "utf8");
-    expect(source).toContain("new AcceptanceDispatcher(runner, acceptanceFailureRecorder(input.pool))");
+    // Upload check Task 6: the runner and its recorder share the runner's pool (input.pool unless one is given).
+    expect(source).toContain("const runnerPool = input.runnerPool ?? input.pool;");
+    expect(source).toContain("new AcceptanceDispatcher(runner, acceptanceFailureRecorder(runnerPool))");
     expect(source).toContain("workerId: ACCEPTANCE_WORKER_ID,");
     expect(source).not.toMatch(/new AcceptanceDispatcher\(runner, new WorkItemRepository\(/u);
   });
@@ -75,7 +77,7 @@ describe("AcceptanceDispatcher", () => {
     expect(source.match(/releaseKey: ACCEPTANCE_RELEASE_KEY\b/gu)).toHaveLength(3);
     expect(source).toContain("new WorkItemRepository(pool, { releaseKey: ACCEPTANCE_RELEASE_KEY, workerId: ACCEPTANCE_WORKER_ID })");
     expect(source).toMatch(
-      /new WalkingSkeletonRunner\(input\.pool, provider, \{\n {4}workerId: ACCEPTANCE_WORKER_ID,\n(?: {4}\/\/[^\n]*\n)* {4}releaseKey: ACCEPTANCE_RELEASE_KEY,/u
+      /new WalkingSkeletonRunner\(runnerPool, provider, \{\n {4}workerId: ACCEPTANCE_WORKER_ID,\n(?: {4}\/\/[^\n]*\n)* {4}releaseKey: ACCEPTANCE_RELEASE_KEY,/u
     );
     expect(source).toMatch(/new PostgresAskApplication\(input\.pool, dispatcher, \{[^}]*releaseKey: ACCEPTANCE_RELEASE_KEY,/u);
     // No second key anywhere: neither `legacy` nor a key built in place.

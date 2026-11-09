@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.12 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.17 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.12
+endMarker: HẾT ĐIỀU KHOẢN · v2.17
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.12 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.17 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -170,9 +170,9 @@ Trên gói trả phí, các cuộc tranh luận **mặc định là riêng tư**
 
 ## 10. Báo cáo nội dung, kiểm duyệt và khiếu nại
 
-**Bất kỳ ai cũng có thể báo cáo nội dung.** Bạn không cần tài khoản. Hãy viết đến support@dezbatere.ro. Nếu bạn đã đăng nhập, bạn cũng có thể sử dụng nút **Báo cáo** trên bất kỳ cuộc tranh luận công khai nào. AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai. Nếu AI đồng ý, cuộc tranh luận bị ẩn ngay lập tức và một người rà soát nó. Nếu không, bạn có thể báo cáo lại kèm thêm chi tiết, và một người sẽ đọc báo cáo đó. Để chúng tôi có thể hành động, hãy cho biết: lý do bạn tin rằng nội dung là bất hợp pháp hoặc vi phạm các Điều khoản này, với đủ chi tiết để hiểu khiếu nại; vị trí chính xác — URL đầy đủ và, nếu có thể, đoạn liên quan; tên và địa chỉ email của bạn (không bắt buộc đối với báo cáo về tài liệu xâm hại tình dục trẻ em); và xác nhận rằng bạn thực sự tin báo cáo của mình là chính xác và đầy đủ.
+**Bất kỳ ai cũng có thể báo cáo nội dung.** Bạn không cần tài khoản. Hãy viết đến support@dezbatere.ro. Nếu bạn đã đăng nhập, bạn cũng có thể sử dụng nút **Báo cáo** trên bất kỳ cuộc tranh luận công khai nào; nút này yêu cầu bạn xác nhận rằng bạn tin một cách thiện chí rằng báo cáo của mình là chính xác và đầy đủ. AI thường đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai. Nếu AI đồng ý và cuộc tranh luận chưa từng bị ẩn trước đó, cuộc tranh luận bị ẩn ngay lập tức mà không có sự tham gia của con người, sau đó một người rà soát nó. Thay vào đó, báo cáo được chuyển thẳng đến một người khi cuộc tranh luận đã từng bị ẩn trước đó, khi bạn đã báo cáo nó rồi, hoặc khi lượt kiểm tra tự động trong ngày đã hết. Nếu AI không đồng ý, hoặc báo cáo bị dừng tự động (ví dụ vì bạn đã gửi nhiều báo cáo trong vòng một giờ, hoặc vì cuộc tranh luận không công khai), sẽ không có người nào đọc báo cáo đó: bạn có thể viết đến support@dezbatere.ro và một người sẽ đọc thư của bạn, hoặc khiếu nại thông qua kênh khiếu nại của chúng tôi nêu dưới đây. Để chúng tôi có thể hành động, hãy cho biết: lý do bạn tin rằng nội dung là bất hợp pháp hoặc vi phạm các Điều khoản này, với đủ chi tiết để hiểu khiếu nại; vị trí chính xác — URL đầy đủ và, nếu có thể, đoạn liên quan; tên và địa chỉ email của bạn (không bắt buộc đối với báo cáo về tài liệu xâm hại tình dục trẻ em); và xác nhận rằng bạn thực sự tin báo cáo của mình là chính xác và đầy đủ.
 
-Chúng tôi xác nhận đã nhận mọi báo cáo mà không trì hoãn quá mức. Chúng tôi xử lý báo cáo một cách kịp thời, thận trọng, không tùy tiện và khách quan, thông báo quyết định và cách bạn có thể phản đối quyết định đó. Khi sử dụng phương tiện tự động để xử lý hoặc quyết định một báo cáo, chúng tôi sẽ nêu rõ. Báo cáo về hình ảnh riêng tư được chia sẻ khi chưa có sự đồng ý sẽ được xử lý **trong vòng 48 giờ** kể từ khi nhận được yêu cầu hợp lệ.
+Chúng tôi xác nhận đã nhận mọi báo cáo mà không trì hoãn quá mức: ngay lập tức trên màn hình và, đối với báo cáo sẽ do một người đọc, qua email. Chúng tôi xử lý báo cáo một cách kịp thời, thận trọng, không tùy tiện và khách quan, thông báo quyết định qua email và cho bạn biết cách bạn có thể phản đối quyết định đó. Khi sử dụng phương tiện tự động để xử lý hoặc quyết định một báo cáo, chúng tôi sẽ nêu rõ. Báo cáo về hình ảnh riêng tư được chia sẻ khi chưa có sự đồng ý sẽ được xử lý **trong vòng 48 giờ** kể từ khi nhận được yêu cầu hợp lệ.
 
 **Hai loại quyết định tự động, được tách biệt.**
 
@@ -183,7 +183,7 @@ Chúng tôi xác nhận đã nhận mọi báo cáo mà không trì hoãn quá m
 
 **Vị trí của bước kiểm tra câu hỏi.** Bước kiểm tra câu hỏi tại mục 8 cũng không phải là quyết định bên trong công cụ. Đó là một công cụ tự động từ chối bắt đầu một cuộc tranh luận, không có người nào tham gia. Một câu hỏi đọc lên giống như lời của một người đang trong khủng hoảng, hoặc hỏi về phương pháp tự tử hay tự làm hại bản thân hoặc yêu cầu lời cổ vũ làm việc đó, nhận được một màn hình có số điện thoại hỗ trợ thay vì một lần từ chối.
 
-**Bản nêu lý do.** Bất cứ khi nào chúng tôi gỡ bỏ hoặc hạn chế khả năng hiển thị nội dung của bạn, hoặc đình chỉ hay chấm dứt tài khoản, chúng tôi cung cấp cho bạn bản nêu lý do: chúng tôi đã làm gì và phạm vi tác động, các sự kiện chúng tôi dựa vào và liệu chúng xuất phát từ báo cáo hay hoạt động kiểm tra của chính chúng tôi, có sử dụng phương tiện tự động hay không, căn cứ pháp lý hoặc hợp đồng, và cách bạn có thể phản đối quyết định: thông qua kênh khiếu nại của chúng tôi nêu dưới đây, thông qua một cơ quan giải quyết tranh chấp ngoài tòa án được chứng nhận theo Đạo luật Dịch vụ Số của EU, hoặc tại tòa án. Khi bước kiểm tra câu hỏi của chúng tôi từ chối một câu hỏi theo đoạn "Những câu hỏi không bắt đầu một cuộc tranh luận" tại mục 7, màn hình thông báo cho bạn chính là bản nêu lý do của chúng tôi cho việc đó: nó nêu rằng cuộc tranh luận đã không bắt đầu, rằng bước kiểm tra tự động của chúng tôi đã từ chối câu hỏi mà không có người nào tham gia, câu hỏi thuộc quy tắc nào của các Điều khoản này, và cách khiếu nại qua kênh dưới đây. Với một câu hỏi bị từ chối, chúng tôi không hứa thêm gì. Khi bước kiểm tra của chúng tôi xóa một cuộc tranh luận (mục 9), thông báo bạn thấy là bản nêu lý do của chúng tôi cho việc đó: nó nêu chúng tôi đã làm gì và phạm vi tác động, các sự kiện chúng tôi dựa vào, rằng không có người nào tham gia, quy tắc nào của các Điều khoản này được áp dụng, và cách khiếu nại qua kênh dưới đây; hai kênh còn lại mà đoạn này nêu vẫn dành cho bạn. Màn hình có số điện thoại hỗ trợ mà một câu hỏi đọc lên giống như lời của một người đang trong khủng hoảng nhận được là sự giúp đỡ, không phải bản nêu lý do.
+**Bản nêu lý do.** Bất cứ khi nào chúng tôi gỡ bỏ hoặc hạn chế khả năng hiển thị nội dung của bạn, hoặc đình chỉ hay chấm dứt tài khoản, chúng tôi cung cấp cho bạn bản nêu lý do: chúng tôi đã làm gì và phạm vi tác động, các sự kiện chúng tôi dựa vào và liệu chúng xuất phát từ báo cáo hay hoạt động kiểm tra của chính chúng tôi, có sử dụng phương tiện tự động hay không, căn cứ pháp lý hoặc hợp đồng, và cách bạn có thể phản đối quyết định: thông qua kênh khiếu nại của chúng tôi nêu dưới đây, thông qua một cơ quan giải quyết tranh chấp ngoài tòa án được chứng nhận theo Đạo luật Dịch vụ Số của EU, hoặc tại tòa án. Chúng tôi gửi bản này cho bạn qua email, kèm đường liên kết đến bản nêu lý do đầy đủ trong tài khoản của bạn tại Cài đặt, Thông báo kiểm duyệt, nơi bản đó được lưu giữ. Bạn cũng nhận được một bản nêu lý do khi nội dung của bạn rời khỏi một trang công khai cùng với nội dung khác mà chúng tôi đang rà soát, ngay cả khi nội dung của bạn không bị xác định là vi phạm bất kỳ quy tắc nào. Khi bước kiểm tra câu hỏi của chúng tôi từ chối một câu hỏi theo đoạn "Những câu hỏi không bắt đầu một cuộc tranh luận" tại mục 7, màn hình thông báo cho bạn chính là bản nêu lý do của chúng tôi cho việc đó: nó nêu rằng cuộc tranh luận đã không bắt đầu, rằng bước kiểm tra tự động của chúng tôi đã từ chối câu hỏi mà không có người nào tham gia, câu hỏi thuộc quy tắc nào của các Điều khoản này, và cách khiếu nại qua kênh dưới đây. Với một câu hỏi bị từ chối, chúng tôi không hứa thêm gì. Khi bước kiểm tra của chúng tôi xóa một cuộc tranh luận (mục 9), thông báo bạn thấy là bản nêu lý do của chúng tôi cho việc đó: nó nêu chúng tôi đã làm gì và phạm vi tác động, các sự kiện chúng tôi dựa vào, rằng không có người nào tham gia, quy tắc nào của các Điều khoản này được áp dụng, và cách khiếu nại qua kênh dưới đây; hai kênh còn lại mà đoạn này nêu vẫn dành cho bạn. Màn hình có số điện thoại hỗ trợ mà một câu hỏi đọc lên giống như lời của một người đang trong khủng hoảng nhận được là sự giúp đỡ, không phải bản nêu lý do.
 
 **Khiếu nại về quyết định.** Nếu không đồng ý với một quyết định kiểm duyệt, hãy trả lời bản nêu lý do hoặc viết đến office@dezbatere.ro trong vòng **sáu tháng**. Một người không tham gia vào quyết định ban đầu sẽ rà soát quyết định và chúng tôi thông báo cho bạn kết quả kèm lý do. Điều này không ảnh hưởng đến quyền khởi kiện ra tòa hoặc sử dụng cơ chế giải quyết tranh chấp thay thế theo mục 18. Kênh khiếu nại cũng tiếp nhận khiếu nại rằng chúng tôi đã không xử lý một báo cáo, nội dung đã bị gỡ bỏ sai, tài khoản đã bị hạn chế sai hoặc công cụ tự động đã tác động sai đến nội dung của bạn, ví dụ bằng cách từ chối một câu hỏi.
 
@@ -211,11 +211,9 @@ Các mục 8 (đối với nội dung đã được công khai), 15, 16 và 18 t
 
 ## 12. Gói trả phí
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine cung cấp một gói miễn phí. Ba gói trả phí, **Plus**, **Pro** và **Max**, sẽ được cung cấp; mỗi gói mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
 
-Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả phí sẽ được cung cấp, mở khóa toàn bộ danh sách mô hình và cho phép bạn tự thiết lập các thước đo tranh luận.
-
-**Trước khi bạn thanh toán**, ngay phía trên nút thanh toán, chúng tôi hiển thị: gói dịch vụ; tổng giá gồm thuế áp dụng; kỳ thanh toán; thông tin rằng gói dịch vụ tự động gia hạn cho đến khi bị hủy; ngày kết thúc mọi thời gian dùng thử miễn phí và khoản tiền bạn sẽ phải trả sau đó; cùng cách hủy. Bạn xác nhận điều khoản gia hạn bằng cách đánh dấu vào một ô riêng. Nút này ghi **Đăng ký và thanh toán** (bằng tiếng Romania, *Comandă cu obligație de plată*). Chúng tôi gửi cho bạn xác nhận trên một phương tiện bền vững có cùng thông tin, các Điều khoản này và biểu mẫu rút lui.
+**Trước khi bạn thanh toán**, ngay phía trên nút thanh toán, chúng tôi hiển thị: gói dịch vụ; tổng giá gồm thuế áp dụng; kỳ thanh toán; thông tin rằng gói dịch vụ tự động gia hạn cho đến khi bị hủy; ngày kết thúc mọi thời gian dùng thử miễn phí và khoản tiền bạn sẽ phải trả sau đó; cùng cách hủy. Bạn xác nhận điều khoản gia hạn bằng cách đánh dấu vào một ô riêng. Nút này ghi **Đăng ký và thanh toán** (bằng tiếng Romania, *Abonați-vă și plătiți*). Chúng tôi gửi cho bạn xác nhận trên một phương tiện bền vững có cùng thông tin, các Điều khoản này và biểu mẫu rút lui.
 
 **Nhắc nhở.** Chúng tôi gửi email cho bạn ít nhất 5 ngày trước khi gói dùng thử miễn phí chuyển thành gói trả phí; ít nhất mỗi năm một lần đối với gói đang tiếp tục; và trong khoảng từ 30 đến 45 ngày trước mỗi lần gia hạn kỳ hạn từ mười hai tháng trở lên. Mỗi thông báo nhắc nhở đều gồm giá, ngày và liên kết hủy.
 
@@ -225,7 +223,7 @@ Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả ph�
 
 **Thanh toán không thành công.** Nếu một khoản thanh toán không thành công, chúng tôi thử lại trong 7 ngày và cảnh báo bạn qua email trước khi hạ tài khoản xuống gói miễn phí. Chúng tôi không xóa các cuộc tranh luận của bạn vì một khoản thanh toán không thành công.
 
-**Thuế và bên bạn thanh toán.** Giá đã bao gồm VAT, GST hoặc thuế bán hàng, tùy thuộc nơi bạn sống và được hiển thị trước khi thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này.
+**Thuế và bên bạn thanh toán.** Giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT (hoặc GST hay thuế bán hàng, tùy thuộc nơi bạn sống). Thuế theo địa chỉ thanh toán của bạn được cộng thêm ở trang thanh toán, và trang thanh toán hiển thị tổng số tiền bạn phải trả, đã gồm thuế, trước khi bạn thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này.
 
 **Phương thức thanh toán.** Bạn thanh toán bằng thẻ. Chúng tôi chấp nhận Visa và Mastercard; chúng tôi không chấp nhận American Express. Thanh toán bằng thẻ được xử lý bởi NETOPIA Payments (netopia-payments.com), và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi.
 
@@ -233,7 +231,7 @@ Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả ph�
 
 **Yêu cầu hoàn tiền qua tổ chức phát hành thẻ.** Nếu bạn tranh chấp một khoản phí với tổ chức phát hành thẻ, chúng tôi có thể đình chỉ các tính năng trả phí trong khi tranh chấp được giải quyết. Chúng tôi không thu phí cho việc này.
 
-**Quyền theo luật định được ưu tiên.** Khi dịch vụ không phù hợp với những gì chúng tôi cam kết, bạn có quyền yêu cầu đưa dịch vụ về trạng thái phù hợp, hoặc được giảm giá tương ứng hay hoàn tiền, theo quy định pháp luật. Ngoài ra, nếu bạn hủy gói trả phí trong một kỳ thanh toán, chúng tôi hoàn lại phần giá của kỳ đó mà bạn chưa dùng, tính theo mức sử dụng gói, dù đã trôi qua bao nhiêu ngày: nếu bạn đã dùng 30% gói, chúng tôi hoàn lại 70%; nếu bạn chưa dùng gì, chúng tôi hoàn lại toàn bộ giá. Hãy yêu cầu tại support@dezbatere.ro; khi chúng tôi đã hoàn tiền, gói sẽ chấm dứt. Nếu quyền rút lui tại mục 13 cũng được áp dụng, bạn nhận khoản hoàn tiền nào lớn hơn. Giới hạn sử dụng của từng gói được công bố trong sản phẩm; chúng tôi sẽ thông báo trước khi siết chặt các giới hạn theo cách ảnh hưởng đáng kể đến bạn.
+**Quyền theo luật định được ưu tiên.** Khi dịch vụ không phù hợp với những gì chúng tôi cam kết, bạn có quyền yêu cầu đưa dịch vụ về trạng thái phù hợp, hoặc được giảm giá tương ứng hay hoàn tiền, theo quy định pháp luật. Ngoài ra, nếu bạn hủy gói trả phí trong một kỳ thanh toán, chúng tôi hoàn lại phần giá của kỳ đó mà bạn chưa dùng, tính theo mức sử dụng gói, dù đã trôi qua bao nhiêu ngày: nếu bạn đã dùng 30% gói, chúng tôi hoàn lại 70%; nếu bạn chưa dùng gì, chúng tôi hoàn lại toàn bộ giá. Hãy yêu cầu tại support@dezbatere.ro; khi chúng tôi đã hoàn tiền, gói sẽ chấm dứt. Nếu quyền rút lui tại mục 13 cũng được áp dụng, bạn nhận khoản hoàn tiền nào lớn hơn. Giới hạn sử dụng của mọi gói được công bố trong sản phẩm; chúng tôi sẽ thông báo trước khi siết chặt các giới hạn theo cách ảnh hưởng đáng kể đến bạn.
 
 ## 13. Quyền rút lui của bạn
 
@@ -250,6 +248,16 @@ Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc
 Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng **30 ngày** kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng.
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
+
+Phiên bản 2.17 thay thế phiên bản 2.16: mục 10 nêu rõ khi nào AI đọc báo cáo được gửi bằng nút Báo cáo và khi nào một người đọc, rằng nút này yêu cầu bạn tuyên bố thiện chí, rằng chúng tôi xác nhận báo cáo và thông báo quyết định cho bạn qua email, và rằng các bản nêu lý do được gửi qua email và lưu giữ trong tài khoản của bạn; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
+
+Phiên bản 2.16 thay thế phiên bản 2.15: mục 12 nêu tên các gói trả phí, Plus, Pro và Max, và các mục 12 và 15 không còn chứa ghi chú soạn thảo; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
+
+Phiên bản 2.15 thay thế phiên bản 2.14: mục 12 nêu rằng giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT, và rằng thuế được cộng thêm ở trang thanh toán.
+
+Phiên bản 2.14 thay thế phiên bản 2.13: mục 18 và Phụ lục A nêu ANPC (SAL) là kênh giải quyết tranh chấp thay thế.
+
+Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu dòng chữ tiếng Romania trên nút thanh toán.
 
 Phiên bản 2.12 thay thế phiên bản 2.11: mục 10 nêu rằng người đã đăng nhập cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào, rằng AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai, và điều gì xảy ra sau đó.
 
@@ -273,8 +281,6 @@ Phiên bản 2.7 thay thế phiên bản 2.6: phiên bản này bổ sung bướ
 
 **Sự kiện nằm ngoài sự kiểm soát của chúng tôi.** Chúng tôi không vi phạm hợp đồng khi bị ngăn cản thực hiện nghĩa vụ bởi một sự việc nằm ngoài khả năng kiểm soát hợp lý. Việc một nhà cung cấp mô hình bên thứ ba không thực hiện nghĩa vụ hoặc rút dịch vụ không tự động cấu thành sự việc như vậy; khi việc đó khiến dịch vụ không thể sử dụng, mục 14 được áp dụng và bạn có thể chấm dứt cũng như được hoàn tiền theo mô tả tại mục đó.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Sở hữu trí tuệ
 
 Bản thân dịch vụ — phần mềm, công cụ, phương pháp chấm điểm, giao diện, tên Dialectical Engine và DebateAIRO cùng các biểu trưng của chúng tôi — thuộc về chúng tôi hoặc bên cấp phép của chúng tôi. Các Điều khoản này cho phép bạn sử dụng dịch vụ chứ không trao cho bạn quyền sở hữu dịch vụ.
@@ -297,7 +303,7 @@ Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong **Ch
 
 **Người tiêu dùng tại nơi khác.** Nếu sống ngoài EU và EEA, không nội dung nào trong các Điều khoản này hạn chế bất kỳ quyền nào bạn có theo pháp luật quốc gia của mình để khởi kiện tại tòa án của quốc gia đó, hoặc bất kỳ quyền nào theo pháp luật đó mà không thể từ bỏ — bao gồm quyền bảo đảm của người tiêu dùng nếu bạn sống tại Australia hoặc New Zealand; Código de Defesa do Consumidor nếu bạn sống tại Brazil; và luật bảo vệ người tiêu dùng của tiểu bang nếu bạn sống tại Hoa Kỳ.
 
-**Trước khi khởi kiện ra tòa.** Hãy liên hệ với chúng tôi tại support@dezbatere.ro; hầu hết vấn đề đều có thể khắc phục, và chúng tôi đặt mục tiêu trả lời trong vòng 5 ngày làm việc. Nếu là người tiêu dùng tại Romania hoặc EU, bạn có thể sử dụng phương thức giải quyết tranh chấp thay thế thông qua www.onoratainstanta.ro; chúng tôi không cam kết tham gia thủ tục đó. Khiếu nại về quyết định kiểm duyệt tuân theo mục 10, là một kênh riêng biệt.
+**Trước khi khởi kiện ra tòa.** Hãy liên hệ với chúng tôi tại support@dezbatere.ro; hầu hết vấn đề đều có thể khắc phục, và chúng tôi đặt mục tiêu trả lời trong vòng 5 ngày làm việc. Nếu là người tiêu dùng tại Romania hoặc EU, bạn có thể sử dụng phương thức giải quyết tranh chấp thay thế thông qua ANPC (SAL), reclamatiisal.anpc.ro; chúng tôi không cam kết tham gia thủ tục đó. Khiếu nại về quyết định kiểm duyệt tuân theo mục 10, là một kênh riêng biệt.
 
 ## 19. Các điều khoản khác
 
@@ -319,7 +325,7 @@ Mỗi mục áp dụng cho người sống tại khu vực tương ứng và ch�
 
 ### A.1 Liên minh Châu Âu và Khu vực Kinh tế Châu Âu
 
-Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua www.onoratainstanta.ro. **Đức:** nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. **Pháp:** bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. **Ý:** các điều khoản về đình chỉ và chấm dứt (11), gói trả phí và việc gia hạn (12), thay đổi (14), trách nhiệm (15) cũng như luật điều chỉnh và nơi giải quyết tranh chấp (18) cần sự chấp thuận cụ thể của bạn theo Điều 1341 và Điều 1342 của Bộ luật Dân sự Ý. Bạn đưa ra chấp thuận này bằng một ô riêng khi đăng ký, ô này được hiển thị cho bất kỳ ai chọn Ý trong trường Khu vực hoặc có kết nối đến từ Ý. **Hà Lan:** các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. **Ba Lan:** có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ.
+Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua ANPC (SAL), reclamatiisal.anpc.ro. **Đức:** nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. **Pháp:** bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. **Ý:** các điều khoản về đình chỉ và chấm dứt (11), gói trả phí và việc gia hạn (12), thay đổi (14), trách nhiệm (15) cũng như luật điều chỉnh và nơi giải quyết tranh chấp (18) cần sự chấp thuận cụ thể của bạn theo Điều 1341 và Điều 1342 của Bộ luật Dân sự Ý. Bạn đưa ra chấp thuận này bằng một ô riêng khi đăng ký, ô này được hiển thị cho bất kỳ ai chọn Ý trong trường Khu vực hoặc có kết nối đến từ Ý. **Hà Lan:** các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. **Ba Lan:** có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ.
 
 ### A.2 Hoa Kỳ
 
@@ -331,7 +337,7 @@ Phần nội dung chung của các Điều khoản này được soạn cho bạ
 
 ### A.3 Canada và Quebec
 
-Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. **Quebec:** các Điều khoản này được cung cấp bằng tiếng Pháp; hãy chọn tiếng Pháp bằng bộ chuyển đổi ngôn ngữ; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình.
+Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. **Quebec:** các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình.
 
 ### A.4 Australia và New Zealand
 

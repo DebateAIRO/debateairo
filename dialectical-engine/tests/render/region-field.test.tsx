@@ -120,7 +120,7 @@ describe("RegionField artboard states", () => {
     expect(query("#signup-region-trigger").getAttribute("aria-controls")).toBe("signup-region-popover");
     expect(query(".regionHeader").textContent).toBe("CONTINENT");
     expect(all<HTMLElement>(".regionContinent .regionContinentName").map((row) => row.textContent)).toEqual([...REGION_CONTINENTS]);
-    expect(all<HTMLElement>(".regionContinent .regionCount").map((row) => row.textContent)).toEqual(["12", "12", "33", "10", "5", "7", "3"]);
+    expect(all<HTMLElement>(".regionContinent .regionCount").map((row) => row.textContent)).toEqual(["12", "12", "35", "10", "5", "7", "3"]);
     expect(all<HTMLElement>(".regionContinent").every((row) => row.textContent?.endsWith("›"))).toBe(true);
   });
 
@@ -131,7 +131,7 @@ describe("RegionField artboard states", () => {
     expect(query(".regionBack").textContent).toBe("‹ Continents");
     expect(query(".regionContinentTitle").textContent).toBe("Europe");
     const cells = all<HTMLElement>(".regionCountry");
-    expect(cells).toHaveLength(33);
+    expect(cells).toHaveLength(35);
     expect([cells[0]?.dataset.code, cells[0]?.querySelector(".regionCellName")?.textContent]).toEqual(["AT", "Austria"]);
     expect([cells.at(-1)?.dataset.code, cells.at(-1)?.querySelector(".regionCellName")?.textContent]).toEqual(["GB", "United Kingdom"]);
     for (const cell of cells) expect(cell.querySelector(".regionCellFlag")?.textContent).toBe(regionFlag(cell.dataset.code!));
@@ -164,7 +164,7 @@ describe("RegionField artboard states", () => {
     await click("#signup-region-trigger");
     expect(host.querySelector(".regionHeader")).toBeNull();
     expect(query('.regionCountry[data-code="RO"]').getAttribute("data-picked")).toBe("true");
-    expect(all<HTMLElement>('.regionCountry[data-picked="false"]')).toHaveLength(32);
+    expect(all<HTMLElement>('.regionCountry[data-picked="false"]')).toHaveLength(34);
   });
 
   it("E7 closes by trigger, Escape and outside press while keeping the pick", async () => {

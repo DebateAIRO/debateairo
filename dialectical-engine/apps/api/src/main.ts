@@ -1,4 +1,4 @@
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket } from "@debateai/providers";
 import { type QuestionLanguagePolicy } from "@debateai/register";
 import { questionLanguageSiteRoute } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -23,6 +23,8 @@ import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
 import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
+import { PostgresModerationStatementRepository, PostgresPublicFlagMailRepository } from "@debateai/db";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "./moderation-statements.js";
 import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
@@ -34,6 +36,7 @@ import {
   ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS, ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify, sweepAskClarifyReservations
 } from "./ask-clarify.js";
 import { continuedRunWake, runHandoverOf } from "./month-pause.js";
+import { PostgresOutboundMailStore } from "../../../packages/db/src/outbound-mail.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -100,6 +103,7 @@ import {
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
+  readOutboundMailPolicy,
   readPublicationCheckPolicy,
   readAbuseLimits,
   readQuestionCheckPolicy,
@@ -196,6 +200,7 @@ import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { systemMailDomainCheck } from "./mail-domain-check.js";
+import { OutboundMailGate, outboundMailReport } from "./outbound-mail-gate.js";
 import { EmailChangeService } from "./email-change.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import {
@@ -984,6 +989,31 @@ const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
 // Ruling 2026-10-09: outside local mode the special-use endings (.test .example .invalid .localhost) are refused.
 const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE, abuseLimits.mailDomainChecksPerMinute);
+// The daily outbound mail limit (owner's rulings of 2026-11-01): every account-mail sender below asks this one gate just
+// before it starts MAIL_SENDMAIL_PATH (address rule, suppression, the day's count). The limits are the register's
+// outboundMailPolicy row (a version without it refuses here, OUTBOUND_MAIL_POLICY_UNRESOLVED). The count is in the
+// database (migration 0170), so it survives restarts and uploads and every API copy shares it.
+const outboundMailPolicy = await boot.run("outbound-mail-policy", () => readOutboundMailPolicy(pool, environment.REGISTER_VERSION));
+const outboundMailStore = new PostgresOutboundMailStore(pool);
+// A login that cannot read the count would refuse every mail at run time; say so at the start instead.
+await boot.run("outbound-mail-store", () => attestEveryRoute(() => outboundMailStore.today()));
+const outboundMailGate: OutboundMailGate = new OutboundMailGate({
+  policy: outboundMailPolicy,
+  blindIndexKey,
+  ledger: outboundMailStore,
+  suppression: outboundMailStore,
+  report: (event) => { reportOutboundMail(event); }
+});
+// The owner's alert goes to the billing owner's address when the site has one; otherwise the journal line is the alert.
+const reportOutboundMail = outboundMailReport({
+  ownerAddress: billingConnectors?.ownerReportEmail,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  })
+});
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -991,7 +1021,8 @@ const registration = new RegistrationService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   dekStore,
   blindIndexKey,
@@ -1004,7 +1035,9 @@ const registration = new RegistrationService({
   argon2: argon2Pool,
   // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
   legalAcceptance: { recordsKey },
-  mailDomainCheck
+  mailDomainCheck,
+  // At the limit, sign-up and resend answer MAIL_DAILY_LIMIT ("try later") before any account work.
+  outboundMail: outboundMailGate
 });
 // Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
 // Hosted: an account with no record owes both documents (it must accept before it can pay).
@@ -1031,7 +1064,7 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   blindIndexKey
 }));
 const socialAuth = new SocialAuthService(socialRepository,socialProviders,sessions.consumerProducer(),{registration,security:new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),authPolicy,blindIndexKey});
-const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
+const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL,gate:outboundMailGate});
 const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
 const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
@@ -1039,7 +1072,7 @@ const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepos
 // COR-B1, V-12: the request path runs on the T1 login, the notification worker on the target: both are attested.
 if(passwordResetRepository)await boot.run("password-reset-role",()=>attestEveryRoute(()=>passwordResetRepository.assertRole()));
 const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
-const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
 let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
 const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
@@ -1048,7 +1081,7 @@ if(backupEmailRepository)await boot.run("backup-email-role",()=>attestEveryRoute
 if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>attestEveryRoute(()=>mfaRecoveryRepository.assertRole()));
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
-const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
+const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate});
 const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
 const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
 let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
@@ -1113,7 +1146,8 @@ const recoveryEmail = new RecoveryEmailService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -1125,7 +1159,8 @@ const emailChange = new EmailChangeService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -1257,7 +1292,8 @@ const threatReportAlertsTimer = startThreatReportAlerts({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readRecipientEmail: readThreatReportStaffEmail
 }, releaseWatcher);
@@ -1266,7 +1302,8 @@ const teamLimitNoticesTimer = startTeamLimitNotices({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
@@ -1276,7 +1313,8 @@ const allowanceNoticesTimer = startTeamLimitNotices({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
@@ -1286,7 +1324,8 @@ const publicReviewNoticesTimer = startTeamLimitNotices({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
@@ -1296,10 +1335,34 @@ const publicFlagNoticesTimer = startTeamLimitNotices({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readEmail: readThreatReportRecipientEmail
 }, releaseWatcher);
+// 0157: every person a review step affects gets a statement of reasons (DSA Art 17). It replaces 0156's content-free notice: this release no longer
+// claims 0156's queue, so nobody gets both from it; twelve months on, the typed facts and the quote go.
+const moderationStatementRepository = new PostgresModerationStatementRepository(pool);
+const moderationStatements = new ModerationStatementReconciler(moderationStatementRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs,
+  gate: outboundMailGate
+}), environment.PUBLIC_APP_URL);
+// 0157 (D4): the answers to people who report, and the sweep of a report left CHECKING (it goes to a person after five minutes).
+const publicFlagMailRepository = new PostgresPublicFlagMailRepository(pool);
+const publicFlagAnswers = new PublicFlagAnswerReconciler(publicFlagMailRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs,
+  gate: outboundMailGate
+}), environment.PUBLIC_APP_URL);
+const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(async () => {
+  await moderationStatements.reconcile(100);
+  await publicFlagAnswers.reconcile(100);
+  await publicFlagMailRepository.settleStuck();
+  await moderationStatementRepository.deleteWordsDue();
+}, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
@@ -1315,7 +1378,8 @@ const erasureNotifications = new AccountErasureNotificationReconciler(
   accountErasureRepository,dekStore,new SendmailSecurityNotificationSender({
     executable:environment.MAIL_SENDMAIL_PATH,
     from:environment.MAIL_FROM,
-    timeoutMs:authPolicy.channel.transportTimeoutMs
+    timeoutMs:authPolicy.channel.transportTimeoutMs,
+    gate:outboundMailGate
   })
 );
 const reconciliationSource = () => Object.freeze({
@@ -1494,7 +1558,8 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
     spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   },
   clock: () => new Date(),
-  report: line => console.error(JSON.stringify(line))
+  report: line => console.error(JSON.stringify(line)),
+  preview: previewGate === undefined ? null : { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") }
 }));
 const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
 const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
@@ -1700,7 +1765,8 @@ const billingRuntime = billingConnectors === null
         sender: new TemplatedMailSender({
           executable: environment.MAIL_SENDMAIL_PATH,
           from: environment.MAIL_FROM,
-          timeoutMs: authPolicy.channel.transportTimeoutMs
+          timeoutMs: authPolicy.channel.transportTimeoutMs,
+          gate: outboundMailGate
         }),
         attachments: billingMailAttachmentResolvers({ audit: consoleBillingAudit })
       },
@@ -1754,7 +1820,8 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   const mail = new TemplatedDataExportMail(new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }));
   const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures, synthesisAnswerAccess };
   dataExport = new DataExportApplication({
@@ -1853,6 +1920,9 @@ const api = buildApi({
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
     log: (event: string, detail: Record<string, unknown>) => { console.error(JSON.stringify({ event, ...detail })); }
   } }),
+  // 0157 (D1): the person's own statements of reasons, their facts opened under the debate's key as the two accounts' review opens them.
+  ...(publications === undefined ? {} : { moderationStatements: { repository: moderationStatementRepository,
+    withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
   ...(publications === undefined ? {} : { publicTree: {
     pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef)
@@ -2002,6 +2072,7 @@ api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
+api.addHook("onClose",async () => clearInterval(moderationNoticesTimer));
 api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
@@ -2049,6 +2120,12 @@ const startup = installStartupResourceOwner({
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
     ...(dataExportPool === undefined ? [] : [dataExportPool]),
     supportPool,
+    // Row-level security S01: the two system pools close last among the pools, after every pool that routes to them as
+    // its cross-account target (pool and legacyAskAdmissionPool to systemPool, authorizationPool to
+    // authorizationSystemPool; setCrossAccountTarget above). Left open, their idle connections kept the process alive
+    // after SIGTERM until a supervisor killed it (preview-auth-dev-startup, 2026-11-08).
+    systemPool,
+    ...(authorizationSystemPool === systemPool ? [] : [authorizationSystemPool]),
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() },
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).

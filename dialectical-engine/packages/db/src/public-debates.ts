@@ -40,6 +40,8 @@ export type PublicContributionRead = Readonly<{
   /** Decision 33, on the person's own read only: their dig was taken off the page after a review; or it was running when the debate was hidden, and stays their own. */
   removed_after_review?: boolean;
   kept_private_after_review?: boolean;
+  /** 0157 (gap 5): allowed, but off the public page while a review runs (its debate is hidden, or an earlier dig was taken out and this one not put back). */
+  off_for_review?: boolean;
 }>;
 export type PublicDigPick = Readonly<{
   kind: string; suggestion_id: string | null; place: string; author: string; content: unknown; attestation: string;
@@ -65,8 +67,13 @@ export class PostgresPublicDebateRepository {
 
   /** The person's own contributions around a debate, refused ones too: they stay private to the person. */
   async readOwn(ownerRef: string, runId: string): Promise<readonly PublicContributionRead[]> {
-    return (await this.pool.query<{ own: PublicContributionRead[] }>(
+    const own = (await this.pool.query<{ own: PublicContributionRead[] }>(
       "SELECT identity.read_own_public_contributions($1,$2) AS own", [ownerRef, runId])).rows[0]!.own;
+    // 0157 (gap 5): what a review does to each, read beside 0150's own line, which cannot change.
+    const review = (await this.pool.query<{ own: { dig_run_id: string; off_for_review: boolean }[] }>(
+      "SELECT identity.read_own_contribution_review($1,$2) AS own", [ownerRef, runId])).rows[0]!.own;
+    const off = new Set(review.filter((row) => row.off_for_review).map((row) => row.dig_run_id.toLowerCase()));
+    return own.map((row) => ({ ...row, off_for_review: off.has(row.dig_run_id.toLowerCase()) }));
   }
 
   /** The ask showed the Free notice: this debate, and only such a debate, goes public when finished. */

@@ -51,6 +51,7 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `taxAuthorities` | optional: where and when each tax is paid, in plain words, for the quarterly tax summary. Left out, the code-owned `taxAuthorities` row is published unchanged; include the member to correct the text. The example carries the member, equal to the code-owned text, so a file copied from it seals that copy under your own `sourceRef`: the code-owned "research of 29 September 2026, for the accountant to confirm" provenance is dropped, and a later correction of the code-owned row never reaches your versions while your file keeps the member. Delete the member from your copy unless you are correcting the text | the register's own parser — `TAX_AUTHORITIES_INVALID` (a `null` member is refused too) |
 | `publicationCheckPolicy` | optional, and NOT in the example: the deadline of the safety check that runs before a debate is published, as `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": 60000}`, in whole milliseconds from 1000 to 60000 (60 seconds is the spec's cap, and the website waits 85 seconds for a publish). Left out, the code-owned `publicationCheckPolicy` row is published unchanged (60000); include the member only to change the deadline. A check that runs out of time refuses the publish, so a shorter deadline can only refuse more publishes, never skip the check | the register's own parser — `PUBLICATION_CHECK_POLICY_INVALID` (a `null` member is refused too) |
 | `questionCheckPolicy` | optional, and NOT in the example: the deadline of the question check that runs before a debate starts, as `{"kind": "QUESTION_CHECK_POLICY", "deadline_ms": 15000}`, in whole milliseconds from 1000 to 15000. Left out, the code-owned `questionCheckPolicy` row is published unchanged | the register's own parser — `QUESTION_CHECK_POLICY_INVALID` |
+| `outboundMailPolicy` | optional, and NOT in the example: the daily mail limit, as `{"kind": "OUTBOUND_MAIL_POLICY", "daily_limit": 10000, "reserved_for_security_pct": 20, "alert_at_pct": 50}`. `daily_limit` is a whole number from 1 to 1000000, `reserved_for_security_pct` from 0 to 90 and `alert_at_pct` from 1 to 100. Left out, the code-owned row (2000 a day, the preview's) is sealed. **The live site's file must carry this member with 10000.** |
 | `answerRoleRotation` | optional, and NOT in the example: `{ "enabled": true }` turns on per-debate role rotation (spec 2026-10-11). When a debate's panel has models from two or more companies, each of its four jobs (the answer writer, the answer checker, the storyteller and the story checker) goes to the model on that panel that has done that job least often so far, and the choice is kept for that debate. `{ "enabled": false }` seals the switch off. Left out, no row is published and the engine keeps its fixed roles. Turn it on only after migration 0114 is applied (`deploy/vps/README.md` §11, "Upgrading to role rotation") | the command's own check — `HOSTED_REGISTER_ROLE_ROTATION_INVALID` (the member must be exactly `enabled`, a boolean; a `null` member is refused too) |
 | `callConcurrencyPolicy` | optional, and NOT in the example: how many AI calls may run at the same time. `perDebate` is the number inside one debate (1 to 64), `perModelPerDebate` the number to one AI inside one debate (1 to 16), and `perModelPerRunner` the number to one AI across all debates, one value per vendor name in lower case, each from 1 to 1000, with a required `default`. The member is one object with no `kind`, for example `{ "perDebate": 12, "perModelPerDebate": 3, "perModelPerRunner": { "default": 50, "deepinfra": 150, "anthropic": 50 } }` (the owner's start values). Left out, no row is sealed and the runner makes one call at a time per debate. See "The call-concurrency setting" below | the command's own check — `HOSTED_REGISTER_CALL_CONCURRENCY_INVALID` (a member that is not an object or carries `kind`, an extra top-level key, a number that is not a whole number in its range, a vendor name that is not lower case, a missing `default`, or a `null` member) |
 | `debateShapePolicy` | optional, and NOT in the example: the debate shape's per-plan sizes and answer lengths (spec 2026-10-12 §3.1), the policy without its `kind`. Absent: today's debate shape. The runner argues the shape; a version that seals this member also seals `mapContractHash` (with `judgeContractHash` and `composerContractHash`, from the same code: the plan builds them from the code it runs), and the runner refuses a version whose `mapContractHash` is missing (`DEBATE_SHAPE_MAP_HASH_UNSEALED`) or is not its own (`MAP_CONTRACT_HASH_MISMATCH`). When the member is present the plan prints `debate_shape=present`, and the publish's own start-up check asks the runner's question (`HOSTED_REGISTER_NOT_BOOT_READY`, `HOSTED_REGISTER_BOOT_CHECK_FAILED:<code>`). To switch the shape off without dropping the row, add `"enabled": false` to the member: the API then asks today's shape, and a runner on that version still finishes the debates admitted with the shape | the command's own check — `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` (a member that is not an object or carries `kind`, a `null` member, or a value the register's own parser refuses) |
@@ -81,26 +82,34 @@ switch later is a new version, never an edit of a sealed one.
 
 ## Closing payment in a region
 
-Some places inside an open country need their own tax registration before the site may sell there. The
-`regions` member of `countryPolicy` closes payment in them. People there can still sign up and use the
-Free plan; only paying is refused. The site finds the region from the billing address the buyer types (the
-postal code, or the state or province), not from the internet address.
+Some places inside an open country need their own tax registration before the site may sell there, and the Terms
+exclude one, Tennessee. The `regions` member of `countryPolicy` closes payment in them. People in a tax region can
+still sign up and use the Free plan; only paying is refused. The site finds the region from the billing address the
+buyer types (the postal code, or the state or province), not from the internet address.
 
 `country-policy.example.json` carries the owner's launch list of 20 October 2026 (the research is in the payment
-region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`):
+region blocks spec, `docs/superpowers/specs/2026-10-20-payment-region-blocks-design.md`), and Tennessee:
 
 - Canada: Saskatchewan (`CA-SK`), Manitoba (`CA-MB`);
-- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, `US-NJ`, and Ohio (`US-OH`) for
-  business buyers only;
+- United States: `US-DC`, `US-HI`, `US-MD`, `US-RI`, `US-VT`, `US-WV`, and Ohio (`US-OH`) for business buyers
+  only. New Jersey (`US-NJ`) was on the list too until the owner opened it on 4 November 2026;
 - the EU places outside the EU VAT area: `ES-CN` (Canary Islands), `ES-CE` (Ceuta), `ES-ML` (Melilla),
   `FR-971` (Guadeloupe, with Saint-Martin and Saint-Barthélemy), `FR-972` (Martinique), `FR-973` (French
   Guiana), `FR-974` (Réunion), `FR-976` (Mayotte), `FI-01` (Åland), `GR-69` (Mount Athos), `IT-LIVIGNO`,
-  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen).
+  `IT-CAMPIONE` (Campione d'Italia), `DE-HELGOLAND` (Heligoland), `DE-BUESINGEN` (Büsingen);
+- Tennessee (`US-TN`), for every buyer, because the Terms exclude it (section 2 and Annex A.2, the owner's
+  amendment of 8 October 2026). Sign-up already refuses a person who declares Tennessee (`us_states`); this entry
+  refuses a Tennessee billing address too, so someone who declared another state still cannot pay from there.
+  Its refusal has its own code, `REGION_TERMS_EXCLUDED`, read from the reason, and its own sentence ("We don't
+  offer Dialectical Engine in Tennessee, so we can't take payment for this address."); a region closed for tax
+  answers `REGION_PAYMENT_UNAVAILABLE`.
 
-Each entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
+Each tax entry reads `{ "pay": false, "reason": "TAX_NOT_READY" }`; Ohio's adds `"buyers": "business"`. To open a
 region once the company is registered there, delete its entry from the hosted file and publish: that new
-version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). A file whose
-`countryPolicy` has no `regions` member closes no region.
+version supersedes the old one, which is never edited (`deploy/vps/README.md` §14.6). Tennessee's entry reads
+`{ "pay": false, "reason": "TERMS_EXCLUDED" }`. Keep it while the Terms exclude Tennessee, and delete it only
+together with the `us_states` entry, once the Terms serve Tennessee again. A file whose `countryPolicy` has no
+`regions` member closes no region.
 
 ## The room read's budget
 
@@ -228,6 +237,7 @@ Your `sourceRef` is sealed in these places, and only there:
 - the `publicationCheckPolicy` row's source reference, verbatim, when the file carries the member
   (left out, that row keeps the code-owned source reference);
 - the `questionCheckPolicy` row's source reference, verbatim, when the file carries the member
+- the `outboundMailPolicy` row's source reference, verbatim, when the file carries the member
   (left out, that row keeps the code-owned source reference);
 - the `answerRoleRotationPolicy` row's source reference, verbatim, when the file carries the member
   (left out, no such row is sealed);

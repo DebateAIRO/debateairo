@@ -44,7 +44,8 @@ function expiryDate(value) {
 }
 function localExpiry(date, display) {
   const timeZone = display.timeZone ?? 'UTC';
-  const locale = display.locale === 'en' ? 'en-GB' : display.locale;
+  // Every English writes the day first on the 24-hour clock, as the pages do (owner's answer to question 5, 5 Nov 2026).
+  const locale = /^en(?:-|$)/.test(display.locale) ? 'en-GB' : display.locale;
   const text = new Intl.DateTimeFormat(locale, { timeZone, calendar: 'gregory', numberingSystem: 'latn', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'shortOffset' }).format(expiryDate(date));
   return `${text} (${timeZone})`;
 }

@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const MAIN = "apps/api/src/main.ts";
 const PREVIEW_BUDGET = "apps/api/src/preview-budget-estimate.ts";
+const PUBLIC_TREE = "apps/api/src/public-tree.ts";
 
 /** PLAN S4.5, verbatim as a map: reader id → the apps/api/src files where its sites are. */
 const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
@@ -30,6 +31,7 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
   X21: [PREVIEW_BUDGET],
   X27: [MAIN],
   X28: [MAIN],
+  X29: [PUBLIC_TREE],
   X30: [MAIN],
   X31: [MAIN],
   X32: [MAIN],
@@ -42,13 +44,14 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
  * X14 the three PostgresStaffRepository constructions and, since the security review (0171), the staff runtime's alert mapping pool; X18h the key store's owner lookup; X21 the gate's two reads; since
  * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
- * review's repository and its two readers; since the security review (0171), X38 the Report button's settlement, after its
+ * review's repository and its two readers; since upload check Task 9, X29 the report press's seal under the public
+ * debate's own run; since the security review (0171), X38 the Report button's settlement, after its
  * judge, and the writers of the site's day a request pays for, each the marker's alone: X30 the language check's probe and record,
  * X31 the question check's, X32 the clarify charge's (its reservation stays the request login's) and X33 the synthesis check's
  * record; and X37 the ask-time discovery's writer of a provider's probe, the marker's alone too (its reader stays the request pool's).
  * The file-level map alone cannot see a site added under an id already mapped to that file.
  */
-const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X30: 2,
+const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1, X30: 2,
   X31: 2, X32: 2, X33: 1, X37: 1, X38: 1 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
@@ -169,7 +172,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37 and X38 in main.ts and X21 in preview-budget-estimate.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1 and 2 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37 and X38 in main.ts, X21 in preview-budget-estimate.ts and X29 in public-tree.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1, 2 and 1 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);
@@ -190,6 +193,34 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     // Each reader's whole body is the crossAccount("X28", …) frame, so every statement it awaits runs on the target.
     for (const name of ["readVerdictCategories", "readReviewBody"]) {
       expect(property(name), name).toMatch(/^\([^)]*\) => crossAccount\("X28", \(\) =>\s*application\.withContentLease\(/u);
+    }
+  });
+
+  /**
+   * Upload check Task 9 (R22 path 9): a stranger's report on a public debate is sealed under the debate's own run key, so
+   * the runner can read it; that run is the author's, which the runtime login does not see inside the stranger's request.
+   * The public check is identity.open_public_report's. So the frame is that one seal and nothing else: the press
+   * decision and the material's record stay on the runtime login.
+   */
+  it("S4.3 (upload check Task 9) X29 is the report press's seal under the carrier open_public_report named, in pressPublicReport's OPENED case, and nothing else", async () => {
+    const tree = await parse(PUBLIC_TREE);
+    const x29 = callsOf(tree, "crossAccount").filter((call) => call.arguments[0]?.getText() === '"X29"');
+    expect(x29.map((call) => enclosingFunctionName(call))).toEqual(["pressPublicReport"]);
+    const frame = x29[0]!;
+    let clause: ts.Node | undefined = frame.parent;
+    while (clause !== undefined && !ts.isCaseClause(clause)) clause = clause.parent;
+    expect(clause !== undefined && ts.isCaseClause(clause) ? clause.expression.getText() : null).toBe('"OPENED"');
+    // The frame's whole body is the one seal, under the carrier and bound to the report's id: anchored at both ends, so
+    // anything chained after the seal (a `.then(...)`, a second call) fails here.
+    expect(frame.arguments[1]?.getText()).toMatch(
+      /^\(\) => sealFor\(input\.pool, opened\.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened\.reportId!, publicMaterialOf\(debate, \{ now: input\.now \}\)\)$/u);
+    const press = descendants(tree).find((node): node is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(node) && node.name?.text === "pressPublicReport")!;
+    const calls = (name: string) => descendants(press).filter((node): node is ts.CallExpression => ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === name);
+    for (const name of ["readPublicDebate", "openReport", "recordMaterial"]) {
+      expect({ name, found: calls(name).length, framed: calls(name).filter((call) => enclosedBy(call, frame)).length })
+        .toEqual({ name, found: 1, framed: 0 });
     }
   });
 

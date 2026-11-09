@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.12 · GÄLLER FRÅN 1 NOVEMBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.17 · GÄLLER FRÅN 1 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.12
+endMarker: SLUT PÅ VILLKOREN · v2.17
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.12 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.17 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. På det kostnadsfria abonnemanget är dina debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När en debatt är offentlig kan vem som helst läsa den, och den förblir offentlig. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -170,9 +170,9 @@ På ett betalabonnemang är debatter **privata som standard**: ingenting som du 
 
 ## 10. Rapportering av innehåll, moderering och klagomål
 
-**Vem som helst kan rapportera innehåll.** Du behöver inget konto. Skriv till support@dezbatere.ro. Om du är inloggad kan du också använda knappen **Rapportera** i en offentlig debatt. En AI läser en rapport som gjorts med knappen, bredvid den offentliga texten. Om AI:n håller med döljs debatten direkt och en person granskar den. Om den inte håller med kan du rapportera igen med fler uppgifter, och en person läser rapporten. För att vi ska kunna agera ska du ange: varför du anser att innehållet är olagligt eller bryter mot dessa villkor, med tillräcklig detaljnivå för att vi ska förstå påståendet; den exakta platsen — den fullständiga webbadressen och, om möjligt, avsnittet; ditt namn och din e-postadress (krävs inte för rapporter om material med sexuella övergrepp mot barn); samt att du i god tro anser att din rapport är riktig och fullständig.
+**Vem som helst kan rapportera innehåll.** Du behöver inget konto. Skriv till support@dezbatere.ro. Om du är inloggad kan du också använda knappen **Rapportera** i en offentlig debatt; den ber dig bekräfta att du i god tro anser att din rapport är korrekt och fullständig. En AI läser vanligtvis en rapport som gjorts med knappen, bredvid den offentliga texten. Om AI:n håller med, och debatten aldrig tidigare har dolts, döljs debatten direkt, utan att någon person är inblandad, och en person granskar den sedan. En rapport går i stället direkt till en person när debatten har dolts tidigare, när du redan har rapporterat den eller när dagens automatiska kontroller är förbrukade. Om AI:n inte håller med, eller om rapporten stoppas automatiskt (till exempel för att du har skickat många rapporter inom en timme eller för att debatten inte är offentlig), läser ingen person den: du kan skriva till support@dezbatere.ro så läser en person ditt meddelande, eller klaga via vår klagomålsväg nedan. För att vi ska kunna agera ska du ange: varför du anser att innehållet är olagligt eller bryter mot dessa villkor, med tillräcklig detaljnivå för att vi ska förstå påståendet; den exakta platsen — den fullständiga webbadressen och, om möjligt, avsnittet; ditt namn och din e-postadress (krävs inte för rapporter om material med sexuella övergrepp mot barn); samt att du i god tro anser att din rapport är riktig och fullständig.
 
-Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar rapporter skyndsamt, omsorgsfullt, icke-godtyckligt och objektivt, meddelar dig vårt beslut och talar om hur du kan bestrida det. Om vi använder automatiserade metoder för att behandla eller avgöra en rapport upplyser vi om det. Vi agerar på rapporter om intima bilder som delats utan samtycke **inom 48 timmar** från en giltig begäran.
+Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål: direkt på skärmen och, för en rapport som en person kommer att läsa, via e-post. Vi hanterar rapporter skyndsamt, omsorgsfullt, icke-godtyckligt och objektivt, meddelar dig vårt beslut via e-post och talar om hur du kan bestrida det. Om vi använder automatiserade metoder för att behandla eller avgöra en rapport upplyser vi om det. Vi agerar på rapporter om intima bilder som delats utan samtycke **inom 48 timmar** från en giltig begäran.
 
 **Två slags automatiserade beslut som hålls åtskilda.**
 
@@ -183,7 +183,7 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 
 **Var frågekontrollen hör hemma.** Frågekontrollen i avsnitt 8 är inte heller ett beslut inne i motorn. Den är ett automatiserat verktyg som vägrar starta en debatt, utan att någon person medverkar. En fråga som låter som ord från en person i kris, eller som frågar efter metoder för självmord eller självskada eller efter uppmuntran att göra det, får en skärm med hjälpnummer i stället för en avvisning.
 
-**Motivering.** När vi tar bort eller begränsar synligheten för ditt innehåll eller stänger av eller avslutar ditt konto ger vi dig en motivering: vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på och om de kom från en rapport eller våra egna kontroller, huruvida automatiserade metoder användes, den rättsliga eller avtalsmässiga grunden samt hur du kan bestrida beslutet: genom vår klagomålsväg nedan, genom ett organ för tvistlösning utanför domstol som är certifierat enligt EU:s förordning om digitala tjänster, eller i domstol. När vår frågekontroll avvisar en fråga enligt stycket ”Frågor som inte startar en debatt” i avsnitt 7, är skärmen som berättar det för dig vår motivering för avvisningen: den anger att debatten inte startade, att vår automatiska kontroll avvisade frågan utan att någon person medverkade, vilken regel i dessa villkor frågan faller under och hur du klagar via klagomålsvägen nedan. För en avvisad fråga lovar vi inget mer. När vår kontroll raderar en debatt (avsnitt 9) är meddelandet du ser vår motivering för det: det anger vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på, att ingen person medverkade, vilken regel i dessa villkor som gäller och hur du klagar via klagomålsvägen nedan; de två andra vägar som detta stycke nämner står fortfarande öppna för dig. Skärmen med hjälpnummer som en fråga som låter som ord från en person i kris får är hjälp, inte en motivering.
+**Motivering.** När vi tar bort eller begränsar synligheten för ditt innehåll eller stänger av eller avslutar ditt konto ger vi dig en motivering: vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på och om de kom från en rapport eller våra egna kontroller, huruvida automatiserade metoder användes, den rättsliga eller avtalsmässiga grunden samt hur du kan bestrida beslutet: genom vår klagomålsväg nedan, genom ett organ för tvistlösning utanför domstol som är certifierat enligt EU:s förordning om digitala tjänster, eller i domstol. Vi skickar den till dig via e-post, med en länk till den fullständiga motiveringen i ditt konto under Inställningar, Modereringsbesked, där den finns kvar. Du får också en motivering när ditt innehåll lämnar en offentlig sida tillsammans med annat innehåll som vi granskar, även om ditt innehåll inte befanns bryta mot någon regel. När vår frågekontroll avvisar en fråga enligt stycket ”Frågor som inte startar en debatt” i avsnitt 7, är skärmen som berättar det för dig vår motivering för avvisningen: den anger att debatten inte startade, att vår automatiska kontroll avvisade frågan utan att någon person medverkade, vilken regel i dessa villkor frågan faller under och hur du klagar via klagomålsvägen nedan. För en avvisad fråga lovar vi inget mer. När vår kontroll raderar en debatt (avsnitt 9) är meddelandet du ser vår motivering för det: det anger vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på, att ingen person medverkade, vilken regel i dessa villkor som gäller och hur du klagar via klagomålsvägen nedan; de två andra vägar som detta stycke nämner står fortfarande öppna för dig. Skärmen med hjälpnummer som en fråga som låter som ord från en person i kris får är hjälp, inte en motivering.
 
 **Klagomål på ett beslut.** Om du inte håller med om ett modereringsbeslut ska du svara på motiveringen eller skriva till office@dezbatere.ro inom **sex månader**. En person som inte deltog i det ursprungliga beslutet granskar det, och vi meddelar dig resultatet med en motivering. Detta påverkar inte din rätt att vända dig till domstol eller använda alternativ tvistlösning enligt avsnitt 18. Klagomålsvägen tar även emot klagomål om att vi inte har agerat på en rapport, att innehåll felaktigt har tagits bort, att ett konto felaktigt har begränsats eller att ett automatiserat verktyg felaktigt har påverkat ditt innehåll, till exempel genom att avvisa en fråga.
 
@@ -211,11 +211,9 @@ Avsnitten 8 (i fråga om innehåll som redan har publicerats), 15, 16 och 18 for
 
 ## 12. Betalabonnemang
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Tre avgiftsbelagda abonnemang, **Plus**, **Pro** och **Max**, kommer att bli tillgängliga; vart och ett ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
 
-Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Premium**-abonnemang kommer att bli tillgängligt, vilket ger tillgång till hela modellutbudet och låter dig själv ställa in debattens parametrar.
-
-**Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Comandă cu obligație de plată*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
+**Innan du betalar** visar vi, direkt ovanför betalningsknappen: abonnemanget; totalpriset inklusive tillämplig skatt; faktureringsperioden; att abonnemanget förnyas automatiskt tills det sägs upp; vilket datum en eventuell kostnadsfri provperiod upphör och vilket belopp du därefter debiteras; samt hur du säger upp abonnemanget. Du bekräftar förnyelsevillkoren genom att markera en separat ruta. På knappen står **Teckna abonnemang och betala** (på rumänska *Abonați-vă și plătiți*). Vi skickar dig en bekräftelse på ett varaktigt medium med samma information, dessa villkor och ångerblanketten.
 
 **Påminnelser.** Vi skickar e-post till dig minst 5 dagar innan en kostnadsfri provperiod övergår till ett betalabonnemang; minst en gång om året för löpande abonnemang; och mellan 30 och 45 dagar före varje förnyelse av en avtalstid på tolv månader eller mer. Varje påminnelse innehåller priset, datumet och en länk för uppsägning.
 
@@ -225,7 +223,7 @@ Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Pr
 
 **Misslyckade betalningar.** Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning.
 
-**Skatter och vem du betalar till.** Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
+**Skatter och vem du betalar till.** Våra priser visas exklusive skatt, som pris + moms (eller GST eller omsättningsskatt, beroende på var du bor). Skatten för din faktureringsadress läggs till i kassan, och kassan visar det totalbelopp du betalar, inklusive skatt, innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
 
 **Betalningssätt.** Du betalar med kort. Vi tar emot Visa och Mastercard; vi tar inte emot American Express. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com), och ditt fullständiga kortnummer når aldrig fram till oss.
 
@@ -233,7 +231,7 @@ Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Pr
 
 **Kortreklamationer.** Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta.
 
-**Lagstadgade rättigheter först.** Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver, om du säger upp ett betalabonnemang under en faktureringsperiod, återbetalar vi den andel av periodens pris som du inte har använt, mätt efter abonnemangets användning, oavsett hur många dagar som har gått: har du använt 30 % av det återbetalar vi 70 %; har du inte använt något av det återbetalar vi hela priset. Fråga på support@dezbatere.ro; när vi har återbetalat upphör abonnemanget. Om ångerrätten i avsnitt 13 också gäller får du den återbetalning som är störst. Användningsgränserna för båda abonnemangen offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig.
+**Lagstadgade rättigheter först.** Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver, om du säger upp ett betalabonnemang under en faktureringsperiod, återbetalar vi den andel av periodens pris som du inte har använt, mätt efter abonnemangets användning, oavsett hur många dagar som har gått: har du använt 30 % av det återbetalar vi 70 %; har du inte använt något av det återbetalar vi hela priset. Fråga på support@dezbatere.ro; när vi har återbetalat upphör abonnemanget. Om ångerrätten i avsnitt 13 också gäller får du den återbetalning som är störst. Användningsgränserna för alla abonnemang offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig.
 
 ## 13. Din ångerrätt
 
@@ -250,6 +248,16 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+
+Version 2.17 ersatte version 2.16: avsnitt 10 anger när en AI läser en rapport som gjorts med knappen Rapportera och när en person gör det, att knappen ber om ditt intygande i god tro, att vi bekräftar en rapport och meddelar dig vårt beslut via e-post och att motiveringar skickas via e-post och sparas i ditt konto; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat.
+
+Version 2.16 ersatte version 2.15: avsnitt 12 anger de avgiftsbelagda abonnemangen, Plus, Pro och Max, och avsnitt 12 och 15 innehåller inte längre några utkastanteckningar; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat.
+
+Version 2.15 ersatte version 2.14: avsnitt 12 anger att våra priser visas exklusive skatt, som pris + moms, och att skatten läggs till i kassan.
+
+Version 2.14 ersatte version 2.13: avsnitt 18 och bilaga A anger ANPC (SAL) som vägen för alternativ tvistlösning.
+
+Version 2.13 ersatte version 2.12: avsnitt 12 anger betalningsknappens rumänska text.
 
 Version 2.12 ersatte version 2.11: avsnitt 10 anger att en inloggad person också kan använda knappen Rapportera i en offentlig debatt, att en AI läser en rapport som gjorts med den bredvid den offentliga texten, och vad som sedan händer.
 
@@ -273,8 +281,6 @@ Version 2.7 ersatte version 2.6: den lägger till frågekontrollen, som läser v
 
 **Händelser utanför vår kontroll.** Vi gör oss inte skyldiga till avtalsbrott om vi hindras från att fullgöra våra skyldigheter av något som ligger utanför vår rimliga kontroll. Ett fel eller ett tillbakadragande från en modelleverantör som är tredje part utgör inte automatiskt en sådan händelse; om det gör tjänsten otillgänglig gäller avsnitt 14, och du får säga upp avtalet och erhålla återbetalning på det sätt som anges där.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Immateriella rättigheter
 
 Själva tjänsten — programvaran, motorn, poängsättningsmetoden, gränssnittet, namnen Dialectical Engine och DebateAIRO samt våra logotyper — tillhör oss eller våra licensgivare. Dessa villkor ger dig tillstånd att använda tjänsten, inte äganderätt till den.
@@ -297,7 +303,7 @@ Hur vi behandlar personuppgifter anges i **integritetspolicyn** på dezbatere.ro
 
 **Konsumenter på andra platser.** Om du bor utanför EU och EES begränsar ingenting i dessa villkor någon rätt som du enligt lagen i ditt land har att väcka talan vid dess domstolar eller någon rätt enligt den lagen som inte kan avtalas bort — däribland, om du bor i Australien eller Nya Zeeland, dina rättigheter enligt konsumentgarantier; om du bor i Brasilien, Código de Defesa do Consumidor; och om du bor i USA, konsumentskyddslagstiftningen i din delstat.
 
-**Innan du vänder dig till domstol.** Kontakta oss på support@dezbatere.ro; det mesta går att lösa, och vi strävar efter att svara inom 5 arbetsdagar. Om du är konsument i Rumänien eller EU får du använda alternativ tvistlösning genom www.onoratainstanta.ro; vi förbinder oss inte att delta i det förfarandet. Klagomål på modereringsbeslut följer avsnitt 10, vilket är en separat väg.
+**Innan du vänder dig till domstol.** Kontakta oss på support@dezbatere.ro; det mesta går att lösa, och vi strävar efter att svara inom 5 arbetsdagar. Om du är konsument i Rumänien eller EU får du använda alternativ tvistlösning genom ANPC (SAL), reclamatiisal.anpc.ro; vi förbinder oss inte att delta i det förfarandet. Klagomål på modereringsbeslut följer avsnitt 10, vilket är en separat väg.
 
 ## 19. Övriga villkor
 
@@ -319,7 +325,7 @@ Varje post gäller för personer som bor i den region som posten avser och anger
 
 ### A.1 Europeiska unionen och Europeiska ekonomiska samarbetsområdet
 
-Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande: du får väcka talan vid domstolarna i det land där du bor; ångerrätten i avsnitt 13 gäller; alternativ tvistlösning är tillgänglig genom www.onoratainstanta.ro. **Tyskland:** uppsägningsknappen på dezbatere.ro/cancel låter dig säga upp ett abonnemang utan att logga in; abonnemangsvillkor, förnyelseperioder och uppsägningstider följer §309(9) BGB: varje abonnemang löper i en månad och förnyas månadsvis tills du säger upp det, och du kan när som helst säga upp det med verkan från slutet av den pågående månaden. **Frankrike:** du får säga upp ett abonnemang online i tre steg på dezbatere.ro/cancel. **Italien:** bestämmelserna om avstängning och uppsägning (11), betalabonnemang och deras förnyelse (12), ändringar (14), ansvar (15) samt tillämplig lag och forum för tvister (18) kräver ditt särskilda godkännande enligt artiklarna 1341 och 1342 i den italienska civillagen. Du lämnar det i en separat ruta vid registrering, som visas för alla som väljer Italien i fältet Region eller vars anslutning kommer från Italien. **Nederländerna:** dessa villkor tillhandahålls i ett lagringsbart format innan avtalet ingås. **Polen:** en polsk version finns; välj Polski i språkmenyn.
+Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande: du får väcka talan vid domstolarna i det land där du bor; ångerrätten i avsnitt 13 gäller; alternativ tvistlösning är tillgänglig genom ANPC (SAL), reclamatiisal.anpc.ro. **Tyskland:** uppsägningsknappen på dezbatere.ro/cancel låter dig säga upp ett abonnemang utan att logga in; abonnemangsvillkor, förnyelseperioder och uppsägningstider följer §309(9) BGB: varje abonnemang löper i en månad och förnyas månadsvis tills du säger upp det, och du kan när som helst säga upp det med verkan från slutet av den pågående månaden. **Frankrike:** du får säga upp ett abonnemang online i tre steg på dezbatere.ro/cancel. **Italien:** bestämmelserna om avstängning och uppsägning (11), betalabonnemang och deras förnyelse (12), ändringar (14), ansvar (15) samt tillämplig lag och forum för tvister (18) kräver ditt särskilda godkännande enligt artiklarna 1341 och 1342 i den italienska civillagen. Du lämnar det i en separat ruta vid registrering, som visas för alla som väljer Italien i fältet Region eller vars anslutning kommer från Italien. **Nederländerna:** dessa villkor tillhandahålls i ett lagringsbart format innan avtalet ingås. **Polen:** en polsk version finns; välj Polski i språkmenyn.
 
 ### A.2 USA
 
@@ -331,7 +337,7 @@ Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande:
 
 ### A.3 Kanada och Quebec
 
-Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; välj franska i språkväljaren; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras.
+Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; om du väljer Kanada när du registrerar dig får du dem först på franska och kan välja engelska i stället; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras.
 
 ### A.4 Australien och Nya Zeeland
 

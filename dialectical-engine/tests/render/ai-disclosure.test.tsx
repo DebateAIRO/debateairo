@@ -12,6 +12,9 @@ import AiTransparencyPage from "../../apps/ui/app/ai-transparency/page.js";
 import { Assistant, type SupportAssistantClient } from "../../apps/ui/components/support/Assistant.js";
 import { debateDetailFromAnswer } from "../../apps/ui/lib/v3/adapter.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import { availablePaymentMarks } from "../../apps/ui/lib/billing/paymentMarks.js";
+import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import homeEnglish from "../../apps/ui/messages/en/home.json" with { type: "json" };
 import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 import supportEnglish from "../../apps/ui/messages/en/support.json" with { type: "json" };
 import { resetSupportOfferedForTests, SUPPORT_OFFERED_STORAGE_KEY } from "../../apps/ui/components/support/availability.js";
@@ -77,7 +80,9 @@ describe("AI disclosure at the point of use", () => {
 
   it("identifies AI output before the landing samples and exposes the full transparency notice", () => {
     const container = document.createElement("div");
-    container.innerHTML = renderToStaticMarkup(<LandingPage />);
+    // The props app/page.tsx gives it: the home and chrome catalogues, no price read, billing off.
+    container.innerHTML = renderToStaticMarkup(<LandingPage catalog={{ ...homeEnglish, ...chromeEnglish }} lowestPaidPrice={null}
+      footerBilling={{ billingOn: false, marks: availablePaymentMarks() }} />);
     const hero = container.querySelector('[data-landing-section="hero"]')!;
     expect(hero.textContent).toContain("AI-generated content.");
     const transparency = container.querySelector("#ai-transparency");

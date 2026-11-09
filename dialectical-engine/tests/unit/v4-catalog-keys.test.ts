@@ -3,6 +3,7 @@ import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { basisKey, OPEN_QUESTION_KINDS, READING_LEVELS, DIG_MODES, TRUST_BASES, TRUST_WORDS } from "../../apps/ui/lib/v4/types.js";
 import { DIG_LEVEL_MAX, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES } from "../../packages/contract/src/web.js";
+import { RUN_FAILURE_KINDS } from "../../apps/ui/lib/v3/runFailure.js";
 
 /*
  * V4 initial (2026-10-28): the v4 namespace has no English backstop in t() (only chrome/home/newDebate/support/time
@@ -52,8 +53,44 @@ const APPROVED_REPORT_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.investigation.noStory": "We couldn't write a short answer this time. The parts below show everything the AIs found."
 });
 
+/**
+ * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers"), the map's and the report's words
+ * the owner gave in the second round of follow-ups, word for word: "Your report starts when the digs in progress finish."
+ * (question 23 A's line, quoted whole for the report page and the map) and "See my report" (question 2 A's words, named in
+ * the phone rule of question 18). Every other new line of those answers waits on DRAFTED_UNTIL_CLICK_TEST.
+ */
+const REPORT_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.rail.seeReport": "See my report",
+  "v4.investigation.waitingDigs.other": "Your report starts when the digs in progress finish."
+});
+
 /** Owner Q20: labels drafted for the owner's click-test, not yet approved. */
 const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
+  // The wave-2 checks (4 Nov): a public dig's period line without the map's "you can still finish your report". The owner's
+  // answer to question 34 (5 Nov, A) shows it to every reader of a public page; "of today" and "of this month" are the
+  // record's own words (read-f19, journey-f8: QUOTA_RECORD_LINES below), the week's form follows them and stays a draft.
+  "v4.public.dig.period.PERSON_WEEK",
+  // The owner's answers of 5 Nov: question 3 A's seven lines saying why a dig did not finish, said about the dig (the
+  // answer's own example is the "stopped partway" line; all are new words, approved at the click-test), and question 20
+  // A's line when the part of a failed question that ran used some of the quota (section 2c: approved at the click-test).
+  // The owner's fourth round (6 Nov) gave two of the seven word for word, so they wait on no list (FOURTH_ROUND_ANSWER_LINES
+  // below): RUN_LIMIT_REACHED "This dig reached its limit before it could produce an answer." and PLAN_ENDED, which keeps
+  // "put on hold". The failed-question line cannot be seen in place until the contract's run read carries
+  // `quota_used` (today's strict contract refuses a run read that has it; the stand-in sends it on its draft view only).
+  // The dig's own failed page names the dig, not a question (the wave-4 browser check, 5 Nov): its heading is drafted.
+  "v4.debate.digFailedTitle",
+  "v4.digFailed.reason.NOT_STARTED",
+  "v4.digFailed.reason.MODELS_UNAVAILABLE",
+  "v4.digFailed.reason.SET_ASIDE",
+  "v4.digFailed.reason.STOPPED",
+  "v4.digFailed.reason.CHOICE_GONE",
+  // The owner's third round (5 Nov afternoon): a dig that keeps failing because the AIs were unavailable says its reason
+  // without "You can try it again in a while.", so it does not disagree with "This keeps failing. Write your report; ...".
+  "v4.digFailed.unavailableKeepsFailing",
+  "v4.debate.failedSomeTaken",
+  // ACCESS-13 (the wave-2 checks): "Light or dark"'s name also says what a press does. Owner question.
+  "v4.header.menu.themeToDark",
+  "v4.header.menu.themeToLight",
   "v4.web.noSearch",
   "v4.web.noSearch.noReason",
   "v4.web.switchedOff",
@@ -76,7 +113,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.kind.HELPS_MAIN_QUESTION.FOR",
   "v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST",
   "v4.suggest.ownView",
-  "v4.suggest.edit",
   // Dig model revision (W2-7): the page labels of section 5.5 (no search-words box: the owner corrected that on 30 Oct).
   "v4.view.heading",
   "v4.rewrite.changedSince.one",
@@ -102,7 +138,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   // Dig model revision W4-6 (31 Oct): the labels the map needed beyond 5.5's, drafted for the click-test (owner C2b): a dig
   // card once done (no path rewritten, rewriting, the rewrite failed), a dig paused at the month wall, a failed rewrite's
   // short line on a path's card, hiding the dig's points again, where the dig's points are when this page has not read
-  // them, and the name of a dig's trail.
+  // them, and the name of a dig's trail. The trail's first step is the record's "Your question" (YOUR_QUESTION_RECORD_LINES
+  // below), so it waits on no list.
   "v4.rewrite.digCard.DONE",
   "v4.rewrite.digCard.REWRITING",
   "v4.rewrite.digCard.REWRITE_FAILED",
@@ -111,14 +148,43 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.rewrite.hideDigPoints",
   "v4.rewrite.digPointsElsewhere",
   "v4.nest.trailLabel",
-  "v4.nest.digHereToo",
-  "v4.nest.trailRoot",
   "v4.nest.level",
   "v4.nest.deepest",
   "v4.nest.tooDeep",
   // R22 W3-8: the two dig refusals with their own codes (DIG_PICKS_ONE_PATH, DIG_FREE_PICKS_MAX), drafted for the click-test.
   "v4.nest.picksOnePath",
   "v4.nest.freePicksMax",
+  // The owner's screen review (3 Nov), the quota track (C2a, C2b): lines written beyond the record's own words, for the
+  // click-test. The header past 100% (map-f9 says "more than today's quota", not the pill's words) and the name of its
+  // detail list (public-d3 A); the week's and the month's forms of the record's "of today" lines (read-f19 names "of this
+  // week" and "of this month" and leaves the words to the owner); the month's "on {date}" for a dig button that waits
+  // (journey-f15 writes only "after 08:00"); the two Quick look / Thorough hints (read-f20: the wording is the owner's;
+  // Thorough's no longer names today, the period is said once by the switch).
+  // The owner's answers of 5 Nov give today's "Today: more than your quota used" (HEADER_ANSWER_LINES below); the week's,
+  // the month's and a team grant's forms follow it and stay drafts.
+  "v4.header.over.PERSON_WEEK",
+  "v4.header.over.PERSON_MONTH",
+  "v4.header.over.PERSON_GRANT",
+  "v4.header.quotaDetails",
+  // The owner's answers of 5 Nov (questions 14 B and 15, with the follow-ups): the quota circle's spoken name past 100% (it
+  // keeps the "Over" it shows; under 100% its name is the record's own "Today: 70% of your quota used"), and a team
+  // grant's bar label. The owner gave "Over", the "70%" form and the bars "Today", "This week" and "This month"
+  // (HEADER_ANSWER_LINES below); these are drafts until the click-test.
+  "v4.header.circleOver.PERSON_DAY",
+  "v4.header.circleOver.PERSON_WEEK",
+  "v4.header.circleOver.PERSON_MONTH",
+  "v4.header.circleOver.PERSON_GRANT",
+  "v4.header.bar.PERSON_GRANT",
+  "v4.room.startShare.PERSON_WEEK",
+  "v4.room.startShare.PERSON_MONTH",
+  "v4.dig.period.PERSON_WEEK",
+  "v4.dig.on",
+  "v4.undo.digShare.PERSON_WEEK",
+  "v4.undo.digShare.PERSON_MONTH",
+  "v4.debate.questionShare.PERSON_WEEK",
+  "v4.debate.questionShare.PERSON_MONTH",
+  "v4.panel.modeHint.quick",
+  "v4.panel.modeHint.thorough",
   "v4.digPage.lookedInto",
   "v4.digPage.rewrote",
   "v4.digPage.backToPath",
@@ -141,6 +207,8 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.money.continueNote",
   "v4.money.continuing",
   "v4.money.continueTooEarly",
+  // The owner's answers of 5 Nov (question 19 A): before the new month the label becomes a greyed button in the same place,
+  // "Continue on 1 December", which the third round quotes word for word: PAUSE_ANSWER_LINES below, not a draft.
   // Perplexity plan W3-4 (31 Oct): choosing what to dig on the map — the two lines a dig's question asks a suggestion and
   // the person's own view with, the panel's "Choose what to dig" (the one-path rule, Free's cap, edits, own view), and
   // Continue's failure line. No search-words label (the owner's correction of 31 Oct).
@@ -149,7 +217,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.heading",
   "v4.suggest.onePath",
   "v4.suggest.otherPath",
-  "v4.suggest.freeCap",
   "v4.suggest.full",
   "v4.suggest.empty",
   "v4.suggest.tooLong",
@@ -162,7 +229,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.cancel",
   "v4.suggest.ownViewLabel",
   "v4.suggest.ownViewAdd",
-  "v4.suggest.ownViewTag",
   "v4.suggest.remove",
   "v4.money.continueFailed",
   // R22 W5-1 (31 Oct): the final report's versions, its waits, a failed version, "Keep digging", and the map's answer from
@@ -170,13 +236,224 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.versions",
   "v4.investigation.versionCurrent",
   "v4.investigation.version",
-  "v4.investigation.writing",
   "v4.investigation.waitingDigs.one",
-  "v4.investigation.waitingDigs.other",
   "v4.investigation.failed",
   "v4.investigation.keepDigging",
   "v4.investigation.fromReport",
-  "v4.investigation.firstAnswer"
+  "v4.investigation.firstAnswer",
+  // The owner's screen review of 3 Nov (OWNER-PICKS-2026-11-03.md, "report"): the report page's states and presses, drafted
+  // from the approved fix texts for the click-test. No time is promised that nobody measured (the old "5 to 10 minutes" went).
+  "v4.report.share",
+  "v4.report.shareButton",
+  "v4.report.copyLink",
+  "v4.report.linkCopied",
+  "v4.report.copyFailed",
+  "v4.report.pdfMaking",
+  "v4.report.pdfFailed",
+  "v4.report.notFound",
+  "v4.report.loadingReport",
+  "v4.report.notWrittenYet",
+  "v4.report.firstAnswerNotReport",
+  "v4.investigation.versionWritten",
+  "v4.investigation.heading.paths",
+  "v4.investigation.onlyAnswer",
+  "v4.investigation.loadFailed",
+  "v4.investigation.startUnconfirmed",
+  "v4.investigation.reopenUnconfirmed",
+  "v4.investigation.writingSince",
+  "v4.investigation.waitingDig",
+  "v4.investigation.versionWriting",
+  "v4.investigation.downloadVersion",
+  "v4.investigation.slow",
+  "v4.investigation.checkAgain",
+  "v4.investigation.writeAgain",
+  "v4.investigation.digMore",
+  "v4.web.freeOnPaper",
+  // The review of the fix branch (4 Nov): lines the builders wrote beyond the record's approved fix texts, shown to the owner
+  // at the click-test. The report's line when this visit cannot know when writing started (review F1); the missing-answer
+  // line without "You can dig or write your report now." where no dig can start (review F10); the team grant's header word;
+  // the public page's dig credit, which the record words "A dig by Quiet Heron changed …" (dig-f25); the problem
+  // report's thank-you and its two "say more" lines (public-f5 gives no words).
+  "v4.investigation.writing",
+  "v4.panel.noShortAnswerNoDig",
+  "v4.header.used.PERSON_GRANT",
+  "v4.public.digFrom",
+  "v4.public.digFromGone",
+  "v4.public.digFromAnother",
+  "v4.public.flag.thanks",
+  "v4.public.flag.whereMore",
+  "v4.public.flag.claimMore",
+  // The wave-1 review fixes (4 Nov 2026), drafted where the owner's record has no words: the grey line under Next for a
+  // signed-out visitor until the start-step's sign-in panel lands (the record's "Your question stays here." is true only
+  // with that panel), a dig still starting after a minute, a dig sent after its map was closed that met a screen nobody
+  // saw, a dig whose start could not be confirmed, the outline's fold button, and the sideways-scroll hint without a side
+  // (right-to-left pages).
+  "v4.ask.signInFirst",
+  "v4.undo.sendingSlow",
+  "v4.dig.notStartedAway",
+  "v4.dig.unconfirmed",
+  "v4.outline.fold",
+  "v4.outline.unfold",
+  "v4.map.scrollHint",
+  // The browser check of the fix branch (4 Nov): the report header's short "Map" on phones, where the record's
+  // "← Back to the map" (report-f12) was cut off; the record gives no short form.
+  "v4.report.backToMapShort",
+  // ask-d6 A (owner's screen review, 3 Nov): the round account button's name for screen readers (and its menu's). The menu's
+  // own words ("Language", "Light or dark", "Settings", "Sign out") are the record's; this one is not. "My questions" is the
+  // owner's answer to question 13 (HEADER_ANSWER_LINES below).
+  "v4.header.account",
+  // V4 screen review (3 Nov), map-d4 A: a point's sources folded into one line. The drawn option said "From 3 pages: …";
+  // journey-f23 says nothing counts sources, so the line names every site and counts nothing ("From iea.org and
+  // oecd-nea.org"; an owner question until the click-test).
+  "v4.web.sourcesFrom",
+  // The owner's screen review of 3 Nov (dig-d1 B): the two words a running dig's steps need that the record does not give,
+  // the list's name for screen readers and the hidden word after a step that is done.
+  "v4.digLive.stepsLabel",
+  "v4.digLive.stepDone",
+  // The owner's screen review of 3 Nov, report-d1 A (the strip "Write my report" turns into on the map) and report-f15 (on
+  // Free, only the trust words that can appear there): the record describes these lines but gives no words for them.
+  // "Write it", "Not yet", "This question is public, so your report will be public too." and "Digging opens again when
+  // your report is written." are the record's own words and are not drafts.
+  "v4.reportStrip.covers",
+  "v4.reportStrip.coversNoDigs",
+  "v4.reportStrip.share",
+  "v4.reportStrip.digsWait",
+  "v4.report.checkedWordsIntroFree",
+  // The owner's screen review of 3 Nov, public-d1 / public-f4 / public-f9 (wave 2): the lines the record does not word. The way back from the public
+  // page's read-only map, the phone menu that holds "Report a problem", and the ready line for a report someone else started (the page knows of it
+  // only from the server). "For", "Against", "Explore the map" and "Check again" are the record's own words.
+  "v4.public.mapBack",
+  "v4.public.menu",
+  "v4.public.report.ready",
+  // The owner's screen review of 3 Nov, wave 2 (public-f11, public-d2 A, public-f26, journey-f20): the public dig flow's and the public marks' lines the
+  // record does not word ("the exact sentences go into the wording card"). The record's own words (Dig done, Checked, On the public page, See it on the
+  // page, Kept with you…, Confirmed…, Or write your own, Someone dug near here on…, Public, See its page, Copy link, This will be public.) are pinned in
+  // tests/unit/public-lane.test.ts.
+  "v4.public.dig.chipsLabel",
+  // The wave-2 review fixes (4 Nov 2026), drafted where the record has no words: the visible reason under a public dig box's
+  // Start while nothing is picked (journey-f14), a public dig sent after its page was closed that met a screen nobody saw,
+  // and one whose start could not be confirmed (the map's own lines name the map), and the running dig's empty findings
+  // list (the drawn line comes from a path card of the wait, not from dig-d1).
+  "v4.public.dig.pickFirst",
+  "v4.public.dig.writeFirst",
+  "v4.public.dig.notStartedAway",
+  "v4.public.dig.unconfirmed",
+  "v4.digLive.foundNone",
+  "v4.public.digCard.running",
+  "v4.public.digCard.stopReached",
+  "v4.public.digCard.stopOpen",
+  "v4.public.digCard.before",
+  "v4.public.digCard.after",
+  "v4.public.digCard.removed",
+  "v4.publicMark.linkCopied",
+  "v4.publicMark.copyFailed",
+  "v4.publicMark.WILL_BE_PUBLIC",
+  "v4.publicMark.BEING_CHECKED",
+  "v4.publicMark.KEPT_PRIVATE",
+  "v4.publicMark.addsToPublic",
+  // The 3-4 Nov screen-review build's own words (checked line by line against OWNER-PICKS-2026-11-03.md on 4 Nov): the
+  // record gives no words for these places, so they are drafts, held here until the owner approves them at the click-test.
+  "v4.report.backToQuestion",
+  "v4.ask.usedUp.PERSON_WEEK",
+  // The owner's third round renamed the page "My questions"; its empty and failed lines now speak of questions, in drafted
+  // words.
+  "v4.maps.empty",
+  "v4.maps.ask",
+  "v4.maps.failed",
+  "v4.maps.more",
+  // The owner's third round (5 Nov afternoon): the sentences that name the page behind "My questions" follow its new name
+  // (MY_QUESTIONS_ANSWER_LINES below); the changed sentence is a draft. v4.public.dig.unconfirmed, the other one, is on
+  // this list already. Since the fourth round its second sentence is the owner's (FOURTH_ROUND_ANSWER_ENDINGS below), so
+  // only its first sentence is still a draft.
+  "v4.debate.usually",
+  "v4.debate.askAgainNoteQuestion",
+  "v4.debate.digFailedBackNote",
+  // "Waiting" alone (v4.state.WAITING.noTime) is the owner's word since the fourth round (the tab's "Waiting · …"):
+  // FOURTH_ROUND_ANSWER_LINES below.
+  "v4.state.SHORT_BREAK.noTime",
+  "v4.state.PAUSED.canContinue",
+  "v4.wait.choices",
+  "v4.report.eyebrow",
+  "v4.report.pathsHeading",
+  "v4.undo.still",
+  "v4.undo.more",
+  "v4.bar.goodTimeClose",
+  "v4.dig.picksClearedUndoLabel",
+  "v4.dig.picksClearedStill",
+  "v4.dig.picksClearedAnnounce",
+  "v4.map.legendLooking",
+  "v4.map.legendNew",
+  "v4.map.level",
+  "v4.map.digWholePath",
+  "v4.map.openGround",
+  "v4.sure.none",
+  "v4.sure.mixed",
+  "v4.sure.SURE.most",
+  "v4.sure.STILL_ARGUED.most",
+  "v4.sure.DIDNT_HOLD.all",
+  "v4.sure.DIDNT_HOLD.most",
+  "v4.sure.argued.some",
+  "v4.sure.fell.one",
+  "v4.sure.fell.some",
+  "v4.result.card.NOTHING_NEW",
+  "v4.result.box.NOTHING_NEW",
+  "v4.rail.goodTimeStarDone",
+  "v4.rail.goodTimeHint",
+  "v4.answerCard.region",
+  "v4.answerCard.folded",
+  "v4.answerCard.fold",
+  "v4.answerCard.first",
+  "v4.answerCard.firstOn",
+  "v4.answerCard.readWhole",
+  "v4.answerCard.updated.PATH_REWRITE",
+  "v4.answerCard.updated.CHILD_PATH",
+  "v4.phone.position",
+  "v4.phone.openMap",
+  "v4.rewrite.youAsked",
+  "v4.digsDid.news.HOLDS",
+  "v4.digsDid.news.FAILED",
+  "v4.digsDid.news.FAILED.noLine",
+  "v4.digsDid.news.ONE_DONE",
+  "v4.digsDid.news.ANSWER",
+  "v4.digsDid.news.OTHER",
+  "v4.ready.digPage",
+  "v4.ready.report",
+  "v4.ready.close",
+  "v4.tour.label",
+  "v4.suggest.leaveStay",
+  "v4.suggest.leaveGo",
+  "v4.public.addedByGone",
+  "v4.public.oneMoment",
+  "v4.public.dig.termsMore",
+  "v4.public.flag.NOT_FOUND",
+  "v4.public.dig.notJoined",
+  // The same check (4 Nov): lines whose words differ from the record, held as owner questions until the click-test. The
+  // dig result box's two sentences as drawn in dig-d4 (journey-f10's one win sentence is "Confirmed: the answer holds.");
+  // the map's "+N more" (map-f10 names "+3 open", but the fold also holds digs and suggestions since map-f22); the rail's
+  // failed digs (journey-f22's "Didn't finish" sits there beside another state word); one point not checked (map-f28 words
+  // only the plural); and a signed-out visitor's lead before "Create a free account · Sign in" (public-f3, then r2-21 A).
+  "v4.result.box.CONFIRMED_HOLDS",
+  "v4.result.box.CONFIRMED",
+  "v4.map.moreOpen",
+  "v4.rail.digsFailed.one",
+  "v4.rail.digsFailed.other",
+  "v4.panel.unchecked.one",
+  "v4.public.signedOut.dig",
+  "v4.public.signedOut.report",
+  // The final check of that list (5 Nov): two more of the build's own words (ask-f4 words only the day and month pills;
+  // no record words a pause whose date is unknown), and lines whose words are only in the drawings the owner picked from
+  // or join two record phrases. REVIEW_LINES below keeps their drawn words; the owner confirms them at the click-test.
+  "v4.header.used.PERSON_WEEK",
+  "v4.state.PAUSED.noDate",
+  "v4.report.digWait",
+  "v4.digsDid.line.CORRECTED",
+  "v4.digsDid.line.ADDED_TO",
+  "v4.digsDid.line.CONFIRMED",
+  "v4.dig.started",
+  "v4.debate.state.HOLDING.noTime",
+  "v4.panel.found",
+  "v4.digLive.found",
+  "v4.digLive.pathNow"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -283,6 +560,20 @@ describe("V4 catalogue keys", () => {
     for (const key of levelLabels) expect(catalog[key], key).toContain(String(DIG_LEVEL_MAX));
   });
 
+  it("the report page (screen review, 3 Nov): no unmeasured time, no count of points, Free's paper line is the honest half", () => {
+    // report-f7, f8 and the record's code facts: no "minutes" figure until a timing run measures one.
+    const report = Object.entries(catalog).filter(([key]) => key.startsWith("v4.report.") || key.startsWith("v4.investigation."));
+    expect(report.filter(([, value]) => /\b\d+\s*(?:to|-|–)\s*\d+\s*minutes?\b|\bminutes?\b/iu.test(value))).toEqual([]);
+    // report-f18: the checking sentence counts nothing.
+    expect(catalog["v4.report.checkedSecondAi"]).toBe("A second AI checked each point. Points it did not check are shown in grey.");
+    expect(Object.keys(catalog).filter((key) => key.startsWith("v4.report.pathUnchecked"))).toEqual([]);
+    // Round 2 r2-13 (A): on paper and in the PDF, Free's web line is the first, honest half of the approved E3b line.
+    expect(catalog["v4.web.free"]!.startsWith(catalog["v4.web.freeOnPaper"]!.replace(/\.$/u, ""))).toBe(true);
+    expect(catalog["v4.web.freeOnPaper"]).toBe("Not checked on the web.");
+    // The level ruling (owner, 5 Nov): the line above the report's title names no level (still a drafted line).
+    expect(catalog["v4.report.eyebrow"]).not.toMatch(/\{level\}/u);
+  });
+
   it("W5-1: the final report's approved headings, F13 and N14 lines are in the catalogue word for word", () => {
     expect(Object.fromEntries(Object.keys(APPROVED_REPORT_LINES).map((key) => [key, catalog[key]]))).toEqual(APPROVED_REPORT_LINES);
     // N14 is the same approved sentence the debate's own report says when its story could not be written.
@@ -290,6 +581,11 @@ describe("V4 catalogue keys", () => {
     // The drafted lines name a version by its number and a wait by how many digs: no engine word, no score.
     const drafts = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.investigation.")).map((key) => catalog[key]!);
     expect(drafts.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
+  });
+
+  it("the owner's 5 Nov answers: the report's words from the second round of follow-ups are the owner's, and wait on no list", () => {
+    expect(Object.fromEntries(Object.keys(REPORT_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(REPORT_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in REPORT_ANSWER_LINES)).toEqual([]);
   });
 
   it("placeholders are well formed", () => {
@@ -305,9 +601,378 @@ describe("V4 catalogue keys", () => {
     const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "CHANGED", "NO_CHANGE", "REWRITE_FAILED"]
       .map((state) => `v4.rewrite.digCard.${state}`);
     expect(cards.filter((key) => !(key in catalog))).toEqual([]);
-    for (const key of cards) expect(catalog[key], key).toMatch(/^Dig · /u);
+    // V4 screen review (3 Nov), journey-f2 / journey-f22: a dig at work says the one state word "Looking into it" (its card
+    // already carries what is being dug); the other card lines keep their "Dig · " start.
+    expect(catalog["v4.rewrite.digCard.RUNNING"]).toBe("Looking into it");
+    for (const key of cards.filter((card) => card !== "v4.rewrite.digCard.RUNNING")) expect(catalog[key], key).toMatch(/^Dig · /u);
     // The new lines say what happened in plain words: no score, no state code, no reviewer or checker name.
     const fresh = DRAFTED_UNTIL_CLICK_TEST.filter((key) => key.startsWith("v4.rewrite.") || key.startsWith("v4.nest.")).map((key) => catalog[key]!);
     expect(fresh.filter((line) => /\b(?:score|strength|threshold|READY|WRITING|FAILED|checker|GLM|Haiku)\b/u.test(line))).toEqual([]);
+  });
+});
+
+/**
+ * The owner's V4 screen review (OWNER-PICKS-2026-11-03.md): the chat answers ("Next", "quota"), Round 2 r2-11, and the
+ * wording fixes dig-f15, wait-f20, wait-f21 and map-f16, word for word.
+ */
+const NO_WAIT = "You don't need to wait. You can dig or write your report now.";
+const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.ask.continue": "Next",
+  "v4.suggest.edit": "Change the wording",
+  // dig-f10 (the undo-bottom track): the person stays where they are; the note says when it started, with its own [See it].
+  "v4.dig.started": "Started {time} · You can leave this page.",
+  // report-d1 / report-d2 / report-f15 (the report from the map): the strip's two buttons, Free's line before writing,
+  // and the quiet reason dig buttons rest with while the report is written.
+  "v4.reportStrip.write": "Write it",
+  "v4.reportStrip.notYet": "Not yet",
+  "v4.report.publicToo": "This question is public, so your report will be public too.",
+  "v4.reportWait.digsRest": "Digging opens again when your report is written.",
+  "v4.debate.state.HOLDING": "Taking a short break · continues about {time}",
+  "v4.debate.state.HOLDING.noTime": "Taking a short break",
+  // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.
+  "v4.panel.storyMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
+  "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
+  // Wave 2, the panel and choosing what to dig: dig-f9 (the question check names the dig), dig-f22 (the visible reason
+  // over greyed boxes), dig-f34 (the two labels). Under the own-view box, journey-f20's "This will be public." where the
+  // debate's own public state says so (v4.publicMark.willBePublic, pinned in tests/unit/public-lane.test.ts), and on a
+  // Free debate whose state says no more than private, dig-f26's own sentence (the wave-2 review, lib/v4/publicNotes.ts).
+  // One pick's button reads map-f14's "Dig into this" (QUOTA_RECORD_LINES below: the owner's answer to question 1, 5 Nov,
+  // B, everywhere one pick is dug), the one dig-button helper of lib/v4/digQuota.ts.
+  "v4.suggest.ownViewPublic": "Free debates are public, so your view may be shown on this public page.",
+  // map-d4 A, as drawn on the page the owner picked from: the findings' heading.
+  "v4.panel.found": "What we found",
+  // dig-d1 B (it includes all of A), as drawn on the page the owner picked from: the running dig's checked findings and
+  // the folded current text of the path.
+  "v4.digLive.found": "Checked so far",
+  "v4.digLive.pathNow": "This path says now",
+  "v4.dig.checkAbout": "About your dig on “{path}”:",
+  "v4.suggest.picksOn": "Your picks are on “{path}”.",
+  "v4.suggest.freeCap": "On the Free plan a dig combines up to {count} picks.",
+  "v4.suggest.openTag": "Open question",
+  "v4.suggest.ownViewTag": "Your view",
+  // journey-f22: the rail says the shared state word "Ready" for finished digs (the build had "Done"); map-f28, whose Where
+  // names v4.panel.unchecked.*: "Some points were not checked by a second AI" (the build had added "here").
+  "v4.rail.digsDone.one": "Ready",
+  "v4.rail.digsDone.other": "Ready",
+  "v4.panel.unchecked.other": "Some points were not checked by a second AI."
+});
+
+/**
+ * The owner's screen review (OWNER-PICKS-2026-11-03.md), the quota track: the record's own words for the dig buttons, the
+ * period by the switch, the can't-start states and "This question" (journey-f13, dig-f5, dig-f31, public-d3 A,
+ * journey-f14, journey-f15, map-f9), word for word. The owner's answers of 5 Nov: one pick reads map-f14's "Dig into this"
+ * everywhere it is dug, in the panel, the phone bar, the tray and a public dig box (question 1 B and its follow-up; two or
+ * more keep "Dig into your picks"), and a public page's dig box says the period alone to every reader (question 34 A and
+ * its follow-up: read-f19 / journey-f8's "of today", "of this month" on Free).
+ */
+const QUOTA_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.panel.dig": "Dig here",
+  "v4.undo.barShare": "up to {percent}%",
+  "v4.dig.yourPicks.one": "Dig into this",
+  "v4.dig.yourPicks.other": "Dig into your picks",
+  "v4.dig.trayDigThese": "Dig into these",
+  "v4.dig.chooseWhat": "Choose what to dig ›",
+  "v4.dig.after": "after {time}",
+  "v4.dig.addToTray": "Add to tray",
+  "v4.dig.period.PERSON_DAY": "of today · you can still finish your report",
+  "v4.dig.period.PERSON_MONTH": "of this month · you can still finish your report",
+  "v4.public.dig.period.PERSON_DAY": "of today",
+  "v4.public.dig.period.PERSON_MONTH": "of this month",
+  "v4.suggest.waitingOn": "Your picks are waiting on “{path}”.",
+  "v4.suggest.goToPicks": "Go to them",
+  "v4.suggest.clearPicks": "Clear them",
+  "v4.debate.questionShare.PERSON_DAY": "This question: {percent}% of today"
+});
+
+/**
+ * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers"), the header's words the owner gave,
+ * word for word: question 13 C names the account menu's way to the maps; the follow-ups to question 15 give the share inside
+ * the circle ("70%"), the bars' names ("Today", "This week" and "This month") and, in the second round, the word inside the
+ * circle past 100% ("Over") and the full bar's "Today: more than your quota used".
+ */
+const HEADER_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.menu": "My questions",
+  "v4.header.circleShare": "{percent}%",
+  "v4.header.circleShareOver": "Over",
+  "v4.header.bar.PERSON_DAY": "Today",
+  "v4.header.bar.PERSON_WEEK": "This week",
+  "v4.header.bar.PERSON_MONTH": "This month",
+  "v4.header.over.PERSON_DAY": "Today: more than your quota used"
+});
+
+/**
+ * The owner's answers of 5 Nov 2026, the follow-ups to question 15 (the reading level is chosen only when asking): the two
+ * lines under the first screen's level choice, word for word. The line under the choice no longer promises a label at the
+ * top, and the longer explanation drops its last sentence (no level can be changed later).
+ */
+const ASK_LEVEL_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.ask.levelNote": "You choose it for this question. Its map, digs and report all keep it.",
+  "v4.ask.levelHonest": "The AIs that write your answer and its story write for this level. It also changes how much detail we show you, and sometimes how long the answer is."
+});
+
+/**
+ * The owner's third round of follow-ups (5 Nov 2026 afternoon), word for word: the page behind the account menu's "My
+ * questions" is renamed "My questions" (its heading and its tab title), and the first screen's link to it becomes "All my
+ * questions".
+ */
+const MY_QUESTIONS_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.title": "My questions",
+  "v4.maps.all": "All my questions"
+});
+
+/**
+ * The owner's third round of follow-ups (5 Nov 2026 afternoon), word for word: a paused dig's greyed button before the new
+ * month, "Continue on 1 December" (question 19 A had named public-d4 A's words; the third round quotes them itself).
+ */
+const PAUSE_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.pause.continuesOn": "Continue on {date}"
+});
+
+/**
+ * The owner's fourth round of follow-ups (chat, 6 Nov 2026, after PR #245; OPEN-OWNER-QUESTIONS-2026-11-04.md, "Fourth
+ * round"), word for word: the browser tab follows the page's state word, "Waiting · …" while a question waits for a free
+ * spot and "Looking into it · …" while it runs (the tab's word is the state word without its time); the "older than the
+ * map" box says "It will wait for your dig in progress."; a dig that reached the site's limit says "This dig reached its
+ * limit before it could produce an answer."; and a dig whose paid plan ended keeps its line with "put on hold".
+ */
+const FOURTH_ROUND_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.ready.tab.waiting": "Looking into it",
+  "v4.state.WAITING.noTime": "Waiting",
+  "v4.rewrite.waitsForDig": "It will wait for your dig in progress.",
+  "v4.digFailed.reason.RUN_LIMIT_REACHED": "This dig reached its limit before it could produce an answer.",
+  "v4.digFailed.reason.PLAN_ENDED": "Your paid plan ended or was put on hold while this dig waited, so it didn't start."
+});
+
+/**
+ * The fourth round also says the public dig box keeps "“My questions” will show it if it did.", which is the second
+ * sentence of v4.public.dig.unconfirmed. That sentence is the owner's and is pinned here as the line's ending. The
+ * first sentence ("We couldn't confirm that this dig started.") is still a draft, so the key stays on
+ * DRAFTED_UNTIL_CLICK_TEST.
+ */
+const FOURTH_ROUND_ANSWER_ENDINGS: Readonly<Record<string, string>> = Object.freeze({
+  "v4.public.dig.unconfirmed": " “My questions” will show it if it did."
+});
+
+/**
+ * The place the owner's record calls "Your question" (OWNER-PICKS-2026-11-03.md: map-d1 A, "whenever you are on “Your
+ * question”"; map-f7, the where-you-are line "Your question › Whole-system costs"; journey-f18, the rail "Your question ·
+ * What we'll look into · The map · Your report"), word for word: the first step of a dig's trail and the place named in
+ * "Your picks are waiting on “…”." when the picks are the question's own (OPEN-OWNER-QUESTIONS-2026-11-04.md, section 3,
+ * "Decided by your record").
+ */
+const YOUR_QUESTION_RECORD_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.nest.trailRoot": "Your question"
+});
+
+/**
+ * The owner's answer to question 33 (5 Nov 2026, A) and the fifth round (7 Nov), word for word: a dig made on someone else's
+ * public page shows on "My questions" as a card of its own, "Dig: {its pick}" (dig-f30's words, which question 33 quotes),
+ * and one that dug a whole path, with no pick, as "Dig: a closer look at a path".
+ */
+const PUBLIC_DIG_CARD_ANSWER_LINES: Readonly<Record<string, string>> = Object.freeze({
+  "v4.maps.dig": "Dig: {pick}",
+  "v4.maps.digWholePath": "Dig: a closer look at a path"
+});
+
+describe("the owner's answer to question 33 and the fifth round (7 Nov): the public dig's card on \"My questions\"", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(PUBLIC_DIG_CARD_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PUBLIC_DIG_CARD_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in PUBLIC_DIG_CARD_ANSWER_LINES)).toEqual([]);
+    // It echoes the map's own button for a whole path.
+    expect(catalog["v4.map.digWholePath"]).toBe("A closer look at this path");
+  });
+});
+
+describe("the owner's fourth round (6 Nov): the tab, the 'older than the map' box and two failed-dig lines", () => {
+  it("are the owner's words, pinned here, and wait on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(FOURTH_ROUND_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(FOURTH_ROUND_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in FOURTH_ROUND_ANSWER_LINES)).toEqual([]);
+    // The tab's working word is the shared state word itself.
+    expect(catalog["v4.ready.tab.waiting"]).toBe(catalog["v4.state.LOOKING"]);
+    // The waiting state's word is the tab's word followed by its time.
+    expect(catalog["v4.state.WAITING"]).toBe(`${catalog["v4.state.WAITING.noTime"]} · starts after {time}`);
+    expect(Object.values(catalog).filter((value) => /running dig/u.test(value))).toEqual([]);
+  });
+
+  it("the public dig box's line ends with the owner's sentence; its first sentence is still a draft", () => {
+    for (const [key, ending] of Object.entries(FOURTH_ROUND_ANSWER_ENDINGS)) {
+      expect(catalog[key], key).toBeDefined();
+      expect(catalog[key]!.endsWith(ending), `${key}: ${catalog[key]}`).toBe(true);
+      expect(catalog[key]!.slice(0, -ending.length).trim().length, key).toBeGreaterThan(0);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+  });
+});
+
+describe("the owner's record: the question's own place is \"Your question\"", () => {
+  it("the trail's first step is the record's words, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(YOUR_QUESTION_RECORD_LINES).map((key) => [key, catalog[key]]))).toEqual(YOUR_QUESTION_RECORD_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in YOUR_QUESTION_RECORD_LINES)).toEqual([]);
+    expect(Object.values(catalog).filter((value) => /Main question/u.test(value))).toEqual([]);
+  });
+});
+
+describe("the page \"My questions\": its empty and failed lines", () => {
+  it("speak of questions, not maps, and are drafts until the click-test", () => {
+    for (const key of ["v4.maps.empty", "v4.maps.failed"]) {
+      expect(catalog[key], key).toMatch(/\bquestions?\b/u);
+      expect(catalog[key], key).not.toMatch(/\bmaps?\b/iu);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+  });
+});
+
+describe("the owner's third round (5 Nov afternoon): the greyed 'Continue on 1 December'", () => {
+  it("is the owner's words, pinned here, and waits on no drafted list", () => {
+    expect(Object.fromEntries(Object.keys(PAUSE_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(PAUSE_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in PAUSE_ANSWER_LINES)).toEqual([]);
+  });
+});
+
+describe("the owner's third round (5 Nov afternoon): the page is called 'My questions'", () => {
+  it("its name and the first screen's link are the owner's words, wait on no list, and no V4 line names 'Your maps' any more", () => {
+    expect(Object.fromEntries(Object.keys(MY_QUESTIONS_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(MY_QUESTIONS_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in MY_QUESTIONS_ANSWER_LINES)).toEqual([]);
+    // The account menu's item and the page it opens carry one name.
+    expect(catalog["v4.maps.menu"]).toBe(catalog["v4.maps.title"]);
+    // The page's old names ("Your maps", "All my maps"); "your maps" for the maps themselves is not the page's name.
+    expect(Object.entries(catalog).filter(([, value]) => /\b(?:Your|All my) maps\b/u.test(value))).toEqual([]);
+    // The sentences that name the page name it by its new name, and wait on the drafted list (v4.public.dig.unconfirmed only
+    // for its first sentence: FOURTH_ROUND_ANSWER_ENDINGS).
+    for (const key of ["v4.debate.usually", "v4.public.dig.unconfirmed"]) {
+      expect(catalog[key], key).toContain(`“${catalog["v4.maps.title"]}”`);
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
+    }
+  });
+});
+
+describe("the owner's 5 Nov answers: the header", () => {
+  it("the owner's header words ('My questions', '70%', 'Over', the bars, the full bar) are pinned and none waits on the drafted list", () => {
+    expect(Object.fromEntries(Object.keys(HEADER_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(HEADER_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in HEADER_ANSWER_LINES)).toEqual([]);
+  });
+
+  it("no header line names the level any more, and every period the circle can show has its 'over' name and its bar", () => {
+    // The reading-level ruling: no level menu in any header, so its two lines are gone.
+    expect(Object.keys(catalog).filter((key) => key.startsWith("v4.header.level"))).toEqual([]);
+    // Under 100% the circle's name is the record's own line (v4.header.used.*): no words of its own.
+    expect(Object.keys(catalog).filter((key) => key.startsWith("v4.header.circle."))).toEqual([]);
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]) {
+      // Past 100% the name keeps the word the circle shows (WCAG 2.5.3, label in name).
+      expect(catalog[`v4.header.circleOver.${scope}`], scope).toMatch(/\bover\b/u);
+      // A bar's label is the period word of its read-out line ("Today", "This week", "This month", "In total").
+      expect(catalog[`v4.header.bar.${scope}`], scope).toBe(catalog[`v4.header.used.${scope}`]!.split(":")[0]);
+    }
+  });
+
+  it("the follow-ups to question 15: the first screen's two level lines are the owner's words, and neither waits on the drafted list", () => {
+    expect(Object.fromEntries(Object.keys(ASK_LEVEL_ANSWER_LINES).map((key) => [key, catalog[key]]))).toEqual(ASK_LEVEL_ANSWER_LINES);
+    expect(DRAFTED_UNTIL_CLICK_TEST.filter((key) => key in ASK_LEVEL_ANSWER_LINES)).toEqual([]);
+    // Nothing on the first screen promises a level label at the top, or a level changed later.
+    expect(Object.entries(catalog).filter(([key, value]) => key.startsWith("v4.ask.") && /label at the top|change it later/iu.test(value))).toEqual([]);
+  });
+});
+
+describe("the owner's 5 Nov answers: failed digs and questions, one pick, the public period", () => {
+  it("question 3 A: a dig that did not finish has its own line for every reason group, said about the dig, drafts but the owner's", () => {
+    const keys = RUN_FAILURE_KINDS.map((kind) => `v4.digFailed.reason.${kind}`);
+    expect(keys.filter((key) => !(key in catalog))).toEqual([]);
+    // The fourth round (6 Nov) gave two of them word for word (FOURTH_ROUND_ANSWER_LINES); the others wait on the list.
+    expect(keys.filter((key) => !DRAFTED_UNTIL_CLICK_TEST.includes(key) && !(key in FOURTH_ROUND_ANSWER_LINES)))
+      .toEqual([]);
+    expect(keys.filter((key) => key in FOURTH_ROUND_ANSWER_LINES).sort())
+      .toEqual(["v4.digFailed.reason.PLAN_ENDED", "v4.digFailed.reason.RUN_LIMIT_REACHED"]);
+    // The answer's own example; every line names the dig, never the question, and asks for nothing to be asked again.
+    expect(catalog["v4.digFailed.reason.STOPPED"]).toBe("This dig stopped partway because of a problem on our side.");
+    for (const key of keys) {
+      expect(catalog[key], key).toMatch(/\bdig\b/u);
+      // "limit" only where the owner gave it (the fourth round: the dig "reached its limit").
+      expect(catalog[key], key).not.toMatch(key === "v4.digFailed.reason.RUN_LIMIT_REACHED"
+        ? /question|debate|ask|allowance|paused/iu : /question|debate|ask|allowance|limit|paused/iu);
+      // Plain words (the wave-4 checks, 5 Nov): no line names an internal reserve "set aside" for the dig, which beside
+      // "Nothing was taken from your quota for this." could read as the person's quota set aside.
+      expect(catalog[key], key).not.toMatch(/set aside/iu);
+    }
+    // The two kinds that were never charged say so in their own line (lib/v4/failedRun.ts never says it twice).
+    for (const kind of ["SET_ASIDE", "CHOICE_GONE"]) expect(catalog[`v4.digFailed.reason.${kind}`], kind).toMatch(/did not use (?:any of )?your quota\./u);
+  });
+
+  it("the third round: a dig that keeps failing because the AIs were unavailable drops only 'You can try it again in a while.'", () => {
+    expect(catalog["v4.digFailed.reason.MODELS_UNAVAILABLE"]).toBe(`${catalog["v4.digFailed.unavailableKeepsFailing"]} You can try it again in a while.`);
+    expect(catalog["v4.digFailed.unavailableKeepsFailing"]).not.toMatch(/again/iu);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.digFailed.unavailableKeepsFailing");
+  });
+
+  it("a dig's own failed page has its own drafted heading, about the dig", () => {
+    expect(catalog["v4.debate.digFailedTitle"]).toMatch(/^This dig didn't finish$/u);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.digFailedTitle");
+  });
+
+  it("question 20 A: the failed question's 'used some' line is the answer's words, a draft until the click-test", () => {
+    expect(catalog["v4.debate.failedSomeTaken"]).toBe("The part that ran used some of your quota.");
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.debate.failedSomeTaken");
+    // The two "nothing taken" lines are the record's (map-f30, wait-f18), not drafts.
+    expect([catalog["v4.debate.failedNothingTaken"], catalog["v4.digFailed.nothingTaken"]])
+      .toEqual(["Nothing was taken for the failed try.", "Nothing was taken from your quota for this."]);
+  });
+
+  it("questions 1 B and 34 A: one pick and the public period are the record's words, off the drafted list; the week stays drafted", () => {
+    for (const key of ["v4.dig.yourPicks.one", "v4.public.dig.period.PERSON_DAY", "v4.public.dig.period.PERSON_MONTH"]) {
+      expect(DRAFTED_UNTIL_CLICK_TEST, key).not.toContain(key);
+    }
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.public.dig.period.PERSON_WEEK");
+    expect(Object.values(catalog).filter((value) => /Dig into your pick(?!s)/u.test(value))).toEqual([]);
+  });
+});
+
+describe("the owner's 3 Nov screen review", () => {
+  it("the quota track's dig, period and can't-start lines are the record's words, and 'Dig here too' is gone", () => {
+    expect(Object.fromEntries(Object.keys(QUOTA_RECORD_LINES).map((key) => [key, catalog[key]]))).toEqual(QUOTA_RECORD_LINES);
+    // journey-f13: one dig button everywhere; "Dig here too" and "Dig deeper here" are on no page.
+    expect(Object.entries(catalog).filter(([, value]) => /Dig here too|Dig deeper here/u.test(value))).toEqual([]);
+    // journey-f8 / r2-2 A: nothing says what is left.
+    expect(Object.entries(catalog).filter(([key, value]) => (key.startsWith("v4.dig.") || key.startsWith("v4.header.")) && /\bleft\b/u.test(value)))
+      .toEqual([]);
+    // journey-f15: a month waits "on" its date ({date}); a day and a week wait "after" a time ({time}).
+    expect(catalog["v4.money.startsWait.PERSON_MONTH"]).toContain("on {date}");
+    for (const key of ["v4.money.startsWait.PERSON_DAY", "v4.money.startsWait.PERSON_WEEK", "v4.dig.quotaDayUsed"]) expect(catalog[key], key).toContain("after {time}");
+  });
+
+  it("the first button reads Next, and the dig, wait and missing-answer lines are the review's words", () => {
+    expect(Object.fromEntries(Object.keys(REVIEW_LINES).map((key) => [key, catalog[key]]))).toEqual(REVIEW_LINES);
+    // Review F10: where no dig can start, the same approved words stop after "You don't need to wait."
+    expect(catalog["v4.panel.noShortAnswerNoDig"]).toBe(`${APPROVED_REPORT_LINES["v4.investigation.noStory"]} You don't need to wait.`);
+    expect(`${catalog["v4.panel.noShortAnswerNoDig"]} You can dig or write your report now.`).toBe(catalog["v4.panel.storyMissing"]);
+    // Review F1: the report's line when the start of writing is not known is the timed line without its time.
+    expect(catalog["v4.investigation.writing"]).toBe(catalog["v4.investigation.writingSince"]!.replace(" Started {time}.", ""));
+  });
+
+  it("the share word is quota: no V4 line says allowance", () => {
+    expect(Object.entries(catalog).filter(([, value]) => /allowance/iu.test(value))).toEqual([]);
+    const shares = ["v4.header.used.PERSON_DAY", "v4.header.used.PERSON_WEEK", "v4.header.used.PERSON_MONTH", "v4.header.used.PERSON_GRANT",
+      "v4.panel.modeHint.thorough", "v4.money.borrowed.PERSON_DAY", "v4.money.borrowed.PERSON_WEEK",
+      "v4.money.startsWait.PERSON_MONTH", "v4.money.paused"];
+    for (const key of shares) expect(catalog[key], key).toMatch(/\bquota\b/u);
+    // wait-f5 (fail-pause track): after the reset the pause block says only "Your new month has started." with Continue.
+    expect(catalog["v4.money.pausedReady"]).toBe("Your new month has started.");
+  });
+
+  it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
+    for (const key of ["v4.debate.usually", "v4.investigation.writingSince", "v4.investigation.writing"]) {
+      expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
+      expect(catalog[key], key).toMatch(/This takes a while\./u);
+    }
+    // ask-d5 B, renamed in the owner's third round (5 Nov): the list on the first page is "My questions" now.
+    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.maps.title"]}”`);
+  });
+
+  it("wait-f20: 'Paused' is the month wall's word only", () => {
+    const paused = Object.entries(catalog).filter(([, value]) => /\bpaused\b/iu.test(value)).map(([key]) => key).sort();
+    // Every one of these is the month's quota (fail-pause's dig card, phone bar and rail words; the waiting card's state words).
+    expect(paused).toEqual([
+      "v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.pause.digCard", "v4.pause.phoneBar", "v4.rail.digsPaused.one",
+      "v4.rail.digsPaused.other", "v4.rewrite.digCard.PAUSED", "v4.state.PAUSED", "v4.state.PAUSED.noDate"
+    ].sort());
+    expect(catalog["v4.state.SHORT_BREAK"]).not.toMatch(/\bpaused\b/iu);
   });
 });

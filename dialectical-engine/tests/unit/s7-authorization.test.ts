@@ -87,6 +87,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
   { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "GET /v1/account/moderation-statements", auth: "user", resource: "identity", action: "read-moderation-statements" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "GET /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
@@ -381,7 +382,8 @@ describe("S7 deny-by-default authorization", () => {
     // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
     // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
     // Decision 33 adds the four staff routes of a public debate under review. Decision 35 adds the Report button's three.
-    expect(contractInventory.routes).toHaveLength(201);
+    // 0157 adds the statements of reasons (GET /v1/account/moderation-statements).
+    expect(contractInventory.routes).toHaveLength(202);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

@@ -1,13 +1,13 @@
 import {
   ContractHttpError, DIG_FREE_PICKS_MAX, DIG_PICKS_ONE_PATH, DIG_TOO_DEEP,
-  type ContractClient, type PublicContribution, type PublicDebate, type PublicDigParent, type PublicReportVersion, type StoryFate
+  type ContractClient, type DigSuggestion, type PublicContribution, type PublicDebate, type PublicDigParent, type PublicReportVersion, type StoryFate
 } from "@debateai/contract";
 import { contractClient } from "../api.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import { digQuestion } from "./askText.js";
-import { startsWaitLine } from "./money.js";
-import { ownViewPick, publicParentOf } from "./suggestions.js";
-import { TRUST_WORDS, type DigTarget, type TrustCounts, type V4Path } from "./types.js";
+import { limitLine } from "./money.js";
+import { ownViewPick, publicParentOf, suggestionPick } from "./suggestions.js";
+import { TRUST_WORDS, type DigMode, type DigTarget, type TrustCounts, type V4Path } from "./types.js";
 import type { AskRoom } from "../billing/room.js";
 
 /*
@@ -79,18 +79,23 @@ export function reportsNewestFirst(reports: readonly PublicReportVersion[] | und
 
 /**
  * What a dig on this path sends: the question built as a dig's question is on the V4 map (digQuestion, from the path's line and the person's own views under
- * the debate's question), and its `public_parent`. A quick look (R22). Null when it would not pass the contract's shape: nothing is sent then.
+ * the debate's question), and its `public_parent`. Owner screen review (public-f11, public-d2): a quick look unless the person chose Thorough (`mode`, paid
+ * plans only: the caller sends Free's quick look), and the path's own suggestions the person tapped (`chips`) first, then their own views. `target` is the
+ * dig as the site's one Undo list keeps it. Null when it would not pass the contract's shape: nothing is sent then.
  */
 export function publicDigAsk(input: Readonly<{
   publicRef: string; question: string; path: Pick<PublicPathView, "ref" | "digRef" | "line" | "fate">; views: readonly string[]; catalog: MessageCatalog; locale: string;
-}>): Readonly<{ questionLine: string; parent: PublicDigParent }> | null {
+  mode?: DigMode; chips?: readonly DigSuggestion[];
+}>): Readonly<{ questionLine: string; parent: PublicDigParent; target: DigTarget }> | null {
   const { path } = input;
   const standIn: V4Path = { id: path.ref, fate: path.fate, line: path.line, points: [], counts: Object.fromEntries(TRUST_WORDS.map((word) => [word, 0])) as TrustCounts, unchecked: 0, open: [] };
-  const picks = input.views.map((view) => view.trim()).filter((view) => view.length > 0).map((view, serial) => ownViewPick(path.ref, view, serial));
+  const chosen = (input.chips ?? []).map((suggestion) => suggestionPick(path.ref, suggestion));
+  const views = input.views.map((view) => view.trim()).filter((view) => view.length > 0).map((view, serial) => ownViewPick(path.ref, view, serial));
+  const picks = [...chosen, ...views];
   if (picks.length === 0) return null;
   const target: DigTarget = { kind: "picks", path: standIn, picks };
-  const parent = publicParentOf(input.publicRef, path.digRef, target, "quick");
-  return parent === null ? null : { questionLine: digQuestion(target, input.question, input.catalog, input.locale), parent };
+  const parent = publicParentOf(input.publicRef, path.digRef, target, input.mode ?? "quick");
+  return parent === null ? null : { questionLine: digQuestion(target, input.question, input.catalog, input.locale), parent, target };
 }
 
 /** A refusal of a public page's dig in plain words: no level, no count, no code. Null: any other failure, which the ask's own handling says. */
@@ -106,9 +111,12 @@ export function publicDigRefusalWords(failure: unknown, catalog: MessageCatalog,
   return null;
 }
 
-/** The site's plain line for a used-up limit, with its time when the room read knows it. */
+/**
+ * The site's plain line for a used-up limit, with its time when the room read knows it. public-f24 (owner's screen review,
+ * 3 Nov): the same V4 line as every other V4 page, whichever server switch is in force (lib/v4/money.ts limitLine).
+ */
 export function usedUpWords(catalog: MessageCatalog, room: AskRoom | null, locale: string): string {
-  const line = startsWaitLine(room, locale);
+  const line = limitLine(room, locale);
   return line === null ? t(catalog, "v4.public.refusal.waitsForReset") : t(catalog, line.key, line.values);
 }
 

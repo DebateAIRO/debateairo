@@ -6,6 +6,86 @@
 .v4RepActions .v4Btn { text-decoration: none; color: var(--text); }
 .v4RepActions .v4BtnPrimary { color: var(--surface); }
 
+/* report-f12: the report's own header, one row: "← Back to the map" on the start side, the reading level and Share on the
+   end side. Small enough to stay one row at phone width; at the narrowest the back link's words shorten, never wrap. */
+.v4RepHdr {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface);
+}
+.v4RepHdrBack {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 0; margin-inline-end: auto;
+  color: var(--text); text-decoration: none; font-size: var(--t-ui); font-weight: 600;
+}
+.v4RepHdrBack:hover .v4RepHdrBackText { text-decoration: underline; text-underline-offset: 3px; }
+.v4RepHdrBackText, .v4RepHdrBackShort { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v4RepHdrBackShort { display: none; }
+.v4RepHdrBack:hover .v4RepHdrBackShort { text-decoration: underline; text-underline-offset: 3px; }
+/* Browser check (4 Nov): below 480px the full words no longer fit beside the level and Share ("Back to the m…"), so the
+   short word shows; the link's name (aria-label) is the full sentence on every screen. Only words that have a short
+   form (.v4RepHdrBackWide) step aside: "Back to your question" (a debate that did not finish, no Share) stays. */
+@media (max-width: 479px) {
+  .v4RepHdrBackWide { display: none; }
+  .v4RepHdrBackShort { display: inline; }
+}
+.v4RepHdrArrow { flex: none; }
+:dir(rtl) .v4RepHdrArrow { transform: scaleX(-1); }
+.v4RepHdrSpacer { margin-inline-end: auto; }
+.v4RepMenu { position: relative; flex: none; }
+.v4RepMenuButton {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; white-space: nowrap;
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface-2); color: var(--text);
+  font-size: var(--t-meta); font-weight: 600; cursor: pointer;
+}
+.v4RepMenuButton:hover { background: var(--surface-sunken); }
+.v4RepMenuList {
+  position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-end: 0; min-width: 220px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; gap: 2px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
+}
+.v4RepMenuTitle { margin: 2px 8px 6px; font-size: var(--t-meta); color: var(--text-3); }
+.v4RepMenuItem {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 10px; text-align: start;
+  border: 0; border-radius: 8px; background: none; color: var(--text); cursor: pointer; font-size: var(--t-ui);
+}
+.v4RepMenuItem:hover { background: var(--surface-2); }
+.v4RepMenuItem[aria-pressed="true"] { font-weight: 700; background: var(--con-bg); }
+.v4RepMenuCheck { width: 14px; color: var(--accent); }
+.v4RepHdrStatus:not(:empty) { padding: 8px var(--v4-gutter); border-bottom: 1px solid var(--line-2); font-size: var(--t-ui); color: var(--text-2); }
+@media (min-width: 768px) {
+  .v4RepHdr { gap: 10px; padding: 8px 32px; }
+  .v4RepMenuButton { padding: 0 14px; font-size: var(--t-ui); }
+  .v4RepHdrStatus:not(:empty) { padding: 8px 32px; }
+}
+
+/* report-f16: the report's space is held while it loads. */
+.v4RepLoading {
+  min-height: 220px; padding: 24px; border-radius: var(--r-panel); background: var(--surface-2); color: var(--text-2);
+  font-size: var(--t-ui);
+}
+
+/* report-f3: the card before any report, and when the versions cannot be read. */
+.v4RepCard {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px clamp(16px, 4vw, 24px);
+  border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-2);
+}
+.v4RepCardTitle { font-family: var(--font-display); font-size: 19px; line-height: 1.35; color: var(--text-strong); }
+.v4RepCard:focus:not(:focus-visible), .v4RepStatusBox:focus:not(:focus-visible) { outline: none; }
+.v4RepStatusBox, .v4RepPressNote, .v4RepSlow, .v4RepDigMore { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.v4RepDigMoreLink { display: inline-flex; align-items: center; min-height: 44px; }
+
+/* report-f3: the first debate's answer: open before any report, behind a closed row once one exists. */
+.v4RepFirstOpen, .v4RepFirstBody { display: flex; flex-direction: column; gap: 32px; }
+.v4RepFirstOpen .v4RepSent, .v4RepFirstBody .v4RepSent { margin-top: 0; }
+.v4RepFirst { border-top: 1px solid var(--line-2); padding-top: 8px; }
+.v4RepFirstSummary {
+  display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--link); font-size: var(--t-ui);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.v4RepFirstBody { padding-top: 16px; }
+
+/* Round 2 r2-13: words that are only for the screen, or only for paper. */
+.v4RepPrintOnly { display: none; }
+
 .v4RepDoc {
   width: min(100%, calc(72ch + 2 * var(--v4-gutter)));
   margin: 0 auto;
@@ -48,7 +128,8 @@
   line-height: 1.3;
 }
 .v4RepProse { font-size: 16px; line-height: 1.65; }
-.v4RepList { padding-left: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }
+/* report-f14: padding and rule lines on the reading side (logical properties), for AI text in any direction. */
+.v4RepList { padding-inline-start: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }
 .v4RepNote { color: var(--text-2); font-size: var(--t-ui); }
 
 /* "What we asked the AIs": the full text sent, shown only when the person's choices added lines to their question. */
@@ -66,7 +147,7 @@
 .v4RepSentText { white-space: pre-wrap; font-size: var(--t-ui); line-height: 1.55; color: var(--text-2); }
 
 /* DATA-2: the whole composed answer when no short answer was written. */
-.v4RepFallback { display: flex; flex-direction: column; gap: 12px; }
+.v4RepFallback, .v4RepAnswerText { display: flex; flex-direction: column; gap: 12px; }
 
 /* "The answer": the one card on the page, as in the prototype's "Our best answer". */
 .v4RepAnswer {
@@ -95,17 +176,24 @@
   break-inside: avoid;
 }
 .v4RepPath:last-child { border-bottom: 1px solid var(--line-2); }
-.v4RepFate {
+/* Round 2 r2-20: a path's ONE trust word (never an outcome tag), in the bar's colours. */
+.v4RepPathWord {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
   letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase;
   color: var(--text-2);
 }
-.v4RepFate[data-fate="HELD_UP"] { color: var(--v4-sure); }
-.v4RepFate[data-fate="PARTLY_HELD"] { color: var(--gold-text); }
-.v4RepFate[data-fate="FELL"] { color: var(--con-text); }
+.v4RepPathWord[data-trust="SURE"] { color: var(--v4-sure); }
+.v4RepPathWord[data-trust="STILL_ARGUED"] { color: var(--gold-text); }
+.v4RepPathWord[data-trust="DIDNT_HOLD"] { color: var(--con-text); }
 .v4RepPathLine { font-family: var(--font-display); font-size: 18px; line-height: 1.45; }
+.v4RepPathSummary { color: var(--text-2); font-size: 15px; line-height: 1.55; }
+/* report-f3: a version's dig paths sit one step in per level, as in the PDF. */
+.v4RepPath[data-level="1"] { margin-inline-start: 14px; }
+.v4RepPath[data-level="2"] { margin-inline-start: 28px; }
+.v4RepPath[data-level="3"] { margin-inline-start: 42px; }
+.v4RepPath[data-level="4"] { margin-inline-start: 56px; }
 .v4RepBar { max-width: 360px; }
 
 .v4RepPoints { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -117,6 +205,9 @@
   background: repeating-linear-gradient(180deg, var(--v4-argued) 0 4px, var(--v4-argued-soft) 4px 7px);
 }
 .v4RepPoint[data-trust="DIDNT_HOLD"] .v4RepPointMark { background: none; box-shadow: inset 0 0 0 1.5px var(--v4-fell); }
+/* report-f18: a point no second AI checked is shown in grey. */
+.v4RepPoint[data-trust="UNCHECKED"] { color: var(--text-3); }
+.v4RepPoint[data-trust="UNCHECKED"] .v4RepPointMark { background: var(--line-2); }
 .v4RepPointBody { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .v4RepPointWord { font-size: var(--t-meta); font-weight: 600; color: var(--text-2); }
 .v4RepSmallHead { margin: 8px 0 0; font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
@@ -133,7 +224,7 @@
   gap: 8px;
   break-inside: avoid;
 }
-.v4RepDigQuestions { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.v4RepDigQuestions { padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
 .v4RepDigMeta { color: var(--text-2); font-size: var(--t-ui); }
 .v4RepDigLink { display: inline-flex; align-items: center; min-height: 44px; }
 
@@ -167,9 +258,10 @@
 .v4RepVersions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .v4RepVersion { min-height: 44px; background: none; border: 0; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
 .v4RepVersion[aria-pressed="true"] { color: var(--text-strong); font-weight: 600; text-decoration: none; }
-.v4RepVersionBody { display: flex; flex-direction: column; gap: 12px; }
+.v4RepVersionBody, .v4RepVersionShown { display: flex; flex-direction: column; gap: 12px; }
+.v4RepVersionLine { color: var(--text-2); font-size: var(--t-ui); }
 .v4RepSources { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 14px; }
-.v4RepSource { display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 2px solid var(--line-2); break-inside: avoid; }
+.v4RepSource { display: flex; flex-direction: column; gap: 4px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); break-inside: avoid; }
 .v4RepSourceSite { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--text-3); }
 .v4RepSourceLine { color: var(--text-2); font-size: var(--t-ui); line-height: 1.55; }
 .v4RepSourceQuote { margin: 0; font-size: 15px; line-height: 1.55; }
@@ -199,14 +291,20 @@
   .v4RepDoc { width: 100%; max-width: none; padding: 0; gap: 24px; font-size: 11pt; }
   .v4RepPrintBrand { display: block; font-family: var(--font-display); font-size: 10pt; }
   .v4RepAnswer, .v4RepDig, .v4RepSent { box-shadow: none; background: none; border-radius: 0; }
-  .v4RepSent { margin-top: 0; border: 0; border-left: 2px solid var(--qr-ink); padding: 0 0 0 12px; }
+  .v4RepSent { margin-top: 0; border: 0; border-inline-start: 2px solid var(--qr-ink); padding: 0; padding-inline-start: 12px; }
   .v4RepAnswer { border: 1px solid var(--qr-ink); }
-  .v4RepDig { border: 0; border-left: 2px solid var(--qr-ink); padding: 0 0 0 12px; }
+  .v4RepDig { border: 0; border-inline-start: 2px solid var(--qr-ink); padding: 0; padding-inline-start: 12px; }
   .v4RepH2, .v4RepH3 { break-after: avoid; }
   .v4RepSection, .v4RepAnswer { break-inside: auto; }
   .v4RepDoc a { text-decoration: none; color: var(--qr-ink); }
   .v4RepDigLink { display: none; }
-  /* W2-6: a printed source keeps its address, since a printed link cannot be followed. */
-  .v4RepDoc .v4SourceLink::after { content: " " attr(href); font-weight: 400; }
+  /* W2-6: a printed source keeps its address, since a printed link cannot be followed (report-f13: the report's own too). */
+  .v4RepDoc .v4SourceLink::after, .v4RepDoc a.v4RepSourceSite::after { content: " " attr(href); font-weight: 400; overflow-wrap: anywhere; }
+  .v4RepScreenOnly { display: none !important; }
+  .v4RepPrintOnly { display: inline; }
+  /* A closed row prints nothing (its words are only a way to open it on screen). */
+  .v4RepFirst:not([open]) { display: none; }
+  .v4RepFirst { border: 0; padding: 0; }
+  .v4RepFirstSummary { color: var(--qr-ink); text-decoration: none; font-weight: 600; }
   .v4RepDoc .v4Source { background: none; border-color: var(--qr-ink); break-inside: avoid; }
 }

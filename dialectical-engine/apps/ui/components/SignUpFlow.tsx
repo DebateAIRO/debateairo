@@ -12,6 +12,7 @@ import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { PhoneField } from '@/components/auth/PhoneField';
 import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { TurnstileChallenge } from '@/components/auth/TurnstileChallenge';
+import { canadaLegalLocale, canadaLegalSwitch, type CanadaLegalLocale } from '@/components/consent/canadaLegalLanguage';
 import { PrivacyPolicyModal } from '@/components/consent/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '@/components/consent/TermsOfServiceModal';
 import { useLegalDocument } from '@/components/consent/useLegalDocument';
@@ -125,13 +126,20 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const [italyFocusRequest, setItalyFocusRequest] = useState(0);
     const italyFocusHandled = useRef(0);
     const italyInputRef = useRef<HTMLInputElement | null>(null);
+    /* Canada (owner ruling 2026-11-02): while Region says Canada, both documents open in French whatever the page
+       language, and the switch at the top of either one moves both to English, and back, for the rest of this
+       sign-up. The request's `locale` names the language of the pair it sends; it drives only the legal check and
+       the acceptance record, while emails and the account follow `ui_locale`. */
+    const [canadaChoice, setCanadaChoice] = useState<CanadaLegalLocale>('fr');
     const privacyInputRef = useRef<HTMLInputElement | null>(null);
     const termsInputRef = useRef<HTMLInputElement | null>(null);
     const flight = useRef(false);
     const announcer = useFormAnnouncer();
     const { locale } = useChromeI18n();
-    const termsDocument = useLegalDocument('terms');
-    const privacyDocument = useLegalDocument('privacy');
+    const legalOverride = canadaLegalLocale(region.country, canadaChoice);
+    const documentsLocale = legalOverride ?? catalogLocale(locale);
+    const termsDocument = useLegalDocument('terms', legalOverride);
+    const privacyDocument = useLegalDocument('privacy', legalOverride);
     useEffect(() => {
         const next = new URLSearchParams(window.location.search).get('next');
         if (next !== null)
@@ -153,6 +161,21 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     function edit(field: keyof SignupFieldErrors) {
         setErrors(current => ({ ...current, [field]: undefined }));
     }
+    /* The documents the boxes accepted are no longer the ones on offer (a stale pair, Canada picked or left, or the
+       French/English switch): every tick on them goes, so nobody accepts a document they did not see. */
+    function withdrawAcceptance() {
+        if (privacyInputRef.current)
+            privacyInputRef.current.checked = false;
+        if (termsInputRef.current)
+            termsInputRef.current.checked = false;
+        setPrivacyAccepted(false);
+        setTermsAccepted(false);
+        setItalyApproved(false);
+    }
+    const languageSwitch = legalOverride === undefined ? undefined : canadaLegalSwitch(legalOverride, next => {
+        setCanadaChoice(next);
+        withdrawAcceptance();
+    });
     async function submitRegistration(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (flight.current)
@@ -216,7 +239,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setRefused(true);
                 return;
             }
-            const acknowledgement = await client.register({ email: submitted, password: rawPassword, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, ...(italyShown && italyApproved ? { italy_approval: true as const } : {}), locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const acknowledgement = await client.register({ email: submitted, password: rawPassword, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, ...(italyShown && italyApproved ? { italy_approval: true as const } : {}), locale: documentsLocale, ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             setEmail('');
             setPhone('');
             setRegion(EMPTY_REGION_PICK);
@@ -230,6 +253,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setItalyApproved(false);
             setItalyRevealed(false);
             setItalyError(null);
+            setCanadaChoice('fr');
             setRetryAfterSeconds(acknowledgement.retry_after_seconds);
             setSubmittedEmail(submitted);
         }
@@ -249,19 +273,14 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 return;
             }
             if (failure instanceof ContractHttpError && failure.serverCode === 'LEGAL_DOCUMENT_STALE') {
-                if (privacyInputRef.current)
-                    privacyInputRef.current.checked = false;
-                if (termsInputRef.current)
-                    termsInputRef.current.checked = false;
-                setPrivacyAccepted(false);
-                setTermsAccepted(false);
-                setItalyApproved(false);
+                withdrawAcceptance();
                 setDocumentsStale(true);
                 setError(t(catalog, "auth.signUp.documentsUpdated"));
                 return;
             }
             const code = failure instanceof ContractHttpError ? failure.serverCode ?? '' : '';
             setError(code === 'EMAIL_INVALID' ? t(catalog, "auth.emailUndeliverable")
+                : code === 'MAIL_DAILY_LIMIT' ? t(catalog, "auth.mailDailyLimit")
                 : code === 'STATE_SIGNUP_UNAVAILABLE' ? t(catalog, "auth.signUp.stateUnavailable")
                 : ['COUNTRY_SIGNUP_UNAVAILABLE', 'COUNTRY_UNKNOWN', 'TOR_REFUSED'].includes(code) ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.signUp.creationFailed"));
         }
@@ -316,6 +335,9 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             edit('password');
         }} required disabled={busy} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" className="authInlineToggle" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button></div><p className="authFieldHint" id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
  <RegionField catalog={catalog} locale={locale} value={region} onChange={next => {
+            // Picking or leaving Canada changes the documents' language, and a tick on the old pair does not carry over.
+            if ((canadaLegalLocale(next.country, canadaChoice) ?? catalogLocale(locale)) !== documentsLocale)
+                withdrawAcceptance();
             setRegion(next);
             // Leaving Italy before any refusal revealed the box unmounts it, and its tick goes with it.
             if (next.country !== ITALY_COUNTRY && !italyRevealed) {
@@ -349,11 +371,11 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
  <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
  {announcer.region}
  </form>
- {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => {
+ {policyOpen ? <PrivacyPolicyModal open mode="consent" locale={legalOverride} languageSwitch={languageSwitch} onClose={() => {
                 setPrivacyAccepted(privacyInputRef.current?.checked ?? false);
                 setPolicyOpen(false);
             }} onAcknowledge={acknowledgePolicy}/> : null}
- {termsOpen ? <TermsOfServiceModal open mode="consent" onClose={() => {
+ {termsOpen ? <TermsOfServiceModal open mode="consent" locale={legalOverride} languageSwitch={languageSwitch} onClose={() => {
                 setTermsAccepted(termsInputRef.current?.checked ?? false);
                 setTermsOpen(false);
             }} onAcknowledge={acknowledgeTerms}/> : null}

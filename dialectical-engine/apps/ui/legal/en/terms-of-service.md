@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.12 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.17 · EFFECTIVE 1 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.12
+endMarker: END OF TERMS · v2.17
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.12 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.17 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -170,9 +170,9 @@ Debates on a paid plan are **private by default**: nothing you create there is v
 
 ## 10. Reporting content, moderation and complaints
 
-**Anyone can report content.** You do not need an account. Write to support@dezbatere.ro. If you are signed in, you can also use the **Report** button on any public debate. An AI reads a report made with the button beside the public text. If it agrees, the debate is hidden at once and a person reviews it. If it does not, you can report again with more details, and a person will read it. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete.
+**Anyone can report content.** You do not need an account. Write to support@dezbatere.ro. If you are signed in, you can also use the **Report** button on any public debate; it asks you to confirm that you believe in good faith that your report is accurate and complete. An AI usually reads a report made with the button beside the public text. If it agrees, and the debate has never been hidden before, the debate is hidden at once, with no person involved, and a person then reviews it. A report goes straight to a person instead when the debate was hidden before, when you have already reported it, or when the automatic checks for the day are used up. If the AI does not agree, or the report is stopped automatically (for example because you have sent many reports within an hour, or the debate is not public), no person reads it: you can write to support@dezbatere.ro and a person will read it, or complain through the route below. So that we can act, tell us: why you believe the content is illegal or breaches these Terms, in enough detail to understand the claim; the exact location — the full URL and, if you can, the passage; your name and email address (not required for reports of child sexual abuse material); and that you believe in good faith that your report is accurate and complete.
 
-We acknowledge every report without undue delay. We handle reports in a timely, diligent, non-arbitrary and objective way, tell you our decision, and tell you how to challenge it. Where we use automated means to process or decide a report, we say so. Reports of intimate imagery shared without consent are acted on **within 48 hours** of a valid request.
+We acknowledge every report without undue delay: on the screen at once and, for a report a person will read, by email. We handle reports in a timely, diligent, non-arbitrary and objective way, tell you our decision by email, and tell you how to challenge it. Where we use automated means to process or decide a report, we say so. Reports of intimate imagery shared without consent are acted on **within 48 hours** of a valid request.
 
 **Two kinds of automated decision, kept apart.**
 
@@ -183,7 +183,7 @@ We acknowledge every report without undue delay. We handle reports in a timely, 
 
 **Where the question check belongs.** The question check in section 8 is not a decision inside the engine either. It is an automated tool that refuses to start a debate, with no person involved. A question that reads like the words of a person in crisis, or that asks for methods of suicide or self-harm or for encouragement to do it, gets a screen with help numbers instead of a refusal.
 
-**Statement of reasons.** Whenever we remove or restrict the visibility of your content, or suspend or terminate your account, we give you a statement of reasons: what we did and how far it reaches, the facts we relied on and whether they came from a report or our own checks, whether automated means were used, the legal or contractual ground, and how you can challenge the decision: through our complaints route below, through an out-of-court dispute settlement body certified under the EU Digital Services Act, or in court. When our question check refuses a question under the paragraph "Questions that do not start a debate" in section 7, the screen that tells you is our statement of reasons for it: it says that the debate did not start, that our automatic check refused the question with no person involved, which rule of these Terms the question falls under, and how to complain through the route below. For a refused question we promise nothing more. When our check deletes a debate (section 9), the notice you see is our statement of reasons for it: it says what we did and how far it reaches, the facts we relied on, that no person was involved, which rule of these Terms applies, and how to complain through the route below; the other two routes this paragraph names stay open to you. The screen with help numbers that a question reading like the words of a person in crisis gets is help, not a statement of reasons.
+**Statement of reasons.** Whenever we remove or restrict the visibility of your content, or suspend or terminate your account, we give you a statement of reasons: what we did and how far it reaches, the facts we relied on and whether they came from a report or our own checks, whether automated means were used, the legal or contractual ground, and how you can challenge the decision: through our complaints route below, through an out-of-court dispute settlement body certified under the EU Digital Services Act, or in court. We email it to you, with a link to the full statement in your account under Settings, Moderation notices, where it stays. You get one too when your content leaves a public page together with other content we are reviewing, even if yours was not found to break any rule. When our question check refuses a question under the paragraph "Questions that do not start a debate" in section 7, the screen that tells you is our statement of reasons for it: it says that the debate did not start, that our automatic check refused the question with no person involved, which rule of these Terms the question falls under, and how to complain through the route below. For a refused question we promise nothing more. When our check deletes a debate (section 9), the notice you see is our statement of reasons for it: it says what we did and how far it reaches, the facts we relied on, that no person was involved, which rule of these Terms applies, and how to complain through the route below; the other two routes this paragraph names stay open to you. The screen with help numbers that a question reading like the words of a person in crisis gets is help, not a statement of reasons.
 
 **Complaining about a decision.** If you disagree with a moderation decision, reply to the statement of reasons or write to office@dezbatere.ro within **six months**. A person who was not involved in the original decision reviews it, and we tell you the outcome with reasons. This does not affect your right to go to court or to use alternative dispute resolution under section 18. The complaints route also accepts complaints that we have failed to act on a report, that content was wrongly removed, that an account was wrongly restricted, or that an automated tool wrongly affected your content, for example by refusing a question.
 
@@ -211,11 +211,9 @@ Sections 8 (as to content already published), 15, 16 and 18 survive termination.
 
 ## 12. Paid plans
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine offers a free plan. Three paid plans, **Plus**, **Pro** and **Max**, will be available; each unlocks the full model roster and lets you set the debate gauges yourself.
 
-Dialectical Engine offers a free plan. A paid **Premium** plan will be available, which unlocks the full model roster and lets you set the debate gauges yourself.
-
-**Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Comandă cu obligație de plată*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
+**Before you pay** we show you, directly above the payment button: the plan; the total price including applicable tax; the billing period; that the plan renews automatically until cancelled; the date any free trial ends and what you will then be charged; and how to cancel. You confirm the renewal terms by ticking a separate box. The button reads **Subscribe and pay** (in Romanian, *Abonați-vă și plătiți*). We send you a confirmation on a durable medium containing the same information, these Terms, and the withdrawal form.
 
 **Reminders.** We email you at least 5 days before a free trial converts to a paid plan; at least once a year for continuing plans; and between 30 and 45 days before any renewal of a term of twelve months or more. Every reminder includes the price, the date, and a cancellation link.
 
@@ -225,7 +223,7 @@ Dialectical Engine offers a free plan. A paid **Premium** plan will be available
 
 **Failed payments.** If a payment fails we retry for 7 days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed.
 
-**Taxes, and who you pay.** Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
+**Taxes, and who you pay.** Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live). The tax for your billing address is added at checkout, and the checkout shows the total you pay, tax included, before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
 
 **Payment methods.** You pay by card. We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments (netopia-payments.com), and your full card number never reaches us.
 
@@ -233,7 +231,7 @@ Dialectical Engine offers a free plan. A paid **Premium** plan will be available
 
 **Chargebacks.** If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this.
 
-**Statutory rights first.** Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on either plan are published in the product; we give notice before tightening them in a way that materially affects you.
+**Statutory rights first.** Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on every plan are published in the product; we give notice before tightening them in a way that materially affects you.
 
 ## 13. Your right of withdrawal
 
@@ -250,6 +248,16 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.17 replaced version 2.16: section 10 says when an AI reads a report made with the Report button and when a person does, that the button asks for your good-faith statement, that we confirm a report and tell you our decision by email, and that statements of reasons are emailed and kept in your account; what we are liable for, and every right in these Terms, is unchanged.
+
+Version 2.16 replaced version 2.15: section 12 names the paid plans, Plus, Pro and Max, and sections 12 and 15 no longer carry drafting notes; what we are liable for, and every right in these Terms, is unchanged.
+
+Version 2.15 replaced version 2.14: section 12 says that our prices are shown before tax, as price + VAT, and that the tax is added at checkout.
+
+Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
+
+Version 2.13 replaced version 2.12: section 12 gives the payment button's Romanian wording.
 
 Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
 
@@ -273,8 +281,6 @@ Version 2.7 replaced version 2.6: it adds the question check, which reads each q
 
 **Events outside our control.** We are not in breach where we are prevented from performing by something outside our reasonable control. A failure or withdrawal by a third-party model provider is not automatically such an event; where it makes the service unavailable, section 14 applies and you may terminate and be refunded as it describes.
 
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
-
 ## 16. Intellectual property
 
 The service itself — the software, the engine, the scoring method, the interface, the names Dialectical Engine and DebateAIRO and our logos — belongs to us or our licensors. These Terms give you permission to use the service, not ownership of it.
@@ -297,7 +303,7 @@ How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro
 
 **Consumers elsewhere.** If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state.
 
-**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through www.onoratainstanta.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
+**Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through ANPC (SAL), reclamatiisal.anpc.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
 
 ## 19. Other terms
 
@@ -319,7 +325,7 @@ Each entry applies to people who live in its region and only states what differs
 
 ### A.1 European Union and European Economic Area
 
-The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through www.onoratainstanta.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
+The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through ANPC (SAL), reclamatiisal.anpc.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
 
 ### A.2 United States
 
@@ -331,7 +337,7 @@ The body of these Terms is written for you. In addition: you may bring proceedin
 
 ### A.3 Canada and Quebec
 
-Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
+Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. **Quebec:** these Terms are available in French; if you choose Canada when you sign up, you get them in French first and can choose English instead; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you.
 
 ### A.4 Australia and New Zealand
 

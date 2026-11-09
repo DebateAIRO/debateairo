@@ -149,6 +149,8 @@ const WORKER_FUNCTIONS = [
   "identity.read_data_export_ask_clarify(uuid,uuid)",
   // The reports the person made with the Report button (0152): wired, into account.json. The words stay under the debate's publication key.
   "identity.read_data_export_public_flags(uuid,uuid)",
+  // The statements of reasons, 0156's earlier notices and the answers to the person's reports (0157): wired, into account.json.
+  "identity.read_data_export_moderation(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -175,7 +177,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 22
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 23
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }
@@ -204,10 +206,10 @@ export class PostgresDataExportSource implements DataExportSourcePort {
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
     const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null;
-      web_evidence: unknown; investigations: Record<string, unknown> | null; passage_retention: Readonly<{ web_shown_quotes?: unknown }> | null; ask_clarify_calls: unknown; public_flags: unknown }>(
+      web_evidence: unknown; investigations: Record<string, unknown> | null; passage_retention: Readonly<{ web_shown_quotes?: unknown }> | null; ask_clarify_calls: unknown; public_flags: unknown; moderation: unknown }>(
       "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
         + "identity.read_data_export_page_memory($1,$2) page_memory, identity.read_data_export_web_evidence($1,$2) web_evidence, "
-        + "identity.read_data_export_investigations($1,$2) investigations, identity.read_data_export_passage_retention($1,$2) passage_retention, identity.read_data_export_ask_clarify($1,$2) ask_clarify_calls, identity.read_data_export_public_flags($1,$2) public_flags",
+        + "identity.read_data_export_investigations($1,$2) investigations, identity.read_data_export_passage_retention($1,$2) passage_retention, identity.read_data_export_ask_clarify($1,$2) ask_clarify_calls, identity.read_data_export_public_flags($1,$2) public_flags, identity.read_data_export_moderation($1,$2) moderation",
       [exportId, workerId])).rows[0]!;
     // 0131's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
     // snapshot's exact-section check refuses the export rather than leaving the records out.
@@ -215,7 +217,7 @@ export class PostgresDataExportSource implements DataExportSourcePort {
     const memory = row.page_memory ?? {};
     const investigations = row.investigations ?? {};
     return {
-      ...row.snapshot, threat_reports: row.threat_reports, ask_clarify_calls: row.ask_clarify_calls, public_flags: row.public_flags,
+      ...row.snapshot, threat_reports: row.threat_reports, ask_clarify_calls: row.ask_clarify_calls, public_flags: row.public_flags, moderation: row.moderation,
       ...("page_reading_level" in memory ? { page_reading_level: memory.page_reading_level } : {}),
       ...("debate_visits" in memory ? { debate_visits: memory.debate_visits } : {}),
       ...("dig_links" in memory ? { dig_links: memory.dig_links } : {}),

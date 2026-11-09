@@ -18,8 +18,8 @@ const NAME = "0171_security_review_hardening.sql";
 const SQL_PATH = `migrations/${NAME}`;
 const MANIFEST_PATH = "migrations/lineage/security-review-hardening-forward0171.json";
 const LOADER_PATH = "packages/db/src/migration-forward0171.ts";
-const PREVIOUS = "0153_dig_tree_settled.sql";
-const PREVIOUS_MANIFEST_PATH = "migrations/lineage/dig-tree-settled-forward0153.json";
+const PREVIOUS = "0170_outbound_mail_limit.sql";
+const PREVIOUS_MANIFEST_PATH = "migrations/lineage/outbound-mail-limit-forward0170.json";
 const VERIFIER_130 = "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57";
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
@@ -620,7 +620,7 @@ const SNAPSHOT_WRITERS = ["core.transition_run_publication", "core.publish_free_
  * The chain's loaders that digest no function at all, so the pin scan below finds no pins in them: each reads tables, constraints or a trigger's
  * function name in its postcondition, never pg_proc. Every other loader hands pg_proc a value the scan must resolve.
  */
-const NO_FUNCTION_PINS = ["0113_billing_price_currencies.sql", "0114_role_rotation.sql", "0122_engine_map_check.sql", "0129_support_answer_scope.sql"] as const;
+const NO_FUNCTION_PINS = ["0113_billing_price_currencies.sql", "0114_role_rotation.sql", "0122_engine_map_check.sql", "0129_support_answer_scope.sql", "0154_region_iceland_liechtenstein.sql"] as const;
 /**
  * The steps applied before the chain, each by its own module. The chain records no amendment of either (it refuses one, AMENDMENT_ORDER), so this step
  * may change none of the functions their digests pin; 0110's module says a change to one of its shared functions re-plans 110.
@@ -777,10 +777,10 @@ const pinnedBy = (): ReadonlyMap<string, readonly string[]> => {
 };
 
 describe("0171: the security review's fixes in the database", () => {
-  it("follows 0153 last in the chain, with its own loader, and keeps 0130's verifier", async () => {
+  it("follows 0170 last in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0171 } from './migration-forward0171.js';");
-    expect(chain).toContain("loadForward0152,loadForward0153,loadForward0171]");
+    expect(chain).toContain("loadForward0157,loadForward0170,loadForward0171]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "security-review-hardening-forward0171-v1";');
@@ -823,7 +823,7 @@ describe("0171: the security review's fixes in the database", () => {
     expect(step.replayVerifierSql).toBeUndefined();
   });
 
-  it("is bound to 0153's manifest and its own bytes, and the manifest and the plan declare the same amendments", async () => {
+  it("is bound to 0170's manifest and its own bytes, and the manifest and the plan declare the same amendments", async () => {
     const manifest = JSON.parse(read(MANIFEST_PATH)) as Record<string, unknown>;
     const previous = JSON.parse(read(PREVIOUS_MANIFEST_PATH)) as { baseRecipeSha256: string };
     expect(manifest).toEqual({
@@ -1329,7 +1329,7 @@ describe("0171: the security review's fixes in the database", () => {
     // The press calls the settlement through its own port, after the judge, and the opening keeps the API's numbers as it passed them (0151's pin).
     const press = read("apps/api/src/public-flag.ts");
     expect(press).toContain("const settled = await ports.settlement.settle({ flagId: input.flagId, ...result });");
-    expect(press).toContain('repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open">;');
+    expect(press).toContain('repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open"> & Partial<Pick<PostgresPublicFlagRepository, "recordQuote">>;');
     expect(press).toContain('settlement: Pick<PostgresPublicFlagRepository, "settle">;');
     expect(press).not.toContain("ports.repository.settle");
     expect(press).toContain("limits: ports.limits }");
@@ -1862,12 +1862,12 @@ describe("0171: the security review's fixes in the database", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain(LOADER_PATH);
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/security-review-hardening-database.test.ts");
     const readme = read("migrations/lineage/README.md");
-    expect(readme.replace(/\s+/gu, " ")).toContain("(0171, below) the forty-fourth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("(0171, below) the forty-ninth");
     const heading = "## The security review's fixes in the database (0171)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(-1);
     const section = readme.slice(at, readme.indexOf("\n## ", at + heading.length)).replace(/\s+/gu, " ");
-    for (const needle of ["forty-fourth", NAME, "security-review-hardening-forward0171.json", LOADER_PATH, "`loadForward0171`", "MIGRATION_FORWARD0171_",
+    for (const needle of ["forty-ninth", "renumbered to 0171", NAME, "security-review-hardening-forward0171.json", LOADER_PATH, "`loadForward0171`", "MIGRATION_FORWARD0171_",
       "-- n1: drained", "-- n1: keeps-verifier", "amendsPostconditionsOf", "function_definition", "privilegeRevocations", "F3", "F4a", "F4b",
       "`identity.private_forget_scope`", "`open_forget_scope`", "`close_forget_scope`", "`forget_scope_open`", "0080", "0084",
       "F2", "`identity.run_is_dig`", "`identity.read_run_is_dig`", "`identity.dig_run`", "`core.create_encrypted_run`", "`digRun`", "`serve.prepare_publication_key_provision`", "`read_free_debates_to_publish`", "`DIG_NOT_PUBLISHABLE`",

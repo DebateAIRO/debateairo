@@ -97,11 +97,11 @@ export const COMPANY: Company = Object.freeze({
 export const isUnverified = (value: string): boolean => value.includes("[");
 
 /**
- * The alternative dispute resolution route Terms section 18 and Annex A.1 name (owner's worksheet,
- * 9 October 2026). The EU online dispute resolution platform closed on 20 July 2025 and is
- * deliberately not linked.
+ * The alternative dispute resolution route Terms section 18 and Annex A.1 name: ANPC's SAL, the
+ * consumer-protection body (Terms 2.14), the same link as the footer's SAL badge. The EU online
+ * dispute resolution platform closed on 20 July 2025 and is deliberately not linked.
  */
-export const ADR_URL = "https://www.onoratainstanta.ro";
+export const ADR_URL = "https://reclamatiisal.anpc.ro/";
 
 /**
  * One stored item /cookies and the storage card list: its name as the code writes it, and the
@@ -480,7 +480,17 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.12", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.17", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.16", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70" },
+  { version: "2.15", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/765a7826b1045fabe77783e3a9bbe95a8f6dec9a48ff071e9c4a844a8317d925" },
+  { version: "2.14", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/94474fdb20bed511a590b6bc1c07750ed4e67b1c3dfb328d31638daaf233f6a7" },
+  { version: "2.13", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/9cad1a62f77eee42c46facba8a3c2e04c44afba940688ae5e06d3bf586808cfc" },
+  { version: "2.12", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b" },
   { version: "2.11", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/58ae2f6196b823ec4e1316e1289861fe54b6c3663913fd9617aa0cfdde4b5bdd" },
   { version: "2.10", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
