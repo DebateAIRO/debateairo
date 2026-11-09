@@ -1282,7 +1282,7 @@ describe("0171: the security review's fixes in the database", () => {
     for (const stale of ["Still open, a known exposure older than this step", "closing 0144's alone would leave the two doors beside it",
       "a member's own session can still charge"]) expect(flat, stale).not.toContain(stale);
     // And the flag's: the settlement believed the verdict it was handed, so it moves to the marker and the API's press calls it after the judge on its
-    // system login (X38), so no request login records a verdict or hides a debate; the opening counts against the lower of the limits it is handed
+    // system login (X38), so no request login records a verdict of its own choosing or hides a debate; the opening counts against the lower of the limits it is handed
     // and the site's own sealed row, and refuses on a CURRENT release with none; a flag staff dismissed hides nothing; and what stays open: a
     // deployment that never switched to a release keeps the caller's numbers, and a flag a request opens outside the press stays CHECKING. The staff
     // notice of an automatic hide is no request login's to claim (the loops moved below).

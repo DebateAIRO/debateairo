@@ -146,7 +146,8 @@ describe("Report a problem: the reporter's line is true in each case (DSA Art 16
   const judge = (verdict: string) => () => ({ providerRef: "provider-a", modelId: "model-a", complete: async () => ({
     text: JSON.stringify(verdict === "AGREE" ? { verdict, reason: "PERSONAL", quote: "Should fares be free?" } : { verdict, reason: null, quote: null }), usage: null }) }) as never;
   const ports = (opened: string, settled: string | null, verdict = "NOT_FOUND"): PublicFlagPorts => ({
-    repository: { readTarget: async () => (opened === "NOT_PUBLIC" ? null : "22222222-2222-4222-8222-222222222222"), open: async () => opened as never, settle: async () => settled as never },
+    repository: { readTarget: async () => (opened === "NOT_PUBLIC" ? null : "22222222-2222-4222-8222-222222222222"), open: async () => opened as never },
+    settlement: { settle: async () => settled as never },
     judge: judge(verdict), seal: async () => ({}) as never, readPublicDebate: async () => debate, limits: {} as never
   });
   const shared = "We have not acted on this report: it was stopped automatically, and no person has read it. If you think that is wrong, write to support@dezbatere.ro and a person will read it, or complain to office@dezbatere.ro within six months; you can also go to a certified out-of-court body or to court.";

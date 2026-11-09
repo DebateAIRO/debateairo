@@ -70,11 +70,17 @@ describe("registration region on real PostgreSQL", () => {
     expect(result.rows.find((row) => row.conname === "registration_region_country_code_check")?.definition).toMatch(/ NOT VALID$/);
   });
   it("B2b stores Iceland and Liechtenstein, the two codes 0154 added", async () => {
-    for (const country of ["IS", "LI"]) {
-      const userId = await bareAccount();
-      await database.pool.query("SELECT identity.record_registration_region($1,$2,NULL)", [userId, country]);
-      expect(await regionRows(userId)).toEqual([{ country_code: country, us_state: null }]);
-    }
+    // Since 0171 the writer takes only an account its own transaction made, so each account and its region are written together, as a sign-up writes them.
+    const client = await database.pool.connect();
+    try {
+      for (const country of ["IS", "LI"]) {
+        await client.query("BEGIN");
+        const userId = await bareAccount("pending_verification", client);
+        await client.query("SELECT identity.record_registration_region($1,$2,NULL)", [userId, country]);
+        await client.query("COMMIT");
+        expect(await regionRows(userId)).toEqual([{ country_code: country, us_state: null }]);
+      }
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   });
   it("B3 refuses an unknown country, absent US state, foreign state, and duplicate row", async () => {
     const userId = await bareAccount();

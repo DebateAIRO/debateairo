@@ -1914,7 +1914,7 @@ const api = buildApi({
     limits: abuseLimits.publicFlag,
     repository: publicFlagRepository, judge: publicationJudgeSwitch.current,
     // Row-level security (X38, the security review's F5): the report's settlement, after the judge, on the API's system login: the cross-account
-    // marker's alone since 0171, so no request login records a verdict or hides a debate.
+    // marker's alone since 0171, so no request login records a verdict of its own choosing or hides a debate.
     settlement: new PostgresPublicFlagRepository(crossAccountPool(pool, "X38")),
     seal: (publicationRef: string, runId: string, value: unknown) => publications.withReviewKey(publicationRef, runId, (cipher) => cipher.encrypt(value)),
     readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),

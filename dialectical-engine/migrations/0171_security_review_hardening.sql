@@ -89,7 +89,7 @@
 --   settle_public_flag, which records the judge's verdict and hides a public debate on AGREE, believed the verdict of whoever called it, and 0151's
 --   open_public_flag counted against limits its caller passed, so a request connection with its own live session could open its own flag on any
 --   public debate never hidden before and settle it AGREE, which hid another account's debate until a person restored it. The settlement moves from
---   debateai_runtime to the marker (section 4): its one caller, the API's press, calls it after the judge, inside the reporter's request, on its
+--   debateai_runtime to the marker (section 4): the API's press calls it after the judge, inside the reporter's request, on its
 --   system login (the cross-account site X38), so no request login records a verdict of its own choosing, closes a flag or hides a debate (0157's sweep
 --   of a report left CHECKING for five minutes, which a request login may still run, records UNAVAILABLE, sends it to a person and hides nothing, and
 --   0157's close of a report by staff is 0151's dismissal, so a verdict that arrives after it hides nothing either); the reporter is the one the
@@ -1688,9 +1688,10 @@ GRANT EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices() 
 REVOKE EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz) FROM debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz) TO debateai_rls_all_accounts;
 -- F5: and 0151's settlement of a flag, which records the judge's verdict and hides a public debate on AGREE, and believed the verdict of whoever called
--- it, so a request login with its own session settled its own flag AGREE and hid another account's debate. Its one caller is the API's press, after
+-- it, so a request login with its own session settled its own flag AGREE and hid another account's debate. The API's press calls it, after
 -- the judge, inside the reporter's request, on its system login (apps/api/src/main.ts, the cross-account site X38); the reporter is the one the
--- opening named under that session, and a settlement never changes it.
+-- opening named under that session, and a settlement never changes it. 0157's sweep of a report left CHECKING also calls it, as the sweep's own
+-- owner, with UNAVAILABLE alone.
 REVOKE EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric) FROM debateai_runtime;
 GRANT EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric) TO debateai_rls_all_accounts;
 -- F5: and the staff ceremonies and staff changes the API calls only through its staff repository, which every staff route reaches on its system login

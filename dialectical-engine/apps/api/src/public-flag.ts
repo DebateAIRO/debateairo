@@ -14,7 +14,7 @@ import { correctedPiece, textPiecesOf } from "./public-tree.js";
  * WHAT THE PERSON HEARS: one of three states, and refused things all read the same: `NOT_FOUND` for a check that did not agree, a guessed or private debate and a person over their limit alike.
  * THE LIMITS are the register's abuseLimits row (R22 decision 18), and nothing in the code stands in for it. The database enforces them from its rows, so a restart forgets nothing; since 0171 it reads the same row
  * itself, at the CURRENT release's own version, and counts against the lower of the two, so a request cannot loosen them.
- * THE VERDICT is the judge's, recorded only by the API's system login (0171 makes the settlement the cross-account marker's alone; main.ts, X38), so no request login can settle a report or hide a debate.
+ * THE VERDICT is the judge's, recorded only by the API's system login (0171 makes the settlement the cross-account marker's alone; main.ts, X38), so no request login can settle a report with a verdict of its own choosing or hide a debate. 0157's sweep of a report left CHECKING, which a request login may still run, records UNAVAILABLE alone, sends it to a person and hides nothing.
  * WHY A QUOTE: the judge must copy the words that break the rules. Words that are not on the page are a judge that obeyed the claim, and they hide nothing: a person reads it.
  */
 /** The whole check, inside what the website's proxy waits. */
