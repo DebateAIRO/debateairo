@@ -2434,7 +2434,7 @@ BEGIN
       RAISE EXCEPTION 'SECURITY_REVIEW_0171_CONTRACT F5 day table %', v_role;
     END IF;
   END LOOP;
-  SELECT COALESCE(pg_catalog.array_agg(p.oid::regprocedure::text ORDER BY 1), '{}') INTO v_grantees FROM pg_catalog.pg_proc AS p
+  SELECT COALESCE(pg_catalog.array_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text), '{}') INTO v_grantees FROM pg_catalog.pg_proc AS p
   WHERE p.prosecdef AND p.prosrc ~ 'INSERT INTO ledger\.model_spend(_hold|_reservation)?\M'
     AND (pg_catalog.has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
       OR pg_catalog.has_function_privilege('debateai_authorization_runtime', p.oid, 'EXECUTE'));

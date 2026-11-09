@@ -620,7 +620,7 @@ const SNAPSHOT_WRITERS = ["core.transition_run_publication", "core.publish_free_
  * The chain's loaders that digest no function at all, so the pin scan below finds no pins in them: each reads tables, constraints or a trigger's
  * function name in its postcondition, never pg_proc. Every other loader hands pg_proc a value the scan must resolve.
  */
-const NO_FUNCTION_PINS = ["0113_billing_price_currencies.sql", "0114_role_rotation.sql", "0122_engine_map_check.sql", "0129_support_answer_scope.sql", "0154_region_iceland_liechtenstein.sql"] as const;
+const NO_FUNCTION_PINS = ["0113_billing_price_currencies.sql", "0114_role_rotation.sql", "0122_engine_map_check.sql", "0129_support_answer_scope.sql", "0154_region_iceland_liechtenstein.sql", "0164_main_answer_path_added.sql"] as const;
 /**
  * The steps applied before the chain, each by its own module. The chain records no amendment of either (it refuses one, AMENDMENT_ORDER), so this step
  * may change none of the functions their digests pin; 0110's module says a change to one of its shared functions re-plans 110.
@@ -697,7 +697,11 @@ const AMENDS = [
   { step: "0149_public_report_team_month.sql", field: "function_definition", functions: ["identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)", "identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)", "identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)", "identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)"] },
   { step: "0150_public_review.sql", field: "function_definition", functions: ["staff.claim_public_review_notices(integer)", "staff.complete_public_review_notice(uuid,uuid,boolean)", "staff.public_review_notice_user(uuid,uuid)", "staff.read_public_review(jsonb,text,uuid)"] },
   { step: "0151_public_flag.sql", field: "function_definition", functions: ["identity.delete_public_flag_words_due()", "identity.open_public_flag(uuid,uuid,uuid,jsonb,integer,integer,integer)", "identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)", "identity.read_public_review_purge_due(integer)", "identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)", "staff.claim_public_flag_notices(integer)", "staff.complete_public_flag_notice(uuid,uuid,boolean)", "staff.public_flag_notice_user(uuid,uuid)"] },
-  { step: "0153_dig_tree_settled.sql", field: "function_definition", functions: ["identity.dig_is_settled(uuid)", "identity.mark_dig_tree_settled(uuid)"] }
+  { step: "0153_dig_tree_settled.sql", field: "function_definition", functions: ["identity.dig_is_settled(uuid)", "identity.mark_dig_tree_settled(uuid)"] },
+  { step: "0158_pre_start_charge.sql", field: "function_definition", functions: ["staff.read_team_internal_spent(timestamptz,timestamptz)"] },
+  { step: "0163_carry_on_session_free_digs.sql", field: "function_definition", functions: ["core.create_encrypted_run(jsonb,uuid,uuid,jsonb)"] },
+  { step: "0165_pre_start_release.sql", field: "function_definition", functions: ["staff.read_team_internal_spent(timestamptz,timestamptz)"] },
+  { step: "0168_set_aside_continue.sql", field: "function_definition", functions: ["staff.read_team_internal_spent(timestamptz,timestamptz)"] }
 ] as const;
 
 type Patch = Readonly<{ old: string; new: string; count: number }>;
@@ -734,16 +738,19 @@ const pinnedBy = (): ReadonlyMap<string, readonly string[]> => {
     expect(step, file).toBeDefined();
     const manifestPath = /const MANIFEST_PATH\s*=\s*["']([^"']+)["']/u.exec(loader)?.[1];
     // The loader's const lists by name, their comments dropped; a list holds signatures and spreads of other lists, nothing else.
+    // A list may also name a single signature by its const (0165's and 0168's SPENT).
+    const signatures = new Map([...loader.matchAll(/const ([A-Z][A-Z0-9_]*)\s*=\s*"([^"]*)"\s*;/gu)].map((match) => [match[1]!, match[2]!] as const));
     const lists = new Map([...loader.matchAll(/const ([A-Z][A-Z0-9_]*)\b[^=]*=\s*(?:Object\.freeze\()?\[([\s\S]*?)\]\s*(?:as const\s*)?\)?\s*(?:as const\s*)?;/gu)]
       .map((match) => [match[1]!, match[2]!.replace(/\/\/[^\n]*/gu, "")] as const));
     const listed = (name: string, seen: readonly string[]): string[] => {
       const list = lists.get(name);
       expect(list !== undefined && !seen.includes(name), `${file}: ${[...seen, name].join(" > ")} does not resolve`).toBe(true);
-      expect(list!.replace(/\.\.\.[A-Z][A-Z0-9_]*|"[^"]*"|'[^']*'/gu, "").replace(/[\s,]/gu, ""), `${file}: ${name} holds what the scan cannot read`).toBe("");
-      return [...list!.matchAll(/\.\.\.([A-Z][A-Z0-9_]*)|"([^"]*)"|'([^']*)'/gu)].flatMap(([, spread, double, single]) => {
+      expect(list!.replace(/\.\.\.[A-Z][A-Z0-9_]*|"[^"]*"|'[^']*'|\b[A-Z][A-Z0-9_]*\b/gu, "").replace(/[\s,]/gu, ""), `${file}: ${name} holds what the scan cannot read`).toBe("");
+      return [...list!.matchAll(/\.\.\.([A-Z][A-Z0-9_]*)|"([^"]*)"|'([^']*)'|\b([A-Z][A-Z0-9_]*)\b/gu)].flatMap(([, spread, double, single, constant]) => {
         if (spread !== undefined) return listed(spread, [...seen, name]);
-        expect(double ?? single, `${file}: ${name}`).toMatch(/^[a-z_]+\.[a-z_0-9]+\([^()]*\)$/u);
-        return [plain((double ?? single)!)];
+        const signature = double ?? single ?? signatures.get(constant!);
+        expect(signature, `${file}: ${name}`).toMatch(/^[a-z_]+\.[a-z_0-9]+\([^()]*\)$/u);
+        return [plain(signature!)];
       });
     };
     const valueOf = (value: string): string[] => {
@@ -780,7 +787,7 @@ describe("0171: the security review's fixes in the database", () => {
   it("follows 0170 last in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0171 } from './migration-forward0171.js';");
-    expect(chain).toContain("loadForward0157,loadForward0170,loadForward0171]");
+    expect(chain).toContain("loadForward0169,loadForward0170,loadForward0171]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "security-review-hardening-forward0171-v1";');
@@ -1722,8 +1729,8 @@ describe("0171: the security review's fixes in the database", () => {
     // Its one writer is the run's creation (0123's writer, the encrypted run's only one since 0040), which takes the mark in its document as one
     // more key of its closed list, refuses any value but JSON true, and writes the row right after the run's ownership event and before the run's
     // key provision is completed: one statement, so no sign-out, step-up, failure or crash after it can part a dig from its row.
-    expect(lastDefinerOf("core.create_encrypted_run")).toBe("0123_side_by_side_releases.sql");
-    let writer = bodyOf(read("migrations/0123_side_by_side_releases.sql"), "core.create_encrypted_run");
+    expect(lastDefinerOf("core.create_encrypted_run")).toBe("0163_carry_on_session_free_digs.sql");
+    let writer = bodyOf(read("migrations/0163_carry_on_session_free_digs.sql"), "core.create_encrypted_run");
     for (const patch of MARKING.patches) writer = writer.replace(patch.old, patch.new);
     const marked = "INSERT INTO identity.dig_run (run_id, owner_ref) VALUES (v_run_id, p_owner_ref) ON CONFLICT (run_id) DO NOTHING;";
     expect(occurrences(writer, marked)).toBe(1);
@@ -1802,14 +1809,14 @@ describe("0171: the security review's fixes in the database", () => {
     expect(read(LOADER_PATH)).toContain('"ledger.allocate_sequence()"');
     expect([...pinnedBy().values()].some((functions) => functions.includes("ledger.allocate_sequence()"))).toBe(false);
     expect(sql).not.toMatch(/ON core\.work_item/u);
-    // The contract: no request role inserts into a day table and the marker does; the only request-callable definer that writes the day is 0107's
-    // settlement; the allocator's shape and callers; no request role writes the counter; the work queue's rule; and the spend readers ask with no
+    // The contract: no request role inserts into a day table and the marker does; the only request-callable definers that write the day are 0107's
+    // settlement and 0158's charge before Start (which arrived with the second merge of the V4 line and this step leaves alone); the allocator's shape and callers; no request role writes the counter; the work queue's rule; and the spend readers ask with no
     // exception left.
     const contract = sql.slice(sql.indexOf("DO $security_review_contract$"), sql.indexOf("$security_review_contract$;"));
     for (const needle of ["ARRAY['ledger.model_spend', 'ledger.model_spend_hold', 'ledger.model_spend_reservation']",
       "pg_catalog.has_table_privilege(candidate.role, v_role, 'INSERT')", "NOT pg_catalog.has_table_privilege('debateai_rls_all_accounts', v_role, 'INSERT')",
       "p.prosrc ~ 'INSERT INTO ledger\\.model_spend(_hold|_reservation)?\\M'",
-      "IS DISTINCT FROM ARRAY['billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)']",
+      "IS DISTINCT FROM ARRAY['billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)',\n      'identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)']",
       "p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog, pg_temp']",
       "ARRAY['debateai_evaluator_api','debateai_evaluator_worker','debateai_runtime','debateai_settlement_watch']",
       "'ledger.sequence_allocator', 'UPDATE,DELETE,TRUNCATE'", "'rls.owns_run(run_id)'"]) expect(contract, needle).toContain(needle);
@@ -1862,12 +1869,12 @@ describe("0171: the security review's fixes in the database", () => {
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain(LOADER_PATH);
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/security-review-hardening-database.test.ts");
     const readme = read("migrations/lineage/README.md");
-    expect(readme.replace(/\s+/gu, " ")).toContain("(0171, below) the forty-ninth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("(0171, below) the sixty-first");
     const heading = "## The security review's fixes in the database (0171)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(-1);
     const section = readme.slice(at, readme.indexOf("\n## ", at + heading.length)).replace(/\s+/gu, " ");
-    for (const needle of ["forty-ninth", "renumbered to 0171", NAME, "security-review-hardening-forward0171.json", LOADER_PATH, "`loadForward0171`", "MIGRATION_FORWARD0171_",
+    for (const needle of ["sixty-first", "renumbered to 0171", NAME, "security-review-hardening-forward0171.json", LOADER_PATH, "`loadForward0171`", "MIGRATION_FORWARD0171_",
       "-- n1: drained", "-- n1: keeps-verifier", "amendsPostconditionsOf", "function_definition", "privilegeRevocations", "F3", "F4a", "F4b",
       "`identity.private_forget_scope`", "`open_forget_scope`", "`close_forget_scope`", "`forget_scope_open`", "0080", "0084",
       "F2", "`identity.run_is_dig`", "`identity.read_run_is_dig`", "`identity.dig_run`", "`core.create_encrypted_run`", "`digRun`", "`serve.prepare_publication_key_provision`", "`read_free_debates_to_publish`", "`DIG_NOT_PUBLISHABLE`",
