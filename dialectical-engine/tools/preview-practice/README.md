@@ -202,7 +202,10 @@ Every call is written to `openings.jsonl` in the `--out` folder the moment it fi
 - exactly what the AI could see (blind, or the ids of the points it was shown) and its place in the plan;
 - its times, its tokens (in, out, reasoning) and its cost;
 - its format check, and how a slip was fixed (by the short patch follow-up or by a full re-ask);
-- the reply itself, with anything key-shaped blanked, at most 64 KiB.
+- the reply itself, with anything key-shaped blanked, at most 64 KiB;
+- for a call whose reply was refused (fixed later or not): its first refused reply, blanked and capped the same way, and
+  what its check said (`code@path`, its parse status, how it ended), under `firstRefused`; `report.json` keeps it in
+  `failures`.
 
 The first line names the AIs, the arms and the questions asked, each question with a short fingerprint of its exact
 wording, so two runs can be compared question by question. After each arm of each question, one line holds what came
@@ -986,15 +989,36 @@ scp tools/preview-practice/gate-relay.py "$PREVIEW_SSH:/home/ubuntu/gate-relay.p
 
 ### S-1, server, root: export the live register (read-only)
 
-The live register version is the runner's `REGISTER_VERSION`. The query only reads; the session is read-only.
+The live register version is the one the owners switched on (`register.read_active_settings_version()`, migration 0124:
+new debates run on it, whatever the release booted with), and the runner's `REGISTER_VERSION` (the release's boot version)
+only while nothing was ever switched on (the pointer is empty). On 9 Nov they differed: runner.env said 17, the site ran 23,
+and only 20 onwards hold the debate shape and the line-up, so an export bounded by runner.env refused the start step's shape
+file (`PRACTICE_START_SHAPE_ROW_MISSING`) and Task 90 (`PRIVATE_REGISTER_EXPORT_DEBATE_SHAPE_ABSENT`). The queries only read;
+each session is read-only. The first `echo` says which version the export ends at; then the export's own facts: its newest
+version (the same number), the answer checker of that version (S-6 uses it) and whether it carries the line-up (S-2 uses it).
 
 ```sh
 install -d -o root -g root -m 0700 /root/practice
-V=$(sed -n 's/^REGISTER_VERSION=//p' /etc/debateai-v3-preview/auth-dev-v1/runner.env)
-echo "register version: $V"
+B=$(sed -n 's/^REGISTER_VERSION=//p' /etc/debateai-v3-preview/auth-dev-v1/runner.env)
+A=$(runuser -u postgres -- env PGOPTIONS='-c default_transaction_read_only=on' psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -X -q -At -v ON_ERROR_STOP=1 -c "SELECT register.read_active_settings_version()")
+V=${A:-$B}
+echo "register version: $V (switched on: ${A:-none}; the release's boot version: $B)"
 runuser -u postgres -- env PGOPTIONS='-c default_transaction_read_only=on' psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -X -q -At -v ON_ERROR_STOP=1 -c "SELECT json_build_object('schema','preview-practice-register-export-v1','versions',(SELECT json_agg(json_build_object('register_version',register_version::text,'row_count',row_count,'sealed',sealed,'base_register_version',base_register_version::text,'publication_id',publication_id::text,'request_sha256',request_sha256::text,'snapshot_sha256',snapshot_sha256::text,'publication_kind',publication_kind,'recorded_at',recorded_at::text) ORDER BY register_version) FROM register.register_version WHERE register_version <= ${V}),'rows',(SELECT json_agg(json_build_object('register_version',register_version::text,'row_key',row_key,'value_json',value_json::text,'source_ref',source_ref) ORDER BY register_version,row_key) FROM register.register_row WHERE register_version <= ${V}))" > /root/practice/register-export.json
 wc -c /root/practice/register-export.json
+/usr/bin/python3 -I - /root/practice/register-export.json <<'PY'
+# S-1 facts: the export's newest version, its answer checker and whether it carries the line-up (words only, never a figure)
+import json, sys
+export = json.load(open(sys.argv[1], encoding='utf-8'))
+newest = export['versions'][-1]['register_version']
+rows = {row['row_key']: row['value_json'] for row in export['rows'] if row['register_version'] == newest}
+ref = json.loads(rows['evaluatorRoleRef']) if 'evaluatorRoleRef' in rows else None
+ref = ref.get('providerRef') if isinstance(ref, dict) else None
+checker = {'preview:deepseek-v4-1-flash': 'deepseek', 'preview:fixture-b': 'glm'}.get(ref, 'other')
+print('newest version: %s; answer checker: %s; line-up row: %s' % (newest, checker, 'yes' if 'previewLineUpPolicy' in rows else 'no'))
+PY
 ```
+
+The newest version must be the number the first `echo` printed. Note the answer checker for S-6.
 
 ### S-2, server, root: export the allowed settings (no secret is copied)
 
@@ -1006,10 +1030,59 @@ From the first Phase 2 upload on, `PREVIEW_PROVIDER_TEST_CONFIG_JSON` is the soc
 practice then takes the line-up from the settings version (or `--line-up`, see "Trying a new line-up before an
 activation").
 
+The copy then follows the version the owners switched on (`register.read_active_settings_version()`, S-1), not the
+release's boot version (V4 Task 90b, the sitting of 9 Nov). The python lines after the two `grep`s print nothing and
+rewrite only the practice's copy, never runner.env:
+
+- `REGISTER_VERSION` becomes the export's newest version (S-1's switched-on one). The practice runs the settings'
+  `REGISTER_VERSION` as its site version and refuses any other than the export's newest
+  (`PRACTICE_REGISTER_VERSION_MISMATCH`); with `--register-next` the next version is composed on it, as the next release
+  will be.
+- When that version carries the line-up (S-1 printed `line-up row: yes`), `PREVIEW_PROVIDER_TEST_CONFIG_JSON` becomes its
+  gate part alone: `free_model_ids`, `premium_model_ids` and `thinking_levels` are dropped, every other member and line
+  stays. The line-up then comes from the version, as the live boot requires on a site version with the row (the full form
+  beside it is refused, `PREVIEW_LINE_UP_ENV_CONFLICT`; the live runner.env may still hold the full form while it boots
+  an older version). Without the row nothing else changes.
+
+A copy that does not read as expected (no `REGISTER_VERSION` or configuration line, an export that is not S-1's) is left
+as it was, with one line that quotes nothing. The last line prints the version written; it must be S-1's.
+
 ```sh
 grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PROVIDER_DISCOVERY_TARGETS_JSON|REGISTER_VERSION|DEBATEAI_DEPLOYMENT_MODE|NODE_ENV|CLAIM_MS|CLAIM_MARGIN_MS|MAX_RECOMPOSE|JUDGEMENT_NUMBER_KIND|JUDGEMENT_PRODUCER|PROPAGATION_NUMBER_KIND|PROPAGATION_PRODUCER|PROVIDER_PROBE_TIMEOUT_MS|PROVIDER_REF|VLLM_BASE_URL|VLLM_MODEL|VLLM_MAKER)=' /etc/debateai-v3-preview/auth-dev-v1/runner.env > /root/practice/settings.env
 grep -E '^(STRANGER_SAMPLE_RATE|BATTERY_VERSION|SETTLEMENT_WATCH_HANDLE)=' /etc/debateai-v3-preview/auth-dev-v1/api.env >> /root/practice/settings.env
+/usr/bin/python3 -I - /root/practice/register-export.json /root/practice/settings.env <<'PY'
+# S-2 settings: REGISTER_VERSION = the export's newest version; the gate part alone when that version carries the line-up (prints nothing)
+import json, os, sys
+try:
+    export = json.load(open(sys.argv[1], encoding='utf-8'))
+    newest = export['versions'][-1]['register_version']
+    line_up = any(row['register_version'] == newest and row['row_key'] == 'previewLineUpPolicy' for row in export['rows'])
+    lines = open(sys.argv[2], encoding='utf-8').read().split('\n')
+    keys = [line.split('=', 1)[0] for line in lines]
+    if not newest.isdigit() or keys.count('REGISTER_VERSION') != 1 or keys.count('PREVIEW_PROVIDER_TEST_CONFIG_JSON') != 1:
+        raise ValueError
+    out = []
+    for line in lines:
+        if line.startswith('REGISTER_VERSION='):
+            line = 'REGISTER_VERSION=' + newest
+        elif line_up and line.startswith('PREVIEW_PROVIDER_TEST_CONFIG_JSON='):
+            config = json.loads(line.split('=', 1)[1])
+            if not isinstance(config, dict):
+                raise ValueError
+            for member in ('free_model_ids', 'premium_model_ids', 'thinking_levels'):
+                config.pop(member, None)
+            line = 'PREVIEW_PROVIDER_TEST_CONFIG_JSON=' + json.dumps(config, separators=(',', ':'))
+        out.append(line)
+except Exception:
+    print('S-2 refused: the export or the settings copy does not read as expected (nothing written)', file=sys.stderr)
+    sys.exit(1)
+fd = os.open(sys.argv[2] + '.new', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w', encoding='utf-8') as new:
+    new.write('\n'.join(out))
+os.replace(sys.argv[2] + '.new', sys.argv[2])
+PY
 cut -d= -f1 /root/practice/settings.env
+sed -n 's/^REGISTER_VERSION=//p' /root/practice/settings.env
 ```
 
 ### S-3, server, root: each gate's status (repeat right before EACH practice run)
@@ -1027,6 +1100,43 @@ searches the web as the site does for a Plus run, through this gate; README-perp
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1 > /root/practice/perplexity-status.json
 install -o ubuntu -g ubuntu -m 0600 /root/practice/perplexity-status.json /home/ubuntu/practice/
+```
+
+### S-3b, server, root: the gates' two GO limits and the hosted billing (read-only, once per sitting)
+
+For the start-step commands of S-6 (`--hosted-billing "$HB"`) and for Task 90's private gate figures (V4 Task 90b): each
+gate's `max_concurrent_calls` and `max_final_writer_calls` from its GO file (the status files do not carry them; a GO
+without `max_final_writer_calls` gives none) and the hosted billing with `billing` set to `off` (the practice keeps
+billing off). The GO files and the billing file are only read; the python lines print nothing and write two private files
+into the practice folder, which S-7 removes. Run it again after any GO change (the GO-change order is stop, edit, restart,
+activate).
+
+```sh
+/usr/bin/python3 -I - /etc/debateai-v3-preview/provider-deepinfra-go-v3.json /etc/debateai-v3-preview/provider-anthropic-go-v1.json /etc/debateai-v3-preview/hosted-billing-v1.json /root/practice <<'PY'
+# S-3b limits: each gate's two GO limits and the hosted billing with billing off, into the practice folder (prints nothing)
+import json, os, sys
+def write(name, value):
+    path = os.path.join(sys.argv[4], name)
+    fd = os.open(path + '.new', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as new:
+        new.write(json.dumps(value) + '\n')
+    os.replace(path + '.new', path)
+try:
+    limits = {'schema': 'preview-practice-gate-limits-v1'}
+    for gate, path in (('deepinfra', sys.argv[1]), ('anthropic', sys.argv[2])):
+        go = json.load(open(path, encoding='utf-8'))
+        limits[gate] = {member: go[member] for member in ('max_concurrent_calls', 'max_final_writer_calls') if member in go}
+    billing = json.load(open(sys.argv[3], encoding='utf-8'))
+    if not isinstance(billing, dict):
+        raise ValueError
+    billing['billing'] = 'off'
+except Exception:
+    print('S-3b refused: a GO file or the hosted billing does not read as expected (nothing written)', file=sys.stderr)
+    sys.exit(1)
+write('gate-limits.json', limits)
+write('hosted-billing.json', billing)
+PY
+install -o ubuntu -g ubuntu -m 0600 /root/practice/gate-limits.json /root/practice/hosted-billing.json /home/ubuntu/practice/
 ```
 
 ### S-4, server, root: install and start the relay
@@ -1168,18 +1278,25 @@ practice asks without billing, so it asks as `free` or `premium`; Plus is measur
 First the shape file, outside the repository (never committed): the export's own debateShapePolicy row of its newest
 version (so Free is the release's own lean row, never the start values), the start step's start values added, and
 `plans.premium` given that row's Plus sizes. The line prints nothing (the file is its only output); it refuses an
-export without that row and never writes over an existing file:
+export without that row and never writes over an existing file. The second line puts S-3b's hosted billing (billing off)
+in `HB` for the commands below (in each terminal that runs them):
 
 ```sh
 P="$P" node_modules/.bin/tsx -e 'import("./tools/preview-practice/practice-start-step.ts").then((m) => m.writePracticeStartShapeFile(`${process.env.P}/register-export.json`, `${process.env.P}/start-step-shape.json`))'
+HB="$(cat "$P/hosted-billing.json")"
 ```
+
+The preview is hosted, so these debates compose the next version with publish kit v3 (`--register-next --hosted-billing
+"$HB"`), whose answer checker is the plan's default, GLM. The commands below carry `--checker deepseek
+--deepseek-enabled-on-gate yes` because the version switched on on 9 Nov checks answers with DeepSeek (S-1 printed
+`answer checker: deepseek`); without them the practice says the next version moves the checker back to GLM. When S-1 printed `answer checker: glm`, leave out `--checker deepseek --deepseek-enabled-on-gate yes`.
 
 Then, before EACH run, S-3 on the server and the status files down again (the Plus run's three, below). The Romanian Free question, 3 paths, one
 dig:
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --register-next --shape-policy "$P/start-step-shape.json" --question ro --start-step free:3 --digs 1 --out "$P/start-month"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --register-next --hosted-billing "$HB" --checker deepseek --deepseek-enabled-on-gate yes --shape-policy "$P/start-step-shape.json" --question ro --start-step free:3 --digs 1 --out "$P/start-month"
 echo "exit: $?"
 ```
 
@@ -1190,7 +1307,7 @@ billing kept off, pins none. It needs the relay's third socket (S-4, S-5) and th
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" PRACTICE_PERPLEXITY_SOCKET="$D/perplexity.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --gate-status-perplexity "$P/perplexity-status.json" --register-next --shape-policy "$P/start-step-shape.json" --question ro --start-step premium:5 --digs 0 --out "$P/start-month"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" PRACTICE_PERPLEXITY_SOCKET="$D/perplexity.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --gate-status-perplexity "$P/perplexity-status.json" --register-next --hosted-billing "$HB" --checker deepseek --deepseek-enabled-on-gate yes --shape-policy "$P/start-step-shape.json" --question ro --start-step premium:5 --digs 0 --out "$P/start-month"
 echo "exit: $?"
 ```
 
@@ -1201,9 +1318,9 @@ open (`PRACTICE_GATE_NOT_OPEN: perplexity: ...`); the log says `web: this Plus d
 settings name none, it refuses before anything is spent (`PRACTICE_SEARCH_GATE_REQUIRED`): the Plus run is there to
 search, so it never runs with the web off. The report's web table (report.md "Web search per path") shows each path's
 searches; the month's `DEBATE` line counts their search fees. `--gate-status-perplexity` is refused on any other run.
-On the hosted preview each debate here also needs `--hosted-billing '<the same JSON the plan will get>'` beside
-`--register-next`, as above (without it the practice refuses `PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED` before
-anything is spent).
+On the hosted preview each debate here needs `--hosted-billing '<the same JSON the plan will get>'` beside
+`--register-next`, as the commands above give it (`"$HB"`, S-3b's copy; without it the practice refuses
+`PRACTICE_REGISTER_NEXT_HOSTED_BILLING_REQUIRED` before anything is spent).
 
 The figures are in `$P/start-month/start-month.jsonl` only, which every run appends to: one `START_MONTH_RUN` line (plan,
 paths, digs, question), then one `START_MONTH` line per phase, each with its `calls` (the ledger rows of its model
@@ -1217,6 +1334,24 @@ total against the Free credit, the 5-path Plus question's cost, and the end-of-d
 quota like the calls before Start), which these debates do not make: add, for each of the two Free questions, arm Q's
 cost per reading from the same sitting (`clarify.costUsd` divided by `clarify.readings` in
 `$P/clarify-timing/report.json`), and say that you added it.
+
+The free check of the start step on the release's figures (V4 Task 90, `tests/integration/r22-private-figures.test.ts`: the
+AIs are its own doubles, nothing is spent, no socket is needed) runs every start-step case on the export of S-1 and on the
+gates' figures. Its gate-figures file is written on the Mac from S-3's two status files and S-3b's two files, all in `$P` (a
+new file only, private, outside the repository; the line prints nothing, never a figure, and a refusal names the file and
+the member, never a value):
+
+```sh
+P="$P" node_modules/.bin/tsx -e 'import("./tools/preview-practice/practice-gate-figures.ts").then((m) => m.writePracticeGateFiguresFile(process.env.P, `${process.env.P}/gate-figures.json`))'
+```
+
+Then run that one test file alone (it starts a database) with `DEBATEAI_PRIVATE_REGISTER_EXPORT="$P/register-export.json"`
+and `DEBATEAI_PRIVATE_GATE_FIGURES="$P/gate-figures.json"` set. On a version that carries the line-up its world uses the
+settings' gate part alone, as S-2's copy does; without both variables it prints `not checked` and skips. Each gate's
+largest holds (what its /remaining answers beside the pot: a full-size call, and a full-size final writer when its GO names
+`max_final_writer_calls`, the two then written as a pair) come from the code's own model rows, as the gate computes them,
+rounded up to a micro-dollar. The world runs the file's plans and ceilings with billing on (its cases are one per plan),
+whatever S-3b's copy says (V4 Task 90c).
 
 Optional flags:
 
@@ -1259,7 +1394,7 @@ Optional flags:
   the export is imported as always, then this checkout's next version is composed on its newest version by the
   preview publish kit itself (`buildPreviewSourceRowsV2` and `composePreviewSnapshotV2`, with the newest version's own
   checker choice, rotation switch and measured runtime), published on top in the throwaway database, and the debate
-  runs on it. The settings file stays the live one (its `REGISTER_VERSION` must still be the export's newest version).
+  runs on it. The settings file stays S-2's copy (its `REGISTER_VERSION`, which S-2 sets to the switched-on version, must still be the export's newest version).
   The progress line and `report.json` (`register.codeNext`) name every row the next version changes: on the server,
   the publish proposal must show the same rows (plus `nodeRuntimeVersion`'s source reference, which the server
   measures again). A checkout that changes no row refuses (`PRACTICE_REGISTER_NEXT_UNSUPPORTED`). On the hosted
@@ -1611,6 +1746,10 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-start-step.ts`: `--start-step` and `--digs` (V4 Task 91b): the step before Start, Start with the menu's top
   paths, the digs, Step 4's shape file, and the month's lines in `start-month.jsonl` (their builder is in
   `practice-verdict.ts`). Test: `tests/unit/practice-start-step-flag.test.ts`.
+- `practice-settings-switch.ts`: the settings text for a version that carries the line-up (the gate part alone, as S-2's
+  python writes it; Task 90's world uses it); `practice-gate-figures.ts`: Task 90's private gate-figures file from S-3's and
+  S-3b's files (V4 Task 90b). Test: `tests/unit/practice-settings-switch.test.ts` (it also runs S-1's, S-2's and S-3b's
+  python lines on made-up files).
 - `practice-story-length.ts`, `practice-story-rounds.ts`: the story tables (`storyLengthByField`, `storyJsonBreaks`) and
   the engine and story-round blocks (`ask.engine`, `storyRounds`, `storyBackups`, `storyReadyRate`).
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,

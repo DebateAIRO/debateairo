@@ -10,6 +10,9 @@
 // the case id and shares of the pot (shareOfPot); the API's own refusal line, which names figures, is held back, and so is any
 // other log line that speaks of money. No vendor is contacted (the AIs are the gate doubles) and nothing is spent. Integration
 // suites are skipped by the CI gate: run this file by hand, alone (Task 91's sitting runs it with the owner's files).
+// Task 90b: the export is README S-1's (it ends at the version the owners switched on); on a version that carries the line-up the
+// world takes the settings' gate part alone. The gate-figures file is written by tools/preview-practice/practice-gate-figures.ts
+// from S-3's status files and S-3b's GO limits and hosted billing (README "The free check of the start step").
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { START_STEP_LIMITS, StartPathsSchema, type ContractClient, type StartPaths, type StartListsEvent } from "@debateai/contract";
 import { debateShapeStartStepOf, readDebateShapePolicy, type DebateShapePlanKey, type DebateShapePolicy } from "@debateai/register";
