@@ -130,6 +130,21 @@ describe("0163: a carry-on dig's key provision, without a live sign-in", () => {
     expect(await leftBy(debate)).toEqual({ bindings: 2, intents: 0, runs: 2 });
   });
 
+  it("the security review's F2 (0171's patch of this body): a carry-on dig marked as the API marks every dig has its own dig row, written by the statement that creates it, its Start session revoked; an unmarked document writes none", async () => {
+    const pool = fixture.database.pool;
+    const debate = await parent("premium");
+    const start = (pathId: string, marked: boolean): Promise<string> => runs().startRun({
+      ...runInput(`Dig ${pathId}: what would a second pier change?`, { kind: "server", userId: fixture.userId, ownerRef: fixture.ownerRef, carryOn: { parentRunId: debate, pathId } }, "premium", "carry-on"),
+      ...(marked ? { digRun: true as const } : {}) });
+    const marked = await signedOut(() => start("b1", true));
+    const unmarked = await signedOut(() => start("b2", false));
+    const rowsOf = async (runId: string): Promise<readonly unknown[]> => (await pool.query("SELECT owner_ref::text FROM identity.dig_run WHERE run_id = $1", [runId])).rows;
+    expect(await rowsOf(marked)).toEqual([{ owner_ref: fixture.ownerRef }]);
+    expect(await rowsOf(unmarked)).toEqual([]);
+    const isDig = async (runId: string): Promise<boolean> => (await pool.query<{ dig: boolean }>("SELECT identity.run_is_dig($1) AS dig", [runId])).rows[0]!.dig;
+    expect([await isDig(marked), await isDig(unmarked), await isDig(debate)]).toEqual([true, false, false]);
+  });
+
   it("a path the debate did not choose (b4 of b1..b3) is INVALID, and nothing is written", async () => {
     const debate = await parent("premium");
     expect(codeOf(await refusal(signedOut(() => dig(debate, "b4"))))).toBe("CARRY_ON_DIG_INVALID");

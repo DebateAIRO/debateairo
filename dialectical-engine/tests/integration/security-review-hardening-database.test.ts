@@ -17,8 +17,8 @@ import {
   questionCheckSpendWriterPresent, recordAskClarifyCharge, recordLanguageCheckSpend, recordQuestionCheckSpend, reserveAskClarifyCharge
 } from "@debateai/budget";
 import {
-  BillingJobQueries, BillingRepository, createPool, crossAccount, crossAccountPool, EntitlementRepository, migrate, PostgresInternalAllowanceRepository,
-  PostgresConsumerAuthRepository, PostgresConsumerRecoveryRepository, PostgresDataExportRepository, PostgresEmailChangeRepository,
+  BillingJobQueries, BillingRepository, createPool, crossAccount, crossAccountPool, EntitlementRepository, migrate, PostgresDigModelRepository,
+  PostgresInternalAllowanceRepository, PostgresConsumerAuthRepository, PostgresConsumerRecoveryRepository, PostgresDataExportRepository, PostgresEmailChangeRepository,
   PostgresInvestigationRepository, PostgresPassageRetentionRepository, PostgresPublicationRepository, PostgresPublicDebateRepository,
   PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresStaffAlertRepository, ProviderProbeRepository, RunRepository, RunWaitRepository,
   type Pool
@@ -118,9 +118,12 @@ async function unpublish(runId: string, ref: string): Promise<void> {
 }
 
 /**
- * The definers the merge of feat/2026-10-28-v4-initial (2026-11-09) brought that either request login may EXECUTE and that none of the census's four lists truly holds
- * (0156's, 0157's and 0170's). Each asks nothing of the connection, so each reason says plainly what a request login can do with it. This step does not harden them: they
- * are open, for a step of their own, and 0171's header says so. The other six the merge brought are in the four lists, each because its body belongs there.
+ * The definers the two merges of feat/2026-10-28-v4-initial (both 2026-11-09) brought that either request login may EXECUTE and that none of the census's four lists truly
+ * holds: seventeen of the first merge (0156's, 0157's and 0170's) and forty-three of the second (0158's to 0169's). Each asks nothing of the connection, so each reason says
+ * plainly what a request login can do with it. This step does not harden them: they are open, for a step of their own, and 0171's header says so. The first merge's other six
+ * and the second's other three (0159's and 0160's writers of a sealed row, whose attestation no request login can make) are in the four lists, each because its body belongs
+ * there. The grants of debateai_billing_runtime reach api-runtime alone (measured on P3-01's memberships: api-authorization holds debateai_authorization_runtime and through it
+ * debateai_runtime), so 0161's report count, 0162's five, 0165's read and re-open and 0167's press are api-runtime's alone; every other one here is either request login's.
  */
 const ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED: Readonly<Record<string, string>> = {
   "identity.claim_moderation_notices(integer)":
@@ -156,10 +159,104 @@ const ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED: Readonly<Record<string, string>> =
   "identity.claim_outbound_mail_alert(text,date)":
     "0170's one-a-day alert, asks nothing: takes today's or yesterday's alert of a kind, so the API's own alert to the team is never sent",
   "identity.outbound_mail_recipient_suppressed(bytea)":
-    "0170's question whether a 32-byte digest is suppressed: one bit, for digests keyed by the API's key, of a list that is empty until the bounce feed exists"
+    "0170's question whether a 32-byte digest is suppressed: one bit, for digests keyed by the API's key, of a list that is empty until the bounce feed exists",
+  // The second merge: what 0158 to 0169 brought.
+  "core.claim_carry_on_due(integer)":
+    "0159's claim, no owner and no connection asked: marks up to 50 debates' carry-on BEGUN and hands back each one's owner ref, user id and identity session id, so the API's own claim finds them gone",
+  "core.continue_failed_run(uuid,uuid,text,bigint)":
+    "0165's and 0168's re-open takes the owner it is handed: re-opens any named owner's failed debate, so the runner resumes it and buys what never ran on that person's quota",
+  "core.read_carry_on_begun(integer)":
+    "0159's list, asks nothing: up to 50 begun carry-ons of any accounts, each with its owner ref, user id and identity session id",
+  "core.read_carry_on_mark(uuid)":
+    "0161's one word of any run id: whether its carry-on is due, begun or done, or none",
+  "core.read_path_gap_round(uuid)":
+    "0160's reader of any run id whose content is live: a path debate's gap round count and its sealed text",
+  "core.read_path_outcomes(uuid)":
+    "0160's reader of any run id whose content is live: each path's state and its sealed answer",
+  "core.read_path_progress(uuid)":
+    "0161's reader of any run id whose content is live: each path's steps, the marks on its points, their trust words and times",
+  "core.read_path_roots(uuid)":
+    "0160's reader of any run id whose content is live: each path's root node, its maker and whether it is stale",
+  "core.read_run_continue(uuid,uuid)":
+    "0165's and 0168's read takes the owner it is handed: for any owner ref and run id, the debate's work state, its stop reason, whether it is paused, set aside or settled, and how often it was continued",
+  "core.read_start_path_ids(uuid)":
+    "0159's ids of any run id: which paths b1 to b8 the debate chose",
+  "core.read_start_paths(uuid)":
+    "0159's reader of any run id whose owner is here: the chosen paths' authors, counts, the carry-on box and times, with their sealed titles and questions",
+  "core.record_carry_on_done(uuid)":
+    "0159's mark, asks nothing: ends any begun carry-on, so that debate's remaining digs and its report are not made",
+  "core.record_carry_on_due(uuid)":
+    "0159's mark, asks nothing: marks any debate whose person ticked the box due before its story is ready, so its carry-on begins early",
+  "core.record_path_point_mark(uuid,text,uuid,text,text)":
+    "0161's writer, asks nothing: for any run id, path and point of that run, writes a progress mark and a trust word the page shows, the first of each kind standing",
+  "core.record_path_step(uuid,text,text)":
+    "0161's writer, asks nothing: for any run id and one of its paths, writes a step the waiting page shows, the first of each standing",
+  "core.record_work_item_retry(uuid,uuid,timestamp with time zone)":
+    "0165's writer, asks nothing: for any CLAIMED work item named with its run, sets the time its one automatic retry waits for",
+  "core.write_path_root(uuid,text,integer,uuid,text)":
+    "0160's writer, asks nothing: for any run whose content is live, writes a path's root or, when its root is stale, moves it to another node",
+  "identity.count_public_reports(uuid,uuid)":
+    "0161's count takes the owner it is handed: two numbers for any publication, its reports and how many that owner wrote",
+  "identity.create_saved_question(uuid,uuid,jsonb,jsonb)":
+    "0162's writer takes the owner it is handed: fills any active account's twenty saved questions with envelopes of its own making",
+  "identity.delete_saved_question(uuid,uuid)":
+    "0162's writer takes the owner it is handed: deletes any named person's saved question by its id",
+  "identity.link_pre_start_try(uuid,text,uuid)":
+    "0165's writer takes the owner it is handed and needs that person's 64-hex try reference and a run of theirs: gives the try's calls to that run, so that run's failure gives their charge back",
+  "identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)":
+    "0167's report press takes the owner it is handed (0147's press beside it, which 0171 made ask the connection, is the one the API no longer calls): opens a report on any public debate in any owner's name, the writer its calls are charged to",
+  "identity.read_main_answer_times(uuid)":
+    "0166's reader of any run id: each main-answer version's id, time and the run that triggered it",
+  "identity.read_pre_start_spent(uuid,timestamp with time zone,timestamp with time zone)":
+    "0158's reader takes the owner it is handed: any person's total of calls before Start in any window, whose answer caps that person's quota",
+  "identity.read_run_quota_used(uuid,uuid)":
+    "0165's question takes the owner it is handed: SOME or NONE, whether that person's debate has been charged anything",
+  "identity.read_saved_question(uuid,uuid)":
+    "0162's reader takes the owner it is handed: any named person's saved question, its sealed title and text, by its id",
+  "identity.read_saved_questions(uuid,integer)":
+    "0162's reader takes the owner it is handed: any named person's list of saved questions, their ids, revisions, sealed titles and times",
+  "identity.record_investigation_report_version_with_settings(uuid,integer,uuid,text,text,text,uuid,timestamp with time zone,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0136's report writer, which 0171 moved to the marker: on any closing waiting for its report, writes it FAILED, so the real report is never recorded (a READY row needs an attestation only the run's key can make)",
+  "identity.record_main_answer_update_with_settings(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0138's main-answer writer, which 0171 moved to the marker: appends a FAILED main-answer row to any live debate, naming any trigger and any payer, and a trigger already recorded writes no real one after (a READY row needs an attestation)",
+  "identity.record_path_rewrite_in_line_with_settings(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0138's in-line rewrite writer, which 0171 moved to the marker: writes a dig's turn FAILED at the line's front, so the real rewrite is never recorded (a READY row needs an attestation)",
+  "identity.record_path_rewrite_with_settings(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0134's rewrite writer, which 0171 moved to the marker: writes any dig's open turn FAILED, so the real rewrite is never recorded and the path's later digs go on without it (a READY row needs an attestation)",
+  "identity.record_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0138's climb writer, which 0171 moved to the marker: writes a climb's open turn FAILED by its update id, so the real climb is never recorded (a READY row needs an attestation)",
+  "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)":
+    "0158's charge takes the owner it is handed, as the clarify charge did before 0171 took it to the marker: writes any size on the site's day of today or the day either side, and any person's quota, so a request login can fill the day and stop every paid call",
+  "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)":
+    "0165's charge calls 0158's and asks nothing: the same write on the site's day and any person's quota, with a try reference of its own making",
+  "identity.record_public_answer_update_with_settings(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0147's public main-answer writer, which 0171 moved to the marker: appends a FAILED version to any allowed dig's public debate, and a trigger already recorded writes no real one after (a READY row needs an attestation)",
+  "identity.record_public_check_passed_with_settings(uuid,uuid,bigint)":
+    "0169's twin, word for word, of 0147's record of a public dig's passed check, which 0171 moved to the marker: marks any public dig's check as passed under any check id",
+  "identity.record_public_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0147's public climb writer, which 0171 moved to the marker: writes a public dig's open climb FAILED, so the real climb is never recorded (a READY row needs an attestation)",
+  "identity.record_public_report_with_settings(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0147's public report writer, which 0171 moved to the marker: closes any public report still being written FAILED, so its report never comes (a READY row needs an attestation)",
+  "identity.record_web_reading_with_settings(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea,bigint)":
+    "0169's twin, word for word, of 0132's reading writer, which 0171 moved to the marker: for a page of any live run, writes a FAILED reading under any reader and maker, which takes that reader's place on the page (a READ row needs an attestation)",
+  "identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)":
+    "0162's writer takes the owner it is handed: overwrites any named person's saved question, by its id and revision, with an envelope of its own making",
+  "ledger.call_waived_attempts(uuid)":
+    "0165's reader takes the owner it is handed: the attempt ids of that person's calls already waived",
+  "ledger.record_call_waiver(uuid,uuid[])":
+    "0165's writer, asks nothing: for any run and attempts it charged, takes those calls out of its owner's day, week and month, the site paying",
+  "ledger.spend_waived_until(uuid)":
+    "0168's bound of any run id: -infinity, infinity or a time, whether that debate's spend is set aside and until when"
 };
-/** The two of them that take an owner. The owner-keyed census below names them, so a new one that asks nothing still fails. */
-const ARRIVED_OWNER_TAKING = ["identity.read_own_contribution_review(uuid,uuid)", "identity.read_own_moderation_statements(uuid)"] as const;
+/** The ones in the identity schema that take an owner and that the billing role may call. The owner-keyed census below names them, so a new one that asks nothing still fails. */
+const ARRIVED_OWNER_TAKING = [
+  "identity.count_public_reports(uuid,uuid)", "identity.create_saved_question(uuid,uuid,jsonb,jsonb)", "identity.delete_saved_question(uuid,uuid)",
+  "identity.link_pre_start_try(uuid,text,uuid)", "identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)",
+  "identity.read_own_contribution_review(uuid,uuid)", "identity.read_own_moderation_statements(uuid)",
+  "identity.read_pre_start_spent(uuid,timestamp with time zone,timestamp with time zone)", "identity.read_run_quota_used(uuid,uuid)", "identity.read_saved_question(uuid,uuid)",
+  "identity.read_saved_questions(uuid,integer)", "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
+  "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)", "identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)"
+] as const;
 
 beforeAll(async () => {
   database = await startTestDatabase();
@@ -1104,8 +1201,8 @@ describe("F5: a request-facing function believes only the owner the database see
       WHERE n.nspname = 'identity' AND p.prosecdef AND p.proargnames && ARRAY['p_owner_ref','p_owner']::text[]
         AND has_function_privilege('debateai_billing_runtime', p.oid, 'EXECUTE')
         AND p.prosrc !~ 'identity\\.(request_owner_matches|page_memory_run_owned)\\(' ORDER BY 1`)).rows.map(({ signature }) => signature);
-    // Only the two 0157 brought, which the merge did not harden and the census's fifth list names; any other that takes an owner and asks nothing fails.
-    expect(unchecked).toEqual([...ARRIVED_OWNER_TAKING]);
+    // Only the ones the two merges brought (0157's two and 0158's to 0167's twelve), which neither merge hardened and the census's fifth list names; any other that takes an owner and asks nothing fails.
+    expect(unchecked).toEqual([...ARRIVED_OWNER_TAKING].sort());
     for (const signature of ARRIVED_OWNER_TAKING) expect(Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED), signature).toContain(signature);
     // And the ones that ask: at least the eighteen of 0131's rule still live and the fourteen others.
     const checked = (await database.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
@@ -1502,12 +1599,15 @@ describe("F5: the site's day of spend is the system's to write: the writers of a
     } finally { for (const pool of opened) await pool.end().catch(() => undefined); }
   }, 300_000);
 
-  it("no definer a request login may call writes the site's day but 0107's settlement of a funded debate's admitted call, which asks the run's owner", async () => {
+  it("no definer a request login may call writes the site's day but 0107's settlement of a funded debate's admitted call, which asks the run's owner, and 0158's charge of a call before Start, named open in the census's fifth list", async () => {
     const writers = (await database.pool.query<{ signature: string }>(`SELECT p.oid::regprocedure::text AS signature FROM pg_proc AS p
       WHERE p.prosecdef AND p.prosrc ~ 'INSERT INTO ledger\\.model_spend(_hold|_reservation)?\\M'
         AND (has_function_privilege($1, p.oid, 'EXECUTE') OR has_function_privilege($2, p.oid, 'EXECUTE')) ORDER BY 1`,
     [login("DATABASE_URL"), login("AUTHORIZATION_DATABASE_URL")])).rows.map(({ signature }) => signature);
-    expect(writers).toEqual(["billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)"]);
+    // 0158's writer arrived with the second merge of the V4 line and is open (0165's try charge calls it, so it holds no INSERT of its own); any other writer fails.
+    expect(writers).toEqual(["billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)",
+      "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)"]);
+    for (const signature of writers.slice(1)) expect(Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED), signature).toContain(signature);
   });
 });
 
@@ -1996,8 +2096,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
    * threat reports' hold and 0152's record of the site; 0048's probe writer moved to the marker and left the census), so a new
    * one needs a reason of its own. staff.authorize_action is not a connection check (it consumes a WebAuthn action proof), so a
    * function gated only by it is GATED, not ASKS (D4b). The fifth list, ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED (above the first
-   * describe), names what the merge of feat/2026-10-28-v4-initial brought and none of these four truly holds, with what a request
-   * login can do with each: open, not hardened here. It asks nothing of the connection, and one that starts to must move to ASKS.
+   * describe), names what the two merges of feat/2026-10-28-v4-initial brought and none of these four truly holds, sixty in all (seventeen
+   * of 0156, 0157 and 0170, forty-three of 0158 to 0169), with what a request login can do with each: open, not hardened here. It asks
+   * nothing of the connection, and one that starts to must move to ASKS. Ten of them are 0169's twins of writers this step moved to the
+   * marker: the marker keeps the older writer, and a request login can still reach the same write through its twin (each reason says so).
    */
   const ASKS = /identity\.(?:request_owner_matches|page_memory_run_owned)\(|rls\.(?:context_owner_ref|context_user_id|session_credential_hash)\(|staff\.require_http_authority\(|pg_catalog\.pg_has_role\(session_user, 'debateai_rls_all_accounts', 'MEMBER'\)|core\.lock_owned_live_runs\(/u;
   const ASKS_CONNECTION = [
@@ -2100,6 +2202,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.rotate_session_after_step_up_with_audit(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone,jsonb)",
     "identity.start_account_recovery(bytea,uuid,uuid[],jsonb,jsonb)", "identity.start_consumer_recovery(bytea,text,jsonb)",
     "identity.store_recovery_codes_with_audit(text,uuid,jsonb,timestamp with time zone,jsonb)", "identity.unlink_social_identity(jsonb,jsonb)",
+    // 0159's and 0160's writers of a sealed row: each row's own trigger refuses it without an attestation, an HMAC under the run's own secret, which no request login can read.
+    "core.record_path_gap_round(uuid,integer,jsonb,bytea)", "core.record_path_outcome(uuid,text,text,jsonb,bytea)", "core.record_start_paths(uuid,jsonb,jsonb)",
     "identity.use_phone_profile_with_audit(uuid,uuid,text,text,text,jsonb,jsonb)", "serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)",
     "serve.prepare_publication_key_provision(uuid,uuid,uuid,uuid,uuid,text)", "staff.authorize_alert_operation(uuid,text,uuid)",
     "staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.disable(jsonb,uuid,jsonb,uuid,text,uuid,jsonb,jsonb)",
@@ -2178,7 +2282,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
    * purges (they clamp the clock they are handed to now), the per-transaction audit attempt, the three challenge prunes (dead
    * rows only), 0000's sequence allocator (a definer since 0171) and 0112's release of a staff claim (it gives back only a
    * live claim). Each is in LEFT_ALONE above; this list fails on a new such loop that asks nothing of the connection.
-   * ARRIVED_LOOP_WRITERS are the five such loops the merge of feat/2026-10-28-v4-initial brought, named apart: each is in the fifth list, open, not left alone on purpose.
+   * ARRIVED_LOOP_WRITERS are the six such loops the merges of feat/2026-10-28-v4-initial brought, named apart: each is in the fifth list, open, not left alone on purpose.
    */
   const LOOP_WRITERS = [
     "billing.purge_expired_records(timestamp with time zone)", "billing.purge_revoked_card_tokens(timestamp with time zone)",
@@ -2188,7 +2292,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
   ] as const;
   const ARRIVED_LOOP_WRITERS = [
     "identity.claim_moderation_notices(integer)", "identity.claim_moderation_statements(integer)", "identity.claim_public_flag_mail(integer)",
-    "identity.complete_moderation_notice(uuid,uuid,text)", "identity.delete_moderation_words_due()"
+    "identity.complete_moderation_notice(uuid,uuid,text)", "identity.delete_moderation_words_due()", "core.claim_carry_on_due(integer)"
   ] as const;
   /**
    * The relations either request login may INSERT, UPDATE or DELETE whose row security is off: each append-only (its mutation
@@ -2202,7 +2306,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "billing.tool_order", "scorecard.model_identity", "serve.publication_check_record",
     // The one-row global sequence counter: its PRIMARY KEY and CHECK(singleton) admit no second row, so an INSERT always
     // conflicts, and 0171 took UPDATE back (section 4), so it is written only through its definer, ledger.allocate_sequence().
-    // The merge of feat/2026-10-28-v4-initial brought no such relation: the tables of 0156, 0157 and 0170 are each no request login's to write.
+    // The merges of feat/2026-10-28-v4-initial brought no such relation: the tables of 0156, 0157, 0158 to 0169 (all sixteen) and 0170 are each no request login's to read or write.
     "ledger.sequence_allocator"
   ] as const;
   const MISMATCH = { code: "42501", message: "REQUEST_OWNER_MISMATCH" };
@@ -3398,6 +3502,39 @@ describe("F2: no dig is published, by the owner's decision", () => {
     expect(await grantees("identity.read_run_is_dig(uuid,uuid)")).toEqual(["debateai_billing_runtime"]);
     for (const pool of [apiRequest, apiSystem, runner, erasure]) {
       expect((await sqlError(() => pool.query("SELECT identity.run_is_dig($1)", [ana.runId]))).code).toBe("42501");
+    }
+  });
+
+  /**
+   * 0165's and 0168's Continue (POST /v1/runs/{id}/continue, on the API's request login) re-opens the SAME work item of the SAME run: a dig that failed goes on being that dig, and
+   * no new run is made to mark. Its dig row stays the one its creation wrote; the writer marks a re-admission's new run (run-supersession.test.ts).
+   */
+  it("on the production logins (P3-01's memberships): a dig the API's Continue re-opens after it failed makes no new run, and it stays a dig to its owner's own request", async () => {
+    const production = await logins!.production();
+    const target = createPool(production.url("api-system"), { max: 2 });
+    const request = createPool(production.url("api-runtime"), { max: 2, crossAccount: target });
+    try {
+      const dig = await dugBy(ana, await run(ana), "row");
+      await seeded([[`INSERT INTO core.work_item (run_id,battery_row_id,node_set,command_key,state,terminal_reason,created_at_seq)
+        VALUES ($1,'Q1','[]'::jsonb,$2,'FAILED','RUNNER_EXECUTION_FAILED:FIXTURE',$3)`, [dig, `fixture:${randomUUID()}`, ++sequence]]]);
+      const runsOf = async (): Promise<number> => Number((await database.pool.query<{ n: string }>(
+        "SELECT count(*) AS n FROM core.run_ownership_event WHERE owner_ref=$1", [ana.ownerRef])).rows[0]!.n);
+      const before = await runsOf();
+      expect(await inAccountRequest(ana.token, () => new PostgresDigModelRepository(request).continueFailedRun(ana.ownerRef, dig, null, null))).toBe("RECORDED");
+      expect(await runsOf()).toBe(before);
+      expect(await inAccountRequest(ana.token, () => asks(request, ana.ownerRef, dig))).toBe(true);
+      expect((await database.pool.query<{ n: string }>("SELECT count(*) AS n FROM identity.dig_run WHERE run_id=$1", [dig])).rows[0]!.n).toBe("1");
+    } finally { await request.end(); await target.end(); }
+  }, 300_000);
+
+  it("a dig's own row stays out of a person's data export, as the owner decided: no export reader reads it, the export worker's role may not, and the export's own code does not name it", async () => {
+    const readers = (await database.pool.query<{ name: string; reads: boolean }>(`SELECT p.proname AS name, bool_or(p.prosrc ~ 'identity\\.dig_run\\y') AS reads
+      FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace WHERE n.nspname = 'identity' AND p.proname LIKE 'read_data_export%' GROUP BY 1 ORDER BY 1`)).rows;
+    expect(readers.map(({ name }) => name)).toEqual(expect.arrayContaining(["read_data_export_dig_model", "read_data_export_pre_start", "read_data_export_saved_questions"]));
+    expect(readers.filter(({ reads }) => reads)).toEqual([]);
+    expect((await database.pool.query<{ reads: boolean }>("SELECT has_table_privilege('debateai_data_export_worker','identity.dig_run','SELECT') AS reads")).rows[0]!.reads).toBe(false);
+    for (const path of ["packages/db/src/data-export.ts", "apps/api/src/data-export/snapshot.ts", "apps/api/src/data-export/readme.ts"]) {
+      expect(readFileSync(path, "utf8"), path).not.toMatch(/\bdig_run\b/u);
     }
   });
 

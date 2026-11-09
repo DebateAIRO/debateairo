@@ -43,7 +43,9 @@
  * of a stranger's report under the public debate's own run (X29) is one content
  * lease and one statement beside it, only on the press that opens the report; the
  * merge's moderation and flag mail timer runs one statement at a time outside any
- * request. None needs more. max_connections stays 320.
+ * request. The second V4 merge's carry-on tick runs single-flight outside any
+ * request, its digs started one after another, and its calls before Start are
+ * charged on the request's own pool. None needs more. max_connections stays 320.
  *
  * The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps

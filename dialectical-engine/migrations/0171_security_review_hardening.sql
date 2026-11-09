@@ -188,15 +188,27 @@
 --   0128's hold of an erasing account's address on its threat reports, gated by the id of a prepared erasure; and 0152's measure of what a public check
 --   used, a record of the site that holds no account's, which nothing reads to gate anything. Still open there, for a review of its own: a request login
 --   may still append such a refusal event to any account's trail (two of them take a user id). The fifth list, ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED, is
---   what the merge of feat/2026-10-28-v4-initial brought and none of the four truly holds, seventeen definers of 0156, 0157 and 0170, each with a reason that
---   says plainly what a request login can do with it: claim any account's pending moderation notice, statement of reasons or reporter's answer mail, read
---   it under that claim (a user id, a publication, a ground and the sealed address) and mark it delivered unsent; read any person's statements and which
---   of their contributions are off for review by naming the owner ref, as both readers take the owner they are handed; keep the first sealed quote of a
---   report that hid its debate; run the stuck report sweep and the twelve-month erasure of moderation words; fill the day's count of outbound mail, which
---   then refuses every later account mail until the next UTC day; take the day's mail alerts; and ask one bit of a keyed digest of an address. This step
---   does not harden them: they are open, for a step of their own. The other six definers the merge brought are in the four lists because their bodies
---   belong there: 0155's two owner writes and 0157's answered queue ask the connection, 0157's two staff acts are gated by an action proof, and 0170's
---   count of the day's mail is a site reader. A new, a removed or a newly reachable definer fails the
+--   what the two merges of feat/2026-10-28-v4-initial brought and none of the four truly holds, sixty definers: seventeen of 0156, 0157 and 0170 (the first
+--   merge) and forty-three of 0158 to 0169 (the second), each with a reason that says plainly what a request login can do with it. Of the first merge's:
+--   claim any account's pending moderation notice, statement of reasons or reporter's answer mail, read it under that claim (a user id, a publication, a
+--   ground and the sealed address) and mark it delivered unsent; read any person's statements and which of their contributions are off for review by naming
+--   the owner ref, as both readers take the owner they are handed; keep the first sealed quote of a report that hid its debate; run the stuck report sweep
+--   and the twelve-month erasure of moderation words; fill the day's count of outbound mail, which then refuses every later account mail until the next
+--   UTC day; take the day's mail alerts; and ask one bit of a keyed digest of an address. Of the second merge's: 0158's and 0165's charges of a call before
+--   Start write any size on the site's day and any person's quota for the owner they are handed, as the clarify charge did before this step moved it (they
+--   stay debateai_runtime's); 0159's carry-on marks claim and read any account's begun carry-on with its owner ref, user id and identity session id, and end
+--   or start one; 0159's to 0161's and 0166's readers hand any run id's path set, outcomes, roots, gap round, progress and main-answer times, the texts still
+--   sealed under the run's key; 0160's and 0161's writers mark any run's steps and points and write its roots; 0162's five read, overwrite and delete any
+--   named person's saved questions; 0165's and 0168's Continue re-opens any named owner's failed debate on that person's quota and reads its state; 0165's
+--   retry time and call waiver act on any claimed work item or on any run's charged calls, taking them out of its owner's windows; 0167's report press opens
+--   a report on any public debate in any owner's name, beside 0147's press, which the API no longer calls and which asks the connection as section 3 makes it;
+--   and 0169's ten writers <writer>_with_settings, each word for word a writer this step moves to the marker (below), stay debateai_runtime's, so a request
+--   login can still end a dig's rewrite, a climb, a report or a reading with a FAILED row through its twin before the real one is recorded (a row with content
+--   needs an attestation only the run's key can make). This step does not harden them: they are open, for a step of their own. The first merge's other six
+--   definers are in the four lists because their bodies belong there: 0155's two owner writes (for an owner; their legacy asker's branch, as the lock's, names
+--   no owner, asks nothing and is gated only by the asker id it is handed) and 0157's answered queue ask the connection, 0157's two staff acts are gated by an
+--   action proof, and 0170's count of the day's mail is a site reader; so are the second merge's other three, 0159's and 0160's writers of a sealed row, which
+--   a row's own trigger refuses without an attestation under the run's secret, which no request login can read. A new, a removed or a newly reachable definer fails the
 --   census, as does one that changes which list it belongs in. 0048's record of a provider's probe took any caller of debateai_runtime and any date, and
 --   the API's ask-time discovery trusts it: it takes each provider's latest row (0040's latest_provider_probes, by probed_at) for healthy while that row
 --   is HEALTHY and fresh, and probes every other provider again, one whose latest row is dated later than now included. So a request login with no
@@ -210,13 +222,13 @@
 --   database), so bounding the date needs a margin for those clocks. The test also censuses the relations
 --   either request login may INSERT, UPDATE or DELETE whose row security is off (billing.tool_order, scorecard.model_identity and
 --   serve.publication_check_record, each append-only and content-free, and 0000's one-row ledger.sequence_allocator, whose PRIMARY KEY admits no second
---   row and whose UPDATE this step takes back), which a definer-only census cannot see, so a new such writable relation fails too (the merge of
---   feat/2026-10-28-v4-initial brought none: the tables of 0156, 0157 and 0170 are each no request login's to write). The functions only the runner
+--   row and whose UPDATE this step takes back), which a definer-only census cannot see, so a new such writable relation fails too (neither merge of
+--   feat/2026-10-28-v4-initial brought one: the tables of 0156, 0157, 0170 and the sixteen of 0158 to 0169 are each no request login's to write). The functions only the runner
 --   or the API's system login call, with no owner, on any account's rows, move from debateai_runtime, which the API's request logins hold (through
 --   debateai_billing_runtime and debateai_authorization_runtime), to the marker, which only the system logins hold: the sweeps' readers and listers,
 --   their settlements, wipes, marks and page writers, the runner's own steps of one debate, which take only its run, turn or report (its web
 --   evidence, rewrites, turns, climbs, suggestions, month pause, closing's report and public dig writers, and their readers; the API calls five of
---   them, only ever on its system login), and staff's notice and alert loops, which the API drains only from its gated timers (0128's threat report
+--   them, only ever on its system login; 0169's twins of ten of those writers arrived after this step was written and are not moved, the fifth list above says what they leave open), and staff's notice and alert loops, which the API drains only from its gated timers (0128's threat report
 --   alerts, the account of the staff holder each goes to and the erasure of the reports due, and the claim, completion and recipient of 0142's team
 --   limit notices, 0146's allowance notices, 0150's public review notices and 0151's flag notices), so a request login with no session no longer
 --   claims a pending notice and marks it delivered unsent; 0151's flag settlement, which the API's press calls on its system login after the judge,
