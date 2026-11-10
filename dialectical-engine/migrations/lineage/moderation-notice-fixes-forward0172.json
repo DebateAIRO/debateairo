@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0172_moderation_notice_fixes.sql",
-    "sha256": "85834caedf09460d6a599020eb3228982b010afb301f0a8125a45b4de6359aad"
+    "sha256": "d6de0f34831fe757a35c14f28699d1d5b13e808b7f2f85e6fb7739627068b7e9"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
@@ -46,6 +46,9 @@
       ],
       "columns": [
         "next_attempt_at"
+      ],
+      "constraints": [
+        "moderation_statement_kind_check"
       ]
     }
   ]

@@ -74,6 +74,22 @@ describe("the moderation notices page", () => {
     for (const card of [removed, corrected, deleted, none]) expect(card!.textContent).toContain(pub["public.moderation.routes"]);
   });
 
+  it("the final decision to a contributor and to a reporter is listed, with its own title and sentence, in en and ro", async () => {
+    for (const catalog of [pub, ro]) {
+      const page = await mount([
+        statement({ statement_id: "57a7e000-0000-4000-8000-000000000006", kind: "CONTRIBUTION_DECIDED", piece_kind: null }),
+        statement({ statement_id: "57a7e000-0000-4000-8000-000000000007", kind: "REPORT_DECIDED", piece_kind: null })], catalog);
+      for (const kind of ["CONTRIBUTION_DECIDED", "REPORT_DECIDED"]) {
+        const card = page.querySelector<HTMLElement>(`[data-statement-kind=${kind}]`)!;
+        expect(card.textContent).toContain(catalog[`public.moderation.kind.${kind}`]);
+        expect(card.textContent).toContain(catalog[`public.moderation.what.${kind}`]);
+      }
+      expect(catalog["public.moderation.what.CONTRIBUTION_DECIDED"]).not.toBe(catalog["public.moderation.what.REPORT_DECIDED"]);
+      act(() => root?.unmount()); host?.remove();
+    }
+    expect(ro["public.moderation.what.REPORT_DECIDED"]).not.toBe(pub["public.moderation.what.REPORT_DECIDED"]);
+  });
+
   it("says when there are none, and when they could not be read", async () => {
     expect((await mount([])).textContent).toContain(pub["public.moderation.empty"]);
     act(() => root?.unmount()); host?.remove();

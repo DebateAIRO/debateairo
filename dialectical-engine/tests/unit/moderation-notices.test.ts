@@ -52,7 +52,7 @@ function world(statements: ReadonlyArray<ModerationStatementMail | null>, channe
 describe("0157: the statement of reasons sender", () => {
   it("sends each kind's template to the account's address, in its language, with the two links, and settles it SENT", async () => {
     const memory = new MemoryTemplatedMailSender();
-    const kinds: ModerationStatementKind[] = ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED"];
+    const kinds: ModerationStatementKind[] = ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"];
     const { reconciler, claims, completed } = world(kinds.map((kind, index) => statement(kind, { mailLocale: index === 1 ? "ro" : "en" })), memory);
     await reconciler.reconcile(100);
     expect(memory.messages.map(({ mail }) => [mail.to, mail.templateId, mail.locale, mail.messageId])).toEqual(kinds.map((kind, index) =>
@@ -61,6 +61,29 @@ describe("0157: the statement of reasons sender", () => {
     expect(params.itemUrl).toBe(`https://debate.example.test/public/debate/${REF}`);
     expect(params.statementUrl).toBe(`https://debate.example.test/settings/notices#${claims[0]!.statementId}`);
     expect(completed).toEqual(claims.map((claim) => [claim.statementId, "SENT"]));
+  });
+
+  // M3 (owner's decision D, 10 Nov 2026): the final decision to those whose dig or report left with the debate: its date, the item's link, the routes, Reply-To office@.
+  it("the final-decision mails for a contributor and for a reporter render in en and ro with the routes, and carry Reply-To office@", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    await world([statement("CONTRIBUTION_DECIDED", { mailLocale: "en" }), statement("REPORT_DECIDED", { mailLocale: "en" }),
+      statement("CONTRIBUTION_DECIDED", { mailLocale: "ro" }), statement("REPORT_DECIDED", { mailLocale: "ro" })], memory).reconciler.reconcile();
+    expect(memory.messages).toHaveLength(4);
+    const en = memory.messages.slice(0, 2).map(({ mail }) => renderMail(mail.templateId, mail.locale, mail.params));
+    expect(en[0]!.subject).toBe("Our decision on the debate your contribution was in");
+    expect(en[0]!.text).toContain(`we decided that this public debate stays off the public page: https://debate.example.test/public/debate/${REF}. What you contributed there stays off it too, in every copy of the page.`);
+    expect(en[1]!.subject).toBe("Our decision on the debate your report was in");
+    expect(en[1]!.text).toContain("Any report you asked for there stays off it too, in every copy of the page.");
+    for (const { mail, raw } of memory.messages) {
+      const { text } = renderMail(mail.templateId, mail.locale, mail.params);
+      // The routes paragraph is the one the same locale's other decision mail carries (the first line that names office@).
+      const routes = renderMail("MODERATION_STATEMENT_DEBATE_DECIDED", mail.locale, mail.params).text.split("\n").find((line) => line.includes("office@dezbatere.ro"))!.trim();
+      expect(text, `${mail.templateId} ${mail.locale}`).toContain(routes);
+      expect(text).toContain("office@dezbatere.ro");
+      expect(raw).toMatch(/^Reply-To: office@dezbatere\.ro\r?$/mu);
+    }
+    // ro has its own words, not English.
+    expect(renderMail("MODERATION_STATEMENT_CONTRIBUTION_DECIDED", "ro", memory.messages[2]!.mail.params).subject).not.toBe(en[0]!.subject);
   });
 
   it("a staff hide on a report: what was done, everywhere and with no end date, the source, the AI's part, the hold, the routes; Reply-To office@", async () => {

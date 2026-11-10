@@ -53,7 +53,7 @@ ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_chec
 CREATE OR REPLACE FUNCTION identity.queue_moderation_statements() RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v identity.public_review_event%ROWTYPE; d identity.moderation_decision%ROWTYPE; v_count integer := 0; v_owner uuid; v_row record; v_since timestamptz;
-  v_state text; v_tries integer;
+  v_state text; v_tries integer; v_hide uuid;
 BEGIN
   SELECT start.since INTO v_since FROM identity.moderation_statement_since AS start;
   FOR v IN SELECT event.* FROM identity.public_review_event AS event
@@ -140,6 +140,18 @@ BEGIN
       INSERT INTO identity.moderation_statement_seen (source_id) VALUES (d.decision_id) ON CONFLICT (source_id) DO NOTHING;
       IF NOT FOUND THEN CONTINUE; END IF;
       PERFORM identity.state_moderation(identity.moderation_debate_owner(d.publication_ref), 'DEBATE_DECIDED', d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
+      -- M3 (owner's decision D, 10 Nov 2026): the hide this decision makes final is the latest HIDE up to the decision with no REPUBLISH after it. Each person
+      -- told at that hide that their dig (CONTRIBUTION_AFFECTED) or report (REPORT_AFFECTED) left with the debate is told the final decision, once per kind
+      -- however many pieces they had (the earlier statements name the pieces): no places, no piece. state_moderation skips an erased account (D8).
+      SELECT hide.event_id INTO v_hide FROM identity.public_review_event AS hide
+        WHERE hide.publication_ref = d.publication_ref AND hide.action = 'HIDE' AND hide.revision <= d.revision
+          AND NOT EXISTS (SELECT 1 FROM identity.public_review_event AS back WHERE back.publication_ref = d.publication_ref AND back.action = 'REPUBLISH'
+            AND back.revision > hide.revision AND back.revision <= d.revision)
+        ORDER BY hide.revision DESC LIMIT 1;
+      FOR v_row IN SELECT DISTINCT affected.owner_ref, CASE affected.kind WHEN 'CONTRIBUTION_AFFECTED' THEN 'CONTRIBUTION_DECIDED' ELSE 'REPORT_DECIDED' END AS kind
+        FROM identity.moderation_statement AS affected WHERE affected.event_id = v_hide AND affected.kind IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED') LOOP
+        PERFORM identity.state_moderation(v_row.owner_ref, v_row.kind, d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
+      END LOOP;
       DELETE FROM identity.moderation_statement_stuck AS stuck WHERE stuck.source_id = d.decision_id;
       v_count := v_count + 1;
     EXCEPTION WHEN OTHERS THEN
@@ -355,6 +367,13 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   FROM jsonb_array_elements(identity.public_flag_queue()) WITH ORDINALITY AS row_found(value, at)
 $$;
 
+-- M3. Two statement kinds for the final decision --------------------------------------------------------------------------------------
+-- CONTRIBUTION_DECIDED and REPORT_DECIDED: what the queue above writes at a decision for those told at the hide. The kind CHECK is 0157's, named in
+-- its CREATE TABLE; swapped here, validated (every stored row is one of 0157's seven).
+ALTER TABLE identity.moderation_statement DROP CONSTRAINT IF EXISTS moderation_statement_kind_check;
+ALTER TABLE identity.moderation_statement ADD CONSTRAINT moderation_statement_kind_check
+  CHECK (kind IN ('DEBATE_HIDDEN','DEBATE_DECIDED','CONTRIBUTION_REMOVED','REPORT_REMOVED','CORRECTED','CONTRIBUTION_AFFECTED','REPORT_AFFECTED','CONTRIBUTION_DECIDED','REPORT_DECIDED'));
+
 -- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
 DO $moderation_notice_fixes_contract$
 DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
@@ -378,7 +397,7 @@ BEGIN
   -- M5: the queue is this file's body, its owner's, a definer with 0157's settings, callable by no other role, and its owner may queue the alert.
   v_queue := 'identity.queue_moderation_statements()'::regprocedure;
   IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue)
-      IS DISTINCT FROM 'd10da1d1c1cbe3bb2f1f271548b404b242bcc1f35611ea197b55699e01dd5da0'
+      IS DISTINCT FROM '206ec00697c8811a0d2555bbd2dbc0d46fa8b2a557f4552e42aa51bbd56a8595'
     OR (SELECT p.proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue) IS DISTINCT FROM v_owner
     OR (SELECT p.prosecdef AND p.provolatile = 'v' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'integer'::regtype
       FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue) IS NOT TRUE
@@ -397,6 +416,14 @@ BEGIN
     OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'staff.public_flag_notice'::regclass AND k.contype = 'c'
       AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%PUBLIC_FLAG_WAITING%') <> 1 THEN
     RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 alert kind';
+  END IF;
+  -- M3: one CHECK on the statement kind, under 0157's name, with its seven kinds and the two new ones.
+  IF (SELECT pg_catalog.pg_get_constraintdef(k.oid) FROM pg_catalog.pg_constraint AS k
+      WHERE k.conrelid = 'identity.moderation_statement'::regclass AND k.conname = 'moderation_statement_kind_check' AND k.contype = 'c' AND k.convalidated)
+      IS DISTINCT FROM 'CHECK ((kind = ANY (ARRAY[''DEBATE_HIDDEN''::text, ''DEBATE_DECIDED''::text, ''CONTRIBUTION_REMOVED''::text, ''REPORT_REMOVED''::text, ''CORRECTED''::text, ''CONTRIBUTION_AFFECTED''::text, ''REPORT_AFFECTED''::text, ''CONTRIBUTION_DECIDED''::text, ''REPORT_DECIDED''::text])))'
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'identity.moderation_statement'::regclass AND k.contype = 'c'
+      AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%DEBATE_DECIDED%') <> 1 THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M3 statement kind';
   END IF;
   -- M2: the retry column on both tables (nullable, no default), and the four functions as 0157 left them: signature, result, definer, settings, owner.
   IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a

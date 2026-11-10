@@ -461,3 +461,92 @@ describe("M6, M4: a review step that acts on a report closes it, and the reporte
     expect((await flagRow(flagId)).has_words).toBe(false);
   }, timeout);
 });
+
+// M3 (owner's decision D, 10 Nov 2026): everyone told at a hide that their content left with the debate hears the final decision, once per kind.
+describe("M3: the final decision reaches everyone whose content left with the debate", () => {
+  const sealed = (ref: string) => JSON.stringify({ v: 1, keyId: `publication-snapshot:${ref}:v1`, nonce: "AAAA", tag: "AAAA", ct: "YQ==" });
+  /** A dig of `person`'s on `ref`, allowed before the hide (so the hide takes it along). */
+  async function dig(ref: string, person: Account): Promise<string> {
+    const digRunId = randomUUID();
+    await seeded([[`INSERT INTO identity.public_contribution (dig_run_id, owner_ref, publication_ref, root_run_id, parent_run_id, outcome, check_ref, checked_at)
+      VALUES ($1,$2,$3,$4,$5,'ALLOWED',$6,now())`, [digRunId, person.ownerRef, ref, randomUUID(), randomUUID(), randomUUID()]]]);
+    return digRunId;
+  }
+  /** A report of `person`'s on `ref` that the hold took with it. */
+  async function reportBy(ref: string, person: Account): Promise<string> {
+    const reportId = randomUUID();
+    await seeded([[`INSERT INTO identity.public_report (report_id, publication_ref, report_version, writer_ref, carrier_run_id, free, outcome, failure_code, recorded_at)
+      VALUES ($1,$2,(SELECT COALESCE(max(report_version),0)+1 FROM identity.public_report WHERE publication_ref=$2),$3,$4,true,'FAILED','PUBLIC_REVIEW_HOLD',now())`,
+      [reportId, ref, person.ownerRef, randomUUID()]]]);
+    return reportId;
+  }
+  const queue = () => database.pool.query("SELECT identity.queue_moderation_statements()");
+  async function decide(ref: string): Promise<string> {
+    const operation = randomUUID();
+    const revision = (await database.pool.query<{ n: number }>("SELECT max(revision)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
+    await database.pool.query("SELECT identity.moderation_decide($1::uuid,$2::uuid,ARRAY['PERSONAL_DATA'],'OWN_INITIATIVE',NULL,$3,$4::jsonb,$5,$6::uuid,$3)",
+      [randomUUID(), ref, "1".repeat(64), sealed(ref), revision, operation]);
+    return (await database.pool.query<{ id: string }>("SELECT decision_id AS id FROM identity.moderation_decision WHERE operation_id=$1", [operation])).rows[0]!.id;
+  }
+  type Told = Readonly<{ owner_ref: string; kind: string; piece_kind: string | null; piece_id: string | null; places: unknown[] }>;
+  const toldOf = async (decisionId: string): Promise<Told[]> => (await database.pool.query<Told>(
+    "SELECT owner_ref, kind, piece_kind, piece_id, places FROM identity.moderation_statement WHERE decision_id=$1 ORDER BY kind, owner_ref", [decisionId])).rows;
+  const sorted = (rows: readonly Told[]) => [...rows].sort((a, b) => (a.kind + a.owner_ref).localeCompare(b.kind + b.owner_ref));
+
+  it("DECIDE tells each affected contributor once, whatever the number of their pieces (R8)", async () => {
+    const [author, pia, quin, rae] = [await account(), await account(), await account(), await account()];
+    const ref = await publishedDebate(author);
+    await dig(ref, pia); await dig(ref, pia); await reportBy(ref, quin);
+    await dig(ref, rae); await reportBy(ref, rae);
+    await hide(ref);
+    await queue();
+    expect((await database.pool.query("SELECT 1 FROM identity.moderation_statement WHERE publication_ref=$1 AND kind IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED')", [ref])).rowCount).toBe(5);
+    const decisionId = await decide(ref);
+    await queue();
+    const told = await toldOf(decisionId);
+    expect(sorted(told)).toEqual(sorted([
+      { owner_ref: author.ownerRef, kind: "DEBATE_DECIDED", piece_kind: null, piece_id: null, places: [] },
+      { owner_ref: pia.ownerRef, kind: "CONTRIBUTION_DECIDED", piece_kind: null, piece_id: null, places: [] },
+      { owner_ref: quin.ownerRef, kind: "REPORT_DECIDED", piece_kind: null, piece_id: null, places: [] },
+      { owner_ref: rae.ownerRef, kind: "CONTRIBUTION_DECIDED", piece_kind: null, piece_id: null, places: [] },
+      { owner_ref: rae.ownerRef, kind: "REPORT_DECIDED", piece_kind: null, piece_id: null, places: [] }]));
+    // A second pass adds nothing.
+    await queue();
+    expect(await toldOf(decisionId)).toHaveLength(5);
+  }, timeout);
+
+  it("an erased contributor gets nothing, and nothing is stuck", async () => {
+    const [author, pia, quin] = [await account(), await account(), await account()];
+    const ref = await publishedDebate(author);
+    await dig(ref, pia); await reportBy(ref, quin);
+    const hidden = await hide(ref);
+    await queue();
+    await database.pool.query('UPDATE identity."user" SET state=\'deleted\' WHERE owner_ref=$1', [pia.ownerRef]);
+    const decisionId = await decide(ref);
+    await queue();
+    expect((await toldOf(decisionId)).map((row) => `${row.kind}`).sort()).toEqual(["DEBATE_DECIDED", "REPORT_DECIDED"]);
+    expect((await toldOf(decisionId)).some((row) => row.owner_ref === pia.ownerRef)).toBe(false);
+    expect((await stuck()).some((row) => row.source_id === decisionId || row.source_id === hidden)).toBe(false);
+    expect(await seen(decisionId)).toBe(true);
+  }, timeout);
+
+  it("a debate put back and hidden again: only the second hide's affected people are told", async () => {
+    const [author, first, second] = [await account(), await account(), await account()];
+    const ref = await publishedDebate(author);
+    const firstDig = await dig(ref, first);
+    await hide(ref);
+    await queue();
+    // The first dig is taken out (revision 2), the debate put back (3), a second person digs, and it is hidden again (4): the first person's dig is not
+    // taken along by the second hide, so only the second person was told at it.
+    const step = (revision: number, action: string, piece: string | null) => seeded([[`INSERT INTO identity.public_review_event (event_id,publication_ref,revision,action,piece_kind,piece_id,actor_staff_id,operation_id,request_sha256)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [randomUUID(), ref, revision, action, piece === null ? null : "DIG", piece, randomUUID(), randomUUID(), "0".repeat(64)]]]);
+    await step(2, "REMOVE_DIG", firstDig);
+    await step(3, "REPUBLISH", null);
+    await dig(ref, second);
+    await step(4, "HIDE", null);
+    await queue();
+    const decisionId = await decide(ref);
+    await queue();
+    expect((await toldOf(decisionId)).filter((row) => row.kind === "CONTRIBUTION_DECIDED").map((row) => row.owner_ref)).toEqual([second.ownerRef]);
+  }, timeout);
+});

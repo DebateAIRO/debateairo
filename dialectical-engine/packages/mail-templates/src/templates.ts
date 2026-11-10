@@ -18,6 +18,7 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED",
   "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "MODERATION_STATEMENT_REPORT_REMOVED",
   "MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED",
+  "MODERATION_STATEMENT_CONTRIBUTION_DECIDED", "MODERATION_STATEMENT_REPORT_DECIDED",
   "PUBLIC_FLAG_ANSWER_RECEIPT", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED",
   "OUTBOUND_MAIL_SHARE", "OUTBOUND_MAIL_SIGN_UP_STOPPED", "OUTBOUND_MAIL_ALL_STOPPED"
 ] as const);
@@ -433,6 +434,9 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   MODERATION_STATEMENT_CORRECTED: statement("corrected"),
   MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: statement("contributionAffected"),
   MODERATION_STATEMENT_REPORT_AFFECTED: statement("reportAffected"),
+  // 0172 (M3; the owner's decision D): the final decision, to each person whose dig or report left with the debate at its hide. One mail a person and kind.
+  MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided"),
+  MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),
   // 0157 (DSA Art 16(4)-(6); the owner's D4): the answers to the person who reported. The date and the debate's link only: no words of the report
   // or the debate, no staff id. The receipt names no decision; each decision says how automated means were used and gives office@ and the routes.
   PUBLIC_FLAG_ANSWER_RECEIPT: define({ catalogue: "mail", subject: "mail.flagAnswer.receiptSubject", paragraphs: ["mail.flagAnswer.receipt"], params: { happened: "date", itemUrl: "url" } }),

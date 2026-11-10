@@ -36,7 +36,9 @@ const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
       "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)", "identity.complete_public_flag_mail(uuid,uuid,text)",
       "identity.record_hide_ground(uuid,uuid,text[],text,uuid)", "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)",
       "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)", "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()"]),
-    relations: Object.freeze(["identity.moderation_statement", "identity.public_flag_mail"]), columns: Object.freeze(["next_attempt_at"]) })
+    relations: Object.freeze(["identity.moderation_statement", "identity.public_flag_mail"]), columns: Object.freeze(["next_attempt_at"]),
+    // M3: and 0157's kind CHECK on identity.moderation_statement (the two statement kinds of the final decision).
+    constraints: Object.freeze(["moderation_statement_kind_check"]) })
 ]);
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0172_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");

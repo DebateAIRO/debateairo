@@ -70,7 +70,8 @@ describe("0172: the moderation notice fixes", () => {
         "identity.claim_moderation_statements(integer)", "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)",
         "identity.complete_public_flag_mail(uuid,uuid,text)", "identity.record_hide_ground(uuid,uuid,text[],text,uuid)",
         "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)", "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
-        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"] }
+        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"],
+        constraints: ["moderation_statement_kind_check"] }
     ]);
     expect(SQL).toContain("ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;\n"
       + "ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_check\n  CHECK (kind IN ('PUBLIC_FLAG_HIDDEN','PUBLIC_FLAG_WAITING','MODERATION_MAIL_FAILED'));");
@@ -110,6 +111,38 @@ describe("0172: the moderation notice fixes", () => {
     expect(SQL).toContain("SELECT core.install_truncate_guard('identity.moderation_statement_stuck');");
     expect(SQL).not.toMatch(/^GRANT /mu);
     expect(SQL).toContain(`IS DISTINCT FROM '${createHash("sha256").update(queue.slice(queue.indexOf("AS $$") + 5)).digest("hex")}'`);
+  });
+
+  it("M3: the decision loop gains the final statements for those told at the hide, the event loop stays 0157's, and the kind CHECK is swapped under 0157's name", () => {
+    const queue = bodyOf("identity.queue_moderation_statements");
+    const original = read("migrations/0157_moderation_statements.sql");
+    // The event loop (everything before the decision loop) is 0157's work, word for word, as M5's case checks; here the decision's own line is still 0157's.
+    expect(queue).toContain("PERFORM identity.state_moderation(identity.moderation_debate_owner(d.publication_ref), 'DEBATE_DECIDED', d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);");
+    expect(original).toContain("PERFORM identity.state_moderation(identity.moderation_debate_owner(d.publication_ref), 'DEBATE_DECIDED', d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);");
+    const decisions = queue.slice(queue.indexOf("  FOR d IN SELECT"));
+    // The hide it makes final: the latest HIDE up to the decision with no REPUBLISH after it.
+    expect(decisions).toContain("hide.action = 'HIDE' AND hide.revision <= d.revision");
+    expect(decisions).toContain("back.action = 'REPUBLISH'\n            AND back.revision > hide.revision AND back.revision <= d.revision)");
+    expect(decisions).toContain("ORDER BY hide.revision DESC LIMIT 1;");
+    // Once per person and kind; no places, no piece (R8); an erased account is state_moderation's to skip, not this loop's.
+    expect(decisions).toContain("SELECT DISTINCT affected.owner_ref, CASE affected.kind WHEN 'CONTRIBUTION_AFFECTED' THEN 'CONTRIBUTION_DECIDED' ELSE 'REPORT_DECIDED' END AS kind");
+    expect(decisions).toContain("affected.event_id = v_hide AND affected.kind IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED')");
+    expect(decisions).toContain("PERFORM identity.state_moderation(v_row.owner_ref, v_row.kind, d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);");
+    expect(decisions).not.toMatch(/identity\."user"|\.state\b/u);
+    // The kind CHECK: 0157's name, dropped and added in one place, the seven kinds and the two new.
+    expect(original).toContain("CONSTRAINT moderation_statement_kind_check CHECK (kind IN ('DEBATE_HIDDEN','DEBATE_DECIDED','CONTRIBUTION_REMOVED','REPORT_REMOVED','CORRECTED','CONTRIBUTION_AFFECTED','REPORT_AFFECTED'))");
+    expect(SQL).toContain("ALTER TABLE identity.moderation_statement DROP CONSTRAINT IF EXISTS moderation_statement_kind_check;\n"
+      + "ALTER TABLE identity.moderation_statement ADD CONSTRAINT moderation_statement_kind_check\n  CHECK (kind IN ('DEBATE_HIDDEN','DEBATE_DECIDED','CONTRIBUTION_REMOVED','REPORT_REMOVED','CORRECTED','CONTRIBUTION_AFFECTED','REPORT_AFFECTED','CONTRIBUTION_DECIDED','REPORT_DECIDED'));");
+    // The kind rides the same path as its neighbours: type, contract, template, channel purpose, English copy.
+    for (const kind of ["CONTRIBUTION_DECIDED", "REPORT_DECIDED"]) {
+      expect(read("packages/db/src/moderation-statement.ts")).toContain(`"${kind}"`);
+      expect(read("packages/contract/src/web.ts")).toContain(`"${kind}"`);
+      expect(read("apps/api/src/moderation-statements.ts")).toContain(`${kind}: "MODERATION_STATEMENT_${kind}"`);
+      expect(read("apps/api/src/mail-channel.ts")).toContain(`MODERATION_STATEMENT_${kind}: "moderation-notice"`);
+      expect(MAIL_TEMPLATE_IDS).toContain(`MODERATION_STATEMENT_${kind}`);
+    }
+    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided"),');
+    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),');
   });
 
   it("M2: the four functions keep their 0157 signatures and results, each claim keeps its queue call first, and the backoff and the alert are as the brief says", () => {

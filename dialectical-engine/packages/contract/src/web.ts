@@ -1072,7 +1072,7 @@ export type PublicMaterialPoint = z.infer<typeof PublicMaterialPointSchema>;
 export const ModerationStatementGroundCodeSchema = z.enum(["REVIEW_HOLD", "UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]);
 export const ModerationStatementSchema = z.object({
   statement_id: z.uuid(),
-  kind: z.enum(["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED"]),
+  kind: z.enum(["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"]),
   public_ref: z.uuid(),
   happened_at: z.iso.datetime({ offset: true }),
   piece_kind: z.enum(["DIG", "REPORT"]).nullable(),
