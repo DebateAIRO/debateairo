@@ -12,7 +12,7 @@ let database: TestDatabase;
 /** The API's runtime login, as the sender's claim runs on it: SET ROLE on every new connection of the test's superuser. */
 let runtime: Pool;
 let sequence = 9_950_000;
-// Who the staff alert goes to: the active Owner and the active team-limit holder, as 0151's notices (seeded once, by the first describe).
+// Who the staff alert goes to: the active Owner and the active team-limit holder, as 0151's notices (seeded once, in the top-level beforeAll).
 const owner = randomUUID();
 const holder = randomUUID();
 
@@ -98,6 +98,10 @@ beforeAll(async () => {
   await migrate(database.pool);
   runtime = new Pool({ connectionString: database.connectionString, max: 2 });
   runtime.on("connect", (client) => { void client.query("SET ROLE debateai_runtime"); });
+  // Every describe's seeds, once: the staff alert's two recipients (only one active Owner may exist).
+  await seeded([
+    ["INSERT INTO staff.owner_designation (staff_id, active) VALUES ($1, true)", [owner]],
+    ["INSERT INTO staff.team_limit_holder (staff_id, active, granted_by_staff_id, granted_operation_id) VALUES ($1, true, $2, $3)", [holder, owner, randomUUID()]]]);
 }, timeout);
 afterAll(async () => {
   await runtime?.end();
@@ -107,12 +111,6 @@ afterAll(async () => {
 describe("M5: one bad row never stops the moderation mail", () => {
   let broken: Readonly<{ ref: string; event: string }>;
   let healthy: Readonly<{ ref: string; event: string }>;
-
-  beforeAll(async () => {
-    await seeded([
-      ["INSERT INTO staff.owner_designation (staff_id, active) VALUES ($1, true)", [owner]],
-      ["INSERT INTO staff.team_limit_holder (staff_id, active, granted_by_staff_id, granted_operation_id) VALUES ($1, true, $2, $3)", [holder, owner, randomUUID()]]]);
-  }, timeout);
 
   it("a source row that raises is set aside and the others are queued", async () => {
     const [ana, bea] = [await account(), await account()];
@@ -272,4 +270,194 @@ describe("M2: a failed send backs off, then gives up once and alerts once", () =
       expect(await notices(dropped)).toEqual([]);
     }, timeout);
   }
+});
+
+// M6 and M4 (decision C): a person's review step or DECIDE whose ground names a report closes it as ACTED in the same transaction, and the reporter
+// hears one decision: "no breach" never after "acted", "acted" after an earlier "no breach". The steps' identity half, as the staff door calls it.
+describe("M6, M4: a review step that acts on a report closes it, and the reporter hears one decision", () => {
+  const AUTOMATIC = "00000000-0000-0000-0000-000000000000";
+  const sha = (text: string): string => createHash("sha256").update(text).digest("hex");
+  /** The close's own operation: md5('review-close:' || the step's log row or decision), as a uuid. */
+  const derived = (source: string): string => createHash("md5").update(`review-close:${source}`).digest("hex").replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/u, "$1-$2-$3-$4-$5");
+  const sealed = (ref: string) => JSON.stringify({ v: 1, keyId: `publication-snapshot:${ref}:v1`, nonce: "AAAA", tag: "AAAA", ct: "YQ==" });
+  /** A report of `ref`'s by `reporter`, in `state`, with its words sealed. */
+  async function reportOf(ref: string, reporter: Account, state: "QUEUED" | "CHECKING" = "QUEUED"): Promise<string> {
+    const flagId = randomUUID();
+    await database.pool.query("INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, state, content_ciphertext) VALUES ($1,$2,$3,$4,$5::jsonb)",
+      [flagId, ref, reporter.ownerRef, state, sealed(ref)]);
+    return flagId;
+  }
+  /** 0150's log row of a step (as its apply writes it), then 0157's ground for it naming the report, as staff.public_review_act_grounded calls it. */
+  async function grounded(ref: string, action: "REMOVE_DIG" | "HIDE_REPORT", flagId: string, actor: string): Promise<string> {
+    const [eventId, operation] = [randomUUID(), randomUUID()];
+    const revision = (await database.pool.query<{ n: number }>("SELECT COALESCE(max(revision),0)::int + 1 AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
+    await seeded([[`INSERT INTO identity.public_review_event (event_id,publication_ref,revision,action,piece_kind,piece_id,actor_staff_id,operation_id,request_sha256)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [eventId, ref, revision, action, action === "REMOVE_DIG" ? "DIG" : "REPORT", randomUUID(), actor, operation, "0".repeat(64)]]]);
+    await database.pool.query("SELECT identity.record_step_ground($1::uuid,$2::uuid,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$3::uuid,$4,$5::jsonb)", [operation, ref, flagId, sha("facts"), sealed(ref)]);
+    return eventId;
+  }
+  /** A person's hide through 0150's own apply and 0157's ground, in one transaction as the staff door runs them. Returns the hide's operation. */
+  async function hideNaming(ref: string, flagId: string, actor: string): Promise<string> {
+    const operation = randomUUID();
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const revision = (await client.query<{ n: number }>("SELECT COALESCE(max(revision),0)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
+      await client.query("SELECT identity.public_review_apply($1::uuid,'HIDE',$2::uuid,NULL,NULL,NULL,NULL,NULL,$3,$4::uuid,$5)", [actor, ref, revision, operation, sha(operation)]);
+      await client.query("SELECT identity.record_hide_ground($1::uuid,$2::uuid,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$3::uuid)", [operation, ref, flagId]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    return operation;
+  }
+  /** A person's close of a report (0157's identity half of staff.public_flag_close). */
+  const close = (flagId: string, outcome: "NO_BREACH" | "ACTED", actor: string) =>
+    database.pool.query("SELECT identity.public_flag_close($1::uuid,$2,$3::uuid,$4::uuid,$5)", [flagId, outcome, actor, randomUUID(), "0".repeat(64)]);
+  type Flag = Readonly<{ dismissed_at: Date | null; dismissed_by: string | null; has_words: boolean }>;
+  const flagRow = async (flagId: string): Promise<Flag> => (await database.pool.query<Flag>(
+    "SELECT dismissed_at, dismissed_by, content_ciphertext IS NOT NULL AS has_words FROM identity.public_flag WHERE flag_id=$1", [flagId])).rows[0]!;
+  type Answer = Readonly<{ outcome: string; actor_staff_id: string; operation_id: string; recorded_at: Date }>;
+  const answerOf = async (flagId: string): Promise<Answer | undefined> => (await database.pool.query<Answer>(
+    "SELECT outcome, actor_staff_id, operation_id, recorded_at FROM identity.public_flag_answer WHERE flag_id=$1", [flagId])).rows[0];
+  /** The reporter's mails, in the order they were queued, after the sender's queue runs. */
+  const mailsOf = async (flagId: string): Promise<string[]> => {
+    await database.pool.query("SELECT identity.queue_public_flag_mail()");
+    return (await database.pool.query<{ kind: string }>("SELECT kind FROM identity.public_flag_mail WHERE flag_id=$1 ORDER BY created_at, mail_id", [flagId])).rows.map((row) => row.kind);
+  };
+  const queueRow = async (flagId: string) => (await database.pool.query<{ value: Array<Record<string, unknown>> }>("SELECT identity.public_flag_queue_answered() AS value")).rows[0]!
+    .value.find((row) => row.flag_id === flagId)!;
+
+  it("a removal naming a report closes it as ACTED", async () => {
+    const [ana, rea] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const flagId = await reportOf(ref, rea);
+    const staffer = randomUUID();
+    const eventId = await grounded(ref, "REMOVE_DIG", flagId, staffer);
+    const flag = await flagRow(flagId);
+    expect(flag.dismissed_at).not.toBeNull();
+    expect(flag.dismissed_by).toBe(staffer);
+    // Its own operation, derived from the step's log row, so it never meets a step's own.
+    expect(await answerOf(flagId)).toMatchObject({ outcome: "ACTED", actor_staff_id: staffer, operation_id: derived(eventId) });
+    expect((await answerOf(flagId))!.recorded_at.getTime()).toBe(flag.dismissed_at!.getTime());
+    expect(await mailsOf(flagId)).toEqual(["RECEIPT", "ACTED"]);
+    // Staff's close finds it closed (the panel shows no Close button on it), and staff's queue says a step closed it.
+    await expect(close(flagId, "NO_BREACH", randomUUID())).rejects.toMatchObject({ message: "PUBLIC_FLAG_ALREADY_DISMISSED" });
+    expect(await queueRow(flagId)).toMatchObject({ outcome: "ACTED", closed_by_step: true });
+    expect(await mailsOf(flagId)).toEqual(["RECEIPT", "ACTED"]);
+  }, timeout);
+
+  it("a final decision naming a report closes it as ACTED, as a step does", async () => {
+    const [ana, rea] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const flagId = await reportOf(ref, rea);
+    await hide(ref);
+    const staffer = randomUUID();
+    const operation = randomUUID();
+    await database.pool.query("SELECT identity.moderation_decide($1::uuid,$2::uuid,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$3::uuid,$4,$5::jsonb,1,$6::uuid,$4)",
+      [staffer, ref, flagId, sha("decided"), sealed(ref), operation]);
+    const decisionId = (await database.pool.query<{ id: string }>("SELECT decision_id AS id FROM identity.moderation_decision WHERE operation_id=$1", [operation])).rows[0]!.id;
+    expect((await answerOf(flagId))?.operation_id).toBe(derived(decisionId));
+    expect((await flagRow(flagId)).dismissed_by).toBe(staffer);
+    expect(await answerOf(flagId)).toMatchObject({ outcome: "ACTED", actor_staff_id: staffer });
+    expect(await mailsOf(flagId)).toEqual(["RECEIPT", "ACTED"]);
+    expect(await queueRow(flagId)).toMatchObject({ outcome: "ACTED", closed_by_step: true });
+    // A person's own close as ACTED is a person's close, not a step's.
+    const other = await reportOf(ref, await account());
+    await close(other, "ACTED", staffer);
+    expect(await queueRow(other)).toMatchObject({ outcome: "ACTED", closed_by_step: false });
+  }, timeout);
+
+  it("a hide naming an already closed report still succeeds", async () => {
+    const [ana, rea] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const flagId = await reportOf(ref, rea);
+    const [first, second] = [randomUUID(), randomUUID()];
+    await close(flagId, "NO_BREACH", first);
+    expect(await mailsOf(flagId)).toEqual(["RECEIPT", "NO_BREACH"]);
+    const closedAt = (await flagRow(flagId)).dismissed_at;
+    // The hide is never refused: its log row and its ground stand; the report is not closed twice, and its answer stays what the person found.
+    const operation = await hideNaming(ref, flagId, second);
+    const event = (await database.pool.query<{ event_id: string }>("SELECT event_id FROM identity.public_review_event WHERE operation_id=$1 AND action='HIDE'", [operation])).rows[0];
+    expect(event).toBeDefined();
+    expect((await database.pool.query("SELECT 1 FROM identity.moderation_ground WHERE event_id=$1 AND flag_id=$2 AND source='REPORT_BUTTON'", [event!.event_id, flagId])).rowCount).toBe(1);
+    expect(await flagRow(flagId)).toMatchObject({ dismissed_at: closedAt, dismissed_by: first });
+    expect(await answerOf(flagId)).toMatchObject({ outcome: "NO_BREACH", actor_staff_id: first });
+    // Decision C: "acted" may follow an earlier "no breach" (a later, real decision); never the reverse.
+    expect(await mailsOf(flagId)).toEqual(["RECEIPT", "NO_BREACH", "ACTED"]);
+    expect(await queueRow(flagId)).toMatchObject({ outcome: "NO_BREACH", closed_by_step: false });
+  }, timeout);
+
+  it("no breach is never mailed once acted is queued or due before it", async () => {
+    const [ana, rea, rob] = [await account(), await account(), await account()];
+    const ref = await publishedDebate(ana);
+    // An ACTED already queued (by any path), then a person's no-breach close: the reporter hears the one decision.
+    const queued = await reportOf(ref, rea);
+    await seeded([["INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at) VALUES ($1,'ACTED',now())", [queued]]]);
+    await close(queued, "NO_BREACH", randomUUID());
+    expect(await mailsOf(queued)).toEqual(["ACTED", "RECEIPT"]);
+    // A step's ground named the report and its close did not happen; a later no-breach close, both due in one run of the queue: "acted" only.
+    const due = await reportOf(ref, rob);
+    const [eventId, operation] = [randomUUID(), randomUUID()];
+    await seeded([
+      [`INSERT INTO identity.public_review_event (event_id,publication_ref,revision,action,piece_kind,piece_id,actor_staff_id,operation_id,request_sha256)
+        VALUES ($1,$2,1,'REMOVE_DIG','DIG',$3,$4,$5,$6)`, [eventId, ref, randomUUID(), randomUUID(), operation, "0".repeat(64)]],
+      [`INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, flag_id, facts_sha256, facts_ciphertext, interim)
+        VALUES ($1,$2,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$3,$4,$5::jsonb,false)`, [eventId, ref, due, sha("facts"), sealed(ref)]]]);
+    await close(due, "NO_BREACH", randomUUID());
+    expect(await mailsOf(due)).toEqual(["RECEIPT", "ACTED"]);
+  }, timeout);
+
+  it("a close that fails is skipped with a warning and no words, and the step stands", async () => {
+    const [ana, rea] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const flagId = await reportOf(ref, rea);
+    await database.pool.query(`CREATE OR REPLACE FUNCTION public.test_0172_answer_fault() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.flag_id = '${flagId}'::uuid THEN RAISE EXCEPTION USING ERRCODE = 'XX001', MESSAGE = 'TEST_0172_SECRET_WORDS'; END IF; RETURN NEW; END $$`);
+    await database.pool.query("CREATE TRIGGER test_0172_answer_fault BEFORE INSERT ON identity.public_flag_answer FOR EACH ROW EXECUTE FUNCTION public.test_0172_answer_fault()");
+    const warnings: string[] = [];
+    const client = await database.pool.connect();
+    const listen = (notice: { severity?: string | undefined; message?: string | undefined }) => { warnings.push(`${notice.severity}:${notice.message}`); };
+    client.on("notice", listen);
+    try {
+      const operation = randomUUID();
+      await client.query("BEGIN");
+      await client.query("SELECT identity.public_review_apply($1::uuid,'HIDE',$2::uuid,NULL,NULL,NULL,NULL,NULL,0,$3::uuid,$4)", [randomUUID(), ref, operation, sha(operation)]);
+      await client.query("SELECT identity.record_hide_ground($1::uuid,$2::uuid,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$3::uuid)", [operation, ref, flagId]);
+      await client.query("COMMIT");
+    } finally { client.off("notice", listen); client.release(); await database.pool.query("DROP TRIGGER IF EXISTS test_0172_answer_fault ON identity.public_flag_answer"); }
+    expect(warnings).toEqual(["WARNING:PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED"]);
+    // The hide and its ground stand; the close went back whole (no dismissal without its answer), so a person still closes the report.
+    expect((await database.pool.query("SELECT 1 FROM identity.moderation_ground WHERE flag_id=$1 AND source='REPORT_BUTTON'", [flagId])).rowCount).toBe(1);
+    expect((await flagRow(flagId)).dismissed_at).toBeNull();
+    expect(await answerOf(flagId)).toBeUndefined();
+  }, timeout);
+
+  it("the automatic hide leaves the report open", async () => {
+    const [ana, rea] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const flagId = await reportOf(ref, rea, "CHECKING");
+    expect((await database.pool.query<{ state: string }>("SELECT identity.settle_public_flag($1::uuid,'AGREE','PERSONAL',NULL,NULL,NULL,NULL,NULL) AS state", [flagId])).rows[0]!.state).toBe("HIDDEN");
+    // 0151's own hide: the nil actor, the report's id as its operation. Even with a ground naming the report, no person decided it.
+    expect((await database.pool.query("SELECT 1 FROM identity.public_review_event WHERE operation_id=$1 AND actor_staff_id=$2", [flagId, AUTOMATIC])).rowCount).toBe(1);
+    await database.pool.query("SELECT identity.record_hide_ground($1::uuid,$2::uuid,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$1::uuid)", [flagId, ref]);
+    expect((await flagRow(flagId)).dismissed_at).toBeNull();
+    expect(await answerOf(flagId)).toBeUndefined();
+    expect(await queueRow(flagId)).toMatchObject({ dismissed_at: null, outcome: null, closed_by_step: false });
+  }, timeout);
+
+  it("the six months start at the step", async () => {
+    const [ana, rea] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const flagId = await reportOf(ref, rea);
+    await grounded(ref, "HIDE_REPORT", flagId, randomUUID());
+    const closedAt = (await flagRow(flagId)).dismissed_at!;
+    expect((await answerOf(flagId))!.recorded_at.getTime()).toBe(closedAt.getTime());
+    // A day short of six months after the step, the words stay; past it, 0151's sweep takes them.
+    const back = (by: string) => seeded([[`UPDATE identity.public_flag SET dismissed_at = $2::timestamptz - $3::interval WHERE flag_id=$1`, [flagId, closedAt.toISOString(), by]]]);
+    await back("6 months - 1 day");
+    await database.pool.query("SELECT identity.delete_public_flag_words_due()");
+    expect((await flagRow(flagId)).has_words).toBe(true);
+    await back("6 months 1 minute");
+    await database.pool.query("SELECT identity.delete_public_flag_words_due()");
+    expect((await flagRow(flagId)).has_words).toBe(false);
+  }, timeout);
 });

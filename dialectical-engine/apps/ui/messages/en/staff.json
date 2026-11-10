@@ -405,6 +405,7 @@
   "staff.publicReports.confirmActed": "Close this report as acted on. Take the step in the review tool first. The reporter is told by email that a person acted on it, with no detail. This goes in the log.",
   "staff.publicReports.closed.NO_BREACH": "Closed: no breach found.",
   "staff.publicReports.closed.ACTED": "Closed: acted on.",
+  "staff.publicReports.closedByStep": "Closed: we acted on it (review step)",
   "staff.publicReports.dismissed": "Dismissed.",
   "staff.publicReports.done": "Done. It is in the log.",
   "staff.publicReports.failed": "That did not work. Nothing changed.",

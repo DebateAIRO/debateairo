@@ -212,7 +212,9 @@ export const PublicFlagQueueSchema = z.object({ reports: z.array(z.object({
     flag_id: z.uuid(), publication_ref: z.uuid(), reporter: z.string().nullable(), state: z.enum(["CHECKING", "QUEUED", "NOT_FOUND", "HIDDEN"]), verdict: z.enum(["AGREE", "NOT_FOUND", "UNSURE", "UNAVAILABLE"]).nullable(), reason: z.enum(["CONTENT", "PERSONAL"]).nullable(),
     created_at: z.iso.datetime({ offset: true }), judged_at: z.iso.datetime({ offset: true }).nullable(), dismissed_at: z.iso.datetime({ offset: true }).nullable(), where: z.string().nullable(), claim: z.string().nullable(), debate_hidden: z.boolean(),
     /** 0157 (D4): what the close found; null while open, or closed by the release before's Dismiss. */
-    outcome: PublicFlagOutcomeSchema.nullable() }).strict()).max(200) }).strict();
+    outcome: PublicFlagOutcomeSchema.nullable(),
+    /** 0172 (M6): a person's review step or decision that named the report closed it, as ACTED; the panel offers no Close on it. */
+    closed_by_step: z.boolean() }).strict()).max(200) }).strict();
 export type PublicFlagQueue = z.infer<typeof PublicFlagQueueSchema>;
 export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), outcome: PublicFlagOutcomeSchema, proof_handle: OpaqueHandleSchema }).strict();
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();

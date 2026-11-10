@@ -68,7 +68,9 @@ describe("0172: the moderation notice fixes", () => {
       { step: "0151_public_flag.sql", relations: ["staff.public_flag_notice"], constraints: ["public_flag_notice_kind_check"], field: "constraint_definition" },
       { step: "0157_moderation_statements.sql", field: "function_definition", functions: ["identity.queue_moderation_statements()",
         "identity.claim_moderation_statements(integer)", "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)",
-        "identity.complete_public_flag_mail(uuid,uuid,text)"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"] }
+        "identity.complete_public_flag_mail(uuid,uuid,text)", "identity.record_hide_ground(uuid,uuid,text[],text,uuid)",
+        "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)", "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
+        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"] }
     ]);
     expect(SQL).toContain("ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;\n"
       + "ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_check\n  CHECK (kind IN ('PUBLIC_FLAG_HIDDEN','PUBLIC_FLAG_WAITING','MODERATION_MAIL_FAILED'));");
@@ -142,6 +144,80 @@ describe("0172: the moderation notice fixes", () => {
     }
     expect(SQL).toContain("ALTER TABLE identity.moderation_statement ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;");
     expect(SQL).toContain("ALTER TABLE identity.public_flag_mail ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;");
+  });
+
+  it("M6, M4: a person's step that names a report closes it through one function that never raises; the five restated bodies are 0157's plus that", () => {
+    const original = read("migrations/0157_moderation_statements.sql");
+    const head = (text: string, name: string): string => {
+      const at = text.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+      expect(at, name).toBeGreaterThan(-1);
+      return text.slice(at, text.indexOf("AS $$", at));
+    };
+    const bodyIn = (text: string, name: string): string => {
+      const at = text.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+      return text.slice(text.indexOf("AS $$", at) + 5, text.indexOf("$$;", text.indexOf("AS $$", at) + 5));
+    };
+    /** 0157's body with exactly these edits, each found once. */
+    const edited = (name: string, edits: ReadonlyArray<readonly [string, string]>): string => edits.reduce((body, [from, to]) => {
+      expect(body.split(from).length - 1, `${name}: ${from}`).toBe(1);
+      return body.replace(from, () => to);
+    }, bodyIn(original, name));
+    const NIL = "'00000000-0000-0000-0000-000000000000'::uuid";
+    const restated = ["identity.record_hide_ground", "identity.moderation_decide", "identity.record_step_ground", "identity.queue_public_flag_mail", "identity.public_flag_queue_answered"];
+    for (const name of restated) expect(head(SQL, name), name).toBe(head(original, name));
+    // R3: the close is its own function, and each ground function calls it in one line, after its own insert, only for a person's step.
+    const closeCall = /identity\.close_public_flag_by_review\(/gu;
+    expect(bodyIn(SQL, "identity.record_hide_ground")).toBe(edited("identity.record_hide_ground", [
+      ["v_suspected text[];", "v_suspected text[]; v_actor uuid;"],
+      ["SELECT event.event_id INTO v_event_id FROM", "SELECT event.event_id, event.actor_staff_id INTO v_event_id, v_actor FROM"],
+      ["v_flag, true) ON CONFLICT (event_id) DO NOTHING;\n", `v_flag, true) ON CONFLICT (event_id) DO NOTHING;\n    IF v_flag IS NOT NULL AND v_actor <> ${NIL} THEN PERFORM identity.close_public_flag_by_review(v_flag, v_actor, v_event_id); END IF;\n`]]));
+    expect(bodyIn(SQL, "identity.moderation_decide")).toBe(edited("identity.moderation_decide", [
+      ["DECLARE v_revision integer; v_at timestamptz;", "DECLARE v_revision integer; v_at timestamptz; v_decision uuid;"],
+      ["RETURNING recorded_at INTO v_at;\n", `RETURNING recorded_at, decision_id INTO v_at, v_decision;\n  IF p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND p_actor <> ${NIL} THEN PERFORM identity.close_public_flag_by_review(p_flag_id, p_actor, v_decision); END IF;\n`]]));
+    const step = bodyIn(original, "identity.record_step_ground");
+    expect(bodyIn(SQL, "identity.record_step_ground")).toBe(`\n  WITH recorded AS (${step.slice(0, -1)}\n  RETURNING event_id)\n`
+      + "  SELECT identity.close_public_flag_by_review(p_flag_id, event.actor_staff_id, event.event_id) FROM recorded JOIN identity.public_review_event AS event ON event.event_id = recorded.event_id"
+      + ` WHERE p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND event.actor_staff_id <> ${NIL}\n`);
+    for (const name of ["identity.record_hide_ground", "identity.moderation_decide", "identity.record_step_ground"]) expect([...bodyIn(SQL, name).matchAll(closeCall)], name).toHaveLength(1);
+    // A hide still cannot raise: its call is inside its own block.
+    const hideBody = bodyIn(SQL, "identity.record_hide_ground");
+    expect(hideBody.indexOf("close_public_flag_by_review")).toBeGreaterThan(hideBody.indexOf("  BEGIN\n"));
+    expect(hideBody.indexOf("close_public_flag_by_review")).toBeLessThan(hideBody.indexOf("EXCEPTION WHEN OTHERS THEN"));
+    // The close: 0151's dismissal under an operation derived from the step's row, then the ACTED answer; nothing when already closed; never raises.
+    const closeBody = bodyIn(SQL, "identity.close_public_flag_by_review");
+    expect(bodyOf("identity.close_public_flag_by_review")).toContain("CREATE OR REPLACE FUNCTION identity.close_public_flag_by_review(p_flag_id uuid, p_actor uuid, p_source_id uuid) RETURNS void\n"
+      + "LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$");
+    expect(closeBody).toContain("v_operation := md5('review-close:' || p_source_id::text)::uuid;");
+    expect(closeBody).toContain("identity.public_flag_dismiss(p_flag_id, p_actor, v_operation, encode(sha256(convert_to('review-close:' || p_source_id::text, 'UTF8')), 'hex'))");
+    expect(closeBody).toContain("VALUES (p_flag_id, 'ACTED', p_actor, v_operation, v_at)");
+    expect(closeBody).toContain("WHERE flag.flag_id = p_flag_id AND flag.dismissed_at IS NULL FOR UPDATE;\n    IF NOT FOUND THEN RETURN; END IF;");
+    expect(closeBody).toContain("  EXCEPTION WHEN OTHERS THEN\n    RAISE WARNING 'PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED';\n  END;\nEND ");
+    expect(closeBody).not.toMatch(/RAISE EXCEPTION|SQLERRM|MESSAGE_TEXT|PG_EXCEPTION_DETAIL|%/u);
+    // M4: the mail queue is 0157's with the three guards added, and nothing else.
+    const QUEUE_ADDED = [
+      "        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = ground.flag_id AND acted.outcome = 'ACTED')",
+      "        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = decision.flag_id AND acted.outcome = 'ACTED')) AS due",
+      "    AND NOT (due.kind = 'NO_BREACH' AND (EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = 'ACTED')",
+      "      OR EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = due.flag_id AND ground.source = 'REPORT_BUTTON' AND ground.recorded_at <= due.happened_at)",
+      "      OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = due.flag_id AND decision.source = 'REPORT_BUTTON' AND decision.recorded_at <= due.happened_at)))"];
+    const queue = bodyIn(SQL, "identity.queue_public_flag_mail");
+    for (const line of QUEUE_ADDED) expect(queue.split("\n"), line).toContain(line);
+    expect(queue.split("\n").filter((line) => !QUEUE_ADDED.includes(line)).join("\n").replace("WHERE decision.flag_id IS NOT NULL AND decision.source = 'REPORT_BUTTON'\n", "WHERE decision.flag_id IS NOT NULL AND decision.source = 'REPORT_BUTTON') AS due\n"))
+      .toBe(bodyIn(original, "identity.queue_public_flag_mail"));
+    // closed_by_step: recomputed from the rows that name the report, never by matching the id's text.
+    const answered = bodyIn(SQL, "identity.public_flag_queue_answered");
+    expect(answered).toContain("answer.operation_id = md5('review-close:' || ground.event_id::text)::uuid");
+    expect(answered).toContain("answer.operation_id = md5('review-close:' || decision.decision_id::text)::uuid");
+    expect(answered).not.toMatch(/LIKE|~|::text = /u);
+    // Each body is pinned by its digest in the file's contract, and the close is its own postcondition's.
+    for (const name of ["identity.close_public_flag_by_review", ...restated]) expect(SQL, name).toContain(`'${sha256(bodyIn(SQL, name))}')`);
+    expect(read("packages/db/src/migration-forward0172.ts")).toContain('"identity.close_public_flag_by_review(uuid,uuid,uuid)"');
+    // Staff's queue carries it to the panel, which shows the closed line and no Close button.
+    expect(read("packages/contract/src/staff-access.ts")).toContain("closed_by_step: z.boolean() }).strict()).max(200) }).strict();");
+    expect(read("apps/api/src/public-flag.ts")).toContain("closed_by_step: row.closed_by_step === true");
+    expect(read("apps/ui/components/PublicReviewPanel.tsx")).toContain('report.closed_by_step ? "staff.publicReports.closedByStep"');
+    expect((JSON.parse(read("apps/ui/messages/en/staff.json")) as Record<string, string>)["staff.publicReports.closedByStep"]).toBe("Closed: we acted on it (review step)");
+    expect((JSON.parse(read("apps/ui/messages/ro/staff.json")) as Record<string, string>)["staff.publicReports.closedByStep"]).toBe("Închisă: am acționat (pas de verificare)");
   });
 
   it("M5: the staff alert rides 0151's notices, in the owner catalogue beside PUBLIC_FLAG_WAITING, with no id in its words", () => {

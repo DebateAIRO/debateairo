@@ -223,6 +223,138 @@ BEGIN
   RETURN v_found;
 END $$;
 
+-- M6, M4. A review step that acts on a report closes it, and the reporter hears one decision ------------------------------------------
+-- M6 (owner, 10 Nov 2026; decision C). 0157 mailed the reporter "a person acted on it" when a review step or DECIDE named their report as its
+-- source, and left the report open: it stayed in the queue as waiting, and a later close could tell the same reporter "no breach" after
+-- "acted" (M4). A person's step whose ground names a report (source REPORT_BUTTON, with its flag_id) now closes it as ACTED in the same
+-- transaction, through 0151's own dismissal (so the words' six months start at the step), with 0157's answer beside it. The automatic hide
+-- (0151's nil actor) is not a person's decision: it leaves the report open for one. A report already closed stays as it was closed.
+-- The close never raises: a hide can never be refused, and no step fails for its report. What it could not do goes back whole and is
+-- logged by a fixed marker only (PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED, never the error's words); a person then closes the report as before.
+-- Its operation is derived from the step's log row or decision (md5('review-close:' || source)), so it never meets a step's own, and
+-- the staff queue knows a step closed a report by recomputing it from those rows.
+CREATE OR REPLACE FUNCTION identity.close_public_flag_by_review(p_flag_id uuid, p_actor uuid, p_source_id uuid) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_operation uuid; v_at timestamptz;
+BEGIN
+  BEGIN
+    -- Locked as 0151's dismissal locks it, so a close by a person at the same moment is seen and this one does nothing.
+    PERFORM 1 FROM identity.public_flag AS flag WHERE flag.flag_id = p_flag_id AND flag.dismissed_at IS NULL FOR UPDATE;
+    IF NOT FOUND THEN RETURN; END IF;
+    v_operation := md5('review-close:' || p_source_id::text)::uuid;
+    v_at := identity.public_flag_dismiss(p_flag_id, p_actor, v_operation, encode(sha256(convert_to('review-close:' || p_source_id::text, 'UTF8')), 'hex'));
+    INSERT INTO identity.public_flag_answer (flag_id, outcome, actor_staff_id, operation_id, recorded_at) VALUES (p_flag_id, 'ACTED', p_actor, v_operation, v_at);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED';
+  END;
+END $$;
+-- n1: reviewed gives only the new function its owner, the owner of 0157's ground functions that call it, and no login a right on it
+DO $m6_close_owner$
+DECLARE v_owner name;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  EXECUTE pg_catalog.format('ALTER FUNCTION identity.close_public_flag_by_review(uuid,uuid,uuid) OWNER TO %I', v_owner);
+  EXECUTE 'REVOKE ALL ON FUNCTION identity.close_public_flag_by_review(uuid,uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker';
+END
+$m6_close_owner$;
+-- 0157's three ground functions, each with one more line after its own insert: a person's step that names a report closes it. Otherwise 0157's
+-- bodies (the contract test compares them). A hide still cannot raise: the close is inside its own block, and never raises.
+CREATE OR REPLACE FUNCTION identity.record_hide_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_event_id uuid; v_source text; v_flag uuid; v_suspected text[]; v_actor uuid;
+BEGIN
+  SELECT event.event_id, event.actor_staff_id INTO v_event_id, v_actor FROM identity.public_review_event AS event WHERE event.operation_id = p_operation AND event.publication_ref = p_publication_ref AND event.action = 'HIDE';
+  IF NOT FOUND THEN RETURN; END IF;
+  BEGIN
+    v_flag := CASE WHEN p_source = 'REPORT_BUTTON' AND EXISTS (SELECT 1 FROM identity.public_flag AS flag WHERE flag.flag_id = p_flag_id AND flag.publication_ref = p_publication_ref) THEN p_flag_id END;
+    v_source := CASE WHEN v_flag IS NOT NULL THEN 'REPORT_BUTTON' WHEN p_source IN ('EMAIL_NOTICE','OWN_INITIATIVE','AUTHORITY_ORDER') THEN p_source ELSE 'OWN_INITIATIVE' END;
+    v_suspected := CASE WHEN identity.moderation_grounds_known(p_grounds, false) THEN p_grounds ELSE '{}'::text[] END;
+    INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, suspected, source, flag_id, interim)
+    VALUES (v_event_id, p_publication_ref, ARRAY['REVIEW_HOLD'], v_suspected, v_source, v_flag, true) ON CONFLICT (event_id) DO NOTHING;
+    IF v_flag IS NOT NULL AND v_actor <> '00000000-0000-0000-0000-000000000000'::uuid THEN PERFORM identity.close_public_flag_by_review(v_flag, v_actor, v_event_id); END IF;
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, interim)
+    VALUES (v_event_id, p_publication_ref, ARRAY['REVIEW_HOLD'], 'OWN_INITIATIVE', true) ON CONFLICT (event_id) DO NOTHING;
+  END;
+END $$;
+CREATE OR REPLACE FUNCTION identity.moderation_decide(p_actor uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb,
+  p_expected_revision integer, p_operation uuid, p_request_sha256 text) RETURNS timestamptz
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_revision integer; v_at timestamptz; v_decision uuid;
+BEGIN
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:public-tree:' || p_publication_ref::text, 0));
+  SELECT COALESCE(max(event.revision), 0) INTO v_revision FROM identity.public_review_event AS event WHERE event.publication_ref = p_publication_ref;
+  IF v_revision <> p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_STALE'; END IF;
+  IF NOT identity.public_review_held(p_publication_ref) THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_NOT_HIDDEN'; END IF;
+  INSERT INTO identity.moderation_decision (publication_ref, revision, grounds, source, flag_id, facts_sha256, facts_ciphertext, actor_staff_id, operation_id, request_sha256)
+  VALUES (p_publication_ref, v_revision, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, p_actor, p_operation, p_request_sha256)
+  RETURNING recorded_at, decision_id INTO v_at, v_decision;
+  IF p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND p_actor <> '00000000-0000-0000-0000-000000000000'::uuid THEN PERFORM identity.close_public_flag_by_review(p_flag_id, p_actor, v_decision); END IF;
+  RETURN v_at;
+END $$;
+CREATE OR REPLACE FUNCTION identity.record_step_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb) RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  WITH recorded AS (
+  INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, flag_id, facts_sha256, facts_ciphertext, interim)
+  SELECT event.event_id, p_publication_ref, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, false
+  FROM identity.public_review_event AS event WHERE event.operation_id = p_operation AND event.publication_ref = p_publication_ref
+  RETURNING event_id)
+  SELECT identity.close_public_flag_by_review(p_flag_id, event.actor_staff_id, event.event_id) FROM recorded JOIN identity.public_review_event AS event ON event.event_id = recorded.event_id WHERE p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND event.actor_staff_id <> '00000000-0000-0000-0000-000000000000'::uuid
+$$;
+-- M4 (decision C): the reporter hears one decision. 0157's queue, with two changes to its second insert: a step's or a decision's ACTED is
+-- left to the close's own ACTED answer when there is one (one ACTED per report, the earliest: 0157's UNIQUE (flag_id, kind) already keeps
+-- it to one row), and NO_BREACH is never queued once ACTED is queued or sent for the report, or due before it in the same run (a step whose
+-- close was skipped, then a person's no-breach). ACTED may still follow an earlier NO_BREACH: a later, real decision.
+CREATE OR REPLACE FUNCTION identity.queue_public_flag_mail() RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_since timestamptz; v_rows integer; v_count integer := 0;
+BEGIN
+  SELECT start.since INTO v_since FROM identity.public_flag_mail_since AS start;
+  -- The receipt, and the automatic check's two decisions.
+  INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at)
+  SELECT due.flag_id, due.kind, due.happened_at FROM (
+    SELECT flag.flag_id, CASE flag.state WHEN 'QUEUED' THEN 'RECEIPT' WHEN 'HIDDEN' THEN 'AUTO_HIDDEN' ELSE 'AUTO_NOT_FOUND' END AS kind,
+      COALESCE(flag.judged_at, flag.created_at) AS happened_at, flag.created_at
+    FROM identity.public_flag AS flag WHERE COALESCE(flag.judged_at, flag.created_at) >= v_since AND flag.state IN ('QUEUED','HIDDEN','NOT_FOUND') AND flag.reporter_ref IS NOT NULL) AS due
+  WHERE NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+  ORDER BY due.created_at, due.flag_id LIMIT 200
+  ON CONFLICT (flag_id, kind) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
+  -- A person's decision: a close, a review step that names the report as its source, or the final decision on its debate that does.
+  INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at)
+  SELECT due.flag_id, due.kind, min(due.happened_at) FROM (
+      SELECT answer.flag_id, answer.outcome AS kind, answer.recorded_at AS happened_at FROM identity.public_flag_answer AS answer
+    UNION ALL
+      SELECT ground.flag_id, 'ACTED', ground.recorded_at FROM identity.moderation_ground AS ground
+      WHERE ground.flag_id IS NOT NULL AND ground.source = 'REPORT_BUTTON'
+        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = ground.flag_id AND acted.outcome = 'ACTED')
+    UNION ALL
+      SELECT decision.flag_id, 'ACTED', decision.recorded_at FROM identity.moderation_decision AS decision
+      WHERE decision.flag_id IS NOT NULL AND decision.source = 'REPORT_BUTTON'
+        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = decision.flag_id AND acted.outcome = 'ACTED')) AS due
+    JOIN identity.public_flag AS flag ON flag.flag_id = due.flag_id
+  WHERE due.happened_at >= v_since AND flag.reporter_ref IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+    AND NOT (due.kind = 'NO_BREACH' AND (EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = 'ACTED')
+      OR EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = due.flag_id AND ground.source = 'REPORT_BUTTON' AND ground.recorded_at <= due.happened_at)
+      OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = due.flag_id AND decision.source = 'REPORT_BUTTON' AND decision.recorded_at <= due.happened_at)))
+  GROUP BY due.flag_id, due.kind ORDER BY min(due.happened_at), due.flag_id LIMIT 200
+  ON CONFLICT (flag_id, kind) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
+  RETURN v_count;
+END $$;
+-- The queue as 0151 reads it, each report with its close's outcome and, new, whether a review step closed it (closed_by_step): its answer's
+-- operation is the one the close derives from a log row or a decision that names the report. Recomputed from those rows, never read from the id.
+CREATE OR REPLACE FUNCTION identity.public_flag_queue_answered() RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT COALESCE(jsonb_agg(row_found.value || jsonb_build_object('outcome', (SELECT answer.outcome FROM identity.public_flag_answer AS answer WHERE answer.flag_id = (row_found.value->>'flag_id')::uuid),
+      'closed_by_step', EXISTS (SELECT 1 FROM identity.public_flag_answer AS answer WHERE answer.flag_id = (row_found.value->>'flag_id')::uuid AND answer.outcome = 'ACTED'
+        AND (EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = answer.flag_id AND answer.operation_id = md5('review-close:' || ground.event_id::text)::uuid)
+          OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = answer.flag_id AND answer.operation_id = md5('review-close:' || decision.decision_id::text)::uuid))))
+    ORDER BY row_found.at), '[]'::jsonb)
+  FROM jsonb_array_elements(identity.public_flag_queue()) WITH ORDINALITY AS row_found(value, at)
+$$;
+
 -- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
 DO $moderation_notice_fixes_contract$
 DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
@@ -283,5 +415,30 @@ BEGIN
     OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.complete_public_flag_mail(uuid,uuid,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M2 retry';
   END IF;
+  -- M6, M4: the close and the five functions restated for it are this file's bodies (by digest; a later section that edits one recomputes it),
+  -- each its owner's, a definer with 0157's settings. The close is callable by no other role and its owner may call 0151's dismissal; staff's
+  -- doors still call the three ground functions and the queue's reader, as 0157 granted.
+  IF (SELECT pg_catalog.count(*) FROM (VALUES
+        ('identity.close_public_flag_by_review(uuid,uuid,uuid)', 'a36f45f64f20bc382d20604479d1e9ecdf06200bde8b807cab32681df2cede7c'),
+        ('identity.record_hide_ground(uuid,uuid,text[],text,uuid)', 'acaccb507a32acb5f51c1d6404691ab40500ca3c6e33fe58e29ae9a9de935e44'),
+        ('identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)', '28517c05e58727387969c392461ccf6332ff0d9028c14472c9fe169c5af73d65'),
+        ('identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)', 'fe033e37d75be869fe053ae93753122fd07c4802e98463a92114638ba7b8b481'),
+        ('identity.queue_public_flag_mail()', 'b2870ffa279c99b4eddb0570f8ba4e12104577163f93cc0870f2693db95455cc'),
+        ('identity.public_flag_queue_answered()', 'c5d3ae0d5d7cf6cd0d73ff9dca6213fb4de79d2a4a037d4e6bd0d1be4b7b1f3c')) AS expected(signature, body)
+      JOIN pg_catalog.pg_proc AS p ON p.oid = pg_catalog.to_regprocedure(expected.signature)
+      WHERE pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') = expected.body
+        AND p.proowner = v_owner AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']) <> 6
+    OR (SELECT p.provolatile = 'v' AND p.prorettype = 'void'::regtype FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.close_public_flag_by_review(uuid,uuid,uuid)'::regprocedure) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege(v_owner, 'identity.public_flag_dismiss(uuid,uuid,uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.record_hide_ground(uuid,uuid,text[],text,uuid)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.public_flag_queue_answered()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M6 close';
+  END IF;
+  SELECT pg_catalog.array_agg(DISTINCT COALESCE(pg_catalog.pg_get_userbyid(NULLIF(a.grantee, 0)), 'PUBLIC')) INTO v_grantees
+  FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
+  WHERE p.oid = 'identity.close_public_flag_by_review(uuid,uuid,uuid)'::regprocedure AND a.grantee <> p.proowner;
+  IF v_grantees IS NOT NULL THEN RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M6 close granted %', v_grantees; END IF;
 END
 $moderation_notice_fixes_contract$;

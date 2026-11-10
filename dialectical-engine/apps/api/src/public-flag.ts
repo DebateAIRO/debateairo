@@ -104,7 +104,8 @@ export async function publicFlagQueueOf(service: PublicFlagStaffService, rows: A
       words = await service.withKey(row.publication_ref, row.run_id, (cipher) => cipher.decrypt(content) as { where: unknown; claim: unknown }).catch(() => null);
     }
     reports.push({ flag_id: row.flag_id, publication_ref: row.publication_ref, reporter: row.reporter, state: row.state, verdict: row.verdict, reason: row.reason, created_at: iso(row.created_at)!, judged_at: iso(row.judged_at), dismissed_at: iso(row.dismissed_at),
-      where: typeof words?.where === "string" ? words.where : null, claim: typeof words?.claim === "string" ? words.claim : null, debate_hidden: row.debate_hidden, outcome: row.outcome ?? null });
+      where: typeof words?.where === "string" ? words.where : null, claim: typeof words?.claim === "string" ? words.claim : null, debate_hidden: row.debate_hidden, outcome: row.outcome ?? null,
+      closed_by_step: row.closed_by_step === true });
   }
   return contract.PublicFlagQueueSchema.parse({ reports });
 }

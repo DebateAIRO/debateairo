@@ -405,6 +405,7 @@
   "staff.publicReports.confirmActed": "Închide această sesizare: am acționat. Fă mai întâi pasul în instrumentul de verificare. Cel care a raportat este anunțat prin e-mail că o persoană a acționat, fără detalii. Se înregistrează în jurnal.",
   "staff.publicReports.closed.NO_BREACH": "Închisă: nicio încălcare.",
   "staff.publicReports.closed.ACTED": "Închisă: am acționat.",
+  "staff.publicReports.closedByStep": "Închisă: am acționat (pas de verificare)",
   "staff.publicReports.dismissed": "Respinsă.",
   "staff.publicReports.done": "Gata. Este în jurnal.",
   "staff.publicReports.failed": "Nu a mers. Nu s-a schimbat nimic.",

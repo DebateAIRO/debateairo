@@ -147,6 +147,22 @@ describe("the review panel", () => {
     await press("Confirm");
     expect(api.closeReport).toHaveBeenCalledWith(LATER, "ACTED");
   });
+  it("0172 (M6): a report a review step closed says so, and offers no Close button", async () => {
+    const closed = (outcome: "ACTED" | "NO_BREACH", closedByStep: boolean) => ({ flag_id: LATER, publication_ref: REF, reporter: "Quiet Heron", state: "QUEUED", verdict: null, reason: null,
+      created_at: "2026-11-01T08:00:00.000Z", judged_at: null, dismissed_at: "2026-11-02T08:00:00.000Z", where: "A place.", claim: "A claim to read.", debate_hidden: true, outcome, closed_by_step: closedByStep });
+    await mount(client({ readReports: vi.fn(async () => ({ reports: [closed("ACTED", true)] })) as never }));
+    const row = host!.querySelector("[data-report]")!;
+    expect(row.textContent).toContain("Closed: we acted on it (review step)");
+    expect(row.textContent).not.toContain("Closed: acted on.");
+    expect(button("Close: no breach found")).toBeUndefined();
+    expect(button("Close: we acted on it")).toBeUndefined();
+    act(() => root?.unmount());
+    host?.remove();
+    // A person's own close keeps its own line.
+    await mount(client({ readReports: vi.fn(async () => ({ reports: [closed("ACTED", false)] })) as never }));
+    expect(host!.querySelector("[data-report]")!.textContent).toContain("Closed: acted on.");
+    expect(host!.querySelector("[data-report]")!.textContent).not.toContain("(review step)");
+  });
   it("a public link or a bare reference names the debate; anything else is nothing", () => {
     expect(publicationRefOf(`https://dezbatere.ro/public/debate/${REF}?x=1`)).toBe(REF);
     expect(publicationRefOf(REF.toUpperCase())).toBe(REF);

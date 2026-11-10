@@ -5,7 +5,7 @@ import type { ForwardStepAnchor, ForwardStepPlan, PostconditionAmendment } from 
 
 /**
  * 0172, the moderation notices' seven gaps after 0157 (the owner's list of 10 November 2026, M1-M7; drained): what it adds, and the earlier objects it
- * changes, each declared as an amendment of the step whose postcondition digests it. Its own postcondition digests what it adds (M5's stuck sources).
+ * changes, each declared as an amendment of the step whose postcondition digests it. Its own postcondition digests what it adds (M5's stuck sources, M6's close).
  * It holds every gap the database must fix whole; once applied, any later change is a step of its own.
  */
 const NAME = "0172_moderation_notice_fixes.sql";
@@ -17,18 +17,25 @@ const TABLES: readonly string[] = [
   // M5: the sources the queue set aside, retried hourly.
   "identity.moderation_statement_stuck"
 ];
-/** The functions this step adds (none yet: the ones it restates are their own step's, AMENDS below). */
-const FUNCTIONS: readonly string[] = [];
+/** The functions this step adds (the ones it restates are their own step's, AMENDS below). */
+const FUNCTIONS: readonly string[] = [
+  // M6: a person's review step that names a report closes it as ACTED; it never raises.
+  "identity.close_public_flag_by_review(uuid,uuid,uuid)"
+];
 /** The earlier steps whose digest this step changes, in step order. The manifest carries the same list. */
 const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
   // M5: the staff alert's kind, MODERATION_MAIL_FAILED, in 0151's CHECK on staff.public_flag_notice (unnamed there; this is the catalog's name).
   Object.freeze({ step: "0151_public_flag.sql", relations: Object.freeze(["staff.public_flag_notice"]), constraints: Object.freeze(["public_flag_notice_kind_check"]),
     field: "constraint_definition" as const }),
   // M5: 0157's queue, each source in its own block. M2: 0157's two claims and two completes (a failed send waits, then alerts), and the column
-  // next_attempt_at they use on 0157's identity.moderation_statement and identity.public_flag_mail. One entry: the chain records one amendment per step.
+  // next_attempt_at they use on 0157's identity.moderation_statement and identity.public_flag_mail. M6, M4: 0157's three ground functions (a
+  // person's step that names a report closes it), the reporter's mail queue (one decision) and staff's queue reader (closed_by_step). One entry:
+  // the chain records one amendment per step.
   Object.freeze({ step: "0157_moderation_statements.sql", field: "function_definition" as const,
     functions: Object.freeze(["identity.queue_moderation_statements()", "identity.claim_moderation_statements(integer)",
-      "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)", "identity.complete_public_flag_mail(uuid,uuid,text)"]),
+      "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)", "identity.complete_public_flag_mail(uuid,uuid,text)",
+      "identity.record_hide_ground(uuid,uuid,text[],text,uuid)", "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)",
+      "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)", "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()"]),
     relations: Object.freeze(["identity.moderation_statement", "identity.public_flag_mail"]), columns: Object.freeze(["next_attempt_at"]) })
 ]);
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0172_${detail}`); };
