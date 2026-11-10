@@ -154,6 +154,75 @@ BEGIN
   RETURN v_count;
 END $$;
 
+-- M2. A failed send backs off over about three days, then alerts the team ------------------------------------------------------------
+-- 0157 let a failed send be claimed again the moment its claim ended, so a mail outage burned the 20 tries it allows in minutes and the statement
+-- or the reporter's answer was given up. A failed try now waits: min(2^attempts_before minutes, 6 hours), attempts_before being the row's
+-- attempts before this complete's increment (1, 2, 4 ... minutes after tries 1, 2, 3; 6 hours from the tenth), so the 20 tries span about three
+-- days. The 20th retry gives up as 0157 does (failed_at) and, once, queues the staff alert MODERATION_MAIL_FAILED (0151's notices, keyed by the
+-- statement's or the mail's id). DROPPED (no address, by design, D8) never alerts. The column is nullable with no default: a row that never
+-- failed, or that the release before wrote, has none and is due at once. The four functions keep their signatures and results; each claim keeps
+-- its queue call as its first statement, so the release before's sender still works beside them.
+ALTER TABLE identity.moderation_statement ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;
+ALTER TABLE identity.public_flag_mail ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;
+CREATE OR REPLACE FUNCTION identity.claim_moderation_statements(p_limit integer)
+RETURNS TABLE(statement_id uuid, claim_token uuid)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_STATEMENT_LIMIT_INVALID'; END IF;
+  PERFORM identity.queue_moderation_statements();
+  RETURN QUERY WITH picked AS (
+    SELECT s.statement_id FROM identity.moderation_statement AS s
+    WHERE s.delivered_at IS NULL AND s.failed_at IS NULL AND (s.claim_expires_at IS NULL OR s.claim_expires_at <= clock_timestamp())
+      AND (s.next_attempt_at IS NULL OR s.next_attempt_at <= clock_timestamp())
+    ORDER BY s.created_at, s.statement_id LIMIT p_limit FOR UPDATE SKIP LOCKED
+  ) UPDATE identity.moderation_statement AS s SET claim_token = gen_random_uuid(), claim_expires_at = clock_timestamp() + interval '5 minutes'
+    FROM picked WHERE s.statement_id = picked.statement_id RETURNING s.statement_id, s.claim_token;
+END $$;
+CREATE OR REPLACE FUNCTION identity.complete_moderation_statement(p_statement_id uuid, p_claim uuid, p_outcome text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_found boolean; v_gave_up boolean;
+BEGIN
+  IF p_outcome IS NULL OR p_outcome NOT IN ('SENT','RETRY','DROPPED') THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_STATEMENT_OUTCOME_INVALID'; END IF;
+  UPDATE identity.moderation_statement AS s SET claim_token = NULL, claim_expires_at = NULL, attempts = least(s.attempts + 1, 20),
+    delivered_at = CASE WHEN p_outcome = 'SENT' THEN clock_timestamp() END,
+    failed_at = CASE WHEN p_outcome = 'DROPPED' OR (p_outcome = 'RETRY' AND s.attempts >= 19) THEN clock_timestamp() END,
+    next_attempt_at = CASE WHEN p_outcome = 'RETRY' AND s.attempts < 19 THEN clock_timestamp() + least(interval '1 minute' * power(2, s.attempts), interval '6 hours') END
+  WHERE s.statement_id = p_statement_id AND s.claim_token = p_claim AND s.claim_expires_at > clock_timestamp()
+  RETURNING p_outcome = 'RETRY' AND s.failed_at IS NOT NULL INTO v_gave_up;
+  v_found := FOUND;
+  IF v_gave_up THEN PERFORM staff.queue_public_flag_notices(p_statement_id, 'MODERATION_MAIL_FAILED'); END IF;
+  RETURN v_found;
+END $$;
+CREATE OR REPLACE FUNCTION identity.claim_public_flag_mail(p_limit integer)
+RETURNS TABLE(mail_id uuid, claim_token uuid)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_LIMIT_INVALID'; END IF;
+  PERFORM identity.queue_public_flag_mail();
+  RETURN QUERY WITH picked AS (
+    SELECT mail.mail_id FROM identity.public_flag_mail AS mail
+    WHERE mail.delivered_at IS NULL AND mail.failed_at IS NULL AND (mail.claim_expires_at IS NULL OR mail.claim_expires_at <= clock_timestamp())
+      AND (mail.next_attempt_at IS NULL OR mail.next_attempt_at <= clock_timestamp())
+    ORDER BY mail.created_at, mail.mail_id LIMIT p_limit FOR UPDATE SKIP LOCKED
+  ) UPDATE identity.public_flag_mail AS mail SET claim_token = gen_random_uuid(), claim_expires_at = clock_timestamp() + interval '5 minutes'
+    FROM picked WHERE mail.mail_id = picked.mail_id RETURNING mail.mail_id, mail.claim_token;
+END $$;
+CREATE OR REPLACE FUNCTION identity.complete_public_flag_mail(p_mail_id uuid, p_claim uuid, p_outcome text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_found boolean; v_gave_up boolean;
+BEGIN
+  IF p_outcome IS NULL OR p_outcome NOT IN ('SENT','RETRY','DROPPED') THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_OUTCOME_INVALID'; END IF;
+  UPDATE identity.public_flag_mail AS mail SET claim_token = NULL, claim_expires_at = NULL, attempts = least(mail.attempts + 1, 20),
+    delivered_at = CASE WHEN p_outcome = 'SENT' THEN clock_timestamp() END,
+    failed_at = CASE WHEN p_outcome = 'DROPPED' OR (p_outcome = 'RETRY' AND mail.attempts >= 19) THEN clock_timestamp() END,
+    next_attempt_at = CASE WHEN p_outcome = 'RETRY' AND mail.attempts < 19 THEN clock_timestamp() + least(interval '1 minute' * power(2, mail.attempts), interval '6 hours') END
+  WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp()
+  RETURNING p_outcome = 'RETRY' AND mail.failed_at IS NOT NULL INTO v_gave_up;
+  v_found := FOUND;
+  IF v_gave_up THEN PERFORM staff.queue_public_flag_notices(p_mail_id, 'MODERATION_MAIL_FAILED'); END IF;
+  RETURN v_found;
+END $$;
+
 -- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
 DO $moderation_notice_fixes_contract$
 DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
@@ -196,6 +265,23 @@ BEGIN
     OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'staff.public_flag_notice'::regclass AND k.contype = 'c'
       AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%PUBLIC_FLAG_WAITING%') <> 1 THEN
     RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 alert kind';
+  END IF;
+  -- M2: the retry column on both tables (nullable, no default), and the four functions as 0157 left them: signature, result, definer, settings, owner.
+  IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a
+        WHERE a.attrelid IN ('identity.moderation_statement'::regclass, 'identity.public_flag_mail'::regclass) AND a.attname = 'next_attempt_at'
+          AND a.atttypid = 'timestamptz'::regtype AND NOT a.attnotnull AND NOT a.atthasdef AND NOT a.attisdropped) <> 2
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_proc AS p
+        WHERE p.oid IN ('identity.claim_moderation_statements(integer)'::regprocedure, 'identity.complete_moderation_statement(uuid,uuid,text)'::regprocedure,
+            'identity.claim_public_flag_mail(integer)'::regprocedure, 'identity.complete_public_flag_mail(uuid,uuid,text)'::regprocedure)
+          AND p.proowner = v_owner AND p.prosecdef AND p.provolatile = 'v' AND p.proconfig = ARRAY['search_path=pg_catalog']
+          AND p.prorettype IN ('boolean'::regtype, 'record'::regtype)) <> 4
+    OR pg_catalog.pg_get_function_result('identity.claim_moderation_statements(integer)'::regprocedure) IS DISTINCT FROM 'TABLE(statement_id uuid, claim_token uuid)'
+    OR pg_catalog.pg_get_function_result('identity.claim_public_flag_mail(integer)'::regprocedure) IS DISTINCT FROM 'TABLE(mail_id uuid, claim_token uuid)'
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.claim_moderation_statements(integer)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.complete_moderation_statement(uuid,uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.claim_public_flag_mail(integer)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.complete_public_flag_mail(uuid,uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M2 retry';
   END IF;
 END
 $moderation_notice_fixes_contract$;

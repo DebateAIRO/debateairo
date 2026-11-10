@@ -66,7 +66,9 @@ describe("0172: the moderation notice fixes", () => {
     // The CHECK it swaps is 0151's, under the catalog's name, dropped and added in the same place.
     expect(manifest.amendsPostconditionsOf).toEqual([
       { step: "0151_public_flag.sql", relations: ["staff.public_flag_notice"], constraints: ["public_flag_notice_kind_check"], field: "constraint_definition" },
-      { step: "0157_moderation_statements.sql", field: "function_definition", functions: ["identity.queue_moderation_statements()"] }
+      { step: "0157_moderation_statements.sql", field: "function_definition", functions: ["identity.queue_moderation_statements()",
+        "identity.claim_moderation_statements(integer)", "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)",
+        "identity.complete_public_flag_mail(uuid,uuid,text)"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"] }
     ]);
     expect(SQL).toContain("ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;\n"
       + "ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_check\n  CHECK (kind IN ('PUBLIC_FLAG_HIDDEN','PUBLIC_FLAG_WAITING','MODERATION_MAIL_FAILED'));");
@@ -106,6 +108,40 @@ describe("0172: the moderation notice fixes", () => {
     expect(SQL).toContain("SELECT core.install_truncate_guard('identity.moderation_statement_stuck');");
     expect(SQL).not.toMatch(/^GRANT /mu);
     expect(SQL).toContain(`IS DISTINCT FROM '${createHash("sha256").update(queue.slice(queue.indexOf("AS $$") + 5)).digest("hex")}'`);
+  });
+
+  it("M2: the four functions keep their 0157 signatures and results, each claim keeps its queue call first, and the backoff and the alert are as the brief says", () => {
+    const original = read("migrations/0157_moderation_statements.sql");
+    const head = (text: string, name: string): string => {
+      const at = text.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+      expect(at, name).toBeGreaterThan(-1);
+      return text.slice(at, text.indexOf("AS $$", at));
+    };
+    for (const name of ["identity.claim_moderation_statements", "identity.complete_moderation_statement", "identity.claim_public_flag_mail", "identity.complete_public_flag_mail"]) {
+      expect(head(SQL, name), name).toBe(head(original, name));
+    }
+    const claimStatements = bodyOf("identity.claim_moderation_statements");
+    const claimMail = bodyOf("identity.claim_public_flag_mail");
+    expect(claimStatements).toContain("BEGIN\n  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_STATEMENT_LIMIT_INVALID'; END IF;\n  PERFORM identity.queue_moderation_statements();\n  RETURN QUERY");
+    expect(claimMail).toContain("BEGIN\n  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_LIMIT_INVALID'; END IF;\n  PERFORM identity.queue_public_flag_mail();\n  RETURN QUERY");
+    expect(claimStatements).toContain("AND (s.next_attempt_at IS NULL OR s.next_attempt_at <= clock_timestamp())");
+    expect(claimMail).toContain("AND (mail.next_attempt_at IS NULL OR mail.next_attempt_at <= clock_timestamp())");
+    // 0157's claim differs from this one by that condition only.
+    const bodyIn = (text: string, name: string): string => {
+      const at = text.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+      return text.slice(text.indexOf("AS $$", at), text.indexOf("$$;", text.indexOf("AS $$", at) + 5));
+    };
+    const without = (text: string): string => text.replace(/\n +AND \((?:s|mail)\.next_attempt_at IS NULL OR (?:s|mail)\.next_attempt_at <= clock_timestamp\(\)\)/u, "");
+    for (const name of ["identity.claim_moderation_statements", "identity.claim_public_flag_mail"]) expect(without(bodyIn(SQL, name)), name).toBe(bodyIn(original, name));
+    for (const [name, alias, id] of [["identity.complete_moderation_statement", "s", "p_statement_id"], ["identity.complete_public_flag_mail", "mail", "p_mail_id"]] as const) {
+      const body = bodyOf(name);
+      expect(body, name).toContain(`next_attempt_at = CASE WHEN p_outcome = 'RETRY' AND ${alias}.attempts < 19 THEN clock_timestamp() + least(interval '1 minute' * power(2, ${alias}.attempts), interval '6 hours') END`);
+      expect(body, name).toContain(`failed_at = CASE WHEN p_outcome = 'DROPPED' OR (p_outcome = 'RETRY' AND ${alias}.attempts >= 19) THEN clock_timestamp() END`);
+      expect(body, name).toContain(`IF v_gave_up THEN PERFORM staff.queue_public_flag_notices(${id}, 'MODERATION_MAIL_FAILED'); END IF;`);
+      expect(body, name).not.toMatch(/'DROPPED'[^\n]*queue_public_flag_notices/u);
+    }
+    expect(SQL).toContain("ALTER TABLE identity.moderation_statement ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;");
+    expect(SQL).toContain("ALTER TABLE identity.public_flag_mail ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;");
   });
 
   it("M5: the staff alert rides 0151's notices, in the owner catalogue beside PUBLIC_FLAG_WAITING, with no id in its words", () => {

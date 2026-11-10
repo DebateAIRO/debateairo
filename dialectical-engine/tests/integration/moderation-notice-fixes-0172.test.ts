@@ -12,6 +12,9 @@ let database: TestDatabase;
 /** The API's runtime login, as the sender's claim runs on it: SET ROLE on every new connection of the test's superuser. */
 let runtime: Pool;
 let sequence = 9_950_000;
+// Who the staff alert goes to: the active Owner and the active team-limit holder, as 0151's notices (seeded once, by the first describe).
+const owner = randomUUID();
+const holder = randomUUID();
 
 type Account = Readonly<{ userId: string; ownerRef: string }>;
 async function account(): Promise<Account> {
@@ -102,9 +105,6 @@ afterAll(async () => {
 }, timeout);
 
 describe("M5: one bad row never stops the moderation mail", () => {
-  // Who the staff alert goes to: the active Owner and the active team-limit holder, as 0151's notices.
-  const owner = randomUUID();
-  const holder = randomUUID();
   let broken: Readonly<{ ref: string; event: string }>;
   let healthy: Readonly<{ ref: string; event: string }>;
 
@@ -161,4 +161,115 @@ describe("M5: one bad row never stops the moderation mail", () => {
     const refused = await runtime.query("SELECT count(*) FROM identity.moderation_statement_stuck").then(() => null, (error: { code?: string }) => error.code);
     expect(refused).toBe("42501");
   }, timeout);
+});
+
+// M2: a failed send backs off over about three days, then alerts the team. The same cases for the statement and for the reporter's answer.
+describe("M2: a failed send backs off, then gives up once and alerts once", () => {
+  type Door = Readonly<{
+    name: string; table: string; key: string; claimFn: string; completeFn: string;
+    /** A new row of this queue, due at once, and its id. */
+    make: () => Promise<string>;
+  }>;
+  const doors: Door[] = [
+    { name: "statement", table: "identity.moderation_statement", key: "statement_id", claimFn: "identity.claim_moderation_statements", completeFn: "identity.complete_moderation_statement",
+      make: async () => {
+        const id = randomUUID();
+        const who = await account();
+        const ref = await publishedDebate(who);
+        await seeded([[`INSERT INTO identity.moderation_statement (statement_id, owner_ref, publication_ref, kind, event_id, happened_at, mail_locale)
+          VALUES ($1,$2,$3,'DEBATE_HIDDEN',$4,now(),'en')`, [id, who.ownerRef, ref, randomUUID()]]]);
+        return id;
+      } },
+    { name: "reporter's answer", table: "identity.public_flag_mail", key: "mail_id", claimFn: "identity.claim_public_flag_mail", completeFn: "identity.complete_public_flag_mail",
+      make: async () => {
+        const id = randomUUID();
+        const flagId = randomUUID();
+        const reporter = await account();
+        const owner2 = await account();
+        const ref = await publishedDebate(owner2);
+        await seeded([
+          [`INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, reason, state, content_deleted_at) VALUES ($1,$2,$3,'CONTENT','QUEUED',now())`, [flagId, ref, reporter.ownerRef]],
+          [`INSERT INTO identity.public_flag_mail (mail_id, flag_id, kind, happened_at) VALUES ($1,$2,'NO_BREACH',now())`, [id, flagId]]]);
+        return id;
+      } }
+  ];
+  for (const door of doors) {
+    const claim = async (id: string): Promise<string | null> => {
+      const rows = (await runtime.query<{ id: string; token: string }>(`SELECT ${door.key} AS id, claim_token AS token FROM ${door.claimFn}(100)`)).rows;
+      return rows.find((row) => row.id === id)?.token ?? null;
+    };
+    const complete = async (id: string, token: string, outcome: string): Promise<boolean> =>
+      (await runtime.query<{ ok: boolean }>(`SELECT ${door.completeFn}($1,$2,$3) AS ok`, [id, token, outcome])).rows[0]!.ok;
+    const row = async (id: string) => (await database.pool.query<{ attempts: number; failed_at: Date | null; delivered_at: Date | null; wait: number | null }>(
+      `SELECT attempts, failed_at, delivered_at, extract(epoch FROM next_attempt_at - clock_timestamp())::float8 AS wait FROM ${door.table} WHERE ${door.key}=$1`, [id])).rows[0]!;
+    const due = (id: string) => database.pool.query(`UPDATE ${door.table} SET next_attempt_at = clock_timestamp() - interval '1 second' WHERE ${door.key}=$1`, [id]);
+    const notices = async (id: string) => (await database.pool.query<{ recipient_staff_id: string }>(
+      "SELECT recipient_staff_id FROM staff.public_flag_notice WHERE operation_id=$1 AND kind='MODERATION_MAIL_FAILED' ORDER BY recipient_staff_id", [id])).rows.map((r) => r.recipient_staff_id);
+
+    it(`${door.name}: a failed send waits before its next try`, async () => {
+      const id = await door.make();
+      // Waits after tries 1, 2, 3 are 1, 2, 4 minutes; after try 10 it is the 6-hour ceiling.
+      for (const minutes of [1, 2, 4]) {
+        const token = await claim(id);
+        expect(token).not.toBeNull();
+        expect(await complete(id, token!, "RETRY")).toBe(true);
+        expect(Math.abs((await row(id)).wait! - minutes * 60)).toBeLessThan(1.5);
+        // Straight away it is not claimable; once its time has come it is.
+        expect(await claim(id)).toBeNull();
+        await due(id);
+      }
+      for (let tries = 4; tries < 10; tries += 1) {
+        const token = await claim(id);
+        expect(token).not.toBeNull();
+        await complete(id, token!, "RETRY");
+        await due(id);
+      }
+      const token = await claim(id);
+      await complete(id, token!, "RETRY");
+      const after = await row(id);
+      expect(after.attempts).toBe(10);
+      expect(Math.abs(after.wait! - 6 * 3600)).toBeLessThan(1.5);
+    }, timeout);
+
+    it(`${door.name}: the 20th failure gives up once and alerts once`, async () => {
+      const id = await door.make();
+      for (let tries = 1; tries <= 20; tries += 1) {
+        const token = await claim(id);
+        expect(token, `try ${tries}`).not.toBeNull();
+        expect(await complete(id, token!, "RETRY")).toBe(true);
+        if (tries < 20) { expect((await row(id)).failed_at, `try ${tries}`).toBeNull(); expect(await notices(id)).toEqual([]); await due(id); }
+      }
+      const done = await row(id);
+      expect(done.attempts).toBe(20);
+      expect(done.failed_at).not.toBeNull();
+      expect(await notices(id)).toEqual([owner, holder].sort());
+      // Given up: never claimed again, and no second alert.
+      await due(id);
+      expect(await claim(id)).toBeNull();
+      expect(await notices(id)).toEqual([owner, holder].sort());
+    }, timeout);
+
+    it(`${door.name}: 19 failures and then SENT is delivered with no alert; DROPPED never alerts`, async () => {
+      const id = await door.make();
+      for (let tries = 1; tries <= 19; tries += 1) {
+        const token = await claim(id);
+        expect(token, `try ${tries}`).not.toBeNull();
+        await complete(id, token!, "RETRY");
+        await due(id);
+      }
+      const token = await claim(id);
+      expect(await complete(id, token!, "SENT")).toBe(true);
+      const sent = await row(id);
+      expect(sent.delivered_at).not.toBeNull();
+      expect(sent.failed_at).toBeNull();
+      expect(sent.wait).toBeNull();
+      expect(await notices(id)).toEqual([]);
+
+      const dropped = await door.make();
+      const droppedToken = await claim(dropped);
+      expect(await complete(dropped, droppedToken!, "DROPPED")).toBe(true);
+      expect((await row(dropped)).failed_at).not.toBeNull();
+      expect(await notices(dropped)).toEqual([]);
+    }, timeout);
+  }
 });

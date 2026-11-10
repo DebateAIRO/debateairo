@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0172_moderation_notice_fixes.sql",
-    "sha256": "0a1e25f82898683ec34c1b2e7609fbc18f23804c1929b3192232cc58725d4d79"
+    "sha256": "edc4d02e93f0024c605b2e60c95f3de57b49471063b76264c718e2d809f6f09b"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
@@ -29,7 +29,18 @@
       "step": "0157_moderation_statements.sql",
       "field": "function_definition",
       "functions": [
-        "identity.queue_moderation_statements()"
+        "identity.queue_moderation_statements()",
+        "identity.claim_moderation_statements(integer)",
+        "identity.complete_moderation_statement(uuid,uuid,text)",
+        "identity.claim_public_flag_mail(integer)",
+        "identity.complete_public_flag_mail(uuid,uuid,text)"
+      ],
+      "relations": [
+        "identity.moderation_statement",
+        "identity.public_flag_mail"
+      ],
+      "columns": [
+        "next_attempt_at"
       ]
     }
   ]
