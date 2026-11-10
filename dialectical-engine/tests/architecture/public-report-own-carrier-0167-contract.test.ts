@@ -42,13 +42,13 @@ describe("0167: a visitor's report of a public debate carried by a run of their 
   it("C-T is a step of the chain, right after 0166, with its own loader and no amendment, and 0168 follows it", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0167 } from './migration-forward0167.js';");
-    expect(chain).toContain("loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171]);");
+    expect(chain).toContain("loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172]);");
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-5)!.name).toBe(NAME);
-    expect(plan.forwardChain.at(-6)!.name).toBe(PREVIOUS);
-    const step = plan.forwardChain.at(-5)!;
+    expect(plan.forwardChain.at(-6)!.name).toBe(NAME);
+    expect(plan.forwardChain.at(-7)!.name).toBe(PREVIOUS);
+    const step = plan.forwardChain.at(-6)!;
     expect(step.previousName).toBe(PREVIOUS);
-    expect(step.previousManifestSha256).toBe(plan.forwardChain.at(-6)!.manifestSha256);
+    expect(step.previousManifestSha256).toBe(plan.forwardChain.at(-7)!.manifestSha256);
     expect(step.verifierSha256).toBe(VERIFIER_130);
     expect(step.amendsPostconditionsOf).toEqual([]);
     expect(step.replayVerifierSql).toBeUndefined();

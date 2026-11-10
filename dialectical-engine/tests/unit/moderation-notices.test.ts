@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { encrypt } from "@debateai/crypto";
-import type { ModerationStatementClaim, ModerationStatementGround, ModerationStatementKind, ModerationStatementMail, ModerationStatementOutcome } from "@debateai/db";
+import type { ModerationStatementClaim, ModerationStatementGround, ModerationStatementKind, ModerationStatementMail, ModerationStatementOutcome, PublicFlagMail, PublicFlagMailClaim } from "@debateai/db";
 import { renderMail } from "@debateai/mail-templates";
 import { MemoryTemplatedMailSender, TemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
-import { ModerationStatementReconciler, statementMailParams } from "../../apps/api/src/moderation-statements.js";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler, statementMailParams } from "../../apps/api/src/moderation-statements.js";
 import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 /*
@@ -23,13 +23,27 @@ const HOLD: ModerationStatementGround = { recorded: true, interim: true, grounds
 const statement = (kind: ModerationStatementKind, overrides: Partial<ModerationStatementMail> = {}): ModerationStatementMail =>
   ({ userId: USER, statementId: randomUUID(), kind, happenedAt: "2026-11-05T09:30:00.000Z", mailLocale: "en", publicationRef: REF, ground: HOLD, emailCiphertext: sealed("bea@example.test"), ...overrides });
 
-function world(statements: ReadonlyArray<ModerationStatementMail | null>, channel: { sendTemplated(mail: TemplatedMail): Promise<void> } = new MemoryTemplatedMailSender()) {
+/** What the sender logs on console.error while `work` runs: its first argument only, the marker. */
+function captureErrors(): { lines: string[]; restore(): void } {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => { lines.push(String(args[0])); };
+  return { lines, restore: () => { console.error = original; } };
+}
+
+/** `breaksAt`: the claims (by index) whose settle throws, after it was recorded as asked. */
+function world(statements: ReadonlyArray<ModerationStatementMail | null>, channel: { sendTemplated(mail: TemplatedMail): Promise<void> } = new MemoryTemplatedMailSender(),
+  breaksAt: readonly number[] = []) {
   const claims: ModerationStatementClaim[] = statements.map((one) => ({ statementId: one?.statementId ?? randomUUID(), claimToken: randomUUID() }));
   const completed: Array<[string, ModerationStatementOutcome]> = [];
   const repository = {
     claim: async () => claims,
     read: async (claim: ModerationStatementClaim) => statements[claims.indexOf(claim)] ?? null,
-    complete: async (claim: ModerationStatementClaim, outcome: ModerationStatementOutcome) => { completed.push([claim.statementId, outcome]); return true; }
+    complete: async (claim: ModerationStatementClaim, outcome: ModerationStatementOutcome) => {
+      completed.push([claim.statementId, outcome]);
+      if (breaksAt.includes(claims.indexOf(claim))) throw new Error("CONNECTION_TERMINATED");
+      return true;
+    }
   };
   const users = { load: async (userId: string) => { if (userId !== USER) throw new Error("NO_KEY"); return Buffer.from(DEK); } };
   return { reconciler: new ModerationStatementReconciler(repository, users, channel, "https://debate.example.test/app/"), claims, completed, channel };
@@ -96,6 +110,37 @@ describe("0157: the statement of reasons sender", () => {
     ], failing);
     await reconciler.reconcile();
     expect(completed).toEqual([[claims[0]!.statementId, "DROPPED"], [claims[1]!.statementId, "DROPPED"], [claims[2]!.statementId, "RETRY"], [claims[3]!.statementId, "RETRY"], [claims[4]!.statementId, "SENT"]]);
+  });
+
+  // M5 (owner, 10 Nov 2026): a settle that throws for one claim (the database went away for a moment, a claim ran out mid-call) is logged and the pass
+  // goes on, so one bad row never stops the mail queue; the claim it could not settle is claimable again when its claim runs out.
+  it("complete throwing for one claim does not stop the batch", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    const { reconciler, claims, completed } = world([statement("DEBATE_HIDDEN"), statement("REPORT_REMOVED"), statement("CONTRIBUTION_REMOVED")], memory, [1]);
+    const logged = captureErrors();
+    try { await reconciler.reconcile(); } finally { logged.restore(); }
+    expect(memory.messages).toHaveLength(3);
+    expect(completed).toEqual(claims.map((claim) => [claim.statementId, "SENT"]));
+    expect(logged.lines).toEqual(["[MODERATION_STATEMENT_COMPLETE_FAILED]"]);
+  });
+
+  it("the reporter's answers: complete throwing for one claim does not stop the batch", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    const mails: PublicFlagMail[] = (["RECEIPT", "AUTO_HIDDEN", "NO_BREACH"] as const).map((kind) =>
+      ({ userId: USER, mailId: randomUUID(), kind, happenedAt: "2026-11-05T09:30:00.000Z", mailLocale: "en", publicationRef: REF, emailCiphertext: sealed("bea@example.test") }));
+    const claims: PublicFlagMailClaim[] = mails.map((mail) => ({ mailId: mail.mailId, claimToken: randomUUID() }));
+    const completed: string[] = [];
+    const repository = {
+      claim: async () => claims,
+      read: async (claim: PublicFlagMailClaim) => mails[claims.indexOf(claim)] ?? null,
+      complete: async (claim: PublicFlagMailClaim) => { completed.push(claim.mailId); if (claim === claims[1]) throw new Error("CONNECTION_TERMINATED"); return true; }
+    };
+    const users = { load: async () => Buffer.from(DEK) };
+    const logged = captureErrors();
+    try { await new PublicFlagAnswerReconciler(repository, users, memory, "https://debate.example.test/app/").reconcile(); } finally { logged.restore(); }
+    expect(memory.messages).toHaveLength(3);
+    expect(completed).toEqual(claims.map((claim) => claim.mailId));
+    expect(logged.lines).toEqual(["[PUBLIC_FLAG_ANSWER_COMPLETE_FAILED]"]);
   });
 
   it("goes out through the production sendmail path: one message on the dev capture, to the account, in its language, with Reply-To office@", async () => {

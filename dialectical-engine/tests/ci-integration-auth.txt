@@ -120,3 +120,5 @@ tests/integration/security-review-hardening-database.test.ts
 tests/integration/run-handover-database.test.ts
 # The daily outbound mail limit (0170): the shared count, its atomicity and the API logins' rights on a real database.
 tests/integration/outbound-mail-limit.test.ts
+# The moderation notice fixes (0172): M5, one bad source row is set aside and retried hourly while every other statement is queued, on the API's runtime login.
+tests/integration/moderation-notice-fixes-0172.test.ts

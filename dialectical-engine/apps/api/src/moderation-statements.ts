@@ -51,12 +51,16 @@ export class ModerationStatementReconciler {
     this.appUrl = publicAppUrl;
   }
 
-  /** One pass. A statement whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. */
+  /**
+   * One pass. A statement whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. M5 (owner, 10 Nov
+   * 2026): a settle that throws (the database went away for a moment) is logged by its marker alone and the pass goes on, so one claim never stops
+   * the others; the one it could not settle is claimable again when its claim runs out.
+   */
   async reconcile(limit = 100): Promise<void> {
     for (const claim of await this.repository.claim(limit)) {
       let outcome: ModerationStatementOutcome;
       try { outcome = await this.send(claim); } catch { outcome = "RETRY"; }
-      await this.repository.complete(claim, outcome);
+      try { await this.repository.complete(claim, outcome); } catch { console.error("[MODERATION_STATEMENT_COMPLETE_FAILED]"); }
     }
   }
 
@@ -101,12 +105,12 @@ export class PublicFlagAnswerReconciler {
   constructor(private readonly repository: Pick<PostgresPublicFlagMailRepository, "claim" | "read" | "complete">, private readonly users: Pick<ReadableUserDekStore, "load">,
     private readonly channel: Pick<TemplatedMailChannel, "sendTemplated">, private readonly appUrl: string) {}
 
-  /** One pass. A mail whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. */
+  /** One pass. A mail whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. M5: as the statements'. */
   async reconcile(limit = 100): Promise<void> {
     for (const claim of await this.repository.claim(limit)) {
       let outcome: ModerationStatementOutcome;
       try { outcome = await this.send(claim); } catch { outcome = "RETRY"; }
-      await this.repository.complete(claim, outcome);
+      try { await this.repository.complete(claim, outcome); } catch { console.error("[PUBLIC_FLAG_ANSWER_COMPLETE_FAILED]"); }
     }
   }
 

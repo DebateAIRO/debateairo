@@ -422,6 +422,7 @@ const TEMPLATED_MAIL_PURPOSE: Readonly<Record<MailTemplateId, MailPurpose>> = Ob
   THREAT_REPORT_WAITING: "threat-report-alert",
   TEAM_LIMIT_CHANGED: "team-notice", TEAM_LIMIT_PARTNER_CHANGED: "team-notice", TEAM_ALLOWANCE_CHANGED: "team-notice",
   TEAM_ALLOWANCE_YOURS: "team-notice", PUBLIC_REVIEW_CHANGED: "team-notice", PUBLIC_FLAG_HIDDEN: "team-notice", PUBLIC_FLAG_WAITING: "team-notice",
+  MODERATION_MAIL_FAILED: "team-notice",
   MODERATION_DEBATE_HIDDEN: "moderation-notice", MODERATION_CONTRIBUTION_REMOVED: "moderation-notice", MODERATION_REPORT_REMOVED: "moderation-notice",
   MODERATION_STATEMENT_DEBATE_HIDDEN: "moderation-notice", MODERATION_STATEMENT_DEBATE_DECIDED: "moderation-notice",
   MODERATION_STATEMENT_CONTRIBUTION_REMOVED: "moderation-notice", MODERATION_STATEMENT_REPORT_REMOVED: "moderation-notice",
