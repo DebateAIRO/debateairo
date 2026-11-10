@@ -219,10 +219,10 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     expect(Object.keys(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)).not.toContain("owner_report_email_ref");
   });
 
-  it("lists the EU 27 plus Iceland, Liechtenstein, Norway and the UK for withdrawal, and nothing else", () => {
+  it("lists the EU 27 plus Iceland, Liechtenstein, Norway, the UK and Taiwan for withdrawal, and nothing else", () => {
     expect([...policy.withdrawalCountries].sort()).toEqual([
       "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE",
-      "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK"
+      "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK", "TW"
     ]);
   });
 

@@ -16,7 +16,7 @@ import {
 const EXAMPLE = new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url);
 const EU = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU",
   "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
-const PAYABLE_LATER_OR_NOW = [...EU, "NO", "IS", "US", "CA", "AU", "NZ", "SG", "JP",
+const PAYABLE_LATER_OR_NOW = [...EU, "NO", "IS", "US", "CA", "AU", "NZ", "SG", "JP", "TW",
   "GB", "KR", "IN", "AE", "SA", "MX", "AR", "CO", "CL", "TH", "PH"];
 
 const dev = () => taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef);
@@ -36,7 +36,7 @@ describe("P16a taxAuthorities v1", () => {
     const authorities = dev();
     expect(authorities.entries.map((entry) => entry.scheme)).toEqual([
       "RO_D300", "EU_REVERSE_CHARGE_D390", "EU_OSS", "NO_VOEC", "IS_VOES", "GB_HMRC", "US_STATE", "CA_GST", "AU_GST",
-      "NZ_GST", "SG_GST", "JP_CONSUMPTION_TAX", "KR_VAT", "IN_GST", "AE_VAT", "SA_VAT", "MX_IVA", "AR_IVA", "CO_IVA",
+      "NZ_GST", "SG_GST", "JP_CONSUMPTION_TAX", "TW_BUSINESS_TAX", "KR_VAT", "IN_GST", "AE_VAT", "SA_VAT", "MX_IVA", "AR_IVA", "CO_IVA",
       "CL_IVA", "TH_VAT", "PH_VAT"
     ]);
     expect(Object.isFrozen(authorities)).toBe(true);
@@ -72,7 +72,7 @@ describe("P16a taxAuthorities v1", () => {
       query: async () => ({ rows: row === null ? [] : [{ value_json: row, source_ref: "v1" }] })
     }) as never;
     expect(await readTaxAuthorities(pool(null), 3)).toBeNull();
-    expect((await readTaxAuthorities(pool(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value), 3))?.entries).toHaveLength(22);
+    expect((await readTaxAuthorities(pool(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value), 3))?.entries).toHaveLength(23);
   });
 
   it("ships the same value in the hosted example, and lets the operator publish a corrected one", async () => {

@@ -81,7 +81,7 @@
     "tax_code": "saas",
     "invoice_issuer_rules": { "RO": "SMARTBILL", "*": "QUADERNO" },
     "withdrawal_countries": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
-      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB"]
+      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "TW"]
   },
   "taxAuthorities": {
     "kind": "TAX_AUTHORITIES",
@@ -292,6 +292,19 @@
         "registration": "AFTER_THRESHOLD",
         "where": "Nothing until your sales to Japan pass Japan's threshold for foreign sellers; after that, register with Japan's National Tax Agency (consumption tax) and pay there. Quaderno watches the threshold and warns you.",
         "when": "After registration: the returns and payment dates Japan's National Tax Agency (consumption tax) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "TW_BUSINESS_TAX",
+        "countries": [
+          "TW"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to individuals in Taiwan pass NT$600,000 in a year (the previous year or the current one); sales to Taiwanese companies are reverse charge. Watch Taiwan's total in this summary: Quaderno is not confirmed to warn you. Past the threshold, register with Taiwan's National Taxation Bureau (eTax Portal, cross-border section) for the 5% business tax, and issue a government e-invoice for every sale to an individual.",
+        "when": "After registration: a return every two months, by the 15th of the month after each period, paid in Taiwan dollars.",
         "due": {
           "rule": "NONE"
         }

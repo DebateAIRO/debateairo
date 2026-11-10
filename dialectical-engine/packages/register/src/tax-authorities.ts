@@ -180,6 +180,20 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
         "Singapore's threshold for overseas sellers"),
       afterThreshold("JP_CONSUMPTION_TAX", "JP", "Japan", "Japan's National Tax Agency (consumption tax)",
         "Japan's threshold for foreign sellers"),
+      // Research of 5 November 2026: the threshold rose from NT$480,000 on 7 April 2025. It is not confirmed that
+      // Quaderno watches it, so the line says to watch it here instead of afterThreshold's Quaderno sentence.
+      Object.freeze({
+        scheme: "TW_BUSINESS_TAX", countries: Object.freeze(["TW"]), tax_statuses: null,
+        registration: "AFTER_THRESHOLD" as const,
+        where: "Nothing until your sales to individuals in Taiwan pass NT$600,000 in a year (the previous year or the"
+          + " current one); sales to Taiwanese companies are reverse charge. Watch Taiwan's total in this summary:"
+          + " Quaderno is not confirmed to warn you. Past the threshold, register with Taiwan's National Taxation"
+          + " Bureau (eTax Portal, cross-border section) for the 5% business tax, and issue a government e-invoice for"
+          + " every sale to an individual.",
+        when: "After registration: a return every two months, by the 15th of the month after each period, paid in"
+          + " Taiwan dollars.",
+        due: noDueDate
+      }),
       fromFirstSale("KR_VAT", "KR", "South Korea", "South Korea's National Tax Service, for VAT on electronic services"),
       fromFirstSale("IN_GST", "IN", "India", "India's GST authorities, for GST on online services"),
       fromFirstSale("AE_VAT", "AE", "the United Arab Emirates", "the UAE Federal Tax Authority, for VAT"),

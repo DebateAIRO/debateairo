@@ -177,6 +177,14 @@ later; only the sign-up switch changes.
 off until each country's tax registration is checked. Ukraine stays closed until the occupied regions can be
 blocked.
 
+**Amendment 2026-11-05 (V, owner decision):** Taiwan opens for payment (`OFFERED`), like Japan and Singapore. Its 5%
+business tax on foreign digital sellers applies only once sales to individuals pass NT$600,000 a year (raised from
+NT$480,000 on 7 April 2025); sales to Taiwanese companies are reverse charge. The `TW_BUSINESS_TAX` tax-authorities
+entry tells the owner to watch Taiwan's total in the tax summary, because Quaderno is not confirmed to warn about this
+threshold. Past it: registration with the National Taxation Bureau, a return every two months, and a government
+e-invoice within 48 hours of each sale to an individual. Taiwan joins `withdrawal_countries`: the Terms (Annex A.7)
+give 7 days under the Consumer Protection Act, and the one `withdrawal_days` window gives Taiwanese buyers 14.
+
 ### 1.6 The money check
 
 Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are

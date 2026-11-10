@@ -124,10 +124,12 @@ export const BILLING_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     quote_ttl_seconds: 1_800,
     tax_code: "saas" as const,
     invoice_issuer_rules: Object.freeze({ RO: "SMARTBILL" as const, "*": "QUADERNO" as const }),
-    // Exactly the legal set (WITHDRAWAL_LAW above); the sealed row is data, so it is spelled out.
+    // The legal set (WITHDRAWAL_LAW above) plus Taiwan (owner's decision of 5 November 2026): its Consumer Protection
+    // Act gives 7 days (Terms Annex A.7), and the one withdrawal_days window gives it the more generous 14. The sealed
+    // row is data, so it is spelled out.
     withdrawal_countries: Object.freeze([
       "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
-      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB"
+      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "TW"
     ])
   })
 });
