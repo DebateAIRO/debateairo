@@ -219,10 +219,10 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     expect(Object.keys(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)).not.toContain("owner_report_email_ref");
   });
 
-  it("lists the EU 27 plus Iceland, Liechtenstein, Norway, the UK and Taiwan for withdrawal, and nothing else", () => {
+  it("lists the EU 27, Iceland, Liechtenstein, Norway, the UK, and the Terms' Moldova, South Korea and Taiwan, nothing else", () => {
     expect([...policy.withdrawalCountries].sort()).toEqual([
       "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE",
-      "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK", "TW"
+      "IS", "IT", "KR", "LI", "LT", "LU", "LV", "MD", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK", "TW"
     ]);
   });
 
@@ -271,6 +271,16 @@ describe("billingPolicy v1 keeps billing switched off", () => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "GB");
     }],
     ["a withdrawal list of one country", (row: Record<string, unknown>) => { row.withdrawal_countries = ["RO"]; }],
+    // The Terms' own rights (Annex A.6, A.7), kept whether or not the country can pay yet.
+    ["a withdrawal list without Moldova (A.6)", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "MD");
+    }],
+    ["a withdrawal list without South Korea (A.7)", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "KR");
+    }],
+    ["a withdrawal list without Taiwan (A.7)", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "TW");
+    }],
     ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }],
     // Final review Part 1b, Minor 6: a changed renewal needs at least 7 business days' notice (M3; A7's notice rule,
     // kept for NETOPIA until N-23 is answered).

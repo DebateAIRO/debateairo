@@ -164,6 +164,22 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
       }),
       afterThreshold("NO_VOEC", "NO", "Norway", "Norway's VOEC scheme (Skatteetaten)", "NOK 50,000 in a year"),
       afterThreshold("IS_VOES", "IS", "Iceland", "Iceland's VOES scheme (Skatturinn)", "ISK 2,000,000 in a year"),
+      // Research of 10 November 2026, the FTA's VAT Info 22 "Foreign businesses" (25 February 2026): §1.1.1 (liable
+      // once worldwide taxable turnover is CHF 100,000 or more; "Swiss territory" includes Liechtenstein), §1.1.2
+      // (register within 30 days), §1.1.3 (electronic services to individuals are not exempt), §4.1 (a representative
+      // in Switzerland). Quaderno is not known to watch a threshold on worldwide turnover, so the line says to watch it.
+      Object.freeze({
+        scheme: "CH_VAT", countries: Object.freeze(["CH", "LI"]), tax_statuses: null,
+        registration: "AFTER_THRESHOLD" as const,
+        where: "Nothing until the company's worldwide taxable turnover (every sale, in every country) reaches CHF "
+          + "100,000 a year; from then Swiss VAT is due on every sale to an individual in Switzerland or "
+          + "Liechtenstein, which are one VAT territory. The threshold counts sales everywhere, not only Swiss "
+          + "ones, so watch the company's total yourself. Register with Switzerland's Federal Tax Administration "
+          + "(FTA) within 30 days, through a Swiss tax representative (required).",
+        when: "After registration: a VAT return on the FTA portal for each period the FTA sets, in Swiss francs "
+          + "(sales in other currencies converted at the FTA's rate).",
+        due: noDueDate
+      }),
       fromFirstSale("GB_HMRC", "GB", "the UK", "HM Revenue & Customs (HMRC), for UK VAT"),
       Object.freeze({
         scheme: "US_STATE", countries: Object.freeze(["US"]), tax_statuses: null, registration: "AFTER_THRESHOLD" as const,

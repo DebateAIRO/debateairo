@@ -81,7 +81,7 @@
     "tax_code": "saas",
     "invoice_issuer_rules": { "RO": "SMARTBILL", "*": "QUADERNO" },
     "withdrawal_countries": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
-      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "TW"]
+      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "TW", "MD", "KR"]
   },
   "taxAuthorities": {
     "kind": "TAX_AUTHORITIES",
@@ -201,6 +201,20 @@
         "registration": "AFTER_THRESHOLD",
         "where": "Nothing until your sales to Iceland pass ISK 2,000,000 in a year; after that, register with Iceland's VOES scheme (Skatturinn) and pay there. Quaderno watches the threshold and warns you.",
         "when": "After registration: the returns and payment dates Iceland's VOES scheme (Skatturinn) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "CH_VAT",
+        "countries": [
+          "CH",
+          "LI"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until the company's worldwide taxable turnover (every sale, in every country) reaches CHF 100,000 a year; from then Swiss VAT is due on every sale to an individual in Switzerland or Liechtenstein, which are one VAT territory. The threshold counts sales everywhere, not only Swiss ones, so watch the company's total yourself. Register with Switzerland's Federal Tax Administration (FTA) within 30 days, through a Swiss tax representative (required).",
+        "when": "After registration: a VAT return on the FTA portal for each period the FTA sets, in Swiss francs (sales in other currencies converted at the FTA's rate).",
         "due": {
           "rule": "NONE"
         }

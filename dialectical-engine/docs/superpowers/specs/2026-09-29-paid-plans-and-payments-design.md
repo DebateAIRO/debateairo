@@ -185,6 +185,15 @@ threshold. Past it: registration with the National Taxation Bureau, a return eve
 e-invoice within 48 hours of each sale to an individual. Taiwan joins `withdrawal_countries`: the Terms (Annex A.7)
 give 7 days under the Consumer Protection Act, and the one `withdrawal_days` window gives Taiwanese buyers 14.
 
+**Amendment 2026-11-10 (V, owner request):** two checks so a country is never opened half-ready. (1) Switzerland and
+Liechtenstein, open for payment since 4 November, get their tax line: `CH_VAT`, one Swiss registration for both (one
+VAT territory), due once the company's worldwide taxable turnover reaches CHF 100,000 a year, through a Swiss tax
+representative, within 30 days (FTA VAT Info 22, February 2026, §1.1.1–1.1.3, §4.1). A unit test now fails if any
+country open for payment, in the code row or the hosted example, has no `taxAuthorities` line. (2) `billingPolicy`
+refuses a `withdrawal_countries` list without a country whose Terms annex gives a withdrawal right: Moldova (A.6, 14
+days), South Korea and Taiwan (A.7, 7 days). Moldova and South Korea join the list now, before they can pay, so
+opening either for payment never opens it without its right. Switzerland (A.5) states no withdrawal right and stays off.
+
 ### 1.6 The money check
 
 Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are
