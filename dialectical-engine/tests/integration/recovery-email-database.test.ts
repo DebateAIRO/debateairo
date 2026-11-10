@@ -12,9 +12,12 @@ import { AccountProfileService } from "../../apps/api/src/account-profile.js";
 import { RecoveryEmailService } from "../../apps/api/src/recovery-email.js";
 import { MemoryRecoveryEmailMailSender, MemoryEmailChangeMailSender } from "../../apps/api/src/mail-channel.js";
 import { createEmailBlindIndex, decrypt, encrypt, generateVerificationToken, hashToken } from "@debateai/crypto";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { profileAccount, profileGrant, profileAudit, profileUsers, profileKeys, profileBlindKey, profileSource, profileAad } from "../support/profileAccount.js";
 let db: TestDatabase, auth: Pool, runtime: Pool;
+/** 0171: the consumer notice loop is the cross-account marker's, which the authorization pool's system login holds outside any request. */
+let authSystem: Pool;
 beforeAll(async () => {
   db = await startTestDatabase();
   await migrate(db.pool);
@@ -24,9 +27,11 @@ beforeAll(async () => {
   auth = createPool(url.toString());
   url.searchParams.set("options", "-c role=debateai_runtime");
   runtime = createPool(url.toString());
+  authSystem = createPool(await createSystemTwin(db, "task3_authority_system", ["debateai_authorization_runtime"]));
 }, 120000);
 afterAll(async () => {
   await auth?.end();
+  await authSystem?.end();
   await runtime?.end();
   await db?.stop();
   for (const k of profileKeys.values())
@@ -83,7 +88,7 @@ it('recovery channel changes atomically enqueue only the verified primary notice
  await service.removeRecoveryEmail(a,{grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);expect((await notices())[0].revision).toBe('2');
  await service.removeRecoveryEmail(a,{grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);expect((await notices())[0].revision).toBe('2');
  const delivered:string[]=[];
- const reconciler=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(auth),profileUsers,{sendConsumerSecurityNotice:async(message)=>{expect(message.recipient).toBe(a.email);expect(message.eventKind).toBe('METHOD_CHANGED');const mail=renderAccountEmail({template:'security-method-changed-v1',recipient:message.recipient,messageId:message.messageId,expiresAt:message.happenedAt,copy:(key:string)=>copyOf('en',key)});delivered.push(mail.text);}});
+ const reconciler=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authSystem),profileUsers,{sendConsumerSecurityNotice:async(message)=>{expect(message.recipient).toBe(a.email);expect(message.eventKind).toBe('METHOD_CHANGED');const mail=renderAccountEmail({template:'security-method-changed-v1',recipient:message.recipient,messageId:message.messageId,expiresAt:message.happenedAt,copy:(key:string)=>copyOf('en',key)});delivered.push(mail.text);}});
  // Other independently-created fixture accounts are excluded from this controlled run.
  await db.pool.query('DELETE FROM identity.consumer_security_notice WHERE user_id<>$1',[a.userId]);
  await reconciler.reconcile(1);expect(delivered).toHaveLength(1);expect(await notices()).toHaveLength(0);

@@ -1,7 +1,7 @@
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrate, PostgresIdentityRepository, type PendingAccountInput, type SignUpAcceptanceRow } from "@debateai/db";
+import { migrate, PostgresIdentityRepository, type PendingAccountInput, type Pool, type SignUpAcceptanceRow } from "@debateai/db";
 import { createEmailBlindIndex, encrypt, generateDek, sealRecord, type AuditContextHasher } from "@debateai/crypto";
 import { AGE_RULE_VERSION, MIN_AGE, REGION_COUNTRY_CODES, US_STATE_CODES, type DeclaredRegion } from "@debateai/kernel";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -42,9 +42,10 @@ function pendingInput(region: DeclaredRegion, options: { acceptances?: readonly 
     declaredRegion: region, ...(options.acceptances === undefined ? {} : { acceptances: options.acceptances })
   };
 }
-async function bareAccount(state: "active" | "pending_verification" = "pending_verification") {
+/** A bare account, written on `client` (its own transaction, or the caller's: the region writer writes only for an account its own transaction made, 0171). */
+async function bareAccount(state: "active" | "pending_verification" = "pending_verification", client: Pick<Pool, "query"> = database.pool) {
   const userId = randomUUID();
-  await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,created_at)
+  await client.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,created_at)
     VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'hash',$3,$4,now(),now())`, [userId, createHash("sha256").update(userId).digest(), `region-${userId}`, state]);
   return userId;
 }
@@ -69,11 +70,17 @@ describe("registration region on real PostgreSQL", () => {
     expect(result.rows.find((row) => row.conname === "registration_region_country_code_check")?.definition).toMatch(/ NOT VALID$/);
   });
   it("B2b stores Iceland and Liechtenstein, the two codes 0154 added", async () => {
-    for (const country of ["IS", "LI"]) {
-      const userId = await bareAccount();
-      await database.pool.query("SELECT identity.record_registration_region($1,$2,NULL)", [userId, country]);
-      expect(await regionRows(userId)).toEqual([{ country_code: country, us_state: null }]);
-    }
+    // Since 0171 the writer takes only an account its own transaction made, so each account and its region are written together, as a sign-up writes them.
+    const client = await database.pool.connect();
+    try {
+      for (const country of ["IS", "LI"]) {
+        await client.query("BEGIN");
+        const userId = await bareAccount("pending_verification", client);
+        await client.query("SELECT identity.record_registration_region($1,$2,NULL)", [userId, country]);
+        await client.query("COMMIT");
+        expect(await regionRows(userId)).toEqual([{ country_code: country, us_state: null }]);
+      }
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   });
   it("B3 refuses an unknown country, absent US state, foreign state, and duplicate row", async () => {
     const userId = await bareAccount();
@@ -125,11 +132,11 @@ describe("registration region on real PostgreSQL", () => {
     expect((await database.pool.query<{ allowed: boolean }>("SELECT has_function_privilege('debateai_billing_runtime',$1,'EXECUTE') AS allowed", [signature])).rows[0]?.allowed).toBe(true);
     expect((await database.pool.query<{ allowed: boolean }>("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [signature])).rows[0]?.allowed).toBe(false);
     expect((await database.pool.query<{ allowed: boolean }>("SELECT has_function_privilege('public',$1,'EXECUTE') AS allowed", [signature])).rows[0]?.allowed).toBe(false);
-    const userId = await bareAccount();
     const deniedUserId = await bareAccount();
     const client = await database.pool.connect();
     try {
-      await client.query("BEGIN"); await client.query("SET LOCAL ROLE debateai_billing_runtime");
+      // The account and its region in one transaction, as the sign-up writes them.
+      await client.query("BEGIN"); const userId = await bareAccount("pending_verification", client); await client.query("SET LOCAL ROLE debateai_billing_runtime");
       await client.query("SELECT identity.record_registration_region($1,'RO',NULL)", [userId]);
       expect(await sqlError(() => client.query("INSERT INTO identity.registration_region(user_id,country_code,us_state) VALUES ($1,'DE',NULL)", [userId]))).toMatchObject({ code: "42501" });
       await client.query("ROLLBACK");
@@ -137,12 +144,21 @@ describe("registration region on real PostgreSQL", () => {
       expect(await sqlError(() => client.query("SELECT identity.record_registration_region($1,'RO',NULL)", [deniedUserId]))).toMatchObject({ code: "42501" });
     } finally { await client.query("ROLLBACK"); client.release(); }
   });
-  it("B9 refuses active accounts and permits pending accounts", async () => {
+  it("B9 refuses active accounts and pending ones another transaction made, and permits a pending account its own transaction made", async () => {
     const active = await bareAccount("active");
-    const pending = await bareAccount();
-    expect(await sqlError(() => database.pool.query("SELECT identity.record_registration_region($1,'RO',NULL)", [active]))).toMatchObject({ code: "22023", message: "REGION_ACCOUNT_INVALID" });
-    expect(await regionRows(active)).toEqual([]);
-    await database.pool.query("SELECT identity.record_registration_region($1,'RO',NULL)", [pending]);
+    const earlier = await bareAccount();
+    for (const userId of [active, earlier]) {
+      expect(await sqlError(() => database.pool.query("SELECT identity.record_registration_region($1,'RO',NULL)", [userId]))).toMatchObject({ code: "22023", message: "REGION_ACCOUNT_INVALID" });
+      expect(await regionRows(userId)).toEqual([]);
+    }
+    const client = await database.pool.connect();
+    let pending: string;
+    try {
+      await client.query("BEGIN");
+      pending = await bareAccount("pending_verification", client);
+      await client.query("SELECT identity.record_registration_region($1,'RO',NULL)", [pending]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
     expect(await regionRows(pending)).toEqual([{ country_code: "RO", us_state: null }]);
   });
   it("B10 erasure cascades to the region row", async () => {

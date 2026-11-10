@@ -8,7 +8,7 @@ import {
   buildApi
 } from "@debateai/api";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
-import { RunRepository, PostgresSessionRepository, configureContentEncryption, migrate } from "@debateai/db";
+import { RunRepository, PostgresSessionRepository, configureContentEncryption, createPool, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
@@ -28,7 +28,7 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
 } from "../support/testDatabase.js";
-import { apiTestPools, provisionRlsLogins, type ApiTestPools, type RlsLogins } from "../support/rls-logins.js";
+import { apiTestPools, inAccountRequest, provisionRlsLogins, type ApiTestPools, type RlsLogins } from "../support/rls-logins.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const ORIGIN = "https://ui.s7.test";
@@ -817,11 +817,13 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
   // Upload check Task 9, 0155: the two owner definers, called directly on the runtime login. Over HTTP row security hides
   // a foreign answer before either definer runs, so their own refusals and the argument mixes HTTP cannot send are
   // pinned here: the owner writes, every refusal is NULL with nothing written, a null id raises 22023, and only
-  // debateai_runtime may call them.
-  it("0155's two definers on debateai_runtime: the owner writes, foreign, absent and cross-run calls are NULL and write nothing", async () => {
+  // debateai_runtime may call them. Since 0171 asks in 0040's lock, which both open with, the owner is the connection's: each
+  // write runs inside the owner's own request, as the API's routes make it, and another account's session or none is refused.
+  it("0155's two definers on debateai_runtime: the owner's own session writes; foreign, absent and cross-run calls, another account's session and no session are NULL and write nothing", async () => {
     apiLogins ??= await provisionRlsLogins(database);
-    const runtime = apiLogins.loginPool("DATABASE_URL", 2);
-    expect((await runtime.query<{ user: string }>("SELECT current_user AS user")).rows[0]!.user).toBe("debateai_dev_runtime");
+    const runtime = apiLogins.apiPools().runtime;
+    const asOwner = <T,>(work: () => Promise<T>): Promise<T> => inAccountRequest(OWNER_TOKEN, work);
+    expect((await asOwner(() => runtime.query<{ user: string }>("SELECT current_user AS user"))).rows[0]!.user).toBe("debateai_dev_runtime");
     const a = await createOwnedTerminalRun(owner, "definer-a");
     const b = await createOwnedTerminalRun(owner, "definer-b");
     const theirs = await createOwnedTerminalRun(foreign, "definer-foreign");
@@ -834,11 +836,11 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     const requestsOf = async (runId: string) => (await database.pool.query<Record<string, unknown>>(
       `SELECT investigation_request_id,run_id,answer_id,answer_version,gap_ref,user_input,input_kind,status,replay_handle,at_seq
        FROM core.investigation_request WHERE run_id=$1 ORDER BY at_seq`, [runId])).rows;
-    const record = async (runId: string, answerId: string, gapRef: string, ownerRef: string | null, legacy: string | null = null) => {
+    const record = async (runId: string, answerId: string, gapRef: string, ownerRef: string | null, legacy: string | null = null, token: string | null = OWNER_TOKEN) => {
       const requestId = randomUUID();
-      const row = (await runtime.query<{ id: string | null }>(
+      const row = (await inAccountRequest(token, () => runtime.query<{ id: string | null }>(
         "SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) AS id",
-        [requestId, runId, answerId, gapRef, ownerRef, legacy, null, `investigation-request:${requestId}`, null, null])).rows[0]!;
+        [requestId, runId, answerId, gapRef, ownerRef, legacy, null, `investigation-request:${requestId}`, null, null]))).rows[0]!;
       return { requestId, id: row.id };
     };
 
@@ -861,9 +863,12 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       // Own run, the foreign account's answer with its own open gap: the same check, across accounts.
       await record(a.runId, theirs.answerId, "gap:0155-foreign", owner.ownerRef),
       await record(a.runId, a.answerId, "gap:0155-b", owner.ownerRef), // own run, a gap opened only on another run
-      await record(a.runId, a.answerId, "gap:0155-absent", owner.ownerRef) // own run, no such gap
+      await record(a.runId, a.answerId, "gap:0155-absent", owner.ownerRef), // own run, no such gap
+      // 0171: the owner's own run and gap, named by a connection that is not the owner's.
+      await record(a.runId, a.answerId, "gap:0155-a", owner.ownerRef, null, FOREIGN_TOKEN), // another account's session
+      await record(a.runId, a.answerId, "gap:0155-a", owner.ownerRef, null, null) // an anonymous request
     ];
-    expect(refused.map(({ id }) => id)).toEqual([null, null, null, null, null, null]);
+    expect(refused.map(({ id }) => id)).toEqual([null, null, null, null, null, null, null, null]);
     expect(Number((await database.pool.query<{ count: string }>("SELECT count(*) FROM core.investigation_request")).rows[0]!.count)).toBe(before);
     expect(await requestsOf(theirs.runId)).toEqual([]);
     expect(await requestsOf(b.runId)).toEqual([]);
@@ -873,11 +878,13 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     const linkTheirs = await seedMemoryLink(theirs, foreignRun, foreign.ownerRef);
     const eventsOf = async (linkId: string) => (await database.pool.query<{ state: string; actor_ref: string; reason: string }>(
       "SELECT state,actor_ref,reason FROM memory.memory_link_event WHERE memory_link_id=$1 ORDER BY at_seq", [linkId])).rows;
-    const unlink = async (runId: string, ownerRef: string | null) => (await runtime.query<{ id: string | null }>(
-      "SELECT memory.unlink_owned_memory_link($1,$2,$3,$4) AS id", [runId, ownerRef, null, "owner:0155-test"])).rows[0]!.id;
+    const unlink = async (runId: string, ownerRef: string | null, token: string | null = OWNER_TOKEN) => (await inAccountRequest(token, () => runtime.query<{ id: string | null }>(
+      "SELECT memory.unlink_owned_memory_link($1,$2,$3,$4) AS id", [runId, ownerRef, null, "owner:0155-test"]))).rows[0]!.id;
     expect(await unlink(theirs.runId, owner.ownerRef)).toBeNull(); // another account's run
     expect(await unlink(randomUUID(), owner.ownerRef)).toBeNull(); // an absent run
     expect(await unlink(b.runId, owner.ownerRef)).toBeNull(); // own run, no link of its own: a's link stays
+    expect(await unlink(a.runId, owner.ownerRef, FOREIGN_TOKEN)).toBeNull(); // 0171: the owner's own link, named by another account's session
+    expect(await unlink(a.runId, owner.ownerRef, null)).toBeNull(); // 0171: and by an anonymous request
     expect(await eventsOf(linkTheirs)).toEqual([{ state: "LINKED", actor_ref: "s7:database-match", reason: "S7_REAL_PG_FIXTURE" }]);
     expect(await eventsOf(linkA)).toHaveLength(1);
     expect(await unlink(a.runId, owner.ownerRef)).toBe(linkA);
@@ -889,10 +896,10 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(await eventsOf(linkA)).toHaveLength(2);
 
     // A null id is a malformed call: SQLSTATE 22023, not a NULL answer.
-    await expect(runtime.query("SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)",
-      [null, a.runId, a.answerId, "gap:0155-a", owner.ownerRef, null, null, "investigation-request:null-id", null, null]))
+    await expect(asOwner(() => runtime.query("SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10)",
+      [null, a.runId, a.answerId, "gap:0155-a", owner.ownerRef, null, null, "investigation-request:null-id", null, null])))
       .rejects.toMatchObject({ code: "22023", message: "OWNED_INVESTIGATION_REQUEST_INVALID" });
-    await expect(runtime.query("SELECT memory.unlink_owned_memory_link($1,$2,$3,$4)", [null, owner.ownerRef, null, "owner:0155-test"]))
+    await expect(asOwner(() => runtime.query("SELECT memory.unlink_owned_memory_link($1,$2,$3,$4)", [null, owner.ownerRef, null, "owner:0155-test"])))
       .rejects.toMatchObject({ code: "22023", message: "OWNED_MEMORY_UNLINK_INVALID" });
 
     // Who may call them: debateai_runtime; not PUBLIC, not the erasure or replay logins' roles.
@@ -906,7 +913,33 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
                         WHERE p.oid=$1::regprocedure AND acl.grantee=0) AS public`, [signature])).rows[0]!;
       expect({ signature, ...may }).toEqual({ signature, runtime: true, erasure: false, replay: false, public: false });
     }
-  });
+
+    // On the production logins (P3-01's memberships), the API's request pool as main.ts builds it: the owner's own session writes both, and another
+    // account's session or an anonymous request writes neither.
+    const production = await apiLogins.production();
+    const productionSystem = createPool(production.url("api-system"), { max: 2 });
+    const productionRequest = createPool(production.url("api-runtime"), { max: 2, crossAccount: productionSystem });
+    try {
+      const c = await createOwnedTerminalRun(owner, "definer-c");
+      await gap(c.runId, "gap:0155-c");
+      const linkC = await seedMemoryLink(c, b, owner.ownerRef);
+      const writes = (token: string | null) => inAccountRequest(token, async () => {
+        const requestId = randomUUID();
+        const recorded = (await productionRequest.query<{ id: string | null }>("SELECT core.record_owned_investigation_request($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) AS id",
+          [requestId, c.runId, c.answerId, "gap:0155-c", owner.ownerRef, null, null, `investigation-request:${requestId}`, null, null])).rows[0]!.id;
+        const unlinked = (await productionRequest.query<{ id: string | null }>("SELECT memory.unlink_owned_memory_link($1,$2,$3,$4) AS id",
+          [c.runId, owner.ownerRef, null, "owner:0155-test"])).rows[0]!.id;
+        return { requestId, recorded, unlinked };
+      });
+      for (const token of [FOREIGN_TOKEN, null]) expect(await writes(token)).toMatchObject({ recorded: null, unlinked: null });
+      expect(await requestsOf(c.runId)).toEqual([]);
+      expect(await eventsOf(linkC)).toHaveLength(1);
+      const own = await writes(OWNER_TOKEN);
+      expect(own).toMatchObject({ recorded: own.requestId, unlinked: linkC });
+      expect(await requestsOf(c.runId)).toHaveLength(1);
+      expect(await eventsOf(linkC)).toHaveLength(2);
+    } finally { await Promise.all([productionRequest.end(), productionSystem.end()]); }
+  }, 300_000);
 
   it("serializes a rejected encrypted ownership transfer on the run lock without changing the owner", async () => {
     const claimedRunId = await createOwnedRunHead(owner, "claim-race");

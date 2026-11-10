@@ -399,6 +399,35 @@ export function inAccountRequest<T>(sessionToken: string | null, fn: () => Promi
   });
 }
 
+/**
+ * The security review's F5 (migration 0171): `pool` as one account's requests use it. Every query and checkout runs inside a request
+ * scope carrying `sessionToken` (inAccountRequest), so a request-facing database function sees that session's owner and believes no
+ * other. `pool` must be a T1 pool, built with a cross-account target as main.ts builds the API's request pool (a file's own login:
+ * `createPool(url, { crossAccount: createPool(url) })`, whose target is the same login with no session): a pool with no target never
+ * sends a credential.
+ */
+export function asRequestOf(pool: Pool, sessionToken: string): Pool {
+  return new Proxy(pool, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target) as unknown;
+      if (property === "query" || property === "connect") {
+        return (...args: unknown[]) => inAccountRequest(sessionToken, () => (value as (...values: unknown[]) => Promise<unknown>).apply(target, args));
+      }
+      return typeof value === "function" ? (value as (...values: unknown[]) => unknown).bind(target) : value;
+    }
+  });
+}
+
+/** A live session for an account a file seeded itself, shaped as seedSessionAccount's; its raw token, which a request presents. */
+export async function seedLiveSession(superuserPool: Pool, userId: string): Promise<string> {
+  const token = generateVerificationToken();
+  await superuserPool.query(`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,
+      last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at,revoked_at)
+    VALUES($1,$2,$3,$4,'{}',now(),now(),now()+interval '1 day',now()+interval '30 days',now(),NULL)`,
+    [randomUUID(), userId, hashToken("session", token), hashToken("csrf", generateVerificationToken())]);
+  return token;
+}
+
 const ROUTED_OBSERVED = Symbol.for("debateai.rls.routed-call-report.v1");
 /** The T1 fields of ApiTestPools: the pools main.ts gives a system target (runtime, legacyAskAdmission, authorization). */
 const T1_FIELDS: readonly ApiPoolField[] = Object.freeze(API_POOL_WIRING.filter(({ target }) => target !== undefined)

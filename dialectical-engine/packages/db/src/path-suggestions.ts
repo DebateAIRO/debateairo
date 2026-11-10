@@ -4,7 +4,8 @@ import type { WebSealed } from "./web-evidence.js";
 
 /**
  * A path's suggestions (migration 0141; plan 2026-10-31-r22-owner-changes decision 9), through 0141's definers only, on the runner's
- * and serve's pool (debateai_runtime).
+ * and serve's pool: `readOfRun` is debateai_runtime's, and `record`, the runner's alone, needs the cross-account marker
+ * (debateai_rls_all_accounts) since 0171, which the runner holds and the API's request login does not.
  *
  * - `setId` is the caller's, worked out by code, so a second copy of the runner writes ALREADY.
  * - Sealed under `runId`, the run that paid: the debate itself for a first debate's suggestions; the dig that rewrote the path for a

@@ -3,11 +3,15 @@ import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import { createPool, migrate, type Pool } from '@debateai/db';
 import { hashToken } from '@debateai/crypto';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
-let database: TestDatabase, runtime: Pool;
+import { createSystemTwin } from '../support/rls-logins.js';
+// The authorization login, and its system twin (the same capability role and the cross-account marker): since the security review's 0171 a
+// recovery's proof and its stored proof's reader are the system login's alone (X36), as main.ts routes them.
+let database: TestDatabase, runtime: Pool, system: Pool;
+const SYSTEM = /\bidentity\.(?:prove_consumer_recovery|read_consumer_recovery_proof)\(/u;
 const source = { ipArgon2id: 'argon2id-audit:v1:' + 'ab'.repeat(32), userAgentArgon2id: 'argon2id-audit:v1:' + 'cd'.repeat(32) };
 const hash = () => hashToken('session', randomBytes(32).toString('base64url'));
 const codeHash = '$argon2id$v=19$m=19456,t=2,p=1$c29tZXJhbmRvbXNhbHQ$' + Buffer.alloc(32, 1).toString('base64').replace(/=/g, '');
-async function audited(sql: string, values: unknown[]) { const c = await runtime.connect(); try {
+async function audited(sql: string, values: unknown[]) { const c = await (SYSTEM.test(sql) ? system : runtime).connect(); try {
     await c.query('BEGIN');
     await c.query('SELECT identity.begin_runtime_audit_attempt()');
     await c.query("SELECT set_config('debateai.mail_locale', 'en', true)");
@@ -29,8 +33,8 @@ async function account() {
     await database.pool.query('INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_slot,code_hash,created_at) VALUES($1,$2,1,$3,now())', [codeId, userId, codeHash]);
     return { userId, index, channelId, codeId };
 }
-beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); await database.pool.query("CREATE ROLE recovery_test_runtime LOGIN PASSWORD 'recovery-test-only' IN ROLE debateai_authorization_runtime"); const url = new URL(database.connectionString); url.username = 'recovery_test_runtime'; url.password = 'recovery-test-only'; runtime = createPool(url.toString()); }, 120000);
-afterAll(async () => { await runtime?.end(); await database?.stop(); });
+beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); await database.pool.query("CREATE ROLE recovery_test_runtime LOGIN PASSWORD 'recovery-test-only' IN ROLE debateai_authorization_runtime"); const url = new URL(database.connectionString); url.username = 'recovery_test_runtime'; url.password = 'recovery-test-only'; runtime = createPool(url.toString()); system = createPool(await createSystemTwin(database, 'recovery_test_system', ['debateai_authorization_runtime'])); }, 120000);
+afterAll(async () => { await runtime?.end(); await system?.end(); await database?.stop(); });
 describe('consumer token plus saved-code recovery', () => {
     it('reserves one bounded attempt and atomically consumes both proofs without creating a session', async () => {
         const a = await account(), tokenHash = hash();
@@ -79,7 +83,7 @@ describe('consumer token plus saved-code recovery', () => {
             const refusal = expect(pending).rejects.toThrow('CONSUMER_RECOVERY_INVALID');
             let blocked = false;
             for (let i = 0; i < 100; i++) {
-                if ((await database.pool.query("SELECT 1 FROM pg_stat_activity WHERE usename='recovery_test_runtime' AND wait_event_type='Lock' AND query LIKE '%prove_consumer_recovery%' ")).rowCount) {
+                if ((await database.pool.query("SELECT 1 FROM pg_stat_activity WHERE usename='recovery_test_system' AND wait_event_type='Lock' AND query LIKE '%prove_consumer_recovery%' ")).rowCount) {
                     blocked = true;
                     break;
                 }

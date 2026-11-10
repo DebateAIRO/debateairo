@@ -8,7 +8,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresModelSpendStore } from "@debateai/budget";
-import { PostgresPublicDebateRunnerRepository } from "@debateai/db";
 import { ask, FREE, panelAgrees } from "../support/r22-pages.js";
 import { startR22World, type R22Account, type R22World } from "../support/r22-world.js";
 
@@ -73,8 +72,10 @@ describe("Task 56b on the real API: the person's first report of their own publi
     expect.soft((await ana.client.readInvestigation(anaDebate.id)).first_closing_left).toBe(true);
     const from = new Date(Date.now() - 3_600_000);
     const to = new Date(Date.now() + 3_600_000);
-    const reportCharges = new PostgresPublicDebateRunnerRepository(world.runnerPool);
-    const chargedBefore = await reportCharges.readReportSpent(ana.ownerRef, from, to);
+    // 0137's reader of a person's report spend is no role's since 0171 (its caller had gone): read as the test's superuser.
+    const reportSpent = async (): Promise<number> => Number((await world.database.pool.query<{ spent: string }>(
+      "SELECT identity.read_public_report_spent($1,$2,$3) AS spent", [ana.ownerRef, from, to])).rows[0]!.spent);
+    const chargedBefore = await reportSpent();
     const windows = new PostgresModelSpendStore(world.runnerPool);
     const windowBefore = await windows.readOwnerSpentMicros(ana.ownerRef, from, to);
     const first = await writeMyReport(ana, anaDebate.id);
@@ -85,7 +86,7 @@ describe("Task 56b on the real API: the person's first report of their own publi
     // Charged as a public report is: on the carrier (her debate) under PUBLIC_REPORT, attributed to her as its writer.
     const booked = await spendOf(anaDebate.id, "PUBLIC_REPORT");
     expect(booked).toBeGreaterThan(0);
-    expect(await reportCharges.readReportSpent(ana.ownerRef, from, to) - chargedBefore).toBe(booked);
+    expect(await reportSpent() - chargedBefore).toBe(booked);
     // Her own window counts it as it counts any public report she writes (plan risk 21): the kept reserve paid for it, past the wall.
     expect(await windows.readOwnerSpentMicros(ana.ownerRef, from, to) - windowBefore).toBe(booked);
     expect((await world.stranger.readPublicDebate(anaRef!)).reports?.map((report) => report.report_version)).toEqual([1]);

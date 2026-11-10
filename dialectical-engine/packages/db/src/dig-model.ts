@@ -8,14 +8,18 @@ export * from "./dig-picks.js";
  * The new dig model and the month pause (migration 0134; plan 2026-10-30 dig-model revision task W2-8 and its money rule
  * of 31 Oct): each dig's level, the path rewrite's turns and rewrites, and a running debate's pause at the month wall,
  * through 0134's definers only. `PostgresDigModelRepository` runs on the API's own pool (debateai_billing_runtime, which
- * also reaches the runtime role's readers by membership); `PostgresDigModelRunnerRepository` on the runner's pool
- * (debateai_runtime).
+ * also reaches the runtime role's readers by membership); `PostgresDigModelRunnerRepository` on the runner's pool, whose
+ * methods but `readPathRewrites` (debateai_runtime, which the API's answer read calls too) need the cross-account marker
+ * (debateai_rls_all_accounts) since 0171: the runner, the scheduler and the API's system pool outside a request hold it,
+ * the API's request login does not.
  *
  * What the later tasks must respect:
  * - W3-2 (the asks route): read the parent's level with `readDigLevel` before admission and refuse 409 DIG_TOO_DEEP when
  *   it is 10 (the contract's DIG_LEVEL_MAX); join with `PostgresInvestigationRepository.join`, which now calls
  *   identity.join_investigation_nested and answers TOO_DEEP itself under the locks (two quick clicks never reach 11).
- *   0133's identity.join_investigation keeps its grant (an expand step revokes nothing) but no code may call it.
+ *   0133's identity.join_investigation kept its grant (an expand step revokes nothing) and no code called it; the security
+ *   review's 0171 took it back, with 0134's owner readers of every level, of the rewrites and of the paused debates, which
+ *   no code called either (the runner and the answer read use the no-owner readers below).
  * - W3-5 (the path rewrite): when a dig settles, `takeRewriteTurn` for the path its picks came from; write only when
  *   `readRewriteTurn` says FRONT, on its `base_rewrite_id` (the path's current text; none: the story's line), then
  *   `recordRewrite`. WAIT_TURN: an earlier dig of the path is still writing; BASE_MOVED: rebuild the material. Every turn
@@ -86,7 +90,6 @@ export type RunPauseRead = Readonly<{
   reason: "MONTH_WALL" | null; resumable_at: string | null;
   planned_calls: number | null; planned_searches: number | null; planned_micros: number | null; paused_at: string | null;
 }>;
-export type DigLevelRead = Readonly<{ run_id: string; parent_run_id: string | null; dig_level: number }>;
 /** V4 start step, Task 57f (0165): a debate as Continue sees it (core.read_run_continue). */
 export type RunContinueRead = Readonly<{
   state: "NONE" | "OPEN" | "DONE" | "FAILED"; terminal_reason: string | null; content_live: boolean; waived: boolean; settled: boolean;
@@ -104,18 +107,6 @@ export class PostgresDigModelRepository {
   async readDigLevel(ownerRef: string, runId: string): Promise<number | null> {
     return (await this.pool.query<{ level: number | null }>("SELECT identity.read_dig_level($1,$2) AS level", [ownerRef, runId]))
       .rows[0]?.level ?? null;
-  }
-
-  /** The levels of every debate of the investigation the debate is in, oldest first; null outside one or not its own. */
-  async readDigLevels(ownerRef: string, runId: string): Promise<readonly DigLevelRead[] | null> {
-    return (await this.pool.query<{ levels: DigLevelRead[] | null }>(
-      "SELECT identity.read_investigation_dig_levels($1,$2) AS levels", [ownerRef, runId])).rows[0]?.levels ?? null;
-  }
-
-  /** The debate's path rewrites and its own as a dig, for its owner only (null otherwise). */
-  async readPathRewrites(ownerRef: string, runId: string): Promise<PathRewritesRead | null> {
-    return (await this.pool.query<{ rewrites: PathRewritesRead | null }>(
-      "SELECT identity.read_path_rewrites($1,$2) AS rewrites", [ownerRef, runId])).rows[0]?.rewrites ?? null;
   }
 
   /** The person pressed Continue; the room code has already found room. */
@@ -165,12 +156,6 @@ export class PostgresDigModelRepository {
     return (await this.pool.query<{ pause: RunPauseRead | null }>("SELECT identity.read_run_pause($1,$2) AS pause",
       [ownerRef, runId])).rows[0]?.pause ?? null;
   }
-
-  /** The account's debates paused now, oldest pause first. */
-  async readPausedRuns(ownerRef: string): Promise<readonly RunPauseRead[]> {
-    return (await this.pool.query<{ paused: RunPauseRead[] }>("SELECT identity.read_paused_runs($1) AS paused", [ownerRef]))
-      .rows[0]!.paused;
-  }
 }
 
 export class PostgresDigModelRunnerRepository {
@@ -205,7 +190,7 @@ export class PostgresDigModelRunnerRepository {
         record.content?.attestation ?? null, record.settingsVersion])).rows[0]!.outcome;
   }
 
-  /** A live debate's rewrites (its paths' histories and its own as a dig); null when it is not a live private debate. */
+  /** A live debate's rewrites (its paths' histories and its own as a dig); null when it is not a live private debate or, in a request, not the connection's own (0171). */
   async readPathRewrites(runId: string): Promise<PathRewritesRead | null> {
     return (await this.pool.query<{ rewrites: PathRewritesRead | null }>(
       "SELECT identity.read_path_rewrites_of_run($1) AS rewrites", [runId])).rows[0]?.rewrites ?? null;

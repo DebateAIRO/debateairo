@@ -12,7 +12,9 @@ import { correctedPiece, textPiecesOf } from "./public-tree.js";
 /**
  * THE REPORT BUTTON (plan 2026-10-31-r22-owner-changes decision 35; migration 0151). A signed-in person says what is wrong and where; an AI reads it beside the public text. The site pays, so the checks are bounded.
  * WHAT THE PERSON HEARS: one of three states, and refused things all read the same: `NOT_FOUND` for a check that did not agree, a guessed or private debate and a person over their limit alike.
- * THE LIMITS are the register's abuseLimits row (R22 decision 18), and nothing in the code stands in for it. The database enforces them from its rows, so a restart forgets nothing.
+ * THE LIMITS are the register's abuseLimits row (R22 decision 18), and nothing in the code stands in for it. The database enforces them from its rows, so a restart forgets nothing; since 0171 it reads the same row
+ * itself, at the CURRENT release's own version, and counts against the lower of the two, so a request cannot loosen them.
+ * THE VERDICT is the judge's, recorded only by the API's system login (0171 makes the settlement the cross-account marker's alone; main.ts, X38), so no request login can settle a report with a verdict of its own choosing or hide a debate. 0157's sweep of a report left CHECKING, which a request login may still run, records UNAVAILABLE alone, sends it to a person and hides nothing.
  * WHY A QUOTE: the judge must copy the words that break the rules. Words that are not on the page are a judge that obeyed the claim, and they hide nothing: a person reads it.
  */
 /** The whole check, inside what the website's proxy waits. */
@@ -22,7 +24,10 @@ const PUBLIC_FLAG_TEXT_CODE_POINTS = 60_000;
 
 export type PublicFlagAnswer = contract.PublicFlagAnswer["state"];
 export type PublicFlagPorts = Readonly<{
-  repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open" | "settle"> & Partial<Pick<PostgresPublicFlagRepository, "recordQuote">>;
+  /** The target read and the opening, on the request's own login, under the reporter's session, and 0157's keeping of the quote an automatic hide relied on. */
+  repository: Pick<PostgresPublicFlagRepository, "readTarget" | "open"> & Partial<Pick<PostgresPublicFlagRepository, "recordQuote">>;
+  /** The judge's verdict, on the API's system login: 0171 makes it the cross-account marker's alone (main.ts, X38). */
+  settlement: Pick<PostgresPublicFlagRepository, "settle">;
   judge: () => PublicationJudgePort | null;
   /** Seals under the publication's key, public or hidden. */
   seal: (publicationRef: string, runId: string, value: unknown) => Promise<CryptoEnvelope>;
@@ -69,7 +74,7 @@ export async function pressPublicFlag(input: Readonly<{ ownerRef: string; public
   if (opened === "QUEUE") return "WITH_A_PERSON";
   const debate = await ports.readPublicDebate(input.publicationRef).catch(() => null);
   const { quote, ...result } = await judged({ where: input.where, claim: input.claim, debate }, ports.judge());
-  const settled = await ports.repository.settle({ flagId: input.flagId, ...result });
+  const settled = await ports.settlement.settle({ flagId: input.flagId, ...result });
   // 0157: the statement of the automatic hide shows its owner the words the check relied on, sealed as the report's were. The hide has happened; nothing here can undo or delay its answer.
   if (settled === "HIDDEN" && quote !== null && ports.repository.recordQuote !== undefined) {
     try { await ports.repository.recordQuote(input.flagId, await ports.seal(input.publicationRef, runId, { quote })); } catch { try { ports.log?.("PUBLIC_FLAG_QUOTE_NOT_KEPT", { flagId: input.flagId }); } catch { /* As below. */ } }

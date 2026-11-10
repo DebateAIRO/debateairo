@@ -5,9 +5,11 @@ import type { CryptoEnvelope } from "@debateai/crypto";
 export { MAP_ROOT_IN_FORCE_SQL, readMapRootsInForce, type MapRootInForce } from "./map-roots.js";
 
 /**
- * The web evidence store (migration 0132; Perplexity plan 2026-10-30, task W1-3): what one debate's web step keeps, per
- * run, through 0132's definers on the runner's pool (debateai_runtime) and, for "add to researched", the API's own
- * pool (debateai_billing_runtime). No table is read directly.
+ * The web evidence store (migration 0132; Perplexity plan 2026-10-30, task W1-3): what one debate's web step keeps, per run, through 0132's definers
+ * on the runner's pool (since 0171 its writers, the page texts' reader, the researched sweep's list and its settlement need the cross-account marker
+ * (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a request hold and the API's request login does not;
+ * `read` and 0134's plan reader stay debateai_runtime's, as the API's answer read calls them) and, for "add to researched", the API's own pool
+ * (debateai_billing_runtime). No table is read directly.
  *
  * Every content value is a run content carrier: the caller seals it under the run's key BEFORE calling, with the
  * carrier name below and the row's own id as the primary key (this package's attested encrypt helpers, under the
@@ -36,7 +38,10 @@ export const WEB_EVIDENCE_CARRIERS = Object.freeze({
 /** 0134's carrier beside them: the planner's reason for a path with no search, bound to its path_ref (not a row id). */
 export const WEB_PLAN_CARRIER = "identity.web_plan_path" as const;
 
-/** 0132's runner-side functions (debateai_runtime), the API's one, and the erasure and export readers. */
+/**
+ * 0132's runner-side functions (since 0171 the cross-account marker's, which the runner holds, as is 0145's `read_unsettled_web_researched`, but
+ * `read_web_evidence`, which stays debateai_runtime's for the API's answer read), the API's one, and the erasure and export readers.
+ */
 export const WEB_EVIDENCE_RUNNER_FUNCTIONS = Object.freeze([
   "identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
   "identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
@@ -120,7 +125,12 @@ async function outcome<T extends string>(executor: Executor, sql: string, values
   return (await executor.query<{ outcome: T }>(sql, [...values])).rows[0]!.outcome;
 }
 
-/** The runner's side of 0132 (debateai_runtime). Pass a transaction client to write a step's rows together. */
+/**
+ * The runner's side of 0132. Every method but the two readers the API's answer read calls too, `read` and 0134's `readPlanStatuses`
+ * (debateai_runtime, which answer in a request only for the connection's own debate since 0171), needs the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and the API's system pool outside a
+ * request hold and the API's request login does not (0171): the writers, 0134's plan's writer, `readPageTexts`, `readUnsettledResearched` and
+ * `settleResearched`. Pass a transaction client to write a step's rows together.
+ */
 export class PostgresWebEvidenceRepository {
   constructor(private readonly pool: Executor) {}
 
@@ -160,7 +170,7 @@ export class PostgresWebEvidenceRepository {
       input.runId, input.packId, input.pathRef, [...input.extractLabels], envelope(input.pack), attestation(input.pack)]);
   }
 
-  /** Everything the run's web step kept but the page texts, or null when the debate is not live. */
+  /** Everything the run's web step kept but the page texts, or null when the debate is not live or, in a request, not the connection's own (0171). */
   async read(runId: string): Promise<WebEvidenceRead | null> {
     return (await this.pool.query<{ web: WebEvidenceRead | null }>("SELECT identity.read_web_evidence($1) AS web", [runId]))
       .rows[0]?.web ?? null;
@@ -192,7 +202,7 @@ export class PostgresWebEvidenceRepository {
     return recorded ? "RECORDED" : "ALREADY";
   }
 
-  /** 0134: the run's stored web plan by path (empty before the planner ran), or null when the debate is not live. */
+  /** 0134: the run's stored web plan by path (empty before the planner ran), or null when the debate is not live or, in a request, not the connection's own (0171). */
   async readPlanStatuses(runId: string): Promise<readonly WebPlanPathRead[] | null> {
     const plan = (await this.pool.query<{ plan: Array<{ path_ref: string; status: WebPlanPathRead["status"]; searches_to_send: number;
       decided_at: string; content: CryptoEnvelope | null }> | null }>("SELECT identity.read_web_plan($1) AS plan", [runId])).rows[0]?.plan ?? null;

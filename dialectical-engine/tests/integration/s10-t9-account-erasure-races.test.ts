@@ -334,7 +334,7 @@ async function expectStillPending<T>(operation: Promise<T>): Promise<void> {
 
 interface Writer {
   readonly name: string;
-  readonly role: "debateai_runtime" | "debateai_authorization_runtime";
+  readonly role: "debateai_runtime" | "debateai_authorization_runtime" | typeof RUNNER_TWIN;
   readonly invoke: (client: PoolClient,fixture: Fixture) => Promise<unknown>;
   readonly assertDeletionWin: (value: unknown) => void;
 }
@@ -363,11 +363,12 @@ const writers: readonly Writer[] = Object.freeze([
   },
   {
     name: "verification-delivery",role: "debateai_runtime",
+    // The security review's 0171: the delivery names the token its mail carried.
     invoke: (client,fixture) => runtimeQuery(client,`
       SELECT identity.record_verification_delivery_with_audit(
-        $1,clock_timestamp(),true,NULL,$2::jsonb
+        $1,$2,clock_timestamp(),true,NULL,$3::jsonb
       ) AS value
-    `,[fixture.userId,sourceContext]),
+    `,[fixture.userId,fixture.verificationTokenHash,sourceContext]),
     assertDeletionWin: (value) => expect(value).toBe(false)
   },
   {
@@ -432,7 +433,8 @@ const writers: readonly Writer[] = Object.freeze([
     assertDeletionWin: (value) => expect(value).toBe("INVALID")
   },
   {
-    name: "mfa-recovery-consume",role: "debateai_runtime",
+    // The security review's 0171: a saved code's use is the marker's (the API's system login, X36); the runner's login shape holds both.
+    name: "mfa-recovery-consume",role: RUNNER_TWIN,
     invoke: (client,fixture) => runtimeQuery(client,`
       SELECT identity.consume_recovery_code_with_audit(
         $1,$2,$3,clock_timestamp(),$4::jsonb

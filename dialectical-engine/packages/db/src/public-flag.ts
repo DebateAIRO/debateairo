@@ -32,10 +32,19 @@ export class PostgresPublicFlagRepository {
   async readTarget(publicationRef: string): Promise<string | null> {
     return (await this.one("SELECT identity.read_public_flag_target($1::uuid) AS value", [publicationRef]) as string | null | undefined) ?? null;
   }
+  /**
+   * The opening, on the request's own login under the reporter's session (0171: its owner must be the session's). It counts against the lower of the
+   * limits it is handed and the site's own, which the database reads itself from the CURRENT release's sealed abuseLimits row (0171), so a request
+   * may tighten them and never loosen them.
+   */
   async open(input: Readonly<{ ownerRef: string; publicationRef: string; flagId: string; content: CryptoEnvelope; limits: PublicFlagLimits }>): Promise<PublicFlagOpened> {
     return await this.one("SELECT identity.open_public_flag($1::uuid,$2::uuid,$3::uuid,$4::jsonb,$5,$6,$7) AS value",
       [input.ownerRef, input.publicationRef, input.flagId, JSON.stringify(input.content), input.limits.personHour, input.limits.debateDay, input.limits.siteDay]) as PublicFlagOpened;
   }
+  /**
+   * The judge's verdict and its call: the cross-account marker's alone since 0171, so the API calls it only on its system login, after the judge
+   * (main.ts, X38). An AGREE hides nothing for a report staff dismissed while the judge ran; it goes to a person (QUEUED).
+   */
   async settle(input: Readonly<{ flagId: string; verdict: PublicFlagVerdict; reason: "CONTENT" | "PERSONAL" | null; providerRef: string | null; modelId: string | null; inputTokens: number | null; outputTokens: number | null; costUsd: number | null }>): Promise<PublicFlagSettled> {
     return await this.one("SELECT identity.settle_public_flag($1::uuid,$2,$3,$4,$5,$6,$7,$8) AS value",
       [input.flagId, input.verdict, input.reason, input.providerRef, input.modelId, input.inputTokens, input.outputTokens, input.costUsd]) as PublicFlagSettled;
@@ -67,6 +76,7 @@ export class PostgresPublicFlagRepository {
   async recordCheckUsage(input: Readonly<{ subjectKind: "RUN" | "PUBLIC_REPORT"; subjectId: string; attemptedAt: Date; calls: number; inputTokens: number | null; outputTokens: number | null; costUsd: number | null }>): Promise<void> {
     await this.pool.query("SELECT identity.record_public_check_usage($1,$2::uuid,$3,$4,$5,$6,$7)", [input.subjectKind, input.subjectId, input.attemptedAt, input.calls, input.inputTokens, input.outputTokens, input.costUsd]);
   }
+  /** The mail loop's leases over 0151's notices: the cross-account marker's since 0171, called only from the API's gated timer on its system login. */
   async claimNotices(limit: number): Promise<readonly PublicFlagNoticeClaim[]> {
     return (await this.pool.query<PublicFlagNoticeClaim>("SELECT notice_id,kind,recipient_staff_id,claim_token FROM staff.claim_public_flag_notices($1)", [limit])).rows;
   }

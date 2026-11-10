@@ -100,7 +100,10 @@ describe("ordinary password-only reset database authority", () => {
     const a = await account();
     await open(a);
     expect((await db.pool.query(`SELECT identity.password_reset_exchange($1,$2,$3,$4) AS outcome`, [a.link, hash(), hash(), source])).rows[0].outcome).toBe("INVALID");
-    expect((await currentRecovery.query(`SELECT identity.read_consumer_recovery_proof($1,NULL) AS record`, [a.session])).rows[0].record).toBeNull();
+    // The consumer recovery's reader is the system login's since the security review's 0171 (X36): the request login is refused it, and the
+    // reset's token is no consumer recovery's.
+    await expect(currentRecovery.query(`SELECT identity.read_consumer_recovery_proof($1,NULL) AS record`, [a.session])).rejects.toMatchObject({code:"42501"});
+    expect((await db.pool.query(`SELECT identity.read_consumer_recovery_proof($1,NULL) AS record`, [a.session])).rows[0].record).toBeNull();
     await expect(currentRecovery.query(`SELECT identity.password_recovery_read($1)`,[a.session])).rejects.toMatchObject({code:"42501"});
     const step = Number((await db.pool.query(`SELECT floor(extract(epoch FROM clock_timestamp())/30)::bigint AS step`)).rows[0].step);
     await db.pool.query(`UPDATE identity.mfa_factor SET last_accepted_step=$1 WHERE mfa_factor_id=$2`, [step, a.factor]);

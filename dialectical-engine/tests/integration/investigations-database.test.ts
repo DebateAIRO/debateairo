@@ -9,6 +9,7 @@ import {
   type Pool,
   type WebSealed
 } from "@debateai/db";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -16,10 +17,16 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * role opens an investigation, joins digs to it (writing 0131's dig link too: the server-side dig parent), closes it
  * (a new report version; its page texts are wiped in the same transaction) and reopens it (earlier versions kept); it
  * records the person's ONE reserve, whose order the database enforces; the scheduler's sweep wipes page texts 30 days
- * after the investigation's last activity, open or not; deleting one debate and deleting the account remove the rows.
+ * after the investigation's last activity, open or not; deleting one debate and deleting the account remove the rows. Since the security review's 0171 (F5)
+ * the API's role runs here as each person's own request (its login carrying their live session), as its functions believe no other owner; 0133's
+ * reserve writer and reader, its owner read of an investigation, its first join, its first closing and its mark of a closing's report had no caller and
+ * are no role's any more, so the reserve's rules and the report's mark are read here as the migrator, and the runner reads an investigation through its
+ * own reader.
  */
 let database: TestDatabase;
 let api: Pool;
+/** The API's role wired as main.ts wires its request pool: inside a request its own connections carry the person's session. */
+let requests: Pool;
 let runner: Pool;
 let erasure: Pool;
 let worker: Pool;
@@ -38,14 +45,40 @@ const loginPool = (role: string, password: string): Pool => {
   url.password = password;
   return createPool(url.toString());
 };
-type Account = Readonly<{ userId: string; ownerRef: string }>;
+type Account = Readonly<{ userId: string; ownerRef: string; token: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
     VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `inv-${userId}`]);
   const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
-  return { userId, ownerRef };
+  return { userId, ownerRef, token: await seedLiveSession(database.pool, userId) };
 }
+/** The person's own request, on the API's role. */
+const asking = (person: Account): Pool => asRequestOf(requests, person.token);
+/** The runner's read of the investigation a debate is in (0133's owner read of it is no role's since 0171). */
+const investigationOf = (runId: string) => new PostgresInvestigationRunnerRepository(runner).ofRun(runId);
+type ReserveEvent =
+  | Readonly<{ kind: "HELD"; amountMicros: number }>
+  | Readonly<{ kind: "USED"; investigationId: string; reportVersion: number }>
+  | Readonly<{ kind: "RELEASED" }>
+  | Readonly<{ kind: "BLOCKED"; window: "day" | "week" | "month"; until: Date }>;
+/** 0133's reserve writer, as the migrator: no code called it, and since 0171 no role may; its order is still the database's. */
+async function recordReserveEvent(ownerRef: string, event: ReserveEvent): Promise<string> {
+  return (await database.pool.query<{ outcome: string }>("SELECT identity.record_reserve_event($1,$2,$3,$4,$5,$6,$7) AS outcome", [ownerRef, event.kind,
+    event.kind === "HELD" ? event.amountMicros : null, event.kind === "USED" ? event.investigationId : null, event.kind === "USED" ? event.reportVersion : null,
+    event.kind === "BLOCKED" ? event.window : null, event.kind === "BLOCKED" ? event.until : null])).rows[0]!.outcome;
+}
+/** 0133's reserve reader, as the migrator (no role's since 0171). */
+async function readReserve(ownerRef: string) {
+  const row = (await database.pool.query<{ state: string; held_micros: string | null; since: Date | null; blocked_window: string | null; blocked_until: Date | null;
+    open_investigations: number }>("SELECT * FROM identity.read_reserve($1)", [ownerRef])).rows[0]!;
+  return { state: row.state, heldMicros: row.held_micros === null ? null : Number(row.held_micros), since: row.since, blockedWindow: row.blocked_window,
+    blockedUntil: row.blocked_until, openInvestigations: row.open_investigations };
+}
+/** 0133's mark of a closing's report, as the migrator: 0136's report writer marks it as its owner, and since 0171 no role may call it. */
+const recordReport = async (investigationId: string, reportVersion: number, reportRef: string): Promise<string> =>
+  (await database.pool.query<{ outcome: string }>("SELECT identity.record_investigation_report($1,$2,$3) AS outcome", [investigationId, reportVersion, reportRef]))
+    .rows[0]!.outcome;
 /** A private debate with content encryption and its attestation secret (0132's web step needs both). */
 async function run(owner: Account): Promise<string> {
   const runId = randomUUID();
@@ -113,7 +146,8 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE inv_api LOGIN PASSWORD 'inv-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  await database.pool.query("CREATE ROLE inv_runner LOGIN PASSWORD 'inv-runner-test-only' IN ROLE debateai_runtime");
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the idle page texts' wipe is the marker's alone.
+  await database.pool.query("CREATE ROLE inv_runner LOGIN PASSWORD 'inv-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE inv_erasure LOGIN PASSWORD 'inv-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE inv_worker LOGIN PASSWORD 'inv-worker-test-only' IN ROLE debateai_data_export_worker");
   api = loginPool("inv_api", "inv-api-test-only");
@@ -121,10 +155,14 @@ beforeAll(async () => {
   erasure = loginPool("inv_erasure", "inv-erasure-test-only");
   worker = loginPool("inv_worker", "inv-worker-test-only");
   expect((await api.query("SELECT current_user AS name")).rows[0].name).toBe("inv_api");
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.username = "inv_api";
+  apiUrl.password = "inv-api-test-only";
+  requests = createPool(apiUrl.toString(), { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([api?.end(), runner?.end(), erasure?.end(), worker?.end()]);
+  await Promise.all([api?.end(), runner?.end(), erasure?.end(), worker?.end(), requests?.end()]);
   await database?.stop();
 });
 
@@ -134,7 +172,7 @@ describe("0133 an investigation and its digs", () => {
     const root = await run(person);
     const dig = await run(person);
     const deeper = await run(person);
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const joined = await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: dig, places: ["path:p1", "p:n-3"], mode: "quick" });
     expect(joined.outcome).toBe("JOINED");
     expect(await investigations.open(person.ownerRef, root)).toBe(joined.investigationId);
@@ -143,12 +181,12 @@ describe("0133 an investigation and its digs", () => {
       .toEqual({ outcome: "JOINED", investigationId: joined.investigationId, digLevel: 2 });
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: dig, places: ["w"], mode: "thorough" })).outcome).toBe("ALREADY");
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: deeper, places: [], mode: "quick" })).outcome).toBe("CONFLICT");
-    const read = (await investigations.read(person.ownerRef, deeper))!;
+    const read = (await investigationOf(deeper))!;
     expect(read).toMatchObject({ investigation_id: joined.investigationId, root_run_id: root, state: "open", report_version: 0, closings: [] });
     expect(read.members.map((member) => [member.run_id, member.parent_run_id, member.places, member.mode])).toEqual([
       [root, null, [], null], [dig, root, ["path:p1", "p:n-3"], "quick"], [deeper, dig, [], "thorough"]]);
     // The server-side dig parent: 0131's links, as identity.read_dig_links answers them.
-    const links = (await api.query("SELECT identity.read_dig_links($1,$2) AS l", [person.ownerRef, dig])).rows[0].l;
+    const links = (await asking(person).query("SELECT identity.read_dig_links($1,$2) AS l", [person.ownerRef, dig])).rows[0].l;
     expect(links.parent).toMatchObject({ parent_run_id: root, child_run_id: dig, places: ["path:p1", "p:n-3"], mode: "quick" });
     expect(links.children).toEqual([expect.objectContaining({ child_run_id: deeper, mode: "thorough" })]);
     expect(await new PostgresInvestigationRunnerRepository(runner).ofRun(deeper)).toEqual(read);
@@ -159,11 +197,14 @@ describe("0133 an investigation and its digs", () => {
     const stranger = await account();
     const root = await run(person);
     const theirs = await run(stranger);
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     expect(await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: theirs, places: [], mode: "quick" }))
       .toEqual({ outcome: "NOT_OWNED", investigationId: null, digLevel: null });
-    expect(await investigations.open(stranger.ownerRef, root)).toBeNull();
-    expect(await investigations.read(stranger.ownerRef, root)).toBeNull();
+    expect(await new PostgresInvestigationRepository(asking(stranger)).open(stranger.ownerRef, root)).toBeNull();
+    // 0171 (F5): the person's own request names no one else, and with no session the API's role names no one.
+    expect(await investigations.open(stranger.ownerRef, theirs)).toBeNull();
+    expect(await new PostgresInvestigationRepository(api).open(person.ownerRef, root)).toBeNull();
+    expect(await investigationOf(root)).toBeNull();
     for (const [places, mode] of [[["has space"], "quick"], [[], "deep"], [Array.from({ length: 17 }, () => "w"), "quick"]] as const) {
       expect(await sqlError(() => investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: randomUUID(),
         places: places as string[], mode: mode as "quick" }))).toMatchObject({ code: "22023", message: "INVESTIGATION_JOIN_INVALID" });
@@ -175,7 +216,7 @@ describe("0133 an investigation and its digs", () => {
     const root = await run(person);
     const dig = await run(person);
     const outside = await run(person);
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const { investigationId } = await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: dig, places: [], mode: "quick" });
     await pagesWithText(root);
     await pagesWithText(dig, 3);
@@ -191,15 +232,14 @@ describe("0133 an investigation and its digs", () => {
     const late = await run(person);
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: dig, childRunId: late, places: [], mode: "quick" })).outcome).toBe("CLOSED");
     const reportRef = randomUUID();
-    const runnerSide = new PostgresInvestigationRunnerRepository(runner);
-    expect(await runnerSide.recordReport(investigationId!, 1, reportRef)).toBe("RECORDED");
-    expect(await runnerSide.recordReport(investigationId!, 1, randomUUID())).toBe("ALREADY");
-    expect(await runnerSide.recordReport(investigationId!, 2, randomUUID())).toBe("NO_CLOSING");
+    expect(await recordReport(investigationId!, 1, reportRef)).toBe("RECORDED");
+    expect(await recordReport(investigationId!, 1, randomUUID())).toBe("ALREADY");
+    expect(await recordReport(investigationId!, 2, randomUUID())).toBe("NO_CLOSING");
     expect(await investigations.reopen(person.ownerRef, investigationId!)).toBe("REOPENED");
     expect(await investigations.reopen(person.ownerRef, investigationId!)).toBe("ALREADY_OPEN");
     expect((await investigations.join({ ownerRef: person.ownerRef, parentRunId: dig, childRunId: late, places: [], mode: "quick" })).outcome).toBe("JOINED");
     expect(await investigations.close(person.ownerRef, investigationId!)).toMatchObject({ outcome: "CLOSED", reportVersion: 2 });
-    const closings = (await investigations.read(person.ownerRef, root))!.closings;
+    const closings = (await investigationOf(root))!.closings;
     expect(closings.map((closing) => [closing.report_version, closing.report_ref, closing.reopened_at === null])).toEqual([
       [1, reportRef, false], [2, null, true]]);
     expect(await investigations.close(randomUUID(), investigationId!)).toMatchObject({ outcome: "NOT_OWNED" });
@@ -210,7 +250,7 @@ describe("0133 an investigation and its digs", () => {
     const idle = await run(person);
     const busy = await run(person);
     const alone = await run(person);
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const idleId = (await investigations.open(person.ownerRef, idle))!;
     const busyId = (await investigations.open(person.ownerRef, busy))!;
     await pagesWithText(idle);
@@ -230,7 +270,7 @@ describe("0133 an investigation and its digs", () => {
     expect(await sweep.wipeInactivePageText(1)).toBe(1);
     expect(await sweep.wipeInactivePageText(100)).toBe(3);
     expect([await texts(idle), await texts(busy), await texts(alone)]).toEqual([0, 2, 0]);
-    expect((await investigations.read(person.ownerRef, idle))!.state).toBe("open");
+    expect((await investigationOf(idle))!.state).toBe("open");
     expect(await sqlError(() => sweep.wipeInactivePageText(0))).toMatchObject({ code: "22023", message: "WEB_PAGE_TEXT_SWEEP_INVALID" });
   });
 });
@@ -239,26 +279,26 @@ describe("0133 the one reserve", () => {
   const amount = 440_000;
   it("R1 is held once, used by a closing, refilled, released; the order is the database's", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const root = await run(person);
     const investigationId = (await investigations.open(person.ownerRef, root))!;
-    expect(await investigations.readReserve(person.ownerRef)).toEqual({ state: "NONE", heldMicros: null, since: null,
+    expect(await readReserve(person.ownerRef)).toEqual({ state: "NONE", heldMicros: null, since: null,
       blockedWindow: null, blockedUntil: null, openInvestigations: 1 });
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("RECORDED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("RECORDED");
     // One reserve per person: never held twice, however many investigations are open.
     await investigations.open(person.ownerRef, await run(person));
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("NOT_ALLOWED");
-    expect(await investigations.readReserve(person.ownerRef)).toMatchObject({ state: "HELD", heldMicros: amount, openInvestigations: 2 });
+    expect(await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("NOT_ALLOWED");
+    expect(await readReserve(person.ownerRef)).toMatchObject({ state: "HELD", heldMicros: amount, openInvestigations: 2 });
     // Used by a closing of the account's own investigation.
     await investigations.close(person.ownerRef, investigationId);
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "USED", investigationId: randomUUID(), reportVersion: 1 })).toBe("NOT_OWNED");
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "USED", investigationId, reportVersion: 1 })).toBe("RECORDED");
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "USED", investigationId, reportVersion: 1 })).toBe("NOT_ALLOWED");
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "RELEASED" })).toBe("NOT_ALLOWED");
-    expect(await investigations.readReserve(person.ownerRef)).toMatchObject({ state: "USED", heldMicros: null, openInvestigations: 1 });
+    expect(await recordReserveEvent(person.ownerRef, { kind: "USED", investigationId: randomUUID(), reportVersion: 1 })).toBe("NOT_OWNED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "USED", investigationId, reportVersion: 1 })).toBe("RECORDED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "USED", investigationId, reportVersion: 1 })).toBe("NOT_ALLOWED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "RELEASED" })).toBe("NOT_ALLOWED");
+    expect(await readReserve(person.ownerRef)).toMatchObject({ state: "USED", heldMicros: null, openInvestigations: 1 });
     // Refilled from credits, then given back.
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("RECORDED");
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "RELEASED" })).toBe("RECORDED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("RECORDED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "RELEASED" })).toBe("RECORDED");
     const events = (await database.pool.query("SELECT event_no,kind,amount_micros FROM identity.investigation_reserve_event WHERE owner_ref=$1 ORDER BY event_no",
       [person.ownerRef])).rows.map((row) => [row.event_no, row.kind, Number(row.amount_micros)]);
     expect(events).toEqual([[1, "HELD", amount], [2, "USED", amount], [3, "HELD", amount], [4, "RELEASED", amount]]);
@@ -266,17 +306,17 @@ describe("0133 the one reserve", () => {
 
   it("R2 with no credits after a closing, BLOCKED waits for the limit that ran out to reset; only then is it held again", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const investigationId = (await investigations.open(person.ownerRef, await run(person)))!;
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount });
+    await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount });
     await investigations.close(person.ownerRef, investigationId);
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "BLOCKED", window: "day", until: new Date(Date.now() + 3_600_000) }))
+    expect(await recordReserveEvent(person.ownerRef, { kind: "BLOCKED", window: "day", until: new Date(Date.now() + 3_600_000) }))
       .toBe("NOT_ALLOWED");
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "USED", investigationId, reportVersion: 1 });
+    await recordReserveEvent(person.ownerRef, { kind: "USED", investigationId, reportVersion: 1 });
     const until = new Date(Date.now() + 3_600_000);
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "BLOCKED", window: "week", until })).toBe("RECORDED");
-    expect(await investigations.readReserve(person.ownerRef)).toMatchObject({ state: "BLOCKED", blockedWindow: "week", blockedUntil: until });
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("NOT_ALLOWED");
+    expect(await recordReserveEvent(person.ownerRef, { kind: "BLOCKED", window: "week", until })).toBe("RECORDED");
+    expect(await readReserve(person.ownerRef)).toMatchObject({ state: "BLOCKED", blockedWindow: "week", blockedUntil: until });
+    expect(await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("NOT_ALLOWED");
     // The reset passes (moved into the past by the superuser): the block reads NONE and the reserve may be held again.
     await database.pool.query("ALTER TABLE identity.investigation_reserve_event DISABLE TRIGGER guard_investigation_record");
     try {
@@ -284,23 +324,26 @@ describe("0133 the one reserve", () => {
     } finally {
       await database.pool.query("ALTER TABLE identity.investigation_reserve_event ENABLE TRIGGER guard_investigation_record");
     }
-    expect(await investigations.readReserve(person.ownerRef)).toMatchObject({ state: "NONE", blockedWindow: null, blockedUntil: null });
-    expect(await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("RECORDED");
+    expect(await readReserve(person.ownerRef)).toMatchObject({ state: "NONE", blockedWindow: null, blockedUntil: null });
+    expect(await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount })).toBe("RECORDED");
     for (const event of [{ kind: "HELD", amountMicros: 0 }, { kind: "BLOCKED", window: "year", until }, { kind: "BLOCKED", window: "day", until: new Date(Date.now() - 1000) }]) {
-      expect(await sqlError(() => investigations.recordReserveEvent(person.ownerRef, event as never)), JSON.stringify(event))
+      expect(await sqlError(() => recordReserveEvent(person.ownerRef, event as never)), JSON.stringify(event))
         .toMatchObject({ code: "22023", message: "RESERVE_EVENT_INVALID" });
     }
-    expect(await investigations.recordReserveEvent(randomUUID(), { kind: "HELD", amountMicros: amount })).toBe("NOT_OWNED");
-    // The runner's wall reads the same state.
-    expect(await new PostgresInvestigationRunnerRepository(runner).readReserve(person.ownerRef)).toMatchObject({ state: "HELD", heldMicros: amount });
+    expect(await recordReserveEvent(randomUUID(), { kind: "HELD", amountMicros: amount })).toBe("NOT_OWNED");
+    // No role may write or read the reserve since 0171: no code ever did.
+    for (const pool of [api, asking(person), runner]) {
+      expect(await sqlError(() => pool.query("SELECT identity.record_reserve_event($1,'RELEASED',NULL,NULL,NULL,NULL,NULL)", [person.ownerRef]))).toMatchObject({ code: "42501" });
+      expect(await sqlError(() => pool.query("SELECT * FROM identity.read_reserve($1)", [person.ownerRef]))).toMatchObject({ code: "42501" });
+    }
   });
 
   it("R3 members and reserve events are append-only; no role reads a table; the runner's role writes none of the API's", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const root = await run(person);
     await investigations.open(person.ownerRef, root);
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount });
+    await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: amount });
     for (const statement of ["UPDATE identity.investigation_member SET places='{w}' WHERE owner_ref=$1",
       "DELETE FROM identity.investigation_member WHERE owner_ref=$1", "UPDATE identity.investigation_reserve_event SET amount_micros=1 WHERE owner_ref=$1",
       "DELETE FROM identity.investigation_reserve_event WHERE owner_ref=$1"]) {
@@ -324,7 +367,7 @@ describe("0133 the one reserve", () => {
 describe("0133 deleting", () => {
   it("D1 (R22 item 16) an erased root takes its investigation; an erased dig leaves it with the digs dug from it", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const root = await run(person);
     const dig = await run(person);
     const deeper = await run(person);
@@ -332,31 +375,31 @@ describe("0133 deleting", () => {
     const { investigationId } = await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: dig, places: [], mode: "quick" });
     await investigations.join({ ownerRef: person.ownerRef, parentRunId: dig, childRunId: deeper, places: [], mode: "quick" });
     await investigations.join({ ownerRef: person.ownerRef, parentRunId: root, childRunId: sibling, places: [], mode: "quick" });
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 440_000 });
+    await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 440_000 });
     expect(await sqlError(() => erasure.query("SELECT identity.forget_erased_debate_investigation($1)", [dig])))
       .toMatchObject({ code: "55000", message: "INVESTIGATION_DEBATE_NOT_ERASED" });
     await seedTombstone(dig);
     expect((await erasure.query("SELECT identity.forget_erased_debate_investigation($1) AS n", [dig])).rows[0].n).toBe(2);
-    expect((await investigations.read(person.ownerRef, root))!.members.map((member) => member.run_id)).toEqual([root, sibling]);
-    expect(await investigations.read(person.ownerRef, deeper)).toBeNull();
+    expect((await investigationOf(root))!.members.map((member) => member.run_id)).toEqual([root, sibling]);
+    expect(await investigationOf(deeper)).toBeNull();
     await investigations.close(person.ownerRef, investigationId!);
     await seedTombstone(root);
     // The investigation, its two remaining members and its closing.
     expect((await erasure.query("SELECT identity.forget_erased_debate_investigation($1) AS n", [root])).rows[0].n).toBe(4);
     expect(Number((await database.pool.query("SELECT count(*) AS n FROM identity.investigation WHERE owner_ref=$1", [person.ownerRef])).rows[0].n)).toBe(0);
     // The reserve stays with the account.
-    expect(await investigations.readReserve(person.ownerRef)).toMatchObject({ state: "HELD" });
+    expect(await readReserve(person.ownerRef)).toMatchObject({ state: "HELD" });
   });
 
   it("D2 deleting the account removes its investigations, members, closings and reserve events", async () => {
     const person = await account();
     const keeper = await account();
-    const investigations = new PostgresInvestigationRepository(api);
     for (const owner of [person, keeper]) {
+      const investigations = new PostgresInvestigationRepository(asking(owner));
       const { investigationId } = await investigations.join({ ownerRef: owner.ownerRef, parentRunId: await run(owner), childRunId: await run(owner), places: [], mode: "quick" });
-      await investigations.recordReserveEvent(owner.ownerRef, { kind: "HELD", amountMicros: 440_000 });
+      await recordReserveEvent(owner.ownerRef, { kind: "HELD", amountMicros: 440_000 });
       await investigations.close(owner.ownerRef, investigationId!);
-      await investigations.recordReserveEvent(owner.ownerRef, { kind: "USED", investigationId: investigationId!, reportVersion: 1 });
+      await recordReserveEvent(owner.ownerRef, { kind: "USED", investigationId: investigationId!, reportVersion: 1 });
     }
     await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [person.userId]);
     const left = async (owner: string) => Number((await database.pool.query(`SELECT
@@ -369,10 +412,10 @@ describe("0133 deleting", () => {
 
   it("D3 the export worker reads the account's investigations and reserve events behind its lease", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const root = await run(person);
     const investigationId = (await investigations.open(person.ownerRef, root))!;
-    await investigations.recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 440_000 });
+    await recordReserveEvent(person.ownerRef, { kind: "HELD", amountMicros: 440_000 });
     const exportId = randomUUID();
     const lease = randomUUID();
     await database.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)

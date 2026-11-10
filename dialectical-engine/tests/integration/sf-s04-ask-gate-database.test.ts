@@ -12,7 +12,7 @@ import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js"
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { runFixtureStepOutsideRequest } from "../support/master-key-guard.js";
-import { apiTestPools, type ApiTestPools } from "../support/rls-logins.js";
+import { apiTestPools, createSystemTwin, type ApiTestPools } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -31,14 +31,15 @@ const labels = ["NONE healthy", "DRUGS healthy", "HARM_TO_OTHERS not", "WEAPONS_
   "QUESTION_CHECK_HTTP_STATUS"] as const;
 const starts = (label: string) => label.endsWith(" healthy") && !label.startsWith("SUICIDE_METHODS");
 
-/** With login mode off: a statement on a superuser client narrowed to the runtime role, as the gate's spend ran before Task 8. */
-async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
+/** With login mode off: a statement on a superuser client narrowed to the API's system login (the billing role and the cross-account marker), where it records each check's cost since 0171 (main.ts's site X31). */
+const API_SYSTEM = "s04_gate_api_system";
+async function asSystem<T extends Record<string, unknown> = Record<string, unknown>>(
   statement: string, values: unknown[] = []
 ): Promise<T[]> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
+    await client.query(`SET LOCAL ROLE ${API_SYSTEM}`);
     const rows = (await client.query<T>(statement, values)).rows;
     await client.query("COMMIT");
     return rows;
@@ -96,10 +97,10 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
   };
   const check = createQuestionCheck({ subjects: readQuestionSubjects(), port: () => port, deadlineMs: 1_000,
     price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date(),
-    // As main.ts:1458 records it: on the API's runtime pool. With login mode off that pool is the superuser, so the write
-    // is narrowed to the runtime role as before Task 8 (asRuntime).
-    spend: { record: entry => recordQuestionCheckSpend(apiPools.runtime !== database.pool ? apiPools.runtime
-      : { query: async (sql: string, values?: unknown[]) => ({ rows: await asRuntime(sql, values) }) } as never, entry) },
+    // As main.ts records it (site X31): on the API's system login. With login mode off that pool is the superuser, so the write
+    // is narrowed to the system login (asSystem).
+    spend: { record: entry => recordQuestionCheckSpend(apiPools.system !== database.pool ? apiPools.system
+      : { query: async (sql: string, values?: unknown[]) => ({ rows: await asSystem(sql, values) }) } as never, entry) },
     report: line => { reports.push(line); } });
   const application = new Proxy({}, { get: (_target, key) => key === "submit"
     ? async () => runFixtureStepOutsideRequest(async () => {
@@ -125,6 +126,7 @@ describe("S04 ask gate over the database", () => {
     database = await startTestDatabase();
     await migrate(database.pool);
     apiPools = await apiTestPools(database, import.meta.url);
+    await createSystemTwin(database, API_SYSTEM, ["debateai_billing_runtime"]);
     await database.pool.query(`INSERT INTO identity."user"
       (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,owner_ref,state,adult_affirmed_at)
       VALUES ($1,$2,'{}','{}','fixture-password',$3,$4,'active',now())`,

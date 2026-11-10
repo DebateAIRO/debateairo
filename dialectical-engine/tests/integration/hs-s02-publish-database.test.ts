@@ -108,10 +108,10 @@ async function publishGrant(runId: string): Promise<string> {
   return token;
 }
 
-/** A settled private run of the owner, and the answer publish is handed: fixture case 1 + the canary. */
-async function settledRun(label: string, canary: string): Promise<{ runId: string; answer: Answer }> {
+/** A settled private run of the owner, and the answer publish is handed: fixture case 1 + the canary. `dig`: created as a dig's run (0171's mark). */
+async function settledRun(label: string, canary: string, dig = false): Promise<{ runId: string; answer: Answer }> {
   const marker = `${label}-${randomUUID()}`;
-  const runId = await createEncryptedStoryRun(database.pool, theOwner(), `hs-s02 publish ${marker}`);
+  const runId = await createEncryptedStoryRun(database.pool, theOwner(), `hs-s02 publish ${marker}`, undefined, dig ? { digRun: true } : {});
   const { answerId } = await persistTerminalRun({
     pool: database.pool,
     runId,
@@ -424,5 +424,124 @@ describe("hate-speech S02 publish path — the runtime pool under concurrent att
     expect(judge.packets).toHaveLength(0);
     expect(await checkRecords(runId)).toEqual([]);
     expect(await tableCounts()).toEqual(countsBefore);
+  }, 120_000);
+});
+
+/**
+ * Security review F2 (migration 0171): the owner decided that a dig is never published. A dig here is a debate the owner dug from another of
+ * theirs, with its picks recorded (0135's identity.dig_pick_set), or with the row the statement that creates every dig's run writes (0171's
+ * identity.dig_run, which names the dig alone, so it stays when the parent is deleted). The database refuses the dig's key provision (0085's
+ * serve.prepare_publication_key_provision, whose PREPARED intent the transition needs before it writes a snapshot), whatever the API does; the
+ * application refuses before the judge; the visibility read names it a dig. The parent publishes as before.
+ */
+describe("a dig is never published (security review F2, 0171)", () => {
+  async function dugFrom(parentRunId: string, label: string): Promise<{ runId: string; answer: Answer }> {
+    const dig = await settledRun(label, `HSCANARY-${randomUUID()}`);
+    await database.pool.query("INSERT INTO identity.dig_pick_set (run_id,owner_ref,parent_run_id,pick_count) VALUES ($1,$2,$3,0)",
+      [dig.runId, theOwner().ownerRef, parentRunId]);
+    return dig;
+  }
+  const repository = () => new PostgresPublicationRepository(database.pool, fakeAuditHasher);
+  const provision = (runId: string, publicationRef: string, grantToken: string) => {
+    const { userId, ownerRef, sessionId } = theOwner();
+    return repository().prepareKeyProvision({ publicationRef, runId, userId, ownerRef, sessionId, grantTokenHash: hashToken("step-up-grant", grantToken) });
+  };
+  const rowsOf = async (table: string, runId: string): Promise<number> =>
+    (await database.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table} WHERE run_id=$1`, [runId])).rows[0]!.n;
+
+  it("the database refuses a dig's key provision under a live grant, so its transition finds no intent and writes no snapshot", async () => {
+    const parent = await settledRun("dig-parent", `HSCANARY-${randomUUID()}`);
+    const dig = await dugFrom(parent.runId, "dig");
+    const publicationRef = randomUUID();
+    const grantToken = await publishGrant(dig.runId);
+    expect(await provision(dig.runId, publicationRef, grantToken)).toBe(false);
+    expect(await rowsOf("serve.publication_key_provision_intent", dig.runId)).toBe(0);
+    // The transition itself, handed that link, that grant, the author's name and a ciphertext as if the API had skipped every check of its own,
+    // publishes nothing without the intent.
+    const { userId, ownerRef, sessionId } = theOwner();
+    const pseudonym = await repository().readAuthorPseudonym(dig.runId, userId, ownerRef);
+    expect(pseudonym).not.toBeNull();
+    expect(await repository().publish({
+      runId: dig.runId, userId, ownerRef, sessionId, grantTokenHash: hashToken("step-up-grant", grantToken), occurredAt: new Date(), source,
+      publicationRef, expectedPseudonym: pseudonym!, contentCiphertext: { v: 1, keyId: `publication-snapshot:${publicationRef}:v1`, nonce: "AAAA", tag: "AAAA", ct: "YQ==" }
+    })).toBe(false);
+    expect(await rowsOf("serve.publication_snapshot", dig.runId)).toBe(0);
+    expect((await database.pool.query<{ state: string }>(
+      "SELECT state FROM core.run_visibility_event WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1", [dig.runId])).rows).toEqual([]);
+    // The parent, a debate that is no dig, is prepared under the same rules.
+    const parentRef = randomUUID();
+    expect(await provision(parent.runId, parentRef, await publishGrant(parent.runId))).toBe(true);
+    expect(await rowsOf("serve.publication_key_provision_intent", parent.runId)).toBe(1);
+    expect(await repository().abandonKeyProvision(parentRef, userId)).toBe(true);
+  }, 120_000);
+
+  it("a dig known by its own row stays a dig when its parent is deleted: the parent takes the link, the row stays, and the key provision is refused", async () => {
+    const parent = await settledRun("dig-parent-deleted", `HSCANARY-${randomUUID()}`);
+    // Created as the API creates a dig's run, marked a dig by the statement that writes it (0171's row), then the link of a join that took (0131);
+    // no picks.
+    const dig = await settledRun("dig-row", `HSCANARY-${randomUUID()}`, true);
+    const { ownerRef } = theOwner();
+    expect(await rowsOf("identity.dig_run", dig.runId)).toBe(1);
+    await database.pool.query("INSERT INTO identity.dig_link (child_run_id,owner_ref,parent_run_id,places,mode) VALUES ($1,$2,$3,'{}','quick')",
+      [dig.runId, ownerRef, parent.runId]);
+    // The parent deleted, as a deletion finishes it: its erasure tombstone, then 0131's per-debate forget, which takes every link naming it.
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL session_replication_role = 'replica'");
+      await client.query(`INSERT INTO serve.private_run_erasure_tombstone (run_id,completed_at,destroyed_key_count,already_absent_key_count)
+        VALUES ($1,clock_timestamp(),1,0)`, [parent.runId]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    await database.pool.query("SELECT identity.forget_erased_debate_page_memory($1)", [parent.runId]);
+    expect((await database.pool.query("SELECT 1 FROM identity.dig_link WHERE child_run_id=$1", [dig.runId])).rowCount).toBe(0);
+    expect(await rowsOf("identity.dig_run", dig.runId)).toBe(1);
+    expect(await provision(dig.runId, randomUUID(), await publishGrant(dig.runId))).toBe(false);
+    expect(await rowsOf("serve.publication_key_provision_intent", dig.runId)).toBe(0);
+    await expect(application.readOwnedVisibility({ runId: dig.runId, authenticated: ownerSession() }))
+      .resolves.toEqual({ state: "PRIVATE", public_ref: null, dig: true });
+  }, 120_000);
+
+  it("a dig the ask waker re-admitted as a new run is refused its key provision too: the database follows the re-admission back", async () => {
+    const parent = await settledRun("dig-parent-readmitted", `HSCANARY-${randomUUID()}`);
+    const dig = await dugFrom(parent.runId, "dig-readmitted");
+    const again = await settledRun("dig-readmitted-again", `HSCANARY-${randomUUID()}`);
+    // The edge alone, as the waker's re-admission records it (its line checks are the waker's): the new run carries none of the dig's records.
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL session_replication_role = 'replica'");
+      await client.query("INSERT INTO core.run_supersession (old_run_id,new_run_id,reason) VALUES ($1,$2,'READMITTED')", [dig.runId, again.runId]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    expect(await provision(again.runId, randomUUID(), await publishGrant(again.runId))).toBe(false);
+    expect(await rowsOf("serve.publication_key_provision_intent", again.runId)).toBe(0);
+    await expect(application.readOwnedVisibility({ runId: again.runId, authenticated: ownerSession() }))
+      .resolves.toEqual({ state: "PRIVATE", public_ref: null, dig: true });
+  }, 120_000);
+
+  it("the application refuses a dig before the judge, the visibility read names it a dig, and the owner's top-level debate still publishes", async () => {
+    const parent = await settledRun("dig-parent-app", `HSCANARY-${randomUUID()}`);
+    const dig = await dugFrom(parent.runId, "dig-app");
+    const judge = createPartJudgeStub({});
+    const contentCheck = createPublicationContentCheck({
+      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(database.pool), clock: () => ATTEMPTED_AT, deadlineMs: D
+    });
+    const countsBefore = await tableCounts();
+    await expect(application.publish({
+      runId: dig.runId, answer: dig.answer, authenticated: ownerSession(), grantToken: await publishGrant(dig.runId), source, contentCheck
+    })).resolves.toBeNull();
+    expect(judge.packets).toHaveLength(0);
+    expect(await checkRecords(dig.runId)).toEqual([]);
+    expect(await tableCounts()).toEqual(countsBefore);
+    await expect(application.readOwnedVisibility({ runId: dig.runId, authenticated: ownerSession() }))
+      .resolves.toEqual({ state: "PRIVATE", public_ref: null, dig: true });
+    await expect(application.readOwnedVisibility({ runId: parent.runId, authenticated: ownerSession() }))
+      .resolves.toEqual({ state: "PRIVATE", public_ref: null });
+    const published = await application.publish({
+      runId: parent.runId, answer: parent.answer, authenticated: ownerSession(), grantToken: await publishGrant(parent.runId), source, contentCheck
+    });
+    expect(published).toEqual({ state: "PUBLISHED", public_ref: expect.stringMatching(/^[0-9a-f-]{36}$/u) });
+    expect(await rowsOf("serve.publication_snapshot", parent.runId)).toBe(1);
   }, 120_000);
 });

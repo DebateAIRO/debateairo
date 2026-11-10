@@ -111,6 +111,8 @@ tests/integration/team-allowance-http.test.ts
 tests/integration/public-tree-flow.test.ts
 # A public debate under review (0150): the four staff routes over HTTP on fake data ports; the database's own refusals are public-tree-flow.test.ts's.
 tests/integration/public-review-http.test.ts
+# The security review's fixes in the database (0171): each fix's hole closed on the real logins, and the legitimate path beside it still open.
+tests/integration/security-review-hardening-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

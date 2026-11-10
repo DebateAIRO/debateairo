@@ -990,9 +990,12 @@ describe("data export over a real database and encrypted file store", () => {
       const joined = await investigations.join({ ownerRef: a.ownerRef, parentRunId: runId, childRunId: dig, places: ["pos-1"], mode: "quick" });
       expect(joined.outcome).toBe("JOINED");
       const closed = (await investigations.open(a.ownerRef, closedRoot))!;
-      expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "HELD", amountMicros: 440_000 })).toBe("RECORDED");
+      // 0133's reserve writer had no caller; 0171 took its grant back, so the migrator records the reserve here.
+      const reserve = async (kind: "HELD" | "USED", values: readonly unknown[]) => (await seedPool.query<{ outcome: string }>(
+        "SELECT identity.record_reserve_event($1,$2,$3,$4,$5,NULL,NULL) AS outcome", [a.ownerRef, kind, ...values])).rows[0]!.outcome;
+      expect(await reserve("HELD", [440_000, null, null])).toBe("RECORDED");
       expect(await investigations.close(a.ownerRef, closed)).toMatchObject({ outcome: "CLOSED", reportVersion: 1 });
-      expect(await investigations.recordReserveEvent(a.ownerRef, { kind: "USED", investigationId: closed, reportVersion: 1 })).toBe("RECORDED");
+      expect(await reserve("USED", [null, closed, 1])).toBe("RECORDED");
       const ownerView: OwnerViewPort = {
         runKeyPresent: runId => keys.exists(runId), runRemovedByCheck: async () => false, resolveRunRef: async runId => runId,
         readRun: async () => ({ state: "SETTLED", question_line: "e15 question" }), readRunAnswer: async () => null,

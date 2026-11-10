@@ -498,6 +498,20 @@ export class PostgresPublicationRepository {
       });
   }
 
+  /**
+   * Security review F2 (migration 0171): whether a debate of the active user's is a dig, which is never published (0171's owner-scoped
+   * identity.read_run_is_dig). A refusal, so it fails closed: true for every debate when the connection is not the owner's (F5's question, asked
+   * first); else null when it is not theirs by 0131's ownership rule (another's, erased, inactive), which the grant's check asked before it refuses.
+   */
+  async readRunIsDig(runId: string, userId: string, ownerRef: string): Promise<boolean | null> {
+    const result = await this.pool.query<{ dig: boolean | null }>(`
+      SELECT identity.read_run_is_dig(identity_user.owner_ref,$1) AS dig
+      FROM identity."user" AS identity_user
+      WHERE identity_user.user_id=$2 AND identity_user.owner_ref=$3 AND identity_user.state='active'
+    `, [runId, userId, ownerRef]);
+    return result.rows[0]?.dig ?? null;
+  }
+
   async readOwnedVisibility(
     runId: string,
     userId: string,
@@ -505,13 +519,17 @@ export class PostgresPublicationRepository {
   ): Promise<Readonly<{
     state: "PRIVATE" | "PUBLISHED";
     publicRef: string | null;
+    /** Security review F2: a dig, which is never published (the same reader as readRunIsDig). */
+    dig: boolean;
   }> | null> {
     const result = await this.pool.query<{
       state: "PRIVATE" | "PUBLISHED";
       publication_ref: string | null;
+      dig: boolean;
     }>(`
       SELECT COALESCE(latest.state,'PRIVATE') AS state,
-        CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref
+        CASE WHEN latest.state='PUBLISHED' THEN latest.publication_ref ELSE NULL END AS publication_ref,
+        identity.read_run_is_dig($3,run.run_id) IS TRUE AS dig
       FROM core.run AS run
       JOIN identity."user" AS identity_user
         ON identity_user.user_id=$2 AND identity_user.owner_ref=$3
@@ -527,7 +545,8 @@ export class PostgresPublicationRepository {
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
       state: row.state,
-      publicRef: row.publication_ref
+      publicRef: row.publication_ref,
+      dig: row.dig
     });
   }
 

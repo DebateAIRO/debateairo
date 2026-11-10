@@ -1,5 +1,6 @@
 import { hashToken } from "@debateai/crypto";
 import {
+  DIG_NOT_PUBLISHABLE, DigNotPublishableSchema,
   PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema,
   PublicationReviewStateSchema, type Answer
 } from "@debateai/contract";
@@ -33,6 +34,12 @@ export function createPublicationReviewOwnerRoutes(deps: Readonly<{
       })) {
         await deps.auditDenial({ authenticated: input.authenticated, requestId: input.requestId });
         return error(404, "RUN_NOT_FOUND");
+      }
+      // Security review F2 (0171): a dig is never published, so it is never put in the team's queue for an approval to publish either. The
+      // publish route's own refusal, once the grant is known live and before the answer is read, the verdict of record is asked or anything is
+      // written (no grant consumed, no request queued); 0127's serve.ask_publication_review refuses a dig too (NOT_ALLOWED).
+      if (await deps.publications.isDig?.({ runId: input.runId, authenticated: input.authenticated }) === true) {
+        return { status: 409, body: DigNotPublishableSchema.parse({ error: DIG_NOT_PUBLISHABLE, message: DIG_NOT_PUBLISHABLE }) };
       }
       const answer = await deps.readOwnedAnswer(input);
       if (answer === null) return error(404, "RUN_NOT_FOUND");

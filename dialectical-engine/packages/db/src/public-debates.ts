@@ -3,14 +3,18 @@ import type { CryptoEnvelope } from "@debateai/crypto";
 
 /**
  * Public debates anyone can dig (migration 0137; plan 2026-10-31-r22-owner-changes decision 13), through 0137's definers only.
- * `PostgresPublicDebateRepository` runs on the API's own pool (debateai_billing_runtime); `PostgresPublicDebateRunnerRepository`
- * on the runner's or the scheduler's pool (debateai_runtime; the API's roles inherit it).
+ * `PostgresPublicDebateRepository` runs on the API's own pool (debateai_billing_runtime); `PostgresPublicDebateRunnerRepository` on the runner's or
+ * the scheduler's pool, and the API's for the public page's two reads (`readPageUpdates`, `isAuthorNameGone`: debateai_runtime, which the API's roles
+ * inherit). Its other methods, which take no owner, need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and
+ * the API's system pool outside a request hold and the API's request login does not since 0171 (the security review, F5).
  *
  * What the later lanes must respect:
- * - Public (13): a dig on a public debate, the root's owner's too, joins with `join`, never 0134's join; its picks go through
- *   `recordPicks` (the pick set's position_ref stays null, the path is on the contribution); its rewrite goes through 0138's
- *   `identity.path_update` with kind PUBLIC_DIG, never 0134's tables, so a refused one is no one's current text. Every contribution
- *   must end in `settleCheck` (UNAVAILABLE when the check could not run), or the path's later rewrites wait for ever.
+ * - Public (13): a dig on a public debate, the root's owner's too, joins the publication with 0147's join
+ *   (`PostgresPublicTreeRepository.join`, public-tree.ts), never 0134's join; 0137's first public join is retired (0171 takes its
+ *   grant back). Its picks go through `recordPicks` (the pick set's position_ref stays null, the path is on the contribution); its
+ *   rewrite goes through `identity.path_update` with kind PUBLIC_DIG, by 0147's public turn, never 0134's tables, so a refused one is
+ *   no one's current text. Every contribution must end in `settleCheck` (UNAVAILABLE when the check could not run), or the path's
+ *   later rewrites wait for ever.
  * - An ALLOWED contribution's public text is copied with `recordPageUpdate`, sealed under the PUBLICATION's key (the API's
  *   PublicationCipher, keyId `publication-snapshot:<ref>:v1`), so the page outlives the digger's run key. The page shows the first
  *   snapshot, then `readPageUpdates` in order; a newer update of a path replaces the older on the page.
@@ -19,8 +23,9 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  * - A Free ask that showed the notice calls `recordFreeNotice`; only those debates ever go public. The sweep lists them
  *   (`readFreeToPublish`), runs the check, then `prepareFreePublication`, makes the key, and `publishFree`; a refusal is
  *   `refuseFree` (private for good); an unavailable check records nothing and the sweep tries again.
- * - A report on a public debate: 0138's `identity.close_public_investigation`; each PUBLIC_REPORT charge names the root's run and its
- *   payer through `recordReportCharge`; the window readers add `readReportSpent`.
+ * - A report on a public debate: 0147's `identity.open_public_report` (public-tree.ts); each PUBLIC_REPORT charge names the root's run
+ *   and its payer through `recordReportCharge` (the runner's: the cross-account marker's since 0171); the window readers count it through
+ *   0149's read_public_report_spent_by_funding (0137's read_public_report_spent had no caller and is no role's since 0171).
  */
 type Executor = Pick<Pool, "query"> | PoolClient;
 
@@ -38,7 +43,6 @@ export type PublicContributionRead = Readonly<{
   /** 0157 (gap 5): allowed, but off the public page while a review runs (its debate is hidden, or an earlier dig was taken out and this one not put back). */
   off_for_review?: boolean;
 }>;
-export type PublicJoinOutcome = "JOINED" | "ALREADY" | "NOT_OWNED" | "NOT_PUBLIC" | "PARENT_PRIVATE" | "CLOSED" | "CONFLICT" | "TOO_DEEP";
 export type PublicDigPick = Readonly<{
   kind: string; suggestion_id: string | null; place: string; author: string; content: unknown; attestation: string;
 }>;
@@ -55,18 +59,7 @@ export type FreeToPublish = Readonly<{ run_id: string; owner_ref: string; notice
 export class PostgresPublicDebateRepository {
   constructor(private readonly pool: Executor) {}
 
-  /** The person's dig joins the public tree the parent is in. */
-  async join(input: Readonly<{ ownerRef: string; parentRunId: string; childRunId: string; places: readonly string[];
-    mode: "quick" | "thorough"; positionRef: string | null }>): Promise<Readonly<{
-      outcome: PublicJoinOutcome; investigationId: string | null; digLevel: number | null; publicationRef: string | null }>> {
-    const row = (await this.pool.query<{ outcome: PublicJoinOutcome; investigation_id: string | null; dig_level: number | null;
-      publication_ref: string | null }>(
-      "SELECT outcome,investigation_id,dig_level,publication_ref FROM identity.join_public_investigation($1,$2,$3,$4::text[],$5,$6)",
-      [input.ownerRef, input.parentRunId, input.childRunId, [...input.places], input.mode, input.positionRef])).rows[0]!;
-    return Object.freeze({ outcome: row.outcome, investigationId: row.investigation_id, digLevel: row.dig_level, publicationRef: row.publication_ref });
-  }
-
-  /** 0135's picks of a dig joined above, each sealed under the DIG's run key. */
+  /** 0135's picks of a dig joined to the publication (0147's join), each sealed under the DIG's run key. */
   async recordPicks(ownerRef: string, runId: string, picks: readonly PublicDigPick[]): Promise<"RECORDED" | "ALREADY" | "NOT_A_DIG" | "NOT_OWNED"> {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" | "NOT_A_DIG" | "NOT_OWNED" }>(
       "SELECT identity.record_public_dig_picks($1,$2,$3::jsonb) AS outcome", [ownerRef, runId, JSON.stringify(picks)])).rows[0]!.outcome;
@@ -90,7 +83,11 @@ export class PostgresPublicDebateRepository {
   }
 }
 
-/** The runner's or the scheduler's pool (debateai_runtime). */
+/**
+ * The runner's or the scheduler's pool. `readPageUpdates` and `isAuthorNameGone` are debateai_runtime's (the public page reads them on the API's
+ * request pool); the rest, `readContribution` included, need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler
+ * and the API's system pool outside a request hold and the API's request login does not (0171).
+ */
 export class PostgresPublicDebateRunnerRepository {
   constructor(private readonly pool: Executor) {}
 
@@ -154,10 +151,5 @@ export class PostgresPublicDebateRunnerRepository {
     return (await this.pool.query<{ outcome: "RECORDED" | "ALREADY" }>(
       "SELECT identity.record_public_report_charge($1,$2,$3,$4,$5) AS outcome",
       [input.spendId, input.ownerRef, input.investigationId, input.reportVersion, input.chargeMicros])).rows[0]!.outcome;
-  }
-
-  async readReportSpent(ownerRef: string, from: Date, to: Date): Promise<number> {
-    return Number((await this.pool.query<{ spent: string }>(
-      "SELECT identity.read_public_report_spent($1,$2,$3) AS spent", [ownerRef, from, to])).rows[0]!.spent);
   }
 }

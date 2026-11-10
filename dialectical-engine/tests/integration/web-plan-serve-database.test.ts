@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AnswerSchema } from "@debateai/contract";
-import { PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS, migrate, readMapRootsInForce } from "@debateai/db";
+import {
+  PostgresWebEvidenceRepository, WEB_EVIDENCE_CARRIERS, configureContentEncryption, contentCipherFor, createPool, migrate, readMapRootsInForce,
+  type Pool
+} from "@debateai/db";
 import { GraphRepository, type RetireClaimFence } from "@debateai/graph";
 import { LedgerRepository } from "@debateai/ledger";
 import { MapChoiceRepository } from "@debateai/map";
@@ -10,6 +13,7 @@ import {
   postgresWebPlanStatusRecorder, postgresWebStepPorts, webPlanPathRecords, webStepRowId
 } from "../../apps/runner/src/web-step.js";
 import type { WebPlanPathStatus } from "../../apps/runner/src/web-planner.js";
+import { asRequestOf, provisionRlsLogins, seedLiveSession, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner
@@ -27,6 +31,10 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 let database: TestDatabase;
 let owner: StoryEncryptedOwner | undefined;
+let logins: RlsLogins | undefined;
+/** The API's system login, and its request login as main.ts builds its request pool (the system login its target outside a request). */
+let system: Pool | undefined;
+let requests: Pool | undefined;
 
 const REASON = "W36_DISTINCTIVE_REASON only what the town values is weighed here.";
 
@@ -34,9 +42,14 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
+  logins = await provisionRlsLogins(database);
+  system = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
+  requests = createPool(logins.url("DATABASE_URL"), { crossAccount: system });
 }, 240_000);
 
 afterAll(async () => {
+  await Promise.all([system?.end(), requests?.end()]);
+  await logins?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -169,6 +182,12 @@ describe("W3-6 the web plan and the web rows reach the served answer", () => {
     expect(JSON.stringify(answer!.web)).not.toMatch(/"a[1-4]"/u);
     expect(JSON.stringify(answer!.web)).not.toContain(deadA1);
     AnswerSchema.parse(answer);
+    // The security review's F5 (0171): the owner's own request, on the API's request login, is served the same web paths, the web step's
+    // readers asking the session's owner.
+    const asOwner = asRequestOf(requests!, await seedLiveSession(database.pool, owner!.userId));
+    configureContentEncryption(asOwner, contentCipherFor(database.pool)!);
+    const own = await new ServeRepository(asOwner).readAnswerProjection(answerId, { ownerRef: owner!.ownerRef, legacyAskerId: null });
+    expect(own!.web).toEqual(answer!.web);
 
     // "Add to researched" (W4-4) goes back from the served root to the stored path.
     const roots = webPathRootsOf(await readMapRootsInForce(database.pool, runId));

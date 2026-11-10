@@ -7,12 +7,16 @@ import {
   PostgresDigModelRepository,
   PostgresDigModelRunnerRepository,
   PostgresInvestigationRepository,
+  PostgresInvestigationRunnerRepository,
   PostgresWebEvidenceRepository,
   type PathRewriteRecord,
+  type PathRewritesRead,
   type PieceSettingsVersion,
   type Pool,
   type WebSealed
 } from "@debateai/db";
+import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -21,10 +25,16 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * rewrite (a settled dig's turn, the rewrite written at the front of its path's line on the path's current text,
  * encrypted under the dig's key, read only by the owner; erasing the dig removes its rewrite and the path falls back),
  * the search planner's decision for each path (written once, its reason sealed), the month pause (PAUSED, Continue),
- * the spend source PATH_REWRITE, and the deletions and the export. Data is made up.
+ * the spend source PATH_REWRITE, and the deletions and the export. Data is made up. Since the security review's 0171 (F5) the API's role
+ * runs here as each person's own request (its login carrying their live session), as its functions believe no other owner; 0134's owner
+ * readers of every level, of the rewrites and of the paused debates had no caller and are no role's any more, so they are read here as the
+ * migrator, as is 0133's first join.
  */
 let database: TestDatabase;
 let api: Pool;
+/** The API's role wired as main.ts wires its request pool: inside a request its own connections carry the person's session. */
+let requests: Pool;
+let apiUrl: string;
 let runner: Pool;
 let erasure: Pool;
 let worker: Pool;
@@ -44,14 +54,25 @@ const loginPool = (role: string, password: string): Pool => {
   url.password = password;
   return createPool(url.toString());
 };
-type Account = Readonly<{ userId: string; ownerRef: string }>;
+type Account = Readonly<{ userId: string; ownerRef: string; token: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
     VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `dig-${userId}`]);
   const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
-  return { userId, ownerRef };
+  return { userId, ownerRef, token: await seedLiveSession(database.pool, userId) };
 }
+/** The person's own request, on the API's role. */
+const asking = (person: Account): Pool => asRequestOf(requests, person.token);
+/** 0134's owner reader of an investigation's levels, as the migrator (no role's since 0171). */
+const readDigLevels = async (ownerRef: string, runId: string): Promise<ReadonlyArray<{ dig_level: number }> | null> =>
+  (await database.pool.query("SELECT identity.read_investigation_dig_levels($1,$2) AS levels", [ownerRef, runId])).rows[0]?.levels ?? null;
+/** 0134's owner reader of a debate's path rewrites, as the migrator (no role's since 0171). */
+const readPathRewrites = async (ownerRef: string, runId: string): Promise<PathRewritesRead | null> =>
+  (await database.pool.query("SELECT identity.read_path_rewrites($1,$2) AS rewrites", [ownerRef, runId])).rows[0]?.rewrites ?? null;
+/** 0134's owner reader of the account's paused debates, as the migrator (no role's since 0171). */
+const readPausedRuns = async (ownerRef: string): Promise<ReadonlyArray<{ run_id: string }>> =>
+  (await database.pool.query("SELECT identity.read_paused_runs($1) AS paused", [ownerRef])).rows[0]!.paused;
 /** A private debate with content encryption and its attestation secret. */
 async function run(owner: Account): Promise<string> {
   const runId = randomUUID();
@@ -92,7 +113,7 @@ async function seedTombstone(runId: string): Promise<void> {
 }
 /** A chain of `depth` digs under a new first debate: [root, level 1, …, level depth]. */
 async function chain(owner: Account, depth: number): Promise<string[]> {
-  const investigations = new PostgresInvestigationRepository(api);
+  const investigations = new PostgresInvestigationRepository(asking(owner));
   const runs = [await run(owner)];
   for (let level = 1; level <= depth; level += 1) {
     const child = await run(owner);
@@ -118,7 +139,8 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE dig_api LOGIN PASSWORD 'dig-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  await database.pool.query("CREATE ROLE dig_runner LOGIN PASSWORD 'dig-runner-test-only' IN ROLE debateai_runtime");
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the runner's own steps of a debate are the marker's.
+  await database.pool.query("CREATE ROLE dig_runner LOGIN PASSWORD 'dig-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   await database.pool.query("CREATE ROLE dig_erasure LOGIN PASSWORD 'dig-erasure-test-only' IN ROLE debateai_erasure_runtime");
   await database.pool.query("CREATE ROLE dig_worker LOGIN PASSWORD 'dig-worker-test-only' IN ROLE debateai_data_export_worker");
   api = loginPool("dig_api", "dig-api-test-only");
@@ -126,10 +148,15 @@ beforeAll(async () => {
   erasure = loginPool("dig_erasure", "dig-erasure-test-only");
   worker = loginPool("dig_worker", "dig-worker-test-only");
   expect((await api.query("SELECT current_user AS name")).rows[0].name).toBe("dig_api");
+  const url = new URL(database.connectionString);
+  url.username = "dig_api";
+  url.password = "dig-api-test-only";
+  apiUrl = url.toString();
+  requests = createPool(apiUrl, { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([api?.end(), runner?.end(), erasure?.end(), worker?.end()]);
+  await Promise.all([api?.end(), runner?.end(), erasure?.end(), worker?.end(), requests?.end()]);
   await database?.stop();
 });
 
@@ -137,16 +164,16 @@ describe("0134 the dig level", () => {
   it("L1 levels 1 to 10 join; an eleventh is TOO_DEEP and writes nothing; the levels read back", async () => {
     const person = await account();
     const runs = await chain(person, 10);
-    const levels = new PostgresDigModelRepository(api);
+    const levels = new PostgresDigModelRepository(asking(person));
     expect(await levels.readDigLevel(person.ownerRef, runs[0]!)).toBe(0);
     expect(await levels.readDigLevel(person.ownerRef, runs[10]!)).toBe(10);
     expect(await new PostgresDigModelRunnerRepository(runner).readDigLevel(runs[7]!)).toBe(7);
-    expect((await levels.readDigLevels(person.ownerRef, runs[3]!))!.map((row) => row.dig_level)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect((await readDigLevels(person.ownerRef, runs[3]!))!.map((row) => row.dig_level)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const tooDeep = await run(person);
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     expect(await investigations.join({ ownerRef: person.ownerRef, parentRunId: runs[10]!, childRunId: tooDeep, places: [], mode: "quick" }))
       .toMatchObject({ outcome: "TOO_DEEP", digLevel: null });
-    expect(await investigations.read(person.ownerRef, tooDeep)).toBeNull();
+    expect(await new PostgresInvestigationRunnerRepository(runner).ofRun(tooDeep)).toBeNull();
     expect((await database.pool.query("SELECT count(*)::int n FROM identity.dig_link WHERE child_run_id=$1", [tooDeep])).rows[0].n).toBe(0);
     // A sibling at level 10 still joins; the same dig again is ALREADY with its level.
     const sibling = await run(person);
@@ -157,8 +184,11 @@ describe("0134 the dig level", () => {
     expect(await levelRows(person.ownerRef)).toBe(11);
     // Not this account's: no level.
     const stranger = await account();
+    expect(await new PostgresDigModelRepository(asking(stranger)).readDigLevel(stranger.ownerRef, runs[2]!)).toBeNull();
+    expect(await readDigLevels(stranger.ownerRef, runs[2]!)).toBeNull();
+    // 0171 (F5): the person's request names no one else, and with no session the API's role names no one.
     expect(await levels.readDigLevel(stranger.ownerRef, runs[2]!)).toBeNull();
-    expect(await levels.readDigLevels(stranger.ownerRef, runs[2]!)).toBeNull();
+    expect(await new PostgresDigModelRepository(api).readDigLevel(person.ownerRef, runs[2]!)).toBeNull();
     // The level table holds 1..10 only, whoever writes.
     expect(await sqlError(() => database.pool.query("INSERT INTO identity.investigation_dig_level (run_id, owner_ref, dig_level) VALUES ($1,$2,11)",
       [tooDeep, person.ownerRef]))).toMatchObject({ code: "23514" });
@@ -169,10 +199,10 @@ describe("0134 the dig level", () => {
     const runs = await chain(person, 9);
     const tenth = await run(person);
     const eleventh = await run(person);
-    const leftPool = loginPool("dig_api", "dig-api-test-only");
-    const rightPool = loginPool("dig_api", "dig-api-test-only");
-    const left = new PostgresInvestigationRepository(leftPool);
-    const right = new PostgresInvestigationRepository(rightPool);
+    const leftPool = createPool(apiUrl, { crossAccount: api });
+    const rightPool = createPool(apiUrl, { crossAccount: api });
+    const left = new PostgresInvestigationRepository(asRequestOf(leftPool, person.token));
+    const right = new PostgresInvestigationRepository(asRequestOf(rightPool, person.token));
     try {
       const outcomes = await Promise.all([
         left.join({ ownerRef: person.ownerRef, parentRunId: runs[9]!, childRunId: tenth, places: [], mode: "quick" }),
@@ -193,18 +223,41 @@ describe("0134 the dig level", () => {
     const root = await run(person);
     const one = await run(person);
     const two = await run(person);
-    // 0133's join, as the release before called it (it keeps its grant; no code calls it any more).
-    await api.query("SELECT * FROM identity.join_investigation($1,$2,$3,'{}'::text[],'quick')", [person.ownerRef, root, one]);
-    await api.query("SELECT * FROM identity.join_investigation($1,$2,$3,'{}'::text[],'quick')", [person.ownerRef, one, two]);
+    // 0133's join, as the release before called it (no code calls it any more, and since 0171 no role may: the migrator calls it here).
+    await database.pool.query("SELECT * FROM identity.join_investigation($1,$2,$3,'{}'::text[],'quick')", [person.ownerRef, root, one]);
+    await database.pool.query("SELECT * FROM identity.join_investigation($1,$2,$3,'{}'::text[],'quick')", [person.ownerRef, one, two]);
     expect(await levelRows(person.ownerRef)).toBe(0);
-    const levels = new PostgresDigModelRepository(api);
+    const levels = new PostgresDigModelRepository(asking(person));
     expect(await levels.readDigLevel(person.ownerRef, two)).toBe(2);
     // A dig of a dig with no level row joins at the walked level + 1.
     const three = await run(person);
-    expect(await new PostgresInvestigationRepository(api).join({ ownerRef: person.ownerRef, parentRunId: two, childRunId: three,
+    expect(await new PostgresInvestigationRepository(asking(person)).join({ ownerRef: person.ownerRef, parentRunId: two, childRunId: three,
       places: [], mode: "quick" })).toMatchObject({ outcome: "JOINED", digLevel: 3 });
-    // 0134 replayed over the finished chain (its fill-in is ON CONFLICT DO NOTHING) writes the missing rows.
+    // 0134 replayed over the finished chain (its fill-in is ON CONFLICT DO NOTHING) writes the missing rows. The replay also puts back 0134's own
+    // bodies of the functions a later step redefined in place and declared as an amendment of 0134 (0171, the security review: the guard and the forget
+    // definer ask their scope, not a setting; the pause's reader and Continue ask the session's owner), and 0134's grants on the owner readers 0171
+    // took back and on the runner's own steps it moved to the cross-account marker. The chain then refuses the database until they are that step's
+    // again, so a replay cannot quietly undo it.
+    const amended = (await loadMigrationPlan()).forwardChain.flatMap((step) => step.amendsPostconditionsOf ?? [])
+      .flatMap((amendment) => amendment.step === "0134_dig_model_and_month_pause.sql" && amendment.field === "function_definition" ? amendment.functions : []);
+    expect(amended.length).toBeGreaterThan(0);
+    const grantees = async () => new Map((await database.pool.query<{ signature: string; grantees: string[] }>(`SELECT signature,
+        ARRAY(SELECT DISTINCT CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE quote_ident(pg_get_userbyid(acl.grantee)) END
+          FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl WHERE acl.grantee <> p.proowner) AS grantees
+      FROM unnest($1::text[]) AS signature JOIN pg_proc AS p ON p.oid = signature::regprocedure`, [amended])).rows
+      .map((row) => [row.signature, row.grantees] as const));
+    const current = (await database.pool.query<{ definition: string }>(
+      "SELECT pg_get_functiondef(signature::regprocedure) AS definition FROM unnest($1::text[]) AS signature", [amended])).rows;
+    const granted = await grantees();
     await database.pool.query(await readFile(new URL("../../migrations/0134_dig_model_and_month_pause.sql", import.meta.url), "utf8"));
+    await expect(migrate(database.pool)).rejects.toThrow("MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0134_dig_model_and_month_pause.sql");
+    for (const { definition } of current) await database.pool.query(definition);
+    expect([...(await grantees())].some(([signature, now]) => now.some((grantee) => !granted.get(signature)!.includes(grantee)))).toBe(true);
+    await expect(migrate(database.pool)).rejects.toThrow("MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0134_dig_model_and_month_pause.sql");
+    for (const [signature, now] of await grantees()) {
+      const regranted = now.filter((grantee) => !granted.get(signature)!.includes(grantee));
+      if (regranted.length > 0) await database.pool.query(`REVOKE ALL ON FUNCTION ${signature} FROM ${regranted.join(",")}`);
+    }
     await expect(migrate(database.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     expect((await database.pool.query("SELECT run_id, dig_level FROM identity.investigation_dig_level WHERE owner_ref=$1 ORDER BY dig_level",
       [person.ownerRef])).rows).toEqual([{ run_id: one, dig_level: 1 }, { run_id: two, dig_level: 2 }, { run_id: three, dig_level: 3 }]);
@@ -223,23 +276,22 @@ describe("0134 the path rewrite", () => {
     expect(await rewrites.readRewriteTurn(dig!)).toEqual({ parent_run_id: root, position_ref: "a1", path_seq: 1, state: "FRONT",
       waiting_for: 0, base_rewrite_id: null });
     // While it writes, the parent's page sees the path WRITING.
-    const owner = new PostgresDigModelRepository(api);
-    expect((await owner.readPathRewrites(person.ownerRef, root!))!.paths).toEqual([expect.objectContaining({ run_id: dig,
+    expect((await readPathRewrites(person.ownerRef, root!))!.paths).toEqual([expect.objectContaining({ run_id: dig,
       position_ref: "a1", path_seq: 1, state: "WRITING", rewrite_id: null, content: null })]);
     const record = await ready(dig!, null);
     expect(await rewrites.recordRewrite(record)).toBe("RECORDED");
     expect(await rewrites.recordRewrite({ ...record, rewriteId: randomUUID() })).toBe("ALREADY");
     expect((await rewrites.readRewriteTurn(dig!))!.state).toBe("DONE");
-    const read = (await owner.readPathRewrites(person.ownerRef, root!))!;
+    const read = (await readPathRewrites(person.ownerRef, root!))!;
     expect(read.paths).toEqual([expect.objectContaining({ run_id: dig, state: "READY", rewrite_id: record.rewriteId,
       fate_before: "HELD_UP", fate_after: "PARTLY_HELD", verdict_outcome: "HELPED", verdict_scope: "PATH", rounds: 1,
       content: ENVELOPE })]);
     expect(read.own).toBeNull();
     // The dig's own page: what it dug and its rewrite's state.
-    expect((await owner.readPathRewrites(person.ownerRef, dig!))!.own).toMatchObject({ parent_run_id: root, position_ref: "a1", state: "READY" });
+    expect((await readPathRewrites(person.ownerRef, dig!))!.own).toMatchObject({ parent_run_id: root, position_ref: "a1", state: "READY" });
     expect((await rewrites.readPathRewrites(root!))!.paths).toHaveLength(1);
     const stranger = await account();
-    expect(await owner.readPathRewrites(stranger.ownerRef, root!)).toBeNull();
+    expect(await readPathRewrites(stranger.ownerRef, root!)).toBeNull();
     // A debate that is not a dig of that parent takes no turn on it.
     const unrelated = await run(person);
     expect(await rewrites.takeRewriteTurn(unrelated, root!, "a1")).toEqual({ outcome: "NOT_A_DIG", pathSeq: null });
@@ -248,7 +300,7 @@ describe("0134 the path rewrite", () => {
 
   it("P2 two digs of one path rewrite it one after another, each on the text the one before left", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const root = await run(person);
     const first = await run(person);
     const second = await run(person);
@@ -277,7 +329,7 @@ describe("0134 the path rewrite", () => {
     // Task 57p (0169): each rewrite notes the version that wrote it, the FAILED one too; the third was written under today's (25), not its own.
     expect((await database.pool.query("SELECT path_seq, settings_version FROM identity.path_rewrite WHERE parent_run_id=$1 ORDER BY path_seq", [root])).rows
       .map((row) => [row.path_seq, Number(row.settings_version)])).toEqual([[1, DIG_VERSION], [2, DIG_VERSION], [3, 25]]);
-    const history = (await new PostgresDigModelRepository(api).readPathRewrites(person.ownerRef, root))!.paths;
+    const history = (await readPathRewrites(person.ownerRef, root))!.paths;
     expect(history.map((entry) => [entry.path_seq, entry.state, entry.based_on_rewrite_id])).toEqual([
       [1, "FAILED", null], [2, "READY", null], [3, "READY", secondRecord.rewriteId]]);
     // Nothing reads the version yet (0169): the page's reader names no such field.
@@ -336,8 +388,10 @@ describe("0134 the web plan", () => {
     const read = (await web.readPlanStatuses(debate))!;
     expect(read.map(({ pathRef, status, searchesToSend, reason: sealedReason }) => [pathRef, status, searchesToSend, sealedReason]))
       .toEqual([["pos-1", "PLANNED", 2, null], ["pos-2", "NO_SEARCH_PLANNED", 0, REASON], ["pos-3", "PLANNED", 0, null]]);
-    // The API's serve reads it too (its role is a member of the runtime role).
-    expect(await new PostgresWebEvidenceRepository(api).readPlanStatuses(debate)).toHaveLength(3);
+    // The API's serve reads it too, in its owner's own request (its role is a member of the runtime role); since 0171 (F5) a request with
+    // no session reads nothing, as for a plan never written.
+    expect(await new PostgresWebEvidenceRepository(asking(person)).readPlanStatuses(debate)).toHaveLength(3);
+    expect(await new PostgresWebEvidenceRepository(api).readPlanStatuses(debate)).toBeNull();
     // The rules: a reason exactly on NO_SEARCH_PLANNED, sends only when planned, attested, never on a plaintext run.
     const other = await run(person);
     expect(await sqlError(() => web.recordPlanStatuses(other, [{ pathRef: "pos-1", status: "NO_SEARCH_PLANNED", searchesToSend: 0, reason: null }])))
@@ -371,7 +425,7 @@ describe("0134 the month pause", () => {
     const person = await account();
     const debate = await run(person);
     const runnerSide = new PostgresDigModelRunnerRepository(runner);
-    const apiSide = new PostgresDigModelRepository(api);
+    const apiSide = new PostgresDigModelRepository(asking(person));
     expect(await apiSide.readPause(person.ownerRef, debate)).toMatchObject({ state: "NONE", reason: null });
     expect(await apiSide.resume(person.ownerRef, debate)).toBe("NOT_PAUSED");
     const resumableAt = new Date(Date.now() + 7 * 86_400_000);
@@ -381,13 +435,19 @@ describe("0134 the month pause", () => {
     expect(await runnerSide.readPause(debate)).toMatchObject({ state: "PAUSED", reason: "MONTH_WALL", planned_calls: 14,
       planned_searches: 6, planned_micros: 31_500 });
     expect(new Date((await apiSide.readPause(person.ownerRef, debate))!.resumable_at!).getTime()).toBe(resumableAt.getTime());
-    expect((await apiSide.readPausedRuns(person.ownerRef)).map((paused) => paused.run_id)).toEqual([debate]);
+    expect((await readPausedRuns(person.ownerRef)).map((paused) => paused.run_id)).toEqual([debate]);
     const stranger = await account();
-    expect(await apiSide.resume(stranger.ownerRef, debate)).toBe("NOT_OWNED");
-    expect(await apiSide.readPause(stranger.ownerRef, debate)).toBeNull();
+    const strangerSide = new PostgresDigModelRepository(asking(stranger));
+    expect(await strangerSide.resume(stranger.ownerRef, debate)).toBe("NOT_OWNED");
+    expect(await strangerSide.readPause(stranger.ownerRef, debate)).toBeNull();
+    // 0171 (F5): a request names only its own session's account, and with no session the API's role names no one.
+    expect(await sqlError(() => strangerSide.resume(person.ownerRef, debate))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
+    expect(await sqlError(() => strangerSide.readPause(person.ownerRef, debate))).toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
+    expect(await sqlError(() => new PostgresDigModelRepository(api).resume(person.ownerRef, debate)))
+      .toMatchObject({ code: "42501", message: "REQUEST_OWNER_MISMATCH" });
     expect(await apiSide.resume(person.ownerRef, debate)).toBe("RECORDED");
     expect(await apiSide.readPause(person.ownerRef, debate)).toMatchObject({ state: "RESUMED", reason: "MONTH_WALL", planned_calls: 14 });
-    expect(await apiSide.readPausedRuns(person.ownerRef)).toEqual([]);
+    expect(await readPausedRuns(person.ownerRef)).toEqual([]);
     // It may pause again in a later month.
     expect(await runnerSide.recordPause(pause)).toBe("RECORDED");
     for (const bad of [{ ...pause, resumableAt: new Date(Date.now() - 1000) }, { ...pause, plannedCalls: -1 },
@@ -412,7 +472,7 @@ describe("0134 the month pause", () => {
 describe("0134 deleting and the export", () => {
   it("D1 (R22 item 16) erasing a dig removes its rewrite and turn (the path falls back) and its pauses; erasing the debate dug from removes its paths' rewrites", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asking(person));
     const root = await run(person);
     const first = await run(person);
     const second = await run(person);

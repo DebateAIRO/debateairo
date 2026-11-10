@@ -23,6 +23,10 @@ const italyApprovalMigration = "migrations/0125_italy_specific_approval.sql";
 // 0154 widens 0095's country CHECK by Iceland and Liechtenstein; its loader names the CHECK for its postcondition.
 const widenMigration = "migrations/0154_region_iceland_liechtenstein.sql";
 const widenLoader = "packages/db/src/migration-forward0154.ts";
+// The security review's 0171 patches the writer in place (it writes only for an account the sign-up's own transaction created) and its loader
+// digests the writer; neither reads nor writes the table.
+const securityReviewMigration = "migrations/0171_security_review_hardening.sql";
+const securityReviewLoader = "packages/db/src/migration-forward0171.ts";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -40,7 +44,7 @@ describe("registration region scope", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
     expect(references.sort()).toEqual([
       migration, forwardContract, verifier, supersedingVerifier, rlsVerifier, writer, socialWriter,
-      exportMigration, exportSnapshot, exportTypes, italyApprovalMigration, widenMigration, widenLoader,
+      exportMigration, exportSnapshot, exportTypes, italyApprovalMigration, widenMigration, widenLoader, securityReviewMigration, securityReviewLoader,
     ].sort());
     // 0154 only swaps the country CHECK: it never reads or writes a region row.
     expect(source(widenMigration)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
@@ -54,6 +58,11 @@ describe("registration region scope", () => {
     expect(source(exportMigration)).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
     // 0125 neither reads nor writes the table.
     expect(source(italyApprovalMigration)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+    // 0171 names the writer, never the table: its patch asks the account's row, before the writer's own INSERT, as it was.
+    for (const path of [securityReviewMigration, securityReviewLoader]) {
+      expect(source(path), path).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+      expect(source(path), path).toContain("identity.record_registration_region(uuid,text,text)");
+    }
     expect(source(exportSnapshot)).toContain('registration_region: raw.registration_region == null ? null : project(');
     expect(source(exportTypes)).toContain("registration_region: Row | null");
 

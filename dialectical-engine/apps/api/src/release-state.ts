@@ -363,10 +363,13 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
  *   (`readActiveSettingsVersionOn`, the one SQL constant of ./active-settings-version.ts; NULL = `siteVersion`). A
  *   waiting debate's START compares it with the run's stamp and re-checks the version it will start on with it.
  *
- * Every read but the pointer is debateai_runtime's (EXECUTE on 0123's reader and on 0124's
- * `register.settings_version_passed`, SELECT on core.work_item); the pointer is debateai_billing_runtime's (D8). The
- * room decision pool's login is the API's runtime login (DATABASE_URL, as the main pool), which holds both
- * (debateai_billing_runtime inherits debateai_runtime: P3 membershipGrants).
+ * The release reads are debateai_runtime's (EXECUTE on 0123's reader and on 0124's
+ * `register.settings_version_passed`). The count needs SELECT on core.work_item and EXECUTE on 0143's
+ * `identity.run_work_is_parked`, which since 0171 (the security review's F5) is the cross-account marker's
+ * (debateai_rls_all_accounts) alone, so the count runs only on a login that holds the marker. The pointer is
+ * debateai_billing_runtime's (D8). The room decision pool's login is the API's system login (API_SYSTEM_DATABASE_URL,
+ * main.ts), which holds all three (debateai_billing_runtime inherits debateai_runtime, and the marker: P3
+ * membershipGrants); a request login is refused the count (42501).
  */
 export class PostgresAskAdmissionGate implements AskAdmissionGate {
   readonly releaseKey: string;

@@ -31,7 +31,7 @@ import {
   EntitlementRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInternalAllowanceRepository, PostgresInvestigationReportRepository,
   PostgresInvestigationRepository, PostgresOwnClosingsReader, PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicFlagRepository, PostgresPublicPageRepository,
   PostgresPublicReviewRepository, PostgresPublicTreeRepository, PostgresPublicationRepository, PostgresStartPathsStore, PostgresWebResearchedRepository, ProviderProbeRepository,
-  RunWaitRepository, ServeDisclosureRepository, configureContentEncryption, contentCipherFor, createPool, migrate, type Pool
+  RunWaitRepository, ServeDisclosureRepository, configureContentEncryption, contentCipherFor, createPool, crossAccountPool, migrate, type Pool
 } from "@debateai/db";
 import { MapChoiceRepository } from "@debateai/map";
 import {
@@ -75,7 +75,7 @@ import { createStartCharges } from "../../apps/api/src/start-step/charge.js";
 import { startStepKeyFrom } from "../../apps/api/src/start-step/signing.js";
 import { createStartStep, startStepRouteOf } from "../../apps/api/src/start-step/step.js";
 import { createStartTransport } from "../../apps/api/src/start-step/transport.js";
-import { preStartChargeWriterPresent, questionCheckSpendWriterPresent, recordAskClarifyCharge, recordPreStartCharge, recordQuestionCheckSpend } from "@debateai/budget";
+import { preStartChargeWriterPresent, questionCheckSpendWriterPresent, recordAskClarifyCharge, recordPreStartCharge, recordQuestionCheckSpend, reserveAskClarifyCharge } from "@debateai/budget";
 import { closingReservesOf, readAbuseLimits, readQuestionCheckPolicy } from "@debateai/register";
 import { sweepInvestigationClosings } from "../../apps/runner/src/investigation-close.js";
 import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
@@ -316,7 +316,7 @@ export async function startR22World(options: R22WorldOptions = {}) {
     mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV });
   const resolveProviderPanel = createProviderDiscoveryResolver({ configuredProviders: deploymentMakers.configuredProviders,
     targets: resolveProviderTargetCredentials(declaredProviderTargets, () => { throw new TypeError("R22_TARGET_DECLARES_A_CREDENTIAL"); }),
-    probes: new ProviderProbeRepository(apiPool), probeFreshnessMs: discoveryPolicy.probeFreshnessMs, probeTimeoutMs: PREVIEW_GLM_DEADLINE_MS, probeControlsFor: previewProbeControls,
+    probes: { readLatest: (providerRefs) => new ProviderProbeRepository(apiPool).readLatest(providerRefs), record: (observation) => new ProviderProbeRepository(crossAccountPool(apiPool, "X37")).record(observation) }, probeFreshnessMs: discoveryPolicy.probeFreshnessMs, probeTimeoutMs: PREVIEW_GLM_DEADLINE_MS, probeControlsFor: previewProbeControls,
     fetchImplementation: previewFetch, previewRound: true });
   const money = (await composePracticeAskMoney({ pool: apiPool, registerVersion: nextVersion, deploymentMode: "hosted" }))!;
   const readiness = money.readiness!;
@@ -394,14 +394,14 @@ export async function startR22World(options: R22WorldOptions = {}) {
     transportFor: askClarifyTransportFor(await questionLanguageSiteRoute({ mode: environment.DEPLOYMENT_MODE, policy: ASK_CLARIFY_ROUTE_POLICY, dayCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros,
       previewGate, previewFetch, readCredential: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, spend: { writerPresent: async () => true, record: async () => undefined },
       daySpentMicros: (day: string) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day), report: () => undefined } as never)),
-    record: (entry) => recordAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
+    record: (entry) => recordAskClarifyCharge(crossAccountPool(apiPool, "X32"), entry), reserve: (entry) => reserveAskClarifyCharge(apiPool, entry), clock: () => new Date(), report: () => undefined });
   // 2026-11-02: the question check exactly as main.ts composes it on the preview, through the Anthropic gate's stand-in (it was a stub
   // that always passed, and R22 reached the test site with a check that could never run). A world where it is off refuses to start.
   const questionCheckOff: string[] = [];
   const questionCheck = await composeQuestionCheck({ mode: "hosted", apiPort: 0, target: undefined,
     readAuthorizationHeader: () => { throw new TypeError("R22_NO_CREDENTIAL"); }, reportDiagnostic: () => undefined,
     policy: await readQuestionCheckPolicy(apiPool, nextVersion), subjects: readQuestionSubjects(),
-    spend: { writerPresent: () => questionCheckSpendWriterPresent(apiPool), record: (entry) => recordQuestionCheckSpend(apiPool, entry) },
+    spend: { writerPresent: () => questionCheckSpendWriterPresent(crossAccountPool(apiPool, "X31")), record: (entry) => recordQuestionCheckSpend(crossAccountPool(apiPool, "X31"), entry) },
     dayPot: { ceilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros, spentMicros: (day) => new PostgresModelSpendStore(apiPool).readDaySpentMicros(day) },
     clock: () => new Date(), report: (line) => { if (line.event === "api.question_check.not_configured") questionCheckOff.push(line.code); },
     preview: { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") } });
@@ -437,7 +437,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
     webResearched: { record: (ownerRef: string, runId: string, pageId: string) => new PostgresWebResearchedRepository(apiPool).record(ownerRef, runId, pageId),
       markActivity: async (ownerRef: string, runId: string) => { if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId); } },
     digPicks: new PostgresDigPicksRepository(apiPool), purposeLines: postgresPurposeLines(apiPool),
-    publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), judge: () => flagJudge,
+    // The settlement on the pool's system login, as main.ts builds it (X38): 0171 makes it the cross-account marker's alone.
+    publicFlags: { limits: abuseLimits.publicFlag, repository: new PostgresPublicFlagRepository(apiPool), settlement: new PostgresPublicFlagRepository(crossAccountPool(apiPool, "X38")), judge: () => flagJudge,
       seal: (ref: string, runId: string, value: unknown) => publications.withReviewKey(ref, runId, (each) => each.encrypt(value)), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     publicTree: { pool: apiPool, tree: new PostgresPublicTreeRepository(apiPool), contributions: new PostgresPublicDebateRepository(apiPool), readPublicDebate: (ref: string) => publications.readPublicDebate(ref) },
     askClarify, monthRoom: askRoom,

@@ -24,7 +24,7 @@ import { pathSuggestionsSetIdOf } from "../../apps/runner/src/dig-suggestions-st
 import { advanceTree, pathUpdateIdOf, sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
 import { runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import { sweepPathRewrites } from "../../apps/runner/src/path-rewrite-sweep.js";
-import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { asRequestOf, provisionRlsLogins, seedLiveSession, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner
@@ -37,6 +37,8 @@ let logins: RlsLogins | undefined;
 let api: Pool;
 let runner: Pool;
 let erasure: Pool;
+/** The API's request login as main.ts builds its request pool, its system pool the target outside a request. */
+let requests: Pool;
 let owner: StoryEncryptedOwner;
 const LINEAGE = { maker: "maker-a", model_id: "model-a", transport: "openai-compatible-http", provider_ref: "provider:a" };
 const UPDATE_BY_STRANGER = "99999999-0000-4000-8000-000000000001";
@@ -54,10 +56,11 @@ beforeAll(async () => {
   runner = createPool(logins.url("RUNNER_DATABASE_URL"));
   configureContentEncryption(runner, contentCipherFor(database.pool)!);
   erasure = createPool(logins.url("ERASURE_DATABASE_URL"));
+  requests = createPool(logins.url("DATABASE_URL"), { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([api?.end(), runner?.end(), erasure?.end()]);
+  await Promise.all([api?.end(), runner?.end(), erasure?.end(), requests?.end()]);
   await logins?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
@@ -565,6 +568,12 @@ describe("decision 3: the main answer on the debate's answer", () => {
     const served = JSON.stringify(answer.main_answer);
     expect(served).not.toContain(owner.ownerRef);
     expect(served).not.toContain(one!);
+    // The security review's F5 (0171): the owner's own request, on the API's request login, is served the same answer, its run-keyed
+    // readers asking the session's owner; the system login above holds the cross-account marker and serves it with no session.
+    const asOwner = asRequestOf(requests, await seedLiveSession(database.pool, owner.userId));
+    configureContentEncryption(asOwner, contentCipherFor(database.pool)!);
+    const own = AnswerSchema.parse(await new ServeRepository(asOwner).readAnswerProjection(answerId, { ownerRef: owner.ownerRef, legacyAskerId: null }));
+    expect([own.main_answer, own.purpose_lines, own.path_rewrites]).toEqual([answer.main_answer, answer.purpose_lines, answer.path_rewrites]);
   }, 180_000);
 });
 

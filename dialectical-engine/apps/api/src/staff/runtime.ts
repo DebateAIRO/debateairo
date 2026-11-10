@@ -139,6 +139,9 @@ export async function createStaffRuntime(input: Readonly<{
     registerVersion: number;
     publicAppUrl: string;
     pool: Pool;
+    /** Where a staff change's alert intent maps its key user to the audit token it seals for, inside the staff member's request: 0088's mapping
+     * is the cross-account marker's since 0171, so main.ts hands the request pool's system login (the cross-account site X14). */
+    mappingPool: Pool;
     keys: ReadableUserDekStore;
     operatorFiles?: StaffAlertConfigFiles;
     configurationFiles?: StaffAlertConfigFiles;
@@ -191,7 +194,8 @@ export async function createStaffRuntime(input: Readonly<{
                 return;
             running = dispatcher.drain({ limit: operator.dispatch.batchSize }).catch(() => { input.log?.('TRANSPORT_UNAVAILABLE'); }).finally(() => { running = undefined; });
         };
-        return Object.freeze({ readiness, funding, targetInvitationTransport, intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: repository, readiness }),
+        return Object.freeze({ readiness, funding, targetInvitationTransport,
+            intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: new PostgresStaffAlertRepository(input.mappingPool), readiness }),
             // Side-by-side spec §4 (plan C7): every dispatch tick and the first drain ask `when` (main.ts: the release
             // watcher's ownIsCurrent), so a release that is not current claims no alert row.
             start(options?: Readonly<{ when?: () => boolean }>) {

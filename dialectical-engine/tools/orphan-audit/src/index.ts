@@ -642,7 +642,14 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Moderation statements (2026-11-06): one export line for the statements of reasons repository (0157); migrate() is byte-identical.
 // Merge of origin V4 957e3d9d7 (2026-11-07): the module carries V4's moderation-statements export line (0157) and the start
 // step's comments above. migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
-const NATIVE_MIGRATE_MODULE_SHA256 = "1a1abf9bbbbf3ad0d231cc4a905b1de5e6fd0dd683c17d00db4d478edbc6bb6c";
+// Security review F2 (2026-11-04, migration 0171): StartRunInput gained `digRun` and #insertRun sends it to
+// core.create_encrypted_run, refusing a legacy asker's dig before any SQL. migrate() is byte-identical (its 13,114-byte
+// slice, sha256 d1495dbe4bbf…).
+// The security review's step takes the number 0171 ahead of the merge of feat/2026-10-28-v4-initial (2026-11-09): the number
+// in the module's comments is all that moved. migrate() is byte-identical.
+// The merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' comments and export lines. migrate() is byte-identical.
+// The second merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' export lines. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "a58622edc223784d038c0595e91d910f2fcb374353e50c853e8a06180d643a01";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

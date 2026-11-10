@@ -16,6 +16,8 @@ import { PublicationReviewPanel } from "@/components/PublicationReviewPanel";
 type Visibility = Readonly<{
   state: "PRIVATE" | "PUBLISHED";
   public_ref: string | null;
+  /** Security review F2: a dig, which is never published (the owner's decision); absent from an API before it. */
+  dig?: boolean | undefined;
 }>;
 
 export type PrivateDeletionStatus="PENDING"|"CLEANED";
@@ -187,6 +189,9 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     setAnswered(count=>count+1);
   }
   const pendingReview = review?.flagged === true && review.state !== "APPROVED" ? review : null;
+  // Security review F2: a dig is never published, so it is offered neither Publish… nor the review a flagged debate asks for before it; the
+  // server refuses one anyway (409 DIG_NOT_PUBLISHABLE). Deleting it stays.
+  const publishable = visibility !== null && visibility.dig !== true;
 
 
   if (deleted) {
@@ -216,7 +221,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
       {statement !== null ? (
         <PublicationStatement statement={statement} catalog={catalog}/>
       ) : message ? <p role="status">{message}</p> : null}
-      {visibility !== null && pendingReview !== null ? <PublicationReviewPanel runId={runId} state={pendingReview} client={client} catalog={catalog} onAsked={() => setReview((current) => current === null || current === undefined ? current : { ...current, state: "UNDER_REVIEW", may_ask: false, asks_used: current.asks_used === 0 ? 1 : 2 })} /> : visibility === null || review === undefined || visibility.state !== "PRIVATE" ? null : action === null ? (
+      {!publishable ? null : pendingReview !== null ? <PublicationReviewPanel runId={runId} state={pendingReview} client={client} catalog={catalog} onAsked={() => setReview((current) => current === null || current === undefined ? current : { ...current, state: "UNDER_REVIEW", may_ask: false, asks_used: current.asks_used === 0 ? 1 : 2 })} /> : review === undefined || visibility?.state !== "PRIVATE" ? null : action === null ? (
         <button
           ref={toggle}
           type="button"

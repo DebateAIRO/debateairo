@@ -95,6 +95,15 @@ type Manifest = Readonly<{
     source: string;
     grants: readonly string[];
   }>[];
+  /**
+   * The security review (migration 0171): a grant a later step takes back, by the step that takes it, in the same words as
+   * a disclosure. The disclosure of the step that granted it stays as that step granted it; its own contract test pins it.
+   */
+  privilegeRevocations: readonly Readonly<{
+    roleName: string;
+    source: string;
+    revokes: readonly string[];
+  }>[];
   deploymentObligations: readonly Readonly<{
     id: string;
     ownerTicket: "P3-02";
@@ -257,8 +266,8 @@ describe("P3-01 production database-principal manifest", () => {
         ownsFunctions: []
       }
        ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
-        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'staff.publication_review_event', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission','staff.threat_report','staff.threat_report_event','staff.threat_report_alert'],
-        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend','ledger.record_question_check_spend','identity.record_ask_clarify_charge','identity.read_ask_clarify_spent','identity.record_pre_start_charge','identity.read_pre_start_spent','identity.record_pre_start_try_charge','identity.link_pre_start_try','identity.read_run_quota_used','staff.keep_threat_report','staff.list_threat_reports','staff.count_unread_threat_reports','staff.read_threat_report','staff.decide_threat_report','staff.erase_due_threat_reports','staff.hold_threat_report_email','staff.claim_threat_report_alerts','staff.complete_threat_report_alert','identity.read_data_export_threat_reports'] },
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'staff.publication_review_event', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission','staff.threat_report','staff.threat_report_event','staff.threat_report_alert','identity.ask_clarify_reservation'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend','ledger.record_question_check_spend','identity.record_ask_clarify_charge','identity.read_ask_clarify_spent','identity.record_pre_start_charge','identity.read_pre_start_spent','identity.record_pre_start_try_charge','identity.link_pre_start_try','identity.read_run_quota_used','staff.keep_threat_report','staff.list_threat_reports','staff.count_unread_threat_reports','staff.read_threat_report','staff.decide_threat_report','staff.erase_due_threat_reports','staff.hold_threat_report_email','staff.claim_threat_report_alerts','staff.complete_threat_report_alert','identity.read_data_export_threat_reports','identity.reserve_ask_clarify_charge','identity.delete_ask_clarify_reservations_due'] },
       {"roleName":"debateai_password_recovery_owner","login":false,"inherit":false,"directMemberships":[],"ownsSchemas":[],"ownsRelations":["identity.password_recovery_control","identity.password_recovery_staged_code","identity.password_recovery_retry_lock","identity.password_recovery_source_window","identity.password_recovery_notice","identity.password_recovery_feed"],"ownsFunctions":["identity.password_recovery_rules","identity.password_recovery_eligible","identity.password_recovery_audit","identity.password_recovery_notice_event","identity.password_recovery_close","identity.password_recovery_current","identity.password_recovery_prepare","identity.password_recovery_start","identity.password_recovery_exchange","identity.password_recovery_read","identity.password_recovery_read_code","identity.password_recovery_accept_code","identity.password_recovery_stage_factor","identity.password_recovery_verify_factor","identity.password_recovery_stage_codes","identity.password_recovery_ack_code","identity.password_recovery_complete","identity.password_recovery_cancel","identity.expire_password_recovery","identity.password_recovery_started_scope","identity.password_recovery_admit","identity.password_recovery_failure","identity.password_recovery_cancel_session","identity.password_recovery_read_feed","identity.password_recovery_cancel_own","identity.password_recovery_claim_notice","identity.password_recovery_finish_notice"]}
     ]);
 
@@ -1573,8 +1582,336 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.record_public_check_passed_with_settings(uuid,uuid,bigint)",
     "EXECUTE ON FUNCTION identity.record_public_answer_update_with_settings(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
     "EXECUTE ON FUNCTION identity.record_public_report_with_settings(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)"]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.publication_is_current(uuid)",
+    "EXECUTE ON FUNCTION identity.request_owner_matches(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.reserve_ask_clarify_charge(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,text,timestamptz,boolean,text,jsonb)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_run_is_dig(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.delete_ask_clarify_reservations_due(integer)",
+    "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+    "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+    "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)",
+    "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+    "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+    "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+    "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)",
+    "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+    "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+    "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+    "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+    "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+    "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)",
+    "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+    "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)",
+    "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+    "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+    "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+    "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+    "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+    "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+    "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)",
+    "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)",
+    "EXECUTE ON FUNCTION core.read_terminal_recorded_facts(uuid)",
+    "EXECUTE ON FUNCTION evaluator.provider_call_request_is_authorized(uuid,text,text,text)",
+    "EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+    "EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid)",
+    "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+    "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+    "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_alert_delivery(integer)",
+    "EXECUTE ON FUNCTION staff.read_alert_key_mapping(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.settle_alert_delivery(uuid,uuid,text,text)",
+    "EXECUTE ON FUNCTION staff.read_alert_delivery_status()",
+    "EXECUTE ON FUNCTION staff.read_target_invitation_channel(uuid,uuid,uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
+    "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.ack_consumer_security_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.fail_consumer_security_notice(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.purge_expired_authentication_risk_signals(integer)",
+    "EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices()",
+    "EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz)",
+    "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+    "EXECUTE ON FUNCTION staff.\"grant\"(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.accept(uuid,uuid,uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_owned_webauthn_challenge(uuid,uuid,text,text,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.fail_owned_webauthn(uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.complete_owned_webauthn_registration(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb)",
+    "EXECUTE ON FUNCTION staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
+    "EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)",
+    "EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid)",
+    "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.read_consumer_passkey_credential(text,text,text)",
+    "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
+    "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)",
+    "EXECUTE ON FUNCTION core.record_provider_probe(uuid,text,text,text,text,text,timestamptz)",
+    "INSERT ON ledger.model_spend",
+    "INSERT ON ledger.model_spend_hold",
+    "INSERT ON ledger.model_spend_reservation"
+  ]
 }
 ]);
+    expect(manifest.privilegeRevocations).toEqual([
+      {
+        roleName: "debateai_billing_runtime",
+        source: "migrations/0171_security_review_hardening.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
+          "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+          "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)",
+          "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)",
+          "EXECUTE ON FUNCTION identity.read_path_line(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_main_answer_updates(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.close_public_investigation(uuid,uuid)",
+          "EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz)"
+        ]
+      },
+      {
+        roleName: "debateai_runtime",
+        source: "migrations/0171_security_review_hardening.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+          "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz)",
+          "EXECUTE ON FUNCTION identity.reopen_public_investigation(uuid,integer)",
+          "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+          "EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid)",
+          "EXECUTE ON FUNCTION staff.keep_threat_report_with_email(text,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_authentication_risk_signals_for_recovery(uuid)",
+          "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)",
+          "EXECUTE ON FUNCTION staff.begin_invitation_challenge(uuid,uuid,text,text,text)",
+          "EXECUTE ON FUNCTION staff.begin_owner_possession_challenge(uuid,uuid,uuid,text,text,text,text)",
+          "EXECUTE ON FUNCTION staff.begin_registration_challenge(uuid,uuid,text,text)",
+          "EXECUTE ON FUNCTION staff.complete_invitation_proof(uuid,uuid,uuid,text,bigint,text,text)",
+          "EXECUTE ON FUNCTION staff.complete_owner_possession(uuid,uuid,uuid,text,bigint,text,text)",
+          "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,timestamptz,boolean,text,jsonb)",
+          "EXECUTE ON FUNCTION identity.read_account_security_hold(uuid)",
+          "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+          "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+          "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+          "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+          "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+          "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)",
+          "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+          "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+          "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+          "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)",
+          "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+          "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+          "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+          "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+          "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+          "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)",
+          "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+          "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)",
+          "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+          "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+          "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+          "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+          "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+          "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+          "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+          "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+          "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+          "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+          "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+          "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+          "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)",
+          "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)",
+          "EXECUTE ON FUNCTION core.read_terminal_recorded_facts(uuid)",
+          "EXECUTE ON FUNCTION evaluator.provider_call_request_is_authorized(uuid,text,text,text)",
+          "EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+          "EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid)",
+          "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+          "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+          "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_alert_delivery(integer)",
+          "EXECUTE ON FUNCTION staff.read_alert_key_mapping(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.settle_alert_delivery(uuid,uuid,text,text)",
+          "EXECUTE ON FUNCTION staff.read_alert_delivery_status()",
+          "EXECUTE ON FUNCTION staff.read_target_invitation_channel(uuid,uuid,uuid,uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.purge_expired_authentication_risk_signals(integer)",
+          "EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices()",
+          "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+          "EXECUTE ON FUNCTION staff.\"grant\"(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.accept(uuid,uuid,uuid,uuid,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+          "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.read_owned_webauthn_challenge(uuid,uuid,text,text,jsonb,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.fail_owned_webauthn(uuid,uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.complete_owned_webauthn_registration(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb)",
+          "EXECUTE ON FUNCTION staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
+          "EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)",
+          "EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid)",
+          "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
+          "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+          "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+          "EXECUTE ON FUNCTION identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)",
+          "EXECUTE ON FUNCTION core.record_provider_probe(uuid,text,text,text,text,text,timestamptz)",
+          "INSERT ON ledger.model_spend",
+          "INSERT ON ledger.model_spend_hold",
+          "INSERT ON ledger.model_spend_reservation",
+          "UPDATE ON ledger.sequence_allocator"
+        ]
+      },
+      {
+        roleName: "debateai_authorization_runtime",
+        source: "migrations/0171_security_review_hardening.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
+          "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.ack_consumer_security_notice(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.fail_consumer_security_notice(uuid,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_consumer_passkey_credential(text,text,text)",
+          "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
+          "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
+          "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)"
+        ]
+      }
+    ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
       .toEqual([
         { id: "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", ownerTicket: "P3-02" },
@@ -2029,6 +2366,32 @@ it("discloses exactly 0142's grants, all to the runtime role (R22 team limit, de
   // ownership move are not granted to anyone.
   expect(declared).toHaveLength(13);
   expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(13);
+});
+
+it("discloses exactly 0171's grants, and records each grant it takes back under privilegeRevocations alone (the security review)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const source = "migrations/0171_security_review_hardening.sql";
+  const sql = await readFile(source, "utf8");
+  // One role per line, at the top level, so each line below is the whole statement: a function's EXECUTE, or (F5, the site's day) a ledger
+  // table's INSERT or UPDATE.
+  expect([...sql.matchAll(/^(?:GRANT|REVOKE) [^\n]+;$/gmu)].map(([statement]) => statement)
+    .filter((statement) => !/^(?:GRANT [^\n]+ TO|REVOKE (?:EXECUTE ON FUNCTION \S+|(?:INSERT|UPDATE) ON ledger\.\w+) FROM) debateai_[a-z_]+;$/u.test(statement))).toEqual([]);
+  const granted = [...sql.matchAll(/^GRANT ([^\n]+) TO (debateai_[a-z_]+);$/gmu)].map(([, grant, role]) => `${role!}:${grant!}`).sort();
+  const disclosed = manifest.privilegeDisclosures.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}:${grant}`)).sort();
+  expect(disclosed).toEqual(granted);
+  const revoked = [...sql.matchAll(/^REVOKE (EXECUTE ON FUNCTION \S+|(?:INSERT|UPDATE) ON ledger\.\w+) FROM (debateai_[a-z_]+);$/gmu)]
+    .map(([, revoke, role]) => `${role!}:${revoke!}`).sort();
+  expect(revoked.length).toBeGreaterThan(0);
+  const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
+  expect(recorded).toEqual(revoked);
+  // Nowhere else: every revocation the manifest records is a line of its own step, and no step's disclosures name it as 0171's grant.
+  for (const entry of manifest.privilegeRevocations) {
+    const own = await readFile(entry.source, "utf8");
+    for (const revoke of entry.revokes) expect(own, revoke).toContain(`REVOKE ${revoke} FROM ${entry.roleName};`);
+  }
+  for (const line of recorded) expect(disclosed, line).not.toContain(line);
 });
 
 it("discloses every 0127 publication review grant, including the run ownership columns", async () => {

@@ -2,13 +2,15 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresModelSpendStore } from "@debateai/budget";
 import {
-  createPool, migrate, PostgresInvestigationReportRunnerRepository, PostgresInvestigationRepository, type InvestigationReportsRead,
+  createPool, migrate, PostgresInvestigationReportRunnerRepository, PostgresInvestigationRepository, PostgresInvestigationRunnerRepository,
+  type InvestigationReportsRead,
   type Pool, type UnreportedClosing, type WebSealed
 } from "@debateai/db";
 import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
 import { sweepInvestigationClosings, type InvestigationCloseSettings } from "../../apps/runner/src/investigation-close.js";
 import { investigationReportProjectedMicros } from "../../apps/runner/src/investigation-close-sources.js";
 import { CLOSING_RESERVES, PRICES, contractOf, investigationInput, team } from "../support/investigation-close-world.js";
+import { asRequestOf, seedLiveSession } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -18,10 +20,14 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * against the plan's reserve read from the ledger since the closing began; the version is stored once, sealed under the
  * root's key, and the closing is marked written; reopening and closing again writes version 2, which reads version 1's
  * answer, and version 1 stays. The investigation's content is the made-up dossier of the unit tests (the sources' reads
- * of stories and points are the path rewrite's, covered by its own integration test). Data is made up.
+ * of stories and points are the path rewrite's, covered by its own integration test). Data is made up. Since the security review's 0171
+ * (F5) the API's role runs here as the person's own request (its login carrying their live session), as its functions believe no other
+ * owner; 0133's owner read of an investigation is no role's any more, so the runner's reader reads it.
  */
 let database: TestDatabase;
 let api: Pool;
+/** The API's role wired as main.ts wires its request pool: inside a request its own connections carry the person's session. */
+let requests: Pool;
 let runner: Pool;
 let sequence = 9_700_000;
 const SECRET = Buffer.alloc(32, 7);
@@ -34,12 +40,13 @@ const loginPool = (role: string, password: string): Pool => {
   url.password = password;
   return createPool(url.toString());
 };
-type Account = Readonly<{ ownerRef: string }>;
+type Account = Readonly<{ ownerRef: string; token: string }>;
 async function account(): Promise<Account> {
   const userId = randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
     VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash("sha256").update(userId).digest(), `close-${userId}`]);
-  return { ownerRef: (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref };
+  return { ownerRef: (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref,
+    token: await seedLiveSession(database.pool, userId) };
 }
 async function seeded(statements: ReadonlyArray<readonly [string, readonly unknown[]]>): Promise<void> {
   const seed = await database.pool.connect();
@@ -86,13 +93,18 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   await database.pool.query("CREATE ROLE close_api LOGIN PASSWORD 'close-api-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
-  await database.pool.query("CREATE ROLE close_runner LOGIN PASSWORD 'close-runner-test-only' IN ROLE debateai_runtime");
+  // The runner's login holds the cross-account marker, as runner-runtime does: since 0171 (F5) the closings' sweep list is the marker's alone.
+  await database.pool.query("CREATE ROLE close_runner LOGIN PASSWORD 'close-runner-test-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   api = loginPool("close_api", "close-api-test-only");
   runner = loginPool("close_runner", "close-runner-test-only");
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.username = "close_api";
+  apiUrl.password = "close-api-test-only";
+  requests = createPool(apiUrl.toString(), { crossAccount: api });
 }, 300_000);
 
 afterAll(async () => {
-  await Promise.all([api?.end(), runner?.end()]);
+  await Promise.all([api?.end(), runner?.end(), requests?.end()]);
   await database?.stop();
 });
 
@@ -144,7 +156,7 @@ function settingsFor(root: string, vendors: ReturnType<typeof team>, contents: M
 describe("W5-1 Write my report on real PostgreSQL", () => {
   it("closes and wipes, waits for the running dig, writes version 1, then version 2 after a reopening; version 1 stays", async () => {
     const person = await account();
-    const investigations = new PostgresInvestigationRepository(api);
+    const investigations = new PostgresInvestigationRepository(asRequestOf(requests, person.token));
     const reports = new PostgresInvestigationReportRunnerRepository(runner);
     const root = await run(person);
     await work(root, "DONE");
@@ -183,7 +195,7 @@ describe("W5-1 Write my report on real PostgreSQL", () => {
     const spentOne = afterFirst.reports[0]!.spent_micros;
     expect(spentOne).toBeGreaterThan(0);
     expect(spentOne).toBeLessThanOrEqual(CLOSING_RESERVES.paid);
-    const written = (await investigations.read(person.ownerRef, root))!;
+    const written = (await new PostgresInvestigationRunnerRepository(runner).ofRun(root))!;
     expect(written.state).toBe("closed");
     expect(written.closings[0]!.report_ref).toBe(afterFirst.reports[0]!.report_id);
     expect(await reports.readUnreported(100).then((listed) => listed.filter((closing) => closing.investigationId === id))).toEqual([]);

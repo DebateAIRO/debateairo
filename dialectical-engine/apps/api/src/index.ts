@@ -81,6 +81,9 @@ import {
   PLAN_TIER_ROSTERS,
   PublicationContentRefusalSchema,
   PublicationTransitionSchema,
+  RunVisibilitySchema,
+  DIG_NOT_PUBLISHABLE,
+  DigNotPublishableSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
   PublicDebateRefusedSchema,
@@ -2064,7 +2067,8 @@ export interface ApiOptions {
   /**
    * V4 account memory (owner rulings N7 and N11, migration 0131): the reading level, each debate's last visit and each
    * dig's link, kept in the account. Its six routes are always mounted; without it they answer 503
-   * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory.
+   * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory. The asks route writes each
+   * dig's own row through it as the dig starts (0171, the security review's F2: a dig is never published).
    */
   readonly accountMemory?: AccountMemoryStore;
   /**
@@ -4660,6 +4664,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         console.error(JSON.stringify(Object.freeze({ event: "api.saved_question.remove_failed", saved_question_id: savedQuestionId })));
       }
     }
+    // Security review F2 (0171): a dig is never published, and is known as one by its own row (identity.dig_run), which the submit's run creation
+    // has already written in the same statement as the run (the application marks an owner's ask with a parent or a public parent), for a private
+    // dig and a public one alike, so it is there whatever the joins below answer (and before the 202 of a public join that did not take), and stays
+    // whatever becomes of the parent.
     // W3-2: at start (started or waiting in line) the server writes the dig's link and joins it to its parent's
     // investigation; a join that does not take leaves the run as it is (the page's own link call is the fallback).
     const digOwner = owner?.ownerRef;
@@ -4675,7 +4683,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (publicAdmission !== null && digOwner !== undefined && options.publicTree !== undefined) {
       const joined = await joinPublicDigAtStart({ ownerRef: digOwner, childRunId: accepted.run_ref, admission: publicAdmission, now: new Date(), pool: options.publicTree.pool, tree: options.publicTree.tree,
         contributions: options.publicTree.contributions, readPublicDebate: options.publicTree.readPublicDebate });
-      // By the rules a join admitted a moment ago cannot be refused now; a store that failed in between can only be said plainly: the debate runs as the person's own, the page is left alone.
+      // A join admitted a moment ago is refused now only by a race (the page or its root made private meanwhile, a climb past level 10) or a store that failed in between, and that
+      // can only be said plainly: the debate runs as the person's own, a dig all the same by its row above, and the page is left alone.
       if (joined !== "JOINED" && joined !== "ALREADY") return Object.freeze({ kind: "ACCEPTED", status: 202, body: { ...accepted, public_dig_not_joined: true } });
     }
     // Decision 13: the page showed the Free notice, on the Free plan: this debate goes public when finished, after the AI check. A dig is a contribution instead; a paid plan's flag means nothing.
@@ -5435,7 +5444,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       });
       return visibility === null
         ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
-        : reply.send(PublicationTransitionSchema.parse(visibility));
+        : reply.send(RunVisibilitySchema.parse(visibility));
     }
   );
   api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", routePolicy("GET /v1/runs/{id}/answer"), async (request, reply) => {
@@ -5485,6 +5494,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           requestId: request.id
         });
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      // Security review F2 (migration 0171): the owner decided that a dig is never published. Asked once the grant is known live, so another's
+      // debate still answers the audited 404 above, and before the answer is read, the synthesis gate runs or a key is made; the application and
+      // the database's key provision refuse a dig as well.
+      if (await options.publications.isDig?.({ runId, authenticated }) === true) {
+        return reply.status(409).send(DigNotPublishableSchema.parse({ error: DIG_NOT_PUBLISHABLE, message: DIG_NOT_PUBLISHABLE }));
       }
       // FIX-HS2-p1 sd-B1 (ruling R-P): each private-content phase holds the run's lease (one pooled client) only
       // for its own reads and writes; `publish` awaits the content check — up to D on an external judge — under
@@ -7191,6 +7206,10 @@ export class PostgresAskApplication implements AskApplication {
       markAskRefusal(error);
     }
     const appliedField = applied === null ? {} : { applied };
+    // Security review F2 (0171): an owner's ask with a parent or a public parent is a dig, marked by the statement that creates its run (0123's
+    // core.create_encrypted_run writes identity.dig_run with the run), on this path and the room's alike, so nothing between the start and the
+    // route's joins can leave it unmarked. A legacy asker owns no account to mark it under, and its run is never published.
+    const digRun = principal.kind === "server" && (requestedAsk.parent !== undefined || requestedAsk.public_parent !== undefined);
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
@@ -7201,7 +7220,7 @@ export class PostgresAskApplication implements AskApplication {
     if (settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
         settings, ask, plannedAsk, session, principal, ownership, settings.room, substitutedAt, shapePlan, questionLanguageLock,
-        settingsUnavailable, start, fundingBasis
+        settingsUnavailable, digRun, start, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -7249,6 +7268,7 @@ export class PostgresAskApplication implements AskApplication {
           envelopeBasis,
           registerVersion: settings.registerVersion,
           releaseKey: settings.releaseKey,
+          ...(digRun ? { digRun: true as const } : {}),
           batteryVersion: settings.batteryVersion,
           askContract: {
             decision_scope: ask.decision_scope,
@@ -7463,6 +7483,7 @@ export class PostgresAskApplication implements AskApplication {
     shapePlan: DebateShapePlanKey,
     questionLanguageLock: QuestionLanguageLock | null,
     settingsUnavailable: boolean,
+    digRun: boolean,
     start: AskStart | null,
     fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
@@ -7555,6 +7576,8 @@ export class PostgresAskApplication implements AskApplication {
             envelopeBasis: evaluated.envelopeBasis,
             registerVersion: settings.registerVersion,
             releaseKey: settings.releaseKey,
+            // Security review F2 (0171): a dig's run is marked in the statement that creates it, START or WAIT alike.
+            ...(digRun ? { digRun: true as const } : {}),
             batteryVersion: settings.batteryVersion,
             askContract: {
               decision_scope: runAsk.decision_scope,

@@ -518,7 +518,7 @@ async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorag
   let clarifyPort: AskClarifyPort | null = null;
   const clarifyReader = (): AskClarifyPort => {
     clarifyPort ??= createAskClarify({ limits: { perHour: input.questions.length, perDay: input.questions.length },
-      transportFor: askClarifyTransportFor({ kind: "PREVIEW", fetch: clarifyFetch }), record: async () => undefined, clock: () => new Date(),
+      transportFor: askClarifyTransportFor({ kind: "PREVIEW", fetch: clarifyFetch }), reserve: async () => undefined, record: async () => undefined, clock: () => new Date(),
       report: (line) => { if (line.event === "api.ask_clarify.none") clarifyNone.code = line.code; } });
     return clarifyPort;
   };

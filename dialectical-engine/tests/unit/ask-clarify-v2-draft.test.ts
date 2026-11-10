@@ -51,6 +51,7 @@ function gateway(replies: readonly string[], sealed?: readonly PromptContract[])
       if (next === undefined) throw new Error("no scripted reply");
       return next;
     },
+    reserve: async () => undefined,
     record: async () => undefined,
     clock: () => new Date("2026-11-04T10:00:00.000Z"),
     report: () => undefined,

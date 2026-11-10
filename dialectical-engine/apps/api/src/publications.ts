@@ -445,13 +445,23 @@ export interface PublicationApplication {
     authenticated: AuthenticatedSession;
     requestId: string | undefined;
   }>): Promise<boolean>;
+  /** Security review F2: `dig` (true) only for a dig, which is never published, so the page offers no Publish. */
   readOwnedVisibility(input: Readonly<{
     runId: string;
     authenticated: AuthenticatedSession;
   }>): Promise<Readonly<{
     state: "PRIVATE" | "PUBLISHED";
     public_ref: string | null;
+    dig?: boolean;
   }> | null>;
+  /**
+   * Security review F2 (migration 0171): is this debate of the session's owner a dig? The owner decided that a dig is never published; the route
+   * asks right after the grant's check, before it reads the answer or runs a check. Absent: the route does not ask (publish still refuses a dig).
+   */
+  isDig?(input: Readonly<{
+    runId: string;
+    authenticated: AuthenticatedSession;
+  }>): Promise<boolean>;
   publish(input: Readonly<{
     runId: string;
     answer: Answer;
@@ -643,6 +653,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
   }>): Promise<Readonly<{
     state: "PRIVATE" | "PUBLISHED";
     public_ref: string | null;
+    dig?: boolean;
   }> | null> {
     const visibility = await this.repository.readOwnedVisibility(
       input.runId,
@@ -651,8 +662,17 @@ export class PostgresPublicationApplication implements PublicationApplication {
     );
     return visibility === null ? null : Object.freeze({
       state: visibility.state,
-      public_ref: visibility.publicRef
+      public_ref: visibility.publicRef,
+      // Security review F2: said only of a dig, so a debate that is none reads as before.
+      ...(visibility.dig === true ? { dig: true } : {})
     });
+  }
+
+  async isDig(input: Readonly<{
+    runId: string;
+    authenticated: AuthenticatedSession;
+  }>): Promise<boolean> {
+    return await this.repository.readRunIsDig(input.runId, input.authenticated.userId, input.authenticated.ownerRef) === true;
   }
 
   async publish(input: Readonly<{
@@ -717,6 +737,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
       });
       return null;
     }
+    // Security review F2 (0171): a dig is never published, whoever calls; the database refuses its key's provision as well. Only a debate the
+    // reader answers is the owner's and no dig goes on.
+    if (await this.repository.readRunIsDig(input.runId, input.authenticated.userId, input.authenticated.ownerRef) !== false) return null;
     const pseudonym = await this.repository.readAuthorPseudonym(
       input.runId,
       input.authenticated.userId,

@@ -21,10 +21,14 @@ export async function ownerCandidate(admin:Pool) {
  return {userId,ordinarySessionId,factorId,ownerRef,keys,credentialIds:[keys[0]!.f.expected.credentialId,keys[1]!.f.expected.credentialId] as readonly [string,string]};
 }
 export type OwnerCandidate=Awaited<ReturnType<typeof ownerCandidate>>;
-export async function ownerNativeReceipts(runtime:Pool,a:OwnerCandidate,commandId:string,nonce:string) {
+/**
+ * The owner's possession receipts, through the step-up on `runtime` and the owned ceremony on `staff`: since 0171 the ceremony is the cross-account
+ * marker's, so `staff` is a login shaped as the API's system login, on which main.ts builds its staff repository (X14).
+ */
+export async function ownerNativeReceipts(runtime:Pool,a:OwnerCandidate,commandId:string,nonce:string,staff:Pool) {
  const handle=b64(randomBytes(32)),replacement=digest(randomBytes(32));
  await runtime.query('SELECT staff.step_up_prerequisite($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15)',[a.userId,a.ownerRef,'task6-synthetic-password',a.factorId,2,a.ordinarySessionId,digest(a.ordinarySessionId),replacement,digest(randomBytes(32)),{}, {ipArgon2id:'argon2id-audit:v1:'+'0'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'1'.repeat(64)},digest(handle),'OWNER_POSSESSION',commandId,digest(nonce)]);
- const repository=new PostgresStaffRepository(runtime),service=new StaffWebAuthnService(repository,{publicAppUrl:origin});
+ const repository=new PostgresStaffRepository(staff),service=new StaffWebAuthnService(repository,{publicAppUrl:origin});
  const context=await repository.readOwnerPossessionContext({...a,commandId,nonceHash:digest(nonce),credentialId:a.credentialIds[0],prerequisiteHandleHash:digest(handle)});
  if(context===null)throw new Error('SYNTHETIC_OWNER_CONTEXT_MISSING');
  const receipts=[];

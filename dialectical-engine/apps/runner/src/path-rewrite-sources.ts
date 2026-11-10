@@ -1,10 +1,10 @@
 import {
-  PATH_ID_PATTERN, PurposeLinesSchema, purposeLinesMaterial, readingLevelOf, StoryBodySchema, StoryFateSchema, type PathOutcome, type PurposeLines,
-  type StoryFate
+  PATH_ID_PATTERN, PublicMaterialSchema, PurposeLinesSchema, purposeLinesMaterial, readingLevelOf, StoryBodySchema, StoryFateSchema, type PathOutcome, type PublicMaterial,
+  type PurposeLines, type StoryFate
 } from "@debateai/contract";
 import {
-  PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresPassageRetentionRepository,
-  PostgresPathResultsRepository, PostgresStartPathsStore,
+  PATH_REWRITE_CARRIER, PATH_UPDATE_CARRIER, PUBLIC_MATERIAL_CARRIER, PostgresDigModelRunnerRepository, PostgresDigPicksRunnerRepository, PostgresPassageRetentionRepository,
+  PostgresPathResultsRepository, PostgresPublicDebateRunnerRepository, PostgresPublicTreeRunnerRepository, PostgresStartPathsStore,
   PostgresTreeUpdateRunnerRepository, PostgresWebEvidenceRepository, RUN_PURPOSE_LINES_CARRIER, RunRepository, WEB_EVIDENCE_CARRIERS, WEB_SHOWN_QUOTE_CARRIER,
   decryptContentForRun, decryptLeasedContentForRun, prepareLeasedContentEncryptionForRun,
   withRunContentLease, type CryptoEnvelope, type Pool, type StoredStartPathSet
@@ -25,6 +25,10 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *    debate's question, found by walking the picks' parents up (a debate with no pick set is the first). The main
  *    question's place, time and purpose lines (R22 decision 5): 0138's, written at its ask; an old debate has none; the locked
  *    question language: not read here (null: the reply's language is checked against the question line).
+ *    The walk never leaves the digger's own runs: a debate on the way up that belongs to someone else stops it unread, and one
+ *    of the digger's own public digs is as far as it goes. Above that dig is a public debate, which a private dig reads the way
+ *    the public lane does (public-tree-sources.ts): the main question is that dig's copy of the page, with no place, time or
+ *    purpose lines, and nothing of the debate's author's own run.
  *  - `parentPathOf`: the path on the parent's latest story (its line and fate; the map's path ids, "<ref>#2" for a
  *    position argued twice), its text replaced by the base rewrite's (0134, opened under that dig's key) when there is
  *    one; its points are the story path's points (each node's own words), each pointing at the point it argues when that
@@ -205,6 +209,25 @@ export function pathOutcomeBaseOf(set: StoredStartPathSet, outcomes: ReadonlyMap
   return question === undefined ? null : Object.freeze({ line: question, summary: null, fate: "SET_ASIDE" as const });
 }
 
+/** The copy sealed for this dig or this report's carrier (0147), opened under the key of the run it is kept with. Null: there is none. */
+export async function openPublicMaterial(pool: Pool, materialId: string): Promise<PublicMaterial | null> {
+  const row = await new PostgresPublicTreeRunnerRepository(pool).readMaterial(materialId);
+  if (row === null) return null;
+  const opened = await withRunContentLease(pool, [row.run_id], () => decryptContentForRun<unknown>(pool, row.run_id, PUBLIC_MATERIAL_CARRIER, materialId, row.content, null));
+  return PublicMaterialSchema.parse(opened);
+}
+
+/**
+ * Who owns the run now: 0037's latest ownership event, a clear id that opens nothing. Null when it has none, or when this
+ * login cannot see it; the runner's login sees every account's (debateai_rls_all_accounts).
+ */
+async function ownerOfRun(pool: Pool, runId: string): Promise<string | null> {
+  const row = (await pool.query<{ owner_ref: string }>(
+    "SELECT event.owner_ref::text AS owner_ref FROM core.run_ownership_event AS event WHERE event.run_id = $1 ORDER BY event.at_seq DESC LIMIT 1",
+    [runId])).rows[0];
+  return row === undefined ? null : row.owner_ref;
+}
+
 /** What 0135's row keeps of the dig's paths: each extract by its point and label, never its words (decision 7). */
 export function digPathsForStore(digPaths: readonly PathRewriteDigPath[]): Readonly<{ v: number; dig_paths: readonly unknown[] }> {
   return Object.freeze({ v: INPUT_VERSION, dig_paths: digPaths.map((path) =>
@@ -216,6 +239,7 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
   const digModel = new PostgresDigModelRunnerRepository(pool);
   const runs = new RunRepository(pool);
   const tree = new PostgresTreeUpdateRunnerRepository(pool);
+  const contributions = new PostgresPublicDebateRunnerRepository(pool);
   const pathResults = new PostgresPathResultsRepository(pool);
   /** V4 start step, Task 55: a path debate's roots in force (ids and codes only, no lease), each by its path id; [] for any other run. */
   const pathRootsOf = async (runId: string): Promise<readonly Readonly<{ ref: string; rootNodeId: string }>[]> =>
@@ -280,21 +304,41 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       if (own === null || own.positionRef === null) return null;
       const level = await digModel.readDigLevel(runId);
       if (level < 1) return null;
+      const ask = await runs.readStoredAsk(runId);
+      if (ask === null) return unread("ask");
+      // The walk up never leaves the digger's own runs. Each debate on the way is checked before anything of it is read: someone
+      // else's stops the walk unread (none is reached by a private dig's own links; a stray one fails closed), and one of the
+      // digger's own public digs ends it there, its picks unread: what is above it is the public debate, read from its copy.
+      const digger = await ownerOfRun(pool, runId);
+      if (digger === null) return unread("owner");
       let root = own.parentRunId;
-      for (let hops = 0; hops < DIG_CHAIN_MAX; hops += 1) {
-        const above = await picks.read(root);
+      let publicDig = false;
+      for (let hops = 0; ; hops += 1) {
+        if (await ownerOfRun(pool, root) !== digger) return unread("owner");
+        if (await contributions.readContribution(root) !== null) {
+          publicDig = true;
+          break;
+        }
+        const above = hops < DIG_CHAIN_MAX ? await picks.read(root) : null;
         if (above === null) break;
         root = above.parentRunId;
       }
-      const ask = await runs.readStoredAsk(runId);
-      const main = await runs.readStoredAsk(root);
-      if (ask === null || main === null) return unread("ask");
-      // Decision 5: the step-2 lines are the first debate's, written at its ask; an old debate has none. Decision 29: its question already says them.
-      const lines = purposeLinesMaterial(main.questionLine, await purposeLinesOf(pool, root));
+      let question: PathRewriteDig["question"];
+      if (publicDig) {
+        // The public lane's main question (public-tree-sources.ts): the page as the dig copied it, no place, time or purpose lines.
+        // A public dig whose copy was never kept (the API stopped between its join and its copy) reads as unread, as on that lane.
+        const page = await openPublicMaterial(pool, root) ?? unread("public copy");
+        question = Object.freeze({ line: page.question, place: null, time: null, purpose: null, readingLevel: readingLevelOf(ask.depthParams), language: null });
+      } else {
+        const main = await runs.readStoredAsk(root);
+        if (main === null) return unread("ask");
+        // Decision 5: the step-2 lines are the first debate's, written at its ask; an old debate has none. Decision 29: its question already says them.
+        const lines = purposeLinesMaterial(main.questionLine, await purposeLinesOf(pool, root));
+        question = Object.freeze({ line: main.questionLine, place: lines.place, time: lines.time, purpose: lines.purpose,
+          readingLevel: readingLevelOf(ask.depthParams), language: null });
+      }
       return Object.freeze({
-        parentRunId: own.parentRunId, positionRef: own.positionRef, level, free: ask.planTier === "free",
-        question: Object.freeze({ line: main.questionLine, place: lines.place, time: lines.time, purpose: lines.purpose,
-          readingLevel: readingLevelOf(ask.depthParams), language: null }),
+        parentRunId: own.parentRunId, positionRef: own.positionRef, level, free: ask.planTier === "free", question,
         picks: Object.freeze(own.picks.map((pick) => Object.freeze({ text: pick.text, by: pick.author })))
       });
     },

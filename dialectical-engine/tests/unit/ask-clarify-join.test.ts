@@ -29,6 +29,7 @@ function heldGateway() {
       await onUsage({ inputTokens: 100, outputTokens: 50, projected: false });
       return text;
     },
+    reserve: async () => undefined,
     record: async (entry) => { charges.push(entry); },
     clock: () => new Date("2026-11-04T10:00:00.000Z"),
     report: () => undefined,

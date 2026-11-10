@@ -31,6 +31,7 @@ import { PostgresRecoveryEmailRepository } from '@debateai/db';
 import { RecoveryEmailService } from '../../apps/api/src/recovery-email.js';
 import { MemoryRecoveryEmailMailSender } from '../../apps/api/src/mail-channel.js';
 import { profileAccount, profileGrant, profileAudit, profileUsers, profileBlindKey, profileSource } from '../support/profileAccount.js';
+import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 let db: TestDatabase, runtime: Pool, registrationRuntime: Pool, erasureRuntime: Pool, argon2: Argon2WorkerPool, dummy: string;
 const audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
@@ -212,7 +213,8 @@ describe('mail language on the recovery-email confirm writer (S01-C08.4)', () =>
 
 async function staffFinishHarness() {
     const { b64, digest, fixture, key, origin } = staffFx;
-    let database: TestDatabase, runtime: Pool, repo: PostgresStaffRepository, service: StaffWebAuthnService;
+    // 0171: the owned ceremony is the cross-account marker's: the staff repository runs on a login shaped as the API's system login (X14).
+    let database: TestDatabase, runtime: Pool, system: Pool, repo: PostgresStaffRepository, service: StaffWebAuthnService;
 const env = { v: 1 as const, keyId: 'fixture', nonce: 'AAAAAAAAAAAAAAAA', tag: 'AAAAAAAAAAAAAAAAAAAAAA==', ct: 'YQ==' };
 async function account() { const userId = randomUUID(), ordinarySessionId = randomUUID(), factorId = randomUUID(); await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1,$2,'{}','{}','fixture-password',$3,'active',now())`, [userId, createHash('sha256').update(userId).digest(), userId]); await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`, [factorId, userId]); await database.pool.query(`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,idle_expires_at,absolute_expires_at,last_mfa_at) VALUES($1,$2,$3,$4,'{}',now()+interval '1 hour',now()+interval '2 hours',now())`, [ordinarySessionId, userId, digest(ordinarySessionId), digest('csrf' + ordinarySessionId)]); await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,'email','{}','verified',now(),now())`, [userId]); const ownerRef = (await database.pool.query('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0].owner_ref as string; return { userId, ordinarySessionId, factorId, ownerRef }; }
 type Account = Awaited<ReturnType<typeof account>>;
@@ -222,8 +224,8 @@ const request = (options: {
     challenge_handle: string;
 }, credential: unknown) => ({ challenge_handle: options.challenge_handle, credential });
 const enrollmentIntent = (expectedOperationId: string) => async (input: StaffEnrollmentIntentBinding) => { expect(input.operationId).toBe(expectedOperationId); await authorizeStaffAlertFixture(database.pool,input.operationId);return { operationId: input.operationId, factorId: input.factorId, deviceLabelEnvelope: { ...env, keyId: 'passkey-label:' + input.factorId + ':v1' }, alertIntent: { schema: 'staff-alert-v1' as const, event: 'KEY_CHANGE' as const, operationId: input.operationId, envelope: env } }; };
-    database = await startTestDatabase(); await migrate(database.pool); await initializeOwnerRecoveryFixture(database.pool, database.connectionString); await database.pool.query(`CREATE ROLE webauthn_test_runtime LOGIN PASSWORD 'webauthn-test-only' IN ROLE debateai_runtime`); const url = new URL(database.connectionString); url.username = 'webauthn_test_runtime'; url.password = 'webauthn-test-only'; runtime = createPool(url.toString()); repo = new PostgresStaffRepository(runtime); service = new StaffWebAuthnService(repo, { publicAppUrl: origin });
-    return { database, runtime, service, account, prerequisite, registration, request, enrollmentIntent, fixture, key, teardown: async () => { await runtime?.end(); await database?.stop(); } };
+    database = await startTestDatabase(); await migrate(database.pool); await initializeOwnerRecoveryFixture(database.pool, database.connectionString); await database.pool.query(`CREATE ROLE webauthn_test_runtime LOGIN PASSWORD 'webauthn-test-only' IN ROLE debateai_runtime`); const url = new URL(database.connectionString); url.username = 'webauthn_test_runtime'; url.password = 'webauthn-test-only'; runtime = createPool(url.toString()); system = createPool(await createSystemTwin(database, 'webauthn_test_system', ['debateai_runtime'])); repo = new PostgresStaffRepository(system); service = new StaffWebAuthnService(repo, { publicAppUrl: origin });
+    return { database, runtime, service, account, prerequisite, registration, request, enrollmentIntent, fixture, key, teardown: async () => { await runtime?.end(); await system?.end(); await database?.stop(); } };
 }
 
 describe('staff finish mail language (S01-C08.5)', () => {

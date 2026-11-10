@@ -21,13 +21,22 @@ import { anthropicFastCheckTransport, type FastCheckUsage } from "./question-lan
  * beside a run-less ledger row that keeps it in the site's day. The windows, a team member's grant and the team's one limit all read it. The caller
  * asks first whether the pool is empty: empty, no call. Every call is recorded from the vendor's real counts, or the projected maximum when a hosted
  * call may have been billed without readable counts; on the preview the gate settles the money and a refused send costs nothing, so only real counts.
- * A record that cannot be written stops the calls until a restart (never spend unrecorded).
+ * Each paid call's charge id is reserved for the person first (0171), on the request's own connection while its session is live, so the record after the
+ * call, which 0171 made the system login's alone (main.ts's site X32), names the person whatever became of the session meanwhile (a sign-out, a
+ * step-up's new token); a reservation the database refuses (the session is not the person's any more) means no further call for this request. A record or a reservation that cannot be written stops the calls until a restart
+ * (never spend unrecorded). The database keeps the grant a team member's call names only when it is that person's own and was running when the call was
+ * reserved, and otherwise records the call on the person's own plan, refusing nothing. A reservation names its person for an hour: every call is recorded
+ * well within that, as the deadline below aborts the call (a hosted send it cuts short is recorded at once, at the projected maximum), the pool waits
+ * 5 s at most for a connection and production ends a statement at 30 s. The reservations no charge took (a refused, skipped or abandoned call) go with the next
+ * reservations, or with the hourly sweep below, which the API runs outside any request.
  *
  * Privacy: nothing here logs the question, the reply or the suggestions, only codes. Nothing is written to a database or a file but the money rows. The
  * cache below lives in this process's memory for minutes and is keyed by a hash under a per-process key, so it can never answer one person with
  * another's words.
  *
- * The limits are the register's abuseLimits row (R22 decision 18): a guard against a stuck page, not a quota. Per person, per process.
+ * The limits are the register's abuseLimits row (R22 decision 18): a guard against a stuck page, not a quota. Per person, per process. A request takes
+ * its one call from them as soon as it would make one, and keeps it whatever stops the call after (a refused reservation, a day-pot skip, a vendor's
+ * refusal): giving it back would leave the limits no bound on a page that loops.
  */
 
 /** The server's bound on the whole step, retries included. The page gives up a little after it (V4 ASK_CLARIFY_PAGE_WAIT_MS). */
@@ -80,7 +89,7 @@ const CACHE = Object.freeze({ ttlMs: 10 * 60_000, entries: 2_000 });
 /** The tables' bound: past it the oldest person is forgotten, which can only give them a fresh limit. */
 const PEOPLE_MAX = 20_000;
 
-export type AskClarifyFallback = "RATE_LIMITED" | "DEADLINE" | "TRANSPORT" | "UNREADABLE" | "RECORD_DOWN";
+export type AskClarifyFallback = "RATE_LIMITED" | "DEADLINE" | "TRANSPORT" | "UNREADABLE" | "RECORD_DOWN" | "REQUEST_OWNER_MISMATCH";
 
 export interface AskClarifyPort {
   /**
@@ -95,6 +104,19 @@ const NONE: AskClarifyResponse = Object.freeze({ source: "NONE" });
 /** A refusal every later record would meet too latches at once; any other failure after this many in a row. */
 const RECORD_LATCHING_CODES: ReadonlySet<string> = new Set(["42501", "42883", "23514"]);
 const RECORD_FAILURES_IN_A_ROW = 3;
+/**
+ * The security review's 0171 (F5): the reservation refuses, with 42501, an owner that is not the account of the live session the request's connection
+ * presents. Only this request meets that (its session ended, or a step-up replaced its token, before the call was sent), never the next person's, so it
+ * neither latches the breaker nor counts towards it. Refused before the first call, the request makes no paid call and shows no questions; refused before
+ * the re-ask, there is no second call, and the first call's reading, reserved while the session was live and charged to the person, stands as for any
+ * other failed re-ask. Either way the request has taken its one call from the person's limits, as every request that reaches a call does (a day-pot
+ * skip or a vendor's refusal too): only a request whose session ended or was replaced after it was authenticated meets a refusal, and the next request
+ * with that token is refused before this route, so it costs the person at most one call per session. Giving the call back would leave the limits no
+ * bound on a page that loops while the API and the database disagree about a session (a clock apart at the session's absolute expiry, say).
+ * Any other refusal of the reservation, a charge id another owner holds among them (23505, which only an id-reuse bug meets), is a reservation that
+ * failed: the breaker counts it, and latches at once only for a code every later one would meet too.
+ */
+const REQUEST_OWNER_MISMATCH = "REQUEST_OWNER_MISMATCH";
 
 /**
  * V4 start step, Task 76d: which version of the call is asked. "v2" only once its contract is sealed (Task 92 puts it in
@@ -200,8 +222,10 @@ export function createAskClarify(deps: Readonly<{
   limits: Readonly<{ perHour: number; perDay: number }>;
   /** Null: this deployment has no paid AI for it (local mode, no gate, no key, no writer). */
   transportFor: AskClarifyTransportFor | null;
-  /** The one writer (0144). A failure stops the calls; it never fails the page. */
+  /** The one writer (0144), on the system login since 0171 (main.ts's site X32). A failure stops the calls; it never fails the page. */
   record: (entry: AskClarifyChargeEntry) => Promise<void>;
+  /** Before each paid call, on the request's connection: the charge id it will be recorded under, reserved for the person (0171). */
+  reserve: (entry: Readonly<{ spendId: string; ownerRef: string }>) => Promise<void>;
   clock: () => Date;
   report: (line: Readonly<{ event: string; code: string }>) => void;
   deadlineMs?: number;
@@ -225,18 +249,22 @@ export function createAskClarify(deps: Readonly<{
   const newId = deps.newId ?? randomUUID;
   let recordDown = false;
   let recordFailures = 0;
-  /** One call's cost, counted in the person's quota. Never throws: a failed record is one code line, and the breaker. */
-  const charge = async (ownerRef: string, funding: FundingBasis | null, usage: FastCheckUsage): Promise<void> => {
+  /** A record or a reservation that failed: the breaker counts it, and latches at once for a refusal every later one would meet too. */
+  const recordFailed = (failure: unknown): void => {
+    const code = typeof failure === "object" && failure !== null && "code" in failure ? String(failure.code) : "";
+    recordFailures += 1;
+    if (RECORD_LATCHING_CODES.has(code) || recordFailures >= RECORD_FAILURES_IN_A_ROW) recordDown = true;
+  };
+  /** One call's cost, under the id reserved for it, counted in the person's quota. Never throws: a failed record is one code line, and the breaker. */
+  const charge = async (spendId: string, ownerRef: string, funding: FundingBasis | null, usage: FastCheckUsage): Promise<void> => {
     try {
       const price = hostedLanguageCheckPrice(ASK_CLARIFY_MODEL_SETTINGS.priceMicrosUsdPerMillionTokens, ASK_CLARIFY_MODEL_SETTINGS.model, usage.inputTokens);
-      await deps.record(Object.freeze({ spendId: newId(), ownerRef, providerRef: ASK_CLARIFY_SPEND_REF, chargedOn: costEnvelopeDay(deps.clock()),
+      await deps.record(Object.freeze({ spendId, ownerRef, providerRef: ASK_CLARIFY_SPEND_REF, chargedOn: costEnvelopeDay(deps.clock()),
         chargeMicros: languageCheckChargeMicros(usage, price), inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
         grant: funding?.kind === "INTERNAL" ? Object.freeze({ grantId: funding.grantId, grantEventId: funding.grantEventId }) : null }));
       recordFailures = 0;
     } catch (failure) {
-      const code = typeof failure === "object" && failure !== null && "code" in failure ? String(failure.code) : "";
-      recordFailures += 1;
-      if (RECORD_LATCHING_CODES.has(code) || recordFailures >= RECORD_FAILURES_IN_A_ROW) recordDown = true;
+      recordFailed(failure);
       deps.report({ event: "api.ask_clarify.charge_unrecorded", code: "RECORD_DOWN" });
     }
   };
@@ -257,12 +285,32 @@ export function createAskClarify(deps: Readonly<{
     if (calls.size > PEOPLE_MAX) calls.delete(calls.keys().next().value!);
     return true;
   };
-  /** One read's AI call and answer (the cache keeps an AI answer for CACHE.ttlMs). */
+  /**
+   * One read's AI call and answer (the cache keeps an AI answer for CACHE.ttlMs). A read joined while this one runs (Task 28) is the same person's, and
+   * shares this read's one call and its reservation, made on the connection of the request that started it; if that request's session was refused, the
+   * read answers no questions, and the joined request with it, which costs a page its questions for that wording and nothing else.
+   */
   const readOnce = async (transportFor: AskClarifyTransportFor, key: string, now: number, ownerRef: string, questionLine: string,
     funding: FundingBasis | null, earlier: AskClarifyEarlier | null): Promise<AskClarifyResponse> => {
     if (recordDown) return fallback("RECORD_DOWN");
     if (!admitted(ownerRef, now)) return fallback("RATE_LIMITED");
-    const transport = transportFor((usage) => charge(ownerRef, funding, usage));
+    /** What stopped a call before it was sent, if anything: this request's own refusal, or the record's failure. */
+    const unsent: { code: "REQUEST_OWNER_MISMATCH" | "RECORD_DOWN" | null } = { code: null };
+    // Each paid call (the slip order may make two, one after the other) under its own charge id, reserved before it is sent and charged by it after.
+    const transport: FastCheckTransport = async (input) => {
+      const spendId = newId();
+      try {
+        await deps.reserve(Object.freeze({ spendId, ownerRef }));
+      } catch (failure) {
+        if (failure instanceof Error && failure.message === REQUEST_OWNER_MISMATCH) unsent.code = REQUEST_OWNER_MISMATCH;
+        else {
+          unsent.code = "RECORD_DOWN";
+          recordFailed(failure);
+        }
+        throw failure;
+      }
+      return transportFor((usage) => charge(spendId, ownerRef, funding, usage))(input);
+    };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), deadlineMs);
     const abandoned = new Promise<never>((_resolve, reject) => {
@@ -277,7 +325,7 @@ export function createAskClarify(deps: Readonly<{
       if (cache.size > CACHE.entries) cache.delete(cache.keys().next().value!);
       return answer;
     } catch {
-      return fallback(controller.signal.aborted ? "DEADLINE" : "TRANSPORT");
+      return fallback(unsent.code ?? (controller.signal.aborted ? "DEADLINE" : "TRANSPORT"));
     } finally {
       clearTimeout(timer);
     }
@@ -303,4 +351,24 @@ export function createAskClarify(deps: Readonly<{
       return reading;
     }
   });
+}
+
+/** How often the API sweeps the clarify reservations no charge took (0171): hourly, so none outlives about two hours (an hour's window, then a pass). */
+export const ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS = 60 * 60_000;
+/** One pass: batches of this many, at most this many batches, so a backlog never holds the timer; the next pass takes the rest. */
+const RESERVATION_SWEEP = Object.freeze({ batch: 500, batchesPerPass: 20 });
+
+/**
+ * One pass of the sweep (0171's identity.delete_ask_clarify_reservations_due, the cross-account marker's alone): batches until one comes back short.
+ * Its caller runs it outside any request, so the API's pool sends it to the system login. A batch that fails ends the pass with its failure; the
+ * single-flight trigger logs one content-free line and the next pass tries again. Returns how many reservations went.
+ */
+export async function sweepAskClarifyReservations(deleteDue: (limit: number) => Promise<number>): Promise<number> {
+  let gone = 0;
+  for (let batch = 0; batch < RESERVATION_SWEEP.batchesPerPass; batch += 1) {
+    const taken = await deleteDue(RESERVATION_SWEEP.batch);
+    gone += taken;
+    if (taken < RESERVATION_SWEEP.batch) break;
+  }
+  return gone;
 }
