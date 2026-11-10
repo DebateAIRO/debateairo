@@ -490,7 +490,9 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.17", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.18", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.17", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/63e8f9c271ed42c5466568999f4a35418b5011d8f31309dabb199f8927a30203" },
   { version: "2.16", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70" },
   { version: "2.15", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,

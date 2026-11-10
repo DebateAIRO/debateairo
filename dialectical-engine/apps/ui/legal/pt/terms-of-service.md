@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.17 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.18 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.17
+endMarker: FIM DOS TERMOS · v2.18
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.17 · Effective 1 de novembro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.18 · Effective 1 de novembro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. No plano gratuito, os seus debates são públicos quando terminam, após uma verificação por IA; num plano pago, são privados, a menos que os publique. Uma vez públicos, qualquer pessoa pode ler um debate, e este mantém-se público. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -249,6 +249,8 @@ Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado 
 
 **A estes Termos.** Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos **30 dias** antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions.
 
+A versão 2.18 substituiu a versão 2.17: o Anexo A.3 indica que também no Quebeque os debates num plano pago são privados por predefinição e os do plano gratuito são públicos, como indica a secção 9; aquilo por que somos responsáveis, e cada um dos direitos previstos nestes Termos, mantém-se inalterado.
+
 A versão 2.17 substituiu a versão 2.16: a secção 10 indica quando uma IA lê uma denúncia feita com o botão Denunciar e quando uma pessoa a lê, que o botão lhe pede a sua declaração de boa-fé, que confirmamos a receção de uma denúncia e lhe comunicamos a nossa decisão por correio eletrónico, e que as exposições dos motivos são enviadas por correio eletrónico e conservadas na sua conta; aquilo por que somos responsáveis, e cada um dos direitos previstos nestes Termos, mantém-se inalterado.
 
 A versão 2.16 substituiu a versão 2.15: a secção 12 indica os planos pagos, Plus, Pro e Max, e as secções 12 e 15 deixam de conter notas de redação; aquilo por que somos responsáveis, e cada um dos direitos previstos nestes Termos, mantém-se inalterado.
@@ -337,7 +339,7 @@ O corpo destes Termos foi redigido para si. Adicionalmente: pode intentar açõe
 
 ### A.3 Canadá e Quebeque
 
-O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. **Quebeque:** estes Termos estão disponíveis em francês; se escolher o Canadá ao registar-se, recebe-os primeiro em francês e pode escolher o inglês em alternativa; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito.
+O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. **Quebeque:** estes Termos estão disponíveis em francês; se escolher o Canadá ao registar-se, recebe-os primeiro em francês e pode escolher o inglês em alternativa; os debates num plano pago são privados por predefinição, e os debates do plano gratuito são públicos, como indica a secção 9; pode pedir a desindexação de informações pessoais a seu respeito.
 
 ### A.4 Austrália e Nova Zelândia
 

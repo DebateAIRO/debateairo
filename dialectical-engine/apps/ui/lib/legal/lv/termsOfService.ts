@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pakalpojuma izmaiņas. Mēs nepārtraukti attīstām Dialectical Engine, un kārtējie uzlabojumi, labojumi un modeļu klāsta izmaiņas notiek bez iepriekšēja paziņojuma. Ja veicam izmaiņas, kas pārsniedz pakalpojuma darbības uzturēšanu atbilstoši aprakstam, mēs to darām tikai kāda no šiem iemesliem dēļ: lai izpildītu juridisku vai regulatīvu prasību; reaģētu uz drošības vai ļaunprātīgas izmantošanas problēmu; jo modeļa pakalpojumu sniedzējs maina, ierobežo vai atsauc modeli vai funkciju, no kuras esam atkarīgi; lai pielāgotos tehniskai videi, kuru nekontrolējam; vai lai pievienotu, uzlabotu vai izbeigtu funkciju tādā veidā, kas jums nerada izmaksas." },
       { kind: "p", text: "Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu 30 dienu laikā pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu." },
       { kind: "p", text: "Šo Noteikumu izmaiņas. Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz 30 dienu iepriekš nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versija 2.18 aizstāja versiju 2.17: A.3 pielikumā norādīts, ka arī Kvebekā debates maksas plānā pēc noklusējuma ir privātas, bet debates bezmaksas plānā ir publiskas, kā norādīts 9. sadaļā; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās." },
       { kind: "p", text: "Versija 2.17 aizstāja versiju 2.16: 10. sadaļā norādīts, kad ar pogu „Ziņot” iesniegtu ziņojumu lasa MI un kad cilvēks, ka poga lūdz jūsu labticības apliecinājumu, ka mēs apstiprinām ziņojuma saņemšanu un paziņojam jums savu lēmumu pa e-pastu un ka pamatojumi tiek nosūtīti pa e-pastu un glabāti jūsu kontā; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās." },
       { kind: "p", text: "Versija 2.16 aizstāja versiju 2.15: 12. sadaļā nosaukti maksas plāni, Plus, Pro un Max, un 12. un 15. sadaļā vairs nav sagatavošanas piezīmju; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās." },
       { kind: "p", text: "Versija 2.15 aizstāja versiju 2.14: 12. sadaļā teikts, ka mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN, un ka nodoklis tiek pievienots norēķinu laikā." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanāda un Kvebeka",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; ja reģistrējoties izvēlaties Kanādu, tos vispirms saņemat franču valodā, un tās vietā varat izvēlēties angļu valodu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem." }
+      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; ja reģistrējoties izvēlaties Kanādu, tos vispirms saņemat franču valodā, un tās vietā varat izvēlēties angļu valodu; debates maksas plānā pēc noklusējuma ir privātas, bet debates bezmaksas plānā ir publiskas, kā norādīts 9. sadaļā; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "de8c7d01192692e69612bab029def1faf59168091d402f5a855703cf470f00e3",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.17 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
+  version: "2.18",
+  sha256: "8f339f364bcf30075d78cfeec943601d8f0175855446561b439b862bf90c8545",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.18 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v2.17",
+  endMarker: "NOTEIKUMU BEIGAS · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

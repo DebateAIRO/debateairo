@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ar an tseirbhís. Déanaimid Dialectical Engine a fhorbairt go leanúnach, agus tarlaíonn gnáthfheabhsuithe, ceartúcháin agus athruithe ar liosta na samhlacha gan fógra. Nuair a dhéanaimid athrú a théann níos faide ná an tseirbhís a choinneáil ag feidhmiú mar a thuairiscítear, ní dhéanaimid é ach ar cheann de na cúiseanna seo: chun ceanglas dlíthiúil nó rialála a chomhlíonadh; chun freagairt ar fhadhb slándála nó mí-úsáide; toisc go n-athraíonn, go srianaíonn nó go dtarraingíonn soláthraí samhla siar samhail nó gné ar a mbraithimid; chun oiriúnú do thimpeallacht theicniúil nach bhfuil smacht againn uirthi; nó chun gné a chur leis, a fheabhsú nó a scor ar bhealach nach gcuireann aon chostas ort." },
       { kind: "p", text: "Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de 30 lá tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh." },
       { kind: "p", text: "Ar na Téarmaí seo. Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat 30 lá ar a laghad sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Tháinig leagan 2.18 in ionad leagan 2.17: deir Iarscríbhinn A.3 go mbíonn díospóireachtaí i Québec freisin príobháideach mar réamhshocrú ar phlean íoctha agus poiblí ar an bplean saor in aisce, mar atá leagtha amach i rannán 9; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo." },
       { kind: "p", text: "Tháinig leagan 2.17 in ionad leagan 2.16: deir rannán 10 cathain a léann IS tuairisc a dhéantar leis an gcnaipe Tuairiscigh agus cathain a léann duine í, go n-iarrann an cnaipe do dhearbhú de mheon macánta, go n-admhaímid tuairisc agus go n-insímid ár gcinneadh duit ar ríomhphost, agus go seoltar ráitis ar chúiseanna ar ríomhphost agus go gcoinnítear i do chuntas iad; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo." },
       { kind: "p", text: "Tháinig leagan 2.16 in ionad leagan 2.15: ainmníonn rannán 12 na pleananna íoctha, Plus, Pro agus Max, agus níl nótaí dréachtaithe i rannáin 12 agus 15 a thuilleadh; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo." },
       { kind: "p", text: "Tháinig leagan 2.15 in ionad leagan 2.14: deir rannán 12 go dtaispeántar ár bpraghsanna gan cháin, mar phraghas + CBL, agus go gcuirtear an cháin leo ag an tseiceáil amach." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ceanada agus Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. Québec: tá na Téarmaí seo ar fáil i bhFraincis; má roghnaíonn tú Ceanada nuair a chláraíonn tú, gheobhaidh tú i bhFraincis ar dtús iad agus is féidir leat an Béarla a roghnú ina n-ionad; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh." }
+      { kind: "p", text: "Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. Québec: tá na Téarmaí seo ar fáil i bhFraincis; má roghnaíonn tú Ceanada nuair a chláraíonn tú, gheobhaidh tú i bhFraincis ar dtús iad agus is féidir leat an Béarla a roghnú ina n-ionad; bíonn díospóireachtaí ar phlean íoctha príobháideach mar réamhshocrú, agus bíonn díospóireachtaí ar an bplean saor in aisce poiblí, mar atá leagtha amach i rannán 9; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "b40967cb75c279a8ceab644e22c4a72a6fb9b442f471e3c8fbc6fdfcb7231fd5",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.17 · I bhFEIDHM 1 SAMHAIN 2026",
+  version: "2.18",
+  sha256: "253f1cd078bf5f883994aac68f857b825524897e6b23f95653b07924ae578b77",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.18 · I bhFEIDHM 1 SAMHAIN 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.17",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

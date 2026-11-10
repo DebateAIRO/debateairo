@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zmiany usługi. Stale rozwijamy Dialectical Engine, a rutynowe ulepszenia, poprawki i zmiany listy modeli są wprowadzane bez powiadomienia. Jeżeli dokonujemy zmiany wykraczającej poza utrzymanie działania usługi zgodnie z opisem, robimy to wyłącznie z jednego z następujących powodów: w celu wykonania obowiązku prawnego lub regulacyjnego; w reakcji na problem dotyczący bezpieczeństwa lub nadużycia; ponieważ dostawca modelu zmienia, ogranicza lub wycofuje model bądź funkcję, od których zależymy; w celu dostosowania się do środowiska technicznego pozostającego poza naszą kontrolą; albo w celu dodania, ulepszenia lub wycofania funkcji w sposób, który nie powoduje po Twojej stronie dodatkowych kosztów." },
       { kind: "p", text: "Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie 30 dni od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres." },
       { kind: "p", text: "Zmiany niniejszych Warunków. Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej 30 dni przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Wersja 2.18 zastąpiła wersję 2.17: załącznik A.3 wskazuje, że również w Quebecu debaty w płatnym planie są domyślnie prywatne, a debaty w planie bezpłatnym są publiczne, jak wskazano w sekcji 9; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian." },
       { kind: "p", text: "Wersja 2.17 zastąpiła wersję 2.16: sekcja 10 określa, kiedy zgłoszenie złożone przyciskiem Zgłoś czyta AI, a kiedy człowiek, że przycisk prosi o Twoje oświadczenie złożone w dobrej wierze, że potwierdzamy zgłoszenie i przekazujemy Ci decyzję e-mailem oraz że uzasadnienia są wysyłane e-mailem i przechowywane na Twoim koncie; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian." },
       { kind: "p", text: "Wersja 2.16 zastąpiła wersję 2.15: sekcja 12 wymienia płatne plany, Plus, Pro i Max, a sekcje 12 i 15 nie zawierają już uwag redakcyjnych; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian." },
       { kind: "p", text: "Wersja 2.15 zastąpiła wersję 2.14: sekcja 12 mówi, że nasze ceny są podawane bez podatku, jako cena + VAT, oraz że podatek jest doliczany na stronie płatności." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada i Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. Quebec: niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą." }
+      { kind: "p", text: "Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. Quebec: niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; w płatnym planie debaty są domyślnie prywatne, a debaty w planie bezpłatnym są publiczne, jak wskazano w sekcji 9; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "4a80d814bbb1fbb0e89f22be04decddcc17b53d1c5a21189146aee25b2e9cfa5",
-  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.17 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
+  version: "2.18",
+  sha256: "e18f725e00a7312a19f9a0e55cdde9740e95e6e8fd46b4a03b7b609ae3b77fd9",
+  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.18 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
-  endMarker: "KONIEC WARUNKÓW · v2.17",
+  endMarker: "KONIEC WARUNKÓW · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Treść Warunków świadczenia usług",
   sectionIdPrefix: "terms-section-",

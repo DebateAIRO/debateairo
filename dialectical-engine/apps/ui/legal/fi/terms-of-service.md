@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.17 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.18 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.17
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.18
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.17 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.18 · Effective 1. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -249,6 +249,8 @@ Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
 
+Versio 2.18 korvasi version 2.17: liitteessä A.3 kerrotaan, että myös Quebecissä maksullisen tilauksen väittelyt ovat oletusarvoisesti yksityisiä ja maksuttoman tilauksen väittelyt julkisia, kuten kohdassa 9 kerrotaan; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan.
+
 Versio 2.17 korvasi version 2.16: kohdassa 10 kerrotaan, milloin Ilmoita-painikkeella tehdyn ilmoituksen lukee tekoäly ja milloin henkilö, että painike pyytää vilpittömässä mielessä annetun vakuutuksesi, että vahvistamme ilmoituksen ja ilmoitamme päätöksestämme sähköpostitse ja että perustelut lähetetään sähköpostitse ja säilytetään tililläsi; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan.
 
 Versio 2.16 korvasi version 2.15: kohdassa 12 nimetään maksulliset tilaukset, Plus, Pro ja Max, eikä kohdissa 12 ja 15 ole enää luonnosteluhuomautuksia; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan.
@@ -337,7 +339,7 @@ Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nos
 
 ### A.3 Kanada ja Quebec
 
-Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. **Quebec:** nämä käyttöehdot ovat saatavilla ranskaksi; jos valitset rekisteröityessäsi Kanadan, saat ne ensin ranskaksi ja voit valita sen sijaan englannin; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta.
+Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. **Quebec:** nämä käyttöehdot ovat saatavilla ranskaksi; jos valitset rekisteröityessäsi Kanadan, saat ne ensin ranskaksi ja voit valita sen sijaan englannin; maksullisessa tilauksessa väittelyt ovat oletusarvoisesti yksityisiä ja maksuttoman tilauksen väittelyt ovat julkisia, kuten kohdassa 9 kerrotaan; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta.
 
 ### A.4 Australia ja Uusi-Seelanti
 

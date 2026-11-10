@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Tjänsten. Vi utvecklar Dialectical Engine fortlöpande, och rutinmässiga förbättringar, rättelser och ändringar av modellutbudet sker utan föregående meddelande. Om vi gör en ändring som går utöver att hålla tjänsten fungerande på beskrivet sätt gör vi det endast av något av följande skäl: för att uppfylla ett rättsligt krav eller myndighetskrav; för att hantera ett säkerhets- eller missbruksproblem; för att en modelleverantör ändrar, begränsar eller drar tillbaka en modell eller funktion som vi är beroende av; för att anpassa oss till en teknisk miljö som vi inte kontrollerar; eller för att lägga till, förbättra eller avveckla en funktion på ett sätt som inte medför någon kostnad för dig." },
       { kind: "p", text: "Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom 30 dagar från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden." },
       { kind: "p", text: "Dessa villkor. Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst 30 dagar innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Version 2.18 ersatte version 2.17: bilaga A.3 anger att debatter även i Quebec är privata som standard på ett betalabonnemang och offentliga på det kostnadsfria abonnemanget, som avsnitt 9 anger; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat." },
       { kind: "p", text: "Version 2.17 ersatte version 2.16: avsnitt 10 anger när en AI läser en rapport som gjorts med knappen Rapportera och när en person gör det, att knappen ber om ditt intygande i god tro, att vi bekräftar en rapport och meddelar dig vårt beslut via e-post och att motiveringar skickas via e-post och sparas i ditt konto; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat." },
       { kind: "p", text: "Version 2.16 ersatte version 2.15: avsnitt 12 anger de avgiftsbelagda abonnemangen, Plus, Pro och Max, och avsnitt 12 och 15 innehåller inte längre några utkastanteckningar; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat." },
       { kind: "p", text: "Version 2.15 ersatte version 2.14: avsnitt 12 anger att våra priser visas exklusive skatt, som pris + moms, och att skatten läggs till i kassan." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada och Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. Quebec: dessa villkor finns på franska; om du väljer Kanada när du registrerar dig får du dem först på franska och kan välja engelska i stället; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras." }
+      { kind: "p", text: "Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. Quebec: dessa villkor finns på franska; om du väljer Kanada när du registrerar dig får du dem först på franska och kan välja engelska i stället; på ett betalabonnemang är debatter privata som standard, och debatter på det kostnadsfria abonnemanget är offentliga, som avsnitt 9 anger; du får begära att personuppgifter om dig avindexeras." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "bb30c8972c5625725b1434a6b821fa373981453790bda0711cc5bafa0996ed74",
-  eyebrow: "ANVÄNDARVILLKOR · v2.17 · GÄLLER FRÅN 1 NOVEMBER 2026",
+  version: "2.18",
+  sha256: "f5cbfc286e69245faf0fc32d97a96ce8a9ee65aa3be38bf17bf0b4137ac5fd78",
+  eyebrow: "ANVÄNDARVILLKOR · v2.18 · GÄLLER FRÅN 1 NOVEMBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
-  endMarker: "SLUT PÅ VILLKOREN · v2.17",
+  endMarker: "SLUT PÅ VILLKOREN · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Användarvillkorens text",
   sectionIdPrefix: "terms-section-",

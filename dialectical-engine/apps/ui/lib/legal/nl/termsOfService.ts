@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "In de dienst. Wij ontwikkelen Dialectical Engine voortdurend en brengen routinematige verbeteringen, oplossingen en wijzigingen in de reeks modellen zonder kennisgeving aan. Wanneer wij een wijziging aanbrengen die verder gaat dan de dienst te laten werken zoals beschreven, doen wij dat uitsluitend om een van deze redenen: om aan een wettelijke of regelgevende eis te voldoen; om op een beveiligings- of misbruikprobleem te reageren; omdat een modelaanbieder een model of functie waarvan wij afhankelijk zijn wijzigt, beperkt of niet langer aanbiedt; om ons aan te passen aan een technische omgeving waarover wij geen controle hebben; of om een functie zonder extra kosten voor u toe te voegen, te verbeteren of te beëindigen." },
       { kind: "p", text: "Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen 30 dagen nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug." },
       { kind: "p", text: "In deze Voorwaarden. Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste 30 dagen vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versie 2.18 verving versie 2.17: bijlage A.3 zegt dat ook in Quebec debatten op een betaald abonnement standaard privé zijn en debatten op het gratis abonnement openbaar, zoals hoofdstuk 9 aangeeft; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd." },
       { kind: "p", text: "Versie 2.17 verving versie 2.16: hoofdstuk 10 zegt wanneer een AI een melding leest die met de knop Melden is gedaan en wanneer een persoon dat doet, dat de knop om uw verklaring te goeder trouw vraagt, dat wij een melding bevestigen en u onze beslissing per e-mail meedelen, en dat motiveringen per e-mail worden verstuurd en in uw account worden bewaard; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd." },
       { kind: "p", text: "Versie 2.16 verving versie 2.15: hoofdstuk 12 noemt de betaalde abonnementen, Plus, Pro en Max, en de hoofdstukken 12 en 15 bevatten geen redactionele notities meer; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd." },
       { kind: "p", text: "Versie 2.15 verving versie 2.14: hoofdstuk 12 zegt dat onze prijzen worden getoond zonder belasting, als prijs + btw, en dat de belasting bij het afrekenen wordt toegevoegd." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada en Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is onze bestuurder, bereikbaar op privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; als u bij het aanmelden Canada kiest, krijgt u ze eerst in het Frans en kunt u in plaats daarvan Engels kiezen; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen." }
+      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is onze bestuurder, bereikbaar op privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; als u bij het aanmelden Canada kiest, krijgt u ze eerst in het Frans en kunt u in plaats daarvan Engels kiezen; debatten op een betaald abonnement zijn standaard privé, en debatten op het gratis abonnement zijn openbaar, zoals hoofdstuk 9 aangeeft; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "1a4bde48cfa4232305e0c1669652ff1b5aaa444b5fb6cc7a6826a04f41ed9d54",
-  eyebrow: "SERVICEVOORWAARDEN · v2.17 · VAN KRACHT OP 1 NOVEMBER 2026",
+  version: "2.18",
+  sha256: "e6483617255af6536a35be9ad877bde05b07e5305f48aed527e0b10264e41292",
+  eyebrow: "SERVICEVOORWAARDEN · v2.18 · VAN KRACHT OP 1 NOVEMBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.17",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",

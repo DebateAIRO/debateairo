@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.17 · HATÁLYOS 2026. NOVEMBER 1.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.18 · HATÁLYOS 2026. NOVEMBER 1.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.17
+endMarker: A FELTÉTELEK VÉGE · v2.18
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.17 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.18 · Effective 2026. november 1. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -249,6 +249,8 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
 
+A 2.18-as verzió a 2.17-es verzió helyébe lépett: az A.3. melléklet leírja, hogy Québecben is a fizetős csomagon a viták alapértelmezés szerint bizalmasak, az ingyenes csomagon pedig nyilvánosak, ahogy a 9. szakasz mondja; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
+
 A 2.17-es verzió a 2.16-os verzió helyébe lépett: a 10. szakasz leírja, mikor olvassa egy MI a Bejelentés gombbal tett bejelentést, és mikor egy személy, hogy a gomb az Ön jóhiszeműségi nyilatkozatát kéri, hogy visszaigazoljuk a bejelentést, és döntésünket e-mailben közöljük, valamint hogy az indokolásokat e-mailben elküldjük és a fiókjában megőrizzük; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
 
 A 2.16-os verzió a 2.15-ös verzió helyébe lépett: a 12. szakasz megnevezi a fizetős csomagokat, a Plus, a Pro és a Max csomagot, a 12. és a 15. szakasz pedig már nem tartalmaz szerkesztési megjegyzéseket; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
@@ -337,7 +339,7 @@ E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye sz
 
 ### A.3 Kanada és Québec
 
-Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. **Québec:** e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását.
+Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. **Québec:** e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; fizetős csomagon a viták alapértelmezés szerint bizalmasak, az ingyenes csomagon pedig nyilvánosak, ahogy a 9. szakasz mondja; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását.
 
 ### A.4 Ausztrália és Új-Zéland
 

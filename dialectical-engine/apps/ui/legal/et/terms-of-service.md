@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.17 · KEHTIB ALATES 1. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.18 · KEHTIB ALATES 1. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.17
+endMarker: TINGIMUSTE LÕPP · v2.18
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.17 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.18 · Effective 1. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -249,6 +249,8 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
 
+Versioon 2.18 asendas versiooni 2.17: lisa A.3 ütleb, et ka Quebecis on tasulise paketi väitlused vaikimisi privaatsed ja tasuta paketi väitlused avalikud, nagu jaotises 9 öeldud; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
+
 Versioon 2.17 asendas versiooni 2.16: jaotis 10 ütleb, millal loeb nupuga Teatage tehtud teadet tehisintellekt ja millal isik, et nupp küsib teie heauskset kinnitust, et kinnitame teate kättesaamist ja teatame teile oma otsuse e-postiga ning et põhjendused saadetakse e-postiga ja säilitatakse teie kontol; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
 
 Versioon 2.16 asendas versiooni 2.15: jaotis 12 nimetab tasulised paketid, Plus, Pro ja Max, ning jaotistes 12 ja 15 ei ole enam koostamismärkusi; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
@@ -337,7 +339,7 @@ Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma e
 
 ### A.3 Kanada ja Quebec
 
-Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. **Quebec:** need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist.
+Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. **Quebec:** need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; tasulise paketi väitlused on vaikimisi privaatsed ja tasuta paketi väitlused on avalikud, nagu jaotises 9 öeldud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist.
 
 ### A.4 Austraalia ja Uus-Meremaa
 

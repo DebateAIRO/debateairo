@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.17 · GÄLLER FRÅN 1 NOVEMBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.18 · GÄLLER FRÅN 1 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.17
+endMarker: SLUT PÅ VILLKOREN · v2.18
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.17 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.18 · Effective 1 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. På det kostnadsfria abonnemanget är dina debatter offentliga när de är klara, efter en AI-kontroll; på ett betalabonnemang är de privata om du inte publicerar dem. När en debatt är offentlig kan vem som helst läsa den, och den förblir offentlig. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -249,6 +249,8 @@ Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
 
+Version 2.18 ersatte version 2.17: bilaga A.3 anger att debatter även i Quebec är privata som standard på ett betalabonnemang och offentliga på det kostnadsfria abonnemanget, som avsnitt 9 anger; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat.
+
 Version 2.17 ersatte version 2.16: avsnitt 10 anger när en AI läser en rapport som gjorts med knappen Rapportera och när en person gör det, att knappen ber om ditt intygande i god tro, att vi bekräftar en rapport och meddelar dig vårt beslut via e-post och att motiveringar skickas via e-post och sparas i ditt konto; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat.
 
 Version 2.16 ersatte version 2.15: avsnitt 12 anger de avgiftsbelagda abonnemangen, Plus, Pro och Max, och avsnitt 12 och 15 innehåller inte längre några utkastanteckningar; det vi ansvarar för, och varje rättighet enligt dessa villkor, är oförändrat.
@@ -337,7 +339,7 @@ Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande:
 
 ### A.3 Kanada och Quebec
 
-Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; om du väljer Kanada när du registrerar dig får du dem först på franska och kan välja engelska i stället; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras.
+Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter. **Quebec:** dessa villkor finns på franska; om du väljer Kanada när du registrerar dig får du dem först på franska och kan välja engelska i stället; på ett betalabonnemang är debatter privata som standard, och debatter på det kostnadsfria abonnemanget är offentliga, som avsnitt 9 anger; du får begära att personuppgifter om dig avindexeras.
 
 ### A.4 Australien och Nya Zeeland
 

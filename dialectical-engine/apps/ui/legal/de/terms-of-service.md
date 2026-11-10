@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.17 · GÜLTIG AB 1. NOVEMBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.18 · GÜLTIG AB 1. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.17
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.18
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.17 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.18 · Effective 1. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Im kostenlosen Tarif sind Ihre Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Sobald eine Debatte öffentlich ist, kann jede Person sie lesen, und sie bleibt öffentlich. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -249,6 +249,8 @@ Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
 
+Version 2.18 ersetzte Version 2.17: Anhang A.3 legt fest, dass Debatten auch in Quebec im kostenpflichtigen Tarif standardmäßig privat und im kostenlosen Tarif öffentlich sind, wie Abschnitt 9 besagt; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert.
+
 Version 2.17 ersetzte Version 2.16: Abschnitt 10 legt fest, wann eine KI eine mit der Schaltfläche Melden abgegebene Meldung liest und wann eine Person, dass die Schaltfläche Ihre Erklärung nach Treu und Glauben verlangt, dass wir eine Meldung bestätigen und Ihnen unsere Entscheidung per E-Mail mitteilen und dass Begründungen per E-Mail versandt und in Ihrem Konto aufbewahrt werden; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert.
 
 Version 2.16 ersetzte Version 2.15: Abschnitt 12 nennt die kostenpflichtigen Tarife, Plus, Pro und Max, und die Abschnitte 12 und 15 enthalten keine Entwurfsvermerke mehr; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert.
@@ -337,7 +339,7 @@ Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzli
 
 ### A.3 Kanada und Quebec
 
-Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. **Quebec:** Diese Nutzungsbedingungen sind auf Französisch verfügbar; wenn Sie bei der Registrierung Kanada wählen, erhalten Sie sie zuerst auf Französisch und können stattdessen Englisch wählen; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen.
+Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. **Quebec:** Diese Nutzungsbedingungen sind auf Französisch verfügbar; wenn Sie bei der Registrierung Kanada wählen, erhalten Sie sie zuerst auf Französisch und können stattdessen Englisch wählen; im kostenpflichtigen Tarif sind Debatten standardmäßig privat, und Debatten im kostenlosen Tarif sind öffentlich, wie Abschnitt 9 besagt; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen.
 
 ### A.4 Australien und Neuseeland
 

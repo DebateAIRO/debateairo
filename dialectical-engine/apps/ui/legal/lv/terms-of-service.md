@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.17 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.18 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.17
+endMarker: NOTEIKUMU BEIGAS · v2.18
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.17 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.18 · Effective 2026. gada 1. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -249,6 +249,8 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
 
+Versija 2.18 aizstāja versiju 2.17: A.3 pielikumā norādīts, ka arī Kvebekā debates maksas plānā pēc noklusējuma ir privātas, bet debates bezmaksas plānā ir publiskas, kā norādīts 9. sadaļā; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās.
+
 Versija 2.17 aizstāja versiju 2.16: 10. sadaļā norādīts, kad ar pogu „Ziņot” iesniegtu ziņojumu lasa MI un kad cilvēks, ka poga lūdz jūsu labticības apliecinājumu, ka mēs apstiprinām ziņojuma saņemšanu un paziņojam jums savu lēmumu pa e-pastu un ka pamatojumi tiek nosūtīti pa e-pastu un glabāti jūsu kontā; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās.
 
 Versija 2.16 aizstāja versiju 2.15: 12. sadaļā nosaukti maksas plāni, Plus, Pro un Max, un 12. un 15. sadaļā vairs nav sagatavošanas piezīmju; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās.
@@ -337,7 +339,7 @@ Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, 
 
 ### A.3 Kanāda un Kvebeka
 
-Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. **Kvebeka:** šie Noteikumi ir pieejami franču valodā; ja reģistrējoties izvēlaties Kanādu, tos vispirms saņemat franču valodā, un tās vietā varat izvēlēties angļu valodu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem.
+Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. **Kvebeka:** šie Noteikumi ir pieejami franču valodā; ja reģistrējoties izvēlaties Kanādu, tos vispirms saņemat franču valodā, un tās vietā varat izvēlēties angļu valodu; debates maksas plānā pēc noklusējuma ir privātas, bet debates bezmaksas plānā ir publiskas, kā norādīts 9. sadaļā; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem.
 
 ### A.4 Austrālija un Jaunzēlande
 

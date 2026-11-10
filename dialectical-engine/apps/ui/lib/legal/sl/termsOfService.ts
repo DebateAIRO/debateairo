@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Spremembe storitve. Dialectical Engine nenehno razvijamo, zato običajne izboljšave, popravki in spremembe nabora modelov potekajo brez obvestila. Kadar uvedemo spremembo, ki presega ohranjanje delovanja storitve, kot je opisana, to storimo samo iz enega od naslednjih razlogov: zaradi skladnosti s pravno ali regulativno zahtevo; zaradi odziva na težavo z varnostjo ali zlorabo; ker ponudnik modela spremeni, omeji ali umakne model ali funkcijo, od katere smo odvisni; zaradi prilagoditve tehničnemu okolju, ki ga ne obvladujemo; ali zaradi dodajanja, izboljšanja ali ukinitve funkcije na način, ki vam ne povzroči stroškov." },
       { kind: "p", text: "Na trajnem nosilcu vas vnaprej obvestimo, kaj se spreminja in kdaj. Če ima sprememba več kot zgolj manjši negativen vpliv na vaš dostop do storitve ali njeno uporabo, lahko brezplačno odpoveste pogodbo v 30 dneh od obvestila ali začetka učinkovanja spremembe, kar je pozneje, mi pa vam vrnemo vse vnaprej plačane zneske za neizkoriščeno obdobje." },
       { kind: "p", text: "Spremembe teh Pogojev. Te Pogoje lahko spremenimo iz enakih vrst razlogov. Pri spremembah, ki ne zmanjšujejo vaših pravic, objavimo novo različico s povzetkom sprememb in vam najmanj 30 dni pred začetkom veljavnosti pošljemo e-poštno sporočilo; nadaljnja uporaba Dialectical Engine po tem datumu pomeni, da spremembo sprejemate, pred tem pa lahko zaprete račun. Pri spremembah, ki zmanjšujejo vaše pravice — vključno z zvišanjem cen obstoječega paketa, nižjimi omejitvami, odstranjenimi funkcijami, novimi načini uporabe vaše vsebine ali spremembami odgovornosti, prava, ki se uporablja, oziroma reševanja sporov — vas ob naslednji prijavi prosimo, da novo različico izrecno sprejmete, sprememba pa velja samo za naprej. Sprememb nikoli ne uveljavljamo za nazaj in tega razdelka nikoli ne uporabimo za spremembo bistva tega, kar ste plačali, med trajanjem pogodbe, ne da bi vam ponudili možnost odstopa. Prejšnje različice ostanejo dostopne na dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Različica 2.18 je nadomestila različico 2.17: Priloga A.3 navaja, da so tudi v Quebecu razprave na plačljivem paketu privzeto zasebne, razprave na brezplačnem paketu pa javne, kot pove razdelek 9; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni." },
       { kind: "p", text: "Različica 2.17 je nadomestila različico 2.16: razdelek 10 navaja, kdaj prijavo, oddano z gumbom Prijavi, prebere umetna inteligenca in kdaj človek, da gumb zahteva vašo izjavo o dobri veri, da prijavo potrdimo in vas o odločitvi obvestimo po e-pošti ter da se obrazložitve pošiljajo po e-pošti in hranijo v vašem računu; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni." },
       { kind: "p", text: "Različica 2.16 je nadomestila različico 2.15: razdelek 12 navaja plačljive pakete, Plus, Pro in Max, razdelka 12 in 15 pa ne vsebujeta več opomb iz priprave osnutka; to, za kar odgovarjamo, in vse pravice iz teh Pogojev ostajajo nespremenjeni." },
       { kind: "p", text: "Različica 2.15 je nadomestila različico 2.14: razdelek 12 navaja, da so naše cene prikazane brez davka, kot cena + DDV, in da se davek doda v blagajni." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada in Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. Quebec: ti Pogoji so na voljo v francoščini; če ob registraciji izberete Kanado, jih najprej prejmete v francoščini, namesto tega pa lahko izberete angleščino; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja." }
+      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. Quebec: ti Pogoji so na voljo v francoščini; če ob registraciji izberete Kanado, jih najprej prejmete v francoščini, namesto tega pa lahko izberete angleščino; na plačljivem paketu so razprave privzeto zasebne, razprave na brezplačnem paketu pa so javne, kot pove razdelek 9; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "f0ddb559b80cf7b1ac46a8e00482d43f5c2b6667fb073d6525748d1d091590a7",
-  eyebrow: "POGOJI UPORABE · v2.17 · VELJAVNI OD 1. NOVEMBRA 2026",
+  version: "2.18",
+  sha256: "783aed0c95b80a5aa98786987f7b3fda3b35f19856e3ac66cb4255f42243462a",
+  eyebrow: "POGOJI UPORABE · v2.18 · VELJAVNI OD 1. NOVEMBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.17",
+  endMarker: "KONEC POGOJEV · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

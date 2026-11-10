@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Palvelun muutokset. Kehitämme Dialectical Engine -palvelua jatkuvasti, ja tavanomaiset parannukset, korjaukset ja mallivalikoiman muutokset tehdään ilman ilmoitusta. Jos muutos ylittää sen, mikä on tarpeen palvelun pitämiseksi kuvatulla tavalla toimivana, teemme sen vain jostakin seuraavista syistä: oikeudellisen tai sääntelyvaatimuksen noudattamiseksi; turvallisuus- tai väärinkäytösongelmaan reagoimiseksi; koska mallipalveluntarjoaja muuttaa tai rajoittaa mallia tai ominaisuutta, johon tukeudumme, taikka poistaa sen; mukautuaksemme tekniseen ympäristöön, jota emme hallitse; tai lisätäksemme, parantaaksemme tai poistaaksemme ominaisuuden tavalla, josta ei aiheudu sinulle kustannuksia." },
       { kind: "p", text: "Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta 30 päivän kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut." },
       { kind: "p", text: "Näiden käyttöehtojen muutokset. Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään 30 päivää ennen sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versio 2.18 korvasi version 2.17: liitteessä A.3 kerrotaan, että myös Quebecissä maksullisen tilauksen väittelyt ovat oletusarvoisesti yksityisiä ja maksuttoman tilauksen väittelyt julkisia, kuten kohdassa 9 kerrotaan; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan." },
       { kind: "p", text: "Versio 2.17 korvasi version 2.16: kohdassa 10 kerrotaan, milloin Ilmoita-painikkeella tehdyn ilmoituksen lukee tekoäly ja milloin henkilö, että painike pyytää vilpittömässä mielessä annetun vakuutuksesi, että vahvistamme ilmoituksen ja ilmoitamme päätöksestämme sähköpostitse ja että perustelut lähetetään sähköpostitse ja säilytetään tililläsi; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan." },
       { kind: "p", text: "Versio 2.16 korvasi version 2.15: kohdassa 12 nimetään maksulliset tilaukset, Plus, Pro ja Max, eikä kohdissa 12 ja 15 ole enää luonnosteluhuomautuksia; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan." },
       { kind: "p", text: "Versio 2.15 korvasi version 2.14: kohdassa 12 kerrotaan, että hintamme näytetään ilman veroa, muodossa hinta + ALV, ja että vero lisätään kassalla." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ja Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. Quebec: nämä käyttöehdot ovat saatavilla ranskaksi; jos valitset rekisteröityessäsi Kanadan, saat ne ensin ranskaksi ja voit valita sen sijaan englannin; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta." }
+      { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. Quebec: nämä käyttöehdot ovat saatavilla ranskaksi; jos valitset rekisteröityessäsi Kanadan, saat ne ensin ranskaksi ja voit valita sen sijaan englannin; maksullisessa tilauksessa väittelyt ovat oletusarvoisesti yksityisiä ja maksuttoman tilauksen väittelyt ovat julkisia, kuten kohdassa 9 kerrotaan; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "3fc2c6091b3de5a56f818ef0ca700ba64e281ce6e16f5a8ae8835f30d92561e9",
-  eyebrow: "KÄYTTÖEHDOT · v2.17 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
+  version: "2.18",
+  sha256: "21bd677bdea09aa7b8968a73e0579cf9572fe0d8a4aeeb6af6a32731b4fb4db2",
+  eyebrow: "KÄYTTÖEHDOT · v2.18 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.17",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

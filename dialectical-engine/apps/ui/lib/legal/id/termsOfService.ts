@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pada layanan. Kami terus mengembangkan Dialectical Engine, dan peningkatan rutin, perbaikan, serta perubahan daftar model terjadi tanpa pemberitahuan. Jika kami membuat perubahan yang melampaui upaya mempertahankan fungsi layanan sebagaimana diuraikan, kami melakukannya hanya atas salah satu alasan berikut: mematuhi persyaratan hukum atau peraturan; menanggapi masalah keamanan atau penyalahgunaan; karena penyedia model mengubah, membatasi, atau menarik model maupun fitur yang kami andalkan; beradaptasi dengan lingkungan teknis yang tidak kami kendalikan; atau menambah, meningkatkan, maupun menghentikan fitur dengan cara yang tidak menambah biaya bagi Anda." },
       { kind: "p", text: "Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu 30 hari sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan." },
       { kind: "p", text: "Pada Ketentuan ini. Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya 30 hari sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versi 2.18 menggantikan versi 2.17: Lampiran A.3 menyebutkan bahwa di Quebec pun debat di paket berbayar bersifat privat secara bawaan dan debat di paket gratis bersifat publik, sebagaimana dijelaskan dalam bagian 9; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah." },
       { kind: "p", text: "Versi 2.17 menggantikan versi 2.16: bagian 10 menyebutkan kapan AI membaca laporan yang dibuat dengan tombol Laporkan dan kapan seseorang yang membacanya, bahwa tombol itu meminta pernyataan iktikad baik Anda, bahwa kami mengonfirmasi laporan dan memberi tahu Anda keputusan kami melalui email, dan bahwa pernyataan alasan dikirim melalui email dan disimpan di akun Anda; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah." },
       { kind: "p", text: "Versi 2.16 menggantikan versi 2.15: bagian 12 menyebutkan paket berbayar, yaitu Plus, Pro, dan Max, dan bagian 12 dan 15 tidak lagi memuat catatan penyusunan; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah." },
       { kind: "p", text: "Versi 2.15 menggantikan versi 2.14: bagian 12 menyatakan bahwa harga kami ditampilkan sebelum pajak, sebagai harga + PPN, dan bahwa pajak ditambahkan di halaman pembayaran." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada dan Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. Quebec: Ketentuan ini tersedia dalam bahasa Prancis; jika Anda memilih Kanada saat mendaftar, Anda akan mendapatkannya dalam bahasa Prancis terlebih dahulu dan dapat memilih bahasa Inggris sebagai gantinya; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks." }
+      { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. Quebec: Ketentuan ini tersedia dalam bahasa Prancis; jika Anda memilih Kanada saat mendaftar, Anda akan mendapatkannya dalam bahasa Prancis terlebih dahulu dan dapat memilih bahasa Inggris sebagai gantinya; di paket berbayar, debat bersifat privat secara bawaan, dan debat di paket gratis bersifat publik, sebagaimana dijelaskan dalam bagian 9; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "b37ead83f8bd0f567cde13fa0d2168f341f9bbab51375d9343a51dab8db62059",
-  eyebrow: "KETENTUAN LAYANAN · v2.17 · BERLAKU 1 NOVEMBER 2026",
+  version: "2.18",
+  sha256: "98f48b284945f31c97788424e56bec4c999aa852cfff9e7cba8c1bd8f5788b73",
+  eyebrow: "KETENTUAN LAYANAN · v2.18 · BERLAKU 1 NOVEMBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",
-  endMarker: "AKHIR KETENTUAN · v2.17",
+  endMarker: "AKHIR KETENTUAN · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teks Ketentuan Layanan",
   sectionIdPrefix: "terms-section-",

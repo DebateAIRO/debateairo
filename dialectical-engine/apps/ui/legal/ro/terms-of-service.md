@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.17 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.18 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.17
+endMarker: SFÂRȘITUL TERMENILOR · v2.18
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.17 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.18 · Effective 1 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Pe planul gratuit, dezbaterile dumneavoastră sunt publice după ce se încheie, în urma unei verificări cu IA; pe un plan cu plată, sunt private dacă nu le publicați. Odată publică, o dezbatere poate fi citită de oricine și rămâne publică. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -249,6 +249,8 @@ Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă 
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
 
+Versiunea 2.18 a înlocuit versiunea 2.17: Anexa A.3 arată că și în Quebec dezbaterile de pe un plan cu plată sunt private în mod implicit, iar cele de pe planul gratuit sunt publice, după cum arată secțiunea 9; răspunderea noastră și fiecare drept din acești Termeni rămân neschimbate.
+
 Versiunea 2.17 a înlocuit versiunea 2.16: secțiunea 10 arată când o raportare făcută cu butonul Raportare este citită de o IA și când de o persoană, că butonul vă cere declarația de bună-credință, că vă confirmăm primirea raportării și vă comunicăm decizia noastră prin e-mail și că expunerile motivelor vă sunt trimise prin e-mail și păstrate în contul dumneavoastră; răspunderea noastră și fiecare drept din acești Termeni rămân neschimbate.
 
 Versiunea 2.16 a înlocuit versiunea 2.15: secțiunea 12 numește planurile cu plată, Plus, Pro și Max, iar secțiunile 12 și 15 nu mai conțin note de redactare; răspunderea noastră și fiecare drept din acești Termeni rămân neschimbate.
@@ -337,7 +339,7 @@ Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți in
 
 ### A.3 Canada și Quebec
 
-Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. **Quebec:** acești Termeni sunt disponibili în limba franceză; dacă alegeți Canada la înregistrare, îi primiți mai întâi în limba franceză și puteți alege în schimb limba engleză; setările care vă mențin dezbaterile private sunt activate în mod implicit; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră.
+Responsabilul nostru cu protecția vieții private, iar în Quebec persoana responsabilă cu protecția informațiilor cu caracter personal, este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră. **Quebec:** acești Termeni sunt disponibili în limba franceză; dacă alegeți Canada la înregistrare, îi primiți mai întâi în limba franceză și puteți alege în schimb limba engleză; dezbaterile de pe un plan cu plată sunt private în mod implicit, iar dezbaterile de pe planul gratuit sunt publice, după cum arată secțiunea 9; puteți solicita dezindexarea informațiilor cu caracter personal despre dumneavoastră.
 
 ### A.4 Australia și Noua Zeelandă
 

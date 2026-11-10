@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Tjenesten. Vi udvikler løbende Dialectical Engine, og rutinemæssige forbedringer, rettelser og ændringer i modeludvalget sker uden varsel. Hvis vi foretager en ændring, der går ud over at holde tjenesten i funktion som beskrevet, gør vi det kun af en af følgende grunde: for at overholde et retligt eller regulatorisk krav; for at reagere på et sikkerheds- eller misbrugsproblem; fordi en modeludbyder ændrer, begrænser eller trækker en model eller funktion tilbage, som vi er afhængige af; for at tilpasse os et teknisk miljø, vi ikke kontrollerer; eller for at tilføje, forbedre eller udfase en funktion på en måde, der ikke medfører omkostninger for dig." },
       { kind: "p", text: "Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornår. Hvis ændringen har mere end en mindre negativ indvirkning på din adgang til eller brug af tjenesten, kan du uden omkostninger opsige inden for 30 dage efter, at du blev underrettet, eller efter at ændringen fik virkning, alt efter hvilken dato der ligger senest, og vi tilbagebetaler eventuelle forudbetalte beløb for den uudnyttede periode." },
       { kind: "p", text: "Disse vilkår. Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst 30 dage, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Version 2.18 erstattede version 2.17: bilag A.3 angiver, at debatter også i Quebec er private som standard på et betalt abonnement og offentlige på det gratis abonnement, som afsnit 9 angiver; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede." },
       { kind: "p", text: "Version 2.17 erstattede version 2.16: afsnit 10 angiver, hvornår en AI læser en anmeldelse indsendt med knappen Anmeld, og hvornår en person gør, at knappen beder om din erklæring i god tro, at vi bekræfter en anmeldelse og meddeler dig vores afgørelse via e-mail, og at begrundelser sendes via e-mail og opbevares på din konto; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede." },
       { kind: "p", text: "Version 2.16 erstattede version 2.15: afsnit 12 nævner de betalte abonnementer, Plus, Pro og Max, og afsnit 12 og 15 indeholder ikke længere redaktionelle noter; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede." },
       { kind: "p", text: "Version 2.15 erstattede version 2.14: afsnit 12 oplyser, at vores priser vises uden afgifter, som pris + moms, og at afgiften lægges til ved betalingen." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada og Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. Quebec: Disse vilkår findes på fransk; hvis du vælger Canada ved tilmelding, får du dem først på fransk og kan i stedet vælge engelsk; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig." }
+      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.3, dækker dine data. Quebec: Disse vilkår findes på fransk; hvis du vælger Canada ved tilmelding, får du dem først på fransk og kan i stedet vælge engelsk; debatter på et betalt abonnement er private som standard, og debatter på det gratis abonnement er offentlige, som afsnit 9 angiver; du kan anmode om afindeksering af personoplysninger om dig." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "d381bdf9b52f33c46f9b4ba6be9bba2f6427fe4a37560e2582ebf678b51be9bd",
-  eyebrow: "TJENESTEVILKÅR · v2.17 · GÆLDENDE FRA 1. NOVEMBER 2026",
+  version: "2.18",
+  sha256: "3ba68424d5c17983617c9dbc36fc124d396e5e6b868b53a5e609ddf08fb20f96",
+  eyebrow: "TJENESTEVILKÅR · v2.18 · GÆLDENDE FRA 1. NOVEMBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",
-  endMarker: "SLUT PÅ VILKÅRENE · v2.17",
+  endMarker: "SLUT PÅ VILKÅRENE · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tjenestevilkårenes tekst",
   sectionIdPrefix: "terms-section-",

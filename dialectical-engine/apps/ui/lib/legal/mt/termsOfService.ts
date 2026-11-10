@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Fis-servizz. Aħna niżviluppaw Dialectical Engine kontinwament, u titjib ta’ rutina, soluzzjonijiet għal problemi u bidliet fil-lista tal-mudelli jsiru mingħajr avviż. Fejn nagħmlu bidla li tmur lil hinn milli nżommu s-servizz jaħdem kif deskritt, nagħmluha biss għal waħda minn dawn ir-raġunijiet: biex nikkonformaw ma’ rekwiżit legali jew regolatorju; biex nirrispondu għal problema ta’ sigurtà jew abbuż; għaliex fornitur tal-mudelli jibdel, jirrestrinġi jew jirtira mudell jew funzjonalità li niddependu fuqha; biex nadattaw għal ambjent tekniku li ma nikkontrollawx; jew biex inżidu, intejbu jew nirtiraw funzjonalità b’mod li ma jżid ebda spiża għalik." },
       { kind: "p", text: "Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidla jkollha effett negattiv aktar minn minuri fuq l-aċċess tiegħek għas-servizz jew l-użu tiegħu, tista’ tittermina mingħajr ħlas fi żmien 30 jum minn meta tiġi avżat, jew minn meta tidħol fis-seħħ il-bidla, skont liema jiġi l-aħħar, u nagħtuk lura kwalunkwe ammont imħallas bil-quddiem għall-perjodu mhux użat." },
       { kind: "p", text: "F’dawn it-Termini. Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas 30 jum qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Il-Verżjoni 2.18 issostitwiet il-Verżjoni 2.17: l-Anness A.3 jgħid li anke fil-Quebec id-dibattiti fuq pjan bi ħlas huma privati b’mod awtomatiku u d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, kif tgħid it-taqsima 9; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx." },
       { kind: "p", text: "Il-Verżjoni 2.17 issostitwiet il-Verżjoni 2.16: it-taqsima 10 tgħid meta IA taqra rapport magħmul bil-buttuna Irrapporta u meta taqrah persuna, li l-buttuna titlob id-dikjarazzjoni tiegħek b’rieda tajba, li nikkonfermaw rapport u ngħidulek id-deċiżjoni tagħna bl-email, u li d-dikjarazzjonijiet tar-raġunijiet jintbagħtu bl-email u jinżammu fil-kont tiegħek; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx." },
       { kind: "p", text: "Il-Verżjoni 2.16 issostitwiet il-Verżjoni 2.15: it-taqsima 12 issemmi l-pjanijiet bi ħlas, Plus, Pro u Max, u t-taqsimiet 12 u 15 m’għadx fihom noti tal-abbozzar; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx." },
       { kind: "p", text: "Il-Verżjoni 2.15 issostitwiet il-Verżjoni 2.14: it-taqsima 12 tgħid li l-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT, u li t-taxxa tiżdied fil-checkout." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Il-Kanada u Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. Quebec: dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek." }
+      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. Quebec: dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; id-dibattiti fuq pjan bi ħlas huma privati b’mod awtomatiku, u d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, kif tgħid it-taqsima 9; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "6c5acbdf8884c73c8be5a2a96d4a10e2acd55782b634f6ca1daee8712df93607",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.17 · EFFETTIVI 1 TA’ NOVEMBRU 2026",
+  version: "2.18",
+  sha256: "61f558a0d03d164d1980c8619ed76c00285886a2cc670be371aaa3dc854a8757",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.18 · EFFETTIVI 1 TA’ NOVEMBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.17",
+  endMarker: "TMIEM IT-TERMINI · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

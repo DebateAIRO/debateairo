@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Teenuse muudatused. Arendame Dialectical Engine-d pidevalt ning tavapärased täiustused, parandused ja mudelivaliku muudatused toimuvad ette teatamata. Kui teeme muudatuse, mis läheb teenuse kirjeldatud viisil toimivana hoidmisest kaugemale, teeme seda ainult ühel järgmistest põhjustest: õigus- või regulatiivse nõude täitmiseks; turva- või kuritarvitamisprobleemile reageerimiseks; seetõttu, et mudelipakkuja muudab, piirab või kõrvaldab mudeli või funktsiooni, millest sõltume; kohanemiseks tehnilise keskkonnaga, mida me ei kontrolli; või funktsiooni lisamiseks, täiustamiseks või kasutuselt kõrvaldamiseks viisil, mis ei tekita teile lisakulu." },
       { kind: "p", text: "Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada 30 päeva jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa." },
       { kind: "p", text: "Nende Tingimuste muudatused. Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt 30 päeva enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Versioon 2.18 asendas versiooni 2.17: lisa A.3 ütleb, et ka Quebecis on tasulise paketi väitlused vaikimisi privaatsed ja tasuta paketi väitlused avalikud, nagu jaotises 9 öeldud; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata." },
       { kind: "p", text: "Versioon 2.17 asendas versiooni 2.16: jaotis 10 ütleb, millal loeb nupuga Teatage tehtud teadet tehisintellekt ja millal isik, et nupp küsib teie heauskset kinnitust, et kinnitame teate kättesaamist ja teatame teile oma otsuse e-postiga ning et põhjendused saadetakse e-postiga ja säilitatakse teie kontol; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata." },
       { kind: "p", text: "Versioon 2.16 asendas versiooni 2.15: jaotis 12 nimetab tasulised paketid, Plus, Pro ja Max, ning jaotistes 12 ja 15 ei ole enam koostamismärkusi; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata." },
       { kind: "p", text: "Versioon 2.15 asendas versiooni 2.14: jaotis 12 ütleb, et meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks, ja et maks lisatakse kassas." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ja Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. Quebec: need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist." }
+      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Teie andmeid käsitleb meie Privaatsuspoliitika lisa B.3. Quebec: need Tingimused on kättesaadavad prantsuse keeles; kui valite registreerumisel Kanada, kuvatakse need teile kõigepealt prantsuse keeles ja võite selle asemel valida inglise keele; tasulise paketi väitlused on vaikimisi privaatsed ja tasuta paketi väitlused on avalikud, nagu jaotises 9 öeldud; võite taotleda teid puudutavate isikuandmete otsingumootorite indeksist eemaldamist." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "abe6005185911101e82709a247f5c07f8c749498bd7e1ff68f0380ab1c0c2765",
-  eyebrow: "TEENUSETINGIMUSED · v2.17 · KEHTIB ALATES 1. NOVEMBRIST 2026",
+  version: "2.18",
+  sha256: "98e12ddc3f2c4e0d03cf520ed84831d685b8d1d12832c9a83e37e7d9178aa73b",
+  eyebrow: "TEENUSETINGIMUSED · v2.18 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.17",
+  endMarker: "TINGIMUSTE LÕPP · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

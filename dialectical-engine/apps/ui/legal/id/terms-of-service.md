@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.17 · BERLAKU 1 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.18 · BERLAKU 1 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.17
+endMarker: AKHIR KETENTUAN · v2.18
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.17 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.18 · Effective 1 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -249,6 +249,8 @@ Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
 
+Versi 2.18 menggantikan versi 2.17: Lampiran A.3 menyebutkan bahwa di Quebec pun debat di paket berbayar bersifat privat secara bawaan dan debat di paket gratis bersifat publik, sebagaimana dijelaskan dalam bagian 9; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah.
+
 Versi 2.17 menggantikan versi 2.16: bagian 10 menyebutkan kapan AI membaca laporan yang dibuat dengan tombol Laporkan dan kapan seseorang yang membacanya, bahwa tombol itu meminta pernyataan iktikad baik Anda, bahwa kami mengonfirmasi laporan dan memberi tahu Anda keputusan kami melalui email, dan bahwa pernyataan alasan dikirim melalui email dan disimpan di akun Anda; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah.
 
 Versi 2.16 menggantikan versi 2.15: bagian 12 menyebutkan paket berbayar, yaitu Plus, Pro, dan Max, dan bagian 12 dan 15 tidak lagi memuat catatan penyusunan; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah.
@@ -337,7 +339,7 @@ Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan
 
 ### A.3 Kanada dan Quebec
 
-Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. **Quebec:** Ketentuan ini tersedia dalam bahasa Prancis; jika Anda memilih Kanada saat mendaftar, Anda akan mendapatkannya dalam bahasa Prancis terlebih dahulu dan dapat memilih bahasa Inggris sebagai gantinya; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks.
+Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. **Quebec:** Ketentuan ini tersedia dalam bahasa Prancis; jika Anda memilih Kanada saat mendaftar, Anda akan mendapatkannya dalam bahasa Prancis terlebih dahulu dan dapat memilih bahasa Inggris sebagai gantinya; di paket berbayar, debat bersifat privat secara bawaan, dan debat di paket gratis bersifat publik, sebagaimana dijelaskan dalam bagian 9; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks.
 
 ### A.4 Australia dan Selandia Baru
 
