@@ -17,7 +17,7 @@ import { join } from "node:path";
 import type { MapMarkRecord, MapNoteRecord, MapResult, MapStep } from "@debateai/map";
 import { previewModelRow } from "@debateai/providers";
 import { START_SEAT_SPEED_ORDER, startModelOfSeat } from "../../apps/api/src/start-step/seats.js";
-import { practiceWireUsage, type PracticeAttempt } from "./practice-formats.js";
+import { practiceWireUsage, type PracticeAttempt, type PracticeFirstRefusal } from "./practice-formats.js";
 import type { PracticeGateName, PracticeWireEvent } from "./practice-gate-observer.js";
 import { practiceWordingRows, practiceWordingTotals } from "./practice-map-wording.js";
 import { OPENINGS_START_PLANS, type OpeningsArm, type OpeningsQuestionDigest, type OpeningsStartPlan } from "./practice-openings-questions.js";
@@ -98,6 +98,12 @@ export type OpeningsCall = Readonly<{
    * fragment). Otherwise the last reply's text. Key-shaped strings blanked, at most 64 KiB; null when none came.
    */
   replyText: string | null;
+  /**
+   * Item 0 (format slips, owner 9 Nov): the call's FIRST refused reply (`practiceFirstRefusalOf`): which try, its parse
+   * status, how it ended, what its check said (`code@path`) and its text, redacted and capped as replyText is. Null when
+   * every reply came back accepted, or none came back; absent in older logs.
+   */
+  firstRefused?: PracticeFirstRefusal | null;
   /** Arm S only (Task 91): the plan whose card the call was made for. Absent on every other arm's call, as before. */
   plan?: OpeningsStartPlan;
 }>;
@@ -196,14 +202,21 @@ function redactedStrings<T>(value: T): T {
   return value;
 }
 
+/** Item 0: a first refused reply as every report keeps it: its text redacted and capped, its issues key-shape redacted. */
+function redactedRefusal(refused: PracticeFirstRefusal | null): PracticeFirstRefusal | null {
+  return refused === null ? null : Object.freeze({ ...refused, issues: refused.issues.map((issue) => redactKeyShapes(issue)),
+    replyText: reportableReplyText(refused.replyText) });
+}
+
 /**
  * The line as it is written, whatever the caller passed, with the rules every report uses: a call's reply text is
  * redacted and capped (key-shaped strings blanked, at most 64 KiB), and an arm line's map has every string key-shape
  * redacted (the map is model-written). Applying it twice changes nothing.
  */
 function redactedForLog(line: OpeningsLogLine): OpeningsLogLine {
-  if (line.kind === "call" && line.call.replyText !== null) {
-    return { kind: "call", call: { ...line.call, replyText: reportableReplyText(line.call.replyText) } };
+  if (line.kind === "call" && (line.call.replyText !== null || (line.call.firstRefused ?? null) !== null)) {
+    return { kind: "call", call: { ...line.call, replyText: line.call.replyText === null ? null : reportableReplyText(line.call.replyText),
+      ...(line.call.firstRefused === undefined ? {} : { firstRefused: redactedRefusal(line.call.firstRefused) }) } };
   }
   if (line.kind === "arm" && line.arm.map !== null) {
     return { kind: "arm", arm: { ...line.arm, map: redactedStrings(line.arm.map) } };
@@ -253,9 +266,13 @@ function openingsCount(values: readonly string[]): Readonly<Record<string, numbe
 
 const openingsAnswered = (call: OpeningsCall): boolean => call.status === "ACCEPTED" || call.status === "REPAIRED";
 
-/** A call the report lists as wrong-format: it failed, or one of its tries came back with a reply that failed its check. */
+/**
+ * A call the report lists as wrong-format: it failed, or one of its tries came back with a reply that failed its check
+ * (item 0: a reply refused though it read as JSON, e.g. cut off at its bound, included).
+ */
 const openingsWrongFormat = (call: OpeningsCall): boolean => call.status === "FORMAT_FAILED" || call.status === "CALL_FAILED"
-  || call.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED");
+  || call.attempts.some((attempt) => attempt.parseStatus !== null && attempt.parseStatus !== "PARSED")
+  || (call.firstRefused ?? null) !== null;
 
 /**
  * One plan's cards (Task 91, arm S), over the cards that were shown (a list in by the cut): the card's wait at the
@@ -482,9 +499,10 @@ export function openingsReportFromLog(lines: readonly OpeningsLogLine[], abort: 
       notes: armLines.reduce((sum, line) => sum + line.notes.length, 0)
     }),
     // The formats report's rule: a call that failed, or one of whose tries came back with a reply that failed its check
-    // (fixed or not). Its reply text is kept only for a format failure, redacted again here (the lines may be in memory).
-    failures: calls.filter(openingsWrongFormat).map((call) => call.status === "FORMAT_FAILED"
-      ? { ...call, replyText: call.replyText === null ? null : reportableReplyText(call.replyText) }
-      : { ...call, replyText: null })
+    // (fixed or not). Its reply text is kept only for a format failure; item 0: its first refused reply and that reply's
+    // issues always. Both redacted again here (the lines may be in memory).
+    failures: calls.filter(openingsWrongFormat).map((call) => ({ ...call,
+      replyText: call.status === "FORMAT_FAILED" && call.replyText !== null ? reportableReplyText(call.replyText) : null,
+      ...(call.firstRefused === undefined ? {} : { firstRefused: redactedRefusal(call.firstRefused) }) }))
   });
 }

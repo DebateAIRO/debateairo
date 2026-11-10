@@ -65,6 +65,7 @@ import {
   PRACTICE_FORMATS_DEFAULTS,
   PRACTICE_MODEL_BUSY,
   practiceAttemptsOf,
+  practiceFirstRefusalOf,
   practiceJobGateway,
   practiceLimitedPorts,
   practiceNextBusyWait,
@@ -300,7 +301,7 @@ async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorag
     const skipped = (status: "SKIPPED_MODEL_BUSY" | "SKIPPED_STOPPED", errorCode: string) => {
       const at = new Date().toISOString();
       record({ ...base, startedAt: at, finishedAt: at, latencyMs: 0, inputTokens: null, outputTokens: null, reasoningTokens: null,
-        cachedInputTokens: null, costNanoUsd: null, status, errorCode, attempts: [], replyForm: null, replyText: null });
+        cachedInputTokens: null, costNanoUsd: null, status, errorCode, attempts: [], replyForm: null, replyText: null, firstRefused: null });
     };
     for (;;) {
       if (busy.includes(model)) {
@@ -360,7 +361,9 @@ async function openingsRun(input: OpeningsRunInput, wireOfCall: AsyncLocalStorag
         status, errorCode, attempts,
         replyForm: ok ? ([...attempts].reverse().find((attempt) => attempt.outcome === "OK")?.replyForm ?? null) : null,
         replyText: ok && accepted.content !== null ? reportableReplyText(accepted.content)
-          : last === null ? null : reportableReplyText(replyContentOf(last.rawText)) });
+          : last === null ? null : reportableReplyText(replyContentOf(last.rawText)),
+        // Item 0 (owner 9 Nov): the slip itself, before any repair (a patched call's replyText is the merged reply).
+        firstRefused: practiceFirstRefusalOf(job.sink) });
       input.progress?.(`${context.question.id} ${context.arm} ${context.callSiteKey} ${model}: ${status} ${String(latencyMs)}ms`);
       if (endedBusy) {
         // Its budget spent: the model sits out the rest of the run (marked once, after its call is told).

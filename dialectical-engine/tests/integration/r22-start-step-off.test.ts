@@ -83,6 +83,8 @@ describe("R22 on the real API with the start-step switch absent", () => {
     expect(isShapeReceiptV2(basis)).toBe(false);
     expect((basis.shape as { version?: number } | undefined)?.version).not.toBe(2);
     expect((basis.web as { version?: number } | undefined)?.version).not.toBe(2);
+    // Task 91k: every kind now mints web version 3, so "no path debate priced" is read from the web part's kind.
+    expect((basis.web as { kind?: string } | undefined)?.kind).not.toBe("PATHS");
     expect((await world.database.pool.query<{ ids: string[] | null }>("SELECT core.read_start_path_ids($1) AS ids", [runId])).rows[0]!.ids).toBeNull();
 
     // R22's map step opened the debate; the start step's never ran.

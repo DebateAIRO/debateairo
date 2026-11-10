@@ -40,6 +40,7 @@ const LIST_INSTRUCTION = "Suggest what is worth looking into before this questio
   + "one question that, once looked into, helps answer the main question from its angle, with one short line on why it matters. Suggest "
   + "three to six paths in all, each clearly different from the others. Do not answer the main question and do not repeat it in other words.";
 
+// Task 91h (owner, 9 Nov: "Approve the words"): the last sentence, so the "Combine?" reason is written in the question's language.
 // OWNER WORDING — approve before switch-on
 const MERGE_INSTRUCTION = "Several people suggested what is worth looking into for this question; you are given their suggestions, each with an "
   + "id. First, mark every suggestion that says the same as another in other words as a repeat of it. Then make the list of paths: put "
@@ -49,7 +50,7 @@ const MERGE_INSTRUCTION = "Several people suggested what is worth looking into f
   + "pick up to three other ways to read the question that the suggestions show and the asker may not have weighed, each with one sentence "
   + "saying what kind of surprise it is and a path that would look into it. Last, suggest up to nine changes: two paths that ask almost the "
   + "same thing and could be combined into one path (but you decided not to, because they do contain separate angles), with a short reason, "
-  + "or a path that fits inside another.";
+  + "or a path that fits inside another. Write it in the question's language.";
 
 // OWNER WORDING — approve before switch-on
 const MERGE_LATE_INSTRUCTION = "More suggestions arrived for this question after its list of paths was made. You are given the list so far, and "

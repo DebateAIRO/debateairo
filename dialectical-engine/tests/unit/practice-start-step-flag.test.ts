@@ -22,6 +22,7 @@ import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate
 import { debateReport } from "../../tools/preview-practice/practice-report.js";
 import { practiceShapeOverrideFromArgs } from "../../tools/preview-practice/practice-shape.js";
 import { parsePracticeRegisterExport, type PracticeRegisterImportReceipt } from "../../tools/preview-practice/practice-register-import.js";
+import { composePracticeRunner } from "../../tools/preview-practice/practice-runner-composition.js";
 import type { PracticeSettings, PracticeSockets } from "../../tools/preview-practice/practice-settings.js";
 import {
   PRACTICE_START_FLAGS, PRACTICE_START_MONTH_FILE, practicePathFillSpread, practiceStartPhaseOf, practiceStartShapePolicyOf, practiceStartStepFromArgs
@@ -580,6 +581,31 @@ describe("Task 91b: a dry run on fake gates (Free, 3 paths, 1 dig)", () => {
       expect(seen.submits[0]!.request).toMatchObject({ plan_tier: "premium" });
       expect(result.admission.satOut.map((entry) => entry.model)).toEqual([MIMO, QWEN]);
       expect(reportOf(result).reasons).toEqual(expect.arrayContaining([`MODEL_NOT_EXERCISED:${MIMO}`, `MODEL_NOT_EXERCISED:${QWEN}`]));
+    });
+  });
+
+  /*
+   * Task 91f (owner 9 Nov, "Fix the practice first"): the practice asks with billing kept off, so the site's plan read finds no plan for
+   * its runs and the web step searched nothing, even on premium:5. The runner composition is handed the plan billing would have pinned:
+   * PLUS for premium, FREE for free; a practice without --start-step hands none (today's runner, byte for byte).
+   */
+  describe("Task 91f: the plan the practice's runner is handed for its web step", () => {
+    const handed = () => vi.mocked(composePracticeRunner).mock.calls.map((call) => (call[0] as { webPlan?: unknown }).webPlan);
+    const practise = (start: { plan: "free" | "premium"; paths: number; digs: 0 } | undefined) => runPracticeDebate({ settings: SETTINGS,
+      sockets: SOCKETS, register: REGISTER, budgetPorts: {} as never, observer: {} as never, depth: 1, questionId: "en",
+      shape: { policy: STEP_ROW, ask: {} }, ...(start === undefined ? {} : { start, startMonthDirectory: out }),
+      progress: () => undefined } as Parameters<typeof runPracticeDebate>[0]);
+    beforeEach(() => { vi.mocked(composePracticeRunner).mockClear(); });
+
+    it("premium:5 is PLUS, free:3 is FREE, no --start-step none", async () => {
+      compose();
+      await practise({ plan: "premium", paths: 5, digs: 0 });
+      compose();
+      await practise({ plan: "free", paths: 3, digs: 0 });
+      compose();
+      await practise(undefined);
+      expect(handed()).toEqual(["PLUS", "FREE", undefined]);
+      expect(vi.mocked(composePracticeRunner).mock.calls[2]![0]).not.toHaveProperty("webPlan");
     });
   });
 });

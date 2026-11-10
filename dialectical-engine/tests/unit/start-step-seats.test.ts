@@ -30,28 +30,32 @@ const seats = (roster: readonly string[], count: number, busy: ReadonlySet<strin
 const refs = (picked: ReturnType<typeof seats>) => picked.seats.map((seat) => seat.aiRef);
 
 describe("the list seats (spec 2026-11-03 §4.1, S5)", () => {
-  it("starts in the order of the earlier single-call speeds (a reorder is a visible pin change, Task 91 Step 4)", () => {
-    expect(START_SEAT_SPEED_ORDER).toEqual([HAIKU, GLM, QWEN, DEEPSEEK, MIMO]);
+  it("the order measured on real AIs (Task 91 Step 4, the sitting of 9 Nov, the owner's yes): Haiku, DeepSeek, Qwen, GLM, MiMo", () => {
+    expect(START_SEAT_SPEED_ORDER).toEqual([HAIKU, DEEPSEEK, QWEN, GLM, MIMO]);
     expect(Object.isFrozen(START_SEAT_SPEED_ORDER)).toBe(true);
   });
 
-  it("Max's 7 on five companies: one seat each, fastest first, then Haiku and GLM again; the Haiku seat named", () => {
+  it("Max's 7 on five companies: one seat each, fastest first, then Haiku and DeepSeek again; the Haiku seat named", () => {
     const max = seats([GLM, DEEPSEEK, MIMO, QWEN, HAIKU], 7);
-    expect(refs(max)).toEqual([HAIKU, GLM, QWEN, DEEPSEEK, MIMO, `${HAIKU}#2`, `${GLM}#2`]);
-    expect(max.seats.map((seat) => seat.maker)).toEqual(["Anthropic", "Z.AI", "Alibaba", "DeepSeek", "Xiaomi", "Anthropic", "Z.AI"]);
+    expect(refs(max)).toEqual([HAIKU, DEEPSEEK, QWEN, GLM, MIMO, `${HAIKU}#2`, `${DEEPSEEK}#2`]);
+    expect(max.seats.map((seat) => seat.maker)).toEqual(["Anthropic", "DeepSeek", "Alibaba", "Z.AI", "Xiaomi", "Anthropic", "DeepSeek"]);
     expect(max.haiku).toEqual({ aiRef: HAIKU, maker: "Anthropic" });
   });
 
   it("the first seats of the speed order per plan's number: Free 2, Plus 4, Pro 5", () => {
     const all = [HAIKU, GLM, QWEN, DEEPSEEK, MIMO];
-    expect(refs(seats(all, 2))).toEqual([HAIKU, GLM]);
-    expect(refs(seats(all, 4))).toEqual([HAIKU, GLM, QWEN, DEEPSEEK]);
-    expect(refs(seats(all, 5))).toEqual([HAIKU, GLM, QWEN, DEEPSEEK, MIMO]);
+    expect(refs(seats(all, 2))).toEqual([HAIKU, DEEPSEEK]);
+    expect(refs(seats(all, 4))).toEqual([HAIKU, DEEPSEEK, QWEN, GLM]);
+    expect(refs(seats(all, 5))).toEqual([HAIKU, DEEPSEEK, QWEN, GLM, MIMO]);
+  });
+
+  it("Free's two list seats on the lean Free line-up (GLM, DeepSeek, Qwen, Haiku) are Haiku and DeepSeek, the two fastest measured", () => {
+    expect(refs(seats([GLM, DEEPSEEK, QWEN, HAIKU], 2))).toEqual([HAIKU, DEEPSEEK]);
   });
 
   it("a busy model is skipped, and the next company takes its place", () => {
-    expect(refs(seats([HAIKU, GLM, QWEN, DEEPSEEK, MIMO], 4, new Set([QWEN])))).toEqual([HAIKU, GLM, DEEPSEEK, MIMO]);
-    expect(refs(seats([HAIKU, GLM, QWEN, DEEPSEEK, MIMO], 7, new Set([QWEN])))).toEqual([HAIKU, GLM, DEEPSEEK, MIMO, `${HAIKU}#2`, `${GLM}#2`, `${DEEPSEEK}#2`]);
+    expect(refs(seats([HAIKU, GLM, QWEN, DEEPSEEK, MIMO], 4, new Set([QWEN])))).toEqual([HAIKU, DEEPSEEK, GLM, MIMO]);
+    expect(refs(seats([HAIKU, GLM, QWEN, DEEPSEEK, MIMO], 7, new Set([QWEN])))).toEqual([HAIKU, DEEPSEEK, GLM, MIMO, `${HAIKU}#2`, `${DEEPSEEK}#2`, `${GLM}#2`]);
   });
 
   it("a company's second seat is its other model when the roster has one, and only then the same model marked #2", () => {

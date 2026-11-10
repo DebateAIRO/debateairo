@@ -10,7 +10,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PRIVATE_NOT_CHECKED, readPrivateGateFigures, readPrivateRegisterExport, shareOfPot } from "../support/private-figures.js";
+import {
+  PRIVATE_NOT_CHECKED, RELEASE_ANTHROPIC_CALLS_AT_ONCE, privateWorldGates, privateWorldHostedBilling, readPrivateGateFigures, readPrivateRegisterExport, shareOfPot
+} from "../support/private-figures.js";
 
 const GATE = Object.freeze({
   daily_budget_usd: "11", max_paid_posts_per_day: 1111, max_concurrent_calls: 22, final_writer_max_in_flight: 11,
@@ -122,5 +124,32 @@ describe("a need against a pot, as a share only", () => {
       const message = thrownBy(() => shareOfPot(need, pot));
       expect(message).toBe("SHARE_OF_POT_INVALID");
     }
+  });
+});
+
+describe("the world's hosted billing from the private file", () => {
+  // Task 90c: the sitting's file carries the practice copy's billing (off: real practice debates run billing off), but the world
+  // drives every plan (Free, Plus, Pro, Max), so it runs the owner's plans and ceilings with billing on, whatever the file's switch.
+  it("a file with billing off is run with billing on; every other field as the file holds it", () => {
+    const off = readPrivateGateFigures(figuresFile(JSON.stringify({ ...GOOD, hosted_billing: { billing: "off", perRunCeilingMicros: 1_100_000,
+      billingPlans: { made_up_plan: "made-up" } } })))!;
+    expect(privateWorldHostedBilling(off)).toEqual({ billing: "on", perRunCeilingMicros: 1_100_000, billingPlans: { made_up_plan: "made-up" } });
+    expect(off.hosted_billing.billing).toBe("off");
+  });
+
+  it("a file with billing on is run as it is", () => {
+    const on = readPrivateGateFigures(figuresFile(JSON.stringify({ ...GOOD, hosted_billing: { billing: "on", dailyCeilingMicros: 11_000_000 } })))!;
+    expect(privateWorldHostedBilling(on)).toEqual({ billing: "on", dailyCeilingMicros: 11_000_000 });
+  });
+});
+
+describe("the world's gates from the private file: the release's GO edit on top", () => {
+  // Task 90c: the sitting's file holds today's GOs; the release's upload sets the Anthropic gate to four calls at once
+  // (deploy/preview-gate/v3/README-anthropic.md, "four calls at once", step 2: that one named field, nothing else).
+  it("the Anthropic gate gets the release's four calls at once; every other figure, and DeepInfra, as the file holds them", () => {
+    const figures = readPrivateGateFigures(figuresFile(JSON.stringify(GOOD)))!;
+    expect(RELEASE_ANTHROPIC_CALLS_AT_ONCE).toBe(4);
+    expect(privateWorldGates(figures)).toEqual({ deepinfra: GOOD.gates.deepinfra, anthropic: { ...GOOD.gates.anthropic, max_concurrent_calls: 4 } });
+    expect(figures.gates.anthropic.max_concurrent_calls).toBe(33);
   });
 });

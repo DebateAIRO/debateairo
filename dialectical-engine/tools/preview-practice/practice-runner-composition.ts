@@ -33,6 +33,9 @@
  *    report; the watching changes nothing they do.
  *  - No Hatchet, no worker, no start-up re-dispatch, no team gate: the practice calls executeWorkItem itself.
  *  - The story shape pack is the repository's own (the server's DEBATEAI_STORY_SHAPES_DIR is a server path).
+ *  - V4 start step, Task 91f: with a start step, the web step's plan read gives the start step's plan (premium: PLUS, free: FREE)
+ *    where the site's read finds none, as billing (kept off here) would have pinned it (`practiceWebSearchOnPlan`); the rest of
+ *    the web settings are main.ts's own call.
  *  - `wait` (the runner's cooldown hold) and `sleep` (the preview policy's one 60-second resend) can be injected, for
  *    the integration test only; the real practice waits for real.
  */
@@ -48,6 +51,7 @@ import {
   readCallConcurrencyPolicy,
   type CallConcurrencyPolicy,
   type DeploymentMode,
+  type PlanId,
   closingReservesOf,
   readBillingPlans,
 } from "@debateai/register";
@@ -103,6 +107,7 @@ import {
   runPreviewThinkingLevelsOf, type RunnerVersionReaders
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
+import type { WebStepRunnerSettings } from "../../apps/runner/src/web-step.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
@@ -152,6 +157,20 @@ export function practiceVersionReaders(callConcurrency: CallConcurrencyPolicy | 
   return Object.freeze({ readCallConcurrencyPolicy: async () => flag });
 }
 
+/**
+ * V4 start step, Task 91f (owner 9 Nov, "Fix the practice first"): THE PLAN THE PRACTICE'S WEB STEP READS. The practice asks with
+ * billing kept off, so none of its runs has a charge scope and the site's read (`readWebRunPlan`) finds no plan: the step then
+ * searches nothing, even for `--start-step premium:5`. With `webPlan` the runner's own web settings are kept member for member,
+ * and only their plan read changes: the site's read first, `webPlan` where it finds none (the plan billing would have pinned for
+ * a person on that plan). Without it: the very object given, as main.ts hands it.
+ */
+export function practiceWebSearchOnPlan<T extends Readonly<{ webSearch: WebStepRunnerSettings }>>(webPlan: PlanId | undefined, settings: T): T {
+  if (webPlan === undefined) return settings;
+  const site = settings.webSearch;
+  return Object.freeze({ ...settings, webSearch: Object.freeze({ ...site,
+    readRunPlan: async (runId: string): Promise<PlanId | null> => (await site.readRunPlan(runId)) ?? webPlan }) });
+}
+
 export async function composePracticeRunner(input: Readonly<{
   pool: Pool;
   environment: PracticeRunnerSettings;
@@ -163,6 +182,11 @@ export async function composePracticeRunner(input: Readonly<{
   keepAlivePool: Pool;
   /** The practice's --call-concurrency: used as it is, instead of the register's row. Absent: the register's row (main.ts). */
   callConcurrency?: CallConcurrencyPolicy;
+  /**
+   * V4 start step, Task 91f: the plan the web step reads where the site's read finds none (`practiceStartWebPlan`: a start-step
+   * practice's PLUS or FREE). Absent: the site's read alone (main.ts).
+   */
+  webPlan?: PlanId;
   /** Test seam: the runner's cooldown hold. Default: real time. */
   wait?: (milliseconds: number) => Promise<void>;
   /** Test seam: the preview call policy's and the claim probe's one 60-second resend. Default: real time. */
@@ -436,9 +460,10 @@ export async function composePracticeRunner(input: Readonly<{
     callSubjects: previewCallSubjects(previewGate),
     // Perplexity plan W3-1, as main.ts: the web step where the practice's gate names the search socket; a debate whose
     // run names no paid plan (billing.run_charge_scope) is NOT_ON_PLAN and makes no web call; searches pause at the month
-    // wall through the same month pause (W4-2).
-    webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
-      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }),
+    // wall through the same month pause (W4-2). V4 start step, Task 91f: main.ts's very call, its plan read given the
+    // start step's plan where the site's read finds none (billing is off in the practice); without one, exactly as given.
+    webSearch: practiceWebSearchOnPlan(input.webPlan, { webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
+      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }) }).webSearch,
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),

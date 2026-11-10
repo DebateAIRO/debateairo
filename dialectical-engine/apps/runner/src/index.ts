@@ -8111,7 +8111,9 @@ export class WalkingSkeletonRunner {
         members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
           providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
         contractHash: settings.engine.engineContractHash, openReplayStep: (members, contractHash) => replayBook.openStep(members, contractHash), bound: settings.judgeBound,
-        keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null
+        keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null,
+        // Task 91k: reader 1's reserve is the run's own receipt's (a debate started before the rise keeps its 7 a pack).
+        readerOneCallsReserved: envelopeBasis.web?.readerOneCallsPerPack ?? null
       });
       // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
       // are the same bytes. No web search happens inside the debate: the legs read what was stored here. W4-7: with the
@@ -8254,6 +8256,8 @@ export class WalkingSkeletonRunner {
         contractHash: engineSeal, openReplayStep: (members, contractHash) => replayBook.openStep(members, contractHash), bound: settings.judgeBound,
         keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop,
         stopsHere: (error) => expansionPhaseStop(error) !== null,
+        // Task 91k: reader 1's reserve is the run's own receipt's (a debate started before the rise keeps its 7 a pack).
+        readerOneCallsReserved: envelopeBasis.web?.readerOneCallsPerPack ?? null,
         // Item wait-d1: each path whose planner planned a search is FINDING_SOURCES once its decision is kept (0134), before any search.
         stepPorts: {
           prepare: () => postgresWebStepPorts(this.pool, run.runId),

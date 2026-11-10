@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  READER_SENTENCE_WRITING, START_CARD_KINDS, START_STEP_LIMITS, TypedDomainError, withQuestionLanguageField, withReaderField, type ReadingLevel,
-  type ReplyLanguageExpectation
+  READER_SENTENCE_WRITING, START_CARD_KINDS, START_STEP_LIMITS, TypedDomainError, replyTextHasStrayScript, withQuestionLanguageField, withReaderField,
+  type ReadingLevel, type ReplyLanguageExpectation
 } from "@debateai/kernel";
 import type { StartListViewpoint, StartMenu } from "@debateai/contract";
 import type { FramedMaterialField, MapReplySalvageRepair, ModelReplyFacts } from "@debateai/providers";
@@ -194,19 +194,42 @@ const issue = (path: readonly (string | number)[], code: string): MapReplyIssue 
 const languageIssues = (texts: readonly string[], expected: ReplyLanguageExpectation, path: readonly (string | number)[]): readonly MapReplyIssue[] =>
   texts.length > 0 && mapWrongLanguage(texts.join(" "), expected) ? [issue(path, "MAP_WRONG_LANGUAGE")] : [];
 
-function listSalvage(angleIds: ReadonlySet<string>): MapReplySalvage<StartListReply> {
+/**
+ * Task 91h (A1, owner 9 Nov): a writer given exactly one angle may leave out a path's `angle_id` (or send null) once it has named it: that
+ * path can only be from the one angle, so it gets that id before the shape check. Nothing else is filled; with two or more angles, nothing.
+ */
+function withTheOneAngle(value: unknown, angleIds: ReadonlySet<string>, done: Repairs): unknown {
+  if (angleIds.size !== 1 || typeof value !== "object" || value === null || !Array.isArray((value as { paths?: unknown }).paths)) return value;
+  const [only] = angleIds;
+  const paths = (value as { paths: readonly unknown[] }).paths.map((path) => {
+    if (typeof path !== "object" || path === null || Array.isArray(path)) return path;
+    const angleId = (path as { angle_id?: unknown }).angle_id;
+    if (angleId !== undefined && angleId !== null) return path;
+    done.normalised = true;
+    return { ...path, angle_id: only };
+  });
+  return done.normalised ? { ...value, paths } : value;
+}
+
+function listSalvage(angleIds: ReadonlySet<string>, expected: ReplyLanguageExpectation): MapReplySalvage<StartListReply> {
   return bothWays((value) => {
-    const shape = ListShape.safeParse(value);
-    if (!shape.success) return { value, repairs: [] };
     const done = new Repairs();
+    const filled = withTheOneAngle(value, angleIds, done);
+    const shape = ListShape.safeParse(filled);
+    // Not well formed: only the filled ids go on, so the reply fixer repairs the rest of its form on them.
+    if (!shape.success) return filled === value ? { value, repairs: [] } : { value: filled, repairs: ["MAP_IDS_NORMALISED"] };
     const titles = new Set<string>();
-    const kept = shape.data.paths.filter((path) => {
+    const good = shape.data.paths.filter((path) => {
       const title = path.title.trim().toLocaleLowerCase();
-      const good = angleIds.has(path.angle_id) && clean(path.title, L.titleMaxChars) && clean(path.question, L.questionMaxChars)
+      const fine = angleIds.has(path.angle_id) && clean(path.title, L.titleMaxChars) && clean(path.question, L.questionMaxChars)
         && clean(path.why, L.whyMaxChars) && !titles.has(title);
-      if (good) titles.add(title);
-      return good;
+      if (fine) titles.add(title);
+      return fine;
     });
+    // Task 91h (C1, owner 9 Nov): the stray-letter rule reads single letters, so it is applied path by path: a path holding one is left out
+    // whole and the rest is kept. With none left, the paths stay and the check refuses the list as before; its language reading is unchanged.
+    const unstrayed = good.filter((path) => !replyTextHasStrayScript(expected, [path.title, path.question, path.why].join(" ")));
+    const kept = unstrayed.length > 0 ? unstrayed : good;
     if (kept.length !== shape.data.paths.length || kept.length > L.viewpointsPerListMax) done.dropped = true;
     return done.of({ paths: kept.slice(0, L.viewpointsPerListMax) }, value);
   });
@@ -320,7 +343,8 @@ export function startListSpec(ctx: StartSpecContext, angles: readonly MapAngle[]
   if (angles.length < 1 || angles.length > L.anglesPerListMax) throw refused("START_LIST_INVALID", "a list is given one to four angles");
   return startSpecOf("START_LIST", ctx, "list", [field("question_line", ctx.questionLine),
     field("angles", angles.map((angle) => ({ angle_id: angle.angleId, label: angle.label, focus: angle.focus })))],
-  startListReplySchema as z.ZodType<StartListReply>, listCheck(ctx.replyLanguage), listSalvage(new Set(angles.map((angle) => angle.angleId))));
+  startListReplySchema as z.ZodType<StartListReply>, listCheck(ctx.replyLanguage), listSalvage(new Set(angles.map((angle) => angle.angleId)),
+    ctx.replyLanguage));
 }
 
 /** The merge of the first lists: what the asker said, and every suggestion with its id, never its writer. */

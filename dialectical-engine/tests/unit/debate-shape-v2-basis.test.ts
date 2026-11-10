@@ -38,7 +38,8 @@ describe("the ceiling mints shape receipt v2", () => {
   });
 
   it("adds every path's web pack", () => {
-    expect(v2({ web: webSitesOf({ kind: "PATHS", depth: "QUICK", paths: 5, origin: "START" }) }).max_model_attempts).toBe(696);
+    // Task 91k (owner 9 Nov): 2 more reader-1 calls a path, 10 calls x 3 attempts over the 696 before.
+    expect(v2({ web: webSitesOf({ kind: "PATHS", depth: "QUICK", paths: 5, origin: "START" }) }).max_model_attempts).toBe(726);
   });
 
   it("refuses both shapes at once, and a v2 shape with the backup provision", () => {

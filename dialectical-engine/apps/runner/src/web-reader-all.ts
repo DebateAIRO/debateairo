@@ -26,6 +26,12 @@
  *   classifier, so the gateway's own follow-up runs. A pick naming unknown pages is completed by grade, in code.
  * - Nothing here fails the debate: an unavailable call leaves its pages unread, an unavailable pick falls back to the
  *   grades. The port returns UNAVAILABLE for a vendor failure and throws only what must stop the run.
+ * - A reply cut off at its output room (Task 91j D, owner 9 Nov, after the paid Plus test lost 59 of 144 pages so): the port
+ *   says so (`cutOff`). Code keeps the whole page entries written before the cut (`cutReplyWholeEntries`, the same rules,
+ *   every passage still checked word for word), and the pages the reply did not reach go out again in the one follow-up
+ *   round, on their own: split in two halves when nothing was kept (a one-page batch is not sent again). Every follow-up
+ *   call, this one and the one for pages a usable reply left out, stays within the reader-1 calls the start estimate
+ *   reserved for the pack (`callsMax`); a follow-up past that count is not sent and its pages stay unread.
  *
  * The runner passes in the call, so this file holds the rules alone and is tested with scripted calls. Storing the
  * readings, extracts and picks (0132) is the web step's (W3-1), with the results this returns.
@@ -74,7 +80,8 @@ export type ReaderOneCallRequest = Readonly<{
 }>;
 export type ReaderOneCallOutcome =
   | Readonly<{ kind: "ANSWERED"; content: string; maker: string; rawArtifactRef: string }>
-  | Readonly<{ kind: "UNAVAILABLE" }>;
+  /** `cutOff` (Task 91j D): the reply ended at its output room; who wrote it and its raw artifact, for the entries kept. */
+  | Readonly<{ kind: "UNAVAILABLE"; cutOff?: Readonly<{ maker: string; rawArtifactRef: string }> }>;
 export type ReaderOneCall = (request: ReaderOneCallRequest) => Promise<ReaderOneCallOutcome>;
 
 export type ReaderOneGrade = 0 | 1 | 2 | 3;
@@ -200,6 +207,18 @@ function planBatches(input: Readonly<{ question: string; answer: string; siteLan
   return Object.freeze({ batches: Object.freeze(batches), tooLarge: Object.freeze(tooLarge) });
 }
 
+/** Task 91j D: a cut-off batch's pages in two halves, in order, the first as near half the text as whole pages allow. */
+function halves(items: readonly Sendable[]): readonly (readonly Sendable[])[] {
+  const total = items.reduce((sum, item) => sum + item.page.text.length, 0);
+  let at = 1;
+  let filled = items[0]!.page.text.length;
+  while (at < items.length - 1 && filled + items[at]!.page.text.length <= total / 2) {
+    filled += items[at]!.page.text.length;
+    at += 1;
+  }
+  return [items.slice(0, at), items.slice(at)];
+}
+
 /* ----------------------------------------------------------------- the replies */
 
 type ReadEntry = Readonly<{ grade: ReaderOneGrade; adds: string; note: string | null; extracts: readonly string[] }>;
@@ -260,13 +279,93 @@ export function classifyPickReply(content: string, promptIds: readonly string[],
   return parsedWithRepairs(decodedRepairsOf(decoded));
 }
 
-/** One call through the port; on an answer, the value the classifier accepted, read as it read it. */
+/** The normalised finish reason of a reply cut off at its output room (`PROVIDER_FINISH_REASON_LENGTH`). */
+const CUT_OFF_FINISH_REASON = "length";
+
+/**
+ * Task 91j D: the whole entries of the list under `listKey` in a reply cut off at its output room, each read strictly as
+ * JSON, in reply order. The reply must open with its object (after one opening code fence at most); the list is the
+ * root object's own member. An entry the cut reached, an entry that is not strict JSON and anything outside that list
+ * are left out. One linear pass (model text is untrusted, CI-1b), then one strict parse per whole entry.
+ */
+export function cutReplyWholeEntries(content: string, listKey: string): readonly unknown[] {
+  const found: unknown[] = [];
+  let text = content.trimStart();
+  if (text.startsWith("```")) {
+    const line = text.indexOf("\n");
+    text = line < 0 ? "" : text.slice(line + 1).trimStart();
+  }
+  if (!text.startsWith("{")) return Object.freeze(found);
+  type Frame = { kind: "object" | "array"; expectKey: boolean };
+  const stack: Frame[] = [];
+  let rootKey: string | null = null;
+  let rootValueKey: string | null = null;
+  let listDepth = -1;
+  let entryStart = -1;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!;
+    const top = stack.at(-1);
+    if (character === "\"") {
+      let cursor = index + 1;
+      for (let escaped = false; cursor < text.length; cursor += 1) {
+        const inner = text[cursor]!;
+        if (escaped) escaped = false;
+        else if (inner === "\\") escaped = true;
+        else if (inner === "\"") break;
+      }
+      if (cursor >= text.length) break;
+      if (stack.length === 1 && top!.expectKey) rootKey = text.slice(index + 1, cursor);
+      index = cursor;
+      continue;
+    }
+    if (character === "{") {
+      if (listDepth >= 0 && stack.length === listDepth) entryStart = index;
+      stack.push({ kind: "object", expectKey: true });
+    } else if (character === "[") {
+      if (stack.length === 1 && listDepth < 0 && rootValueKey === listKey) listDepth = stack.length + 1;
+      stack.push({ kind: "array", expectKey: false });
+    } else if (character === "}" || character === "]") {
+      stack.pop();
+      if (listDepth >= 0 && stack.length === listDepth - 1) break;
+      if (character === "}" && entryStart >= 0 && stack.length === listDepth) {
+        try { found.push(JSON.parse(text.slice(entryStart, index + 1))); } catch { /* a broken entry is left out */ }
+        entryStart = -1;
+      }
+    } else if (character === ":" && top?.kind === "object") {
+      top.expectKey = false;
+      if (stack.length === 1) rootValueKey = rootKey;
+    } else if (character === "," && top?.kind === "object") {
+      top.expectKey = true;
+      if (stack.length === 1) rootValueKey = null;
+    }
+  }
+  return Object.freeze(found);
+}
+
+type Asked =
+  | Readonly<{ kind: "ANSWERED"; value: unknown; maker: string; rawArtifactRef: string }>
+  /** Task 91j D: a reply cut off at its output room, its value the whole page entries written before the cut. */
+  | Readonly<{ kind: "CUT_OFF"; value: unknown; maker: string; rawArtifactRef: string }>
+  | Readonly<{ kind: "UNAVAILABLE" }>;
+
+/**
+ * One call through the port; on an answer, the value the classifier accepted, read as it read it. On a cut-off (the port's
+ * `cutOff`), the whole entries of the last cut reply the classifier saw, as `{ pages }` (none when it saw none).
+ */
 async function ask(call: ReaderOneCall, request: Omit<ReaderOneCallRequest, "classifyContent" | "thinking">,
-  classify: (content: string, reply: ModelReplyFacts | undefined) => ContentClassification):
-  Promise<Readonly<{ kind: "ANSWERED"; value: unknown; maker: string; rawArtifactRef: string }> | Readonly<{ kind: "UNAVAILABLE" }>> {
+  classify: (content: string, reply: ModelReplyFacts | undefined) => ContentClassification): Promise<Asked> {
   const remembered = rememberingAcceptedReply(classify);
-  const outcome = await call(Object.freeze({ ...request, thinking: WEB_READER_ONE_THINKING, classifyContent: remembered.classifyContent }));
-  if (outcome.kind === "UNAVAILABLE") return outcome;
+  let cutReply: string | null = null;
+  const classifyContent = (content: string, reply?: ModelReplyFacts): ContentClassification => {
+    if (reply?.finishReason === CUT_OFF_FINISH_REASON) cutReply = content;
+    return remembered.classifyContent(content, reply);
+  };
+  const outcome = await call(Object.freeze({ ...request, thinking: WEB_READER_ONE_THINKING, classifyContent }));
+  if (outcome.kind === "UNAVAILABLE") {
+    if (outcome.cutOff === undefined) return Object.freeze({ kind: "UNAVAILABLE" });
+    return Object.freeze({ kind: "CUT_OFF", value: { pages: cutReply === null ? [] : cutReplyWholeEntries(cutReply, "pages") },
+      maker: outcome.cutOff.maker, rawArtifactRef: outcome.cutOff.rawArtifactRef });
+  }
   const decoded = decodeModelJson(outcome.content, remembered.acceptedAs(outcome.content).reply);
   return Object.freeze({ kind: "ANSWERED", value: decoded.ok ? decoded.value : null, maker: outcome.maker, rawArtifactRef: outcome.rawArtifactRef });
 }
@@ -294,6 +393,11 @@ export async function readAllPages(input: Readonly<{
   known?: ReadonlyMap<string, ReaderOneKnownReading>;
   /** The call's body cap, less headroom; the STANDARD tier's by default. */
   requestBytesMax?: number;
+  /**
+   * Task 91j D: the reader-1 calls the start estimate reserved for this pack (`webSitesOf`'s readerOneCallsPerPack): no
+   * follow-up call is sent past it. Absent: no bound (a caller with no estimate behind it).
+   */
+  callsMax?: number;
 }>): Promise<ReaderOnePathResult> {
   if (new Set(input.pages.map((page) => page.pageId)).size !== input.pages.length
     || input.pages.some((page) => page.pageId.trim() === "")) {
@@ -317,15 +421,26 @@ export async function readAllPages(input: Readonly<{
   }
   const items = allItems.filter((item) => !results.has(item.page.pageId));
 
-  let plan = planBatches(shape, items);
+  const notRead = (item: Sendable, reason: ReaderOnePageNotRead["reason"]) =>
+    results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "NOT_READ", reason }));
+  const first = planBatches(shape, items);
+  for (const item of first.tooLarge) notRead(item, "TOO_LARGE");
+  // Each batch with the reason its pages stay unread should a follow-up past the reserved calls not be sent.
+  let planned: readonly Readonly<{ batch: Batch; unsent: "LEFT_OUT_OF_REPLY" | "CALL_UNAVAILABLE" }>[] =
+    first.batches.map((batch) => Object.freeze({ batch, unsent: "LEFT_OUT_OF_REPLY" as const }));
+  const order = new Map(items.map((item, index) => [item.page.pageId, index]));
+  const inSearchOrder = (list: readonly Sendable[]) => [...list].sort((a, b) => order.get(a.page.pageId)! - order.get(b.page.pageId)!);
   let nextIndex = 0;
   for (let round = 0; round <= WEB_READER_ONE_LIMITS.followUpRounds; round += 1) {
-    for (const item of plan.tooLarge) {
-      results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "NOT_READ", reason: "TOO_LARGE" }));
+    // Task 91j D: a follow-up call is sent only within the reader-1 calls the start estimate reserved for the pack.
+    if (round > 0 && input.callsMax !== undefined) {
+      const room = Math.max(0, input.callsMax - nextIndex);
+      for (const { batch, unsent } of planned.slice(room)) for (const item of batch.items) notRead(item, unsent);
+      planned = planned.slice(0, room);
     }
-    if (plan.batches.length === 0) break;
+    if (planned.length === 0) break;
     const lastRound = round === WEB_READER_ONE_LIMITS.followUpRounds;
-    const keyed = plan.batches.map((batch) => ({ batch, callSiteKey: webReadAllCallSiteKey(input.answerIndex, nextIndex++) }));
+    const keyed = planned.map(({ batch }) => ({ batch, callSiteKey: webReadAllCallSiteKey(input.answerIndex, nextIndex++) }));
     const answers = await Promise.all(keyed.map(({ batch, callSiteKey }) => {
       const promptIds = batch.items.map((item) => item.promptId);
       return ask(input.call, { callSiteKey, contractId: WEB_READ_ALL_V2_PROMPT_CONTRACT.contractId, packet: batch.packet,
@@ -333,19 +448,23 @@ export async function readAllPages(input: Readonly<{
       (content, reply) => classifyReadAllReply(content, promptIds, reply));
     }));
     const leftOut: Sendable[] = [];
+    const cutRests: Array<Readonly<{ batch: Batch; rest: readonly Sendable[] }>> = [];
     keyed.forEach(({ batch, callSiteKey }, at) => {
       const answer = answers[at]!;
-      calls.push(Object.freeze({ callSiteKey, outcome: answer.kind, pageIds: Object.freeze(batch.items.map((item) => item.page.pageId)) }));
+      calls.push(Object.freeze({ callSiteKey, outcome: answer.kind === "ANSWERED" ? "ANSWERED" : "UNAVAILABLE",
+        pageIds: Object.freeze(batch.items.map((item) => item.page.pageId)) }));
       if (answer.kind === "UNAVAILABLE") {
-        for (const item of batch.items) results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "NOT_READ", reason: "CALL_UNAVAILABLE" }));
+        for (const item of batch.items) notRead(item, "CALL_UNAVAILABLE");
         return;
       }
+      const cut = answer.kind === "CUT_OFF";
+      const rest: Sendable[] = [];
       const entries = readEntries(answer.value, batch.items.map((item) => item.promptId));
       for (const item of batch.items) {
         const entry = entries.get(item.promptId);
         if (entry === undefined) {
-          if (lastRound) results.set(item.page.pageId, Object.freeze({ pageId: item.page.pageId, outcome: "NOT_READ", reason: "LEFT_OUT_OF_REPLY" }));
-          else leftOut.push(item);
+          if (lastRound) notRead(item, cut ? "CALL_UNAVAILABLE" : "LEFT_OUT_OF_REPLY");
+          else (cut ? rest : leftOut).push(item);
           continue;
         }
         const checked = checkVerbatimExtracts(item.page.text, entry.extracts);
@@ -355,10 +474,22 @@ export async function readAllPages(input: Readonly<{
           maker: answer.maker, rawArtifactRef: answer.rawArtifactRef, callSiteKey
         }));
       }
+      if (rest.length > 0) cutRests.push(Object.freeze({ batch, rest }));
     });
-    // A page left out is sent again in a follow-up carrying only the pages left out, in search order.
-    const order = new Map(items.map((item, index) => [item.page.pageId, index]));
-    plan = planBatches(shape, [...leftOut].sort((a, b) => order.get(a.page.pageId)! - order.get(b.page.pageId)!));
+    // A page left out is sent again in a follow-up carrying only the pages left out, in search order. Task 91j D: the pages
+    // a cut-off reply did not reach go on their own: the batch in two halves when nothing was kept (a single page is not sent
+    // again: the same page alone would be cut off again), else the rest as one smaller batch. Each piece is a part of a
+    // batch already within every cap, so it is too.
+    const again = planBatches(shape, inSearchOrder(leftOut));
+    for (const item of again.tooLarge) notRead(item, "TOO_LARGE");
+    const next: Array<Readonly<{ batch: Batch; unsent: "LEFT_OUT_OF_REPLY" | "CALL_UNAVAILABLE" }>> =
+      again.batches.map((batch) => Object.freeze({ batch, unsent: "LEFT_OUT_OF_REPLY" as const }));
+    for (const { batch, rest } of cutRests) {
+      if (rest.length === batch.items.length && rest.length < 2) { for (const item of rest) notRead(item, "CALL_UNAVAILABLE"); continue; }
+      const pieces = rest.length === batch.items.length ? halves(rest) : [rest];
+      for (const piece of pieces) next.push(Object.freeze({ batch: buildBatch(shape, piece), unsent: "CALL_UNAVAILABLE" as const }));
+    }
+    planned = next.sort((a, b) => order.get(a.batch.items[0]!.page.pageId)! - order.get(b.batch.items[0]!.page.pageId)!);
   }
 
   const pages = Object.freeze(input.pages.map((page) => results.get(page.pageId)!));
@@ -382,11 +513,12 @@ export async function readAllPages(input: Readonly<{
     const answer = await ask(input.call, { callSiteKey, contractId: WEB_PICK_V2_PROMPT_CONTRACT.contractId, packet,
       vendorPacketOf: (sent) => guarded(sent), inputTokens: estimateWindowTokens(packet.messages) },
     (content, reply) => classifyPickReply(content, shown, reply));
-    calls.push(Object.freeze({ callSiteKey, outcome: answer.kind, pageIds: Object.freeze(helpful.map((page) => page.pageId)) }));
+    calls.push(Object.freeze({ callSiteKey, outcome: answer.kind === "ANSWERED" ? "ANSWERED" : "UNAVAILABLE",
+      pageIds: Object.freeze(helpful.map((page) => page.pageId)) }));
     const picked = answer.kind === "ANSWERED" ? pickedIds(answer.value, shown).slice(0, input.topCount).map((id) => pageIdOf.get(id)!) : [];
     const rest = byGrade(helpful).map((page) => page.pageId).filter((id) => !picked.includes(id));
     top = [...picked, ...rest].slice(0, input.topCount);
-    topChosenBy = answer.kind === "UNAVAILABLE" ? "GRADE_ORDER" : picked.length === input.topCount ? "PICK" : "PICK_COMPLETED_BY_GRADE";
+    topChosenBy = answer.kind !== "ANSWERED" ? "GRADE_ORDER" : picked.length === input.topCount ? "PICK" : "PICK_COMPLETED_BY_GRADE";
   }
   return Object.freeze({
     answerIndex: input.answerIndex,

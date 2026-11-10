@@ -784,10 +784,11 @@ describe("R22 on the real API", () => {
     await ask(jan, slowQuestion, { startLane: { startCheck: { ref: slow.check!.check_ref }, startPaths: top } });
     const slowDone = await world.settle();
     expect(slowDone.map((job) => job.result)).toEqual([expect.objectContaining({ kind: "COMPLETED" })]);
-    // Free with GLM's list late: one list in at the cut, and the first menu (an AI merge of that one list) already has a card and a suggestion.
+    // Free with DeepSeek's list late (Free's two seats: Haiku and DeepSeek, the measured speed order): one list in at the cut, and the first
+    // menu (an AI merge of that one list) already has a card and a suggestion.
     const kai = await world.account("kai");
     world.setScript(both(mergeWithCardAndSuggestions, webScript));
-    world.setDelays(listsLate((model) => model.startsWith("zai-org/")));
+    world.setDelays(listsLate((model) => model.startsWith("deepseek-ai/")));
     let one: StartStepDrive;
     try { one = await driveStartStep(kai.client, readOf("Should Harbour Town plant trees along the ferry road?")); } finally { world.setDelays(null); world.setScript(webScript); }
     expect(one.check?.seats).toBe(2);
@@ -798,7 +799,7 @@ describe("R22 on the real API", () => {
     expect(freeFirst.menu.menu.cards.length).toBeGreaterThanOrEqual(1);
     expect(freeFirst.menu.menu.suggestions.length).toBeGreaterThanOrEqual(1);
     saw("17", `every list 500: ${JSON.stringify(noneReason?.data)}, end NONE, a lone check RUN_BUILT COMPLETED; two late: cut 2, late 2, revision 2 keeps revision 1's ${String(firstMerge.menu.menu.paths.length)} paths, Start COMPLETED; `
-      + `Free with GLM late: cut 1, first menu AI with ${String(freeFirst.menu.menu.cards.length)} card(s) and ${String(freeFirst.menu.menu.suggestions.length)} suggestion(s)`);
+      + `Free with DeepSeek late: cut 1, first menu AI with ${String(freeFirst.menu.menu.cards.length)} card(s) and ${String(freeFirst.menu.menu.suggestions.length)} suggestion(s)`);
   }, 300_000);
 
   it("path 18: digs with paths: three picks on b2 (one the person's own view) argued as three paths; the parent's b2 rewritten, its title kept; a '+ N more' idea dug", async () => {
