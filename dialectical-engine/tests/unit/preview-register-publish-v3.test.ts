@@ -52,7 +52,7 @@ describe('publish kit v3: the hosted source', () => {
     }
   });
 
-  it('carries the owner\'s ceilings and room-read budget, keeps every other member, and switches billing on with the US withdrawal right', async () => {
+  it('carries the owner\'s ceilings and room-read budget, keeps every other member, and switches billing on, the US withdrawal right already in the code-owned row', async () => {
     const f = await fixture();
     const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
     const cost = value(rows, 'costEnvelopePolicy'), oldCost = value(f.v2, 'costEnvelopePolicy');
@@ -68,7 +68,9 @@ describe('publish kit v3: the hosted source', () => {
     expect(oldAdmission.start_step_calls).toEqual({ key: 'owner', limit: 30, window_ms: 60_000, capacity: 65_536 });
     expect(admission).toEqual({ ...oldAdmission, ask_room_reads: { key: 'owner', limit: 60, window_ms: 60_000, capacity: 65_536 } });
     const billing = value(rows, 'billingPolicy');
-    expect(billing).toEqual({ ...value(f.v2, 'billingPolicy'), enabled: true, withdrawal_countries: [...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries, 'US'] });
+    // Owner's decision 2026-11-10: everyone the site serves gets 14 days, so the US is in the code-owned list; nothing is added.
+    expect(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries).toContain('US');
+    expect(billing).toEqual({ ...value(f.v2, 'billingPolicy'), enabled: true, withdrawal_countries: [...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries] });
     expect(rows.find(row => row.rowKey === 'billingPolicy')!.sourceRef).toContain('NETOPIA\'s sandbox');
     expect(value(rows, STORY_COST_ENVELOPE_POLICY_ROW_KEY)).toMatchObject({ kind: 'STORY_COST_ENVELOPE_POLICY', currency: 'USD', per_story_ceiling_micros: 50_000, per_story_overrun_basis_points: 2_000 });
     expect(value([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], 'billingPolicy')).toEqual(value(f.v2, 'billingPolicy'));
@@ -185,8 +187,7 @@ describe('publish kit v3: composing from the current version', () => {
 
   const edit = (rows: Row[], key: string, change: (value: any) => void) => rows.map(row => row.rowKey === key ? { ...row, valueJsonText: canonical((v => (change(v), v))(JSON.parse(row.valueJsonText))) } : row);
   it.each([
-    ['billing on without the sandbox host\'s US withdrawal right', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.withdrawal_countries = v.withdrawal_countries.filter((c: string) => c !== 'US'); }), 'billing-policy-source'],
-    ['billing off with a US withdrawal right', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.enabled = false; }), 'billing-policy-source'],
+    ['billing on with a withdrawal country the code-owned row does not list', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.withdrawal_countries = [...v.withdrawal_countries, 'UA']; }), 'billing-policy-source'],
     ['a billing row with other rules', (rows: Row[]) => edit(rows, 'billingPolicy', v => { v.quote_ttl_seconds = 600; }), 'billing-policy-source'],
     ['a source without the story money row', (rows: Row[]) => rows.filter(row => row.rowKey !== STORY_COST_ENVELOPE_POLICY_ROW_KEY), 'source-key-list'],
     ['a source with a scorecard row', (rows: Row[]) => [...rows, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'x' }], 'support-or-scorecard-row'],
@@ -195,6 +196,15 @@ describe('publish kit v3: composing from the current version', () => {
     const f = await fixture();
     const rows = tamper([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[]);
     expect(() => compose(rows, f.v12)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+  });
+
+  it('refuses billing on without the sandbox buyer\'s US withdrawal right, by the register\'s own billing check', async () => {
+    // Since the owner's decision of 2026-11-10 the code-owned list names every country served, the US included, so a
+    // list without it is no lawful billing row at all, before the source comparison is reached.
+    const f = await fixture();
+    const rows = edit([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], 'billingPolicy',
+      v => { v.withdrawal_countries = v.withdrawal_countries.filter((c: string) => c !== 'US'); });
+    expect(() => compose(rows, f.v12)).toThrow(expect.objectContaining({ code: 'BILLING_POLICY_INVALID' }));
   });
 
   it.each([

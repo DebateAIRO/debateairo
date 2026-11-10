@@ -15,7 +15,9 @@ import {
   planNetPrice,
   readBillingPlans,
   readBillingPolicy,
-  type PlanId
+  type PlanId,
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  countryPolicyFromValue
 } from "../../packages/register/src/index.js";
 import { buildDevelopmentDeploymentRegisterPublicationRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
@@ -219,11 +221,28 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     expect(Object.keys(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)).not.toContain("owner_report_email_ref");
   });
 
-  it("lists the EU 27, Iceland, Liechtenstein, Norway, the UK, and the Terms' Moldova, South Korea and Taiwan, nothing else", () => {
+  it("lists the EU 27, Iceland, Liechtenstein, Norway, the UK and every other country the site serves, nothing else", () => {
     expect([...policy.withdrawalCountries].sort()).toEqual([
-      "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE",
-      "IS", "IT", "KR", "LI", "LT", "LU", "LV", "MD", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK", "TW"
+      "AT", "AU", "BE", "BG", "CA", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU",
+      "IE", "IS", "IT", "JP", "KR", "LI", "LT", "LU", "LV", "MD", "MT", "NL", "NO", "NZ", "PL", "PT", "RO", "SE",
+      "SG", "SI", "SK", "TW", "US"
     ]);
+  });
+
+  it("gives every country whose sign-up is on the 14 days, in the code's rows and the hosted examples (owner, 10 November 2026)", async () => {
+    // Sign-up, not only payment: a country that can sign up is opened for payment by one switch, never without its right.
+    const read = async (path: string) => JSON.parse(await readFile(new URL(path, import.meta.url), "utf8")) as Record<string, unknown>;
+    const hosted = await read("../../deploy/vps/register/hosted-register.example.json");
+    const countryExample = await read("../../deploy/vps/register/country-policy.example.json");
+    const served = [
+      countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),
+      countryPolicyFromValue(countryExample.countryPolicy, "country-policy.example.json")
+    ].flatMap((rules) => Object.entries(rules.countries).filter(([, rule]) => rule.signup || rule.pay).map(([code]) => code));
+    expect(served).toEqual(expect.arrayContaining(["US", "JP", "CH", "TW", "MD", "KR"]));
+    for (const lists of [policy.withdrawalCountries, policyOf(hosted.billingPolicy).withdrawalCountries]) {
+      expect([...new Set(served)].filter((country) => !lists.includes(country))).toEqual([]);
+    }
+    expect(policy.withdrawalDays).toBe(14);
   });
 
   it("accepts a renewal notice of exactly 7 business days and a longer one: 7 is a floor, not a ceiling", () => {
@@ -237,9 +256,9 @@ describe("billingPolicy v1 keeps billing switched off", () => {
   it("accepts a longer withdrawal period and an extra country: the law sets a floor, not a ceiling", () => {
     const row = policyRow();
     row.withdrawal_days = 30;
-    row.withdrawal_countries = [...(row.withdrawal_countries as string[]), "CH"];
+    row.withdrawal_countries = [...(row.withdrawal_countries as string[]), "UA"];
     expect(policyOf(row)).toMatchObject({ withdrawalDays: 30 });
-    expect(policyOf(row).withdrawalCountries).toContain("CH");
+    expect(policyOf(row).withdrawalCountries).toContain("UA");
   });
 
   it.each([
@@ -271,14 +290,23 @@ describe("billingPolicy v1 keeps billing switched off", () => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "GB");
     }],
     ["a withdrawal list of one country", (row: Record<string, unknown>) => { row.withdrawal_countries = ["RO"]; }],
-    // The Terms' own rights (Annex A.6, A.7), kept whether or not the country can pay yet.
-    ["a withdrawal list without Moldova (A.6)", (row: Record<string, unknown>) => {
+    // Every country the site serves (owner, 10 November 2026), kept whether or not it can pay yet.
+    ["a withdrawal list without the US", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "US");
+    }],
+    ["a withdrawal list without Japan", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "JP");
+    }],
+    ["a withdrawal list without Switzerland", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "CH");
+    }],
+    ["a withdrawal list without Moldova", (row: Record<string, unknown>) => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "MD");
     }],
-    ["a withdrawal list without South Korea (A.7)", (row: Record<string, unknown>) => {
+    ["a withdrawal list without South Korea", (row: Record<string, unknown>) => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "KR");
     }],
-    ["a withdrawal list without Taiwan (A.7)", (row: Record<string, unknown>) => {
+    ["a withdrawal list without Taiwan", (row: Record<string, unknown>) => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "TW");
     }],
     ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }],

@@ -194,6 +194,13 @@ refuses a `withdrawal_countries` list without a country whose Terms annex gives 
 days), South Korea and Taiwan (A.7, 7 days). Moldova and South Korea join the list now, before they can pay, so
 opening either for payment never opens it without its right. Switzerland (A.5) states no withdrawal right and stays off.
 
+**Amendment 2026-11-10, later the same day (V, owner decision): everyone gets the 14-day withdrawal right.** Not only
+the EU, the EEA, the UK and the Terms' Moldova, South Korea and Taiwan: also Switzerland, the US, Canada, Australia, New
+Zealand, Singapore and Japan. `withdrawal_countries` names every country the site serves (sign-up or payment on), and
+`billingPolicy` refuses a list without one of them; a unit test checks the list against `countryPolicy`. The sandbox
+run's US buyer needs no added `"US"` any more (deploy/vps/README.md §14.9). The Terms (section 13, Annex A) and the
+withdraw page's text still describe the narrower set and must follow.
+
 ### 1.6 The money check
 
 Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are

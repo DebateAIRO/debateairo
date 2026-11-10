@@ -17,9 +17,9 @@
 // - admissionPolicy: the owner's ask_room_reads budget joins the code-owned row as its one added member, exactly as
 //   the hosted publisher does (apps/runner/src/hosted-register-publish.ts, P4-G); a hosted API with the band refuses
 //   to start without it (ASK_ROOM_ADMISSION_UNSEALED).
-// - billingPolicy: off, the code-owned row unchanged; or on, the same row with `enabled: true` and "US" added to
-//   withdrawal_countries (the sandbox run buys as a United States buyer; deploy/vps/README.md §14.9). Only on this
-//   sandbox host, never on a live one.
+// - billingPolicy: off, the code-owned row unchanged; or on, the same row with `enabled: true`. The sandbox run buys as
+//   a United States buyer (deploy/vps/README.md §14.9), whose withdrawal right the code-owned row carries since the
+//   owner's decision of 10 November 2026 (everyone the site serves gets 14 days); a row without it is refused here.
 // The base may have billing on or off (a base this kit published). Every other v2 rule stays: canonical rows, the
 // base snapshot hash, no support or scorecard row, the credential-free reviewed provider set, the two base-owned
 // staff and internal-allowance policies carried over and parsed, the approval equal to the recomposed snapshot; the
@@ -94,7 +94,7 @@ const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 export const STORY_COST_ENVELOPE_POLICY_ROW_KEY = 'storyCostEnvelopePolicy' as const;
 /** v3's reviewed source closure: v2's keys plus the two rows only a hosted build seals (the estimate's starting figures, the story's money row). */
 export const PREVIEW_SOURCE_ROW_KEYS_V3 = Object.freeze([...PREVIEW_SOURCE_ROW_KEYS_V2, COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
-/** The country added to withdrawal_countries while billing is on, on this sandbox host only (deploy/vps/README.md §14.9). */
+/** The country the sandbox run buys as (deploy/vps/README.md §14.9); the code-owned withdrawal list must name it. */
 export const PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY = 'US' as const;
 /** Why each owner-input row changed, as the proposal shows it to the owner. */
 const OWNER_INPUT_REASON = 'owner-hosted-billing-input' as const;
@@ -189,14 +189,14 @@ export async function buildPreviewSourceRowsV3(bootstrap:BootstrapRegister, runt
   const admission={...codeAdmission,ask_room_reads:{key:'owner',limit:choice.askRoomReads.limit,window_ms:choice.askRoomReads.windowMs,capacity:choice.askRoomReads.capacity}};
   const admissionRef=withSuffix(sourceRef(ADMISSION_POLICY_ROW_KEY),`paid plans P4-G ask_room_reads, the owner's value from the hosted preview publish plan`);
   admissionPolicyFromValue(admission,admissionRef);
-  // Billing: the code-owned row, switched on only by the owner's plan, with the sandbox host's US withdrawal right.
+  // Billing: the code-owned row, switched on only by the owner's plan; it must already give the sandbox's US buyer the right.
   const codeBilling=value(BILLING_POLICY_ROW_KEY);
   if(sourceRef(BILLING_POLICY_ROW_KEY)!==BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef||codeBilling.enabled!==false)fail('hosted-billing-row');
   const billingRows=choice.billing==='off'?[byKey.get(BILLING_POLICY_ROW_KEY)!]:(()=>{
     const countries=codeBilling.withdrawal_countries as string[];
-    if(countries.includes(PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY))fail('hosted-billing-row');
-    const on={...codeBilling,enabled:true,withdrawal_countries:[...countries,PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY]};
-    const ref=withSuffix(sourceRef(BILLING_POLICY_ROW_KEY),`enabled on the hosted preview with NETOPIA's sandbox, "US" withdrawal on this sandbox host only (${OWNER_RULING})`);
+    if(!countries.includes(PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY))fail('hosted-billing-row');
+    const on={...codeBilling,enabled:true};
+    const ref=withSuffix(sourceRef(BILLING_POLICY_ROW_KEY),`enabled on the hosted preview with NETOPIA's sandbox (${OWNER_RULING})`);
     billingPolicyFromValue(on,ref);
     return [{rowKey:BILLING_POLICY_ROW_KEY,valueJsonText:canonicalValue(on),sourceRef:ref}];
   })();
@@ -263,13 +263,13 @@ function assertProviderRows(rows:ReadonlyMap<string,RegisterPublicationRow>, sid
 
 /**
  * The billing switch on either side: the strict row, parsed by the register's own reader. The source is the code-owned
- * row (enabled false) or that row switched on with the US withdrawal right; the base may be either (a version this kit
+ * row (enabled false) or that row switched on, its withdrawal list unchanged; the base may be either (a version this kit
  * published) or any lawful billing-off row.
  */
 function assertBillingRows(source:ReadonlyMap<string,RegisterPublicationRow>, base:ReadonlyMap<string,RegisterPublicationRow>) {
   const read=(row:RegisterPublicationRow|undefined)=>row===undefined?fail('billing-policy-missing'):billingPolicyFromValue(JSON.parse(row.valueJsonText),row.sourceRef);
   const own=read(source.get(BILLING_POLICY_ROW_KEY)),code=BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value;
-  const expected=canonicalValue({...code,enabled:own.enabled,withdrawal_countries:own.enabled?[...code.withdrawal_countries,PREVIEW_SANDBOX_WITHDRAWAL_COUNTRY]:[...code.withdrawal_countries]});
+  const expected=canonicalValue({...code,enabled:own.enabled});
   if(source.get(BILLING_POLICY_ROW_KEY)!.valueJsonText!==expected)fail('billing-policy-source');
   read(base.get(BILLING_POLICY_ROW_KEY));
 }

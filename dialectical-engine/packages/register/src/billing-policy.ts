@@ -51,14 +51,13 @@ const WITHDRAWAL_LAW = Object.freeze({
 });
 
 /**
- * The withdrawal rights the Terms give beyond that legal floor (Annex A): Moldova 14 days (A.6, the rights of an EU
- * consumer), South Korea 7 days (A.7, the E-Commerce Act) and Taiwan 7 days (A.7, the Consumer Protection Act); the one
- * withdrawal_days window, at least 14, covers each. They stay on the list whether or not the country can pay yet, so
- * opening one for payment (countryPolicy) never opens it without its right. An annex that gives a new right adds its
- * country here in the same change. Switzerland (A.5), the US, Canada, Australia, New Zealand, Singapore and Japan state
- * none (owner's request of 10 November 2026).
+ * Everyone the site serves gets the same 14 days (owner's decision of 10 November 2026), not only those the law
+ * covers: Switzerland, the US, Canada, Australia, New Zealand, Singapore, Japan and Taiwan, which can pay, and Moldova
+ * and South Korea, which can sign up and will pay later. A country stays on the list whether or not it can pay yet, so
+ * opening one for payment (countryPolicy) never opens it without the right; a country the site starts to serve joins
+ * here in the same change (tests/unit/b4-billing-register-rows.test.ts checks every country whose sign-up is on).
  */
-const TERMS_WITHDRAWAL = Object.freeze(["MD", "KR", "TW"]);
+const SERVED_WITHDRAWAL = Object.freeze(["CH", "US", "CA", "AU", "NZ", "SG", "JP", "TW", "MD", "KR"]);
 
 /**
  * The notice a CHANGED renewal needs (spec §1.10 and the global constraints:
@@ -116,8 +115,8 @@ const billingPolicyValueSchema = z.object({
   if (WITHDRAWAL_LAW.countries.some((country) => !value.withdrawal_countries.includes(country))) {
     refuse("withdrawal_countries", "every EU/EEA country and the UK keeps its withdrawal right");
   }
-  if (TERMS_WITHDRAWAL.some((country) => !value.withdrawal_countries.includes(country))) {
-    refuse("withdrawal_countries", "every country whose Terms annex gives a withdrawal right (Moldova, South Korea, Taiwan) keeps it");
+  if (SERVED_WITHDRAWAL.some((country) => !value.withdrawal_countries.includes(country))) {
+    refuse("withdrawal_countries", "every country the site serves keeps the 14-day withdrawal right");
   }
 });
 
@@ -137,12 +136,12 @@ export const BILLING_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     quote_ttl_seconds: 1_800,
     tax_code: "saas" as const,
     invoice_issuer_rules: Object.freeze({ RO: "SMARTBILL" as const, "*": "QUADERNO" as const }),
-    // The legal set (WITHDRAWAL_LAW above) plus the Terms' own (TERMS_WITHDRAWAL): Taiwan since the owner's decision
-    // of 5 November 2026, Moldova and South Korea since the owner's request of 10 November 2026, before either can pay.
-    // The one withdrawal_days window gives the 7-day ones the more generous 14. The sealed row is data, so it is spelled out.
+    // The legal set (WITHDRAWAL_LAW above) plus every other country the site serves (SERVED_WITHDRAWAL): the owner's
+    // decision of 10 November 2026 gives everyone the same 14 days. The sealed row is data, so it is spelled out.
     withdrawal_countries: Object.freeze([
       "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
-      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "TW", "MD", "KR"
+      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB",
+      "CH", "US", "CA", "AU", "NZ", "SG", "JP", "TW", "MD", "KR"
     ])
   })
 });
