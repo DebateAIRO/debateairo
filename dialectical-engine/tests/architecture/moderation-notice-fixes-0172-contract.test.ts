@@ -70,7 +70,7 @@ describe("0172: the moderation notice fixes", () => {
         "identity.claim_moderation_statements(integer)", "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)",
         "identity.complete_public_flag_mail(uuid,uuid,text)", "identity.record_hide_ground(uuid,uuid,text[],text,uuid)",
         "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)", "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
-        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"],
+        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()", "identity.read_own_moderation_statements(uuid)"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"],
         constraints: ["moderation_statement_kind_check"] }
     ]);
     expect(SQL).toContain("ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;\n"
@@ -143,6 +143,28 @@ describe("0172: the moderation notice fixes", () => {
     }
     expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided"),');
     expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),');
+  });
+
+  it("M3: the page's reader gives a decision's words to the debate owner's statement alone; it is 0157's body plus those edits, and the export reads through it", () => {
+    const original = read("migrations/0157_moderation_statements.sql");
+    const at = original.indexOf("CREATE OR REPLACE FUNCTION identity.read_own_moderation_statements");
+    const was = original.slice(at, original.indexOf("$$;", original.indexOf("AS $$", at) + 5));
+    const now = bodyOf("identity.read_own_moderation_statements");
+    // The head is byte-equal; the body is 0157's with the two edits, each found once.
+    expect(now.slice(0, now.indexOf("AS $$"))).toBe(was.slice(0, was.indexOf("AS $$")));
+    const edited = was
+      .replace("'facts', CASE WHEN s.decision_id IS NOT NULL THEN", "'facts', CASE WHEN s.decision_id IS NOT NULL AND s.kind = 'DEBATE_DECIDED' THEN")
+      .replace("WHERE decision.decision_id = s.decision_id AND decision.facts_deleted_at IS NOT NULL),", "WHERE decision.decision_id = s.decision_id AND s.kind = 'DEBATE_DECIDED' AND decision.facts_deleted_at IS NOT NULL),");
+    expect(edited).not.toBe(was);
+    expect(now).toBe(edited);
+    expect(SQL).toContain(`IS DISTINCT FROM '${createHash("sha256").update(now.slice(now.indexOf("AS $$") + 5)).digest("hex")}'`);
+    // The export has no copy of the facts logic: it reads the person's statements through this one, which 0172 does not restate.
+    expect(original).toContain("FROM jsonb_array_elements(identity.read_own_moderation_statements(v_owner_ref)) WITH ORDINALITY AS own(value, at)");
+    expect(SQL).not.toContain("CREATE OR REPLACE FUNCTION identity.read_data_export_moderation");
+    // A decision waits for its hide's statements, unless the hide predates the watch or none is open; it never raises for it.
+    const queue = bodyOf("identity.queue_moderation_statements");
+    expect(queue).toContain("IF v_hide IS NOT NULL AND v_hide_at >= v_since AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_seen AS seen WHERE seen.source_id = v_hide) THEN CONTINUE; END IF;");
+    expect(queue.indexOf("v_hide_at >= v_since")).toBeLessThan(queue.indexOf("VALUES (d.decision_id)"));
   });
 
   it("M2: the four functions keep their 0157 signatures and results, each claim keeps its queue call first, and the backoff and the alert are as the brief says", () => {

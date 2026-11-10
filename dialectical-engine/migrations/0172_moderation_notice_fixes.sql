@@ -53,7 +53,7 @@ ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_chec
 CREATE OR REPLACE FUNCTION identity.queue_moderation_statements() RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v identity.public_review_event%ROWTYPE; d identity.moderation_decision%ROWTYPE; v_count integer := 0; v_owner uuid; v_row record; v_since timestamptz;
-  v_state text; v_tries integer; v_hide uuid;
+  v_state text; v_tries integer; v_hide uuid; v_hide_at timestamptz;
 BEGIN
   SELECT start.since INTO v_since FROM identity.moderation_statement_since AS start;
   FOR v IN SELECT event.* FROM identity.public_review_event AS event
@@ -137,17 +137,20 @@ BEGIN
     ORDER BY decision.recorded_at, decision.decision_id LIMIT 200 LOOP
     -- M5: the same for each decision.
     BEGIN
-      INSERT INTO identity.moderation_statement_seen (source_id) VALUES (d.decision_id) ON CONFLICT (source_id) DO NOTHING;
-      IF NOT FOUND THEN CONTINUE; END IF;
-      PERFORM identity.state_moderation(identity.moderation_debate_owner(d.publication_ref), 'DEBATE_DECIDED', d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
       -- M3 (owner's decision D, 10 Nov 2026): the hide this decision makes final is the latest HIDE up to the decision with no REPUBLISH after it. Each person
       -- told at that hide that their dig (CONTRIBUTION_AFFECTED) or report (REPORT_AFFECTED) left with the debate is told the final decision, once per kind
       -- however many pieces they had (the earlier statements name the pieces): no places, no piece. state_moderation skips an erased account (D8).
-      SELECT hide.event_id INTO v_hide FROM identity.public_review_event AS hide
+      SELECT hide.event_id, hide.recorded_at INTO v_hide, v_hide_at FROM identity.public_review_event AS hide
         WHERE hide.publication_ref = d.publication_ref AND hide.action = 'HIDE' AND hide.revision <= d.revision
           AND NOT EXISTS (SELECT 1 FROM identity.public_review_event AS back WHERE back.publication_ref = d.publication_ref AND back.action = 'REPUBLISH'
             AND back.revision > hide.revision AND back.revision <= d.revision)
         ORDER BY hide.revision DESC LIMIT 1;
+      -- M3: a decision waits for its hide's own statements (stuck for an hour, or beyond this call's 200): told now, the final statements would never follow. It is
+      -- left unseen and not raised (that would alert), so the next pass takes it. A hide from before the watch began, or none open, never waits.
+      IF v_hide IS NOT NULL AND v_hide_at >= v_since AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_seen AS seen WHERE seen.source_id = v_hide) THEN CONTINUE; END IF;
+      INSERT INTO identity.moderation_statement_seen (source_id) VALUES (d.decision_id) ON CONFLICT (source_id) DO NOTHING;
+      IF NOT FOUND THEN CONTINUE; END IF;
+      PERFORM identity.state_moderation(identity.moderation_debate_owner(d.publication_ref), 'DEBATE_DECIDED', d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
       FOR v_row IN SELECT DISTINCT affected.owner_ref, CASE affected.kind WHEN 'CONTRIBUTION_AFFECTED' THEN 'CONTRIBUTION_DECIDED' ELSE 'REPORT_DECIDED' END AS kind
         FROM identity.moderation_statement AS affected WHERE affected.event_id = v_hide AND affected.kind IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED') LOOP
         PERFORM identity.state_moderation(v_row.owner_ref, v_row.kind, d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
@@ -374,6 +377,25 @@ ALTER TABLE identity.moderation_statement DROP CONSTRAINT IF EXISTS moderation_s
 ALTER TABLE identity.moderation_statement ADD CONSTRAINT moderation_statement_kind_check
   CHECK (kind IN ('DEBATE_HIDDEN','DEBATE_DECIDED','CONTRIBUTION_REMOVED','REPORT_REMOVED','CORRECTED','CONTRIBUTION_AFFECTED','REPORT_AFFECTED','CONTRIBUTION_DECIDED','REPORT_DECIDED'));
 
+-- M3: the signed-in page's reader (the data export reads it too: identity.read_data_export_moderation calls it), 0157's body with two edits. A decision's
+-- words are the debate owner's statement alone (DEBATE_DECIDED): the contributor's and the reporter's final statements (CONTRIBUTION_DECIDED, REPORT_DECIDED)
+-- carry no facts and no deleted flag, as the AFFECTED kinds never did at the hide. Same signature, owner and grants (CREATE OR REPLACE keeps them).
+CREATE OR REPLACE FUNCTION identity.read_own_moderation_statements(p_owner_ref uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('statement_id', s.statement_id, 'kind', s.kind, 'publication_ref', s.publication_ref,
+      'run_id', core.run_of_publication(s.publication_ref), 'happened_at', s.happened_at, 'piece_kind', s.piece_kind, 'places', s.places,
+      'ground', identity.moderation_statement_ground(s.statement_id), 'hidden_now', identity.public_review_held(s.publication_ref),
+      'facts', CASE WHEN s.decision_id IS NOT NULL AND s.kind = 'DEBATE_DECIDED' THEN (SELECT jsonb_build_array(decision.facts_ciphertext) FROM identity.moderation_decision AS decision WHERE decision.decision_id = s.decision_id)
+        ELSE COALESCE((SELECT jsonb_agg(ground.facts_ciphertext ORDER BY ground.recorded_at) FROM identity.moderation_ground AS ground
+          WHERE ground.event_id = ANY (s.ground_events) AND ground.facts_ciphertext IS NOT NULL AND s.kind NOT IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED')), '[]'::jsonb) END,
+      'facts_deleted', EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.event_id = ANY (s.ground_events) AND ground.facts_deleted_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.decision_id = s.decision_id AND s.kind = 'DEBATE_DECIDED' AND decision.facts_deleted_at IS NOT NULL),
+      'quote', CASE WHEN s.kind = 'DEBATE_HIDDEN' THEN (SELECT quote.quote_ciphertext FROM identity.public_review_event AS event JOIN identity.public_flag_quote AS quote ON quote.flag_id = event.operation_id
+        WHERE event.event_id = ANY (s.ground_events) AND event.actor_staff_id = '00000000-0000-0000-0000-000000000000'::uuid LIMIT 1) END)
+    ORDER BY s.happened_at DESC, s.statement_id), '[]'::jsonb)
+  FROM identity.moderation_statement AS s WHERE s.owner_ref = p_owner_ref AND p_owner_ref IS NOT NULL
+$$;
+
 -- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
 DO $moderation_notice_fixes_contract$
 DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
@@ -397,7 +419,7 @@ BEGIN
   -- M5: the queue is this file's body, its owner's, a definer with 0157's settings, callable by no other role, and its owner may queue the alert.
   v_queue := 'identity.queue_moderation_statements()'::regprocedure;
   IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue)
-      IS DISTINCT FROM '206ec00697c8811a0d2555bbd2dbc0d46fa8b2a557f4552e42aa51bbd56a8595'
+      IS DISTINCT FROM '59a59d95195db92cb15c9f44f2f7595d7af4ea248280b81cbb72b188c07da51d'
     OR (SELECT p.proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue) IS DISTINCT FROM v_owner
     OR (SELECT p.prosecdef AND p.provolatile = 'v' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'integer'::regtype
       FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue) IS NOT TRUE
@@ -424,6 +446,14 @@ BEGIN
     OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'identity.moderation_statement'::regclass AND k.contype = 'c'
       AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%DEBATE_DECIDED%') <> 1 THEN
     RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M3 statement kind';
+  END IF;
+  -- M3: the page's reader is this file's body (by digest; a later section that edits it recomputes), its owner's, a definer with 0157's settings, as granted.
+  IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p
+        WHERE p.oid = 'identity.read_own_moderation_statements(uuid)'::regprocedure) IS DISTINCT FROM 'a409eb5c3034c78cb04bedddd0f78aa8c67273bc30e2ddd5f04ce9f7ebdea372'
+    OR (SELECT p.proowner = v_owner AND p.prosecdef AND p.provolatile = 's' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'jsonb'::regtype
+      FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.read_own_moderation_statements(uuid)'::regprocedure) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_own_moderation_statements(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M3 reader';
   END IF;
   -- M2: the retry column on both tables (nullable, no default), and the four functions as 0157 left them: signature, result, definer, settings, owner.
   IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a

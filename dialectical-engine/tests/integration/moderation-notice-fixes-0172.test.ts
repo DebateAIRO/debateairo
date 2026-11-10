@@ -513,6 +513,18 @@ describe("M3: the final decision reaches everyone whose content left with the de
     // A second pass adds nothing.
     await queue();
     expect(await toldOf(decisionId)).toHaveLength(5);
+    // The words staff typed at DECIDE are the debate owner's alone: the page's reader (the export's too) gives a contributor or a reporter none.
+    type Read = Readonly<{ kind: string; facts: unknown[]; facts_deleted: boolean }>;
+    const read = async (person: Account): Promise<Read[]> => (await database.pool.query<{ value: Read[] }>("SELECT identity.read_own_moderation_statements($1::uuid) AS value", [person.ownerRef])).rows[0]!.value;
+    const factsOf = async (person: Account, kind: string) => (await read(person)).find((row) => row.kind === kind)!;
+    expect(await factsOf(author, "DEBATE_DECIDED")).toMatchObject({ facts: [JSON.parse(sealed(ref))], facts_deleted: false });
+    for (const [person, kind] of [[pia, "CONTRIBUTION_DECIDED"], [quin, "REPORT_DECIDED"], [rae, "CONTRIBUTION_DECIDED"], [rae, "REPORT_DECIDED"]] as const) {
+      expect(await factsOf(person, kind), kind).toMatchObject({ facts: [], facts_deleted: false });
+    }
+    // Even once the decision's words are swept (12 months), only the owner's statement says so.
+    await seeded([["UPDATE identity.moderation_decision SET facts_ciphertext = NULL, facts_deleted_at = now() WHERE decision_id=$1", [decisionId]]]);
+    expect((await factsOf(author, "DEBATE_DECIDED")).facts_deleted).toBe(true);
+    expect((await factsOf(pia, "CONTRIBUTION_DECIDED")).facts_deleted).toBe(false);
   }, timeout);
 
   it("an erased contributor gets nothing, and nothing is stuck", async () => {
@@ -548,5 +560,43 @@ describe("M3: the final decision reaches everyone whose content left with the de
     const decisionId = await decide(ref);
     await queue();
     expect((await toldOf(decisionId)).filter((row) => row.kind === "CONTRIBUTION_DECIDED").map((row) => row.owner_ref)).toEqual([second.ownerRef]);
+  }, timeout);
+
+  it("a decision waits for its hide's statements: nothing is lost when the hide is set aside for an hour", async () => {
+    const [author, pia] = [await account(), await account()];
+    const ref = await publishedDebate(author);
+    await dig(ref, pia);
+    const hidden = await hide(ref);
+    await breakDebate(ref);
+    await queue();
+    expect(await stuck()).toEqual(expect.arrayContaining([expect.objectContaining({ source_id: hidden, tries: 1 })]));
+    const decisionId = await decide(ref);
+    await queue();
+    // Not told yet, not seen, not stuck (no spurious alert): the decision is left for the next pass.
+    expect(await toldOf(decisionId)).toEqual([]);
+    expect(await seen(decisionId)).toBe(false);
+    expect((await stuck()).some((row) => row.source_id === decisionId)).toBe(false);
+    expect(await alerts(decisionId)).toEqual([]);
+    // The fault goes and the hour passes: the hide is told, and the decision after it.
+    await mendDebate();
+    await anHourLater(hidden);
+    await queue();
+    await queue();
+    const kinds = async (person: Account) => (await database.pool.query<{ kind: string }>("SELECT kind FROM identity.moderation_statement WHERE publication_ref=$1 AND owner_ref=$2 ORDER BY kind", [ref, person.ownerRef])).rows.map((row) => row.kind);
+    expect(await kinds(pia)).toEqual(["CONTRIBUTION_AFFECTED", "CONTRIBUTION_DECIDED"]);
+    expect(await kinds(author)).toEqual(["DEBATE_DECIDED", "DEBATE_HIDDEN"]);
+    expect(await seen(decisionId)).toBe(true);
+  }, timeout);
+
+  it("a decision whose hide came before the watch began, or has none open, is not held back", async () => {
+    const author = await account();
+    const ref = await publishedDebate(author);
+    const hidden = await hide(ref);
+    // The hide is older than the watch: the queue never reads it, so the decision must not wait for it.
+    await seeded([["UPDATE identity.public_review_event SET recorded_at = (SELECT since FROM identity.moderation_statement_since) - interval '1 day' WHERE event_id=$1", [hidden]]]);
+    const decisionId = await decide(ref);
+    await queue();
+    expect((await toldOf(decisionId)).map((row) => row.kind)).toEqual(["DEBATE_DECIDED"]);
+    expect(await seen(decisionId)).toBe(true);
   }, timeout);
 });
