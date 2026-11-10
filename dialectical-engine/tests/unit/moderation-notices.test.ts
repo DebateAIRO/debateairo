@@ -150,7 +150,7 @@ describe("0157: the statement of reasons sender", () => {
   it("the reporter's answers: complete throwing for one claim does not stop the batch", async () => {
     const memory = new MemoryTemplatedMailSender();
     const mails: PublicFlagMail[] = (["RECEIPT", "AUTO_HIDDEN", "NO_BREACH"] as const).map((kind) =>
-      ({ userId: USER, mailId: randomUUID(), kind, happenedAt: "2026-11-05T09:30:00.000Z", mailLocale: "en", publicationRef: REF, emailCiphertext: sealed("bea@example.test") }));
+      ({ userId: USER, mailId: randomUUID(), kind, aiReadFirst: false, happenedAt: "2026-11-05T09:30:00.000Z", mailLocale: "en", publicationRef: REF, emailCiphertext: sealed("bea@example.test") }));
     const claims: PublicFlagMailClaim[] = mails.map((mail) => ({ mailId: mail.mailId, claimToken: randomUUID() }));
     const completed: string[] = [];
     const repository = {
@@ -164,6 +164,28 @@ describe("0157: the statement of reasons sender", () => {
     expect(memory.messages).toHaveLength(3);
     expect(completed).toEqual(claims.map((claim) => claim.mailId));
     expect(logged.lines).toEqual(["[PUBLIC_FLAG_ANSWER_COMPLETE_FAILED]"]);
+  });
+
+  it("M1: the reporter's mails carry aiReadFirst for the receipt and the two decisions a person made, and the automatic ones carry none", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    const kinds = ["RECEIPT", "AUTO_HIDDEN", "AUTO_NOT_FOUND", "NO_BREACH", "ACTED"] as const;
+    const mails: PublicFlagMail[] = kinds.flatMap((kind) => [true, false].map((aiReadFirst) =>
+      ({ userId: USER, mailId: randomUUID(), kind, aiReadFirst, happenedAt: "2026-11-05T09:30:00.000Z", mailLocale: "en", publicationRef: REF, emailCiphertext: sealed("bea@example.test") })));
+    const claims: PublicFlagMailClaim[] = mails.map((mail) => ({ mailId: mail.mailId, claimToken: randomUUID() }));
+    const repository = { claim: async () => claims, read: async (claim: PublicFlagMailClaim) => mails[claims.indexOf(claim)] ?? null, complete: async () => true };
+    await new PublicFlagAnswerReconciler(repository, { load: async () => Buffer.from(DEK) }, memory, "https://debate.example.test/app/").reconcile();
+    expect(memory.messages).toHaveLength(10);
+    const sent = memory.messages.map(({ mail }) => mail);
+    expect(sent.map((mail) => [mail.templateId, mail.params.aiReadFirst])).toEqual([
+      ["PUBLIC_FLAG_ANSWER_RECEIPT", "true"], ["PUBLIC_FLAG_ANSWER_RECEIPT", "false"], ["PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", undefined], ["PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", undefined],
+      ["PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", undefined], ["PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", undefined],
+      ["PUBLIC_FLAG_ANSWER_NO_BREACH", "true"], ["PUBLIC_FLAG_ANSWER_NO_BREACH", "false"], ["PUBLIC_FLAG_ANSWER_ACTED", "true"], ["PUBLIC_FLAG_ANSWER_ACTED", "false"]]);
+    // Each renders: the sentence only where the flag is true.
+    const text = (index: number) => renderMail(sent[index]!.templateId as never, "en", sent[index]!.params as never).text;
+    expect(text(0)).toContain("An automatic check read your report first");
+    expect(text(1)).not.toContain("An automatic check read your report first");
+    expect(text(6)).toContain("An AI read the report first. A person made this decision.");
+    expect(text(9)).not.toContain("An AI read the report first");
   });
 
   it("goes out through the production sendmail path: one message on the dev capture, to the account, in its language, with Reply-To office@", async () => {

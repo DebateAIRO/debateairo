@@ -118,6 +118,7 @@
   "mail.statement.routes": "Selle otsuse vaidlustamiseks vastake sellele e-kirjale või kirjutage kuue kuu jooksul aadressile office@dezbatere.ro: selle vaatab üle inimene, kes ei olnud otsusega seotud. Võite pöörduda ka sertifitseeritud vaidluste kohtuvälise lahendamise organi või kohtu poole.",
   "mail.flagAnswer.receiptSubject": "Saime teie teate kätte",
   "mail.flagAnswer.receipt": "{happened} saime teie teate selle avaliku debati kohta: {itemUrl}. Inimene loeb selle läbi ja anname teile oma otsusest teada.",
+  "mail.flagAnswer.aiReadFirst": "Automaatne kontroll luges teie teate esmalt läbi ja andis selle edasi inimesele.",
   "mail.flagAnswer.autoHiddenSubject": "Peitsime debati, millest teatasite",
   "mail.flagAnswer.autoHidden": "{happened} luges automaatne kontroll läbi teie teate selle avaliku debati kohta ja peitis debati, ilma et ükski inimene oleks osalenud: {itemUrl}. Nüüd vaatab selle üle inimene ja anname teile oma otsusest teada.",
   "mail.flagAnswer.autoNotFoundSubject": "Me ei ole teie teate põhjal midagi ette võtnud",

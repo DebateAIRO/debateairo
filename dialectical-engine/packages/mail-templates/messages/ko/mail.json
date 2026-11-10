@@ -118,6 +118,7 @@
   "mail.statement.routes": "이 결정에 이의를 제기하려면 6개월 이내에 이 이메일에 회신하거나 office@dezbatere.ro로 연락해 주세요. 결정에 관여하지 않은 사람이 검토합니다. 이 결정을 인증된 대체적 분쟁 해결 기관이나 법원에 제기할 수도 있습니다.",
   "mail.flagAnswer.receiptSubject": "회원님의 신고를 접수했습니다",
   "mail.flagAnswer.receipt": "{happened}에 이 공개 토론에 대한 회원님의 신고를 접수했습니다: {itemUrl}. 사람이 신고를 읽은 후 당사의 결정을 알려 드리겠습니다.",
+  "mail.flagAnswer.aiReadFirst": "자동 검사가 먼저 회원님의 신고를 읽고 사람에게 전달했습니다.",
   "mail.flagAnswer.autoHiddenSubject": "회원님이 신고한 토론을 숨겼습니다",
   "mail.flagAnswer.autoHidden": "{happened}에 자동 검사가 이 공개 토론에 대한 회원님의 신고를 읽고, 사람의 관여 없이 토론을 숨겼습니다: {itemUrl}. 이제 사람이 이를 검토하며, 당사의 결정을 알려 드리겠습니다.",
   "mail.flagAnswer.autoNotFoundSubject": "회원님의 신고에 따른 조치를 취하지 않았습니다",

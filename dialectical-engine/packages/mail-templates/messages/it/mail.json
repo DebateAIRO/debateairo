@@ -118,6 +118,7 @@
   "mail.statement.routes": "Per contestare questa decisione, risponda a questa email o scriva a office@dezbatere.ro entro sei mesi: la esaminerà una persona che non vi ha preso parte. Può anche rivolgersi a un organismo di risoluzione extragiudiziale delle controversie certificato, o ai tribunali.",
   "mail.flagAnswer.receiptSubject": "Abbiamo ricevuto la sua segnalazione",
   "mail.flagAnswer.receipt": "Il {happened} abbiamo ricevuto la sua segnalazione su questo dibattito pubblico: {itemUrl}. Una persona la leggerà, e le comunicheremo la nostra decisione.",
+  "mail.flagAnswer.aiReadFirst": "Una verifica automatica ha letto per prima la sua segnalazione e l’ha passata a una persona.",
   "mail.flagAnswer.autoHiddenSubject": "Abbiamo nascosto il dibattito che ha segnalato",
   "mail.flagAnswer.autoHidden": "Il {happened} una verifica automatica ha letto la sua segnalazione su questo dibattito pubblico e ha nascosto il dibattito, senza l’intervento di alcuna persona: {itemUrl}. Ora una persona lo esaminerà, e le comunicheremo la nostra decisione.",
   "mail.flagAnswer.autoNotFoundSubject": "Non abbiamo dato seguito alla sua segnalazione",

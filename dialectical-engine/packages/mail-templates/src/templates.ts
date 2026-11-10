@@ -136,9 +136,15 @@ const statement = (kind: string): MailTemplateDefinition => define({
   params: statementParams,
   replyTo: "authorities"
 });
-const flagAnswer = (kind: string): MailTemplateDefinition => define({
-  catalogue: "mail", subject: `mail.flagAnswer.${kind}Subject`, paragraphs: [`mail.flagAnswer.${kind}`, "mail.flagAnswer.routes"],
-  params: { happened: "date", itemUrl: "url" }, replyTo: "authorities"
+/**
+ * M1 (owner, 10 Nov 2026): the reporter's mails say when an AI read the report first. `aiReadFirst` is optional (a mail queued before it reads as it did)
+ * and is a flag: the receipt adds its own sentence, and NO_BREACH and ACTED (`aiFirst`) add the statements' "An AI read the report first. A person made
+ * this decision." before the routes. The two automatic answers (AUTO_HIDDEN, AUTO_NOT_FOUND) already say an automatic check read it and take no flag.
+ */
+const flagAnswer = (kind: string, aiFirst = false): MailTemplateDefinition => define({
+  catalogue: "mail", subject: `mail.flagAnswer.${kind}Subject`,
+  paragraphs: aiFirst ? [`mail.flagAnswer.${kind}`, when("aiReadFirst", "mail.statement.automatedDetection"), "mail.flagAnswer.routes"] : [`mail.flagAnswer.${kind}`, "mail.flagAnswer.routes"],
+  params: { happened: "date", itemUrl: "url" }, ...(aiFirst ? { optional: { aiReadFirst: "flag" } } : {}), replyTo: "authorities"
 });
 const retryOptional = Object.freeze({ confirmCard: "flag", bankAsked: "flag", endDate: "date" } as const);
 /**
@@ -439,11 +445,11 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),
   // 0157 (DSA Art 16(4)-(6); the owner's D4): the answers to the person who reported. The date and the debate's link only: no words of the report
   // or the debate, no staff id. The receipt names no decision; each decision says how automated means were used and gives office@ and the routes.
-  PUBLIC_FLAG_ANSWER_RECEIPT: define({ catalogue: "mail", subject: "mail.flagAnswer.receiptSubject", paragraphs: ["mail.flagAnswer.receipt"], params: { happened: "date", itemUrl: "url" } }),
+  PUBLIC_FLAG_ANSWER_RECEIPT: define({ catalogue: "mail", subject: "mail.flagAnswer.receiptSubject", paragraphs: ["mail.flagAnswer.receipt", when("aiReadFirst", "mail.flagAnswer.aiReadFirst")], params: { happened: "date", itemUrl: "url" }, optional: { aiReadFirst: "flag" } }),
   PUBLIC_FLAG_ANSWER_AUTO_HIDDEN: flagAnswer("autoHidden"),
   PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: flagAnswer("autoNotFound"),
-  PUBLIC_FLAG_ANSWER_NO_BREACH: flagAnswer("noBreach"),
-  PUBLIC_FLAG_ANSWER_ACTED: flagAnswer("acted"),
+  PUBLIC_FLAG_ANSWER_NO_BREACH: flagAnswer("noBreach", true),
+  PUBLIC_FLAG_ANSWER_ACTED: flagAnswer("acted", true),
   THREAT_REPORT_WAITING: define({
     catalogue: "owner", subject: "owner.threatReport.subject",
     paragraphs: ["owner.threatReport.waiting", "owner.threatReport.open"], params: {}

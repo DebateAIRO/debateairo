@@ -396,6 +396,19 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   FROM identity.moderation_statement AS s WHERE s.owner_ref = p_owner_ref AND p_owner_ref IS NOT NULL
 $$;
 
+-- M1: the reporter's answer says whether an automatic check read the report first (the owner, 10 Nov 2026). 0157's body with one key more, aiReadFirst: true when
+-- 0151's check gave a verdict (AGREE, NOT_FOUND or UNSURE), false when it was unavailable (the five-minute sweep settles a stuck report so) or none ran. The
+-- receipt and the two decisions a person made (NO_BREACH, ACTED) show it; the two automatic answers already say it. Same signature, owner and grants.
+CREATE OR REPLACE FUNCTION identity.read_public_flag_mail(p_mail_id uuid, p_claim uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT jsonb_build_object('userId', identity_user.user_id, 'mailId', mail.mail_id, 'kind', mail.kind, 'happenedAt', mail.happened_at,
+    'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false),
+    'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref), 'publicationRef', flag.publication_ref, 'emailCiphertext', identity_user.email_ciphertext)
+  FROM identity.public_flag_mail AS mail JOIN identity.public_flag AS flag ON flag.flag_id = mail.flag_id
+    JOIN identity."user" AS identity_user ON identity_user.owner_ref = flag.reporter_ref AND identity_user.state IN ('active','suspended')
+  WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp()
+$$;
+
 -- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
 DO $moderation_notice_fixes_contract$
 DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
@@ -454,6 +467,14 @@ BEGIN
       FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.read_own_moderation_statements(uuid)'::regprocedure) IS NOT TRUE
     OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_own_moderation_statements(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M3 reader';
+  END IF;
+  -- M1: the reporter's answer reader is this file's body (by digest), its owner's, a definer with 0157's settings, as granted.
+  IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p
+        WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS DISTINCT FROM '162d03acca757fffb8bc6e63bb6ab5d6a688b3d251db95cb451448db20b58ea6'
+    OR (SELECT p.proowner = v_owner AND p.prosecdef AND p.provolatile = 's' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'jsonb'::regtype
+      FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_public_flag_mail(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M1 reader';
   END IF;
   -- M2: the retry column on both tables (nullable, no default), and the four functions as 0157 left them: signature, result, definer, settings, owner.
   IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a

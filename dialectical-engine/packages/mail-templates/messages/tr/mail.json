@@ -118,6 +118,7 @@
   "mail.statement.routes": "Bu karara itiraz etmek için altı ay içinde bu e-postayı yanıtlayın veya office@dezbatere.ro adresine yazın: Karara dâhil olmamış bir kişi onu inceleyecektir. Ayrıca sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organına veya mahkemeye de başvurabilirsiniz.",
   "mail.flagAnswer.receiptSubject": "Bildiriminizi aldık",
   "mail.flagAnswer.receipt": "{happened} tarihinde bu herkese açık tartışmayla ilgili bildiriminizi aldık: {itemUrl}. Bildiriminizi bir kişi okuyacak ve verdiğimiz kararı size bildireceğiz.",
+  "mail.flagAnswer.aiReadFirst": "Otomatik bir kontrol bildiriminizi önce okudu ve bir kişiye iletti.",
   "mail.flagAnswer.autoHiddenSubject": "Bildirdiğiniz tartışmayı gizledik",
   "mail.flagAnswer.autoHidden": "{happened} tarihinde otomatik bir kontrol, bu herkese açık tartışmayla ilgili bildiriminizi okudu ve hiçbir kişi dâhil olmadan tartışmayı gizledi: {itemUrl}. Şimdi bir kişi bunu inceleyecek ve verdiğimiz kararı size bildireceğiz.",
   "mail.flagAnswer.autoNotFoundSubject": "Bildiriminiz üzerine işlem yapmadık",

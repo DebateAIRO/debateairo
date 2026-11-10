@@ -118,6 +118,7 @@
   "mail.statement.routes": "Norėdami užginčyti šį sprendimą, per šešis mėnesius atsakykite į šį el. laišką arba parašykite adresu office@dezbatere.ro: jį peržiūrės žmogus, kuris nedalyvavo priimant sprendimą. Taip pat galite kreiptis į sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą.",
   "mail.flagAnswer.receiptSubject": "Gavome jūsų pranešimą",
   "mail.flagAnswer.receipt": "{happened} gavome jūsų pranešimą apie šiuos viešus debatus: {itemUrl}. Jį perskaitys žmogus, ir mes jums pranešime savo sprendimą.",
+  "mail.flagAnswer.aiReadFirst": "Automatinė patikra pirmiausia perskaitė jūsų pranešimą ir perdavė jį žmogui.",
   "mail.flagAnswer.autoHiddenSubject": "Paslėpėme debatus, apie kuriuos pranešėte",
   "mail.flagAnswer.autoHidden": "{happened} automatinė patikra perskaitė jūsų pranešimą apie šiuos viešus debatus ir juos paslėpė, nedalyvaujant jokiam žmogui: {itemUrl}. Dabar juos peržiūrės žmogus, ir mes jums pranešime savo sprendimą.",
   "mail.flagAnswer.autoNotFoundSubject": "Pagal jūsų pranešimą veiksmų nesiėmėme",

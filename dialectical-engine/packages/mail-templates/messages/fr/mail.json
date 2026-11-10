@@ -118,6 +118,7 @@
   "mail.statement.routes": "Pour contester cette décision, répondez à cet e-mail ou écrivez à office@dezbatere.ro dans un délai de six mois : une personne qui n’y a pas participé l’examinera. Vous pouvez aussi vous adresser à un organe de règlement extrajudiciaire des litiges certifié ou à une juridiction.",
   "mail.flagAnswer.receiptSubject": "Nous avons reçu votre signalement",
   "mail.flagAnswer.receipt": "Le {happened}, nous avons reçu votre signalement concernant ce débat public : {itemUrl}. Une personne le lira, et nous vous informerons de notre décision.",
+  "mail.flagAnswer.aiReadFirst": "Une vérification automatique a d’abord lu votre signalement et l’a transmis à une personne.",
   "mail.flagAnswer.autoHiddenSubject": "Nous avons masqué le débat que vous avez signalé",
   "mail.flagAnswer.autoHidden": "Le {happened}, une vérification automatique a lu votre signalement concernant ce débat public et a masqué le débat, sans intervention d’aucune personne : {itemUrl}. Une personne va maintenant l’examiner, et nous vous informerons de notre décision.",
   "mail.flagAnswer.autoNotFoundSubject": "Nous n’avons pas donné suite à votre signalement",

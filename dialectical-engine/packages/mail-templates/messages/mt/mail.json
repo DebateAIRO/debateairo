@@ -118,6 +118,7 @@
   "mail.statement.routes": "Biex tikkontesta din id-deċiżjoni, wieġeb għal din l-email jew ikteb lil office@dezbatere.ro fi żmien sitt xhur: persuna li ma kinitx involuta se tirrieżaminaha. Tista’ wkoll tressaqha quddiem korp iċċertifikat għas-soluzzjoni tat-tilwim barra mill-qorti, jew quddiem qorti.",
   "mail.flagAnswer.receiptSubject": "Irċevejna r-rapport tiegħek",
   "mail.flagAnswer.receipt": "Fil-{happened}, irċevejna r-rapport tiegħek dwar dan id-dibattitu pubbliku: {itemUrl}. Persuna se taqrah, u ngħidulek x’niddeċiedu.",
+  "mail.flagAnswer.aiReadFirst": "Verifika awtomatika l-ewwel qrat ir-rapport tiegħek u għaddietu lil persuna.",
   "mail.flagAnswer.autoHiddenSubject": "Ħbejna d-dibattitu li rrapportajt",
   "mail.flagAnswer.autoHidden": "Fil-{happened}, verifika awtomatika qrat ir-rapport tiegħek dwar dan id-dibattitu pubbliku u ħbiet id-dibattitu, mingħajr ma kienet involuta ebda persuna: {itemUrl}. Issa persuna se tirrieżaminah, u ngħidulek x’niddeċiedu.",
   "mail.flagAnswer.autoNotFoundSubject": "Ma aġixxejniex fuq ir-rapport tiegħek",

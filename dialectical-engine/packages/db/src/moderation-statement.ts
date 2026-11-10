@@ -55,7 +55,7 @@ export class PostgresModerationStatementRepository {
  */
 export type PublicFlagMailKind = "RECEIPT" | "AUTO_HIDDEN" | "AUTO_NOT_FOUND" | "NO_BREACH" | "ACTED";
 export type PublicFlagMailClaim = Readonly<{ mailId: string; claimToken: string }>;
-export type PublicFlagMail = Readonly<{ userId: string; mailId: string; kind: PublicFlagMailKind; happenedAt: string; mailLocale: string; publicationRef: string; emailCiphertext: CryptoEnvelope }>;
+export type PublicFlagMail = Readonly<{ userId: string; mailId: string; kind: PublicFlagMailKind; aiReadFirst: boolean; happenedAt: string; mailLocale: string; publicationRef: string; emailCiphertext: CryptoEnvelope }>;
 
 export class PostgresPublicFlagMailRepository {
   constructor(private readonly pool: Pool) {}

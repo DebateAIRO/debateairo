@@ -70,7 +70,7 @@ describe("0172: the moderation notice fixes", () => {
         "identity.claim_moderation_statements(integer)", "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)",
         "identity.complete_public_flag_mail(uuid,uuid,text)", "identity.record_hide_ground(uuid,uuid,text[],text,uuid)",
         "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)", "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
-        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()", "identity.read_own_moderation_statements(uuid)"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"],
+        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()", "identity.read_own_moderation_statements(uuid)", "identity.read_public_flag_mail(uuid,uuid)"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"],
         constraints: ["moderation_statement_kind_check"] }
     ]);
     expect(SQL).toContain("ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;\n"
@@ -165,6 +165,24 @@ describe("0172: the moderation notice fixes", () => {
     const queue = bodyOf("identity.queue_moderation_statements");
     expect(queue).toContain("IF v_hide IS NOT NULL AND v_hide_at >= v_since AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_seen AS seen WHERE seen.source_id = v_hide) THEN CONTINUE; END IF;");
     expect(queue.indexOf("v_hide_at >= v_since")).toBeLessThan(queue.indexOf("VALUES (d.decision_id)"));
+  });
+
+  it("M1: the reporter's answer reader is 0157's body plus the one key aiReadFirst (a verdict of the check, not UNAVAILABLE), the sender and the three templates use it, the two automatic mails do not", () => {
+    const original = read("migrations/0157_moderation_statements.sql");
+    const at = original.indexOf("CREATE OR REPLACE FUNCTION identity.read_public_flag_mail");
+    const was = original.slice(at, original.indexOf("$$;", original.indexOf("AS $$", at) + 5));
+    const now = bodyOf("identity.read_public_flag_mail");
+    expect(now.slice(0, now.indexOf("AS $$"))).toBe(was.slice(0, was.indexOf("AS $$")));
+    const edited = was.replace("'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref),",
+      "'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false),\n    'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref),");
+    expect(edited).not.toBe(was);
+    expect(now).toBe(edited);
+    expect(SQL).toContain(`IS DISTINCT FROM '${sha256(now.slice(now.indexOf("AS $$") + 5))}'`);
+    const templates = read("packages/mail-templates/src/templates.ts");
+    expect(templates).toContain('PUBLIC_FLAG_ANSWER_AUTO_HIDDEN: flagAnswer("autoHidden"),');
+    expect(templates).toContain('PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: flagAnswer("autoNotFound"),');
+    expect(templates).toContain('PUBLIC_FLAG_ANSWER_NO_BREACH: flagAnswer("noBreach", true),');
+    expect(templates).toContain('PUBLIC_FLAG_ANSWER_ACTED: flagAnswer("acted", true),');
   });
 
   it("M2: the four functions keep their 0157 signatures and results, each claim keeps its queue call first, and the backoff and the alert are as the brief says", () => {

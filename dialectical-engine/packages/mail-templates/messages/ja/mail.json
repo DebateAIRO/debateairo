@@ -118,6 +118,7 @@
   "mail.statement.routes": "この決定に異議を申し立てるには、6か月以内にこのメールに返信するか、office@dezbatere.ro までご連絡ください。決定に関与していない人が見直します。認証された裁判外紛争解決機関または裁判所に持ち込むこともできます。",
   "mail.flagAnswer.receiptSubject": "あなたの通報を受け付けました",
   "mail.flagAnswer.receipt": "{happened}、この公開ディベートに関するあなたの通報を受け付けました：{itemUrl}。人が通報を読み、当社の決定をお知らせします。",
+  "mail.flagAnswer.aiReadFirst": "自動チェックがまずあなたの通報を読み、人に引き継ぎました。",
   "mail.flagAnswer.autoHiddenSubject": "あなたが通報したディベートを非表示にしました",
   "mail.flagAnswer.autoHidden": "{happened}、自動チェックがこの公開ディベートに関するあなたの通報を読み、人の関与なしにディベートを非表示にしました：{itemUrl}。今後、人が確認し、当社の決定をお知らせします。",
   "mail.flagAnswer.autoNotFoundSubject": "あなたの通報に基づく対応は行っていません",

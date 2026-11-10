@@ -118,6 +118,7 @@
   "mail.statement.routes": "Untuk mengajukan keberatan atas keputusan ini, balas email ini atau kirim pesan ke office@dezbatere.ro dalam waktu enam bulan: seseorang yang tidak terlibat akan meninjaunya. Anda juga dapat membawanya ke badan penyelesaian sengketa di luar pengadilan yang disertifikasi, atau ke pengadilan.",
   "mail.flagAnswer.receiptSubject": "Kami telah menerima laporan Anda",
   "mail.flagAnswer.receipt": "Pada {happened}, kami menerima laporan Anda tentang debat publik ini: {itemUrl}. Seseorang akan membacanya, dan kami akan memberi tahu Anda keputusan kami.",
+  "mail.flagAnswer.aiReadFirst": "Pemeriksaan otomatis lebih dulu membaca laporan Anda dan meneruskannya kepada seseorang.",
   "mail.flagAnswer.autoHiddenSubject": "Kami menyembunyikan debat yang Anda laporkan",
   "mail.flagAnswer.autoHidden": "Pada {happened}, pemeriksaan otomatis membaca laporan Anda tentang debat publik ini dan menyembunyikan debat tersebut, tanpa keterlibatan seorang pun: {itemUrl}. Kini seseorang akan meninjaunya, dan kami akan memberi tahu Anda keputusan kami.",
   "mail.flagAnswer.autoNotFoundSubject": "Kami belum menindaklanjuti laporan Anda",

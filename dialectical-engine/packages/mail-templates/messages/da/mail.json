@@ -118,6 +118,7 @@
   "mail.statement.routes": "Hvis du vil anfægte denne afgørelse, så svar på denne e-mail eller skriv til office@dezbatere.ro inden for seks måneder: En person, der ikke var involveret, vil gennemgå den. Du kan også henvende dig til et certificeret udenretsligt tvistbilæggelsesorgan eller til domstolene.",
   "mail.flagAnswer.receiptSubject": "Vi har modtaget din anmeldelse",
   "mail.flagAnswer.receipt": "Den {happened} modtog vi din anmeldelse af denne offentlige debat: {itemUrl}. En person vil læse den, og vi fortæller dig, hvad vi beslutter.",
+  "mail.flagAnswer.aiReadFirst": "En automatisk kontrol læste først din anmeldelse og overgav den til en person.",
   "mail.flagAnswer.autoHiddenSubject": "Vi har skjult den debat, du anmeldte",
   "mail.flagAnswer.autoHidden": "Den {happened} læste en automatisk kontrol din anmeldelse af denne offentlige debat og skjulte debatten, uden at nogen person var involveret: {itemUrl}. En person vil nu gennemgå den, og vi fortæller dig, hvad vi beslutter.",
   "mail.flagAnswer.autoNotFoundSubject": "Vi har ikke grebet ind på baggrund af din anmeldelse",

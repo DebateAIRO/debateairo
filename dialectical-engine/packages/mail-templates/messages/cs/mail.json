@@ -118,6 +118,7 @@
   "mail.statement.routes": "Chcete-li toto rozhodnutí napadnout, odpovězte na tento e-mail nebo napište do šesti měsíců na office@dezbatere.ro: posoudí ho člověk, který se na něm nepodílel. Můžete se také obrátit na certifikovaný subjekt pro mimosoudní řešení sporů nebo na soud.",
   "mail.flagAnswer.receiptSubject": "Vaše hlášení jsme přijali",
   "mail.flagAnswer.receipt": "Dne {happened} jsme přijali vaše hlášení k této veřejné debatě: {itemUrl}. Přečte ho člověk a sdělíme vám, jak jsme rozhodli.",
+  "mail.flagAnswer.aiReadFirst": "Nejdřív vaše hlášení přečetla automatická kontrola a předala ho člověku.",
   "mail.flagAnswer.autoHiddenSubject": "Debatu, kterou jste nahlásili, jsme skryli",
   "mail.flagAnswer.autoHidden": "Dne {happened} přečetla automatická kontrola vaše hlášení k této veřejné debatě a debatu skryla, bez účasti člověka: {itemUrl}. Nyní ji posoudí člověk a sdělíme vám, jak jsme rozhodli.",
   "mail.flagAnswer.autoNotFoundSubject": "Na základě vašeho hlášení jsme nezasáhli",

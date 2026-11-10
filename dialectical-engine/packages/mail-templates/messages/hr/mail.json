@@ -118,6 +118,7 @@
   "mail.statement.routes": "Da biste osporili ovu odluku, odgovorite na ovu poruku e-pošte ili pišite na office@dezbatere.ro u roku od šest mjeseci: preispitat će je osoba koja nije sudjelovala u njoj. Možete se obratiti i certificiranom tijelu za izvansudsko rješavanje sporova ili sudu.",
   "mail.flagAnswer.receiptSubject": "Primili smo vašu prijavu",
   "mail.flagAnswer.receipt": "Dana {happened} primili smo vašu prijavu u vezi s ovom javnom raspravom: {itemUrl}. Pročitat će je osoba, a mi ćemo vam javiti što smo odlučili.",
+  "mail.flagAnswer.aiReadFirst": "Automatska provjera prvo je pročitala vašu prijavu i proslijedila je osobi.",
   "mail.flagAnswer.autoHiddenSubject": "Sakrili smo raspravu koju ste prijavili",
   "mail.flagAnswer.autoHidden": "Dana {happened} automatska provjera pročitala je vašu prijavu u vezi s ovom javnom raspravom i sakrila raspravu, bez sudjelovanja ijedne osobe: {itemUrl}. Sada će je pregledati osoba, a mi ćemo vam javiti što smo odlučili.",
   "mail.flagAnswer.autoNotFoundSubject": "Nismo postupili po vašoj prijavi",

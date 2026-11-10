@@ -118,6 +118,7 @@
   "mail.statement.routes": "Para contestar esta decisão, responda a este e-mail ou escreva para office@dezbatere.ro no prazo de seis meses: uma pessoa que não tenha participado na decisão irá revê-la. Pode também recorrer a um organismo de resolução extrajudicial de litígios certificado ou aos tribunais.",
   "mail.flagAnswer.receiptSubject": "Recebemos a sua denúncia",
   "mail.flagAnswer.receipt": "Em {happened}, recebemos a sua denúncia sobre este debate público: {itemUrl}. Uma pessoa vai lê-la e iremos comunicar-lhe a nossa decisão.",
+  "mail.flagAnswer.aiReadFirst": "Uma verificação automática leu primeiro a sua denúncia e passou-a a uma pessoa.",
   "mail.flagAnswer.autoHiddenSubject": "Ocultámos o debate que denunciou",
   "mail.flagAnswer.autoHidden": "Em {happened}, uma verificação automática leu a sua denúncia sobre este debate público e ocultou o debate, sem intervenção de qualquer pessoa: {itemUrl}. Uma pessoa vai agora revê-lo, e iremos comunicar-lhe a nossa decisão.",
   "mail.flagAnswer.autoNotFoundSubject": "Não tomámos medidas quanto à sua denúncia",

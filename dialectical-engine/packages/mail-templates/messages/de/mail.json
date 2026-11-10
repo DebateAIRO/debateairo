@@ -118,6 +118,7 @@
   "mail.statement.routes": "Um diese Entscheidung anzufechten, antworten Sie auf diese E-Mail oder schreiben Sie innerhalb von sechs Monaten an office@dezbatere.ro: Eine Person, die nicht beteiligt war, prüft sie. Sie können sich auch an eine zertifizierte außergerichtliche Streitbeilegungsstelle wenden oder ein Gericht anrufen.",
   "mail.flagAnswer.receiptSubject": "Wir haben Ihre Meldung erhalten",
   "mail.flagAnswer.receipt": "Am {happened} haben wir Ihre Meldung zu dieser öffentlichen Debatte erhalten: {itemUrl}. Eine Person wird sie lesen, und wir teilen Ihnen unsere Entscheidung mit.",
+  "mail.flagAnswer.aiReadFirst": "Eine automatische Prüfung hat Ihre Meldung zuerst gelesen und an eine Person weitergeleitet.",
   "mail.flagAnswer.autoHiddenSubject": "Wir haben die von Ihnen gemeldete Debatte ausgeblendet",
   "mail.flagAnswer.autoHidden": "Am {happened} hat eine automatische Prüfung Ihre Meldung zu dieser öffentlichen Debatte gelesen und die Debatte ausgeblendet, ohne Beteiligung einer Person: {itemUrl}. Eine Person wird sie nun prüfen, und wir teilen Ihnen unsere Entscheidung mit.",
   "mail.flagAnswer.autoNotFoundSubject": "Wir haben aufgrund Ihrer Meldung nichts unternommen",

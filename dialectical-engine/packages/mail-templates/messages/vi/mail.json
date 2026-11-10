@@ -118,6 +118,7 @@
   "mail.statement.routes": "Để phản đối quyết định này, hãy trả lời email này hoặc viết đến office@dezbatere.ro trong vòng sáu tháng: một người không tham gia vào quyết định sẽ xem xét lại. Quý vị cũng có thể đưa vụ việc đến một cơ quan giải quyết tranh chấp ngoài tòa án được chứng nhận, hoặc ra tòa.",
   "mail.flagAnswer.receiptSubject": "Chúng tôi đã nhận được báo cáo của quý vị",
   "mail.flagAnswer.receipt": "Vào {happened}, chúng tôi đã nhận được báo cáo của quý vị về cuộc tranh luận công khai này: {itemUrl}. Một người sẽ đọc báo cáo, và chúng tôi sẽ cho quý vị biết quyết định của chúng tôi.",
+  "mail.flagAnswer.aiReadFirst": "Một bước kiểm tra tự động đã đọc báo cáo của quý vị trước và chuyển cho một người.",
   "mail.flagAnswer.autoHiddenSubject": "Chúng tôi đã ẩn cuộc tranh luận mà quý vị báo cáo",
   "mail.flagAnswer.autoHidden": "Vào {happened}, một bước kiểm tra tự động đã đọc báo cáo của quý vị về cuộc tranh luận công khai này và đã ẩn cuộc tranh luận, không có người nào tham gia: {itemUrl}. Giờ đây một người sẽ xem xét, và chúng tôi sẽ cho quý vị biết quyết định của chúng tôi.",
   "mail.flagAnswer.autoNotFoundSubject": "Chúng tôi chưa xử lý báo cáo của quý vị",

@@ -118,6 +118,7 @@
   "mail.statement.routes": "Om du vill bestrida det här beslutet kan du svara på det här mejlet eller skriva till office@dezbatere.ro inom sex månader: en person som inte var inblandad granskar det. Du kan också vända dig till ett certifierat organ för tvistlösning utanför domstol eller till domstol.",
   "mail.flagAnswer.receiptSubject": "Vi har tagit emot din rapport",
   "mail.flagAnswer.receipt": "Den {happened} tog vi emot din rapport om den här offentliga debatten: {itemUrl}. En person kommer att läsa den, och vi meddelar dig vårt beslut.",
+  "mail.flagAnswer.aiReadFirst": "En automatisk kontroll läste din rapport först och lämnade den vidare till en person.",
   "mail.flagAnswer.autoHiddenSubject": "Vi har dolt debatten du rapporterade",
   "mail.flagAnswer.autoHidden": "Den {happened} läste en automatisk kontroll din rapport om den här offentliga debatten och dolde debatten, utan att någon person var inblandad: {itemUrl}. En person granskar den nu, och vi meddelar dig vårt beslut.",
   "mail.flagAnswer.autoNotFoundSubject": "Vi har inte agerat på din rapport",

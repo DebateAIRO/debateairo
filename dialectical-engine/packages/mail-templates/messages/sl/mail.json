@@ -118,6 +118,7 @@
   "mail.statement.routes": "Če želite to odločitev izpodbijati, v šestih mesecih odgovorite na to e-poštno sporočilo ali pišite na office@dezbatere.ro: pregledala jo bo oseba, ki pri odločitvi ni sodelovala. Obrnete se lahko tudi na certificirani organ za izvensodno reševanje sporov ali na sodišče.",
   "mail.flagAnswer.receiptSubject": "Prejeli smo vašo prijavo",
   "mail.flagAnswer.receipt": "Dne {happened} smo prejeli vašo prijavo v zvezi s to javno debato: {itemUrl}. Prebral jo bo človek, mi pa vam bomo sporočili svojo odločitev.",
+  "mail.flagAnswer.aiReadFirst": "Samodejno preverjanje je najprej prebralo vašo prijavo in jo predalo človeku.",
   "mail.flagAnswer.autoHiddenSubject": "Debato, ki ste jo prijavili, smo skrili",
   "mail.flagAnswer.autoHidden": "Dne {happened} je samodejno preverjanje prebralo vašo prijavo v zvezi s to javno debato in debato skrilo, brez sodelovanja človeka: {itemUrl}. Zdaj jo bo pregledal človek, mi pa vam bomo sporočili svojo odločitev.",
   "mail.flagAnswer.autoNotFoundSubject": "Na podlagi vaše prijave nismo ukrepali",

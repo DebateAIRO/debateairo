@@ -118,6 +118,7 @@
   "mail.statement.routes": "כדי להשיג על ההחלטה הזו, אפשר להשיב למייל הזה או לכתוב אל office@dezbatere.ro בתוך שישה חודשים: אדם שלא היה מעורב בה יבחן אותה. אפשר גם לפנות לגוף ליישוב סכסוכים מחוץ לבית המשפט שהוסמך לכך או לבית משפט.",
   "mail.flagAnswer.receiptSubject": "קיבלנו את הדיווח שלך",
   "mail.flagAnswer.receipt": "ב-{happened}, קיבלנו את הדיווח שלך על הדיון הציבורי הזה: {itemUrl}. אדם יקרא אותו, ונעדכן אותך במה שנחליט.",
+  "mail.flagAnswer.aiReadFirst": "בדיקה אוטומטית קראה תחילה את הדיווח שלך והעבירה אותו לאדם.",
   "mail.flagAnswer.autoHiddenSubject": "הסתרנו את הדיון שדיווחת עליו",
   "mail.flagAnswer.autoHidden": "ב-{happened}, בדיקה אוטומטית קראה את הדיווח שלך על הדיון הציבורי הזה והסתירה את הדיון, ללא מעורבות של אדם: {itemUrl}. כעת אדם יבחן אותו, ונעדכן אותך במה שנחליט.",
   "mail.flagAnswer.autoNotFoundSubject": "לא פעלנו בעקבות הדיווח שלך",

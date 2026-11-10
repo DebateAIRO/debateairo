@@ -15,6 +15,9 @@ let sequence = 9_950_000;
 // Who the staff alert goes to: the active Owner and the active team-limit holder, as 0151's notices (seeded once, in the top-level beforeAll).
 const owner = randomUUID();
 const holder = randomUUID();
+/** M1's seeds (top-level beforeAll): a live-claimed receipt for a report the check passed to a person (UNSURE), and one for a report the five-minute sweep settled UNAVAILABLE. */
+const m1 = { unsure: { mailId: randomUUID(), claim: randomUUID(), flagId: randomUUID() }, swept: { mailId: randomUUID(), claim: randomUUID(), flagId: randomUUID() },
+  unchecked: { mailId: randomUUID(), claim: randomUUID(), flagId: randomUUID() } };
 
 type Account = Readonly<{ userId: string; ownerRef: string }>;
 async function account(): Promise<Account> {
@@ -102,6 +105,18 @@ beforeAll(async () => {
   await seeded([
     ["INSERT INTO staff.owner_designation (staff_id, active) VALUES ($1, true)", [owner]],
     ["INSERT INTO staff.team_limit_holder (staff_id, active, granted_by_staff_id, granted_operation_id) VALUES ($1, true, $2, $3)", [holder, owner, randomUUID()]]]);
+  // M1: three reporters' receipts, claimed for an hour: the check's UNSURE, a report stuck CHECKING (settled UNAVAILABLE by the sweep below), and one no check ran for.
+  const publisher = await account();
+  const ref = await publishedDebate(publisher);
+  for (const [name, state, verdict] of [["unsure", "QUEUED", "UNSURE"], ["swept", "CHECKING", null], ["unchecked", "QUEUED", null]] as const) {
+    const reporter = await account();
+    await seeded([
+      [`INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, reason, state, verdict, created_at, content_deleted_at) VALUES ($1,$2,$3,'CONTENT',$4,$5,now() - interval '10 minutes',now())`,
+        [m1[name].flagId, ref, reporter.ownerRef, state, verdict]],
+      [`INSERT INTO identity.public_flag_mail (mail_id, flag_id, kind, happened_at, claim_token, claim_expires_at) VALUES ($1,$2,'RECEIPT',now(),$3,now() + interval '1 hour')`,
+        [m1[name].mailId, m1[name].flagId, m1[name].claim]]]);
+  }
+  await database.pool.query("SELECT identity.settle_stuck_public_flags()");
 }, timeout);
 afterAll(async () => {
   await runtime?.end();
@@ -598,5 +613,21 @@ describe("M3: the final decision reaches everyone whose content left with the de
     await queue();
     expect((await toldOf(decisionId)).map((row) => row.kind)).toEqual(["DEBATE_DECIDED"]);
     expect(await seen(decisionId)).toBe(true);
+  }, timeout);
+});
+
+describe("M1: the reporter's mail says when an automatic check read the report first", () => {
+  const read = async (one: { mailId: string; claim: string }) => (await runtime.query<{ value: Record<string, unknown> | null }>(
+    "SELECT identity.read_public_flag_mail($1::uuid,$2::uuid) AS value", [one.mailId, one.claim])).rows[0]!.value;
+  it("is true for a report the check passed to a person (UNSURE)", async () => {
+    expect((await read(m1.unsure))!.aiReadFirst).toBe(true);
+  }, timeout);
+  it("is false for a report the five-minute sweep settled UNAVAILABLE, and for one no check ran for", async () => {
+    expect((await database.pool.query<{ verdict: string }>("SELECT verdict FROM identity.public_flag WHERE flag_id=$1", [m1.swept.flagId])).rows[0]!.verdict).toBe("UNAVAILABLE");
+    expect((await read(m1.swept))!.aiReadFirst).toBe(false);
+    expect((await read(m1.unchecked))!.aiReadFirst).toBe(false);
+  }, timeout);
+  it("keeps every other key of 0157's answer", async () => {
+    expect(Object.keys((await read(m1.unsure))!).sort()).toEqual(["aiReadFirst", "emailCiphertext", "happenedAt", "kind", "mailId", "mailLocale", "publicationRef", "userId"]);
   }, timeout);
 });

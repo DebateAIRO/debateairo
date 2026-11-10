@@ -47,6 +47,8 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   sourceOwn: "true",
   automatedDecision: "true",
   automatedDetection: "true",
+  // M1: the reporter's mails say an automatic check read the report first.
+  aiReadFirst: "true",
   groundNone: "true",
   groundHold: "true",
   groundUnlawful: "true",
@@ -790,5 +792,49 @@ describe("P17 renderMail", () => {
     expect(expiring.text).not.toContain("We couldn't keep your card");
     const missing = renderMail("M12", "ro", { ...paramsFor("M12"), cardExpiring: "false" });
     expect(missing.text).toContain("Nu am putut păstra cardul de la ultima dumneavoastră plată.");
+  });
+
+  it("M1: the receipt says an automatic check read the report first only when the flag is true, and a receipt queued without it reads as before", () => {
+    const base = { happened: SAMPLE.happened!, itemUrl: SAMPLE.itemUrl! };
+    const sentence = "An automatic check read your report first and passed it to a person.";
+    const off = renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", base).text;
+    expect(off).not.toContain(sentence);
+    expect(renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", { ...base, aiReadFirst: "false" }).text).toBe(off);
+    const on = renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", { ...base, aiReadFirst: "true" }).text;
+    expect(on).toContain(sentence);
+    expect(on.replace(`\n\n${sentence}`, "")).toBe(off);
+    expect(MAIL_TEMPLATES.PUBLIC_FLAG_ANSWER_RECEIPT.optional).toEqual({ aiReadFirst: "flag" });
+    expect(codeOf(() => renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", { ...base, aiReadFirst: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+  });
+
+  it("M1: a decision a person made reuses the statements' sentence, before the routes, only when the flag is true", () => {
+    const sentence = "An AI read the report first. A person made this decision.";
+    for (const id of ["PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED"] as const) {
+      const base = { happened: SAMPLE.happened!, itemUrl: SAMPLE.itemUrl! };
+      const off = renderMail(id, "en", base).text;
+      expect(off, id).not.toContain(sentence);
+      expect(renderMail(id, "en", { ...base, aiReadFirst: "false" }).text, id).toBe(off);
+      const on = renderMail(id, "en", { ...base, aiReadFirst: "true" }).text;
+      expect(on, id).toContain(sentence);
+      expect(on.indexOf(sentence), id).toBeLessThan(on.indexOf("To challenge our decision"));
+      expect(on.replace(`${sentence}\n\n`, ""), id).toBe(off);
+      expect(MAIL_TEMPLATES[id].optional, id).toEqual({ aiReadFirst: "flag" });
+    }
+  });
+
+  it("M1: the two automatic mails are unchanged: the same two paragraphs, no optional flag, and a flag given to them is refused", () => {
+    const base = { happened: SAMPLE.happened!, itemUrl: SAMPLE.itemUrl! };
+    for (const [id, own] of [["PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "mail.flagAnswer.autoHidden"], ["PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "mail.flagAnswer.autoNotFound"]] as const) {
+      expect(MAIL_TEMPLATES[id].paragraphs, id).toEqual([own, "mail.flagAnswer.routes"]);
+      expect(MAIL_TEMPLATES[id].optional, id).toBeUndefined();
+      expect(MAIL_TEMPLATES[id].params, id).toEqual({ happened: "date", itemUrl: "url" });
+      const text = renderMail(id, "en", base).text;
+      expect(text, id).not.toContain("An AI read the report first");
+      expect(text, id).not.toContain("passed it to a person");
+      expect(codeOf(() => renderMail(id, "en", { ...base, aiReadFirst: "true" })), id).toBe("MAIL_TEMPLATE_PARAM_UNKNOWN");
+    }
+    // Byte for byte as 0157 shipped them (the English catalogue's own two sentences, joined by a blank line).
+    expect(renderMail("PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "en", { happened: "2026-11-01T10:00:00.000Z", itemUrl: "https://dezbatere.ro/public/debate/x" }).text).toContain(
+      "an automatic check read your report about this public debate and hid the debate, with no person involved: https://dezbatere.ro/public/debate/x. A person will now review it, and we will tell you what we decide.\n\nTo challenge our decision on your report");
   });
 });

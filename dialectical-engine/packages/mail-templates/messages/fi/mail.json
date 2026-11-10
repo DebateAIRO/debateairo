@@ -118,6 +118,7 @@
   "mail.statement.routes": "Voit riitauttaa tämän päätöksen vastaamalla tähän sähköpostiin tai kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa: sen käsittelee ihminen, joka ei ollut mukana päätöksessä. Voit myös kääntyä sertifioidun tuomioistuinten ulkopuolisen riidanratkaisuelimen tai tuomioistuimen puoleen.",
   "mail.flagAnswer.receiptSubject": "Saimme ilmoituksesi",
   "mail.flagAnswer.receipt": "{happened} saimme ilmoituksesi tästä julkisesta keskustelusta: {itemUrl}. Ihminen lukee sen, ja kerromme sinulle päätöksestämme.",
+  "mail.flagAnswer.aiReadFirst": "Automaattinen tarkistus luki ilmoituksesi ensin ja välitti sen ihmiselle.",
   "mail.flagAnswer.autoHiddenSubject": "Piilotimme keskustelun, josta ilmoitit",
   "mail.flagAnswer.autoHidden": "{happened} automaattinen tarkistus luki ilmoituksesi tästä julkisesta keskustelusta ja piilotti keskustelun ilman ihmisen osallistumista: {itemUrl}. Ihminen tarkistaa sen nyt, ja kerromme sinulle päätöksestämme.",
   "mail.flagAnswer.autoNotFoundSubject": "Emme ole ryhtyneet toimiin ilmoituksesi perusteella",

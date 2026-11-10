@@ -118,6 +118,7 @@
   "mail.statement.routes": "Aby zakwestionować tę decyzję, prosimy odpowiedzieć na tę wiadomość albo napisać na adres office@dezbatere.ro w ciągu sześciu miesięcy: sprawę rozpatrzy osoba, która nie brała udziału w decyzji. Mogą Państwo także zwrócić się do certyfikowanego organu pozasądowego rozstrzygania sporów lub do sądu.",
   "mail.flagAnswer.receiptSubject": "Otrzymaliśmy Państwa zgłoszenie",
   "mail.flagAnswer.receipt": "Dnia {happened} otrzymaliśmy Państwa zgłoszenie dotyczące tej publicznej debaty: {itemUrl}. Przeczyta je człowiek, a my poinformujemy Państwa o naszej decyzji.",
+  "mail.flagAnswer.aiReadFirst": "Automatyczna kontrola najpierw przeczytała Państwa zgłoszenie i przekazała je człowiekowi.",
   "mail.flagAnswer.autoHiddenSubject": "Ukryliśmy zgłoszoną przez Państwa debatę",
   "mail.flagAnswer.autoHidden": "Dnia {happened} automatyczna kontrola przeczytała Państwa zgłoszenie dotyczące tej publicznej debaty i ukryła debatę, bez udziału człowieka: {itemUrl}. Teraz sprawdzi ją człowiek, a my poinformujemy Państwa o naszej decyzji.",
   "mail.flagAnswer.autoNotFoundSubject": "Nie podjęliśmy działań w związku z Państwa zgłoszeniem",

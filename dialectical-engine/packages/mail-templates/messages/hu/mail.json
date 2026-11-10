@@ -118,6 +118,7 @@
   "mail.statement.routes": "Ha meg szeretné támadni ezt a döntést, válaszoljon erre az e-mailre, vagy írjon hat hónapon belül az office@dezbatere.ro címre: egy olyan személy vizsgálja felül, aki nem vett részt benne. Fordulhat tanúsított peren kívüli vitarendezési testülethez vagy bírósághoz is.",
   "mail.flagAnswer.receiptSubject": "Megkaptuk bejelentését",
   "mail.flagAnswer.receipt": "{happened} napján megkaptuk bejelentését erről a nyilvános vitáról: {itemUrl}. Egy személy el fogja olvasni, és tájékoztatjuk döntésünkről.",
+  "mail.flagAnswer.aiReadFirst": "Egy automatikus ellenőrzés először elolvasta a bejelentését, és továbbította egy személynek.",
   "mail.flagAnswer.autoHiddenSubject": "Elrejtettük a vitát, amelyet bejelentett",
   "mail.flagAnswer.autoHidden": "{happened} napján egy automatikus ellenőrzés elolvasta az erről a nyilvános vitáról szóló bejelentését, és elrejtette a vitát, személy közreműködése nélkül: {itemUrl}. Most egy személy felülvizsgálja, és tájékoztatjuk döntésünkről.",
   "mail.flagAnswer.autoNotFoundSubject": "Bejelentése alapján nem intézkedtünk",

@@ -103,6 +103,8 @@ const FLAG_TEMPLATE_OF: Readonly<Record<PublicFlagMailKind, MailTemplateId>> = O
   ACTED: "PUBLIC_FLAG_ANSWER_ACTED"
 });
 
+const AI_READ_KINDS: ReadonlySet<PublicFlagMailKind> = new Set<PublicFlagMailKind>(["RECEIPT", "NO_BREACH", "ACTED"]);
+
 export class PublicFlagAnswerReconciler {
   constructor(private readonly repository: Pick<PostgresPublicFlagMailRepository, "claim" | "read" | "complete">, private readonly users: Pick<ReadableUserDekStore, "load">,
     private readonly channel: Pick<TemplatedMailChannel, "sendTemplated">, private readonly appUrl: string) {}
@@ -126,7 +128,9 @@ export class PublicFlagAnswerReconciler {
       const recipient = plain.toString("utf8");
       if (!isSingleDeliverableRecipient(recipient)) return "DROPPED";
       await this.channel.sendTemplated({ to: recipient, templateId: FLAG_TEMPLATE_OF[mail.kind], locale: mail.mailLocale, messageId: claim.mailId,
-        params: { happened: new Date(mail.happenedAt).toISOString(), itemUrl: new URL(`/public/debate/${encodeURIComponent(mail.publicationRef)}`, this.appUrl).toString() } });
+        params: { happened: new Date(mail.happenedAt).toISOString(), itemUrl: new URL(`/public/debate/${encodeURIComponent(mail.publicationRef)}`, this.appUrl).toString(),
+          // M1: an AI read the report first, said by the receipt and by the two decisions a person made; the two automatic answers take no flag.
+          ...(AI_READ_KINDS.has(mail.kind) ? { aiReadFirst: mail.aiReadFirst === true ? "true" : "false" } : {}) } });
       return "SENT";
     } finally {
       plain?.fill(0);

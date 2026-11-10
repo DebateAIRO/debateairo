@@ -118,6 +118,7 @@
   "mail.statement.routes": "Pentru a contesta această decizie, răspundeți la acest e-mail sau scrieți la office@dezbatere.ro în termen de șase luni: o va examina o persoană care nu a fost implicată. Vă puteți adresa, de asemenea, unui organism de soluționare extrajudiciară a litigiilor certificat sau instanței.",
   "mail.flagAnswer.receiptSubject": "Am primit raportarea dumneavoastră",
   "mail.flagAnswer.receipt": "Pe {happened}, am primit raportarea dumneavoastră despre această dezbatere publică: {itemUrl}. O persoană o va citi și vă vom comunica decizia noastră.",
+  "mail.flagAnswer.aiReadFirst": "O verificare automată a citit mai întâi raportarea dumneavoastră și a transmis-o unei persoane.",
   "mail.flagAnswer.autoHiddenSubject": "Am ascuns dezbaterea pe care ați raportat-o",
   "mail.flagAnswer.autoHidden": "Pe {happened}, o verificare automată a citit raportarea dumneavoastră despre această dezbatere publică și a ascuns dezbaterea, fără nicio persoană implicată: {itemUrl}. Acum o persoană o va examina și vă vom comunica decizia noastră.",
   "mail.flagAnswer.autoNotFoundSubject": "Nu am luat măsuri în urma raportării dumneavoastră",

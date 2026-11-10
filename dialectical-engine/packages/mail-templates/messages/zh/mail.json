@@ -118,6 +118,7 @@
   "mail.statement.routes": "如需对这一决定提出异议，请在六个月内回复本邮件或写信至 office@dezbatere.ro：将由一名未参与该决定的人员进行复核。您也可以将其提交经认证的替代性争议解决机构或法院。",
   "mail.flagAnswer.receiptSubject": "我们已收到您的举报",
   "mail.flagAnswer.receipt": "我们已于 {happened} 收到您关于这场公开辩论的举报：{itemUrl}。将由人员阅读您的举报，我们会告知您我们的决定。",
+  "mail.flagAnswer.aiReadFirst": "一项自动检测先读取了您的举报，并将其转交给人员。",
   "mail.flagAnswer.autoHiddenSubject": "我们已隐藏您举报的辩论",
   "mail.flagAnswer.autoHidden": "一项自动检测已于 {happened} 读取了您关于这场公开辩论的举报，并在无人参与的情况下隐藏了该辩论：{itemUrl}。现在将由人员对其进行审核，我们会告知您我们的决定。",
   "mail.flagAnswer.autoNotFoundSubject": "我们尚未对您的举报采取行动",

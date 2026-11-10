@@ -118,6 +118,7 @@
   "mail.statement.routes": "Chun agóid a dhéanamh i gcoinne an chinnidh seo, freagair an ríomhphost seo nó scríobh chuig office@dezbatere.ro laistigh de shé mhí: déanfaidh duine nach raibh páirteach ann athbhreithniú air. Féadfaidh tú freisin dul chuig comhlacht um réiteach díospóidí lasmuigh den chúirt atá deimhnithe, nó chuig cúirt.",
   "mail.flagAnswer.receiptSubject": "Fuaireamar do thuairisc",
   "mail.flagAnswer.receipt": "Ar {happened}, fuaireamar do thuairisc faoin díospóireacht phoiblí seo: {itemUrl}. Léifidh duine í, agus inseoimid duit cad a chinnfimid.",
+  "mail.flagAnswer.aiReadFirst": "Léigh seiceáil uathoibrithe do thuairisc ar dtús agus chuir sí chuig duine í.",
   "mail.flagAnswer.autoHiddenSubject": "D’fholaíomar an díospóireacht a thuairiscigh tú",
   "mail.flagAnswer.autoHidden": "Ar {happened}, léigh seiceáil uathoibrithe do thuairisc faoin díospóireacht phoiblí seo agus d’fholaigh sí an díospóireacht, gan aon duine páirteach: {itemUrl}. Déanfaidh duine athbhreithniú uirthi anois, agus inseoimid duit cad a chinnfimid.",
   "mail.flagAnswer.autoNotFoundSubject": "Níor ghníomhaíomar ar do thuairisc",

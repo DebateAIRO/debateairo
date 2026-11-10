@@ -118,6 +118,7 @@
   "mail.statement.routes": "للاعتراض على هذا القرار، ردّ على هذه الرسالة أو اكتب إلى office@dezbatere.ro خلال ستة أشهر: سيراجعه شخص لم يشارك فيه. ويمكنك أيضًا اللجوء إلى هيئة لتسوية المنازعات خارج نطاق القضاء معتمدة أو إلى القضاء.",
   "mail.flagAnswer.receiptSubject": "تلقّينا بلاغك",
   "mail.flagAnswer.receipt": "في {happened}، تلقّينا بلاغك عن هذه المناظرة العامة: {itemUrl}. سيقرؤه شخص، وسنخبرك بما نقرره.",
+  "mail.flagAnswer.aiReadFirst": "قرأ فحص آلي بلاغك أولاً وأحاله إلى شخص.",
   "mail.flagAnswer.autoHiddenSubject": "أخفينا المناظرة التي أبلغت عنها",
   "mail.flagAnswer.autoHidden": "في {happened}، قرأ فحص آلي بلاغك عن هذه المناظرة العامة وأخفى المناظرة، دون مشاركة أي شخص: {itemUrl}. سيراجعها الآن شخص، وسنخبرك بما نقرره.",
   "mail.flagAnswer.autoNotFoundSubject": "لم نتخذ إجراءً بناءً على بلاغك",
