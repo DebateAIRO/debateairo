@@ -31,7 +31,7 @@ const manifest = JSON.parse(read("migrations/lineage/moderation-notice-fixes-for
 describe("0172: the moderation notice fixes", () => {
   it("comes last in the chain, after 0171, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174]);");
+    expect(chain).toContain("loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]);");
     expect(chain).toContain("import { loadForward0172 } from './migration-forward0172.js';");
     const loader = read("packages/db/src/migration-forward0172.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
