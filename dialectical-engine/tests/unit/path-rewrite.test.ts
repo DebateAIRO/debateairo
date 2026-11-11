@@ -22,7 +22,7 @@ import {
 
 const writerBodies = (bodies: readonly string[]) => bodies.map((body) => JSON.parse(body) as { messages: PromptPacket["messages"] })
   .filter((body) => !isChecker(body));
-/** B3: a suggestion call on a dig's own path (web.suggest-dig.v1), and a reply resting on that path's first point. */
+/** A suggestion call on a dig's own path (web.suggest-dig.v1), and a reply resting on that path's first point. */
 const isSuggestPacket = (packet: PromptPacket): boolean => readPromptFrame({ messages: packet.messages.slice(0, 2) }).contractId === "web.suggest-dig.v1";
 function suggestedOn(packet: PromptPacket): string {
   const fields = fieldsOf(packet);
@@ -75,7 +75,7 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
       outcome: "READY", digPathRefs: [DIG_NODES.no, DIG_NODES.yes] }]);
   });
 
-  it("B3: the checked rewrite is stored, and the climb starts, while the suggestion calls are still out; the run ends once they are in", async () => {
+  it("the checked rewrite is stored, and the climb starts, while the suggestion calls are still out; the run ends once they are in", async () => {
     const store = memoryStore();
     let release: () => void = () => undefined;
     const held = new Promise<void>((resolve) => { release = resolve; });
@@ -98,7 +98,7 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     expect(store.rewrites[0]!.outcome).toBe("READY");
     expect(store.contents.get(store.rewrites[0]!.rewriteId)).not.toHaveProperty("dig_suggestions");
     expect([jobs.length, refreshed.length, suggestionsIn]).toEqual([1, 1, false]);
-    // The same job as before: the dig's own paths, told what the rewrite changed, on the rewrite's writer.
+    // The job: the dig's own paths, told what the rewrite changed, on the rewrite's writer.
     expect(jobs[0]).toMatchObject({ digRunId: DIG_A, free: false, level: 1, whatChanged: ["The dig weakened the year-round case: winter ridership falls."] });
     expect(jobs[0]!.digPaths.map((path) => path.positionRef)).toEqual([DIG_NODES.no, DIG_NODES.yes]);
     expect(jobs[0]!.writer.providerRef).toBe("ref-haiku");
@@ -110,7 +110,7 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     expect(markWaitedForThem).toBe(true);
   });
 
-  it("B3: a runner that stopped after the row: the tree's sweep asks the dig's own suggestions from the store alone, the same prompts, every answered call replayed free", async () => {
+  it("a runner that stopped after the row: the tree's sweep asks the dig's own suggestions from the store alone, the same prompts, every answered call replayed free", async () => {
     const store = memoryStore();
     const inputs = new Map<string, PathRewriteStoredInput>();
     const sources = {
@@ -152,7 +152,7 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     expect([books, again.haiku.bodies.length, kept.length]).toEqual([1, 0, 2]);
   });
 
-  it("B3: the tree's sweep asks what a dig owes beside its climb, and marks the dig settled only once that is in", async () => {
+  it("the tree's sweep asks what a dig owes beside its climb, and marks the dig settled only once that is in", async () => {
     const refused = async (): Promise<never> => { throw new Error("test: not read here"); };
     const settled: string[] = [];
     const tree: TreeUpdateSettings = { writerRoleRef: "ref-haiku", checkerRoleRef: "ref-glm", roles: {},
@@ -174,7 +174,7 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     expect([owed, settled]).toEqual([[DIG_A], [DIG_A]]);
   });
 
-  it("W4-3, B3: the AI's suggestions are asked once the row is stored, told what it changed, and no longer sealed in it; a failure costs the rewrite nothing", async () => {
+  it("the AI's suggestions are asked once the row is stored, told what it changed, and not sealed in it; a failure costs the rewrite nothing", async () => {
     const store = memoryStore();
     const jobs: DigSuggestionsJob[] = [];
     let storedFirst = false;

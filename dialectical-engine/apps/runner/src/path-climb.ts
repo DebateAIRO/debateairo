@@ -224,8 +224,8 @@ export type ClimbStart = Readonly<{
 /**
  * A dig's own rewrite is stored: climb, and update the main answer, as far as the change goes. V4 start step, Task 55e: a run with no
  * rewrite of its own that is a first-level path its dig added (`addedPathOf`) updates the main answer itself (`addedPathUpdate`). Never
- * rejects. B3: `alongside` is the dig's suggestions, asked beside the climb (path-rewrite.ts); the dig is marked settled only once they
- * are in, as before, when they were asked in front of it. Absent: nothing beside.
+ * rejects. `alongside` is the dig's suggestions, asked beside the climb (path-rewrite.ts): the dig is marked settled only once they
+ * are in, because that mark says nothing more is bought for it. Absent: nothing beside.
  */
 export async function advanceTree(settings: TreeUpdateSettings, digRunId: string, lease: StepLease = BARE_STEP,
   alongside?: Promise<unknown>): Promise<TreeAdvance> {
@@ -643,8 +643,8 @@ async function spentOf(ports: TreeUpdatePorts, runId: string): Promise<number> {
  * `advanceTree` for each: the rows already there are walked, free, and it goes on at the first one missing. A dig it finished in this process
  * is not asked again. `paused`: a retiring release starts nothing new. V4 start step, Task 55e: the list also holds each dig under the main
  * question of a path debate whose paths' answers so far stood still with no main-answer version of its own yet, so an update a runner left
- * undone (it stopped after the dig's story, or its update was left) is written here. B3: beside each climb walked, the dig's own suggestions
- * a runner left unwritten (`owed`).
+ * undone (it stopped after the dig's story, or its update was left) is written here.
+ * Beside each climb it walks, it also writes the dig's own suggestions a stopped runner left unwritten (`owed`).
  */
 export type TreeSweepSettings = Readonly<{
   tree: TreeUpdateSettings;
@@ -662,7 +662,7 @@ export type TreeSweepSettings = Readonly<{
    */
   mapRun?: (runId: string) => Promise<void>;
   /**
-   * B3: what a dig's own rewrite still owes beside its climb: the AI's suggestions on its own paths, when a runner stopped after the row
+   * What a dig's own rewrite still owes beside its climb: the AI's suggestions on its own paths, when a runner stopped after the row
    * and before they were in (path-rewrite.ts `owedDigSuggestions`). Asked for every dig walked, beside its climb, the mark waiting for it.
    * Never rejects. Absent: none.
    */

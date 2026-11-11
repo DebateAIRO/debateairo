@@ -219,7 +219,7 @@ describe("0141: deleting", () => {
     expect(await rowCount("set_id", kept)).toBe(1);
   });
 
-  it("B3: a dig's own paths: the dig seals the set and its own map holds it; a second copy writes ALREADY; erasing the dig takes it", async () => {
+  it("a dig's own paths: the dig seals the set and its own map holds it; a second copy writes ALREADY; erasing the dig takes it", async () => {
     const ana = await account();
     const [debate, dig] = [await run(ana), await run(ana)];
     const setId = await write(dig, dig, "b1");

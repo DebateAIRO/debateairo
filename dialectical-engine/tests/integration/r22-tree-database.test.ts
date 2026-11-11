@@ -429,7 +429,7 @@ describe("decision 2: a rewrite that really changed a path rewrites the path abo
     expect((await versionsOf(root)).map((row) => row.trigger_kind)).toEqual(["PATH_REWRITE", "PATH_UPDATE"]);
   }, 120_000);
 
-  it("B3: a runner that stopped right after a dig's row, before its own suggestions: the tree's sweep writes them once, with the climb", async () => {
+  it("a runner that stopped right after a dig's row, before its own suggestions: the tree's sweep writes them once, with the climb", async () => {
     const { root, position } = await firstDebate();
     const { digs: [one] } = await chain(root, position, 1);
     const settled = await settledDig(one!, nodesOf(one!).no, 2);
@@ -506,7 +506,7 @@ describe("owner Q-D8: a climb's rewrite refreshes that path's suggestions", () =
   it("a level that really changed gets its own set, under the dig that paid", async () => {
     const { root, position } = await firstDebate();
     const { digs: [one, two, three] } = await chain(root, position, 3);
-    // B3: level 1's own suggestions on its own path, kept once its rewrite was stored, under level 1 on its own map. Then level 3's climb
+    // Level 1's own suggestions on its own path, kept once its rewrite was stored, under level 1 on its own map. Then level 3's climb
     // rewrote that path at its step 1; level 2's own rewrite had already refreshed it, as its step 0.
     expect(await setsOn(one!, nodesOf(one!).no)).toEqual([{ set_id: ownPathSuggestionsSetIdOf(one!, nodesOf(one!).no), run_id: one },
       { set_id: pathSuggestionsSetIdOf(two!, one!, nodesOf(one!).no, 0), run_id: two },
@@ -528,7 +528,7 @@ describe("owner Q-D8: a climb's rewrite refreshes that path's suggestions", () =
     await runDigPathRewrite(composed(team.members).settings, snapshotOf(settled.dig, settled.workItemId, team.members));
     expect(await updatesOf(settled.dig)).toMatchObject([{ climb_step: 1, parent_run_id: one, outcome: "READY", changed: false }]);
     expect(await suggestSitesOf(settled.dig)).not.toContain("PATH_REWRITE:SUGGEST:97");
-    // B3: level 1's own set on its own path first, then level 2's refresh; the unchanged level adds none.
+    // Level 1's own set on its own path first, then level 2's refresh; the unchanged level adds none.
     expect((await setsOn(one!, nodesOf(one!).no)).map((set) => set.run_id)).toEqual([one, two]);
   }, 180_000);
 

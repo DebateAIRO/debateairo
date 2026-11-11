@@ -41,7 +41,7 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *  - `pathRootsOf`: a run's roots in force (0160), each by its path id; none for a run that is no path debate.
  *  - `digExtractsOf`: the same extract rule on the dig's own points, whose passages it may read (decision 6).
  *  - `recordInput` / `storedInputOf`: 0135's identity.path_rewrite_input, the dig's own paths as `{ v: 2, dig_paths }`.
- *  - `ownWhatChangedOf` (B3): what the dig's own finished rewrite (0134) says it changed, opened under the dig's key; null when it has
+ *  - `ownWhatChangedOf`: what the dig's own finished rewrite (0134) says it changed, opened under the dig's key; null when it has
  *    none finished.
  *  - `parentCodesOf`: clear codes only, for a FAILED row (the base rewrite's version and fate, else the story's).
  */

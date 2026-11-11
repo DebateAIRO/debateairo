@@ -97,8 +97,8 @@ export function composePathRewrite(input: Readonly<{
     replayBookOf: (runId: string, workItemId: string) => readReplayBook(pool, runId, workItemId),
     log: input.log,
     inFlight,
-    // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated. B3: asked once the row is
-    // stored, beside the climb, each set kept in 0141's store.
+    // The AI's suggestions on the dig's own paths, told what the whole debate already investigated: asked once the row is stored,
+    // beside the climb, each set kept in the suggestions store.
     suggest: writeOwnPathSuggestionsOnPool(pool),
     // Owner Q-D8, and a first debate's own (0141).
     refreshSuggestions,
@@ -117,7 +117,7 @@ export function composePathRewrite(input: Readonly<{
       list: (before: Date, limit: number) => picks.readUnwritten(before, limit),
       roles
     }),
-    // B3: beside each climb it walks, the dig's own suggestions a stopped runner left unwritten.
+    // Beside each climb it walks, the dig's own suggestions a stopped runner left unwritten.
     treeSweep: Object.freeze({ tree, list: (since: Date, before: Date, limit: number) => readRecentTreeDigs(pool, since, before, limit),
       owed: (digRunId: string) => owedDigSuggestions(settings, roles, suggestionStore, digRunId) })
   });
