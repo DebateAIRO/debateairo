@@ -36,6 +36,8 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *    and only the checked extracts their locators name (0132, W3-3's rule). V4 start step, Task 55: on a path debate the
  *    path is named by its id b<n>, and the point left out is that path's root in force (0160), its own answer. Task 55b: with
  *    no rewrite or climb written on it yet, a path b<n>'s text is its answer so far (0160; a FAILED one: its question, SET_ASIDE).
+ *    A path b<n> of a first path debate needs no story: its points are every point under its root in force (`pointsUnderRoot`,
+ *    the report's own read), so a rewrite sees the whole path and a debate whose story failed can still be dug.
  *  - `pathRootsOf`: a run's roots in force (0160), each by its path id; none for a run that is no path debate.
  *  - `digExtractsOf`: the same extract rule on the dig's own points, whose passages it may read (decision 6).
  *  - `recordInput` / `storedInputOf`: 0135's identity.path_rewrite_input, the dig's own paths as `{ v: 2, dig_paths }`.
@@ -159,6 +161,30 @@ export async function pointsOf(pool: Pool, runId: string, nodeIds: readonly stri
   }));
 }
 
+/**
+ * V4 start step, Task 55b: every point under a path's root, following the arrows from the root down (core.edge, in edge order), each
+ * right after the one it argues, the root itself left out (it is the path's own answer); each read as `pointsOf` reads a story path's.
+ */
+export async function pointsUnderRoot(pool: Pool, runId: string, rootNodeId: string): Promise<readonly PathRewritePoint[]> {
+  const edges = (await pool.query<{ source_node_id: string; target_node_id: string }>(
+    `SELECT edge.source_node_id::text AS source_node_id, edge.target_node_id::text AS target_node_id
+       FROM core.edge AS edge
+      WHERE edge.run_id = $1 AND edge.target_node_id IS NOT NULL
+      ORDER BY edge.edge_id`, [runId])).rows;
+  const ordered: string[] = [];
+  const seen = new Set([rootNodeId.toLowerCase()]);
+  const visit = (target: string): void => {
+    for (const edge of edges) {
+      if (edge.target_node_id.toLowerCase() !== target.toLowerCase() || seen.has(edge.source_node_id.toLowerCase())) continue;
+      seen.add(edge.source_node_id.toLowerCase());
+      ordered.push(edge.source_node_id);
+      visit(edge.source_node_id);
+    }
+  };
+  visit(rootNodeId);
+  return pointsOf(pool, runId, ordered);
+}
+
 function storedPoint(value: unknown): PathRewritePoint {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.text !== "string"
     || !(value.onId === null || typeof value.onId === "string") || !(value.side === null || value.side === "for" || value.side === "against")
@@ -270,6 +296,13 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
     return Object.freeze({ line: written.line, summary: written.summary, fate: fate.data });
   };
 
+  /** A debate's newest answer version; 1 when it has none stored yet. */
+  const answerVersionOf = async (runId: string): Promise<number> => {
+    const version = (await pool.query<{ answer_version: number }>(
+      "SELECT answer_version FROM serve.answer WHERE run_id = $1 ORDER BY answer_version DESC LIMIT 1", [runId])).rows[0];
+    return version === undefined ? 1 : Number(version.answer_version);
+  };
+
   /**
    * R22 decision 1: one path of a dig, for the dig dug from it. Its points and sources are what the dig's settled run gave its own
    * rewrite (0135's stored paths); its line and fate are what that rewrite wrote for it (`dig_paths`). A dig whose own rewrite failed or
@@ -281,9 +314,7 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
     if (stored === undefined || stored === null) return null;
     const path = storedDigPathsOf(stored).find((candidate) => candidate.positionRef.toLowerCase() === positionRef.toLowerCase());
     if (path === undefined) return null;
-    const version = (await pool.query<{ answer_version: number }>(
-      "SELECT answer_version FROM serve.answer WHERE run_id = $1 ORDER BY answer_version DESC LIMIT 1", [parentRunId])).rows[0];
-    const answerVersion = version === undefined ? 1 : Number(version.answer_version);
+    const answerVersion = await answerVersionOf(parentRunId);
     const own = (await digModel.readPathRewrites(parentRunId))?.own ?? null;
     let written: Readonly<{ line: string; fate: StoryFate }> | null = null;
     if (own !== null && (own.state === "READY" || own.state === "READY_WITH_RESERVATION") && own.rewrite_id !== null) {
@@ -346,10 +377,16 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       const story = await storyPathOf(pool, parentRunId, positionRef);
       // R22 decision 1: a dig has no story, so a path of a dig (a dig of level 2 or deeper is dug from one) is read from that dig.
       const digPath = story === null ? await digPathOf(parentRunId, positionRef) : null;
-      if (story === null && digPath === null) return unread("parent path");
+      // A first path debate's path b<n> is read from the debate itself: its root in force (0160) and its answer so far. Its story is
+      // not needed, so a debate whose story failed or is still being written can be dug, and its path can be rewritten.
+      const ownPath = digPath === null && PATH_ID_PATTERN.test(positionRef);
+      const rootInForce = ownPath ? (await pathRootsOf(parentRunId)).find((root) => root.ref === positionRef)?.rootNodeId ?? null : null;
+      const storyless = story === null && ownPath ? await outcomeBaseOf(parentRunId, positionRef) : null;
+      if (story === null && digPath === null && storyless === null) return unread("parent path");
       let text: Readonly<{ answerVersion: number; line: string; summary: string | null; fate: StoryFate }> = story !== null
         ? { answerVersion: story.answerVersion, line: story.line, summary: null, fate: story.fate }
-        : { answerVersion: digPath!.answerVersion, line: digPath!.line, summary: null, fate: digPath!.fate };
+        : digPath !== null ? { answerVersion: digPath.answerVersion, line: digPath.line, summary: null, fate: digPath.fate }
+        : { answerVersion: await answerVersionOf(parentRunId), line: storyless!.line, summary: storyless!.summary, fate: storyless!.fate };
       if (baseRewriteId !== null) {
         const entry = await rewriteText(parentRunId, baseRewriteId);
         const opened = await withRunContentLease(pool, [entry.run_id], () => decryptContentForRun<unknown>(pool, entry.run_id,
@@ -373,12 +410,13 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
         return Object.freeze({ positionRef, answerVersion: text.answerVersion, line: text.line, summary: text.summary, fate: text.fate,
           points: digPath.points, extracts: digPath.extracts });
       }
-      // The path's own answer is its line, not one of its points: on R22 the story path's position; on a path debate (V4 start step,
-      // Task 55) the path is named by its id b<n>, and its answer is that path's root in force.
-      const ownAnswer = PATH_ID_PATTERN.test(positionRef)
-        ? (await pathRootsOf(parentRunId)).find((root) => root.ref === positionRef)?.rootNodeId ?? story!.positionNodeId : story!.positionNodeId;
-      const pointIds = story!.nodeRefs.filter((id) => id.toLowerCase() !== ownAnswer.toLowerCase());
-      const points = await pointsOf(pool, parentRunId, pointIds);
+      // The path's own answer is its line, not one of its points. On a path debate (V4 start step, Task 55) the path is named by its id
+      // b<n>, its answer is that path's root in force, and its points are every point under that root, as the report reads it
+      // (`pointsUnderRoot`): whole, whichever of them the storyteller named. A path whose root dropped and that has no story keeps its
+      // answer so far and no point. On R22 the path is the storyteller's: the points its story names, without the story path's position.
+      const points = rootInForce !== null ? await pointsUnderRoot(pool, parentRunId, rootInForce)
+        : story === null ? Object.freeze([])
+        : await pointsOf(pool, parentRunId, story.nodeRefs.filter((id) => id.toLowerCase() !== story.positionNodeId.toLowerCase()));
       // Decision 6: the parent is an older debate: AI text and the shown quote, never a passage.
       const extracts = await extractsOfPoints(pool, parentRunId, points.map((point) => point.id), "SHOWN");
       return Object.freeze({ positionRef, answerVersion: text.answerVersion, line: text.line, summary: text.summary, fate: text.fate,
@@ -404,9 +442,7 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       // V4 start step, Task 55b: a path debate's path b<n> was first written as its answer so far: its fate is the one before.
       const base = PATH_ID_PATTERN.test(positionRef) ? await outcomeBaseOf(parentRunId, positionRef).catch(() => null) : null;
       if (story !== null) return Object.freeze({ answerVersion: story.answerVersion, fate: base?.fate ?? story.fate });
-      const version = (await pool.query<{ answer_version: number }>(
-        "SELECT answer_version FROM serve.answer WHERE run_id = $1 ORDER BY answer_version DESC LIMIT 1", [parentRunId])).rows[0];
-      return Object.freeze({ answerVersion: version === undefined ? 1 : Number(version.answer_version), fate: base?.fate ?? "SET_ASIDE" });
+      return Object.freeze({ answerVersion: await answerVersionOf(parentRunId), fate: base?.fate ?? "SET_ASIDE" });
     }
   });
 }

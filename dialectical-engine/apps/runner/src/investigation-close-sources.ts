@@ -23,7 +23,7 @@ import { pathRewriteBodyBytes, type PathRewriteDigPath, type PathRewritePoint } 
 import { PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
 import { pathsGoalStated } from "./paths-main-answer.js";
 import { backfillShownQuotes } from "./passage-sweep.js";
-import { pathOutcomeBaseOf, pointsOf, storedDigPathsOf } from "./path-rewrite-sources.js";
+import { pathOutcomeBaseOf, pointsOf, pointsUnderRoot, storedDigPathsOf } from "./path-rewrite-sources.js";
 import { readReplayBook } from "./run-replay.js";
 import { addedPagesOf } from "./web-researched-read.js";
 
@@ -229,30 +229,6 @@ function newestOfPaths(line: LineRead, digs: readonly DossierDig[]): ReadonlyMap
     if (text !== null) newest.set(ref, text);
   }
   return newest;
-}
-
-/**
- * V4 start step, Task 55b: every point under a path's root, following the arrows from the root down (core.edge, in edge order), each
- * right after the one it argues, the root itself left out (it is the path's own answer); each read as `pointsOf` reads a story path's.
- */
-async function pointsUnderRoot(pool: Pool, runId: string, rootNodeId: string): Promise<readonly PathRewritePoint[]> {
-  const edges = (await pool.query<{ source_node_id: string; target_node_id: string }>(
-    `SELECT edge.source_node_id::text AS source_node_id, edge.target_node_id::text AS target_node_id
-       FROM core.edge AS edge
-      WHERE edge.run_id = $1 AND edge.target_node_id IS NOT NULL
-      ORDER BY edge.edge_id`, [runId])).rows;
-  const ordered: string[] = [];
-  const seen = new Set([rootNodeId.toLowerCase()]);
-  const visit = (target: string): void => {
-    for (const edge of edges) {
-      if (edge.target_node_id.toLowerCase() !== target.toLowerCase() || seen.has(edge.source_node_id.toLowerCase())) continue;
-      seen.add(edge.source_node_id.toLowerCase());
-      ordered.push(edge.source_node_id);
-      visit(edge.source_node_id);
-    }
-  };
-  visit(rootNodeId);
-  return pointsOf(pool, runId, ordered);
 }
 
 /**
