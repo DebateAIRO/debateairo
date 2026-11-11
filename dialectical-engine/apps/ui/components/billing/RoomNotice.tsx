@@ -122,7 +122,7 @@ export function waitingDebateHref(runRef: string, address: string): string {
   return path === "/v4" || path.startsWith("/v4/") ? `/v4/debate/${run}` : `/debate/${run}`;
 }
 
-/** The address, read from window.location (as lib/v4/useReadingLevel.ts does) and re-read on Back/Forward. */
+/** The address, read from window.location and re-read on Back/Forward. */
 function onTraversal(changed: () => void): () => void {
   window.addEventListener("popstate", changed);
   return () => window.removeEventListener("popstate", changed);

@@ -15,7 +15,7 @@ import type { V4DigDraft, V4Map, V4Selection } from "./types.js";
  * the page's own ticks into the address it lands on.
  *
  * The address is written with `history.pushState(null, "", href)` / `replaceState`: Next's patched history methods then
- * keep their own state and tell the router (as lib/v4/useReadingLevel.ts does for `?level=`). Nothing is kept in the
+ * keep their own state and tell the router. Nothing is kept in the
  * browser's storage. Every history call is guarded: without a history API the page still works, without addresses.
  */
 

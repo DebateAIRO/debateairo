@@ -28,10 +28,6 @@ vi.mock("@/lib/v4/load", async (importActual) => ({
 }));
 vi.mock("@/lib/v4/digIndex", () => ({ readQuestionIndex: async () => [], digLinksFor: () => [] }));
 vi.mock("@/lib/v4/accountMemory", () => ({ readDigRecords: async () => null, mergeDigLinks: () => [] }));
-vi.mock("@/lib/v4/storage", async (importActual) => ({
-  ...(await importActual<typeof import("../../apps/ui/lib/v4/storage.js")>()),
-  useReadingLevel: (initial: ReadingLevel | null) => [initial, () => {}]
-}));
 
 import { V4ReportClient } from "../../apps/ui/components/v4/V4ReportClient.js";
 

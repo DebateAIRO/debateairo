@@ -34,10 +34,6 @@ vi.mock("@/lib/v4/load", async (importActual) => ({
 }));
 vi.mock("@/lib/v4/digIndex", () => ({ readQuestionIndex: async () => [], digLinksFor: () => [] }));
 vi.mock("@/lib/v4/accountMemory", () => ({ readDigRecords: async () => null, mergeDigLinks: () => [] }));
-vi.mock("@/lib/v4/storage", async (importActual) => ({
-  ...(await importActual<typeof import("../../apps/ui/lib/v4/storage.js")>()),
-  useReadingLevel: (initial: ReadingLevel | null) => [initial, () => {}]
-}));
 
 import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine, type V4ResearchedPress } from "../../apps/ui/components/v4/V4Sources.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
