@@ -66,6 +66,7 @@ import { loadForward0171 } from './migration-forward0171.js';
 import { loadForward0172 } from './migration-forward0172.js';
 import { loadForward0173 } from './migration-forward0173.js';
 import { loadForward0174 } from './migration-forward0174.js';
+import { loadForward0175 } from './migration-forward0175.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -155,9 +156,11 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * notices' seven gaps after 0157 (0172, the owner's list of 10 November 2026, drained: 0157's queue restated, 0151's alert kind CHECK widened, both
  * declared as amendments), then the check's answer on a report a person already closed (0173, the follow-up to 0172's M6, drained: 0151's settle
  * restated so it queues no staff notice for a closed report, declared as an amendment), then 0150's staff review door without a ground closed to the
- * runtime (0174, the final review of 0172, drained: one revoke, declared as an amendment of 0150). A new step appends its loader here (README).
+ * runtime (0174, the final review of 0172, drained: one revoke, declared as an amendment of 0150), then everyone told "until the review ends" hearing
+ * how it ended (0175, what was left of 0172's M3, drained: 0172's queue and page reader restated, 0157's kind CHECK widened, one amendment of 0157).
+ * A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

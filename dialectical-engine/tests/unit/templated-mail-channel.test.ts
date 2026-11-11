@@ -16,6 +16,7 @@ import {
 // notices, 0157's statements of reasons and the daily mail limit's three alerts are the package ids outside billing.
 type StatementIds = "MODERATION_STATEMENT_DEBATE_HIDDEN" | "MODERATION_STATEMENT_DEBATE_DECIDED" | "MODERATION_STATEMENT_CONTRIBUTION_REMOVED" | "MODERATION_STATEMENT_REPORT_REMOVED"
   | "MODERATION_STATEMENT_CORRECTED" | "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED" | "MODERATION_STATEMENT_REPORT_AFFECTED" | "MODERATION_STATEMENT_CONTRIBUTION_DECIDED" | "MODERATION_STATEMENT_REPORT_DECIDED"
+  | "MODERATION_STATEMENT_CONTRIBUTION_KEPT_OFF" | "MODERATION_STATEMENT_REPORT_KEPT_OFF" | "MODERATION_STATEMENT_CONTRIBUTION_BACK" | "MODERATION_STATEMENT_REPORT_BACK"
   | "PUBLIC_FLAG_ANSWER_RECEIPT" | "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN" | "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND" | "PUBLIC_FLAG_ANSWER_NO_BREACH" | "PUBLIC_FLAG_ANSWER_ACTED";
 type BillingInMail = [BillingMailTemplateId] extends [MailTemplateId] ? true : false;
 type OutsideBilling = Exclude<MailTemplateId, BillingMailTemplateId>;
@@ -139,8 +140,8 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
     // R-8's sixteen, ruling Q-5's owner template O2, W9's M8_RECEIVED and O2_WITHDRAWAL (P2-I11), and W12's O3 (P2-I16), N9's O4,
     // N14's O2_REFUND_DUE and O2_REFUND_REMINDER, N17's M12 (ruling PR-17), M10_ENDED (the owner's decision of
     // 24 October 2026: a lost charge-back ended the plan) + DATA_EXPORT and S04's THREAT_REPORT_WAITING, and R22's team-limit, allowance, public review and report notices, and 0156's three moderation notices, and 0157's seven statements of reasons, and the daily mail limit's three alerts.
-    // 0157: seven statements of reasons and five answers to people who report. 0172 (M5): the staff alert MODERATION_MAIL_FAILED.
-    expect(MAIL_TEMPLATE_IDS).toHaveLength(55);
+    // 0157: seven statements of reasons and five answers to people who report. 0172 (M5): the staff alert MODERATION_MAIL_FAILED. 0175: four ends of a re-publish.
+    expect(MAIL_TEMPLATE_IDS).toHaveLength(59);
     expect(MAIL_TEMPLATE_IDS.filter((id) => !id.startsWith("MODERATION_STATEMENT_") && !id.startsWith("PUBLIC_FLAG_ANSWER_") && !["DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING", "MODERATION_MAIL_FAILED",
       "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED",
       "OUTBOUND_MAIL_SHARE", "OUTBOUND_MAIL_SIGN_UP_STOPPED", "OUTBOUND_MAIL_ALL_STOPPED"].includes(id))).toHaveLength(25);

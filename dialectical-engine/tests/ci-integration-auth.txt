@@ -126,3 +126,5 @@ tests/integration/moderation-notice-fixes-0172.test.ts
 tests/integration/settle-dismissed-flag-0173.test.ts
 # 0150's staff review door without a ground (0174): the runtime role gets 42501 on it, keeps the door with the law, and a grant back is refused as drift.
 tests/integration/public-review-ungrounded-door-0174.test.ts
+# Everyone told "until the review ends" hears how it ended (0175): at a re-publish, what stays off or that it is back; at DECIDE, those of a dig taken out too.
+tests/integration/moderation-final-outcome-0175.test.ts

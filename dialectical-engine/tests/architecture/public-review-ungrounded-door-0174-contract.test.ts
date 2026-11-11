@@ -29,7 +29,7 @@ const statements = (): string[] => SQL.slice(0, SQL.indexOf("DO $public_review_u
 describe("0174: 0150's staff review door without a ground", () => {
   it("comes last in the chain, after 0173, with its own loader, bound to its own bytes and 0173's manifest", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0172,loadForward0173,loadForward0174]);");
+    expect(chain).toContain("loadForward0172,loadForward0173,loadForward0174,loadForward0175]);");
     expect(chain).toContain("import { loadForward0174 } from './migration-forward0174.js';");
     const loader = read("packages/db/src/migration-forward0174.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -42,10 +42,10 @@ describe("0174: 0150's staff review door without a ground", () => {
     expect(manifest.migration).toEqual({ name: NAME, sha256: sha256(SQL) });
     expect(manifest.verifier).toEqual({ path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(read("migrations/lineage/verify-effective-capabilities-130.sql")) });
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-1)!;
+    const step = plan.forwardChain.at(-2)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe("0173_settle_dismissed_flag.sql");
-    expect(step.verifierSha256).toBe(plan.forwardChain.at(-2)!.verifierSha256);
+    expect(step.verifierSha256).toBe(plan.forwardChain.at(-3)!.verifierSha256);
     expect(step.replayVerifierSql).toBeUndefined();
     expect(step.amendsPostconditionsOf).toEqual(AMENDS);
   });

@@ -31,7 +31,7 @@ const manifest = JSON.parse(read("migrations/lineage/moderation-notice-fixes-for
 describe("0172: the moderation notice fixes", () => {
   it("comes last in the chain, after 0171, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174]);");
+    expect(chain).toContain("loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]);");
     expect(chain).toContain("import { loadForward0172 } from './migration-forward0172.js';");
     const loader = read("packages/db/src/migration-forward0172.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -159,8 +159,8 @@ describe("0172: the moderation notice fixes", () => {
       expect(read("apps/api/src/mail-channel.ts")).toContain(`MODERATION_STATEMENT_${kind}: "moderation-notice"`);
       expect(MAIL_TEMPLATE_IDS).toContain(`MODERATION_STATEMENT_${kind}`);
     }
-    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided"),');
-    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),');
+    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided", true),'); // 0175: the other content's rule, said as such
+    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided", true),');
   });
 
   it("M3: the page's reader gives a decision's words to the debate owner's statement alone; it is 0157's body plus those edits, and the export reads through it", () => {
