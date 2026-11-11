@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { V4FailedScreen } from "../../apps/ui/components/v4/V4FailedScreen.js";
-import { V4PausedScreen } from "../../apps/ui/components/v4/V4PausedScreen.js";
 import type { RunProjection } from "../../packages/contract/src/index.js";
 import { advance, CATALOG, harness, mountMap, page, resetHarness, settle, unmountMap } from "./v4-debate-harness.js";
 
@@ -117,7 +116,7 @@ describe("Open in the classic view while the question waits (wait-f23)", () => {
   });
 });
 
-describe("question 12 B on the screens themselves: the failed and paused screens draw no classic link", () => {
+describe("question 12 B on the screen itself: the failed screen draws no classic link", () => {
   const HOME: Record<string, string> = {};
   async function draw(node: ReactNode): Promise<HTMLElement> {
     const box = document.body.appendChild(document.createElement("div"));
@@ -131,20 +130,14 @@ describe("question 12 B on the screens themselves: the failed and paused screens
   const classicIn = (box: HTMLElement): Element[] =>
     [...box.querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
 
-  it("the failed screen and the paused screen draw no classic link (the account menu holds it)", async () => {
+  it("the failed screen draws no classic link (the account menu holds it)", async () => {
     const runId = crypto.randomUUID();
     const failed = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" } as RunProjection;
-    const pausedRun = { ...running(runId), month_pause: { until: "2026-12-01T00:00:00.000Z", can_continue: false } } as RunProjection;
-    // Each screen must have drawn itself (so an empty box cannot pass), and still hold no classic-view link.
+    // The screen must have drawn itself (so an empty box cannot pass), and still hold no classic-view link.
     const failedBox = await draw(
       <V4FailedScreen run={failed} askAgainHref="/v4?again=1" askHref="/v4" dig={null} catalog={CATALOG} homeCatalog={HOME} />
     );
     expect(failedBox.querySelector(".v4DebFailed")).not.toBeNull();
     expect(classicIn(failedBox)).toEqual([]);
-    const pausedBox = await draw(
-      <V4PausedScreen run={pausedRun} runId={runId} reconnecting={false} catalog={CATALOG} locale="en" />
-    );
-    expect(pausedBox.querySelector(".v4DebPausedCard")).not.toBeNull();
-    expect(classicIn(pausedBox)).toEqual([]);
   });
 });

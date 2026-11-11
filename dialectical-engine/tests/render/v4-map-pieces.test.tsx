@@ -248,7 +248,8 @@ describe("V4 map tree", () => {
     expect(branchA.querySelector(".v4MapMore")?.textContent).toBe(t(catalog, "v4.map.moreOpen", { count: 2 }));
     // map-f25 / journey-f11: "Held up", "Partly held" and "Set aside" are gone from the cards (the panel says it in a sentence).
     expect(root.querySelector(".v4MapFate")).toBeNull();
-    for (const word of ["HELD_UP", "PARTLY_HELD", "SET_ASIDE"]) expect(root.textContent).not.toContain(t(catalog, `v4.fate.${word}`));
+    // (The v4.fate.* keys went with the unused keys: their words.)
+    for (const word of ["Held up", "Partly held", "Set aside"]) expect(root.textContent).not.toContain(word);
     // Path c has one unchecked point and nothing checked: an empty track.
     expect(root.querySelectorAll(".v4MapBranch")[2]!.querySelector(".v4BarEmpty")).not.toBeNull();
   });
@@ -276,7 +277,8 @@ describe("V4 map tree", () => {
     const root = tree(buildMap(), "root", { digs: [] });
     expect(root.querySelector(".v4MapRootChip")).toBeNull();
     expect(root.querySelector(".v4BarCounts")).toBeNull();
-    expect(root.textContent).not.toContain(t(catalog, "v4.map.openCount", { count: 4 }).replace("4", ""));
+    // The old chip's words (v4.map.openCount went with the unused keys).
+    expect(root.textContent).not.toContain("Open questions: ");
   });
 });
 

@@ -649,7 +649,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // in the module's comments is all that moved. migrate() is byte-identical.
 // The merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' comments and export lines. migrate() is byte-identical.
 // The second merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' export lines. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "a58622edc223784d038c0595e91d910f2fcb374353e50c853e8a06180d643a01";
+// The moderation notice repository's export line is gone from that file: nothing constructed the repository.
+// migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, as before).
+const NATIVE_MIGRATE_MODULE_SHA256 = "de6bd3466ad612e007b2210515b71f2acbf1f5077b30f7bd01896e93f0b4d84e";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

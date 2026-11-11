@@ -747,7 +747,6 @@ apps/ui/components/v4/V4NotStarted.tsx
 apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
 apps/ui/components/v4/V4PathRewrite.tsx
-apps/ui/components/v4/V4PausedScreen.tsx
 apps/ui/components/v4/V4PendingMap.tsx
 apps/ui/components/v4/V4PicksClearedNote.tsx
 apps/ui/components/v4/V4PublicDig.tsx
@@ -1066,7 +1065,6 @@ apps/ui/lib/v4/useDigsBelow.ts
 apps/ui/lib/v4/useFailedDigs.ts
 apps/ui/lib/v4/useFocusHandOff.ts
 apps/ui/lib/v4/useLeaveGuard.ts
-apps/ui/lib/v4/useLevelSettled.ts
 apps/ui/lib/v4/useMapKeys.ts
 apps/ui/lib/v4/useOpenSide.ts
 apps/ui/lib/v4/useParentDigRetry.ts
@@ -1074,7 +1072,6 @@ apps/ui/lib/v4/usePausedBarJob.ts
 apps/ui/lib/v4/usePicksUndo.ts
 apps/ui/lib/v4/useQuestionAddress.ts
 apps/ui/lib/v4/useQuotaMoments.ts
-apps/ui/lib/v4/useReadingLevel.ts
 apps/ui/lib/v4/useReportVersions.ts
 apps/ui/lib/v4/useReveal.ts
 apps/ui/lib/v4/useSavedQuestion.ts
@@ -1305,7 +1302,6 @@ packages/db/src/migration-forward115.ts
 packages/db/src/migration-lineage.ts
 packages/db/src/migration-n1.ts
 packages/db/src/migration-transaction.ts
-packages/db/src/moderation-notice.ts
 packages/db/src/moderation-statement.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts

@@ -123,7 +123,6 @@ import { useWaitPolling } from "@/lib/v4/useWaitPolling";
 import { useDigProgress } from "@/lib/v4/useDigProgress";
 import { useDigsBelow, type DigsBelowReads } from "@/lib/v4/useDigsBelow";
 import { useLeaveLinkGuard, useTypedWords } from "@/lib/v4/useLeaveGuard";
-import { useLevelSettled } from "@/lib/v4/useLevelSettled";
 import { usePicksUndo } from "@/lib/v4/usePicksUndo";
 import { useAddressPicks, useQuestionAddress } from "@/lib/v4/useQuestionAddress";
 import { useSheetFocusReturn } from "@/lib/v4/useSheetFocusReturn";
@@ -392,8 +391,6 @@ function V4Debate({
   // each map reads its own debate's level, so the address never names one).
   const debateLevel: ReadingLevel | null = load === null ? null : load.kind === "RUN" ? load.run.reading_level ?? null : load.level ?? null;
   const readingLevel: ReadingLevel = debateLevel ?? DEFAULT_LEVEL;
-  /** The level is known once the debate was read (map-f6: no level shows before). */
-  const levelKnown = load !== null;
   // Task 76i (wait-f14): once the debate's first read answered, whatever it said, the ask page's hand-off is used up; a reload,
   // or this map opened again, finds none.
   const firstReadAnswered = load !== null || loadProblem !== null;
@@ -1520,13 +1517,10 @@ function V4Debate({
   // link is made above, with the ready moments. Task 75c: the debate's own level is no choice for the next question, so the ask
   // page's link carries none (step 1 offers the account's level, as before).
   const askHref = levelHref("/v4", null);
-  // map-f6: no reading level shows until the saved one is known; the map waits for it behind its outline (not forever).
-  // Task 62: the run read's map too.
-  const levelSettled = useLevelSettled(levelKnown, drawn !== null);
   // journey-d3 / dig-f16: this page draws the dig notes in its own bottom stack once its map shows (and not while the
-  // grey outline waits for the reading level, which draws no notes: the site-wide holder keeps them until then).
-  // Task 62: the run read's map draws its own bottom stack too.
-  useClaimDigNotes(drawn !== null && levelSettled);
+  // grey outline shows, which draws no notes: the site-wide holder keeps them until then). The map's level comes with the
+  // debate's read (Task 75c), so a drawn map never waits for it. Task 62: the run read's map draws its own bottom stack too.
+  useClaimDigNotes(drawn !== null);
   // wait-f2: a dig paused at the month wall, open in the panel: the phone's pinned bar says "Paused · Continue".
   const pausedBar = usePausedBarJob(map === null ? null : selectedDigOf(digs, shownSelection), catalog, locale);
   const header = (
@@ -1562,8 +1556,8 @@ function V4Debate({
       </div>
     );
   }
-  if ((map === null && load === null && loadProblem === null) || (drawn !== null && !levelSettled)) {
-    // map-f6: the page's grey outline until there is something to show (and, on the map, until the level is known). Task 76i
+  if (map === null && load === null && loadProblem === null) {
+    // map-f6: the page's grey outline until there is something to show. Task 76i
     // (wait-f14): after Start, never the outline: the question and its paths, each being looked into, until the first read answers.
     return (
       <div className="v4DebPage">

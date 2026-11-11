@@ -106,7 +106,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.web.researched.ADDS",
   "v4.web.researched.ADDS_NOTHING",
   "v4.web.researched.FAILED",
-  "v4.room.blockedUntil",
   "v4.suggest.kind.CONTRADICTING",
   "v4.suggest.kind.UNDOCUMENTED",
   "v4.suggest.kind.NEEDS_MORE_WEB",
@@ -115,9 +114,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.suggest.ownView",
   // Dig model revision (W2-7): the page labels of section 5.5 (no search-words box: the owner corrected that on 30 Oct).
   "v4.view.heading",
-  "v4.rewrite.changedSince.one",
-  "v4.rewrite.changedSince.other",
-  "v4.rewrite.changedSinceReport",
   "v4.rewrite.whatChanged",
   "v4.rewrite.rewrittenOnce",
   "v4.rewrite.rewrittenMany",
@@ -130,8 +126,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.rewrite.state.NO_CHANGE",
   "v4.rewrite.state.FAILED",
   "v4.rewrite.changedBelow",
-  "v4.rewrite.digCard.CHANGED",
-  "v4.rewrite.digCard.NO_CHANGE",
   "v4.rewrite.digCard.RUNNING",
   "v4.rewrite.digCard.WAITING",
   "v4.rewrite.digCard.FAILED",
@@ -189,9 +183,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.digPage.rewrote",
   "v4.digPage.backToPath",
   "v4.digPage.rewriting",
-  "v4.changes.digChanged",
-  "v4.changes.digNoChange",
-  "v4.report.pathsChangedHeading",
   // The money rule (owner, 31 Oct): the estimate before a new question, the borrow notice, new starts after the reset,
   // the month pause and Continue.
   "v4.room.startShare",
@@ -200,7 +191,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.money.startsWait.PERSON_DAY",
   "v4.money.startsWait.PERSON_WEEK",
   "v4.money.startsWait.PERSON_MONTH",
-  "v4.debate.state.PAUSED_MONTH",
   "v4.money.paused",
   "v4.money.pausedReady",
   "v4.money.continue",
@@ -260,7 +250,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.loadFailed",
   "v4.investigation.startUnconfirmed",
   "v4.investigation.reopenUnconfirmed",
-  "v4.investigation.writingSince",
   "v4.investigation.waitingDig",
   "v4.investigation.versionWriting",
   "v4.investigation.downloadVersion",
@@ -270,11 +259,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.investigation.digMore",
   "v4.web.freeOnPaper",
   // The review of the fix branch (4 Nov): lines the builders wrote beyond the record's approved fix texts, shown to the owner
-  // at the click-test. The report's line when this visit cannot know when writing started (review F1); the missing-answer
-  // line without "You can dig or write your report now." where no dig can start (review F10); the team grant's header word;
-  // the public page's dig credit, which the record words "A dig by Quiet Heron changed …" (dig-f25); the problem
-  // report's thank-you and its two "say more" lines (public-f5 gives no words).
-  "v4.investigation.writing",
+  // at the click-test. The missing-answer line without "You can dig or write your report now." where no dig can start
+  // (review F10); the team grant's header word; the public page's dig credit, which the record words "A dig by Quiet Heron
+  // changed …" (dig-f25); the problem report's thank-you and its two "say more" lines (public-f5 gives no words).
   "v4.panel.noShortAnswerNoDig",
   "v4.header.used.PERSON_GRANT",
   "v4.public.digFrom",
@@ -367,10 +354,9 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.maps.failed",
   "v4.maps.more",
   // The owner's third round (5 Nov afternoon): the sentences that name the page behind "My questions" follow its new name
-  // (MY_QUESTIONS_ANSWER_LINES below); the changed sentence is a draft. v4.public.dig.unconfirmed, the other one, is on
-  // this list already. Since the fourth round its second sentence is the owner's (FOURTH_ROUND_ANSWER_ENDINGS below), so
-  // only its first sentence is still a draft.
-  "v4.debate.usually",
+  // (MY_QUESTIONS_ANSWER_LINES below). v4.public.dig.unconfirmed, the one a page still reads (the question's old wait line
+  // went with the unused keys), is on this list already. Since the fourth round its second sentence is the owner's
+  // (FOURTH_ROUND_ANSWER_ENDINGS below), so only its first sentence is still a draft.
   "v4.debate.askAgainNoteQuestion",
   "v4.debate.digFailedBackNote",
   // "Waiting" alone (v4.state.WAITING.noTime) is the owner's word since the fourth round (the tab's "Waiting · …"):
@@ -455,7 +441,6 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.digsDid.line.ADDED_TO",
   "v4.digsDid.line.CONFIRMED",
   "v4.dig.started",
-  "v4.debate.state.HOLDING.noTime",
   "v4.panel.found",
   "v4.digLive.found",
   "v4.digLive.pathNow",
@@ -816,7 +801,6 @@ describe("V4 catalogue keys", () => {
       ...TRUST_WORDS.flatMap((word) => [`v4.trust.${word}`, `v4.trustCount.${word}`]),
       // W2-6: the new "Sure" basis reads the approved "v4.web.sureBasis"; every other basis its "v4.basis.<BASIS>".
       ...TRUST_BASES.map(basisKey),
-      ...["HELD_UP", "PARTLY_HELD", "FELL", "SET_ASIDE"].map((fate) => `v4.fate.${fate}`),
       ...READING_LEVELS.map((level) => `v4.readingLevel.${level}`),
       ...DIG_MODES.map((mode) => `v4.digMode.${mode}`),
       // V4 start step, Task 55e: the main answer's line and the answer card's line for every trigger, PATH_ADDED's included.
@@ -919,7 +903,9 @@ describe("V4 catalogue keys", () => {
   });
 
   it("W4-6: the dig card words cover every state a dig of the new model can be in, and none names an engine word", () => {
-    const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "CHANGED", "NO_CHANGE", "REWRITE_FAILED"]
+    // A done dig's result (journey-f11) says one of the v4.result.card.* lines (V4MapTree's digNote), so the old "changed this
+    // path" and "no change" cards went with the unused keys.
+    const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "REWRITE_FAILED"]
       .map((state) => `v4.rewrite.digCard.${state}`);
     expect(cards.filter((key) => !(key in catalog))).toEqual([]);
     // V4 screen review (3 Nov), journey-f2 / journey-f22: a dig at work says the one state word "Looking into it" (its card
@@ -948,8 +934,10 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.reportStrip.notYet": "Not yet",
   "v4.report.publicToo": "This question is public, so your report will be public too.",
   "v4.reportWait.digsRest": "Digging opens again when your report is written.",
-  "v4.debate.state.HOLDING": "Taking a short break · continues about {time}",
-  "v4.debate.state.HOLDING.noTime": "Taking a short break",
+  // The short break's words, which the waiting card's state words say (v4.state.*; the old v4.debate.state.* copies went
+  // with the unused keys).
+  "v4.state.SHORT_BREAK": "Taking a short break · continues about {time}",
+  "v4.state.SHORT_BREAK.noTime": "Taking a short break",
   // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.
   "v4.panel.storyMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
   "v4.panel.fallbackMissing": `${APPROVED_REPORT_LINES["v4.investigation.noStory"]} ${NO_WAIT}`,
@@ -1248,7 +1236,7 @@ describe("the owner's third round (5 Nov afternoon): the page is called 'My ques
     expect(Object.entries(catalog).filter(([, value]) => /\b(?:Your|All my) maps\b/u.test(value))).toEqual([]);
     // The sentences that name the page name it by its new name, and wait on the drafted list (v4.public.dig.unconfirmed only
     // for its first sentence: FOURTH_ROUND_ANSWER_ENDINGS).
-    for (const key of ["v4.debate.usually", "v4.public.dig.unconfirmed"]) {
+    for (const key of ["v4.public.dig.unconfirmed"]) {
       expect(catalog[key], key).toContain(`“${catalog["v4.maps.title"]}”`);
       expect(DRAFTED_UNTIL_CLICK_TEST, key).toContain(key);
     }
@@ -1352,8 +1340,6 @@ describe("the owner's 3 Nov screen review", () => {
     // Review F10: where no dig can start, the same approved words stop after "You don't need to wait."
     expect(catalog["v4.panel.noShortAnswerNoDig"]).toBe(`${APPROVED_REPORT_LINES["v4.investigation.noStory"]} You don't need to wait.`);
     expect(`${catalog["v4.panel.noShortAnswerNoDig"]} You can dig or write your report now.`).toBe(catalog["v4.panel.storyMissing"]);
-    // Review F1: the report's line when the start of writing is not known is the timed line without its time.
-    expect(catalog["v4.investigation.writing"]).toBe(catalog["v4.investigation.writingSince"]!.replace(" Started {time}.", ""));
   });
 
   it("the share word is quota: no V4 line says allowance", () => {
@@ -1366,20 +1352,14 @@ describe("the owner's 3 Nov screen review", () => {
     expect(catalog["v4.money.pausedReady"]).toBe("Your new month has started.");
   });
 
-  it("wait-f3 / map-f3: no wait names a figure before it is measured, and the question's wait says where to find it", () => {
-    for (const key of ["v4.debate.usually", "v4.investigation.writingSince", "v4.investigation.writing"]) {
-      expect(catalog[key], key).not.toMatch(/\d|minute|hour|usually|few/iu);
-      expect(catalog[key], key).toMatch(/This takes a while\./u);
-    }
-    // ask-d5 B, renamed in the owner's third round (5 Nov): the list on the first page is "My questions" now.
-    expect(catalog["v4.debate.usually"]).toContain(`“${catalog["v4.maps.title"]}”`);
-  });
+  // wait-f3 / map-f3's three "This takes a while." lines (the question's and the report's waits) went with the unused keys,
+  // because no page read them. No V4 line promises an unmeasured time: tests/unit/v4-state-words.test.ts checks every line.
 
   it("wait-f20: 'Paused' is the month wall's word only", () => {
     const paused = Object.entries(catalog).filter(([, value]) => /\bpaused\b/iu.test(value)).map(([key]) => key).sort();
     // Every one of these is the month's quota (fail-pause's dig card, phone bar and rail words; the waiting card's state words).
     expect(paused).toEqual([
-      "v4.debate.state.PAUSED_MONTH", "v4.money.paused", "v4.pause.digCard", "v4.pause.phoneBar", "v4.rail.digsPaused.one",
+      "v4.money.paused", "v4.pause.digCard", "v4.pause.phoneBar", "v4.rail.digsPaused.one",
       "v4.rail.digsPaused.other", "v4.rewrite.digCard.PAUSED", "v4.state.PAUSED", "v4.state.PAUSED.noDate"
     ].sort());
     expect(catalog["v4.state.SHORT_BREAK"]).not.toMatch(/\bpaused\b/iu);

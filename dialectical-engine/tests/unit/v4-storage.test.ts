@@ -43,7 +43,7 @@ describe("levelHref", () => {
 
 describe("no browser storage (Decision A, S01-R17)", () => {
   it("lib/v4 never writes browser storage or cookies", () => {
-    for (const file of ["storage.ts", "useReadingLevel.ts", "digIndex.ts", "askText.ts", "askConfig.ts", "useV4Ask.tsx", "trust.ts", "web.ts",
+    for (const file of ["storage.ts", "digIndex.ts", "askText.ts", "askConfig.ts", "useV4Ask.tsx", "trust.ts", "web.ts",
       // Perplexity plan W3-4: choosing what to dig and the money lines keep nothing in the browser either.
       "suggestions.ts", "money.ts",
       // Dig model revision W4-6: the rewrites, the dig trail and the news of a finished rewrite keep nothing in the browser.

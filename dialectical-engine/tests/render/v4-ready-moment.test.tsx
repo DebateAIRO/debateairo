@@ -159,7 +159,8 @@ describe("the first arrival is not news (wait-f15, map-f21)", () => {
     expect(fold.open).toBe(false);
     fold.open = true;
     // The short answer is said once, at the question: not again above the map.
-    expect(page().textContent).not.toContain(CATALOG["v4.debate.storyWriting"]);
+    // The old line above the map (its key went with the unused keys), in its words.
+    expect(page().textContent).not.toContain("The short answer is still being written. This page updates by itself.");
 
     harness.story = seededStory();
     await advance(10_100);

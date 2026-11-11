@@ -242,7 +242,7 @@ describe("V4 mock API: the draft web fields", () => {
       ...SUGGESTION_SIDES.map((side) => `v4.suggest.kind.HELPS_MAIN_QUESTION.${side}`),
       ...RESEARCHED_STATES.map((state) => `v4.web.researched.${state}`),
       "v4.web.noSearch", "v4.web.switchedOff", "v4.web.previewOnly", "v4.web.fewerReaders", "v4.web.otherPages", "v4.web.addResearched",
-      "v4.web.failed", "v4.web.free", "v4.web.sureBasis", "v4.room.blockedUntil", "v4.dig.quotaShare", "v4.dig.quotaDayUsed",
+      "v4.web.failed", "v4.web.free", "v4.web.sureBasis", "v4.dig.quotaShare", "v4.dig.quotaDayUsed",
       "v4.suggest.ownView", "v4.suggest.edit"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);
@@ -513,11 +513,11 @@ describe("V4 mock API: the new dig model and the money rule", () => {
   it("every dig-model and money-rule word the mock plays has its English line in the V4 catalogue", () => {
     const words = [
       "v4.view.heading", "v4.view.HELPED.MAIN_QUESTION", "v4.view.DID_NOT_HELP.PATH", "v4.view.asYours", "v4.view.why",
-      "v4.rewrite.whatChanged", "v4.rewrite.changedSince.other", "v4.rewrite.changedSinceReport", "v4.rewrite.changedBelow",
+      "v4.rewrite.whatChanged", "v4.rewrite.changedBelow",
       // V4 screen review (3 Nov 2026): the first debate's report is older than its map (dig-f19), and its main answer is rewritten (dig-f1).
       "v4.rewrite.reportOlder", "v4.rewrite.updateReport", "v4.rewrite.changedSinceYourReport", "v4.mainAnswer.writing", "v4.digsDid.news.ANSWER",
       "v4.rewrite.state.WRITING", "v4.nest.level", "v4.dig.chooseWhat", "v4.room.startShare", "v4.money.startsWait.PERSON_DAY",
-      "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.debate.state.PAUSED_MONTH"
+      "v4.money.borrowed.PERSON_DAY", "v4.money.paused", "v4.money.pausedReady", "v4.money.continue", "v4.state.PAUSED"
     ];
     expect(words.filter((key) => !(key in catalog))).toEqual([]);
   });

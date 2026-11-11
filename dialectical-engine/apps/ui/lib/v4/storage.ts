@@ -32,7 +32,3 @@ export function levelHref(path: string, level: ReadingLevel | null): string {
   params.set(LEVEL_PARAM, checked);
   return `${base}?${params.toString()}${hash}`;
 }
-
-// The hook lives in a "use client" file so a server page can import parseReadingLevel / levelHref from here without
-// pulling a React hook into the server build; client components import it from here as before.
-export { useReadingLevel } from "./useReadingLevel.js";

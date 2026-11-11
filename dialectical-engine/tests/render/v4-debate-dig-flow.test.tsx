@@ -184,7 +184,8 @@ describe("V4DebateClient's dig flow", () => {
     await mountMap(1600, childRunId);
     await advance(60_000);
     expect(harness.loadStory).not.toHaveBeenCalled();
-    expect(text()).not.toContain(CATALOG["v4.debate.storyWriting"]);
+    // The old line above the map (its key went with the unused keys), in its words.
+    expect(text()).not.toContain("The short answer is still being written. This page updates by itself.");
     expect(text()).not.toContain(CATALOG["v4.panel.fallbackWriting"]);
     expect(text()).toContain(harness.answer.composed_text[0]!.text);
     expect(page().querySelectorAll(".v4MapBranch")).toHaveLength(4);
