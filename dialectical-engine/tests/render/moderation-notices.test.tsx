@@ -20,7 +20,7 @@ afterEach(() => { act(() => root?.unmount()); host?.remove(); root = null; host 
 const REF = "f1000000-0000-4000-8000-000000000001";
 const statement = (over: Partial<ModerationStatement> = {}): ModerationStatement => ({
   statement_id: "57a7e000-0000-4000-8000-000000000001", kind: "DEBATE_HIDDEN", public_ref: REF, happened_at: "2026-11-05T10:00:00.000Z", piece_kind: null, hidden_now: true,
-  ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false },
+  ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false, law: null },
   facts: [], facts_deleted: false, quote: null, places: [], ...over
 });
 async function mount(statements: readonly ModerationStatement[] | Error, catalog: Record<string, string> = pub) {
@@ -46,7 +46,7 @@ describe("the moderation notices page", () => {
   });
 
   it("the automatic hide names the rule it found as relied on, and shows the words it found, on this page only", async () => {
-    const page = await mount([statement({ ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: true },
+    const page = await mount([statement({ ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: true, law: null },
       quote: "the words the check found" })]);
     const text = page.textContent!;
     expect(text).toContain(pub["public.moderation.automatedDecision"]);
@@ -58,10 +58,10 @@ describe("the moderation notices page", () => {
   it("a removal shows the facts staff typed; a correction lists its places; facts past twelve months say they were deleted; a step with no ground says so", async () => {
     const page = await mount([
       statement({ statement_id: "57a7e000-0000-4000-8000-000000000002", kind: "CONTRIBUTION_REMOVED", piece_kind: "DIG", hidden_now: false,
-        ground: { recorded: true, interim: false, grounds: ["PERSONAL_DATA"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false }, facts: ["It names a private person's address."] }),
+        ground: { recorded: true, interim: false, grounds: ["PERSONAL_DATA"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false, law: null }, facts: ["It names a private person's address."] }),
       statement({ statement_id: "57a7e000-0000-4000-8000-000000000003", kind: "CORRECTED", hidden_now: false, places: [{ piece_kind: "UPDATE", pointer: "/paths/2/line" }] }),
       statement({ statement_id: "57a7e000-0000-4000-8000-000000000004", facts_deleted: true }),
-      statement({ statement_id: "57a7e000-0000-4000-8000-000000000005", ground: { recorded: false, interim: false, grounds: [], suspected: [], sources: [], automated_detection: false, automated_decision: false } })
+      statement({ statement_id: "57a7e000-0000-4000-8000-000000000005", ground: { recorded: false, interim: false, grounds: [], suspected: [], sources: [], automated_detection: false, automated_decision: false, law: null } })
     ]);
     const [removed, corrected, deleted, none] = [...page.querySelectorAll<HTMLElement>("section")];
     expect(removed!.textContent).toContain("It names a private person's address.");
@@ -72,6 +72,50 @@ describe("the moderation notices page", () => {
     expect(deleted!.textContent).toContain(pub["public.moderation.factsDeleted"]);
     expect(none!.textContent).toContain(pub["public.moderation.groundNone"]);
     for (const card of [removed, corrected, deleted, none]) expect(card!.textContent).toContain(pub["public.moderation.routes"]);
+  });
+
+  it("the final decision to a contributor and to a reporter is listed, with its own title and sentence, in en and ro", async () => {
+    for (const catalog of [pub, ro]) {
+      const page = await mount([
+        statement({ statement_id: "57a7e000-0000-4000-8000-000000000006", kind: "CONTRIBUTION_DECIDED", piece_kind: null }),
+        statement({ statement_id: "57a7e000-0000-4000-8000-000000000007", kind: "REPORT_DECIDED", piece_kind: null })], catalog);
+      for (const kind of ["CONTRIBUTION_DECIDED", "REPORT_DECIDED"]) {
+        const card = page.querySelector<HTMLElement>(`[data-statement-kind=${kind}]`)!;
+        expect(card.textContent).toContain(catalog[`public.moderation.kind.${kind}`]);
+        expect(card.textContent).toContain(catalog[`public.moderation.what.${kind}`]);
+      }
+      expect(catalog["public.moderation.what.CONTRIBUTION_DECIDED"]).not.toBe(catalog["public.moderation.what.REPORT_DECIDED"]);
+      act(() => root?.unmount()); host?.remove();
+    }
+    expect(ro["public.moderation.what.REPORT_DECIDED"]).not.toBe(pub["public.moderation.what.REPORT_DECIDED"]);
+  });
+
+  it("0172 (M7): an illegal ground names the law we relied on, in its own words; a ground with none says nothing of a law", async () => {
+    const LAW = "Legea nr. 8/1996, art. 139";
+    const page = await mount([
+      statement({ statement_id: "57a7e000-0000-4000-8000-000000000006", kind: "CONTRIBUTION_REMOVED", piece_kind: "DIG", hidden_now: false,
+        ground: { recorded: true, interim: false, grounds: ["ILLEGAL"], suspected: [], sources: ["AUTHORITY_ORDER"], automated_detection: false, automated_decision: false, law: LAW } }),
+      statement({ statement_id: "57a7e000-0000-4000-8000-000000000007" })
+    ]);
+    const [removed, hidden] = [...page.querySelectorAll<HTMLElement>("section")];
+    expect(pub["public.moderation.law"]).toBe("The law we relied on: {law}");
+    const line = removed!.querySelector<HTMLElement>("[data-statement-law]")!;
+    expect(line.textContent).toBe(`The law we relied on: ${LAW}`);
+    expect(line.getAttribute("dir")).toBe("auto");
+    expect(hidden!.querySelector("[data-statement-law]")).toBeNull();
+    // Final review: the ILLEGAL line names no facts (the law has its own line, and some readers see no facts at all).
+    expect(pub["public.moderation.ground.ILLEGAL"]).toBe("The law: the content is illegal.");
+    expect([...removed!.querySelectorAll("li")].map((item) => item.textContent)).toEqual(["The law: the content is illegal."]);
+  });
+
+  it("final review: a hide that names ILLEGAL as suspected lists it under what the review is about, with no law and no facts promised", async () => {
+    const page = await mount([statement({ ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["ILLEGAL"], sources: ["EMAIL_NOTICE"], automated_detection: false, automated_decision: false, law: null } })]);
+    const card = page.querySelector("section")!;
+    const lists = [...card.querySelectorAll("ul")].map((list) => [...list.querySelectorAll("li")].map((item) => item.textContent));
+    expect(lists).toEqual([[pub["public.moderation.ground.REVIEW_HOLD"]], ["The law: the content is illegal."]]);
+    expect(card.textContent).toContain(pub["public.moderation.suspectedIntro"]);
+    expect(card.querySelector("[data-statement-law]")).toBeNull();
+    expect(card.textContent).not.toContain("facts below");
   });
 
   it("says when there are none, and when they could not be read", async () => {

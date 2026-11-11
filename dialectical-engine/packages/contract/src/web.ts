@@ -1072,14 +1072,16 @@ export type PublicMaterialPoint = z.infer<typeof PublicMaterialPointSchema>;
 export const ModerationStatementGroundCodeSchema = z.enum(["REVIEW_HOLD", "UNLAWFUL", "HATE_SPEECH", "WEAPONS_OR_DRUGS", "SUICIDE_OR_HARM", "RELIGIOUS_INSULT", "PERSONAL_DATA", "ILLEGAL"]);
 export const ModerationStatementSchema = z.object({
   statement_id: z.uuid(),
-  kind: z.enum(["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED"]),
+  kind: z.enum(["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"]),
   public_ref: z.uuid(),
   happened_at: z.iso.datetime({ offset: true }),
   piece_kind: z.enum(["DIG", "REPORT"]).nullable(),
   hidden_now: z.boolean(),
   ground: z.object({
     recorded: z.boolean(), interim: z.boolean(), grounds: z.array(ModerationStatementGroundCodeSchema).max(8), suspected: z.array(ModerationStatementGroundCodeSchema).max(8),
-    sources: z.array(z.enum(["REPORT_BUTTON", "EMAIL_NOTICE", "OWN_INITIATIVE", "AUTHORITY_ORDER"])).max(4), automated_detection: z.boolean(), automated_decision: z.boolean()
+    sources: z.array(z.enum(["REPORT_BUTTON", "EMAIL_NOTICE", "OWN_INITIATIVE", "AUTHORITY_ORDER"])).max(4), automated_detection: z.boolean(), automated_decision: z.boolean(),
+    /** 0172 (M7): the law an ILLEGAL ground relies on, as staff typed it (several, "; "-joined, only for a correction's places); null for none. */
+    law: z.string().min(3).max(10_000).nullable()
   }).strict(),
   facts: z.array(z.string().max(4000)).max(50),
   facts_deleted: z.boolean(),

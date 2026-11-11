@@ -2236,7 +2236,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.disable(jsonb,uuid,jsonb,uuid,text,uuid,jsonb,jsonb)",
     "staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)", "staff.invite(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,text,jsonb,jsonb)",
     "staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)", "staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)",
-    "staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)", "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
+    // 0174: 0150's door without a ground is no longer the runtime's; only 0172's door with the law is.
+    "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)",
     "staff.read_action_proof(jsonb,text,text,jsonb)", "staff.read_authentication(uuid,uuid,text,text)", "staff.read_context(uuid,uuid,text)",
     "staff.read_current_context(jsonb,text)", "staff.read_enrollment(uuid,uuid,text)", "staff.read_invitation_context(uuid,uuid,text)",
     "staff.read_invitation_proof(jsonb,text,text)", "staff.read_owner_possession_context(uuid,uuid,uuid,text,text,text)",

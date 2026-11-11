@@ -1,0 +1,68 @@
+{
+  "version": "moderation-notice-fixes-forward0172-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0171_security_review_hardening.sql",
+    "manifestSha256": "c189c02772748ed1cbd9a15f6e56891ad54a4158dc0ec66d54251f7dd9864d0a",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0172_moderation_notice_fixes.sql",
+    "sha256": "dea7437a04dcf042523c79cd0a859d3603a3870ae21733a872189c0339396864"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0151_public_flag.sql",
+      "relations": [
+        "staff.public_flag_notice"
+      ],
+      "constraints": [
+        "public_flag_notice_kind_check"
+      ],
+      "field": "constraint_definition"
+    },
+    {
+      "step": "0157_moderation_statements.sql",
+      "field": "function_definition",
+      "functions": [
+        "identity.queue_moderation_statements()",
+        "identity.claim_moderation_statements(integer)",
+        "identity.complete_moderation_statement(uuid,uuid,text)",
+        "identity.claim_public_flag_mail(integer)",
+        "identity.complete_public_flag_mail(uuid,uuid,text)",
+        "identity.record_hide_ground(uuid,uuid,text[],text,uuid)",
+        "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)",
+        "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
+        "identity.queue_public_flag_mail()",
+        "identity.public_flag_queue_answered()",
+        "identity.read_own_moderation_statements(uuid)",
+        "identity.read_public_flag_mail(uuid,uuid)",
+        "identity.moderation_statement_ground(uuid)"
+      ],
+      "relations": [
+        "identity.moderation_statement",
+        "identity.public_flag_mail",
+        "identity.moderation_ground",
+        "identity.moderation_decision"
+      ],
+      "columns": [
+        "next_attempt_at",
+        "law_ref"
+      ],
+      "constraints": [
+        "moderation_statement_kind_check",
+        "moderation_ground_law_length",
+        "moderation_ground_law_required",
+        "moderation_decision_law_length",
+        "moderation_decision_law_required"
+      ],
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime"
+      ]
+    }
+  ]
+}

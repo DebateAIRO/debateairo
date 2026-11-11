@@ -27,9 +27,13 @@ export class PublicReviewHttpError extends Error {
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
 export const isPublicReviewIntent = (intent: { action: string }): intent is PublicReviewIntent => intent.action === "PUBLIC_REVIEW_HIDE" || intent.action === "PUBLIC_REVIEW_STEP";
 
-/** The ground's four fields as the proof's body and 0157's command carry them: the codes sorted and comma-joined, and "" for none. */
-export function groundFieldsOf(intent: PublicReviewIntent): Readonly<{ grounds: string; source: string; flag_id: string; facts_sha256: string }> {
-  return { grounds: [...intent.grounds].sort().join(","), source: intent.source ?? "", flag_id: intent.flag_id ?? "", facts_sha256: intent.action === "PUBLIC_REVIEW_HIDE" ? "" : intent.facts_sha256 ?? "" };
+/**
+ * The ground's fields as the proof's body and 0157's command carry them: the codes sorted and comma-joined, and "" for none. 0172 (M7; DSA Art 17(3)(d)):
+ * a fifth, the law an ILLEGAL ground relies on, bound in the proof and passed to the database beside the command; a hide carries none ("").
+ */
+export function groundFieldsOf(intent: PublicReviewIntent): Readonly<{ grounds: string; source: string; flag_id: string; facts_sha256: string; law: string }> {
+  const step = intent.action === "PUBLIC_REVIEW_HIDE" ? null : intent;
+  return { grounds: [...intent.grounds].sort().join(","), source: intent.source ?? "", flag_id: intent.flag_id ?? "", facts_sha256: step?.facts_sha256 ?? "", law: step?.law ?? "" };
 }
 export function canonicalPublicReviewBinding(intent: PublicReviewIntent, state: PublicReviewCommandState): ActionBinding {
   if (intent.expected_revision !== state.expectedRevision) throw new PublicReviewHttpError(409, "PUBLIC_REVIEW_STALE");
@@ -85,12 +89,22 @@ function parsed<T>(schema: { safeParse(value: unknown): { success: true; data: T
   return result.data;
 }
 const PLAIN_REFUSALS: Readonly<Record<string, number>> = Object.freeze({ PUBLIC_REVIEW_STALE: 409, PUBLIC_REVIEW_ALREADY_HIDDEN: 409, PUBLIC_REVIEW_NOT_HIDDEN: 409, PUBLIC_REVIEW_NOT_PUBLIC: 404, PUBLIC_REVIEW_PIECE_UNKNOWN: 404,
-  PUBLIC_REVIEW_GROUND_INVALID: 422 });
+  PUBLIC_REVIEW_GROUND_INVALID: 422, MODERATION_GROUND_LAW_MISSING: 422, MODERATION_GROUND_LAW_INVALID: 422 });
 /** A step's ground, before any passkey is spent (the database checks it again): a removal, a hidden report, a correction and DECIDE need a ground, a source, the
  * report for the Report button and the facts; a re-publish and a put-back carry none. Whether the report is this debate's is the database's to say. */
 function groundHolds(input: contract.PublicReviewStepRequest): boolean {
-  if (input.step === "REPUBLISH" || input.step === "PUT_BACK") return input.grounds.length === 0 && input.source === null && input.flag_id === null && input.facts === null;
+  if (input.step === "REPUBLISH" || input.step === "PUT_BACK") return input.grounds.length === 0 && input.source === null && input.flag_id === null && input.facts === null && input.law === null;
   return input.grounds.length > 0 && input.source !== null && (input.source === "REPORT_BUTTON") === (input.flag_id !== null) && input.facts !== null;
+}
+/**
+ * 0172 (M7): the law a step's ground needs, before any passkey is spent (the database checks it again, as identity.moderation_law_of): ILLEGAL needs one,
+ * nothing else takes one, and it is 3-200 characters once trimmed. Null when it holds, else the refusal's code.
+ */
+function lawRefusal(input: contract.PublicReviewStepRequest): "MODERATION_GROUND_LAW_MISSING" | "MODERATION_GROUND_LAW_INVALID" | null {
+  const law = input.law === null || input.law === "" ? null : input.law;
+  if (input.grounds.includes("ILLEGAL") && law === null) return "MODERATION_GROUND_LAW_MISSING";
+  if (law !== null && (!input.grounds.includes("ILLEGAL") || !contract.ModerationLawSchema.safeParse(law).success)) return "MODERATION_GROUND_LAW_INVALID";
+  return null;
 }
 /** The database's own words for a step it would not take; anything else stays the generic refusal. */
 async function plainRefusals<T>(work: () => Promise<T>): Promise<T> {
@@ -160,11 +174,14 @@ export function registerPublicReviewRoutes(route: Route, service: () => PublicRe
     const whole = input.step === "REPUBLISH" || input.step === "DECIDE";
     if (whole !== (input.piece_id === null) || whole !== (input.piece_kind === null)) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
     if (!groundHolds(input)) throw new PublicReviewHttpError(422, "PUBLIC_REVIEW_GROUND_INVALID");
+    const lawRefused = lawRefusal(input);
+    if (lawRefused !== null) throw new PublicReviewHttpError(422, lawRefused);
+    const law = input.law === null || input.law === "" ? null : input.law;
     const textSha256 = input.text === null ? null : sha(input.text);
     const factsSha256 = input.facts === null ? null : sha(input.facts);
     return plainRefusals(async () => {
       const intent = { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: publicationRef, step: input.step, piece_kind: input.piece_kind, piece_id: input.piece_id, pointer: input.pointer,
-        text_sha256: textSha256, expected_revision: input.expected_revision, operation_id: input.operation_id, grounds: input.grounds, source: input.source, flag_id: input.flag_id, facts_sha256: factsSha256 };
+        text_sha256: textSha256, expected_revision: input.expected_revision, operation_id: input.operation_id, grounds: input.grounds, source: input.source, flag_id: input.flag_id, facts_sha256: factsSha256, law };
       const common = await proved(request, intent, input.proof_handle);
       const { repository, withKey } = present();
       let content: CryptoEnvelope | null = null;

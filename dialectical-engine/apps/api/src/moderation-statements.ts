@@ -20,7 +20,9 @@ const TEMPLATE_OF: Readonly<Record<ModerationStatementKind, MailTemplateId>> = O
   REPORT_REMOVED: "MODERATION_STATEMENT_REPORT_REMOVED",
   CORRECTED: "MODERATION_STATEMENT_CORRECTED",
   CONTRIBUTION_AFFECTED: "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED",
-  REPORT_AFFECTED: "MODERATION_STATEMENT_REPORT_AFFECTED"
+  REPORT_AFFECTED: "MODERATION_STATEMENT_REPORT_AFFECTED",
+  CONTRIBUTION_DECIDED: "MODERATION_STATEMENT_CONTRIBUTION_DECIDED",
+  REPORT_DECIDED: "MODERATION_STATEMENT_REPORT_DECIDED"
 });
 /** The mail's flag for each ground code. */
 const GROUND_FLAGS: Readonly<Record<string, string>> = Object.freeze({
@@ -29,15 +31,22 @@ const GROUND_FLAGS: Readonly<Record<string, string>> = Object.freeze({
 });
 const SOURCE_FLAGS: Readonly<Record<string, string>> = Object.freeze({ REPORT_BUTTON: "sourceReport", EMAIL_NOTICE: "sourceEmail", AUTHORITY_ORDER: "sourceAuthority", OWN_INITIATIVE: "sourceOwn" });
 const flag = (value: boolean): string => (value ? "true" : "false");
+/**
+ * Final review (0172, M3): the kinds whose full statement carries no facts. Those told because their contribution or report left with the debate read
+ * the step, the rule and the law, never the facts staff typed (identity.read_own_moderation_statements): their mail's link says so (`noFacts`).
+ * DEBATE_HIDDEN keeps its sentence (ruling R14).
+ */
+const NO_FACTS: ReadonlySet<ModerationStatementKind> = new Set<ModerationStatementKind>(["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"]);
 
 /**
  * The mail's params for one statement: two links, the date and one flag each. A staff hide relies on the hold alone, and what a person suspected stays on
  * the page; the automatic hide relied on the rule the check found, so that rule is named beside the hold (D2).
  */
-export function statementMailParams(input: Readonly<{ happenedAt: string; itemUrl: string; statementUrl: string; ground: ModerationStatementGround }>): Record<string, string> {
+export function statementMailParams(input: Readonly<{ kind: ModerationStatementKind; happenedAt: string; itemUrl: string; statementUrl: string; ground: ModerationStatementGround }>): Record<string, string> {
   const grounds = new Set([...input.ground.grounds, ...(input.ground.automated_decision ? input.ground.suspected : [])]);
   const params: Record<string, string> = { happened: new Date(input.happenedAt).toISOString(), itemUrl: input.itemUrl, statementUrl: input.statementUrl,
-    automatedDecision: flag(input.ground.automated_decision), automatedDetection: flag(input.ground.automated_detection), groundNone: flag(!input.ground.recorded) };
+    automatedDecision: flag(input.ground.automated_decision), automatedDetection: flag(input.ground.automated_detection), groundNone: flag(!input.ground.recorded),
+    noFacts: flag(NO_FACTS.has(input.kind)) };
   for (const [code, name] of Object.entries(GROUND_FLAGS)) params[name] = flag(input.ground.recorded && grounds.has(code));
   for (const [code, name] of Object.entries(SOURCE_FLAGS)) params[name] = flag(input.ground.sources.includes(code));
   return params;
@@ -51,12 +60,16 @@ export class ModerationStatementReconciler {
     this.appUrl = publicAppUrl;
   }
 
-  /** One pass. A statement whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. */
+  /**
+   * One pass. A statement whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. M5 (owner, 10 Nov
+   * 2026): a settle that throws (the database went away for a moment) is logged by its marker alone and the pass goes on, so one claim never stops
+   * the others; the one it could not settle is claimable again when its claim runs out.
+   */
   async reconcile(limit = 100): Promise<void> {
     for (const claim of await this.repository.claim(limit)) {
       let outcome: ModerationStatementOutcome;
       try { outcome = await this.send(claim); } catch { outcome = "RETRY"; }
-      await this.repository.complete(claim, outcome);
+      try { await this.repository.complete(claim, outcome); } catch { console.error("[MODERATION_STATEMENT_COMPLETE_FAILED]"); }
     }
   }
 
@@ -70,7 +83,7 @@ export class ModerationStatementReconciler {
       const recipient = plain.toString("utf8");
       if (!isSingleDeliverableRecipient(recipient)) return "DROPPED";
       await this.channel.sendTemplated({ to: recipient, templateId: TEMPLATE_OF[statement.kind], locale: statement.mailLocale, messageId: claim.statementId,
-        params: statementMailParams({ happenedAt: statement.happenedAt, ground: statement.ground,
+        params: statementMailParams({ kind: statement.kind, happenedAt: statement.happenedAt, ground: statement.ground,
           itemUrl: new URL(`/public/debate/${encodeURIComponent(statement.publicationRef)}`, this.appUrl).toString(),
           statementUrl: new URL(`/settings/notices#${encodeURIComponent(statement.statementId)}`, this.appUrl).toString() }) });
       return "SENT";
@@ -97,16 +110,18 @@ const FLAG_TEMPLATE_OF: Readonly<Record<PublicFlagMailKind, MailTemplateId>> = O
   ACTED: "PUBLIC_FLAG_ANSWER_ACTED"
 });
 
+const AI_READ_KINDS: ReadonlySet<PublicFlagMailKind> = new Set<PublicFlagMailKind>(["RECEIPT", "NO_BREACH", "ACTED"]);
+
 export class PublicFlagAnswerReconciler {
   constructor(private readonly repository: Pick<PostgresPublicFlagMailRepository, "claim" | "read" | "complete">, private readonly users: Pick<ReadableUserDekStore, "load">,
     private readonly channel: Pick<TemplatedMailChannel, "sendTemplated">, private readonly appUrl: string) {}
 
-  /** One pass. A mail whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. */
+  /** One pass. A mail whose send failed is claimable again after its claim runs out; the database ends it after twenty tries. M5: as the statements'. */
   async reconcile(limit = 100): Promise<void> {
     for (const claim of await this.repository.claim(limit)) {
       let outcome: ModerationStatementOutcome;
       try { outcome = await this.send(claim); } catch { outcome = "RETRY"; }
-      await this.repository.complete(claim, outcome);
+      try { await this.repository.complete(claim, outcome); } catch { console.error("[PUBLIC_FLAG_ANSWER_COMPLETE_FAILED]"); }
     }
   }
 
@@ -120,7 +135,9 @@ export class PublicFlagAnswerReconciler {
       const recipient = plain.toString("utf8");
       if (!isSingleDeliverableRecipient(recipient)) return "DROPPED";
       await this.channel.sendTemplated({ to: recipient, templateId: FLAG_TEMPLATE_OF[mail.kind], locale: mail.mailLocale, messageId: claim.mailId,
-        params: { happened: new Date(mail.happenedAt).toISOString(), itemUrl: new URL(`/public/debate/${encodeURIComponent(mail.publicationRef)}`, this.appUrl).toString() } });
+        params: { happened: new Date(mail.happenedAt).toISOString(), itemUrl: new URL(`/public/debate/${encodeURIComponent(mail.publicationRef)}`, this.appUrl).toString(),
+          // M1: an AI read the report first, said by the receipt and by the two decisions a person made; the two automatic answers take no flag.
+          ...(AI_READ_KINDS.has(mail.kind) ? { aiReadFirst: mail.aiReadFirst === true ? "true" : "false" } : {}) } });
       return "SENT";
     } finally {
       plain?.fill(0);
@@ -152,7 +169,8 @@ export async function moderationStatementsOf(ownerRef: string, ports: Moderation
       ({ facts, quote } = await read(row.facts ?? [], row.quote).catch(() => ({ facts: [] as string[], quote: null })));
     }
     statements.push({ statement_id: row.statement_id, kind: row.kind, public_ref: row.publication_ref, happened_at: new Date(row.happened_at).toISOString(), piece_kind: row.piece_kind,
-      hidden_now: row.hidden_now, ground: row.ground, facts, facts_deleted: row.facts_deleted, quote,
+      // 0172 (M7): the ground carries the law an ILLEGAL ground relies on (null for none); it is the page's, never a mail's (statementMailParams picks flags only).
+      hidden_now: row.hidden_now, ground: { ...row.ground, law: row.ground.law ?? null }, facts, facts_deleted: row.facts_deleted, quote,
       places: row.places.map((place) => ({ piece_kind: place.piece_kind, pointer: place.pointer })) });
   }
   return contract.ModerationStatementsSchema.parse({ statements });

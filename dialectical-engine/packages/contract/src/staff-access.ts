@@ -134,11 +134,14 @@ export type ModerationSource = z.infer<typeof ModerationSourceSchema>;
 const ModerationGroundsSchema = z.array(ModerationGroundSchema).max(7).refine((grounds) => new Set(grounds).size === grounds.length, "MODERATION_GROUND_REPEATED");
 const Sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/u);
 const ModerationFactsSchema = z.string().trim().min(1).max(4000);
+/** 0172 (M7; DSA Art 17(3)(d)): the law an ILLEGAL ground relies on, as a person types it (3-200 characters once trimmed). The request takes any length up to
+ * 1000 so that a wrong one is refused by name (MODERATION_GROUND_LAW_INVALID); the passkey's intent takes only a whole one. Never in a mail. */
+export const ModerationLawSchema = z.string().trim().min(3).max(200);
 const PublicReviewPointerSchema = z.string().regex(/^(\/[A-Za-z0-9_]{1,64}){1,12}$/u);
 const PublicReviewGroundShape = { grounds: ModerationGroundsSchema, source: ModerationSourceSchema.nullable(), flag_id: z.uuid().nullable() };
 const PublicReviewHideShape = { publication_ref: z.uuid(), expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape };
 const PublicReviewStepShape = { ...PublicReviewHideShape, step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
-    pointer: PublicReviewPointerSchema.nullable(), text_sha256: Sha256HexSchema.nullable(), facts_sha256: Sha256HexSchema.nullable() };
+    pointer: PublicReviewPointerSchema.nullable(), text_sha256: Sha256HexSchema.nullable(), facts_sha256: Sha256HexSchema.nullable(), law: ModerationLawSchema.nullable() };
 /** 0157 (D4): a close of a report: NO_BREACH (nothing to act on) or ACTED (a person acted on it). The reporter is told which. */
 export const PublicFlagOutcomeSchema = z.enum(["NO_BREACH", "ACTED"]);
 export type PublicFlagOutcome = z.infer<typeof PublicFlagOutcomeSchema>;
@@ -185,7 +188,7 @@ export type TeamLimitPage = z.infer<typeof TeamLimitPageSchema>;
 export const PublicReviewHideRequestSchema = z.object({ expected_revision: RevisionSchema, operation_id: z.uuid(), ...PublicReviewGroundShape, proof_handle: OpaqueHandleSchema }).strict();
 export const PublicReviewStepRequestSchema = z.object({ step: PublicReviewStepSchema, piece_kind: PublicReviewPieceKindSchema.nullable(), piece_id: z.uuid().nullable(),
     pointer: PublicReviewPointerSchema.nullable(), text: z.string().trim().min(1).max(20000).nullable(), expected_revision: RevisionSchema, operation_id: z.uuid(),
-    ...PublicReviewGroundShape, facts: ModerationFactsSchema.nullable(), proof_handle: OpaqueHandleSchema }).strict();
+    ...PublicReviewGroundShape, facts: ModerationFactsSchema.nullable(), law: z.string().trim().max(1000).nullable(), proof_handle: OpaqueHandleSchema }).strict();
 export type PublicReviewStepRequest = z.infer<typeof PublicReviewStepRequestSchema>;
 const PublicReviewPieceSchema = z.object({ pointer: PublicReviewPointerSchema, original: z.string(), corrected: z.string().nullable() }).strict();
 const PublicReviewLogEntrySchema = z.object({ revision: z.number().int().positive(), action: z.enum(["HIDE", "REPUBLISH", "REMOVE_DIG", "PUT_BACK", "CORRECT", "HIDE_REPORT"]), piece_kind: PublicReviewPieceKindSchema.nullable(),
@@ -212,7 +215,9 @@ export const PublicFlagQueueSchema = z.object({ reports: z.array(z.object({
     flag_id: z.uuid(), publication_ref: z.uuid(), reporter: z.string().nullable(), state: z.enum(["CHECKING", "QUEUED", "NOT_FOUND", "HIDDEN"]), verdict: z.enum(["AGREE", "NOT_FOUND", "UNSURE", "UNAVAILABLE"]).nullable(), reason: z.enum(["CONTENT", "PERSONAL"]).nullable(),
     created_at: z.iso.datetime({ offset: true }), judged_at: z.iso.datetime({ offset: true }).nullable(), dismissed_at: z.iso.datetime({ offset: true }).nullable(), where: z.string().nullable(), claim: z.string().nullable(), debate_hidden: z.boolean(),
     /** 0157 (D4): what the close found; null while open, or closed by the release before's Dismiss. */
-    outcome: PublicFlagOutcomeSchema.nullable() }).strict()).max(200) }).strict();
+    outcome: PublicFlagOutcomeSchema.nullable(),
+    /** 0172 (M6): a person's review step or decision that named the report closed it, as ACTED; the panel offers no Close on it. */
+    closed_by_step: z.boolean() }).strict()).max(200) }).strict();
 export type PublicFlagQueue = z.infer<typeof PublicFlagQueueSchema>;
 export const PublicFlagDismissRequestSchema = z.object({ operation_id: z.uuid(), outcome: PublicFlagOutcomeSchema, proof_handle: OpaqueHandleSchema }).strict();
 export const StaffActionProofResponseSchema = z.object({ proof_handle: OpaqueHandleSchema, expires_at: z.iso.datetime() }).strict();

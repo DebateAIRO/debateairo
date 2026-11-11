@@ -1566,7 +1566,7 @@ async function delegate(): Promise<Actor> {
   const reviewRevision = async (ref: string) => (await q().query<{ n: number }>("SELECT coalesce(max(revision),0)::int AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
   type Step = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT" | "DECIDE";
   /** 0157's ground: a removal, a hidden report, a correction and DECIDE get a whole one unless the case names its own; null sends none. */
-  type Ground = Readonly<{ grounds: readonly ModerationGround[]; source: ModerationSource | null; flagId: string | null; facts: string | null }>;
+  type Ground = Readonly<{ grounds: readonly ModerationGround[]; source: ModerationSource | null; flagId: string | null; facts: string | null; law?: string | null }>;
   type Piece = Readonly<{ kind?: "SNAPSHOT" | "UPDATE" | "REPORT" | "DIG"; id?: string; pointer?: string; text?: string; ground?: Ground | null }>;
   const STANDARD_GROUND: Ground = { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flagId: null, facts: "It names a private person and where they live." };
   const groundOf = (step: Step, piece: Piece): Ground => piece.ground ?? (piece.ground === undefined && ["REMOVE_DIG", "HIDE_REPORT", "CORRECT", "DECIDE"].includes(step) ? STANDARD_GROUND : { grounds: [], source: null, flagId: null, facts: null });
@@ -1576,7 +1576,7 @@ async function delegate(): Promise<Actor> {
     const fields = { grounds: [...ground.grounds], source: ground.source, flag_id: ground.flagId };
     return step === "HIDE" ? { action: "PUBLIC_REVIEW_HIDE" as const, publication_ref: ref, expected_revision: revision, operation_id: operationId, ...fields }
       : { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: ref, step, piece_kind: piece.kind ?? null, piece_id: piece.id ?? null, pointer: piece.pointer ?? null,
-        text_sha256: digestOf(piece.text ?? null), expected_revision: revision, operation_id: operationId, ...fields, facts_sha256: digestOf(ground.facts) };
+        text_sha256: digestOf(piece.text ?? null), expected_revision: revision, operation_id: operationId, ...fields, facts_sha256: digestOf(ground.facts), law: ground.law ?? null };
   }
   async function act(actor: Actor, debate: Readonly<{ ref: string; root: string }>, step: Step, piece: Piece = {}, change: Readonly<{ noAlert?: boolean; revision?: number; proofFor?: Parameters<typeof intentOf>; replay?: Readonly<{ proofId: string; binding: Record<string, unknown>; alert: Record<string, unknown>; operationId: string }> }> = {}) {
     const revision = change.revision ?? await reviewRevision(debate.ref);
@@ -1997,7 +1997,7 @@ async function delegate(): Promise<Actor> {
     expect(replay.receipt.operationId).toBe(first.operationId);
     expect(await reviewRevision(debate.ref)).toBe(1);
     await expect(new PostgresPublicReviewRepository(api).act({ actor: owner.context as never, proof: { proofId: first.proofId, binding: first.binding } as never, step: "REPUBLISH", publicationRef: debate.ref, pieceKind: null, pieceId: null, pointer: null, textSha256: null, content: null,
-      ground: { grounds: "", source: "", flag_id: "", facts_sha256: "" }, facts: null, expectedRevision: 1, operationId: randomUUID(), alertIntent: first.alert as never })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
+      ground: { grounds: "", source: "", flag_id: "", facts_sha256: "", law: "" }, facts: null, expectedRevision: 1, operationId: randomUUID(), alertIntent: first.alert as never })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
     // Bound to the piece and to the text's digest: a proof for one piece opens no other.
     const pieceA = randomUUID();
     await expect(act(owner, debate, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/question", text: "Other words." }, { proofFor: [debate.ref, "CORRECT", { kind: "SNAPSHOT", id: debate.ref, pointer: "/question", text: "Words." }, 1, pieceA] })).rejects.toMatchObject({ message: "STAFF_PROOF_INVALID" });
@@ -2125,6 +2125,42 @@ async function delegate(): Promise<Actor> {
     // No runtime login reads these records; they cannot be edited.
     for (const table of ["identity.moderation_ground", "identity.moderation_decision", "identity.public_flag_quote"]) await expect(api.query(`SELECT * FROM ${table}`)).rejects.toMatchObject({ code: "42501" });
     await expect(q().query("UPDATE identity.moderation_ground SET source='OWN_INITIATIVE' WHERE publication_ref=$1", [debate.ref])).rejects.toMatchObject({ message: "MODERATION_RECORD_APPEND_ONLY" });
+  }, 240_000);
+
+  it("0172, M7 (DSA Art 17(3)(d)): a removal on ILLEGAL names the law or is refused before the passkey is spent; the law is bound into the proof, kept and shown; the old door is closed to the runtime", async () => {
+    const [ana, xena] = [await account(), await account()];
+    const debate = await publishedDebate(ana);
+    const world = vendors();
+    const xRun = await dig(xena, debate, world);
+    await settleAll(world);
+    await act(owner, debate, "HIDE", {}, { noAlert: true });
+    const facts = "A court order names this path as unlawful.";
+    const before = await reviewRevision(debate.ref);
+    const proofs = async () => (await q().query<{ consumed: boolean }>("SELECT consumed_at IS NOT NULL AS consumed FROM staff.action_proof WHERE staff_id=$1 ORDER BY verified_at", [owner.staffId])).rows.map((row) => row.consumed);
+    const spentBefore = (await proofs()).filter(Boolean).length;
+    // No law: refused, nothing written, and the proof it carried is not spent.
+    await expect(act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun, ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts } }))
+      .rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_MISSING" });
+    await expect(act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun, ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts, law: "ab" } }))
+      .rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_INVALID" });
+    expect(await reviewRevision(debate.ref)).toBe(before);
+    const after = await proofs();
+    expect(after.filter(Boolean).length).toBe(spentBefore);
+    expect(after.slice(-2)).toEqual([false, false]);
+    // The law is in the proof's body: a proof bound to one law is not the proof of another.
+    const LAW = "Legea nr. 8/1996, art. 139";
+    const operationId = randomUUID();
+    const bound = canonicalPublicReviewBinding(intentOf(debate.ref, "REMOVE_DIG", { kind: "DIG", id: xRun, ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts, law: LAW } }, before, operationId), { expectedRevision: before, hidden: true });
+    const other = canonicalPublicReviewBinding(intentOf(debate.ref, "REMOVE_DIG", { kind: "DIG", id: xRun, ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts, law: "Legea nr. 8/1996, art. 140" } }, before, operationId), { expectedRevision: before, hidden: true });
+    expect(bound.bodySha256).not.toBe(other.bodySha256);
+    // With the law: the database recomputes the same body (the law in it), so the proof holds; recorded beside the log, and the person's statement names it.
+    await act(owner, debate, "REMOVE_DIG", { kind: "DIG", id: xRun, ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts, law: LAW } });
+    expect((await q().query("SELECT ground.grounds, ground.law_ref FROM identity.moderation_ground AS ground JOIN identity.public_review_event AS event USING (event_id) WHERE event.publication_ref=$1 AND event.action='REMOVE_DIG'", [debate.ref])).rows)
+      .toEqual([{ grounds: ["ILLEGAL"], law_ref: LAW }]);
+    await act(owner, debate, "DECIDE", { ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts: "Kept hidden on the court's order.", law: LAW } });
+    expect((await q().query("SELECT law_ref FROM identity.moderation_decision WHERE publication_ref=$1", [debate.ref])).rows).toEqual([{ law_ref: LAW }]);
+    // The release before's door: the runtime may no longer call it.
+    await expect(api.query("SELECT staff.public_review_act_grounded('{}'::jsonb,$1::uuid,'{}'::jsonb,'{}'::jsonb,NULL,NULL,NULL)", [randomUUID()])).rejects.toMatchObject({ code: "42501" });
   }, 240_000);
 
   it("0157, D4 (DSA Art 16(4)-(6)): the reporter hears each answer once: a receipt, the automatic hide and not-found, a person's close and a step naming the report; a stuck check goes to a person; an erased reporter hears nothing", async () => {

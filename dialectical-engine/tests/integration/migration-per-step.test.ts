@@ -88,10 +88,16 @@ const MAIN_ANSWER_TIMES = "0166_main_answer_times.sql";
 const PUBLIC_REPORT_OWN_CARRIER = "0167_public_report_own_carrier.sql";
 const SET_ASIDE_CONTINUE = "0168_set_aside_continue.sql";
 const PIECE_SETTINGS_VERSION = "0169_piece_settings_version.sql";
-/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234): the step before the last. */
+/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234). */
 const OUTBOUND_MAIL = "0170_outbound_mail_limit.sql";
-/** The security review's fixes in the database: the chain's last step. */
+/** The security review's fixes in the database. */
 const SECURITY_REVIEW = "0171_security_review_hardening.sql";
+/** The moderation notices' seven gaps after 0157 (the owner's list of 10 Nov 2026). */
+const MODERATION_NOTICE_FIXES = "0172_moderation_notice_fixes.sql";
+/** The check's answer on a report a person already closed (the follow-up to 0172's M6): the step before the last. */
+const SETTLE_DISMISSED = "0173_settle_dismissed_flag.sql";
+/** 0150's staff review door without a ground closed to the runtime (the final review of 0172): the chain's last step. */
+const UNGROUNDED_DOOR = "0174_public_review_ungrounded_door.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -124,55 +130,58 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(61);
-    expect(real.at(-42)).toBe(RLS);
-    expect(real.at(-41)).toBe(V4);
-    expect(real.at(-40)).toBe(WEB);
-    expect(real.at(-39)).toBe(INVESTIGATIONS);
-    expect(real.at(-38)).toBe(DIG_MODEL);
-    expect(real.at(-37)).toBe(DIG_PICKS);
-    expect(real.at(-36)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-35)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-34)).toBe(TREE_UPDATES);
-    expect(real.at(-33)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-32)).toBe(SPEND_KINDS);
-    expect(real.at(-31)).toBe(PATH_SUGGESTIONS);
-    expect(real.at(-30)).toBe(TEAM_LIMIT);
-    expect(real.at(-29)).toBe(RUN_HANDOVER);
-    expect(real.at(-28)).toBe(ASK_CLARIFY_CHARGE);
-    expect(real.at(-27)).toBe(WEB_RESEARCHED_UNSETTLED);
-    expect(real.at(-26)).toBe(TEAM_ALLOWANCES);
-    expect(real.at(-25)).toBe(PUBLIC_TREE);
-    expect(real.at(-24)).toBe(ERASURE_KEEPS_PUBLIC);
-    expect(real.at(-23)).toBe(PUBLIC_REPORT_TEAM_MONTH);
-    expect(real.at(-22)).toBe(PUBLIC_REVIEW);
-    expect(real.at(-21)).toBe(PUBLIC_FLAG);
-    expect(real.at(-20)).toBe(REPORT_EXPORT);
-    expect(real.at(-19)).toBe(DIG_TREE_SETTLED);
-    expect(real.at(-18)).toBe(REGION_WIDEN);
-    expect(real.at(-17)).toBe(OWNER_ANSWER_WRITES);
-    expect(real.at(-16)).toBe(MODERATION_NOTICE);
-    expect(real.at(-15)).toBe(MODERATION_STATEMENTS);
-    expect(real.at(-14)).toBe(PRE_START_CHARGE);
-    expect(real.at(-13)).toBe(START_PATHS);
-    expect(real.at(-12)).toBe(PATH_RESULTS);
-    expect(real.at(-11)).toBe(PATH_PROGRESS);
-    expect(real.at(-10)).toBe(SAVED_QUESTIONS);
-    expect(real.at(-9)).toBe(CARRY_ON_DIGS);
-    expect(real.at(-8)).toBe(PATH_ADDED);
-    expect(real.at(-7)).toBe(PRE_START_RELEASE);
-    expect(real.at(-6)).toBe(MAIN_ANSWER_TIMES);
-    expect(real.at(-5)).toBe(PUBLIC_REPORT_OWN_CARRIER);
-    expect(real.at(-4)).toBe(SET_ASIDE_CONTINUE);
-    expect(real.at(-3)).toBe(PIECE_SETTINGS_VERSION);
-    expect(real.at(-2)).toBe(OUTBOUND_MAIL);
-    expect(real.at(-1)).toBe(SECURITY_REVIEW);
+    expect(real).toHaveLength(64);
+    expect(real.at(-45)).toBe(RLS);
+    expect(real.at(-44)).toBe(V4);
+    expect(real.at(-43)).toBe(WEB);
+    expect(real.at(-42)).toBe(INVESTIGATIONS);
+    expect(real.at(-41)).toBe(DIG_MODEL);
+    expect(real.at(-40)).toBe(DIG_PICKS);
+    expect(real.at(-39)).toBe(INVESTIGATION_REPORTS);
+    expect(real.at(-38)).toBe(PUBLIC_DEBATES);
+    expect(real.at(-37)).toBe(TREE_UPDATES);
+    expect(real.at(-36)).toBe(PASSAGE_RETENTION);
+    expect(real.at(-35)).toBe(SPEND_KINDS);
+    expect(real.at(-34)).toBe(PATH_SUGGESTIONS);
+    expect(real.at(-33)).toBe(TEAM_LIMIT);
+    expect(real.at(-32)).toBe(RUN_HANDOVER);
+    expect(real.at(-31)).toBe(ASK_CLARIFY_CHARGE);
+    expect(real.at(-30)).toBe(WEB_RESEARCHED_UNSETTLED);
+    expect(real.at(-29)).toBe(TEAM_ALLOWANCES);
+    expect(real.at(-28)).toBe(PUBLIC_TREE);
+    expect(real.at(-27)).toBe(ERASURE_KEEPS_PUBLIC);
+    expect(real.at(-26)).toBe(PUBLIC_REPORT_TEAM_MONTH);
+    expect(real.at(-25)).toBe(PUBLIC_REVIEW);
+    expect(real.at(-24)).toBe(PUBLIC_FLAG);
+    expect(real.at(-23)).toBe(REPORT_EXPORT);
+    expect(real.at(-22)).toBe(DIG_TREE_SETTLED);
+    expect(real.at(-21)).toBe(REGION_WIDEN);
+    expect(real.at(-20)).toBe(OWNER_ANSWER_WRITES);
+    expect(real.at(-19)).toBe(MODERATION_NOTICE);
+    expect(real.at(-18)).toBe(MODERATION_STATEMENTS);
+    expect(real.at(-17)).toBe(PRE_START_CHARGE);
+    expect(real.at(-16)).toBe(START_PATHS);
+    expect(real.at(-15)).toBe(PATH_RESULTS);
+    expect(real.at(-14)).toBe(PATH_PROGRESS);
+    expect(real.at(-13)).toBe(SAVED_QUESTIONS);
+    expect(real.at(-12)).toBe(CARRY_ON_DIGS);
+    expect(real.at(-11)).toBe(PATH_ADDED);
+    expect(real.at(-10)).toBe(PRE_START_RELEASE);
+    expect(real.at(-9)).toBe(MAIN_ANSWER_TIMES);
+    expect(real.at(-8)).toBe(PUBLIC_REPORT_OWN_CARRIER);
+    expect(real.at(-7)).toBe(SET_ASIDE_CONTINUE);
+    expect(real.at(-6)).toBe(PIECE_SETTINGS_VERSION);
+    expect(real.at(-5)).toBe(OUTBOUND_MAIL);
+    expect(real.at(-4)).toBe(SECURITY_REVIEW);
+    expect(real.at(-3)).toBe(MODERATION_NOTICE_FIXES);
+    expect(real.at(-2)).toBe(SETTLE_DISMISSED);
+    expect(real.at(-1)).toBe(UNGROUNDED_DOOR);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All sixty-one real steps were applied by that same run and stay committed; the probe left nothing.
+    // All sixty-four real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(61);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(64);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.

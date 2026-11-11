@@ -422,11 +422,13 @@ const TEMPLATED_MAIL_PURPOSE: Readonly<Record<MailTemplateId, MailPurpose>> = Ob
   THREAT_REPORT_WAITING: "threat-report-alert",
   TEAM_LIMIT_CHANGED: "team-notice", TEAM_LIMIT_PARTNER_CHANGED: "team-notice", TEAM_ALLOWANCE_CHANGED: "team-notice",
   TEAM_ALLOWANCE_YOURS: "team-notice", PUBLIC_REVIEW_CHANGED: "team-notice", PUBLIC_FLAG_HIDDEN: "team-notice", PUBLIC_FLAG_WAITING: "team-notice",
+  MODERATION_MAIL_FAILED: "team-notice",
   MODERATION_DEBATE_HIDDEN: "moderation-notice", MODERATION_CONTRIBUTION_REMOVED: "moderation-notice", MODERATION_REPORT_REMOVED: "moderation-notice",
   MODERATION_STATEMENT_DEBATE_HIDDEN: "moderation-notice", MODERATION_STATEMENT_DEBATE_DECIDED: "moderation-notice",
   MODERATION_STATEMENT_CONTRIBUTION_REMOVED: "moderation-notice", MODERATION_STATEMENT_REPORT_REMOVED: "moderation-notice",
   MODERATION_STATEMENT_CORRECTED: "moderation-notice", MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: "moderation-notice",
   MODERATION_STATEMENT_REPORT_AFFECTED: "moderation-notice",
+  MODERATION_STATEMENT_CONTRIBUTION_DECIDED: "moderation-notice", MODERATION_STATEMENT_REPORT_DECIDED: "moderation-notice",
   PUBLIC_FLAG_ANSWER_RECEIPT: "moderation-notice", PUBLIC_FLAG_ANSWER_AUTO_HIDDEN: "moderation-notice",
   PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: "moderation-notice", PUBLIC_FLAG_ANSWER_NO_BREACH: "moderation-notice", PUBLIC_FLAG_ANSWER_ACTED: "moderation-notice",
   OUTBOUND_MAIL_SHARE: "owner-limit-alert", OUTBOUND_MAIL_SIGN_UP_STOPPED: "owner-limit-alert", OUTBOUND_MAIL_ALL_STOPPED: "owner-limit-alert"

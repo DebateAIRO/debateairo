@@ -4,9 +4,12 @@ import { createStaffApiClient, type StaffBrowser } from "./staffApi.js";
 import { createStaffWebAuthnBrowser } from "./staffWebAuthn.js";
 import { privateAdminRequester } from "./teamLimitApi.js";
 
-/** 0157: what a statement of reasons needs from a step (DSA Art 17(3)). A hide may carry a suspected rule and a source; facts only go with the other steps. */
-export type PublicReviewGround = Readonly<{ grounds: readonly contract.ModerationGround[]; source: contract.ModerationSource | null; flagId: string | null; facts: string | null }>;
-export const NO_GROUND: PublicReviewGround = Object.freeze({ grounds: [], source: null, flagId: null, facts: null });
+/**
+ * 0157: what a statement of reasons needs from a step (DSA Art 17(3)). A hide may carry a suspected rule and a source; facts only go with the other steps.
+ * 0172 (M7): and the law an ILLEGAL ground relies on, bound into the passkey's proof; a hide never sends one.
+ */
+export type PublicReviewGround = Readonly<{ grounds: readonly contract.ModerationGround[]; source: contract.ModerationSource | null; flagId: string | null; facts: string | null; law: string | null }>;
+export const NO_GROUND: PublicReviewGround = Object.freeze({ grounds: [], source: null, flagId: null, facts: null, law: null });
 export type PublicReviewStepInput = Readonly<{
   step: "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT" | "DECIDE"; pieceKind?: "SNAPSHOT" | "UPDATE" | "REPORT" | "DIG"; pieceId?: string; pointer?: string; text?: string;
   ground?: PublicReviewGround;
@@ -52,9 +55,9 @@ export function createPublicReviewClient({ fetchImplementation = fetch, apiBase 
       const fields = { step: input.step, piece_kind: input.pieceKind ?? null, piece_id: input.pieceId ?? null, pointer: input.pointer ?? null, expected_revision: revision, operation_id: crypto.randomUUID(),
         grounds: [...ground.grounds], source: ground.source, flag_id: ground.flagId };
       const proof = await staff.proveAction({ action: "PUBLIC_REVIEW_STEP", publication_ref: publicationRef, ...fields, text_sha256: input.text === undefined ? null : await digestOf(input.text),
-        facts_sha256: ground.facts === null ? null : await digestOf(ground.facts) });
+        facts_sha256: ground.facts === null ? null : await digestOf(ground.facts), law: ground.law });
       return request(`/${encodeURIComponent(publicationRef)}/step`, contract.SecurityReceiptSchema, "POST", contract.PublicReviewStepRequestSchema.parse({ ...fields, text: input.text ?? null, facts: ground.facts,
-        proof_handle: proof.proof_handle }));
+        law: ground.law, proof_handle: proof.proof_handle }));
     }
   });
 }

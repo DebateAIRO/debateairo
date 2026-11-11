@@ -1,0 +1,29 @@
+{
+  "version": "public-review-ungrounded-door-forward0174-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0173_settle_dismissed_flag.sql",
+    "manifestSha256": "a8b9b1263e207f0a1157955b7bbd54309c4a9549b266f8cb91acf5ba9fe901a0",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0174_public_review_ungrounded_door.sql",
+    "sha256": "b6e2a0a8b7597288654c0e0c3b8edc93b5427336f1c429bf3486e038af452d1e"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0150_public_review.sql",
+      "functions": [
+        "staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"
+      ],
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime"
+      ],
+      "field": "function_acl_revoked"
+    }
+  ]
+}

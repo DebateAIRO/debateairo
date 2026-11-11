@@ -11,8 +11,11 @@ export type PublicFlagLimits = Readonly<{ personHour: number; debateDay: number;
 export type PublicFlagQueueRow = Readonly<{ flag_id: string; publication_ref: string; run_id: string; reporter: string | null; state: "CHECKING" | "QUEUED" | "NOT_FOUND" | "HIDDEN"; verdict: PublicFlagVerdict | null; reason: "CONTENT" | "PERSONAL" | null;
   created_at: string; judged_at: string | null; dismissed_at: string | null; content: CryptoEnvelope | null; debate_hidden: boolean;
   /** 0157 (D4): the close's outcome. */
-  outcome?: "NO_BREACH" | "ACTED" | null }>;
-export type PublicFlagNoticeClaim = Readonly<{ notice_id: string; kind: "PUBLIC_FLAG_HIDDEN" | "PUBLIC_FLAG_WAITING"; recipient_staff_id: string; claim_token: string }>;
+  outcome?: "NO_BREACH" | "ACTED" | null;
+  /** 0172 (M6): a person's review step or decision that named the report closed it (ACTED). */
+  closed_by_step?: boolean }>;
+/** 0172, M5: MODERATION_MAIL_FAILED, a moderation mail that could not be created or sent, rides on the same notices. */
+export type PublicFlagNoticeClaim = Readonly<{ notice_id: string; kind: "PUBLIC_FLAG_HIDDEN" | "PUBLIC_FLAG_WAITING" | "MODERATION_MAIL_FAILED"; recipient_staff_id: string; claim_token: string }>;
 export type PublicReviewPurgeDue = Readonly<{ publication_ref: string; run_id: string; piece_kind: "SNAPSHOT" | "UPDATE" | "REPORT"; piece_id: string; mode: "BAKED" | "EMPTIED"; up_to_revision: number; content: CryptoEnvelope;
   corrections: readonly Readonly<{ pointer: string; content: CryptoEnvelope }>[] }>;
 

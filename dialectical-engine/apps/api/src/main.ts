@@ -1402,9 +1402,10 @@ const publicFlagAnswers = new PublicFlagAnswerReconciler(publicFlagMailRepositor
   timeoutMs: authPolicy.channel.transportTimeoutMs,
   gate: outboundMailGate
 }), environment.PUBLIC_APP_URL);
+// M5 (owner, 10 Nov 2026): the statements and the reporters' answers each in their own try, so one failing (its claim, a settle) never skips the other.
 const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(async () => {
-  await moderationStatements.reconcile(100);
-  await publicFlagAnswers.reconcile(100);
+  try { await moderationStatements.reconcile(100); } catch { console.error("[MODERATION_STATEMENT_PENDING]"); }
+  try { await publicFlagAnswers.reconcile(100); } catch { console.error("[PUBLIC_FLAG_ANSWER_PENDING]"); }
   await publicFlagMailRepository.settleStuck();
   await moderationStatementRepository.deleteWordsDue();
 }, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);

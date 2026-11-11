@@ -45,7 +45,7 @@ async function ground(rule: string, source: string, facts: string | null, report
     box.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
-const NO_GROUND = { grounds: [], source: null, flagId: null, facts: null };
+const NO_GROUND = { grounds: [], source: null, flagId: null, facts: null, law: null };
 async function open() {
   const input = host!.querySelector<HTMLInputElement>("#public-review-link")!;
   input.value = `https://dezbatere.ro/public/debate/${REF}`;
@@ -80,7 +80,7 @@ describe("the review panel", () => {
     await press("Hide now");
     await ground("Terms §7: personal data about other people", "A report made with the Report button", null, LATER);
     await press("Confirm");
-    expect(hide).toHaveBeenCalledWith(REF, 0, { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: LATER, facts: null });
+    expect(hide).toHaveBeenCalledWith(REF, 0, { grounds: ["PERSONAL_DATA"], source: "REPORT_BUTTON", flagId: LATER, facts: null, law: null });
     act(() => root?.unmount()); host?.remove();
     const step = vi.fn(async () => ({}));
     await mount(client({ read: vi.fn(async () => pageOf(true)), step } as never));
@@ -92,12 +92,55 @@ describe("the review panel", () => {
     expect(button("Confirm")!.disabled).toBe(false);
     await press("Confirm");
     expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG,
-      ground: { grounds: ["UNLAWFUL"], source: "EMAIL_NOTICE", flagId: null, facts: "The email named the street and the person." } });
+      ground: { grounds: ["UNLAWFUL"], source: "EMAIL_NOTICE", flagId: null, facts: "The email named the street and the person.", law: null } });
     await press("Decide: keep it hidden");
     expect(host!.querySelector("[data-review-confirm]")!.textContent).toContain("stays hidden");
     await ground("Terms §7: hate speech", "Our own initiative", "The whole question is hate speech.");
     await press("Confirm");
-    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "DECIDE", ground: { grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flagId: null, facts: "The whole question is hate speech." } });
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "DECIDE", ground: { grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flagId: null, facts: "The whole question is hate speech.", law: null } });
+  });
+  it("0172 (M7): the Law field shows only when Illegal is ticked on a step that needs a ground, and Confirm waits for a law of 3 to 200 characters", async () => {
+    const lawBox = () => host!.querySelector<HTMLInputElement>("[data-review-ground] #review-law");
+    const typeLaw = async (law: string) => act(async () => {
+      const box = lawBox()!;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(box, law);
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const hide = vi.fn(async () => ({}));
+    await mount(client({ hide } as never));
+    await open();
+    await press("Hide now");
+    await ground("Illegal under the law (name the law below)", "A report by email", null);
+    // A hide never asks for the law: what is suspected is not yet decided.
+    expect(lawBox()).toBeNull();
+    await press("Confirm");
+    expect(hide).toHaveBeenCalledWith(REF, 0, { grounds: ["ILLEGAL"], source: "EMAIL_NOTICE", flagId: null, facts: null, law: null });
+    act(() => root?.unmount()); host?.remove();
+    const step = vi.fn(async () => ({}));
+    await mount(client({ read: vi.fn(async () => pageOf(true)), step } as never));
+    await open();
+    await press("Take this dig out");
+    expect(lawBox()).toBeNull();
+    await ground("Illegal under the law (name the law below)", "An order from an authority", "A court ordered it removed.");
+    expect(host!.querySelector("label[for=review-law]")!.textContent).toBe("The law we rely on: its name and article, for example Legea nr. 8/1996, art. 139. Everyone this step affects reads it on their statement.");
+    expect(lawBox()!.maxLength).toBe(200);
+    expect(button("Confirm")!.disabled).toBe(true);
+    await typeLaw("ab");
+    expect(button("Confirm")!.disabled).toBe(true);
+    await typeLaw("  Legea nr. 8/1996, art. 139  ");
+    expect(button("Confirm")!.disabled).toBe(false);
+    await press("Confirm");
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG,
+      ground: { grounds: ["ILLEGAL"], source: "AUTHORITY_ORDER", flagId: null, facts: "A court ordered it removed.", law: "Legea nr. 8/1996, art. 139" } });
+    // Unticked, the field goes and no law is sent.
+    await press("Decide: keep it hidden");
+    await ground("Illegal under the law (name the law below)", "Our own initiative", "Kept hidden.");
+    expect(lawBox()).not.toBeNull();
+    await act(async () => { [...host!.querySelectorAll<HTMLInputElement>("[data-review-ground] input[type=checkbox]")].find((box) => box.labels?.[0]?.textContent === "Illegal under the law (name the law below)")!.click(); });
+    expect(lawBox()).toBeNull();
+    await act(async () => { [...host!.querySelectorAll<HTMLInputElement>("[data-review-ground] input[type=checkbox]")].find((box) => box.labels?.[0]?.textContent === "Terms §7: hate speech")!.click(); });
+    await press("Confirm");
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "DECIDE", ground: { grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flagId: null, facts: "Kept hidden.", law: null } });
   });
   it("while hidden: each dig's text with what it changed and its state; a correction shows both texts; the steps name their piece", async () => {
     const step = vi.fn(async () => ({}));
@@ -112,7 +155,7 @@ describe("the review panel", () => {
     await press("Take this dig out");
     await ground("Terms §7: personal data about other people", "Our own initiative", "It names a person.");
     await press("Confirm");
-    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG, ground: { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flagId: null, facts: "It names a person." } });
+    expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: DIG, ground: { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flagId: null, facts: "It names a person.", law: null } });
     await press("Put this back");
     expect(host!.querySelector("[data-review-ground]")).toBeNull();
     await press("Confirm");
@@ -146,6 +189,22 @@ describe("the review panel", () => {
     expect(host!.textContent).toContain("The reporter is told by email that a person acted on it, with no detail.");
     await press("Confirm");
     expect(api.closeReport).toHaveBeenCalledWith(LATER, "ACTED");
+  });
+  it("0172 (M6): a report a review step closed says so, and offers no Close button", async () => {
+    const closed = (outcome: "ACTED" | "NO_BREACH", closedByStep: boolean) => ({ flag_id: LATER, publication_ref: REF, reporter: "Quiet Heron", state: "QUEUED", verdict: null, reason: null,
+      created_at: "2026-11-01T08:00:00.000Z", judged_at: null, dismissed_at: "2026-11-02T08:00:00.000Z", where: "A place.", claim: "A claim to read.", debate_hidden: true, outcome, closed_by_step: closedByStep });
+    await mount(client({ readReports: vi.fn(async () => ({ reports: [closed("ACTED", true)] })) as never }));
+    const row = host!.querySelector("[data-report]")!;
+    expect(row.textContent).toContain("Closed: we acted on it (review step)");
+    expect(row.textContent).not.toContain("Closed: acted on.");
+    expect(button("Close: no breach found")).toBeUndefined();
+    expect(button("Close: we acted on it")).toBeUndefined();
+    act(() => root?.unmount());
+    host?.remove();
+    // A person's own close keeps its own line.
+    await mount(client({ readReports: vi.fn(async () => ({ reports: [closed("ACTED", false)] })) as never }));
+    expect(host!.querySelector("[data-report]")!.textContent).toContain("Closed: acted on.");
+    expect(host!.querySelector("[data-report]")!.textContent).not.toContain("(review step)");
   });
   it("a public link or a bare reference names the debate; anything else is nothing", () => {
     expect(publicationRefOf(`https://dezbatere.ro/public/debate/${REF}?x=1`)).toBe(REF);

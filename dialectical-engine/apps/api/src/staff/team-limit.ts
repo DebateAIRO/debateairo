@@ -126,7 +126,9 @@ export function registerTeamLimitRoutes(route: Route, service: () => TeamLimitSt
 }
 
 /** Decision 32 runs this same loop over its own notices (0146): the Owner's and the member's. Neither names an amount or a person. */
-const NOTICE_TEMPLATES = Object.freeze({ LIMIT_CHANGED: "TEAM_LIMIT_CHANGED", PARTNER_CHANGED: "TEAM_LIMIT_PARTNER_CHANGED", ALLOWANCE_CHANGED: "TEAM_ALLOWANCE_CHANGED", ALLOWANCE_YOURS: "TEAM_ALLOWANCE_YOURS", PUBLIC_REVIEW: "PUBLIC_REVIEW_CHANGED", PUBLIC_FLAG_HIDDEN: "PUBLIC_FLAG_HIDDEN", PUBLIC_FLAG_WAITING: "PUBLIC_FLAG_WAITING" } as const);
+const NOTICE_TEMPLATES = Object.freeze({ LIMIT_CHANGED: "TEAM_LIMIT_CHANGED", PARTNER_CHANGED: "TEAM_LIMIT_PARTNER_CHANGED", ALLOWANCE_CHANGED: "TEAM_ALLOWANCE_CHANGED", ALLOWANCE_YOURS: "TEAM_ALLOWANCE_YOURS", PUBLIC_REVIEW: "PUBLIC_REVIEW_CHANGED", PUBLIC_FLAG_HIDDEN: "PUBLIC_FLAG_HIDDEN", PUBLIC_FLAG_WAITING: "PUBLIC_FLAG_WAITING",
+  // 0172, M5: a moderation email that could not be created or sent, on 0151's notices.
+  MODERATION_MAIL_FAILED: "MODERATION_MAIL_FAILED" } as const);
 export type TeamLimitNoticeInputs = Readonly<{
   repository: Pick<PostgresTeamLimitRepository, "completeNotice" | "noticeUser"> & Readonly<{ claimNotices(limit: number): ReturnType<PostgresTeamLimitRepository["claimNotices"]> | ReturnType<PostgresInternalAllowanceRepository["claimNotices"]> | ReturnType<PostgresPublicReviewRepository["claimNotices"]> | ReturnType<PostgresPublicFlagRepository["claimNotices"]> }>;
   mail: TemplatedMailChannel;

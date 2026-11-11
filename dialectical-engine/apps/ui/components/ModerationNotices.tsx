@@ -70,6 +70,8 @@ function Statement({ statement, catalog, locale }: Readonly<{ statement: Moderat
         <>
           <p>{t(catalog, "public.moderation.groundIntro")}</p>
           <ul>{relied.map((code) => <li key={code}>{t(catalog, `public.moderation.ground.${code}`)}</li>)}</ul>
+          {/* 0172 (M7; DSA Art 17(3)(d)): the law an ILLEGAL ground relies on, in staff's own words; on this page and in the export, never in a mail. */}
+          {ground.law !== null ? <p data-statement-law dir="auto">{t(catalog, "public.moderation.law", { law: ground.law })}</p> : null}
         </>
       )}
       {suspected.length > 0 ? (

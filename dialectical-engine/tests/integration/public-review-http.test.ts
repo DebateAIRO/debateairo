@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { StaffAccessService, staffTokenHash } from "../../apps/api/src/staff/access.js";
-import { canonicalPublicReviewBinding } from "../../apps/api/src/staff/public-review.js";
+import { canonicalPublicReviewBinding, groundFieldsOf } from "../../apps/api/src/staff/public-review.js";
 import { canonicalPublicFlagBinding } from "../../apps/api/src/public-flag.js";
 import { StaffAlertError } from "../../apps/api/src/staff/alerts.js";
 import { testHttpIdentity, testSessionApplication, testSessionHeaders, TEST_APP_ORIGIN } from "../support/httpSession.js";
@@ -72,7 +72,7 @@ function server(options: Readonly<{ allowed?: boolean; proof?: boolean; locked?:
 }
 const handle = () => randomBytes(32).toString("base64url");
 const proved = (change: Record<string, unknown> = {}) => ({ expected_revision: 3, operation_id: randomUUID(), grounds: [], source: null, flag_id: null, proof_handle: handle(), ...change });
-const stepBody = (change: Record<string, unknown>) => proved({ step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text: null, facts: null, ...change });
+const stepBody = (change: Record<string, unknown>) => proved({ step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text: null, facts: null, law: null, ...change });
 /** 0157: what a removal, a hidden report, a correction and DECIDE must carry. */
 const GROUNDED = { grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flag_id: null, facts: "It names a private person and where they live." };
 const NO_GROUND = { grounds: [], source: null, flag_id: null };
@@ -136,7 +136,7 @@ describe("the steps", () => {
     expect(waits.statusCode).toBe(503);
     expect(waits.json().error).toBe("STAFF_ALERT_UNAVAILABLE");
     expect(locked.calls).toHaveLength(1);
-    const ceremony = await locked.built.inject({ method: "POST", url: "/v1/admin/webauthn/action/options", headers: headers(true), payload: { intent: { action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text_sha256: null, expected_revision: 3, operation_id: randomUUID(), ...NO_GROUND, facts_sha256: null } } });
+    const ceremony = await locked.built.inject({ method: "POST", url: "/v1/admin/webauthn/action/options", headers: headers(true), payload: { intent: { action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REPUBLISH", piece_kind: null, piece_id: null, pointer: null, text_sha256: null, expected_revision: 3, operation_id: randomUUID(), ...NO_GROUND, facts_sha256: null, law: null } } });
     expect(ceremony.statusCode).toBe(503);
   });
   it("a correction binds the text's digest, never the words; only a string a person reads can be replaced; a proof for one piece differs from another's", async () => {
@@ -158,7 +158,7 @@ describe("the steps", () => {
     const unknown = await post(yes.built, "step", stepBody({ ...GROUNDED, step: "CORRECT", piece_kind: "UPDATE", piece_id: randomUUID(), pointer: "/line", text }));
     expect(unknown.statusCode).toBe(404);
     expect(yes.calls).toHaveLength(1);
-    const of = (piece: string) => canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "PUT_BACK", piece_kind: "UPDATE", piece_id: piece, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN, ...NO_GROUND, facts_sha256: null }, STATE).bodySha256;
+    const of = (piece: string) => canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "PUT_BACK", piece_kind: "UPDATE", piece_id: piece, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN, ...NO_GROUND, facts_sha256: null, law: null }, STATE).bodySha256;
     expect(of(UPDATE)).not.toBe(of(RUN));
   });
   it("gap 1 (DSA Art 17(3)): a removal names its ground, its source and its facts, or nothing is asked of the passkey; the facts are sealed and only their digest is bound", async () => {
@@ -178,10 +178,45 @@ describe("the steps", () => {
     expect(yes.calls[0]).toMatchObject({ step: "REMOVE_DIG", ground: { grounds: "PERSONAL_DATA,UNLAWFUL", source: "OWN_INITIATIVE", flag_id: "", facts_sha256: digest }, facts: { sealed: { facts: GROUNDED.facts } } });
     expect(JSON.stringify(yes.bindings)).not.toContain(GROUNDED.facts);
     const other = canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN,
-      grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flag_id: null, facts_sha256: digest }, STATE).bodySha256;
+      grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flag_id: null, facts_sha256: digest, law: null }, STATE).bodySha256;
     const same = canonicalPublicReviewBinding({ action: "PUBLIC_REVIEW_STEP", publication_ref: REF, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN, pointer: null, text_sha256: null, expected_revision: 3, operation_id: RUN,
-      grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flag_id: null, facts_sha256: digest }, STATE).bodySha256;
+      grounds: ["PERSONAL_DATA"], source: "OWN_INITIATIVE", flag_id: null, facts_sha256: digest, law: null }, STATE).bodySha256;
     expect(other).not.toBe(same);
+  });
+  it("0172, M7: a step on ILLEGAL names the law or nothing is asked of the passkey; the law is bound into the proof and passed to the database; a hide never waits for it", async () => {
+    const yes = server();
+    const LAW = "Legea nr. 8/1996, art. 139";
+    const missing = await post(yes.built, "step", stepBody({ ...GROUNDED, grounds: ["ILLEGAL"], law: null, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+    expect(missing.statusCode).toBe(422);
+    expect(missing.json().error).toBe("MODERATION_GROUND_LAW_MISSING");
+    for (const law of ["ab", "x".repeat(201)]) {
+      const bad = await post(yes.built, "step", stepBody({ ...GROUNDED, grounds: ["ILLEGAL"], law, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+      expect(bad.statusCode, law).toBe(422);
+    }
+    // A re-publish carries no law.
+    expect((await post(yes.built, "step", stepBody({ law: LAW }))).statusCode).toBe(422);
+    expect(yes.bindings).toEqual([]);
+    expect(yes.calls).toEqual([]);
+    const ok = await post(yes.built, "step", stepBody({ ...GROUNDED, grounds: ["ILLEGAL"], law: LAW, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(yes.calls[0]).toMatchObject({ step: "REMOVE_DIG", ground: { grounds: "ILLEGAL", law: LAW } });
+    const intent = { action: "PUBLIC_REVIEW_STEP" as const, publication_ref: REF, step: "REMOVE_DIG" as const, piece_kind: "DIG" as const, piece_id: RUN, pointer: null, text_sha256: null, expected_revision: 3,
+      operation_id: RUN, grounds: ["ILLEGAL" as const], source: "OWN_INITIATIVE" as const, flag_id: null, facts_sha256: "a".repeat(64), law: LAW };
+    expect(Object.keys(groundFieldsOf(intent))).toEqual(["grounds", "source", "flag_id", "facts_sha256", "law"]);
+    expect(groundFieldsOf({ ...intent, law: null }).law).toBe("");
+    expect(canonicalPublicReviewBinding(intent, STATE).bodySha256).not.toBe(canonicalPublicReviewBinding({ ...intent, law: "Legea nr. 8/1996, art. 140" }, STATE).bodySha256);
+    // The database's own refusal passes through plainly.
+    await close?.();
+    const refused = server({ databaseSays: "MODERATION_GROUND_LAW_MISSING" });
+    const said = await post(refused.built, "step", stepBody({ ...GROUNDED, grounds: ["ILLEGAL"], law: LAW, step: "REMOVE_DIG", piece_kind: "DIG", piece_id: RUN }));
+    expect(said.statusCode).toBe(422);
+    expect(said.json().error).toBe("MODERATION_GROUND_LAW_MISSING");
+    // A hide on a suspected ILLEGAL carries no law and waits for none.
+    await close?.();
+    const locked = server({ locked: true });
+    const hide = await post(locked.built, "hide", proved({ grounds: ["ILLEGAL"], source: "EMAIL_NOTICE" }));
+    expect(hide.statusCode).toBe(200);
+    expect(locked.calls[0]).toMatchObject({ step: "HIDE", ground: { grounds: "ILLEGAL", law: "" } });
   });
   it("gap 1: a hide may name a suspected ground and the report it came from, and never waits for them; DECIDE records the final ground of a debate kept hidden", async () => {
     const locked = server({ locked: true });

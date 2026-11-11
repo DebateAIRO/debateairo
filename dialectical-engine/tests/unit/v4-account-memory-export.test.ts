@@ -112,18 +112,18 @@ describe("V4 account memory in the data export", () => {
       expect(text).not.toContain("SECRET-STAFF");
     });
 
-    it("0157 (D1): each statement of reasons in full, its facts and quote opened under the debate's key; 0156's earlier notices; no run id, no ciphertext", async () => {
+    it("0157 (D1), 0172 (M7): each statement of reasons in full, with the law an illegal ground names, its facts and quote opened under the debate's key; 0156's earlier notices; no run id, no ciphertext", async () => {
       const raw = rawRows();
       const FACTS = { ciphertext: "SEALED-FACTS" }, QUOTE = { ciphertext: "SEALED-QUOTE" };
       raw.moderation = { report_answers: [], earlier_notices: [{ kind: "DEBATE_HIDDEN", publication_ref: PUBLICATION, happened_at: "2026-11-02T08:00:00+00:00", emailed_at: "2026-11-02T08:01:00+00:00" }],
         statements: [{ statement_id: "s-1", kind: "CONTRIBUTION_REMOVED", publication_ref: PUBLICATION, run_id: RUN_BEHIND_IT, happened_at: "2026-11-05T08:00:00+00:00", piece_kind: "DIG",
-          places: [], ground: { recorded: true, interim: false, grounds: ["PERSONAL_DATA"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false },
+          places: [], ground: { recorded: true, interim: false, grounds: ["ILLEGAL"], suspected: [], sources: ["AUTHORITY_ORDER"], automated_detection: false, automated_decision: false, law: "Legea nr. 8/1996, art. 139" },
           hidden_now: false, facts: [FACTS], facts_deleted: false, quote: QUOTE, emailed_at: "2026-11-05T08:01:00+00:00" }] };
       const open = vi.fn(async (_ref: string, _run: string, envelope: unknown) => envelope === FACTS ? { facts: "It names a home address." } : { quote: "the words found" });
       const account = JSON.parse(await accountOf(raw, open));
       expect(open.mock.calls.map(([ref, run]) => [ref, run])).toEqual([[PUBLICATION, RUN_BEHIND_IT], [PUBLICATION, RUN_BEHIND_IT]]);
       expect(account.moderation_notices).toEqual([{ kind: "CONTRIBUTION_REMOVED", debate_reference: PUBLICATION, happened_at: "2026-11-05T08:00:00.000Z", piece_kind: "DIG",
-        ground: { recorded: true, interim: false, grounds: ["PERSONAL_DATA"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false },
+        ground: { recorded: true, interim: false, grounds: ["ILLEGAL"], suspected: [], sources: ["AUTHORITY_ORDER"], automated_detection: false, automated_decision: false, law: "Legea nr. 8/1996, art. 139" },
         places: [], facts: ["It names a home address."], facts_deleted: false, quote: "the words found", emailed_at: "2026-11-05T08:01:00.000Z" }]);
       expect(account.earlier_moderation_notices).toEqual([{ kind: "DEBATE_HIDDEN", debate_reference: PUBLICATION, happened_at: "2026-11-02T08:00:00.000Z", emailed_at: "2026-11-02T08:01:00.000Z" }]);
       for (const absent of [RUN_BEHIND_IT, "SEALED-FACTS", "SEALED-QUOTE", "ciphertext", "s-1"]) expect(JSON.stringify(account), absent).not.toContain(absent);
