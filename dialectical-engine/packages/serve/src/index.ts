@@ -4019,8 +4019,9 @@ export class ServeRepository {
         plan: (plan ?? []).map((decided) => ({ pathId: decided.pathRef, status: decided.status,
           reason: decided.status === "NO_SEARCH_PLANNED" ? webPlanReasonOf(open(WEB_PLAN_CARRIER, decided.pathRef, decided.reason)) : null }))
       }), roots);
-      // W4-3: the AI's suggestions on this debate's paths, when it is a dig with a checked rewrite (sealed with it, under its
-      // key), and the readers' "still worth looking into" lines from each pack (code's kind; a wiped pack has none).
+      // W4-3: the AI's suggestions on this debate's paths, when it is a dig with a checked rewrite sealed before B3 (sealed with it,
+      // under its key; since B3 they are in 0141's store, read with the answer and offered in place of these), and the readers'
+      // "still worth looking into" lines from each pack (code's kind; a wiped pack has none).
       const own = (await new PostgresDigModelRunnerRepository(this.pool).readPathRewrites(runId))?.own ?? null;
       const rewriteOpened = own === null || own.rewrite_id === null || own.content === null || own.content === undefined ? null
         : decryptLeasedContentForRun<unknown>(cipher, PATH_REWRITE_CARRIER, own.rewrite_id, own.content as CryptoEnvelope, null);

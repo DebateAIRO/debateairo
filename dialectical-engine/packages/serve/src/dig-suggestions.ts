@@ -5,7 +5,8 @@ import { DigSuggestionSchema, WEB_CONTRACT_LIMITS, DIG_LEVEL_MAX, type AnswerWeb
  * THE DIG SUGGESTIONS CODE FINDS (plan 2026-10-30 task W4-3; owner, 30 Oct: "contradicting parts, undocumented parts, things
  * that need more web-search"; F14: Free gets only these, with no AI call). Worked out from what the answer already holds, with
  * no AI and nothing stored, so a first debate, a dig and Free all have them. The AI's own suggestions (on a dig's paths) are
- * sealed with its rewrite (apps/runner dig-suggestions-step.ts) and joined beside these.
+ * joined beside these: 0141's newest set of each path (B3: since 12 Nov a dig's own are kept there, once its rewrite's row is stored),
+ * else what a rewrite sealed before then (apps/runner dig-suggestions-step.ts).
  *  - CONTRADICTING: a point of the path the second AI disputed;
  *  - UNDOCUMENTED: a point of the path that rests on reasoning alone and names no source;
  *  - NEEDS_MORE_WEB: what the readers said is still worth looking into (their lines, from the path's pack).

@@ -224,9 +224,11 @@ export type ClimbStart = Readonly<{
 /**
  * A dig's own rewrite is stored: climb, and update the main answer, as far as the change goes. V4 start step, Task 55e: a run with no
  * rewrite of its own that is a first-level path its dig added (`addedPathOf`) updates the main answer itself (`addedPathUpdate`). Never
- * rejects.
+ * rejects. B3: `alongside` is the dig's suggestions, asked beside the climb (path-rewrite.ts); the dig is marked settled only once they
+ * are in, as before, when they were asked in front of it. Absent: nothing beside.
  */
-export async function advanceTree(settings: TreeUpdateSettings, digRunId: string, lease: StepLease = BARE_STEP): Promise<TreeAdvance> {
+export async function advanceTree(settings: TreeUpdateSettings, digRunId: string, lease: StepLease = BARE_STEP,
+  alongside?: Promise<unknown>): Promise<TreeAdvance> {
   const log = safeLog(settings);
   try {
     const own = await settings.ports.ownRewriteOf(digRunId);
@@ -238,6 +240,7 @@ export async function advanceTree(settings: TreeUpdateSettings, digRunId: string
     }
     const rewriteId = own.entry.rewrite_id ?? null;
     const outcome = own.text === null || rewriteId === null ? "NOTHING" : await advanceFrom(settings, digRunId, own.entry, own.text, rewriteId, lease);
+    await alongside?.then(() => undefined, () => undefined);
     // 0153: nothing more will be bought for this dig, so the test site's estimate stops holding it. An unwritten mark only keeps the hour's hold.
     if (outcome !== "LEFT") await settings.ports.tree.markDigSettled(digRunId);
     return outcome;
@@ -640,7 +643,8 @@ async function spentOf(ports: TreeUpdatePorts, runId: string): Promise<number> {
  * `advanceTree` for each: the rows already there are walked, free, and it goes on at the first one missing. A dig it finished in this process
  * is not asked again. `paused`: a retiring release starts nothing new. V4 start step, Task 55e: the list also holds each dig under the main
  * question of a path debate whose paths' answers so far stood still with no main-answer version of its own yet, so an update a runner left
- * undone (it stopped after the dig's story, or its update was left) is written here.
+ * undone (it stopped after the dig's story, or its update was left) is written here. B3: beside each climb walked, the dig's own suggestions
+ * a runner left unwritten (`owed`).
  */
 export type TreeSweepSettings = Readonly<{
   tree: TreeUpdateSettings;
@@ -657,6 +661,12 @@ export type TreeSweepSettings = Readonly<{
    * Absent: as before.
    */
   mapRun?: (runId: string) => Promise<void>;
+  /**
+   * B3: what a dig's own rewrite still owes beside its climb: the AI's suggestions on its own paths, when a runner stopped after the row
+   * and before they were in (path-rewrite.ts `owedDigSuggestions`). Asked for every dig walked, beside its climb, the mark waiting for it.
+   * Never rejects. Absent: none.
+   */
+  owed?: (digRunId: string) => Promise<void>;
   now?: () => Date;
 }>;
 
@@ -690,7 +700,13 @@ export async function sweepTreeUpdates(settings: TreeSweepSettings, finished: Se
         skipped += 1;
         continue;
       }
-      const outcome = await advanceTree(settings.tree, digRunId);
+      const owed = settings.owed === undefined ? undefined : settings.owed(digRunId).catch(() => undefined);
+      let outcome: TreeAdvance;
+      try {
+        outcome = await advanceTree(settings.tree, digRunId, BARE_STEP, owed);
+      } finally {
+        await owed;
+      }
       if (outcome === "LEFT") { skipped += 1; continue; }
       // No finished rewrite yet: its own sweep writes it, and this one looks again.
       if (outcome !== "NOTHING") finished.add(key);

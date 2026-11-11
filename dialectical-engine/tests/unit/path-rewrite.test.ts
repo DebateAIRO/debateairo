@@ -5,17 +5,30 @@
 // or a pick that stay data, code's checks of the reply (refs, verdict, trust word), and two digs of one path in order.
 import { describe, expect, it } from "vitest";
 import { readPromptFrame, type PromptPacket } from "@debateai/providers";
-import type { DigSuggestionsJob, PathSuggestionsRefresh } from "../../apps/runner/src/dig-suggestions-step.js";
+import {
+  ownPathSuggestionsSetIdOf, writeOwnPathSuggestions, type DigSuggestionsJob, type PathSuggestionsRefresh, type PathSuggestionsStore
+} from "../../apps/runner/src/dig-suggestions-step.js";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
-import { pathRewriteIdOf, runDigPathRewrite, runFirstDebateSuggestions } from "../../apps/runner/src/path-rewrite.js";
+import { sweepTreeUpdates, type TreeUpdateSettings } from "../../apps/runner/src/path-climb.js";
+import {
+  owedDigSuggestions, pathRewriteIdOf, runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings, type PathRewriteStoredInput
+} from "../../apps/runner/src/path-rewrite.js";
+import { createReplayBook, recordedCalls } from "../../apps/runner/src/run-replay.js";
 import {
   AI_PICK, DIG_A, DIG_B, DIG_NODES, OBJECTION, ORDERS, OWN_VIEW, PARENT_POINTS, SATISFIED, dig, digSnapshot, down, fieldsOf,
-  fittingRewrite, isChecker, memoryStore, membersOf, parentOf, settingsOver, storyParentPath, team, until, writesFitting,
+  fittingRewrite, isChecker, memoryStore, membersOf, parentOf, recorded, settingsOver, storyParentPath, team, until, writesFitting,
   type Logged
 } from "../support/path-rewrite-world.js";
 
 const writerBodies = (bodies: readonly string[]) => bodies.map((body) => JSON.parse(body) as { messages: PromptPacket["messages"] })
   .filter((body) => !isChecker(body));
+/** B3: a suggestion call on a dig's own path (web.suggest-dig.v1), and a reply resting on that path's first point. */
+const isSuggestPacket = (packet: PromptPacket): boolean => readPromptFrame({ messages: packet.messages.slice(0, 2) }).contractId === "web.suggest-dig.v1";
+function suggestedOn(packet: PromptPacket): string {
+  const fields = fieldsOf(packet);
+  const refs = [...JSON.parse(fields.get("for")!) as Array<{ ref: string }>, ...JSON.parse(fields.get("against")!) as Array<{ ref: string }>];
+  return JSON.stringify({ suggestions: [{ side: "for", question: "Does it hold in winter too?", why: "It could change where this path comes out.", rests_on: [refs[0]!.ref] }] });
+}
 
 describe("W3-5 a dig rewrites the path it was dug from", () => {
   it("writer then checker, one round, READY: the row, the sealed text, the dig's paths by their real refs, and the hook", async () => {
@@ -62,22 +75,137 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
       outcome: "READY", digPathRefs: [DIG_NODES.no, DIG_NODES.yes] }]);
   });
 
-  it("W4-3: the AI's suggestions are sealed with the rewrite, told what it changed; a failure to write them costs the rewrite nothing", async () => {
-    const offered = [{ position_ref: "pos", suggestions: [{ suggestion_id: "s-1", kind: "HELPS_MAIN_QUESTION" as const, side: "FOR" as const, text: "t", places: ["path:pos"] }] }];
+  it("B3: the checked rewrite is stored, and the climb starts, while the suggestion calls are still out; the run ends once they are in", async () => {
+    const store = memoryStore();
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const jobs: DigSuggestionsJob[] = [];
+    const refreshed: PathSuggestionsRefresh[] = [];
+    let suggestionsIn = false;
+    let climbing = false;
+    let markWaitedForThem: boolean | null = null;
+    const settings = settingsOver({ store, digs: new Map([[DIG_A, dig()]]), extra: {
+      // Both kinds of call hang until released, as a slow vendor's would (up to three tries of 240 s each).
+      suggest: async (job) => { jobs.push(job); await held; suggestionsIn = true; },
+      refreshSuggestions: async (input) => { refreshed.push(input); await held; },
+      // The climb is handed the suggestions' promise: it marks the dig settled only once they are in.
+      afterStored: async (_digRunId, _lease, alongside) => { climbing = true; await alongside; markWaitedForThem = suggestionsIn; }
+    } });
+    let ended = false;
+    const running = runDigPathRewrite(settings, digSnapshot(DIG_A, membersOf(team()))).then(() => { ended = true; });
+    await until(() => store.rewrites.length === 1 && climbing);
+    // The row is there, READY, sealed without the dig's own suggestions, and the climb has begun: nothing waited for the calls.
+    expect(store.rewrites[0]!.outcome).toBe("READY");
+    expect(store.contents.get(store.rewrites[0]!.rewriteId)).not.toHaveProperty("dig_suggestions");
+    expect([jobs.length, refreshed.length, suggestionsIn]).toEqual([1, 1, false]);
+    // The same job as before: the dig's own paths, told what the rewrite changed, on the rewrite's writer.
+    expect(jobs[0]).toMatchObject({ digRunId: DIG_A, free: false, level: 1, whatChanged: ["The dig weakened the year-round case: winter ridership falls."] });
+    expect(jobs[0]!.digPaths.map((path) => path.positionRef)).toEqual([DIG_NODES.no, DIG_NODES.yes]);
+    expect(jobs[0]!.writer.providerRef).toBe("ref-haiku");
+    // The rewrite's task is still open (the sweep never starts a second copy beside it) until the calls are in.
+    for (let at = 0; at < 50; at += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(ended).toBe(false);
+    release();
+    await running;
+    expect(markWaitedForThem).toBe(true);
+  });
+
+  it("B3: a runner that stopped after the row: the tree's sweep asks the dig's own suggestions from the store alone, the same prompts, every answered call replayed free", async () => {
+    const store = memoryStore();
+    const inputs = new Map<string, PathRewriteStoredInput>();
+    const sources = {
+      recordInput: async (runId: string, workItemId: string, digPaths: PathRewriteStoredInput["digPaths"]) => {
+        inputs.set(runId, JSON.parse(JSON.stringify({ workItemId, digPaths })) as PathRewriteStoredInput);
+        return "RECORDED";
+      },
+      storedInputOf: async (runId: string) => inputs.get(runId) ?? null,
+      ownWhatChangedOf: async (runId: string) => store.contents.get(pathRewriteIdOf(runId))?.what_changed ?? null
+    };
+    const withSources = (settings: PathRewriteRunnerSettings) => ({ ...settings, sources: { ...settings.sources, ...sources } });
+    const first = team({ haiku: (packet) => (isSuggestPacket(packet) ? suggestedOn(packet) : writesFitting(packet, 1)) });
+    // The first runner dies once both calls have answered and before it keeps either: its store never answers.
+    const dying: PathSuggestionsStore = { positionsOf: async () => new Set(), record: () => new Promise<string>(() => undefined) };
+    void runDigPathRewrite(withSources(settingsOver({ store, digs: new Map([[DIG_A, dig()]]), extra: {
+      suggest: (job) => writeOwnPathSuggestions(job, dying, async () => "[]") } })), digSnapshot(DIG_A, membersOf(first)));
+    await until(() => first.haiku.ledger.filter((entry) => entry.callSiteKey.startsWith("PATH_REWRITE:SUGGEST:") && entry.outcome === "OK").length === 2);
+    expect(store.rewrites.map((row) => row.outcome)).toEqual(["READY"]);
+
+    // A new process: its own members, which anything asked of them would be a call paid twice.
+    const again = team();
+    const kept: Array<Readonly<{ setId: string; runId: string; debateRunId: string; positionRef: string; content: { suggestions: readonly unknown[] } }>> = [];
+    const keeping: PathSuggestionsStore = { positionsOf: async () => new Set(kept.map((set) => set.positionRef)),
+      record: async (input) => { kept.push(input); return "RECORDED"; } };
+    let books = 0;
+    const book = createReplayBook({ calls: recordedCalls(recorded(first.all)), earlierNodes: [] });
+    const sweep = withSources(settingsOver({ store, digs: new Map([[DIG_A, dig()], [DIG_B, dig()]]), extra: {
+      suggest: (job) => writeOwnPathSuggestions(job, keeping, async () => "[]"),
+      replayBookOf: async (runId, workItemId) => { books += 1; expect([runId, workItemId]).toEqual([DIG_A, inputs.get(DIG_A)!.workItemId]); return book; } } }));
+    const roles = { resolveProvider: membersOf(again).resolve, backupCandidates: membersOf(again).backups };
+    await owedDigSuggestions(sweep, roles, keeping, DIG_A);
+    expect(again.haiku.bodies).toEqual([]);
+    expect([...kept].sort((left, right) => left.positionRef.localeCompare(right.positionRef)).map((set) => [set.setId, set.runId, set.debateRunId, set.positionRef]))
+      .toEqual([DIG_NODES.no, DIG_NODES.yes].sort().map((ref) => [ownPathSuggestionsSetIdOf(DIG_A, ref), DIG_A, DIG_A, ref]));
+    expect(kept.map((set) => set.content.suggestions.length)).toEqual([1, 1]);
+    // Asked again: every path has its set, so nothing more is read or asked. A dig with no finished rewrite of its own owes nothing.
+    await owedDigSuggestions(sweep, roles, keeping, DIG_A);
+    await owedDigSuggestions(sweep, roles, keeping, DIG_B);
+    expect([books, again.haiku.bodies.length, kept.length]).toEqual([1, 0, 2]);
+  });
+
+  it("B3: the tree's sweep asks what a dig owes beside its climb, and marks the dig settled only once that is in", async () => {
+    const refused = async (): Promise<never> => { throw new Error("test: not read here"); };
+    const settled: string[] = [];
+    const tree: TreeUpdateSettings = { writerRoleRef: "ref-haiku", checkerRoleRef: "ref-glm", roles: {},
+      ports: { tree: { takeTurn: refused, readTurn: refused, record: refused, readLine: refused, readClimbNext: refused, recordMainAnswer: refused,
+        readMainAnswers: refused, markDigSettled: async (runId: string) => { settled.push(runId); return "RECORDED"; } } as never,
+      // A finished rewrite whose text did not open: nothing to climb, so the dig is marked as soon as what it owes is in.
+      ownRewriteOf: async () => ({ entry: { state: "READY", rewrite_id: pathRewriteIdOf(DIG_A) } as never, text: null }),
+      digOf: refused, parentPathOf: refused, childOf: refused, sealUpdate: refused, sealMainAnswer: refused, openMainAnswer: refused, answerInputOf: refused,
+      payerOf: refused, answerSpentMicros: refused } };
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const owed: string[] = [];
+    const pass = sweepTreeUpdates({ tree, list: async () => [DIG_A], owed: async (digRunId) => { owed.push(digRunId); await held; } });
+    await until(() => owed.length === 1);
+    for (let at = 0; at < 50; at += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(settled).toEqual([]);
+    release();
+    expect(await pass).toEqual({ listed: 1, advanced: 1, skipped: 0 });
+    expect([owed, settled]).toEqual([[DIG_A], [DIG_A]]);
+  });
+
+  it("W4-3, B3: the AI's suggestions are asked once the row is stored, told what it changed, and no longer sealed in it; a failure costs the rewrite nothing", async () => {
     const store = memoryStore();
     const jobs: DigSuggestionsJob[] = [];
-    await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]), extra: { suggest: async (job) => { jobs.push(job); return offered; } } }),
+    let storedFirst = false;
+    await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]), extra: { suggest: async (job) => { storedFirst = store.rewrites.length === 1; jobs.push(job); } } }),
       digSnapshot(DIG_A, membersOf(team())));
+    expect(storedFirst).toBe(true);
+    expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({ digRunId: DIG_A, free: false, whatChanged: ["The dig weakened the year-round case: winter ridership falls."] });
     const row = store.rewrites[0]!;
     expect(row.outcome).toBe("READY");
-    expect(store.contents.get(row.rewriteId)).toMatchObject({ dig_suggestions: offered });
+    expect(store.contents.get(row.rewriteId)).not.toHaveProperty("dig_suggestions");
 
     const failing = memoryStore();
-    await runDigPathRewrite(settingsOver({ store: failing, digs: new Map([[DIG_A, dig()]]), extra: { suggest: async () => { throw new Error("down"); } } }),
-      digSnapshot(DIG_A, membersOf(team())));
+    let climbed = false;
+    await runDigPathRewrite(settingsOver({ store: failing, digs: new Map([[DIG_A, dig()]]), extra: { suggest: async () => { throw new Error("down"); },
+      afterStored: async () => { climbed = true; } } }), digSnapshot(DIG_A, membersOf(team())));
     expect(failing.rewrites[0]!.outcome).toBe("READY");
+    expect(climbed).toBe(true);
     expect(failing.contents.get(failing.rewrites[0]!.rewriteId)).not.toHaveProperty("dig_suggestions");
+    // A rewrite every writer failed asks for none.
+    const none: DigSuggestionsJob[] = [];
+    await runDigPathRewrite(settingsOver({ store: memoryStore(), digs: new Map([[DIG_A, dig()]]), extra: { suggest: async (job) => { none.push(job); } } }),
+      digSnapshot(DIG_A, membersOf(team({ haiku: down, deepseek: down, qwen: down }))));
+    expect(none).toEqual([]);
+    // Nor does a text that could not be sealed: its row is FAILED, and neither kind of suggestion is asked for it.
+    const unsealed = memoryStore();
+    const asked: string[] = [];
+    await runDigPathRewrite(settingsOver({ store: unsealed, digs: new Map([[DIG_A, dig()]]), extra: { seal: async () => { throw new Error("no key"); },
+      suggest: async () => { asked.push("own"); }, refreshSuggestions: async () => { asked.push("refresh"); } } }), digSnapshot(DIG_A, membersOf(team())));
+    expect(unsealed.rewrites[0]).toMatchObject({ outcome: "FAILED", failureCode: "PATH_REWRITE_UNEXPECTED_ERROR" });
+    expect(asked).toEqual([]);
   });
 
   it("Q-D8: once the row is stored, the rewritten path's suggestions again, from its new text; a failed rewrite asks for none", async () => {

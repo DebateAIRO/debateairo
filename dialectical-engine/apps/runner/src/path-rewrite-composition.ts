@@ -4,11 +4,11 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ProviderGateway, TokenCounter } from "@debateai/providers";
-import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeDigSuggestionsOnPool } from "./dig-suggestions-step.js";
+import { postgresPathSuggestionsStore, refreshPathSuggestionsOnPool, writeOwnPathSuggestionsOnPool } from "./dig-suggestions-step.js";
 import { firstDebateSuggestionFacts } from "./investigation-digest.js";
 import { advanceAfterStory, advanceTree, type TreeSweepSettings, type TreeUpdateSettings } from "./path-climb.js";
 import { postgresTreeUpdatePorts, readRecentTreeDigs } from "./path-climb-sources.js";
-import { createPathRewriteInFlight, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { createPathRewriteInFlight, owedDigSuggestions, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { publicDigOnSettle, type PublicTreeRunnerSettings } from "./public-contribution.js";
 import { postgresPathRewriteSources } from "./path-rewrite-sources.js";
 import type { PathRewriteSweepSettings } from "./path-rewrite-sweep.js";
@@ -66,6 +66,7 @@ export function composePathRewrite(input: Readonly<{
   });
   const inFlight = createPathRewriteInFlight();
   const refreshSuggestions = refreshPathSuggestionsOnPool(pool);
+  const suggestionStore = postgresPathSuggestionsStore(pool);
   const tokenCount = input.tokenCount === undefined ? {} : { tokenCount: input.tokenCount };
   // Task 57p: one reader of the run → version map for the rewrite, the tree and the public tree alike.
   const versionOf = input.settingsVersionOf === undefined ? {} : { settingsVersionOf: input.settingsVersionOf };
@@ -96,13 +97,14 @@ export function composePathRewrite(input: Readonly<{
     replayBookOf: (runId: string, workItemId: string) => readReplayBook(pool, runId, workItemId),
     log: input.log,
     inFlight,
-    // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated.
-    suggest: writeDigSuggestionsOnPool(pool),
+    // W4-3: the AI's suggestions on the dig's own paths, told what the whole debate already investigated. B3: asked once the row is
+    // stored, beside the climb, each set kept in 0141's store.
+    suggest: writeOwnPathSuggestionsOnPool(pool),
     // Owner Q-D8, and a first debate's own (0141).
     refreshSuggestions,
-    firstDebateSuggestions: Object.freeze({ store: postgresPathSuggestionsStore(pool), read: firstDebateSuggestionFacts(pool) }),
+    firstDebateSuggestions: Object.freeze({ store: suggestionStore, read: firstDebateSuggestionFacts(pool) }),
     line: new PostgresTreeUpdateRunnerRepository(pool),
-    afterStored: (digRunId, lease) => advanceTree(tree, digRunId, lease),
+    afterStored: (digRunId, lease, alongside) => advanceTree(tree, digRunId, lease, alongside),
     // V4 start step, Task 55e: a dig under the main question of a path debate updates the main answer once its story is written.
     afterStory: (runId, lease) => advanceAfterStory(tree, runId, lease)
   });
@@ -115,6 +117,8 @@ export function composePathRewrite(input: Readonly<{
       list: (before: Date, limit: number) => picks.readUnwritten(before, limit),
       roles
     }),
-    treeSweep: Object.freeze({ tree, list: (since: Date, before: Date, limit: number) => readRecentTreeDigs(pool, since, before, limit) })
+    // B3: beside each climb it walks, the dig's own suggestions a stopped runner left unwritten.
+    treeSweep: Object.freeze({ tree, list: (since: Date, before: Date, limit: number) => readRecentTreeDigs(pool, since, before, limit),
+      owed: (digRunId: string) => owedDigSuggestions(settings, roles, suggestionStore, digRunId) })
   });
 }

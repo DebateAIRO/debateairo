@@ -2,14 +2,20 @@
 // R22 decision 9 and W4-3 (owner Q7 and its follow-up, 31 Oct): a dig works like a first debate. Each chosen path has its own AI
 // that decides whether and what to search (0 to 4, its own language and country when it judges that worth it), told what the
 // whole debate already investigated, from AI text only; and after the dig's rewrite the AI offers what to dig into next on the
-// dig's own paths, none on Free and none at level 10. Scripted vendors behind the real gateway; made-up figures and pages.
+// dig's own paths, none on Free and none at level 10 (B3: asked once the rewrite's row is stored, each path's set kept in 0141's
+// store). Scripted vendors behind the real gateway; made-up figures and pages.
 import { describe, expect, it } from "vitest";
 import {
   WEB_DIG_PLANNER_V2_INSTRUCTION, WEB_DIG_PLANNER_V3_CONTRACT_ID, WEB_DIG_PLANNER_V3_INSTRUCTION, WEB_SUGGEST_DIG_CONTRACT_ID, WEB_SUGGEST_DIG_INSTRUCTION
 } from "@debateai/judgement";
 import { createPerplexitySearchPort, previewThinkingStepOf, readPromptFrame, type PromptPacket, type ProviderCallRequest } from "@debateai/providers";
 import { addressKey, selectPathPages } from "../../packages/evidence/src/host-filter.js";
-import { digSuggestionIdOf, refreshPathSuggestions, writeDigSuggestions, writeFirstDebateSuggestions, type DigSuggestionsJob, type PathSuggestionsStore } from "../../apps/runner/src/dig-suggestions-step.js";
+import type { DigSuggestion } from "@debateai/contract";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
+import {
+  digSuggestionIdOf, ownPathSuggestionsSetIdOf, pathSuggestionsSetIdOf, refreshPathSuggestions, writeDigSuggestions, writeFirstDebateSuggestions, writeOwnPathSuggestions,
+  type DigSuggestionsJob, type PathSuggestionsStore
+} from "../../apps/runner/src/dig-suggestions-step.js";
 import { DIG_INVESTIGATED_MAX_BYTES, digDebateTextOf, investigatedText, storyPathPointIds, type InvestigatedDebate } from "../../apps/runner/src/investigation-digest.js";
 import { isPathRewriteCallSite, pathRewriteCallSiteRole } from "../../apps/runner/src/path-rewrite-scope.js";
 import { ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
@@ -417,6 +423,96 @@ describe("W4-3 the suggestions on a dig's own paths", () => {
     const { job, asked } = jobOf({ digPaths: [{ ...digPaths[0]!, points: [] }] });
     await writeDigSuggestions(job, async () => "[]", "seal");
     expect(asked).toEqual([]);
+  });
+
+  /* B3 (code review of 12 Nov): asked once the rewrite's row is stored, each path's set kept in 0141's store. */
+  type Kept = { setId: string; runId: string; debateRunId: string; positionRef: string; content: { suggestions: readonly DigSuggestion[] } };
+  function keeping(read: () => Promise<ReadonlySet<string>> = async () => new Set()) {
+    const kept: Kept[] = [];
+    const store: PathSuggestionsStore = { positionsOf: read, record: async (input) => { kept.push(input as Kept); return "RECORDED"; } };
+    return { kept, store };
+  }
+  const byPath = (kept: readonly Kept[]) => [...kept].sort((left, right) => left.positionRef.localeCompare(right.positionRef));
+
+  it("B3: each path's set is kept under the dig, on the dig's own map, from the very calls that were sealed with the rewrite before", async () => {
+    const { job, asked } = jobOf();
+    const { kept, store } = keeping();
+    await writeOwnPathSuggestions(job, store, async () => INVESTIGATED, "seal");
+    const before = jobOf();
+    const offeredBefore = await writeDigSuggestions(before.job, async () => INVESTIGATED, "seal");
+    // The same calls, byte for byte (fence and canary aside): a call answered before the change is replayed free after it.
+    const sent = (requests: readonly ProviderCallRequest[]) => requests.map((request) => [request.callSiteKey, request.role, request.lane, request.providerRef,
+      canonicalPromptFingerprint(request.packet.messages)]).sort();
+    expect(sent(asked)).toEqual(sent(before.asked));
+    expect(byPath(kept).map((set) => [set.setId, set.runId, set.debateRunId, set.positionRef])).toEqual([
+      [ownPathSuggestionsSetIdOf(job.digRunId, "pos-1"), job.digRunId, job.digRunId, "pos-1"],
+      [ownPathSuggestionsSetIdOf(job.digRunId, "pos-2"), job.digRunId, job.digRunId, "pos-2"]]);
+    expect(byPath(kept).map((set) => set.content.suggestions)).toEqual(offeredBefore.map((entry) => entry.suggestions));
+    // The set id is the step-0 set of the dig on its own map: a second copy writes ALREADY; a first debate's own set is never a dig's.
+    expect(ownPathSuggestionsSetIdOf(job.digRunId, "pos-1")).toBe(pathSuggestionsSetIdOf(job.digRunId, job.digRunId, "pos-1", 0));
+  });
+
+  it("B3: a path that has a set is not asked again and its sibling keeps its call site; a set that lands while the call is out stays", async () => {
+    const again = jobOf();
+    const done = keeping(async () => new Set(["POS-1"]));
+    await writeOwnPathSuggestions(again.job, done.store, async () => "[]", "seal");
+    expect(again.asked.map((request) => request.callSiteKey)).toEqual(["PATH_REWRITE:SUGGEST:2"]);
+    expect(done.kept.map((set) => set.positionRef)).toEqual(["pos-2"]);
+    // A deeper dig's rewrite of pos-1 refreshed it while the call was out (owner Q-D8): its set is the newer one and stays.
+    let reads = 0;
+    const late = jobOf();
+    const raced = keeping(async () => (++reads === 1 ? new Set<string>() : new Set(["pos-1"])));
+    await writeOwnPathSuggestions(late.job, raced.store, async () => "[]", "seal");
+    expect(late.asked).toHaveLength(2);
+    expect(raced.kept.map((set) => set.positionRef)).toEqual(["pos-2"]);
+    // Every path has its set: nothing is read beyond the store, nothing asked.
+    let digests = 0;
+    const all = jobOf();
+    await writeOwnPathSuggestions(all.job, keeping(async () => new Set(["pos-1", "pos-2"])).store, async () => { digests += 1; return "[]"; }, "seal");
+    expect([all.asked.length, digests]).toEqual([0, 0]);
+  });
+
+  it("B3: a failed call keeps an empty set (no suggestions, and nothing asks again); offering none too; a path with no point keeps nothing", async () => {
+    const lines: string[] = [];
+    const failing = jobOf({ send: async () => { throw new Error("vendor down"); }, log: (event) => { lines.push(event); } });
+    const failed = keeping();
+    await writeOwnPathSuggestions(failing.job, failed.store, async () => "[]", "seal");
+    expect(byPath(failed.kept).map((set) => [set.positionRef, set.content.suggestions])).toEqual([["pos-1", []], ["pos-2", []]]);
+    expect(lines).toContain("DIG_SUGGESTION_CALL_FAILED");
+    const none = jobOf({ send: async (_maker, request) => { request.classifyContent?.(JSON.stringify({ suggestions: [] }), undefined);
+      return { content: JSON.stringify({ suggestions: [] }) } as never; } });
+    const empty = keeping();
+    await writeOwnPathSuggestions(none.job, empty.store, async () => "[]", "seal");
+    expect(byPath(empty.kept).map((set) => set.content.suggestions)).toEqual([[], []]);
+    const pointless = jobOf({ digPaths: [{ ...digPaths[0]!, points: [] }, digPaths[1]!] });
+    const one = keeping();
+    await writeOwnPathSuggestions(pointless.job, one.store, async () => "[]", "seal");
+    expect(pointless.asked.map((request) => request.callSiteKey)).toEqual(["PATH_REWRITE:SUGGEST:2"]);
+    expect(one.kept.map((set) => set.positionRef)).toEqual(["pos-2"]);
+  });
+
+  it("B3: Free and level 10 read nothing and ask nothing; a store that cannot be read asks nothing; one set not kept costs the other nothing", async () => {
+    for (const overrides of [{ level: 10 }, { free: true }]) {
+      const { job, asked } = jobOf(overrides);
+      let read = 0;
+      const { kept, store } = keeping(async () => { read += 1; return new Set(); });
+      await writeOwnPathSuggestions(job, store, async () => { read += 1; return "[]"; }, "seal");
+      expect([asked, kept, read]).toEqual([[], [], 0]);
+    }
+    const lines: string[] = [];
+    const unread = jobOf({ log: (event) => { lines.push(event); } });
+    await writeOwnPathSuggestions(unread.job, keeping(async () => { throw new Error("database gone"); }).store, async () => "[]", "seal");
+    expect(unread.asked).toEqual([]);
+    expect(lines).toContain("DIG_SUGGESTIONS_STORE_UNREAD");
+    const half = jobOf({ log: (event) => { lines.push(event); } });
+    const kept: string[] = [];
+    await writeOwnPathSuggestions(half.job, { positionsOf: async () => new Set(), record: async (input) => {
+      if (input.positionRef === "pos-1") throw new Error("not now");
+      kept.push(input.positionRef);
+      return "RECORDED";
+    } }, async () => "[]", "seal");
+    expect(kept).toEqual(["pos-2"]);
+    expect(lines).toContain("DIG_SUGGESTIONS_NOT_KEPT");
   });
 });
 

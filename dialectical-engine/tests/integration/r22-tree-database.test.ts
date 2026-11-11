@@ -9,7 +9,7 @@ import { CostEnvelopeGuard, PostgresModelSpendStore } from "@debateai/budget";
 import { AnswerSchema, StoryBodySchema, type Answer } from "@debateai/contract";
 import {
   MAIN_ANSWER_UPDATE_CARRIER, configureContentEncryption, contentCipherFor, createPool, encryptAttestedContentForRun, migrate,
-  PostgresDigPicksRepository, PostgresInvestigationRepository, PostgresTreeUpdateRunnerRepository, withRunContentLease,
+  PostgresDigPicksRepository, PostgresInvestigationRepository, PostgresPathSuggestionsRepository, PostgresTreeUpdateRunnerRepository, withRunContentLease,
   type Pool
 } from "@debateai/db";
 import { ServeRepository } from "@debateai/serve";
@@ -20,7 +20,7 @@ import {
   PATH_REWRITE_CHECKER_MODEL, PATH_REWRITE_WRITER_MODEL, composePathRewrite
 } from "../../apps/runner/src/path-rewrite-composition.js";
 import { postgresPurposeLines } from "../../apps/api/src/purpose-lines.js";
-import { pathSuggestionsSetIdOf } from "../../apps/runner/src/dig-suggestions-step.js";
+import { ownPathSuggestionsSetIdOf, pathSuggestionsSetIdOf } from "../../apps/runner/src/dig-suggestions-step.js";
 import { advanceTree, pathUpdateIdOf, sweepTreeUpdates } from "../../apps/runner/src/path-climb.js";
 import { runDigPathRewrite } from "../../apps/runner/src/path-rewrite.js";
 import { sweepPathRewrites } from "../../apps/runner/src/path-rewrite-sweep.js";
@@ -429,6 +429,29 @@ describe("decision 2: a rewrite that really changed a path rewrites the path abo
     expect((await versionsOf(root)).map((row) => row.trigger_kind)).toEqual(["PATH_REWRITE", "PATH_UPDATE"]);
   }, 120_000);
 
+  it("B3: a runner that stopped right after a dig's row, before its own suggestions: the tree's sweep writes them once, with the climb", async () => {
+    const { root, position } = await firstDebate();
+    const { digs: [one] } = await chain(root, position, 1);
+    const settled = await settledDig(one!, nodesOf(one!).no, 2);
+    const first = vendors();
+    const { afterStored: _dropped, suggest: _unasked, ...stoppedEarly } = composed(first.members).settings;
+    await runDigPathRewrite(stoppedEarly, snapshotOf(settled.dig, settled.workItemId, first.members));
+    expect(await rowOf(settled.dig)).toMatchObject([{ outcome: "READY" }]);
+    const own = [nodesOf(settled.dig).no, nodesOf(settled.dig).yes];
+    const ownSites = async () => (await suggestSitesOf(settled.dig)).filter((key) => ["PATH_REWRITE:SUGGEST:1", "PATH_REWRITE:SUGGEST:2"].includes(key));
+    for (const ref of own) expect(await setsOn(settled.dig, ref)).toEqual([]);
+    expect(await ownSites()).toEqual([]);
+    const later = () => new Date(Date.now() + 60 * 60_000);
+    await sweepTreeUpdates({ ...composed(vendors().members).treeSweep, now: later });
+    for (const ref of own) expect(await setsOn(settled.dig, ref)).toEqual([{ set_id: ownPathSuggestionsSetIdOf(settled.dig, ref), run_id: settled.dig }]);
+    expect(await ownSites()).toEqual(["PATH_REWRITE:SUGGEST:1", "PATH_REWRITE:SUGGEST:2"]);
+    expect(await updatesOf(settled.dig)).toMatchObject([{ climb_step: 1, parent_run_id: root, outcome: "READY", changed: true }]);
+    expect((await database.pool.query<{ settled: boolean }>("SELECT identity.dig_is_settled($1) AS settled", [settled.dig])).rows[0]!.settled).toBe(true);
+    // Another pass: every path has its set, so nothing more is asked or paid.
+    await sweepTreeUpdates({ ...composed(vendors().members).treeSweep, now: later });
+    expect(await ownSites()).toEqual(["PATH_REWRITE:SUGGEST:1", "PATH_REWRITE:SUGGEST:2"]);
+  }, 180_000);
+
   it("rewrites of one path stay in order: a dig behind an unfinished climb waits, then writes on the climb's text", async () => {
     const { root, position } = await firstDebate();
     const { digs: [one] } = await chain(root, position, 1);
@@ -483,10 +506,18 @@ describe("owner Q-D8: a climb's rewrite refreshes that path's suggestions", () =
   it("a level that really changed gets its own set, under the dig that paid", async () => {
     const { root, position } = await firstDebate();
     const { digs: [one, two, three] } = await chain(root, position, 3);
-    // Level 3's climb rewrote level 1's path at its step 1; level 2's own rewrite had already refreshed it, as its step 0.
-    expect(await setsOn(one!, nodesOf(one!).no)).toEqual([{ set_id: pathSuggestionsSetIdOf(two!, one!, nodesOf(one!).no, 0), run_id: two },
+    // B3: level 1's own suggestions on its own path, kept once its rewrite was stored, under level 1 on its own map. Then level 3's climb
+    // rewrote that path at its step 1; level 2's own rewrite had already refreshed it, as its step 0.
+    expect(await setsOn(one!, nodesOf(one!).no)).toEqual([{ set_id: ownPathSuggestionsSetIdOf(one!, nodesOf(one!).no), run_id: one },
+      { set_id: pathSuggestionsSetIdOf(two!, one!, nodesOf(one!).no, 0), run_id: two },
       { set_id: pathSuggestionsSetIdOf(three!, one!, nodesOf(one!).no, 1), run_id: three }]);
     expect(await suggestSitesOf(three!)).toContain("PATH_REWRITE:SUGGEST:97");
+    // What the page offers on that path is still the newest set: the climb's refresh, never the dig's own older one.
+    expect((await new PostgresPathSuggestionsRepository(runner).readOfRun(one!))!.find((row) => row.position_ref === nodesOf(one!).no)!.run_id).toBe(three);
+    // Each dig's own paths each have their set, under the dig, on its own map.
+    for (const dig of [one!, two!, three!]) {
+      expect(await setsOn(dig, nodesOf(dig).yes)).toEqual([{ set_id: ownPathSuggestionsSetIdOf(dig, nodesOf(dig).yes), run_id: dig }]);
+    }
   }, 180_000);
 
   it("a level that came out unchanged makes no call and keeps the set it had", async () => {
@@ -497,7 +528,8 @@ describe("owner Q-D8: a climb's rewrite refreshes that path's suggestions", () =
     await runDigPathRewrite(composed(team.members).settings, snapshotOf(settled.dig, settled.workItemId, team.members));
     expect(await updatesOf(settled.dig)).toMatchObject([{ climb_step: 1, parent_run_id: one, outcome: "READY", changed: false }]);
     expect(await suggestSitesOf(settled.dig)).not.toContain("PATH_REWRITE:SUGGEST:97");
-    expect((await setsOn(one!, nodesOf(one!).no)).map((set) => set.run_id)).toEqual([two]);
+    // B3: level 1's own set on its own path first, then level 2's refresh; the unchanged level adds none.
+    expect((await setsOn(one!, nodesOf(one!).no)).map((set) => set.run_id)).toEqual([one, two]);
   }, 180_000);
 
   it("Free: the climb and the main answer's update run as on paid, with no suggestion call", async () => {

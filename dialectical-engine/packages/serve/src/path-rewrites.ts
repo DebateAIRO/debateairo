@@ -132,7 +132,8 @@ function storedText(value: unknown): StoredPathRewriteText | null {
 
 /**
  * W4-3: the suggestions a dig's own sealed rewrite offers for one of its paths (the contract's shape, checked one by one;
- * one that does not parse is left out). None on a text sealed before W4-3, on Free, or at level 10.
+ * one that does not parse is left out). None on a text sealed before W4-3, on Free, or at level 10. B3: none on a text sealed
+ * since 12 Nov either: those are in 0141's store, whose newest set of a path is offered in place of these (dig-suggestions.ts).
  */
 export function digSuggestionsOf(opened: unknown, positionRef: string): readonly DigSuggestion[] {
   if (!isRecord(opened) || !Array.isArray(opened.dig_suggestions)) return [];

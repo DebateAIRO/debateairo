@@ -9,7 +9,8 @@ import type { WebSealed } from "./web-evidence.js";
  *
  * - `setId` is the caller's, worked out by code, so a second copy of the runner writes ALREADY.
  * - Sealed under `runId`, the run that paid: the debate itself for a first debate's suggestions; the dig that rewrote the path for a
- *   refresh. Carrier `PATH_SUGGESTIONS_CARRIER`, the set's id as its key.
+ *   refresh; B3 (12 Nov), the dig itself for its own paths' suggestions, the dig being `debateRunId` too. Carrier
+ *   `PATH_SUGGESTIONS_CARRIER`, the set's id as its key.
  * - `readOfRun` gives the newest set per path; open each row's envelope under its own `run_id`, which may be a dig's. Null when the
  *   debate is not live.
  */
