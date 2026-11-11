@@ -788,7 +788,7 @@ describe("0171: the security review's fixes in the database", () => {
   it("follows 0170 in the chain (0172 comes after it), with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0171 } from './migration-forward0171.js';");
-    expect(chain).toContain("loadForward0169,loadForward0170,loadForward0171,loadForward0172]");
+    expect(chain).toContain("loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "security-review-hardening-forward0171-v1";');
@@ -824,7 +824,7 @@ describe("0171: the security review's fixes in the database", () => {
       "identity.complete_consumer_passkey_login(jsonb,jsonb)", "identity.read_consumer_recovery_proof(text,integer)"]) expect(regranted, signature).toContain(signature);
     for (const signature of regranted) expect([`"${signature}"`, `'${signature}'`].some((quoted) => loader.includes(quoted)), signature).toBe(true);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-2)!;
+    const step = plan.forwardChain.at(-3)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -844,7 +844,7 @@ describe("0171: the security review's fixes in the database", () => {
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-2)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(plan.forwardChain.at(-3)!.amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`: it creates no billing relation or function and moves no billing grant, owner, definer flag or setting", () => {
@@ -921,7 +921,8 @@ describe("0171: the security review's fixes in the database", () => {
     // A pre-chain step's pins cannot be amended, so none is changed; nothing this step adds is any earlier step's pin.
     for (const step of PRE_CHAIN) expect([...changed].filter((signature) => pins.get(step)!.includes(signature)), step).toEqual([]);
     for (const signature of own) expect([...pins.entries()].filter(([, functions]) => functions.includes(signature)).map(([step]) => step), signature).toEqual([]);
-    const expected = [...pins.entries()].filter(([step]) => chain.has(step))
+    // Only the steps applied before this one: a later step that restates a function this one patched (0173's settle) declares its own amendments.
+    const expected = [...pins.entries()].filter(([step]) => chain.has(step) && step < NAME)
       .flatMap(([step, functions]) => [...changed].filter((signature) => functions.includes(signature)).map((signature) => `${step} ${signature}`)).sort();
     const declared = AMENDS.flatMap(({ step, functions }) => functions.map((signature) => `${step} ${plain(signature)}`)).sort();
     expect(declared).toEqual(expected);

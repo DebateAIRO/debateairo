@@ -122,12 +122,14 @@ const PIECE_SETTINGS_VERSION = "0169_piece_settings_version.sql";
 const OUTBOUND_MAIL = "0170_outbound_mail_limit.sql";
 /** The security review's fixes (the review of 3 Nov 2026): drained, keeping 0130's verifier. */
 const SECURITY_REVIEW = "0171_security_review_hardening.sql";
-/** This code's chain head since the moderation notices' fixes (0172, the owner's list of 10 Nov 2026) reached the database: drained, keeping 0130's verifier. */
-const HEAD_STEP = "0172_moderation_notice_fixes.sql";
-const AFTER_RLS = [V4, WEB, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", REGION, OWNER_ANSWER_WRITES, MODERATION_NOTICE, MODERATION_STATEMENTS, PRE_START_CHARGE, START_PATHS, PATH_RESULTS, PATH_PROGRESS, SAVED_QUESTIONS, CARRY_ON_DIGS, PATH_ADDED, PRE_START_RELEASE, MAIN_ANSWER_TIMES, PUBLIC_REPORT_OWN_CARRIER, SET_ASIDE_CONTINUE, PIECE_SETTINGS_VERSION, OUTBOUND_MAIL, SECURITY_REVIEW, HEAD_STEP] as const;
-// A newer release's steps come after this code's chain head (0172 since the moderation notices' fixes reached the database).
-const FIRST = "0173_probe_ahead.sql";
-const SECOND = "0174_probe_ahead.sql";
+/** The moderation notices' fixes (0172, the owner's list of 10 Nov 2026): drained, keeping 0130's verifier. */
+const MODERATION_NOTICE_FIXES = "0172_moderation_notice_fixes.sql";
+/** This code's chain head since the check's answer on a report a person already closed (0173) reached the database: drained, keeping 0130's verifier. */
+const HEAD_STEP = "0173_settle_dismissed_flag.sql";
+const AFTER_RLS = [V4, WEB, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", REGION, OWNER_ANSWER_WRITES, MODERATION_NOTICE, MODERATION_STATEMENTS, PRE_START_CHARGE, START_PATHS, PATH_RESULTS, PATH_PROGRESS, SAVED_QUESTIONS, CARRY_ON_DIGS, PATH_ADDED, PRE_START_RELEASE, MAIN_ANSWER_TIMES, PUBLIC_REPORT_OWN_CARRIER, SET_ASIDE_CONTINUE, PIECE_SETTINGS_VERSION, OUTBOUND_MAIL, SECURITY_REVIEW, MODERATION_NOTICE_FIXES, HEAD_STEP] as const;
+// A newer release's steps come after this code's chain head (0173 since the check's answer on a closed report reached the database).
+const FIRST = "0174_probe_ahead.sql";
+const SECOND = "0175_probe_ahead.sql";
 /** 0111's effective-capability verifier, which 0112 to 0129 keep in force. */
 const VERIFIER = "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a";
 /** 0130's verifier, which supersedes 0111's (SPEC-v4 R34): the one in force at this code's head (0131 to 0172 keep it),
@@ -183,11 +185,11 @@ describe("an older release on a database a newer release moved forward (Review F
     await migrate(db.pool);
     plan = await loadMigrationPlan();
     expect(plan.forwardChain.slice(-DECLARED.length - 43, -43).map((step) => step.name)).toEqual(DECLARED.map(([name]) => name));
-    expect(plan.forwardChain.at(-44)!.verifierSha256).toBe(VERIFIER);
-    expect(plan.forwardChain.at(-43)!.name).toBe(RLS);
-    expect(plan.forwardChain.at(-43)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
-    expect(plan.forwardChain.slice(-42).map((step) => step.name)).toEqual([...AFTER_RLS]);
-    for (const step of plan.forwardChain.slice(-42)) expect(step.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.at(-45)!.verifierSha256).toBe(VERIFIER);
+    expect(plan.forwardChain.at(-44)!.name).toBe(RLS);
+    expect(plan.forwardChain.at(-44)!.verifierSha256).toBe(IN_FORCE_VERIFIER);
+    expect(plan.forwardChain.slice(-43).map((step) => step.name)).toEqual([...AFTER_RLS]);
+    for (const step of plan.forwardChain.slice(-43)) expect(step.verifierSha256).toBe(IN_FORCE_VERIFIER);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
   afterEach(async () => {
@@ -209,7 +211,7 @@ describe("an older release on a database a newer release moved forward (Review F
       source_name: RLS, n1_expand: false, keeps_verifier: false, outside_transaction: false,
       chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
     }, ...AFTER_RLS.map((source_name) => ({
-      source_name, n1_expand: source_name !== SPEND_KINDS && source_name !== TEAM_LIMIT && source_name !== ASK_CLARIFY_CHARGE && source_name !== TEAM_ALLOWANCES && source_name !== ERASURE_KEEPS_PUBLIC && source_name !== PUBLIC_REPORT_TEAM_MONTH && source_name !== PUBLIC_REVIEW && source_name !== PUBLIC_FLAG && source_name !== PRE_START_CHARGE && source_name !== CARRY_ON_DIGS && source_name !== PATH_ADDED && source_name !== PRE_START_RELEASE && source_name !== SET_ASIDE_CONTINUE && source_name !== SECURITY_REVIEW && source_name !== HEAD_STEP, keeps_verifier: true, outside_transaction: false,
+      source_name, n1_expand: source_name !== SPEND_KINDS && source_name !== TEAM_LIMIT && source_name !== ASK_CLARIFY_CHARGE && source_name !== TEAM_ALLOWANCES && source_name !== ERASURE_KEEPS_PUBLIC && source_name !== PUBLIC_REPORT_TEAM_MONTH && source_name !== PUBLIC_REVIEW && source_name !== PUBLIC_FLAG && source_name !== PRE_START_CHARGE && source_name !== CARRY_ON_DIGS && source_name !== PATH_ADDED && source_name !== PRE_START_RELEASE && source_name !== SET_ASIDE_CONTINUE && source_name !== SECURITY_REVIEW && source_name !== MODERATION_NOTICE_FIXES && source_name !== HEAD_STEP, keeps_verifier: true, outside_transaction: false,
       chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
     }))]);
   });
@@ -257,13 +259,13 @@ describe("an older release on a database a newer release moved forward (Review F
   it("describeForwardSteps describes this code's whole chain with its n1 headers", async () => {
     const steps = await describeForwardSteps();
     expect(steps.map((step) => step.name)).toEqual(plan.forwardChain.map((step) => step.name));
-    expect(steps.at(-43)).toEqual({ name: RLS, manifestSha256: plan.forwardChain.at(-43)!.manifestSha256,
-      sourceSha256: plan.forwardChain.at(-43)!.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
+    expect(steps.at(-44)).toEqual({ name: RLS, manifestSha256: plan.forwardChain.at(-44)!.manifestSha256,
+      sourceSha256: plan.forwardChain.at(-44)!.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
     // 0130 is drained and supersedes the verifier, so its header omits keeps-verifier (SPEC-v4 R26, R34); 0131 to 0139
     // and 0141, 0143, 0152, 0153, 0154, 0155, 0156, 0157, 0159, 0160, 0161, 0162, 0166, 0167, 0169 and 0170 are expand steps that keep 0130's verifier, and 0140, 0142, 0144, 0146, 0148, 0149, 0150, 0151, 0158, 0163, 0164, 0165, 0168, 0171 and 0172 are drained (they keep the verifier too).
-    expect(steps.slice(-42)).toEqual(plan.forwardChain.slice(-42).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
-      sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: step.name !== SPEND_KINDS && step.name !== TEAM_LIMIT && step.name !== ASK_CLARIFY_CHARGE && step.name !== TEAM_ALLOWANCES && step.name !== ERASURE_KEEPS_PUBLIC && step.name !== PUBLIC_REPORT_TEAM_MONTH && step.name !== PUBLIC_REVIEW && step.name !== PUBLIC_FLAG && step.name !== PRE_START_CHARGE && step.name !== CARRY_ON_DIGS && step.name !== PATH_ADDED && step.name !== PRE_START_RELEASE && step.name !== SET_ASIDE_CONTINUE && step.name !== SECURITY_REVIEW && step.name !== HEAD_STEP, keepsVerifier: true, outsideTransaction: false })));
-    expect(steps.slice(-42).map((step) => step.name)).toEqual([...AFTER_RLS]);
+    expect(steps.slice(-43)).toEqual(plan.forwardChain.slice(-43).map((step) => ({ name: step.name, manifestSha256: step.manifestSha256,
+      sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: step.name !== SPEND_KINDS && step.name !== TEAM_LIMIT && step.name !== ASK_CLARIFY_CHARGE && step.name !== TEAM_ALLOWANCES && step.name !== ERASURE_KEEPS_PUBLIC && step.name !== PUBLIC_REPORT_TEAM_MONTH && step.name !== PUBLIC_REVIEW && step.name !== PUBLIC_FLAG && step.name !== PRE_START_CHARGE && step.name !== CARRY_ON_DIGS && step.name !== PATH_ADDED && step.name !== PRE_START_RELEASE && step.name !== SET_ASIDE_CONTINUE && step.name !== SECURITY_REVIEW && step.name !== MODERATION_NOTICE_FIXES && step.name !== HEAD_STEP, keepsVerifier: true, outsideTransaction: false })));
+    expect(steps.slice(-43).map((step) => step.name)).toEqual([...AFTER_RLS]);
     const tail = plan.forwardChain.slice(-DECLARED.length - 43, -43);
     expect(steps.slice(-DECLARED.length - 43, -43)).toEqual(DECLARED.map(([name, n1Expand], index) => ({ name,
       manifestSha256: tail[index]!.manifestSha256, sourceSha256: tail[index]!.sourceSha256, verifierSha256: VERIFIER,
@@ -350,7 +352,7 @@ describe("an older release on a database a newer release moved forward (Review F
     await refused("NEWER_CHAIN_MISMATCH", SIDE_BY_SIDE, { newerChain: [...own.filter((step) => step.name !== SIDE_BY_SIDE), declaration(first())] });
     // A list that is missing this code's step before last (0130).
     await refused("NEWER_CHAIN_MISMATCH", RLS, { newerChain: [...own.filter((step) => step.name !== RLS), declaration(first())] });
-    // A list that is missing this code's last step (0172).
+    // A list that is missing this code's last step (0173).
     await refused("NEWER_CHAIN_MISMATCH", HEAD_STEP, { newerChain: [...own.slice(0, -1), declaration(first())] });
     // A list that declares the extra step drained.
     await refused("NEWER_CHAIN_MISMATCH", FIRST, { newerChain: [...own, declaration(first({ expand: false }))] });

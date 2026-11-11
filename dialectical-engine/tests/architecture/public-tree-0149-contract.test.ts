@@ -55,7 +55,7 @@ describe("0149: a funded person's public report, a settled dig, the page's refer
   it("follows 0148 in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0149 } from './migration-forward0149.js';");
-    expect(chain).toContain("loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172]");
+    expect(chain).toContain("loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "public-report-team-month-forward0149-v1";');
@@ -67,7 +67,7 @@ describe("0149: a funded person's public report, a settled dig, the page's refer
     for (const table of TABLES) expect(loader, table).toContain(`"${table}"`);
     for (const signature of [...GRANTED, ...PRIVATE, ...REDEFINED]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-24)!;
+    const step = plan.forwardChain.at(-25)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -87,7 +87,7 @@ describe("0149: a funded person's public report, a settled dig, the page's refer
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-24)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(plan.forwardChain.at(-25)!.amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`", () => {

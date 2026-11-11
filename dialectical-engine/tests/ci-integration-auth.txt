@@ -122,3 +122,5 @@ tests/integration/run-handover-database.test.ts
 tests/integration/outbound-mail-limit.test.ts
 # The moderation notice fixes (0172): M5, one bad source row is set aside and retried hourly while every other statement is queued, on the API's runtime login.
 tests/integration/moderation-notice-fixes-0172.test.ts
+# The check's answer on a report a person already closed (0173): the verdict is recorded, and no staff notice or automatic hide follows.
+tests/integration/settle-dismissed-flag-0173.test.ts
