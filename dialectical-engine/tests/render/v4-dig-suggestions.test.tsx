@@ -3,10 +3,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DIG_LEVEL_MAX } from "../../packages/contract/src/index.js";
+import { AnswerSchema, DIG_LEVEL_MAX, DIG_SUGGESTIONS_WATCH_MS, type Answer, type PathRewrite } from "../../packages/contract/src/index.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, panel, PATHS, resetHarness,
-  seededAnswer, text, tray, typeInto, unmountMap, page
+  seededAnswer, settle, text, tray, typeInto, unmountMap, page
 } from "./v4-debate-harness.js";
 
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -328,5 +328,75 @@ describe("phone width (375px)", () => {
     expect(rule(".v4SugEdit")).toMatch(/min-height: 44px/u);
     expect(block).not.toMatch(/(?:^|[\s;{])(?:min-)?width:\s*[0-9]{3,}px/mu);
     for (const match of block.matchAll(/([0-9.]+)px/gu)) expect(Number(match[1]), match[0]).toBeLessThanOrEqual(44);
+  });
+});
+
+/*
+ * The AI's suggestions on a dig's own paths are asked once the dig's rewrite is stored, so they can land after the page has already
+ * read the finished rewrite. While some may still arrive the server says so (`dig.suggestions_pending`), and the page reads the
+ * answer again until they are in, or until the time they can take has passed.
+ */
+describe("a dig's own suggestions that land after its rewrite", () => {
+  const PARENT = "c1000000-0000-4000-8000-000000000001";
+  const panelKinds = (): (string | null)[] => [...panel().querySelectorAll(".v4SugGroup .v4PanelSmallHead")].map((node) => node.textContent);
+  /** The dig's own answer: its finished rewrite names every path of its map; with or without the AI's suggestions on them. */
+  function digAnswer(runId: string, options: Readonly<{ pending: boolean; withAi: boolean; rewrittenAt?: string; level?: number; web?: "PAID" | "FREE" }>): Answer {
+    const level = options.level ?? 1;
+    const base = seededAnswer(runId, {}, options.web ?? "PAID");
+    const rewrittenAt = options.rewrittenAt ?? new Date(Date.now()).toISOString();
+    const rewrite: PathRewrite = {
+      rewrite_id: `rw-${runId.slice(0, 8)}`, dig_run_id: runId, dig_level: level, dig_finished_at: new Date(Date.parse(rewrittenAt) - 60_000).toISOString(),
+      state: "READY", rewritten_at: rewrittenAt, changed: true,
+      text: { line: "Mostly renewables, with firm power for winter.", summary: "Storage covers hours, not weeks.", fate: "PARTLY_HELD" },
+      what_changed: ["The dig found storage covers hours, not weeks."], fate_before: "HELD_UP", view: null,
+      dig_paths: base.web!.paths.map((path) => ({ position_ref: path.position_ref, line: `What the dig says on ${path.position_ref}.`, fate: "HELD_UP" as const }))
+    };
+    // No page is being read here, so nothing but the suggestions can make the page read again.
+    const web = { paths: base.web!.paths.map((path) => ({ ...path,
+      other_pages: path.other_pages.map(({ researched, ...page }) => (researched?.state === "READING" ? page : { ...page, researched })),
+      suggestions: options.withAi ? path.suggestions : path.suggestions.filter((suggestion) => suggestion.kind !== "HELPS_MAIN_QUESTION") })) };
+    return AnswerSchema.parse({ ...base, web, dig: { ...digPart(PARENT, level)!, rewrite, ...(options.pending ? { suggestions_pending: true } : {}) } });
+  }
+
+  it("a suggestion that lands after the page read the finished rewrite shows without a reload; once all are in, the page stops reading", async () => {
+    const runId = crypto.randomUUID();
+    harness.answer = digAnswer(runId, { pending: true, withAi: false });
+    harness.fresh = digAnswer(runId, { pending: false, withAi: true });
+    await mountMap(1600, runId);
+    await openPath(PATHS.renew);
+    expect(panelKinds()).not.toContain(CATALOG["v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST"]);
+    await advance(15_100);
+    await settle();
+    expect(panelKinds()).toContain(CATALOG["v4.suggest.kind.HELPS_MAIN_QUESTION.AGAINST"]);
+    const reads = harness.loadAnswer.mock.calls.length;
+    await advance(5 * 60_000);
+    expect(harness.loadAnswer.mock.calls.length).toBe(reads);
+  });
+
+  it("suggestions that never come (their runner stopped) keep the page reading only until the bound after the rewrite", async () => {
+    const runId = crypto.randomUUID();
+    const rewrittenAt = new Date(Date.now()).toISOString();
+    harness.answer = digAnswer(runId, { pending: true, withAi: false, rewrittenAt });
+    // Each read is a new answer, as a real read is, and each still says some may arrive.
+    harness.loadAnswer = vi.fn(async () => digAnswer(runId, { pending: true, withAi: false, rewrittenAt }));
+    await mountMap(1600, runId);
+    await advance(DIG_SUGGESTIONS_WATCH_MS + 60_000);
+    const reads = harness.loadAnswer.mock.calls.length;
+    expect(reads).toBeGreaterThan(1);
+    expect(reads).toBeLessThanOrEqual(Math.ceil(DIG_SUGGESTIONS_WATCH_MS / 15_000) + 1);
+    await advance(10 * 60_000);
+    expect(harness.loadAnswer.mock.calls.length).toBe(reads);
+  });
+
+  it.each([
+    ["on Free", { web: "FREE" as const }],
+    ["at the deepest level", { level: DIG_LEVEL_MAX }],
+    ["past the bound", { rewrittenAt: new Date(Date.now() - DIG_SUGGESTIONS_WATCH_MS - 60_000).toISOString() }]
+  ])("%s the page never starts reading again for them", async (_name, options) => {
+    const runId = crypto.randomUUID();
+    harness.answer = digAnswer(runId, { pending: true, withAi: false, ...options });
+    await mountMap(1600, runId);
+    await advance(2 * 60_000);
+    expect(harness.loadAnswer).not.toHaveBeenCalled();
   });
 });

@@ -54,7 +54,7 @@ import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./ju
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
-import { digLeadSuggestions, digLeadsOfPack, pathSuggestionsOfSet, webWithDigSuggestions } from "./dig-suggestions.js";
+import { digLeadSuggestions, digLeadsOfPack, digSuggestionsPending, pathSuggestionsOfSet, webWithDigSuggestions } from "./dig-suggestions.js";
 import {
   digPicksAtMapPaths, serveWebEvidence, webPathRootsOf, webPathsAtRoots, webPlanReasonOf, withWebSources, type ServedWeb
 } from "./web-sources.js";
@@ -3311,6 +3311,9 @@ export class ServeRepository {
         branches === null ? undefined : new Map(branches.paths.flatMap((path) => path.root_node_id === null ? [] : [[path.path_id, path.root_node_id] as const]))) }),
       // Dig-model revision W4-5: each rewritten path and, on a dig, what it dug; absent when no dig touched the debate.
       ...digModel,
+      // On a dig, whether the AI's suggestions for its own paths may still arrive, so its page keeps reading until they do.
+      ...(digModel.dig !== undefined && digSuggestionsPending({ dig: digModel.dig, web: servedWeb?.web ?? null, sets: new Set(pathSuggestions.keys()), now: Date.now() })
+        ? { dig: { ...digModel.dig, suggestions_pending: true as const } } : {}),
       // V4 start step, Task 58: a path debate's paths (each its own branch); absent on every R22 answer.
       ...(branches === null ? {} : { branches })
     };
@@ -4019,8 +4022,8 @@ export class ServeRepository {
         plan: (plan ?? []).map((decided) => ({ pathId: decided.pathRef, status: decided.status,
           reason: decided.status === "NO_SEARCH_PLANNED" ? webPlanReasonOf(open(WEB_PLAN_CARRIER, decided.pathRef, decided.reason)) : null }))
       }), roots);
-      // W4-3: the AI's suggestions on this debate's paths, when it is a dig with a checked rewrite sealed before B3 (sealed with it,
-      // under its key; since B3 they are in 0141's store, read with the answer and offered in place of these), and the readers'
+      // The AI's suggestions on this debate's paths, when it is a dig whose checked rewrite carries them in its sealed text (a row
+      // that carries none has them in the suggestions store, read with the answer and offered in place of these), and the readers'
       // "still worth looking into" lines from each pack (code's kind; a wiped pack has none).
       const own = (await new PostgresDigModelRunnerRepository(this.pool).readPathRewrites(runId))?.own ?? null;
       const rewriteOpened = own === null || own.rewrite_id === null || own.content === null || own.content === undefined ? null

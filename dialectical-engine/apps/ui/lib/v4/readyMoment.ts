@@ -1,4 +1,4 @@
-import type { Answer, PathRewrite } from "@debateai/contract";
+import { DIG_LEVEL_MAX, DIG_SUGGESTIONS_WATCH_MS, webRanOnFree, type Answer, type PathRewrite } from "@debateai/contract";
 import { selectionForChange } from "./changes.js";
 import { rewriteByDig } from "./mapModel.js";
 import type { V4Change, V4Map, V4Path, V4Selection } from "./types.js";
@@ -74,6 +74,22 @@ export function mainAnswerItems(answer: Answer | null | undefined): Readonly<Rec
 /** dig-f1: a change is being written into the main answer, so the page keeps reading it (every 15 s). */
 export function mainAnswerWriting(answer: Answer | null | undefined): boolean {
   return answer?.main_answer?.writing === true;
+}
+
+/**
+ * Until when a dig's own page keeps reading its answer for the AI's suggestions on the dig's own paths, in epoch milliseconds. They
+ * are asked only once the dig's rewrite is stored, so they can land after the page read the finished rewrite. The server says when
+ * some may still arrive (`dig.suggestions_pending`); they come within DIG_SUGGESTIONS_WATCH_MS of the rewrite, so the watch ends
+ * there even if the server never says they are in. Null when there is nothing to watch for: none pending, the rewrite not finished,
+ * or a dig on Free or at the deepest level, which get no AI suggestions.
+ */
+export function digSuggestionsWatchUntil(answer: Answer | null | undefined): number | null {
+  const dig = answer?.dig;
+  if (dig === undefined || dig.suggestions_pending !== true || dig.level >= DIG_LEVEL_MAX || webRanOnFree(answer?.web)) return null;
+  const rewrite = dig.rewrite;
+  if (rewrite === null || !isFinished(rewrite)) return null;
+  const at = Date.parse(rewrite.rewritten_at);
+  return Number.isNaN(at) ? null : at + DIG_SUGGESTIONS_WATCH_MS;
 }
 
 /** True while the first answer is still arriving or has just finished arriving: its short answer is being written, or that state just changed. */

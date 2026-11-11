@@ -2,8 +2,11 @@
 // W4-3: what the map offers. The kinds code finds (owner, 30 Oct; F14: Free gets only these), joined beside the AI's sealed ones; none
 // at level 10; never an engine number or a passage. Made-up points.
 import { describe, expect, it } from "vitest";
-import { AnswerWebSchema, type AnswerWeb, type Node } from "@debateai/contract";
-import { digLeadSuggestions, digLeadsOfPack, digPointSuggestions, digPicksAtMapPaths, digSuggestionsOf, pathSuggestionsOfSet, webWithDigSuggestions } from "@debateai/serve";
+import { AnswerWebSchema, DIG_LEVEL_MAX, DIG_SUGGESTIONS_WATCH_MS, type AnswerWeb, type Node } from "@debateai/contract";
+import { PATH_REWRITE_POLICY } from "@debateai/register";
+import {
+  digLeadSuggestions, digLeadsOfPack, digPointSuggestions, digPicksAtMapPaths, digSuggestionsOf, digSuggestionsPending, pathSuggestionsOfSet, webWithDigSuggestions
+} from "@debateai/serve";
 
 const node = (id: string, overrides: Partial<Node> = {}): Node => ({ node_id: id, claim: `Point ${id} in plain words.`, way_of_knowing: "LOOKED_UP", review: null,
   sources: [], ...overrides } as Node);
@@ -68,5 +71,43 @@ describe("W4-3 the suggestions code finds", () => {
     expect(digSuggestionsOf(opened, "pos")).toEqual([one]);
     expect(digSuggestionsOf(opened, "other")).toEqual([]);
     expect(digSuggestionsOf({ text: {} }, "pos")).toEqual([]);
+  });
+});
+
+/* Whether the AI's suggestions on a dig's own paths may still arrive: the flag that keeps the dig's page reading its answer. */
+describe("a dig's own suggestions still to come", () => {
+  const AT = Date.parse("2026-11-12T10:00:00.000Z");
+  const finished = (overrides: Record<string, unknown> = {}) => ({
+    rewrite_id: "rw-1", dig_run_id: "33333333-3333-4333-8333-333333333333", dig_level: 1, dig_finished_at: "2026-11-12T09:59:00.000Z", state: "READY",
+    rewritten_at: "2026-11-12T10:00:00.000Z", changed: true, text: { line: "A line.", summary: "A summary.", fate: "HELD_UP" }, what_changed: ["A sentence."],
+    fate_before: "PARTLY_HELD", view: null,
+    dig_paths: [{ position_ref: "B1", line: "One.", fate: "HELD_UP" }, { position_ref: "b2", line: "Two.", fate: "FELL" }], ...overrides
+  });
+  const dig = (rewrite: unknown, level = 1) => ({ parent_run_id: "11111111-1111-4111-8111-111111111111", position_ref: "b1", places: ["path:b1"], level,
+    picks: [], rewrite }) as never;
+  const paid: AnswerWeb = { paths: [{ position_ref: "b1", search: { status: "NO_SEARCH_PLANNED" } as never, other_pages: [], suggestions: [] }] };
+  const pending = (input: Partial<Parameters<typeof digSuggestionsPending>[0]>) =>
+    digSuggestionsPending({ dig: dig(finished()), web: paid, sets: new Set(), now: AT + 60_000, ...input });
+
+  it("pending until every path the finished rewrite names has a set, an empty one included; matched in any case", () => {
+    expect(pending({})).toBe(true);
+    expect(pending({ sets: new Set(["b1"]) })).toBe(true);
+    expect(pending({ sets: new Set(["b1", "b2"]) })).toBe(false);
+  });
+
+  it("never on Free, at the deepest level, without a web part, before the rewrite is finished, or past the bound", () => {
+    expect(pending({ web: { paths: [{ ...paid.paths[0]!, search: { status: "NOT_ON_PLAN" } }] } })).toBe(false);
+    expect(pending({ dig: dig(finished({ dig_level: DIG_LEVEL_MAX }), DIG_LEVEL_MAX) })).toBe(false);
+    expect(pending({ web: null })).toBe(false);
+    expect(pending({ dig: dig(null) })).toBe(false);
+    expect(pending({ dig: dig({ rewrite_id: "rw-1", dig_run_id: "33333333-3333-4333-8333-333333333333", dig_level: 1, dig_finished_at: "2026-11-12T09:59:00.000Z",
+      state: "WRITING" }) })).toBe(false);
+    expect(pending({ now: AT + DIG_SUGGESTIONS_WATCH_MS })).toBe(true);
+    expect(pending({ now: AT + DIG_SUGGESTIONS_WATCH_MS + 1 })).toBe(false);
+  });
+
+  it("the bound covers every try a suggestion call may make, at the rewrite writer's own limits", () => {
+    const bound = PATH_REWRITE_POLICY.writerBound;
+    expect(DIG_SUGGESTIONS_WATCH_MS).toBeGreaterThanOrEqual(bound.maxAttempts * bound.deadlineMs);
   });
 });

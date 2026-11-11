@@ -1,12 +1,16 @@
 import { createHash } from "node:crypto";
-import { DigSuggestionSchema, WEB_CONTRACT_LIMITS, DIG_LEVEL_MAX, type AnswerWeb, type DigSuggestion, type Edge, type Node } from "@debateai/contract";
+import {
+  DigSuggestionSchema, WEB_CONTRACT_LIMITS, DIG_LEVEL_MAX, DIG_SUGGESTIONS_WATCH_MS, webRanOnFree, type AnswerDig, type AnswerWeb, type DigSuggestion, type Edge,
+  type Node
+} from "@debateai/contract";
 
 /**
  * THE DIG SUGGESTIONS CODE FINDS (plan 2026-10-30 task W4-3; owner, 30 Oct: "contradicting parts, undocumented parts, things
  * that need more web-search"; F14: Free gets only these, with no AI call). Worked out from what the answer already holds, with
  * no AI and nothing stored, so a first debate, a dig and Free all have them. The AI's own suggestions (on a dig's paths) are
- * joined beside these: 0141's newest set of each path (B3: since 12 Nov a dig's own are kept there, once its rewrite's row is stored),
- * else what a rewrite sealed before then (apps/runner dig-suggestions-step.ts).
+ * joined beside these: the suggestions store's newest set of each path, which is where a dig's own are written once its rewrite's
+ * row is stored; else what the dig's rewrite row carries in its sealed text, for a row that carries them (apps/runner
+ * dig-suggestions-step.ts).
  *  - CONTRADICTING: a point of the path the second AI disputed;
  *  - UNDOCUMENTED: a point of the path that rests on reasoning alone and names no source;
  *  - NEEDS_MORE_WEB: what the readers said is still worth looking into (their lines, from the path's pack).
@@ -49,6 +53,22 @@ function pointsUnder(root: string, nodes: readonly Node[], edges: readonly Pick<
     }
   }
   return found;
+}
+
+/**
+ * `AnswerDig.suggestions_pending`: whether the AI's suggestions for a dig's own paths may still arrive. They are written once the
+ * dig's rewrite is stored, each path's set as its call answers (an empty one when the call failed or the path has no point), so one
+ * is still to come while a path the finished rewrite names has no set (`sets`: the positions with a set on the dig's map, in lower
+ * case). None come on Free or at the deepest level, nor without a web part to show them in, and none later than
+ * DIG_SUGGESTIONS_WATCH_MS after the rewrite.
+ */
+export function digSuggestionsPending(input: Readonly<{ dig: AnswerDig; web: AnswerWeb | null; sets: ReadonlySet<string>; now: number }>): boolean {
+  const rewrite = input.dig.rewrite;
+  if (rewrite === null || (rewrite.state !== "READY" && rewrite.state !== "READY_WITH_RESERVATION")) return false;
+  if (input.dig.level >= DIG_LEVEL_MAX || input.web === null || webRanOnFree(input.web)) return false;
+  const at = Date.parse(rewrite.rewritten_at);
+  if (Number.isNaN(at) || input.now - at > DIG_SUGGESTIONS_WATCH_MS) return false;
+  return rewrite.dig_paths.slice(0, WEB_CONTRACT_LIMITS.pathsMax).some((path) => !input.sets.has(path.position_ref.toLowerCase()));
 }
 
 /** 0141's opened set: the suggestions that parse, one by one; none when it is not a set. */

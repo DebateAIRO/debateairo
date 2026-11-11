@@ -37,14 +37,14 @@ import { webStepRowId } from "./web-step.js";
  *     row: when every writer failed, or the parent path or the dig's own material could not be read, the row is FAILED
  *     and the path keeps its text; otherwise later digs of the path would wait for ever. A turn whose store cannot be read
  *     or written at all is left to the sweep (path-rewrite-sweep.ts, W3-7), which writes it once the store answers.
- *  5. once the row is stored, the `afterRewrite` hook; and W4-3's suggestions: the AI's for the dig's own paths (`suggest`; none on
- *     Free, none at level 10) and the rewritten path's again (`refreshSuggestions`, owner Q-D8);
+ *  5. once the row is stored, the `afterRewrite` hook; and the suggestions: the AI's for the dig's own paths (`suggest`; none on
+ *     Free, none at level 10) and the rewritten path's again (`refreshSuggestions`);
  *  6. R22 decisions 2 and 3: when the rewrite really changed the path, the path above is rewritten too and, at the first debate, the
  *     main answer (`afterStored`, path-climb.ts). With the tree's settings the turn in 1 and 2 is held to the path's whole line (0138).
- * B3 (code review of 12 Nov): the suggestions in 5 are never in front of the row or the climb. The checked rewrite is stored as soon as
- * it is written, and its calls run BESIDE the climb; the climb marks the dig settled only once they are in (`afterStored`'s
- * `alongside`), and this task ends only then, so the sweep never starts a second copy beside them. A runner that stops in between leaves
- * them to the tree's sweep (`owedDigSuggestions`).
+ * The suggestions in 5 are never in front of the row or the climb: the rewrite is what the person waits for, and the suggestions are a
+ * small extra whose calls can take minutes. The checked rewrite is stored as soon as it is written, and the suggestion calls run BESIDE
+ * the climb; the climb marks the dig settled only once they are in (`afterStored`'s `alongside`), and this task ends only then, so the
+ * sweep never starts a second copy beside them. A runner that stops in between leaves them to the tree's sweep (`owedDigSuggestions`).
  *
  * W3-7: before it takes its turn, the dig's own paths are stored (0135's identity.path_rewrite_input, `recordInput`), so
  * a rewrite whose runner stopped is built again by the sweep from the store alone, byte for byte, its answered calls
@@ -99,7 +99,7 @@ export type PathRewriteSources = Readonly<{
   /** W3-7: what `recordInput` stored, for the sweep; null when nothing was. */
   storedInputOf?: (runId: string) => Promise<PathRewriteStoredInput | null>;
   /**
-   * B3: what the dig's own finished rewrite says it changed, sentence by sentence, as its row seals it (`what_changed`): what its own
+   * What the dig's own finished rewrite says it changed, sentence by sentence, as its row seals it (`what_changed`): what its own
    * suggestions are told. Null when the dig has no finished rewrite of its own (none yet, FAILED, or none at all). For the tree's sweep.
    */
   ownWhatChangedOf?: (digRunId: string) => Promise<readonly string[] | null>;
@@ -169,8 +169,9 @@ export type PathRewriteContent = Readonly<{
    */
   rests_on: readonly string[];
   /**
-   * W4-3: what the AI offered to dig into on each of the dig's own paths, in a text sealed before B3 (none before W4-3, or on Free).
-   * B3: a text sealed since has none; they are in 0141's store (dig-suggestions-step.ts `writeOwnPathSuggestions`).
+   * What the AI offered to dig into on each of the dig's own paths, in a row whose sealed text carries them. This code seals none: each
+   * path's set is in the suggestions store (dig-suggestions-step.ts `writeOwnPathSuggestions`), so the row can be stored without
+   * waiting for those calls.
    */
   dig_suggestions?: readonly DigPathSuggestions[];
   /** Decision 13: on a public dig's own rewrite, its paths' points, as the page will show them. */
@@ -215,8 +216,8 @@ export type PathRewriteRunnerSettings = Readonly<{
   /** R22 decision 2: the path's whole line (absent: 0134's rows alone, a runner without the tree's settings). */
   line?: PathRewriteLine;
   /**
-   * R22 decisions 2 and 3: once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. B3: `alongside`
-   * is the suggestions' work, running beside it (never rejects); the mark that nothing more is bought for the dig waits for it.
+   * Once the dig's row is stored, the climb and the main answer (path-climb.ts). Never rejects. `alongside` is the suggestions' work,
+   * running beside it (never rejects); the mark that nothing more is bought for the dig waits for it.
    */
   afterStored?: (digRunId: string, lease: StepLease, alongside?: Promise<unknown>) => Promise<unknown>;
   /**
@@ -229,11 +230,11 @@ export type PathRewriteRunnerSettings = Readonly<{
    */
   afterRewrite?: (settled: PathRewriteSettled) => Promise<void> | void;
   /**
-   * W4-3 (dig-suggestions-step.ts `writeOwnPathSuggestions`): the AI's suggestions for the dig's own paths. B3: asked once the row is
-   * stored, beside the climb, each path's set kept in 0141's store; a call already answered is replayed free. Never rejects. Absent: none.
+   * The AI's suggestions for the dig's own paths (dig-suggestions-step.ts `writeOwnPathSuggestions`): asked once the row is stored,
+   * beside the climb, each path's set kept in the suggestions store; a call already answered is replayed free. Never rejects. Absent: none.
    */
   suggest?: (input: DigSuggestionsJob) => Promise<unknown>;
-  /** Owner Q-D8 (dig-suggestions-step.ts `refreshPathSuggestions`): once the row is stored, the rewritten path's suggestions again, beside the climb. */
+  /** Once the row is stored, the rewritten path's suggestions again, beside the climb (dig-suggestions-step.ts `refreshPathSuggestions`). */
   refreshSuggestions?: (input: PathSuggestionsRefresh) => Promise<void>;
   /** A first debate's suggestions (0141), once its story is written. Absent: none. */
   firstDebateSuggestions?: Readonly<{
@@ -495,7 +496,7 @@ async function rewriteOnItsTurn(settings: PathRewriteRunnerSettings, job: PathRe
     log("PATH_REWRITE_STORED", { runId: digRunId, outcome: record.outcome, failureCode: record.failureCode, stored });
     if (stored === "BASE_MOVED" || stored === "WAIT_TURN") continue;
     if (stored === "RECORDED" || stored === "ALREADY") {
-      // B3: the row is stored; what to dig next is worked out beside the climb, never in front of it. Only the copy that recorded the
+      // The row is stored; what to dig next is worked out beside the climb, never in front of it. Only the copy that recorded the
       // row asks (a second copy's ALREADY buys nothing more), and this task ends once they are in.
       const beside = stored === "RECORDED" && suggestAfter !== null ? (suggestAfter as () => Promise<void>)().catch((error: unknown) => {
         log("PATH_REWRITE_SUGGESTIONS_FAILED", { runId: digRunId, code: codeOf(error) });
@@ -527,7 +528,7 @@ async function afterRewrite(settings: PathRewriteRunnerSettings, dig: PathRewrit
 type Compose = Readonly<{
   dig: PathRewriteDig; job: PathRewriteJob; parent: PathRewriteParentPath; digPaths: readonly PathRewriteDigPath[];
   rewriteId: string; baseRewriteId: string | null; book: ReplayBook | null; log: Log;
-  /** What to do once this rewrite's row is stored, beside the climb: the dig's own paths' suggestions (W4-3) and the rewritten path's (Q-D8). */
+  /** What to do once this rewrite's row is stored, beside the climb: the dig's own paths' suggestions and the rewritten path's. */
   onStored: (suggest: () => Promise<void>) => void;
 }>;
 
@@ -601,7 +602,7 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
   const served = written.rounds.find((round) => round.round === outcome.servedRound)!;
   const content = contentOf(outcome.body, built.pointIds, built.digPathRefs);
   const sealed = await settings.seal(digRunId, rewriteId, content);
-  // B3: nothing more is asked before the row: the suggestions are asked once it is stored, beside the climb, on the same writer and the
+  // Nothing more is asked before the row: the suggestions are asked once it is stored, beside the climb, on the same writer and the
   // same calls (`send`: the dig's run, the story lane, the rewrite's never-walled seam, its answered calls replayed). Handed over only
   // once the text is sealed, so a seal that fails (the row is then FAILED) asks for none.
   const suggest = settings.suggest;
@@ -643,7 +644,7 @@ async function composeRecord(settings: PathRewriteRunnerSettings, compose: Compo
 /**
  * The draft as it is stored: refs gone (the dig's paths named by their real refs, the points the sentences rest on by
  * their real ids), the reason apart from its codes. Code kept only sentences whose every ref the material gives.
- * B3: no suggestion is sealed here any more (0141's store keeps them).
+ * No suggestion is sealed here: the suggestions store keeps them, so the row never waits for their calls.
  */
 export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string, string>, digPathRefs: ReadonlyMap<string, string>): PathRewriteContent {
   const restsOn = [...new Set(draft.what_changed.flatMap((sentence) => sentence.rests_on.flatMap((name) => {
@@ -662,7 +663,7 @@ export function contentOf(draft: PathRewriteDraft, pointIds: ReadonlyMap<string,
 }
 
 /**
- * B3: THE DIG'S OWN SUGGESTIONS A RUNNER LEFT UNWRITTEN. They are asked once the dig's row is stored, beside the climb, so a runner that
+ * THE DIG'S OWN SUGGESTIONS A RUNNER LEFT UNWRITTEN. They are asked once the dig's row is stored, beside the climb, so a runner that
  * stops in between leaves them unasked, and nothing else knows they are owed. The tree's sweep (path-climb.ts `sweepTreeUpdates`) asks
  * this for every dig it walks once the dig's calls have stood still. It builds the very job the stopped runner built, from the store
  * alone: the dig as `digOf` reads it, its own paths and work item as 0135 stored them, what its row says it changed, the runner's
@@ -687,7 +688,7 @@ export async function owedDigSuggestions(settings: PathRewriteRunnerSettings, ro
       return;
     }
     const kept = new Set([...await store.positionsOf(digRunId)].map((positionRef) => positionRef.toLowerCase()));
-    if (!stored.digPaths.slice(0, WEB_CONTRACT_LIMITS.pathsMax).some((path) => path.points.length > 0 && !kept.has(path.positionRef.toLowerCase()))) return;
+    if (!stored.digPaths.slice(0, WEB_CONTRACT_LIMITS.pathsMax).some((path) => !kept.has(path.positionRef.toLowerCase()))) return;
     const dig = await sources.digOf(digRunId);
     if (dig === null || dig.free || dig.level >= DIG_LEVEL_MAX) return;
     const writer = roles.resolveProvider?.(settings.writerRoleRef) ?? null;
