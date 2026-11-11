@@ -1302,7 +1302,6 @@ packages/db/src/migration-forward115.ts
 packages/db/src/migration-lineage.ts
 packages/db/src/migration-n1.ts
 packages/db/src/migration-transaction.ts
-packages/db/src/moderation-notice.ts
 packages/db/src/moderation-statement.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
