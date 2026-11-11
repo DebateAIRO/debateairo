@@ -1752,19 +1752,28 @@ class SignalStopTests(GateTest):
         def execute(*_args):
             raise AssertionError('never reached')
         path, server, loop = self.serve_on(gate, execute, allowed_uids=frozenset({PEER}), peer_uid_of=lambda _r: 7)
-        with patch.object(server, 'process_request', side_effect=AssertionError('no thread for a stranger')):
-            client = self.post(path)
+        given_a_thread = []
+
+        def process_request(request, client_address):
+            given_a_thread.append(client_address)  # Recorded, then closed, so the client below never waits.
+            server.shutdown_request(request)
+        with patch.object(server, 'process_request', side_effect=process_request):
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.addCleanup(client.close)
+            client.connect(str(path))
             client.settimeout(5)
-            # Closed without one reply byte. Linux answers a close with unread request bytes by a
-            # reset (ECONNRESET); macOS by a plain end of stream. Both mean "closed, no reply";
-            # any byte received before either one still fails the test.
+            # Closed without one reply byte. The server may close before the request is even written: the
+            # write then fails (EPIPE; seen on a busy Linux CI runner, 11 Nov 2026). Linux answers a close with
+            # unread request bytes by a reset (ECONNRESET); macOS by a plain end of stream. All mean "closed,
+            # no reply"; any byte received, or a thread given, still fails the test.
             reply = b''
             try:
+                client.sendall(b'POST /complete HTTP/1.0\r\nContent-Length: 2\r\n\r\n{}')
                 while chunk := client.recv(65536):
                     reply += chunk
-            except ConnectionResetError:
+            except (BrokenPipeError, ConnectionResetError):
                 pass
-            self.assertEqual(reply, b'')
+            self.assertEqual((reply, given_a_thread), (b'', []))
         broken = bridge.UnixThreadingServer.__new__(bridge.UnixThreadingServer)
         broken.allowed_uids, broken.peer_uid_of = frozenset({PEER}), lambda _r: 1 / 0
         self.assertFalse(broken.verify_request(None, None))
