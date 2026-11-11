@@ -8,8 +8,8 @@ import { guardedAuthorityQuery, type StaffAlertIntent } from "./staff-access.js"
  * proof and the log.
  */
 export type PublicReviewStepName = "HIDE" | "REPUBLISH" | "REMOVE_DIG" | "PUT_BACK" | "CORRECT" | "HIDE_REPORT" | "DECIDE";
-/** 0157: the ground's fields as the proof's body carries them: the codes sorted and comma-joined, and "" for none. */
-export type PublicReviewGroundFields = Readonly<{ grounds: string; source: string; flag_id: string; facts_sha256: string }>;
+/** 0157: the ground's fields as the proof's body carries them: the codes sorted and comma-joined, and "" for none. 0172 (M7): and the law an ILLEGAL ground relies on. */
+export type PublicReviewGroundFields = Readonly<{ grounds: string; source: string; flag_id: string; facts_sha256: string; law: string }>;
 export type PublicReviewCommandState = Readonly<{ expectedRevision: number; hidden: boolean }>;
 export type PublicReviewMaterial = Readonly<{
   snapshot: Readonly<{ run_id: string; created_at: string; content: CryptoEnvelope; latest_state: string | null }>; hidden: boolean; revision: number;
@@ -61,8 +61,10 @@ export class PostgresPublicReviewRepository {
     alertIntent: StaffAlertIntent | null }>): Promise<SecurityReceipt> {
     const command = { targetId: input.publicationRef, step: input.step, pieceKind: input.pieceKind ?? "", pieceId: input.pieceId ?? "", pointer: input.pointer ?? "", textSha256: input.textSha256 ?? "",
       expectedRevision: input.expectedRevision, operationId: input.operationId, grounds: input.ground.grounds, source: input.ground.source, flagId: input.ground.flag_id, factsSha256: input.ground.facts_sha256 };
-    return receiptOf(await this.one("SELECT staff.public_review_act_grounded($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb) AS value",
-      [input.actor, input.proof.proofId, input.proof.binding, command, input.content === null ? null : JSON.stringify(input.content), input.facts === null ? null : JSON.stringify(input.facts), input.alertIntent]));
+    // 0172 (M7): through the door with the law, last; the release before's door is closed to the runtime.
+    return receiptOf(await this.one("SELECT staff.public_review_act_grounded($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb,$8::text) AS value",
+      [input.actor, input.proof.proofId, input.proof.binding, command, input.content === null ? null : JSON.stringify(input.content), input.facts === null ? null : JSON.stringify(input.facts), input.alertIntent,
+        input.ground.law]));
   }
   async readOverlay(publicationRef: string): Promise<PublicReviewOverlayRead | null> {
     return (await this.one("SELECT identity.read_public_review_overlay($1::uuid) AS value", [publicationRef]) as PublicReviewOverlayRead | null) ?? null;

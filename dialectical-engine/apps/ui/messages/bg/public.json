@@ -285,6 +285,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Нашите Условия за ползване, раздел 7: никаква обида на религията.",
   "public.moderation.ground.PERSONAL_DATA": "Нашите Условия за ползване, раздел 7: не изпращайте лични данни за други лица.",
   "public.moderation.ground.ILLEGAL": "Законът: съдържанието е незаконно. Фактите по-долу посочват закона.",
+  "public.moderation.law": "Законът, на който се основахме: {law}",
   "public.moderation.suspectedIntro": "Предметът на прегледа, все още без решение:",
   "public.moderation.factsIntro": "Фактите, на които се основахме:",
   "public.moderation.factsDeleted": "Фактите бяха изтрити дванадесет месеца след стъпката. Правилото и датите остават.",

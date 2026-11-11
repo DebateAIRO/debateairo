@@ -287,6 +287,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Naše Podmienky poskytovania služby, oddiel 7: žiadna urážka náboženstva.",
   "public.moderation.ground.PERSONAL_DATA": "Naše Podmienky poskytovania služby, oddiel 7: nezadávajte osobné údaje iných osôb.",
   "public.moderation.ground.ILLEGAL": "Zákon: obsah je nezákonný. Fakty nižšie uvádzajú, o aký zákon ide.",
+  "public.moderation.law": "Zákon, o ktorý sme sa opreli: {law}",
   "public.moderation.suspectedIntro": "Čoho sa posudzovanie týka, zatiaľ nerozhodnuté:",
   "public.moderation.factsIntro": "Fakty, o ktoré sme sa opreli:",
   "public.moderation.factsDeleted": "Fakty boli vymazané dvanásť mesiacov po tomto kroku. Pravidlo a dátumy zostávajú.",

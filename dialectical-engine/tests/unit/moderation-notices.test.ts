@@ -19,7 +19,7 @@ const USER = randomUUID();
 const DEK = randomBytes(32);
 const REF = "f1000000-0000-4000-8000-000000000001";
 const sealed = (address: string) => encrypt(DEK, Buffer.from(address, "utf8"), ["identity", "user.email_ciphertext", USER, "run:none", USER, `user-dek:${USER}`, "1"]);
-const HOLD: ModerationStatementGround = { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false };
+const HOLD: ModerationStatementGround = { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false, law: null };
 const statement = (kind: ModerationStatementKind, overrides: Partial<ModerationStatementMail> = {}): ModerationStatementMail =>
   ({ userId: USER, statementId: randomUUID(), kind, happenedAt: "2026-11-05T09:30:00.000Z", mailLocale: "en", publicationRef: REF, ground: HOLD, emailCiphertext: sealed("bea@example.test"), ...overrides });
 
@@ -114,12 +114,24 @@ describe("0157: the statement of reasons sender", () => {
     expect(text).toContain("An automatic check read the report and took this step by itself, with no person involved yet.");
     expect(text).toContain("Our Terms of Service, section 7: no hate speech of any kind.");
     const before = statementMailParams({ happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
-      ground: { recorded: false, interim: false, grounds: [], suspected: [], sources: [], automated_detection: false, automated_decision: false } });
+      ground: { recorded: false, interim: false, grounds: [], suspected: [], sources: [], automated_detection: false, automated_decision: false, law: null } });
     expect(before.groundNone).toBe("true");
     expect(Object.entries(before).filter(([name, value]) => name.startsWith("ground") && name !== "groundNone" && value === "true")).toEqual([]);
     expect(renderMail("MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "de", before).text).toContain("office@dezbatere.ro");
     // Every param is a date, a link or a flag: no words of the debate, no staff id, no reporter can travel in one.
     for (const [name, value] of Object.entries(automatic)) expect(name === "happened" || name.endsWith("Url") || value === "true" || value === "false", name).toBe(true);
+  });
+
+  it("0172 (M7): the law an illegal ground names stays on the page; the mail says only that the full statement names it, and never carries its words", () => {
+    const LAW = "Legea nr. 8/1996, art. 139 SECRET-LAW-WORDS";
+    const params = statementMailParams({ happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
+      ground: { recorded: true, interim: false, grounds: ["ILLEGAL"], suspected: [], sources: ["AUTHORITY_ORDER"], automated_detection: false, automated_decision: false, law: LAW } });
+    expect(params.groundIllegal).toBe("true");
+    expect(JSON.stringify(params)).not.toContain("SECRET-LAW-WORDS");
+    for (const [name, value] of Object.entries(params)) expect(name === "happened" || name.endsWith("Url") || value === "true" || value === "false", name).toBe(true);
+    const text = renderMail("MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "en", params).text;
+    expect(text).toContain("The full statement names the law.");
+    expect(text).not.toContain("SECRET-LAW-WORDS");
   });
 
   it("drops a statement with nothing to send to, and retries one whose key or transport failed, without stopping the pass", async () => {

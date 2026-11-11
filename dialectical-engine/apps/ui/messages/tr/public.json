@@ -285,6 +285,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Hizmet Koşullarımız, 7. bölüm: Dine hakaret yasaktır.",
   "public.moderation.ground.PERSONAL_DATA": "Hizmet Koşullarımız, 7. bölüm: Başka kişiler hakkında kişisel veri göndermeyin.",
   "public.moderation.ground.ILLEGAL": "Kanun: İçerik hukuka aykırıdır. Aşağıdaki olgular ilgili kanunu belirtir.",
+  "public.moderation.law": "Dayandığımız kanun: {law}",
   "public.moderation.suspectedIntro": "İncelemenin konusu, henüz karar verilmedi:",
   "public.moderation.factsIntro": "Dayandığımız olgular:",
   "public.moderation.factsDeleted": "Olgular, adımdan on iki ay sonra silindi. Kural ve tarihler kalır.",

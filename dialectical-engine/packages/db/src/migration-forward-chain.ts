@@ -85,7 +85,8 @@ export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:str
 export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>
  // 0144: a step that redefines functions an earlier step's digest pins names them.
  // 0172 (M2): a step that redefines functions of a step and adds columns to that step's tables (one amendment per step, so one entry) names both.
- |Readonly<{step:string;functions:readonly string[];field:'function_definition';relations?:readonly string[];columns?:readonly string[]}>
+ // 0172 (M3, M7): and the CHECKs it adds or swaps on those tables, and the grants it takes back from a function that step granted (a drained step's).
+ |Readonly<{step:string;functions:readonly string[];field:'function_definition';relations?:readonly string[];columns?:readonly string[];constraints?:readonly string[];revokes?:readonly string[]}>
  // 0169: a step that grants a role EXECUTE on a function an earlier step's digest pins (0124's pointer reader) names the function and the roles.
  |Readonly<{step:string;functions:readonly string[];grantees:readonly string[];field:'function_acl'}>
  // 0169 (Task 57p): a step that adds a column (and its CHECK) to tables an earlier step's digest pins names the tables and the columns.

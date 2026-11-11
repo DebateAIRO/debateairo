@@ -286,6 +286,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Nuestros Términos de servicio, sección 7: prohibido el insulto religioso.",
   "public.moderation.ground.PERSONAL_DATA": "Nuestros Términos de servicio, sección 7: no envíe datos personales de otras personas.",
   "public.moderation.ground.ILLEGAL": "La ley: el contenido es ilegal. Los hechos de abajo indican la ley.",
+  "public.moderation.law": "La ley en la que nos basamos: {law}",
   "public.moderation.suspectedIntro": "Sobre qué trata la revisión, aún sin decidir:",
   "public.moderation.factsIntro": "Los hechos en los que nos basamos:",
   "public.moderation.factsDeleted": "Los hechos se eliminaron doce meses después del paso. La norma y las fechas se conservan.",

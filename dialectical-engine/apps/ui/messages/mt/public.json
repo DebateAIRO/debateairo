@@ -288,6 +288,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "It-Termini tas-Servizz tagħna, taqsima 7: ebda insult reliġjuż.",
   "public.moderation.ground.PERSONAL_DATA": "It-Termini tas-Servizz tagħna, taqsima 7: tissottomettix data personali dwar persuni oħra.",
   "public.moderation.ground.ILLEGAL": "Il-liġi: il-kontenut huwa illegali. Il-fatti hawn taħt isemmu l-liġi.",
+  "public.moderation.law": "Il-liġi li bbażajna fuqha: {law}",
   "public.moderation.suspectedIntro": "Dwar xiex huwa r-rieżami, għadu mhux deċiż:",
   "public.moderation.factsIntro": "Il-fatti li bbażajna fuqhom:",
   "public.moderation.factsDeleted": "Il-fatti tħassru tnax-il xahar wara l-pass. Ir-regola u d-dati jibqgħu.",

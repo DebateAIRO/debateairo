@@ -284,6 +284,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "당사 서비스 이용약관 제7조: 종교 모독은 허용되지 않습니다.",
   "public.moderation.ground.PERSONAL_DATA": "당사 서비스 이용약관 제7조: 다른 사람의 개인정보를 제출하지 마십시오.",
   "public.moderation.ground.ILLEGAL": "법률: 이 콘텐츠는 불법입니다. 해당 법률은 아래 사실에 나와 있습니다.",
+  "public.moderation.law": "당사가 근거로 삼은 법률: {law}",
   "public.moderation.suspectedIntro": "검토 대상(아직 결정되지 않음):",
   "public.moderation.factsIntro": "당사가 근거로 삼은 사실:",
   "public.moderation.factsDeleted": "사실 정보는 조치 후 12개월이 지나 삭제되었습니다. 규칙과 날짜는 남아 있습니다.",

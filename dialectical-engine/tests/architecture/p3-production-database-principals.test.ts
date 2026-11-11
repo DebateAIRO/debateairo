@@ -1737,6 +1737,13 @@ describe("P3-01 production database-principal manifest", () => {
     "INSERT ON ledger.model_spend_hold",
     "INSERT ON ledger.model_spend_reservation"
   ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0172_moderation_notice_fixes.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
+  ]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -1909,6 +1916,13 @@ describe("P3-01 production database-principal manifest", () => {
           "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
           "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
           "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)"
+        ]
+      },
+      {
+        roleName: "debateai_runtime",
+        source: "migrations/0172_moderation_notice_fixes.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
         ]
       }
     ]);
@@ -2392,6 +2406,22 @@ it("discloses exactly 0171's grants, and records each grant it takes back under 
     for (const revoke of entry.revokes) expect(own, revoke).toContain(`REVOKE ${revoke} FROM ${entry.roleName};`);
   }
   for (const line of recorded) expect(disclosed, line).not.toContain(line);
+});
+
+it("discloses exactly 0172's one grant and records the one it takes back (M7: staff's door with the law replaces the release before's for the runtime)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const source = "migrations/0172_moderation_notice_fixes.sql";
+  const sql = await readFile(source, "utf8");
+  const granted = [...sql.matchAll(/^GRANT ([^\n]+) TO (debateai_[a-z_]+);$/gmu)].map(([, grant, role]) => `${role!}:${grant!}`).sort();
+  const disclosed = manifest.privilegeDisclosures.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}:${grant}`)).sort();
+  expect(disclosed).toEqual(granted);
+  expect(granted).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"]);
+  const revoked = [...sql.matchAll(/^REVOKE (EXECUTE ON FUNCTION \S+) FROM (debateai_[a-z_]+);$/gmu)].map(([, revoke, role]) => `${role!}:${revoke!}`).sort();
+  const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
+  expect(recorded).toEqual(revoked);
+  expect(recorded).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"]);
 });
 
 it("discloses every 0127 publication review grant, including the run ownership columns", async () => {

@@ -409,6 +409,185 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp()
 $$;
 
+-- M7. An "illegal" ground names the law it relies on --------------------------------------------------------------------------------
+-- M7 (owner, 10 Nov 2026; decision E; DSA Art 17(3)(d)). A removal, a hidden report, a correction or DECIDE whose grounds include ILLEGAL now names
+-- the law it relies on: free text of 3 to 200 characters a person types (a reference, not facts: stored plainly in the new law_ref beside 0157's
+-- ground and decision, bound into the passkey's proof as `law`, kept as long as the statement, never touched by the twelve-month sweep, shown on the
+-- person's page and in their export, and never in a mail, which keeps its line "The full statement names the law"). A hide never names one and is
+-- never refused: what it suspects is not yet decided, and its hold is Terms §9 (0150). New rows only: the two CHECKs each table gets are NOT VALID,
+-- so a row from before 0172 keeps its null.
+ALTER TABLE identity.moderation_ground ADD COLUMN IF NOT EXISTS law_ref text;
+ALTER TABLE identity.moderation_decision ADD COLUMN IF NOT EXISTS law_ref text;
+ALTER TABLE identity.moderation_ground DROP CONSTRAINT IF EXISTS moderation_ground_law_length;
+ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;
+ALTER TABLE identity.moderation_ground DROP CONSTRAINT IF EXISTS moderation_ground_law_required;
+ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim) NOT VALID;
+ALTER TABLE identity.moderation_decision DROP CONSTRAINT IF EXISTS moderation_decision_law_length;
+ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;
+ALTER TABLE identity.moderation_decision DROP CONSTRAINT IF EXISTS moderation_decision_law_required;
+ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL) NOT VALID;
+-- The law a step's grounds need, trimmed, or null for none: ILLEGAL with no law is MODERATION_GROUND_LAW_MISSING; a law beside no ILLEGAL, or one
+-- shorter than 3 or longer than 200 characters, MODERATION_GROUND_LAW_INVALID. Staff's door asks it before the passkey is spent, and each writer again.
+CREATE OR REPLACE FUNCTION identity.moderation_law_of(p_grounds text[], p_law text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_law text := NULLIF(btrim(p_law), '');
+BEGIN
+  IF 'ILLEGAL' = ANY (COALESCE(p_grounds, '{}'::text[])) THEN
+    IF v_law IS NULL THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_GROUND_LAW_MISSING'; END IF;
+  ELSIF v_law IS NOT NULL THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_GROUND_LAW_INVALID';
+  END IF;
+  IF v_law IS NOT NULL AND char_length(v_law) NOT BETWEEN 3 AND 200 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_GROUND_LAW_INVALID'; END IF;
+  RETURN v_law;
+END $$;
+-- The writers, new overloads with the law last (0157's arguments plus p_law), each the body above it in this file (Task 3's, with the report's
+-- one-line close, R3) plus the law: refused first, then stored. The overloads without it stay, for the release before's door, which loses its grant below.
+CREATE OR REPLACE FUNCTION identity.moderation_decide(p_actor uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb,
+  p_expected_revision integer, p_operation uuid, p_request_sha256 text, p_law text) RETURNS timestamptz
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_revision integer; v_at timestamptz; v_decision uuid; v_law text := identity.moderation_law_of(p_grounds, p_law);
+BEGIN
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:public-tree:' || p_publication_ref::text, 0));
+  SELECT COALESCE(max(event.revision), 0) INTO v_revision FROM identity.public_review_event AS event WHERE event.publication_ref = p_publication_ref;
+  IF v_revision <> p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_STALE'; END IF;
+  IF NOT identity.public_review_held(p_publication_ref) THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_NOT_HIDDEN'; END IF;
+  INSERT INTO identity.moderation_decision (publication_ref, revision, grounds, source, flag_id, facts_sha256, facts_ciphertext, actor_staff_id, operation_id, request_sha256, law_ref)
+  VALUES (p_publication_ref, v_revision, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, p_actor, p_operation, p_request_sha256, v_law)
+  RETURNING recorded_at, decision_id INTO v_at, v_decision;
+  IF p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND p_actor <> '00000000-0000-0000-0000-000000000000'::uuid THEN PERFORM identity.close_public_flag_by_review(p_flag_id, p_actor, v_decision); END IF;
+  RETURN v_at;
+END $$;
+CREATE OR REPLACE FUNCTION identity.record_step_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb, p_law text) RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT identity.moderation_law_of(p_grounds, p_law);
+  WITH recorded AS (
+  INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, flag_id, facts_sha256, facts_ciphertext, interim, law_ref)
+  SELECT event.event_id, p_publication_ref, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, false, identity.moderation_law_of(p_grounds, p_law)
+  FROM identity.public_review_event AS event WHERE event.operation_id = p_operation AND event.publication_ref = p_publication_ref
+  RETURNING event_id)
+  SELECT identity.close_public_flag_by_review(p_flag_id, event.actor_staff_id, event.event_id) FROM recorded JOIN identity.public_review_event AS event ON event.event_id = recorded.event_id WHERE p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND event.actor_staff_id <> '00000000-0000-0000-0000-000000000000'::uuid
+$$;
+-- What a statement says: 0157's body plus `law`, the distinct laws of its grounds joined by "; " (several only for a correction's places), or null.
+-- R9: it is part of the ground, so whoever holds the statement reads it, a contributor's and a reporter's too; the facts stay the owner's (M3).
+-- Same signature, owner and grants (CREATE OR REPLACE keeps them); the page's reader and the export read it through 0172's and 0157's readers.
+CREATE OR REPLACE FUNCTION identity.moderation_statement_ground(p_statement_id uuid) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE s identity.moderation_statement%ROWTYPE; d identity.moderation_decision%ROWTYPE; v_grounds text[] := '{}'; v_suspected text[] := '{}'; v_sources text[] := '{}';
+  v_flag uuid; v_detected boolean := false; v_decided boolean := false; v_interim boolean := false; v_recorded boolean := false; v_event record; v_laws text[] := '{}';
+BEGIN
+  SELECT * INTO s FROM identity.moderation_statement AS statement WHERE statement.statement_id = p_statement_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF s.decision_id IS NOT NULL THEN
+    SELECT * INTO d FROM identity.moderation_decision AS decision WHERE decision.decision_id = s.decision_id;
+    v_grounds := d.grounds; v_sources := ARRAY[d.source]; v_flag := d.flag_id; v_recorded := true; v_laws := ARRAY[d.law_ref];
+  ELSE
+    FOR v_event IN SELECT event.event_id, event.action, event.actor_staff_id, event.operation_id, ground.grounds, ground.suspected, ground.source, ground.flag_id, ground.interim, ground.law_ref
+      FROM identity.public_review_event AS event LEFT JOIN identity.moderation_ground AS ground ON ground.event_id = event.event_id
+      WHERE event.event_id = ANY (s.ground_events) LOOP
+      IF v_event.action = 'HIDE' AND v_event.actor_staff_id = '00000000-0000-0000-0000-000000000000'::uuid THEN
+        -- 0151's automatic hide: the report it settled is its source, an AI found it and the hide itself was automated, pending a person.
+        SELECT flag.flag_id, CASE flag.reason WHEN 'CONTENT' THEN ARRAY['UNLAWFUL','HATE_SPEECH'] WHEN 'PERSONAL' THEN ARRAY['PERSONAL_DATA'] ELSE '{}'::text[] END
+          INTO v_flag, v_suspected FROM identity.public_flag AS flag WHERE flag.flag_id = v_event.operation_id;
+        v_grounds := v_grounds || ARRAY['REVIEW_HOLD']; v_sources := v_sources || ARRAY['REPORT_BUTTON']; v_decided := true; v_interim := true; v_recorded := true;
+      ELSIF v_event.grounds IS NOT NULL THEN
+        v_grounds := v_grounds || v_event.grounds; v_suspected := v_suspected || v_event.suspected; v_sources := v_sources || ARRAY[v_event.source];
+        v_flag := COALESCE(v_flag, v_event.flag_id); v_interim := v_interim OR v_event.interim; v_recorded := true; v_laws := v_laws || v_event.law_ref;
+      END IF;
+    END LOOP;
+  END IF;
+  -- An AI read the report that led here (0151's check), so automated means helped detect it.
+  v_detected := v_decided OR EXISTS (SELECT 1 FROM identity.public_flag AS flag WHERE flag.flag_id = v_flag AND flag.judge_model_id IS NOT NULL);
+  RETURN jsonb_build_object('recorded', v_recorded, 'interim', v_interim,
+    'grounds', COALESCE((SELECT jsonb_agg(DISTINCT code ORDER BY code) FROM unnest(v_grounds) AS code), '[]'::jsonb),
+    'suspected', COALESCE((SELECT jsonb_agg(DISTINCT code ORDER BY code) FROM unnest(v_suspected) AS code), '[]'::jsonb),
+    'sources', COALESCE((SELECT jsonb_agg(DISTINCT code ORDER BY code) FROM unnest(v_sources) AS code), '[]'::jsonb),
+    'automated_detection', v_detected, 'automated_decision', v_decided,
+    'law', (SELECT string_agg(DISTINCT law, '; ' ORDER BY law) FROM unnest(v_laws) AS law));
+END $$;
+-- Staff's door with the law: 0157's body and door plus p_law. The proof's body carries `law` ("" for none) beside the ground's four fields; the
+-- law is checked with the ground, before the proof is spent, and passed to the writers. A hide carries none and never waits for it.
+CREATE OR REPLACE FUNCTION staff.public_review_body_grounded(p_action text,p_command jsonb,p_law text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
+  SELECT register.canonical_json_text(json_build_object('action',p_action,'target_id',p_command->>'targetId','step',p_command->>'step','piece_kind',p_command->>'pieceKind',
+    'piece_id',p_command->>'pieceId','pointer',p_command->>'pointer','text_sha256',p_command->>'textSha256','expected_revision',(p_command->>'expectedRevision')::bigint,'operation_id',p_command->>'operationId',
+    'grounds',p_command->>'grounds','source',p_command->>'source','flag_id',p_command->>'flagId','facts_sha256',p_command->>'factsSha256','law',COALESCE(p_law,''))::text)
+$$;
+CREATE OR REPLACE FUNCTION staff.public_review_act_grounded(p_context jsonb,p_proof uuid,p_binding jsonb,p_command jsonb,p_content jsonb,p_facts jsonb,p_alert jsonb,p_law text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE
+  v_staff uuid:=(p_context->>'staffId')::uuid; v_user uuid:=(p_context->>'userId')::uuid; v_step text:=p_command->>'step'; v_action text; v_target uuid; v_operation uuid;
+  v_request jsonb; v_request_sha text; v_replay jsonb; v_at timestamptz; v_kind text; v_piece uuid; v_pointer text; v_text text;
+  v_grounds text[]; v_source text; v_flag uuid; v_facts_sha text; v_law text;
+BEGIN
+  IF core.jsonb_has_exact_keys(p_command,ARRAY['targetId','step','pieceKind','pieceId','pointer','textSha256','expectedRevision','operationId','grounds','source','flagId','factsSha256']) IS DISTINCT FROM true
+    OR v_step IS NULL OR v_step NOT IN ('HIDE','REPUBLISH','REMOVE_DIG','PUT_BACK','CORRECT','HIDE_REPORT','DECIDE')
+    OR jsonb_typeof(p_command->'expectedRevision') IS DISTINCT FROM 'number' OR jsonb_typeof(p_command->'grounds') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(p_command->'source') IS DISTINCT FROM 'string' OR jsonb_typeof(p_command->'flagId') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(p_command->'factsSha256') IS DISTINCT FROM 'string' THEN RAISE EXCEPTION 'PUBLIC_REVIEW_COMMAND_INVALID'; END IF;
+  v_action:=CASE WHEN v_step='HIDE' THEN 'PUBLIC_REVIEW_HIDE' ELSE 'PUBLIC_REVIEW_STEP' END;
+  v_target:=(p_command->>'targetId')::uuid; v_operation:=(p_command->>'operationId')::uuid;
+  v_kind:=NULLIF(p_command->>'pieceKind',''); v_piece:=NULLIF(p_command->>'pieceId','')::uuid; v_pointer:=NULLIF(p_command->>'pointer',''); v_text:=NULLIF(p_command->>'textSha256','');
+  v_grounds:=string_to_array(NULLIF(p_command->>'grounds',''),','); v_source:=NULLIF(p_command->>'source','');
+  v_facts_sha:=NULLIF(p_command->>'factsSha256','');
+  PERFORM identity.lock_security_subjects(ARRAY[v_user]);
+  IF staff.authorize_action(p_context,'TEAM_LIMIT_SET') IS DISTINCT FROM true THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_AUTHORITY_INVALID'; END IF;
+  -- Locked team tools stop everything but the hide.
+  IF v_step<>'HIDE' AND p_alert IS NULL THEN RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='STAFF_ALERT_UNAVAILABLE'; END IF;
+  IF p_binding->>'action' IS DISTINCT FROM v_action OR p_binding->>'targetId' IS DISTINCT FROM v_target::text OR p_binding->>'operationId' IS DISTINCT FROM v_operation::text
+    OR p_binding->'expectedRevision' IS DISTINCT FROM p_command->'expectedRevision'
+    OR p_binding->>'bodySha256' IS DISTINCT FROM encode(sha256(convert_to(staff.public_review_body_grounded(v_action,p_command,p_law),'UTF8')),'hex') THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_PROOF_INVALID';
+  END IF;
+  -- The facts the API sealed are the facts the passkey bound.
+  IF (v_facts_sha IS NULL) <> (p_facts IS NULL) THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END IF;
+  PERFORM staff.expected_revision(p_binding);
+  v_request:=jsonb_build_array(v_staff,p_binding,p_command);
+  v_request_sha:=encode(sha256(convert_to(v_request::text,'UTF8')),'hex');
+  v_replay:=CASE WHEN v_step='DECIDE' THEN identity.moderation_decision_replay(v_operation,v_request_sha) ELSE identity.public_review_replay(v_operation,v_request_sha) END;
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  IF v_step<>'HIDE' THEN
+    BEGIN v_flag:=NULLIF(p_command->>'flagId','')::uuid; EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END;
+    IF NOT identity.moderation_ground_whole(v_step,v_target,v_grounds,v_source,v_flag,v_facts_sha,p_facts) THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END IF;
+    v_law:=identity.moderation_law_of(v_grounds,p_law);
+  END IF;
+  PERFORM staff.consume_action(p_context,p_proof,p_binding,'TEAM_LIMIT_SET',v_action,v_target,v_operation);
+  IF v_step='DECIDE' THEN
+    v_at:=identity.moderation_decide(v_staff,v_target,v_grounds,v_source,v_flag,v_facts_sha,p_facts,(p_command->>'expectedRevision')::integer,v_operation,v_request_sha,v_law);
+  ELSE
+    v_at:=identity.public_review_apply(v_staff,v_step,v_target,v_kind,v_piece,v_pointer,v_text,p_content,(p_command->>'expectedRevision')::integer,v_operation,v_request_sha);
+    IF v_step='HIDE' THEN
+      BEGIN v_flag:=NULLIF(p_command->>'flagId','')::uuid; EXCEPTION WHEN OTHERS THEN v_flag:=NULL; END;
+      PERFORM identity.record_hide_ground(v_operation,v_target,v_grounds,v_source,v_flag);
+    ELSIF v_step IN ('REMOVE_DIG','HIDE_REPORT','CORRECT') THEN
+      PERFORM identity.record_step_ground(v_operation,v_target,v_grounds,v_source,v_flag,v_facts_sha,p_facts,v_law);
+    END IF;
+  END IF;
+  PERFORM staff.queue_public_review_notices(v_operation);
+  IF p_alert IS NOT NULL THEN
+    PERFORM staff.record_mutation(v_operation,'PUBLIC_REVIEW_CHANGED',v_staff,v_staff,jsonb_build_object('code','SECURITY_RESPONSE'),v_user,p_alert,v_request);
+  END IF;
+  RETURN jsonb_build_object('operationId',v_operation,'outcome','COMPLETED','recordedAt',v_at);
+END $$;
+-- n1: reviewed gives the new functions their owners (0157's owners of their neighbours) and the grants 0157 gave those; the release before's
+-- door, staff.public_review_act_grounded without the law, keeps existing (0157's postcondition digests it) and loses its runtime grant: drained.
+DO $m7_law_owner$
+DECLARE v_owner name; v_name text;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  FOREACH v_name IN ARRAY ARRAY['identity.moderation_law_of(text[],text)', 'identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)',
+    'identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)'] LOOP
+    EXECUTE pg_catalog.format('ALTER FUNCTION %s OWNER TO %I', v_name, v_owner);
+    EXECUTE pg_catalog.format('REVOKE ALL ON FUNCTION %s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker', v_name);
+    EXECUTE pg_catalog.format('GRANT EXECUTE ON FUNCTION %s TO debateai_staff_security_owner', v_name);
+  END LOOP;
+END
+$m7_law_owner$;
+ALTER FUNCTION staff.public_review_body_grounded(text,jsonb,text) OWNER TO debateai_staff_security_owner;
+ALTER FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.public_review_body_grounded(text,jsonb,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+REVOKE ALL ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) TO debateai_runtime;
+REVOKE EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime;
+
 -- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
 DO $moderation_notice_fixes_contract$
 DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
@@ -518,5 +697,37 @@ BEGIN
   FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
   WHERE p.oid = 'identity.close_public_flag_by_review(uuid,uuid,uuid)'::regprocedure AND a.grantee <> p.proowner;
   IF v_grantees IS NOT NULL THEN RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M6 close granted %', v_grantees; END IF;
+  -- M7: the law's column on 0157's ground and decision (text, nullable, no default), and each table's two CHECKs, NOT VALID (rows from before keep null).
+  IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a
+        WHERE a.attrelid IN ('identity.moderation_ground'::regclass, 'identity.moderation_decision'::regclass) AND a.attname = 'law_ref'
+          AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef AND NOT a.attisdropped) <> 2
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k
+        WHERE k.contype = 'c' AND NOT k.convalidated AND ((k.conrelid = 'identity.moderation_ground'::regclass AND k.conname IN ('moderation_ground_law_length','moderation_ground_law_required'))
+          OR (k.conrelid = 'identity.moderation_decision'::regclass AND k.conname IN ('moderation_decision_law_length','moderation_decision_law_required')))) <> 4 THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M7 law column';
+  END IF;
+  -- M7: the law's check, the two writers' overloads, the statement's ground and staff's door with the law are this file's bodies (by digest), definers with
+  -- 0157's settings; the identity ones are the queue's owner's and staff's door may call them; the runtime calls the new door, never the release before's.
+  IF (SELECT pg_catalog.count(*) FROM (VALUES
+        ('identity.moderation_law_of(text[],text)', '73f3b027384f9f04c7e268d1812be4cc4e1f3ca6a2dd4b4921cc9be1ce502ab7'),
+        ('identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)', 'bbeacdbfe354a46e82dc4f10cc0f33e620c8a0cfcae39e2c2f0810be3290213e'),
+        ('identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)', 'fbc2254290946b186be228477134325a6398ed6d59535babbbc5caf011115b38'),
+        ('identity.moderation_statement_ground(uuid)', 'c045904c9925ef254e413bced8e06c6b21c356ff09f2e1fef6515f2f54408ed0'),
+        ('staff.public_review_body_grounded(text,jsonb,text)', 'd61fcc38d627a3b2798b12050ad173941f335ee5405fb19e8f5f5ea5a42ad82f'),
+        ('staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)', 'c5c44123b5053c1352a903bfe019147eee7c0e5a65019aa4f6f6b30fb0ff01b3')) AS expected(signature, body)
+      JOIN pg_catalog.pg_proc AS p ON p.oid = pg_catalog.to_regprocedure(expected.signature)
+      WHERE pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') = expected.body
+        AND p.proconfig = ARRAY['search_path=pg_catalog']
+        AND (p.prosecdef OR expected.signature = 'staff.public_review_body_grounded(text,jsonb,text)')
+        AND p.proowner = CASE WHEN expected.signature LIKE 'staff.%' THEN 'debateai_staff_security_owner'::regrole::oid ELSE v_owner END) <> 6
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.moderation_law_of(text[],text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'identity.moderation_law_of(text[],text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'staff.public_review_body_grounded(text,jsonb,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M7 law';
+  END IF;
 END
 $moderation_notice_fixes_contract$;

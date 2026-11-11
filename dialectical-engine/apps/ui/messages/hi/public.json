@@ -285,6 +285,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "हमारी सेवा की शर्तें, धारा 7: धार्मिक अपमान निषिद्ध है।",
   "public.moderation.ground.PERSONAL_DATA": "हमारी सेवा की शर्तें, धारा 7: अन्य लोगों का व्यक्तिगत डेटा प्रस्तुत न करें।",
   "public.moderation.ground.ILLEGAL": "कानून: यह सामग्री अवैध है। नीचे दिए गए तथ्यों में उस कानून का नाम दिया गया है।",
+  "public.moderation.law": "वह कानून जिसके आधार पर हमने कार्रवाई की: {law}",
   "public.moderation.suspectedIntro": "समीक्षा किस बारे में है, जिस पर अभी निर्णय नहीं हुआ है:",
   "public.moderation.factsIntro": "वे तथ्य जिनके आधार पर हमने कार्रवाई की:",
   "public.moderation.factsDeleted": "कदम उठाए जाने के बारह महीने बाद तथ्य मिटा दिए गए। नियम और तिथियाँ बनी रहती हैं।",

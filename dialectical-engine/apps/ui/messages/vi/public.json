@@ -284,6 +284,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Điều khoản dịch vụ của chúng tôi, mục 7: không cho phép xúc phạm tôn giáo.",
   "public.moderation.ground.PERSONAL_DATA": "Điều khoản dịch vụ của chúng tôi, mục 7: không gửi dữ liệu cá nhân của người khác.",
   "public.moderation.ground.ILLEGAL": "Pháp luật: nội dung này là bất hợp pháp. Các dữ kiện bên dưới nêu tên đạo luật.",
+  "public.moderation.law": "Đạo luật mà chúng tôi dựa vào: {law}",
   "public.moderation.suspectedIntro": "Nội dung đang được xem xét, chưa có quyết định:",
   "public.moderation.factsIntro": "Các dữ kiện mà chúng tôi dựa vào:",
   "public.moderation.factsDeleted": "Các dữ kiện đã bị xóa mười hai tháng sau bước này. Quy tắc và các ngày tháng vẫn được giữ lại.",

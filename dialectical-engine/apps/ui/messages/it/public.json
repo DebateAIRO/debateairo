@@ -286,6 +286,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Le nostre Condizioni di servizio, sezione 7: vietata l'offesa religiosa.",
   "public.moderation.ground.PERSONAL_DATA": "Le nostre Condizioni di servizio, sezione 7: non inviare dati personali relativi ad altre persone.",
   "public.moderation.ground.ILLEGAL": "La legge: il contenuto è illegale. I fatti qui sotto indicano la legge.",
+  "public.moderation.law": "La legge su cui ci siamo basati: {law}",
   "public.moderation.suspectedIntro": "L’oggetto dell’esame, non ancora deciso:",
   "public.moderation.factsIntro": "I fatti su cui ci siamo basati:",
   "public.moderation.factsDeleted": "I fatti sono stati cancellati dodici mesi dopo il passo. La regola e le date restano.",

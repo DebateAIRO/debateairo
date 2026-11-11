@@ -287,6 +287,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Nasze Warunki świadczenia usług, punkt 7: żadnego znieważania religii.",
   "public.moderation.ground.PERSONAL_DATA": "Nasze Warunki świadczenia usług, punkt 7: nie przesyłaj danych osobowych innych osób.",
   "public.moderation.ground.ILLEGAL": "Prawo: treść jest niezgodna z prawem. Fakty poniżej wskazują właściwy przepis prawa.",
+  "public.moderation.law": "Przepis prawa, na którym się opieraliśmy: {law}",
   "public.moderation.suspectedIntro": "Czego dotyczy sprawdzanie (jeszcze nie rozstrzygnięto):",
   "public.moderation.factsIntro": "Fakty, na których się opieraliśmy:",
   "public.moderation.factsDeleted": "Fakty zostały usunięte dwanaście miesięcy po tym kroku. Zasada i daty pozostają.",

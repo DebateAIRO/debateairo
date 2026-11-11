@@ -287,6 +287,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Naši Pogoji uporabe, razdelek 7: brez žalitve vere.",
   "public.moderation.ground.PERSONAL_DATA": "Naši Pogoji uporabe, razdelek 7: ne pošiljajte osebnih podatkov drugih ljudi.",
   "public.moderation.ground.ILLEGAL": "Zakon: vsebina je nezakonita. V spodnjih dejstvih je naveden zakon.",
+  "public.moderation.law": "Zakon, na kateri smo se oprli: {law}",
   "public.moderation.suspectedIntro": "Kaj se pregleduje, še ni odločeno:",
   "public.moderation.factsIntro": "Dejstva, na katera smo se oprli:",
   "public.moderation.factsDeleted": "Dejstva so bila izbrisana dvanajst mesecev po tem koraku. Pravilo in datumi ostanejo.",

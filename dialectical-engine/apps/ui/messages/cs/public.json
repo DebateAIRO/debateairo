@@ -287,6 +287,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Naše Podmínky poskytování služby, oddíl 7: žádná urážka náboženství.",
   "public.moderation.ground.PERSONAL_DATA": "Naše Podmínky poskytování služby, oddíl 7: nezadávejte osobní údaje jiných osob.",
   "public.moderation.ground.ILLEGAL": "Zákon: obsah je nezákonný. O jaký zákon jde, uvádějí skutečnosti níže.",
+  "public.moderation.law": "Zákon, o který jsme se opřeli: {law}",
   "public.moderation.suspectedIntro": "Čeho se posouzení týká, zatím nerozhodnuto:",
   "public.moderation.factsIntro": "Skutečnosti, o které jsme se opřeli:",
   "public.moderation.factsDeleted": "Skutečnosti byly smazány dvanáct měsíců po tomto kroku. Pravidlo a data zůstávají.",

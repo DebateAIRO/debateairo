@@ -11,6 +11,8 @@ export type ModerationStatementGround = Readonly<{
   /** False: the step was taken before 0157 kept a ground (D9). */
   recorded: boolean; interim: boolean; grounds: readonly string[]; suspected: readonly string[]; sources: readonly string[];
   automated_detection: boolean; automated_decision: boolean;
+  /** 0172 (M7): the law an ILLEGAL ground relies on, for the page and the export only; null for none. Never in a mail. */
+  law: string | null;
 }>;
 export type ModerationStatementClaim = Readonly<{ statementId: string; claimToken: string }>;
 export type ModerationStatementMail = Readonly<{ userId: string; statementId: string; kind: ModerationStatementKind; happenedAt: string; mailLocale: string; publicationRef: string;

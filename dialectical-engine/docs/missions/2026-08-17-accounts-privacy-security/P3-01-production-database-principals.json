@@ -3607,6 +3607,13 @@
         "INSERT ON ledger.model_spend_hold",
         "INSERT ON ledger.model_spend_reservation"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0172_moderation_notice_fixes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
+      ]
     }
   ],
   "privilegeRevocations": [
@@ -3779,6 +3786,13 @@
         "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
         "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
         "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0172_moderation_notice_fixes.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
       ]
     }
   ],

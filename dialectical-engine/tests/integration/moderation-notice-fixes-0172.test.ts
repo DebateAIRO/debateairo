@@ -631,3 +631,155 @@ describe("M1: the reporter's mail says when an automatic check read the report f
     expect(Object.keys((await read(m1.unsure))!).sort()).toEqual(["aiReadFirst", "emailCiphertext", "happenedAt", "kind", "mailId", "mailLocale", "publicationRef", "userId"]);
   }, timeout);
 });
+
+// M7 (owner's decision E, 10 Nov 2026; DSA Art 17(3)(d)): an "illegal" ground names the law it relies on, as free text of 3-200 characters.
+describe("M7: an illegal ground names the law it relies on", () => {
+  const LAW = "Legea nr. 8/1996, art. 139";
+  const sha = (text: string): string => createHash("sha256").update(text).digest("hex");
+  const sealed = (ref: string) => JSON.stringify({ v: 1, keyId: `publication-snapshot:${ref}:v1`, nonce: "AAAA", tag: "AAAA", ct: "YQ==" });
+  /** 0150's log row of a removal of `person`'s dig, as its apply writes it. Returns its operation and event. */
+  async function removal(ref: string, person: Account, actor = randomUUID()): Promise<Readonly<{ operation: string; eventId: string; digRunId: string }>> {
+    const [eventId, operation, digRunId] = [randomUUID(), randomUUID(), randomUUID()];
+    const revision = (await database.pool.query<{ n: number }>("SELECT COALESCE(max(revision),0)::int + 1 AS n FROM identity.public_review_event WHERE publication_ref=$1", [ref])).rows[0]!.n;
+    await seeded([
+      [`INSERT INTO identity.public_contribution (dig_run_id, owner_ref, publication_ref, root_run_id, parent_run_id, outcome, check_ref, checked_at)
+        VALUES ($1,$2,$3,$4,$5,'ALLOWED',$6,now())`, [digRunId, person.ownerRef, ref, randomUUID(), randomUUID(), randomUUID()]],
+      [`INSERT INTO identity.public_review_event (event_id,publication_ref,revision,action,piece_kind,piece_id,actor_staff_id,operation_id,request_sha256)
+        VALUES ($1,$2,$3,'REMOVE_DIG','DIG',$4,$5,$6,$7)`, [eventId, ref, revision, digRunId, actor, operation, "0".repeat(64)]]]);
+    return { operation, eventId, digRunId };
+  }
+  /** The new step ground, with the law last (the 0157 arguments plus p_law). */
+  const step = (operation: string, ref: string, grounds: readonly string[], law: string | null, source = "OWN_INITIATIVE", flagId: string | null = null) =>
+    database.pool.query("SELECT identity.record_step_ground($1::uuid,$2::uuid,$3::text[],$4,$5::uuid,$6,$7::jsonb,$8::text)", [operation, ref, grounds, source, flagId, sha("facts"), sealed(ref), law]);
+  const decideWith = (ref: string, grounds: readonly string[], law: string | null, source = "OWN_INITIATIVE", flagId: string | null = null, actor = randomUUID()) =>
+    database.pool.query("SELECT identity.moderation_decide($1::uuid,$2::uuid,$3::text[],$4,$5::uuid,$6,$7::jsonb,1,$8::uuid,$6,$9::text)",
+      [actor, ref, grounds, source, flagId, sha("decided"), sealed(ref), randomUUID(), law]);
+  const lawOfGround = async (eventId: string) => (await database.pool.query<{ law_ref: string | null }>("SELECT law_ref FROM identity.moderation_ground WHERE event_id=$1", [eventId])).rows[0]?.law_ref;
+  type Read = Readonly<{ kind: string; ground: Readonly<{ law: string | null; grounds: string[] }>; facts: unknown[] }>;
+  const read = async (person: Account): Promise<Read[]> => (await runtime.query<{ value: Read[] }>("SELECT identity.read_own_moderation_statements($1::uuid) AS value", [person.ownerRef])).rows[0]!.value;
+  const queue = () => database.pool.query("SELECT identity.queue_moderation_statements()");
+  async function exported(person: Account): Promise<Read[]> {
+    const exportId = randomUUID(), workerId = randomUUID();
+    await database.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
+      VALUES ($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '1 minute')`, [exportId, person.userId, randomUUID(), workerId]);
+    return (await database.pool.query<{ value: { statements: Read[] } }>("SELECT identity.read_data_export_moderation($1,$2) AS value", [exportId, workerId])).rows[0]!.value.statements;
+  }
+
+  it("a removal on ILLEGAL with no law is refused MODERATION_GROUND_LAW_MISSING, and one of 2 or 201 characters MODERATION_GROUND_LAW_INVALID; nothing is recorded", async () => {
+    const [ana, xena] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const { operation, eventId } = await removal(ref, xena);
+    for (const law of [null, "", "   "]) await expect(step(operation, ref, ["ILLEGAL"], law), String(law)).rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_MISSING" });
+    for (const law of ["ab", "x".repeat(201)]) await expect(step(operation, ref, ["ILLEGAL", "UNLAWFUL"], law), law).rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_INVALID" });
+    await expect(decideWith(ref, ["ILLEGAL"], null)).rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_MISSING" });
+    await expect(decideWith(ref, ["ILLEGAL"], "x".repeat(201))).rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_INVALID" });
+    expect(await lawOfGround(eventId)).toBeUndefined();
+    // 3 and 200 characters are the bounds, and a law may stand beside another ground; a ground without ILLEGAL needs none.
+    expect(await (async () => { await step(operation, ref, ["ILLEGAL"], "abc"); return lawOfGround(eventId); })()).toBe("abc");
+    const other = await removal(ref, xena);
+    await step(other.operation, ref, ["PERSONAL_DATA"], null);
+    expect(await lawOfGround(other.eventId)).toBeNull();
+    const longest = await removal(ref, xena);
+    await step(longest.operation, ref, ["ILLEGAL"], "x".repeat(200));
+    expect(await lawOfGround(longest.eventId)).toBe("x".repeat(200));
+  }, timeout);
+
+  it("the CHECKs hold for every new row: no ILLEGAL without a law (a hold excepted), and the law 3-200 characters", async () => {
+    const [ana, xena] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const { eventId } = await removal(ref, xena);
+    const insert = (grounds: readonly string[], law: string | null, interim = false) => database.pool.query(
+      `INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, facts_sha256, facts_ciphertext, interim, law_ref) VALUES ($1,$2,$3::text[],'OWN_INITIATIVE',$4,$5::jsonb,$6,$7)`,
+      [eventId, ref, grounds, sha("facts"), sealed(ref), interim, law]);
+    await expect(insert(["ILLEGAL"], null)).rejects.toMatchObject({ code: "23514", constraint: "moderation_ground_law_required" });
+    await expect(insert(["ILLEGAL"], "ab")).rejects.toMatchObject({ code: "23514", constraint: "moderation_ground_law_length" });
+    const decision = (grounds: readonly string[], law: string | null) => database.pool.query(
+      `INSERT INTO identity.moderation_decision (publication_ref, revision, grounds, source, facts_sha256, facts_ciphertext, actor_staff_id, operation_id, request_sha256, law_ref)
+       VALUES ($1,1,$2::text[],'OWN_INITIATIVE',$3,$4::jsonb,$5,$6,$3,$7)`, [ref, grounds, sha("d"), sealed(ref), randomUUID(), randomUUID(), law]);
+    await expect(decision(["ILLEGAL"], null)).rejects.toMatchObject({ code: "23514", constraint: "moderation_decision_law_required" });
+    await expect(decision(["ILLEGAL"], "x".repeat(201))).rejects.toMatchObject({ code: "23514", constraint: "moderation_decision_law_length" });
+  }, timeout);
+
+  it("a hide naming ILLEGAL as suspected, with no law, still hides on the hold", async () => {
+    const ana = await account();
+    const ref = await publishedDebate(ana);
+    const operation = randomUUID();
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT identity.public_review_apply($1::uuid,'HIDE',$2::uuid,NULL,NULL,NULL,NULL,NULL,0,$3::uuid,$4)", [randomUUID(), ref, operation, sha(operation)]);
+      await client.query("SELECT identity.record_hide_ground($1::uuid,$2::uuid,ARRAY['ILLEGAL'],'EMAIL_NOTICE',NULL)", [operation, ref]);
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+    expect((await database.pool.query("SELECT ground.grounds, ground.suspected, ground.source, ground.interim, ground.law_ref FROM identity.moderation_ground AS ground JOIN identity.public_review_event AS event USING (event_id) WHERE event.operation_id=$1", [operation])).rows)
+      .toEqual([{ grounds: ["REVIEW_HOLD"], suspected: ["ILLEGAL"], source: "EMAIL_NOTICE", interim: true, law_ref: null }]);
+  }, timeout);
+
+  it("the law is recorded, shown on the person's page and in their export (and to those whose content went with it, without the facts), and kept past the 12-month sweep", async () => {
+    const [ana, xena] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const { operation, eventId } = await removal(ref, xena);
+    await step(operation, ref, ["ILLEGAL"], LAW, "EMAIL_NOTICE");
+    expect(await lawOfGround(eventId)).toBe(LAW);
+    await queue();
+    expect((await read(xena)).find((row) => row.kind === "CONTRIBUTION_REMOVED")).toMatchObject({ ground: { grounds: ["ILLEGAL"], law: LAW }, facts: [JSON.parse(sealed(ref))] });
+    expect((await exported(xena)).find((row) => row.kind === "CONTRIBUTION_REMOVED")).toMatchObject({ ground: { law: LAW } });
+    // A ground with no law says null, never a missing key.
+    const other = await removal(ref, xena);
+    await step(other.operation, ref, ["PERSONAL_DATA"], null);
+    await queue();
+    expect((await read(xena)).filter((row) => row.kind === "CONTRIBUTION_REMOVED").map((row) => row.ground.law).sort()).toEqual([LAW, null]);
+    // A final decision on ILLEGAL: the owner's statement names the law, and so does a contributor's (R9), with no facts (Task 4).
+    const [pia, author] = [await account(), await account()];
+    const kept = await publishedDebate(author);
+    await seeded([[`INSERT INTO identity.public_contribution (dig_run_id, owner_ref, publication_ref, root_run_id, parent_run_id, outcome, check_ref, checked_at)
+      VALUES ($1,$2,$3,$4,$5,'ALLOWED',$6,now())`, [randomUUID(), pia.ownerRef, kept, randomUUID(), randomUUID(), randomUUID()]]]);
+    await hide(kept);
+    await queue();
+    await decideWith(kept, ["ILLEGAL"], LAW);
+    await queue();
+    expect((await read(author)).find((row) => row.kind === "DEBATE_DECIDED")).toMatchObject({ ground: { law: LAW }, facts: [JSON.parse(sealed(kept))] });
+    expect((await read(pia)).find((row) => row.kind === "CONTRIBUTION_DECIDED")).toMatchObject({ ground: { law: LAW }, facts: [] });
+    // Twelve months on, the facts go; the law stays with the statement.
+    await seeded([["UPDATE identity.moderation_ground SET recorded_at = now() - interval '13 months' WHERE event_id=$1", [eventId]],
+      ["UPDATE identity.moderation_decision SET recorded_at = now() - interval '13 months' WHERE publication_ref=$1", [kept]]]);
+    await database.pool.query("SELECT identity.delete_moderation_words_due()");
+    expect((await database.pool.query("SELECT law_ref, facts_ciphertext IS NULL AS gone FROM identity.moderation_ground WHERE event_id=$1", [eventId])).rows).toEqual([{ law_ref: LAW, gone: true }]);
+    expect((await database.pool.query("SELECT law_ref, facts_ciphertext IS NULL AS gone FROM identity.moderation_decision WHERE publication_ref=$1", [kept])).rows).toEqual([{ law_ref: LAW, gone: true }]);
+    expect((await read(xena)).find((row) => row.kind === "CONTRIBUTION_REMOVED" && row.ground.law === LAW)).toMatchObject({ facts: [] });
+  }, timeout);
+
+  it("R3: a removal or a decision naming a report through the law's overloads still closes the report as ACTED", async () => {
+    const [ana, xena, rea, rob] = [await account(), await account(), await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const reportOf = async (reporter: Account) => {
+      const flagId = randomUUID();
+      await database.pool.query("INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, state, content_ciphertext) VALUES ($1,$2,$3,'QUEUED',$4::jsonb)", [flagId, ref, reporter.ownerRef, sealed(ref)]);
+      return flagId;
+    };
+    const outcome = async (flagId: string) => (await database.pool.query<{ outcome: string }>("SELECT outcome FROM identity.public_flag_answer WHERE flag_id=$1", [flagId])).rows[0]?.outcome;
+    const first = await reportOf(rea);
+    const { operation } = await removal(ref, xena);
+    await step(operation, ref, ["ILLEGAL"], LAW, "REPORT_BUTTON", first);
+    expect(await outcome(first)).toBe("ACTED");
+    // The decision on a debate of its own (its hide is the log's only row, so the decision's revision is 1).
+    const kept = await publishedDebate(ana);
+    const second = randomUUID();
+    await database.pool.query("INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, state, content_ciphertext) VALUES ($1,$2,$3,'QUEUED',$4::jsonb)", [second, kept, rob.ownerRef, sealed(kept)]);
+    await hide(kept);
+    await decideWith(kept, ["ILLEGAL"], LAW, "REPORT_BUTTON", second);
+    expect(await outcome(second)).toBe("ACTED");
+  }, timeout);
+
+  it("the statement's mail reader carries the law for the page only; the runtime cannot call the old staff door", async () => {
+    const [ana, xena] = [await account(), await account()];
+    const ref = await publishedDebate(ana);
+    const { operation } = await removal(ref, xena);
+    await step(operation, ref, ["ILLEGAL"], LAW);
+    const claims = await new PostgresModerationStatementRepository(runtime).claim(100);
+    const mails = await Promise.all(claims.map((claim) => new PostgresModerationStatementRepository(runtime).read(claim)));
+    const mine = mails.find((mail) => mail !== null && mail.publicationRef === ref && mail.kind === "CONTRIBUTION_REMOVED");
+    expect(mine?.ground).toMatchObject({ grounds: ["ILLEGAL"], law: LAW });
+    await expect(runtime.query("SELECT staff.public_review_act_grounded('{}'::jsonb,$1::uuid,'{}'::jsonb,'{}'::jsonb,NULL,NULL,NULL)", [randomUUID()])).rejects.toMatchObject({ code: "42501" });
+  }, timeout);
+});

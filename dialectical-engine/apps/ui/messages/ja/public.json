@@ -284,6 +284,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "当社の利用規約 第7条：宗教的侮辱は禁止です。",
   "public.moderation.ground.PERSONAL_DATA": "当社の利用規約 第7条：他者の個人データを送信しないでください。",
   "public.moderation.ground.ILLEGAL": "法律：このコンテンツは違法です。該当する法律は、下記の事実に記載されています。",
+  "public.moderation.law": "当社が根拠とした法律：{law}",
   "public.moderation.suspectedIntro": "確認の対象（まだ決定していません）：",
   "public.moderation.factsIntro": "当社が根拠とした事実：",
   "public.moderation.factsDeleted": "事実は、措置から12か月後に削除されました。規則と日付は残ります。",

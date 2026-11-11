@@ -285,6 +285,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Vores tjenestevilkår, afsnit 7: Ingen religiøs fornærmelse.",
   "public.moderation.ground.PERSONAL_DATA": "Vores tjenestevilkår, afsnit 7: Indsend ikke personoplysninger om andre personer.",
   "public.moderation.ground.ILLEGAL": "Loven: Indholdet er ulovligt. Fakta nedenfor angiver loven.",
+  "public.moderation.law": "Den lov, vi støttede os på: {law}",
   "public.moderation.suspectedIntro": "Hvad gennemgangen handler om, endnu ikke afgjort:",
   "public.moderation.factsIntro": "De fakta, vi støttede os på:",
   "public.moderation.factsDeleted": "Fakta blev slettet tolv måneder efter skridtet. Reglen og datoerne bliver.",

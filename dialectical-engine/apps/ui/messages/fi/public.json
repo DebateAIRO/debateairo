@@ -285,6 +285,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Käyttöehtomme, kohta 7: ei uskonnon loukkaamista.",
   "public.moderation.ground.PERSONAL_DATA": "Käyttöehtomme, kohta 7: älä lähetä muita henkilöitä koskevia henkilötietoja.",
   "public.moderation.ground.ILLEGAL": "Laki: sisältö on laiton. Alla olevissa tosiseikoissa mainitaan laki.",
+  "public.moderation.law": "Laki, johon tukeuduimme: {law}",
   "public.moderation.suspectedIntro": "Mitä tarkistus koskee, ei vielä ratkaistu:",
   "public.moderation.factsIntro": "Tosiseikat, joihin tukeuduimme:",
   "public.moderation.factsDeleted": "Tosiseikat poistettiin kaksitoista kuukautta askeleen jälkeen. Sääntö ja päivämäärät säilyvät.",

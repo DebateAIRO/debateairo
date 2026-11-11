@@ -162,7 +162,8 @@ export async function moderationStatementsOf(ownerRef: string, ports: Moderation
       ({ facts, quote } = await read(row.facts ?? [], row.quote).catch(() => ({ facts: [] as string[], quote: null })));
     }
     statements.push({ statement_id: row.statement_id, kind: row.kind, public_ref: row.publication_ref, happened_at: new Date(row.happened_at).toISOString(), piece_kind: row.piece_kind,
-      hidden_now: row.hidden_now, ground: row.ground, facts, facts_deleted: row.facts_deleted, quote,
+      // 0172 (M7): the ground carries the law an ILLEGAL ground relies on (null for none); it is the page's, never a mail's (statementMailParams picks flags only).
+      hidden_now: row.hidden_now, ground: { ...row.ground, law: row.ground.law ?? null }, facts, facts_deleted: row.facts_deleted, quote,
       places: row.places.map((place) => ({ piece_kind: place.piece_kind, pointer: place.pointer })) });
   }
   return contract.ModerationStatementsSchema.parse({ statements });

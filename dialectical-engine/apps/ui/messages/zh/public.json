@@ -284,6 +284,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "我们的《服务条款》第7节：禁止宗教侮辱。",
   "public.moderation.ground.PERSONAL_DATA": "我们的《服务条款》第7节：不得提交他人的个人数据。",
   "public.moderation.ground.ILLEGAL": "法律：该内容违法。下方的事实列明了相关法律。",
+  "public.moderation.law": "我们所依据的法律：{law}",
   "public.moderation.suspectedIntro": "审核所涉事项（尚未决定）：",
   "public.moderation.factsIntro": "我们所依据的事实：",
   "public.moderation.factsDeleted": "这些事实已在该步骤发生十二个月后删除。规则和日期仍会保留。",

@@ -19,11 +19,14 @@ type Pending = Readonly<{ line: string; need: GroundNeed; run: (client: PublicRe
 const FAILURE_CODES: ReadonlySet<string> = new Set(["PUBLIC_REVIEW_STALE", "PUBLIC_REVIEW_NOT_HIDDEN", "PUBLIC_REVIEW_ALREADY_HIDDEN", "PUBLIC_REVIEW_NOT_PUBLIC", "PUBLIC_REVIEW_PIECE_UNKNOWN", "STAFF_ALERT_UNAVAILABLE", "STAFF_INPUT_INVALID",
   "PUBLIC_REVIEW_GROUND_INVALID"]);
 const STEP_NEEDS: Readonly<Record<PublicReviewStepInput["step"], GroundNeed>> = Object.freeze({ REPUBLISH: "NONE", PUT_BACK: "NONE", REMOVE_DIG: "REQUIRED", CORRECT: "REQUIRED", HIDE_REPORT: "REQUIRED", DECIDE: "REQUIRED" });
-const groundWhole = (ground: PublicReviewGround): boolean => ground.grounds.length > 0 && ground.source !== null && (ground.source === "REPORT_BUTTON") === (ground.flagId !== null) && ground.facts !== null;
-/** What a step sends: a hide drops a half-chosen report and never sends facts. */
+/** 0172 (M7; DSA Art 17(3)(d)): an ILLEGAL ground names the law it relies on, 3-200 characters; no other ground takes one. */
+const lawNeeded = (grounds: readonly ModerationGround[]): boolean => grounds.includes("ILLEGAL");
+const groundWhole = (ground: PublicReviewGround): boolean => ground.grounds.length > 0 && ground.source !== null && (ground.source === "REPORT_BUTTON") === (ground.flagId !== null) && ground.facts !== null
+  && (!lawNeeded(ground.grounds) || (ground.law !== null && ground.law.length >= 3 && ground.law.length <= 200));
+/** What a step sends: a hide drops a half-chosen report and never sends facts or a law; a law goes only with ILLEGAL. */
 const sentGround = (need: GroundNeed, ground: PublicReviewGround): PublicReviewGround => need === "NONE" ? NO_GROUND
   : { grounds: ModerationGroundSchema.options.filter((code) => ground.grounds.includes(code)), source: ground.source, flagId: ground.source === "REPORT_BUTTON" ? ground.flagId : null,
-    facts: need === "REQUIRED" ? ground.facts : null };
+    facts: need === "REQUIRED" ? ground.facts : null, law: need === "REQUIRED" && lawNeeded(ground.grounds) ? ground.law : null };
 const failureLine = (catalog: MessageCatalog, failure: unknown): string => {
   if (failure instanceof ContractHttpError && failure.serverCode !== null && FAILURE_CODES.has(failure.serverCode)) return t(catalog, `staff.publicReview.failure.${failure.serverCode}`);
   return t(catalog, failure instanceof Error && failure.name === "NotAllowedError" ? "staff.publicReview.failure.passkeyCancelled" : "staff.publicReview.failure.other");
@@ -42,7 +45,7 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
   const [busy, setBusy] = useState(false);
   const [find, setFind] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
-  const [ground, setGround] = useState<Readonly<{ grounds: readonly ModerationGround[]; source: ModerationSource | null; flagId: string | null; facts: string }>>({ grounds: [], source: null, flagId: null, facts: "" });
+  const [ground, setGround] = useState<Readonly<{ grounds: readonly ModerationGround[]; source: ModerationSource | null; flagId: string | null; facts: string; law: string }>>({ grounds: [], source: null, flagId: null, facts: "", law: "" });
   const reads = useRef(0);
   const load = useCallback(async (publicationRef: string | null) => {
     const read = ++reads.current;
@@ -67,7 +70,8 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
     setMessage(null);
     try {
       const typed = ground.facts.trim();
-      await change.run(api, page, ref ?? "", sentGround(change.need, { ...ground, facts: typed === "" ? null : typed }));
+      const law = ground.law.trim();
+      await change.run(api, page, ref ?? "", sentGround(change.need, { ...ground, facts: typed === "" ? null : typed, law: law === "" ? null : law }));
       setPending(null);
       setEditing(null);
       setMessage({ text: t(catalog, "staff.publicReview.done"), good: true });
@@ -80,7 +84,7 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
     }
   }
   /** A new confirm box starts with an empty ground. */
-  const ask = (next: Pending) => { setGround({ grounds: [], source: null, flagId: null, facts: "" }); setPending(next); };
+  const ask = (next: Pending) => { setGround({ grounds: [], source: null, flagId: null, facts: "", law: "" }); setPending(next); };
   const stepOf = (line: string, input: PublicReviewStepInput): Pending => ({ line, need: STEP_NEEDS[input.step],
     run: (client2, current, at, chosen) => client2.step(at, current?.revision ?? 0, STEP_NEEDS[input.step] === "NONE" ? input : { ...input, ground: chosen }) });
   function open(event: FormEvent<HTMLFormElement>) {
@@ -124,8 +128,10 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       </select></div> : null}
     {pending.need === "REQUIRED" ? <div className="staffField"><label htmlFor="review-facts">{t(catalog, "staff.publicReview.facts")}</label>
       <textarea id="review-facts" rows={3} maxLength={4000} value={ground.facts} onChange={(event) => setGround({ ...ground, facts: event.target.value })} /></div> : null}
+    {pending.need === "REQUIRED" && lawNeeded(ground.grounds) ? <div className="staffField"><label htmlFor="review-law">{t(catalog, "staff.publicReview.law")}</label>
+      <input id="review-law" type="text" dir="auto" maxLength={200} value={ground.law} onChange={(event) => setGround({ ...ground, law: event.target.value })} /></div> : null}
   </fieldset>;
-  const ready = pending === null || pending.need !== "REQUIRED" || groundWhole({ ...ground, facts: ground.facts.trim() === "" ? null : ground.facts });
+  const ready = pending === null || pending.need !== "REQUIRED" || groundWhole({ ...ground, facts: ground.facts.trim() === "" ? null : ground.facts, law: ground.law.trim() === "" ? null : ground.law.trim() });
   const confirm = pending === null ? null : <div className="staffMutation" data-review-confirm>
     <p>{pending.line}</p>{groundFields}<p className="setCardHint">{t(catalog, "staff.publicReview.passkeyConfirms")}</p>
     <div className="staffActions"><button className="setBtn setBtnPrimary" type="button" disabled={busy || !ready} onClick={() => { void go(pending); }}>{t(catalog, "staff.publicReview.confirm")}</button>

@@ -14,6 +14,11 @@ const SQL = read(`migrations/${NAME}`);
 const EARLIER_FILES = readdirSync(new URL("migrations/", ROOT)).filter((name) => /^\d{4}_.*\.sql$/u.test(name) && name < NAME);
 const EARLIER = EARLIER_FILES.map((name) => read(`migrations/${name}`)).join("\n");
 const created = (text: string): string[] => [...text.matchAll(/CREATE (?:OR REPLACE )?FUNCTION ([a-z_]+\.[a-z_]+)\(/gu)].map((match) => match[1]!);
+/** A function as name/arity: an overload with one more argument (M7's law) is a new function, not a second definition of the old one. */
+const arityOf = (args: string): number => (args.trim() === "" ? 0 : args.split(",").length);
+const createdFunctions = (text: string): string[] => [...text.matchAll(/CREATE (?:OR REPLACE )?FUNCTION ([a-z_]+\.[a-z_]+)\(([^)]*)\)/gu)]
+  .map((match) => `${match[1]!}/${arityOf(match[2]!)}`);
+const functionOf = (signature: string): string => `${signature.slice(0, signature.indexOf("("))}/${arityOf(signature.slice(signature.indexOf("(") + 1, signature.lastIndexOf(")")))}`;
 const bodyOf = (name: string): string => {
   const at = SQL.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
   expect(at, name).toBeGreaterThan(-1);
@@ -50,16 +55,25 @@ describe("0172: the moderation notice fixes", () => {
   });
 
   it("defines each function once (R1), and every earlier one it restates is declared under its own step's function_definition", () => {
-    const names = created(SQL);
+    const names = createdFunctions(SQL);
     expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
-    const earlier = new Set(created(EARLIER));
+    const earlier = new Set(createdFunctions(EARLIER));
     const restated = names.filter((name) => earlier.has(name));
     const declared = manifest.amendsPostconditionsOf.filter((entry) => entry.field === "function_definition").flatMap((entry) => entry.functions ?? []);
-    expect(declared.map((signature) => signature.slice(0, signature.indexOf("(")))).toEqual(restated);
+    expect(declared.map(functionOf)).toEqual(restated);
+    // M7: the overloads with the law are new, and this step's own postcondition digests them.
+    const loader = read("packages/db/src/migration-forward0172.ts");
+    for (const added of ["identity.moderation_law_of(text[],text)", "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)",
+      "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)", "staff.public_review_body_grounded(text,jsonb,text)",
+      "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"]) {
+      expect(earlier.has(functionOf(added)), added).toBe(false);
+      expect(names, added).toContain(functionOf(added));
+      expect(loader, added).toContain(`"${added}"`);
+    }
     // Each is declared under the step that first created it.
     for (const entry of manifest.amendsPostconditionsOf.filter((one) => one.field === "function_definition")) {
       for (const signature of entry.functions!) {
-        const first = EARLIER_FILES.find((file) => created(read(`migrations/${file}`)).includes(signature.slice(0, signature.indexOf("("))));
+        const first = EARLIER_FILES.find((file) => createdFunctions(read(`migrations/${file}`)).includes(functionOf(signature)));
         expect(first, signature).toBe(entry.step);
       }
     }
@@ -70,8 +84,11 @@ describe("0172: the moderation notice fixes", () => {
         "identity.claim_moderation_statements(integer)", "identity.complete_moderation_statement(uuid,uuid,text)", "identity.claim_public_flag_mail(integer)",
         "identity.complete_public_flag_mail(uuid,uuid,text)", "identity.record_hide_ground(uuid,uuid,text[],text,uuid)",
         "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)", "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)",
-        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()", "identity.read_own_moderation_statements(uuid)", "identity.read_public_flag_mail(uuid,uuid)"], relations: ["identity.moderation_statement", "identity.public_flag_mail"], columns: ["next_attempt_at"],
-        constraints: ["moderation_statement_kind_check"] }
+        "identity.queue_public_flag_mail()", "identity.public_flag_queue_answered()", "identity.read_own_moderation_statements(uuid)", "identity.read_public_flag_mail(uuid,uuid)",
+        "identity.moderation_statement_ground(uuid)"], relations: ["identity.moderation_statement", "identity.public_flag_mail", "identity.moderation_ground", "identity.moderation_decision"],
+        columns: ["next_attempt_at", "law_ref"],
+        constraints: ["moderation_statement_kind_check", "moderation_ground_law_length", "moderation_ground_law_required", "moderation_decision_law_length", "moderation_decision_law_required"],
+        revokes: ["EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime"] }
     ]);
     expect(SQL).toContain("ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;\n"
       + "ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_check\n  CHECK (kind IN ('PUBLIC_FLAG_HIDDEN','PUBLIC_FLAG_WAITING','MODERATION_MAIL_FAILED'));");
@@ -109,7 +126,8 @@ describe("0172: the moderation notice fixes", () => {
     expect(SQL).toContain("CREATE TABLE IF NOT EXISTS identity.moderation_statement_stuck (\n  source_id uuid PRIMARY KEY,\n  sqlstate text NOT NULL,\n"
       + "  first_failed_at timestamptz NOT NULL,\n  last_failed_at timestamptz NOT NULL,\n  tries integer NOT NULL\n);");
     expect(SQL).toContain("SELECT core.install_truncate_guard('identity.moderation_statement_stuck');");
-    expect(SQL).not.toMatch(/^GRANT /mu);
+    // No grant on the stuck table: the step's one top-level GRANT is M7's, the runtime's on staff's door with the law.
+    expect([...SQL.matchAll(/^GRANT [^\n]+$/gmu)].map(([line]) => line)).toEqual(["GRANT EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) TO debateai_runtime;"]);
     expect(SQL).toContain(`IS DISTINCT FROM '${createHash("sha256").update(queue.slice(queue.indexOf("AS $$") + 5)).digest("hex")}'`);
   });
 
@@ -311,5 +329,81 @@ describe("0172: the moderation notice fixes", () => {
     const main = read("apps/api/src/main.ts");
     expect(main).toContain('  try { await moderationStatements.reconcile(100); } catch { console.error("[MODERATION_STATEMENT_PENDING]"); }\n'
       + '  try { await publicFlagAnswers.reconcile(100); } catch { console.error("[PUBLIC_FLAG_ANSWER_PENDING]"); }\n');
+  });
+
+  it("M7: an illegal ground names the law; the new overloads are their neighbours' bodies plus the law, the check comes before the proof is spent, and no mail carries it", () => {
+    const original = read("migrations/0157_moderation_statements.sql");
+    /** The function whose head starts with `head`, from its CREATE to its closing $$ (its body is after AS $$). */
+    const whole = (text: string, head: string): string => {
+      const at = text.indexOf(`CREATE OR REPLACE FUNCTION ${head}`);
+      expect(at, head).toBeGreaterThan(-1);
+      return text.slice(at, text.indexOf("$$;", text.indexOf("AS $$", at) + 5));
+    };
+    const bodyIn = (fn: string): string => fn.slice(fn.indexOf("AS $$") + 5);
+    /** `from` with exactly these edits, each found once. */
+    const edited = (from: string, edits: ReadonlyArray<readonly [string, string]>): string => edits.reduce((text, [a, b]) => {
+      expect(text.split(a).length - 1, a).toBe(1);
+      return text.replace(a, () => b);
+    }, from);
+    const digest = (fn: string): string => sha256(bodyIn(fn));
+    const contract = SQL.slice(SQL.indexOf("DO $moderation_notice_fixes_contract$"));
+    // The statement's ground: 0157's, plus the distinct laws of its grounds, "; "-joined, or null.
+    const ground = whole(SQL, "identity.moderation_statement_ground(");
+    expect(ground).toBe(edited(whole(original, "identity.moderation_statement_ground("), [
+      ["v_recorded boolean := false; v_event record;", "v_recorded boolean := false; v_event record; v_laws text[] := '{}';"],
+      ["v_flag := d.flag_id; v_recorded := true;", "v_flag := d.flag_id; v_recorded := true; v_laws := ARRAY[d.law_ref];"],
+      ["ground.source, ground.flag_id, ground.interim\n", "ground.source, ground.flag_id, ground.interim, ground.law_ref\n"],
+      ["v_interim := v_interim OR v_event.interim; v_recorded := true;\n", "v_interim := v_interim OR v_event.interim; v_recorded := true; v_laws := v_laws || v_event.law_ref;\n"],
+      ["'automated_detection', v_detected, 'automated_decision', v_decided);", "'automated_detection', v_detected, 'automated_decision', v_decided,\n    'law', (SELECT string_agg(DISTINCT law, '; ' ORDER BY law) FROM unnest(v_laws) AS law));"]]));
+    // R3: the writers' overloads are Task 3's bodies in this file (the report's one-line close kept) plus the law, refused first.
+    const decide = whole(SQL, "identity.moderation_decide(p_actor uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb,\n  p_expected_revision integer, p_operation uuid, p_request_sha256 text, p_law text)");
+    expect(decide).toBe(edited(whole(SQL, "identity.moderation_decide("), [
+      ["p_request_sha256 text) RETURNS timestamptz", "p_request_sha256 text, p_law text) RETURNS timestamptz"],
+      ["DECLARE v_revision integer; v_at timestamptz; v_decision uuid;\nBEGIN\n", "DECLARE v_revision integer; v_at timestamptz; v_decision uuid; v_law text := identity.moderation_law_of(p_grounds, p_law);\nBEGIN\n"],
+      ["operation_id, request_sha256)\n", "operation_id, request_sha256, law_ref)\n"], ["p_operation, p_request_sha256)\n", "p_operation, p_request_sha256, v_law)\n"]]));
+    const step = whole(SQL, "identity.record_step_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb, p_law text)");
+    expect(step).toBe(edited(whole(SQL, "identity.record_step_ground("), [
+      ["p_facts jsonb) RETURNS void", "p_facts jsonb, p_law text) RETURNS void"],
+      ["AS $$\n  WITH recorded AS (\n", "AS $$\n  SELECT identity.moderation_law_of(p_grounds, p_law);\n  WITH recorded AS (\n"],
+      ["facts_ciphertext, interim)\n", "facts_ciphertext, interim, law_ref)\n"], ["p_facts, false\n", "p_facts, false, identity.moderation_law_of(p_grounds, p_law)\n"]]));
+    for (const fn of [decide, step]) expect([...bodyIn(fn).matchAll(/identity\.close_public_flag_by_review\(/gu)]).toHaveLength(1);
+    // The check: ILLEGAL needs a law, nothing else takes one, 3-200 characters once trimmed, by fixed codes.
+    const law = whole(SQL, "identity.moderation_law_of(");
+    expect(law).toContain("LANGUAGE plpgsql IMMUTABLE SECURITY DEFINER SET search_path=pg_catalog AS $$");
+    for (const code of ["MODERATION_GROUND_LAW_MISSING", "MODERATION_GROUND_LAW_INVALID"]) expect(law).toContain(`MESSAGE='${code}'`);
+    expect(law).toContain("char_length(v_law) NOT BETWEEN 3 AND 200");
+    // Staff's door: 0157's body and door plus the law, bound in the proof's body and checked with the ground, before consume_action.
+    const body = whole(SQL, "staff.public_review_body_grounded(p_action text,p_command jsonb,p_law text)");
+    expect(body).toBe(edited(whole(original, "staff.public_review_body_grounded("), [["(p_action text,p_command jsonb) RETURNS text", "(p_action text,p_command jsonb,p_law text) RETURNS text"],
+      ["'facts_sha256',p_command->>'factsSha256')::text)", "'facts_sha256',p_command->>'factsSha256','law',COALESCE(p_law,''))::text)"]]));
+    const act = whole(SQL, "staff.public_review_act_grounded(p_context jsonb,p_proof uuid,p_binding jsonb,p_command jsonb,p_content jsonb,p_facts jsonb,p_alert jsonb,p_law text)");
+    expect(act).toBe(edited(whole(original, "staff.public_review_act_grounded("), [
+      ["p_facts jsonb,p_alert jsonb) RETURNS jsonb", "p_facts jsonb,p_alert jsonb,p_law text) RETURNS jsonb"],
+      ["v_facts_sha text;\n", "v_facts_sha text; v_law text;\n"],
+      ["staff.public_review_body_grounded(v_action,p_command)", "staff.public_review_body_grounded(v_action,p_command,p_law)"],
+      ["MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END IF;\n  END IF;\n  PERFORM staff.consume_action", "MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END IF;\n    v_law:=identity.moderation_law_of(v_grounds,p_law);\n  END IF;\n  PERFORM staff.consume_action"],
+      ["v_operation,v_request_sha);\n  ELSE", "v_operation,v_request_sha,v_law);\n  ELSE"],
+      ["v_facts_sha,p_facts);", "v_facts_sha,p_facts,v_law);"]]));
+    expect(act.indexOf("identity.moderation_law_of(")).toBeLessThan(act.indexOf("staff.consume_action("));
+    // A hide neither checks nor records a law.
+    expect(act.slice(act.indexOf("IF v_step='HIDE' THEN"))).toContain("PERFORM identity.record_hide_ground(v_operation,v_target,v_grounds,v_source,v_flag);");
+    // The contract pins every new or restated body by its digest.
+    for (const fn of [law, decide, step, ground, body, act]) expect(contract, fn.slice(0, 80)).toContain(`'${digest(fn)}'`);
+    // The columns and their CHECKs: new rows only.
+    for (const table of ["ground", "decision"]) {
+      expect(SQL).toContain(`ALTER TABLE identity.moderation_${table} ADD COLUMN IF NOT EXISTS law_ref text;`);
+      expect(SQL).toContain(`ADD CONSTRAINT moderation_${table}_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;`);
+    }
+    expect(SQL).toContain("ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim) NOT VALID;");
+    expect(SQL).toContain("ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL) NOT VALID;");
+    // The runtime calls the new door, and no longer the release before's (drained); the twelve-month sweep and the export reader are not restated.
+    expect(SQL).toContain("GRANT EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) TO debateai_runtime;");
+    expect(SQL).toContain("REVOKE EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime;");
+    expect(SQL).not.toContain("CREATE OR REPLACE FUNCTION identity.delete_moderation_words_due");
+    expect(read("packages/db/src/public-review.ts")).toContain("SELECT staff.public_review_act_grounded($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb,$8::text)");
+    // The mail stays content-free: its params are flags, dates and links, and the law's words are never read for it.
+    const sender = read("apps/api/src/moderation-statements.ts");
+    const params = sender.slice(sender.indexOf("export function statementMailParams"), sender.indexOf("\n}\n", sender.indexOf("export function statementMailParams")));
+    expect(params).not.toContain(".law");
   });
 });

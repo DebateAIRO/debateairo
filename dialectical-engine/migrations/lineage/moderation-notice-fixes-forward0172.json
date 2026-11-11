@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0172_moderation_notice_fixes.sql",
-    "sha256": "a47de4f1006b3bdced2dc47d447b438710587db7ef54fb3381e300fd8a742f86"
+    "sha256": "8c3a651b57969569cfe282efb85a4b6e2d6fdd6e17742bec88a03d4ae1c1fdfb"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
@@ -40,17 +40,28 @@
         "identity.queue_public_flag_mail()",
         "identity.public_flag_queue_answered()",
         "identity.read_own_moderation_statements(uuid)",
-        "identity.read_public_flag_mail(uuid,uuid)"
+        "identity.read_public_flag_mail(uuid,uuid)",
+        "identity.moderation_statement_ground(uuid)"
       ],
       "relations": [
         "identity.moderation_statement",
-        "identity.public_flag_mail"
+        "identity.public_flag_mail",
+        "identity.moderation_ground",
+        "identity.moderation_decision"
       ],
       "columns": [
-        "next_attempt_at"
+        "next_attempt_at",
+        "law_ref"
       ],
       "constraints": [
-        "moderation_statement_kind_check"
+        "moderation_statement_kind_check",
+        "moderation_ground_law_length",
+        "moderation_ground_law_required",
+        "moderation_decision_law_length",
+        "moderation_decision_law_required"
+      ],
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime"
       ]
     }
   ]

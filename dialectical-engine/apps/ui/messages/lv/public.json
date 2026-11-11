@@ -286,6 +286,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Mūsu Pakalpojuma noteikumi, 7. sadaļa: nekādas reliģijas apvainošanas.",
   "public.moderation.ground.PERSONAL_DATA": "Mūsu Pakalpojuma noteikumi, 7. sadaļa: neiesniedziet citu personu datus.",
   "public.moderation.ground.ILLEGAL": "Likums: saturs ir nelikumīgs. Tālāk norādītajos faktos ir minēts attiecīgais likums.",
+  "public.moderation.law": "Likums, uz kuru mēs balstījāmies: {law}",
   "public.moderation.suspectedIntro": "Par ko ir pārskatīšana (vēl nav izlemts):",
   "public.moderation.factsIntro": "Fakti, uz kuriem balstījāmies:",
   "public.moderation.factsDeleted": "Fakti tika dzēsti divpadsmit mēnešus pēc šī soļa. Noteikums un datumi paliek.",

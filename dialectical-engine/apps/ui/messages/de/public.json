@@ -285,6 +285,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "Unsere Nutzungsbedingungen, Abschnitt 7: Religiöse Beleidigungen sind verboten.",
   "public.moderation.ground.PERSONAL_DATA": "Unsere Nutzungsbedingungen, Abschnitt 7: Übermitteln Sie keine personenbezogenen Daten anderer Personen.",
   "public.moderation.ground.ILLEGAL": "Das Gesetz: Der Inhalt ist rechtswidrig. Die Tatsachen unten nennen das Gesetz.",
+  "public.moderation.law": "Das Gesetz, auf das wir uns gestützt haben: {law}",
   "public.moderation.suspectedIntro": "Worum es bei der Prüfung geht, noch nicht entschieden:",
   "public.moderation.factsIntro": "Die Tatsachen, auf die wir uns gestützt haben:",
   "public.moderation.factsDeleted": "Die Tatsachen wurden zwölf Monate nach dem Schritt gelöscht. Die Regel und die Datumsangaben bleiben erhalten.",

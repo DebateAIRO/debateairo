@@ -286,6 +286,7 @@
   "public.moderation.ground.RELIGIOUS_INSULT": "תנאי השירות שלנו, סעיף 7: העלבת דת אסורה.",
   "public.moderation.ground.PERSONAL_DATA": "תנאי השירות שלנו, סעיף 7: אל תמסרו נתונים אישיים על אנשים אחרים.",
   "public.moderation.ground.ILLEGAL": "החוק: התוכן בלתי חוקי. העובדות שלמטה מציינות את החוק.",
+  "public.moderation.law": "החוק שעליו הסתמכנו: {law}",
   "public.moderation.suspectedIntro": "במה עוסקת הבדיקה, טרם הוחלט:",
   "public.moderation.factsIntro": "העובדות שעליהן הסתמכנו:",
   "public.moderation.factsDeleted": "העובדות נמחקו שנים-עשר חודשים לאחר הצעד. הכלל והתאריכים נשמרים.",

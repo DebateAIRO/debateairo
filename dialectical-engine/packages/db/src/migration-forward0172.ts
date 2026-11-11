@@ -20,7 +20,13 @@ const TABLES: readonly string[] = [
 /** The functions this step adds (the ones it restates are their own step's, AMENDS below). */
 const FUNCTIONS: readonly string[] = [
   // M6: a person's review step that names a report closes it as ACTED; it never raises.
-  "identity.close_public_flag_by_review(uuid,uuid,uuid)"
+  "identity.close_public_flag_by_review(uuid,uuid,uuid)",
+  // M7: the law's check, and the new overloads with the law last: the two writers and staff's door with its proof's body.
+  "identity.moderation_law_of(text[],text)",
+  "identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)",
+  "identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)",
+  "staff.public_review_body_grounded(text,jsonb,text)",
+  "staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
 ];
 /** The earlier steps whose digest this step changes, in step order. The manifest carries the same list. */
 const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
@@ -39,10 +45,17 @@ const AMENDS: readonly PostconditionAmendment[] = Object.freeze([
       // M3: the page's (and the export's) reader, no facts for a contributor's or a reporter's final statement.
       "identity.read_own_moderation_statements(uuid)",
       // M1: the reporter's answer reader, with aiReadFirst (true when the automatic check gave a verdict).
-      "identity.read_public_flag_mail(uuid,uuid)"]),
-    relations: Object.freeze(["identity.moderation_statement", "identity.public_flag_mail"]), columns: Object.freeze(["next_attempt_at"]),
-    // M3: and 0157's kind CHECK on identity.moderation_statement (the two statement kinds of the final decision).
-    constraints: Object.freeze(["moderation_statement_kind_check"]) })
+      "identity.read_public_flag_mail(uuid,uuid)",
+      // M7: the statement's ground, with the law.
+      "identity.moderation_statement_ground(uuid)"]),
+    // M7: and the column law_ref on 0157's identity.moderation_ground and identity.moderation_decision.
+    relations: Object.freeze(["identity.moderation_statement", "identity.public_flag_mail", "identity.moderation_ground", "identity.moderation_decision"]),
+    columns: Object.freeze(["next_attempt_at", "law_ref"]),
+    // M3: and 0157's kind CHECK on identity.moderation_statement (the two statement kinds of the final decision). M7: each law_ref's two CHECKs, NOT VALID.
+    constraints: Object.freeze(["moderation_statement_kind_check", "moderation_ground_law_length", "moderation_ground_law_required", "moderation_decision_law_length",
+      "moderation_decision_law_required"]),
+    // M7: the release before's door loses its runtime grant (drained); the door with the law is this step's own.
+    revokes: Object.freeze(["EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime"]) })
 ]);
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0172_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
