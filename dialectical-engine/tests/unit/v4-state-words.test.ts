@@ -85,7 +85,7 @@ describe("the shared state words (journey-f22)", () => {
     const lines = Object.entries(CATALOG);
     expect(lines.filter(([, line]) => /\busually\b|\babout \d|\d+\s*(?:to|-|–)\s*\d+\s*(?:minutes?|hours?)/iu.test(line)).map(([key]) => key)).toEqual([]);
     // wait-f3's question line (v4.debate.usually) and the report page's timed line (v4.investigation.writingSince) went with
-    // the unused keys (12 Nov): no page read them.
+    // the unused keys: no page read them.
   });
 
   it("a wait names a clock time from the server, with its day only when it is not today", () => {

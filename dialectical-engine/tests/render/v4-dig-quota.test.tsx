@@ -236,7 +236,7 @@ describe("a debate paused at the month wall", () => {
     expect(text()).toContain(word("v4.money.paused", { date }));
     expect(text()).not.toContain(word("v4.state.PAUSED", { date }));
     expect(text()).toContain(CATALOG["v4.money.continueNote"]);
-    // The old wait line (its key went with the unused keys, 12 Nov), in its words.
+    // The old wait line (its key went with the unused keys), in its words.
     expect(text()).not.toContain("This takes a while. You can leave this page. Your question will be under “My questions”.");
     expect(buttonsNamed(CATALOG["v4.money.continue"]!)).toEqual([]);
     expect(page().querySelector(".v4DebPulse")).toBeNull();
@@ -260,7 +260,7 @@ describe("a debate paused at the month wall", () => {
     expect(document.activeElement).toBe(early);
     // ask-f6 with the owner's 5 Nov answer 12 B: the classic view is in the header's account menu only (the page's own wiring,
     // Task 76j), so this card draws none. Merge with the start step (6 Nov): its page shows the pause in the first card of the
-    // map's step (V4RunRoot in .v4DebFirstCard), not in the old paused screen's card (removed 12 Nov).
+    // map's step (V4RunRoot in .v4DebFirstCard), not in the old paused screen's card (since removed).
     const card = page().querySelector(".v4DebFirstCard");
     expect(card).not.toBeNull();
     const classic = [...page().querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);

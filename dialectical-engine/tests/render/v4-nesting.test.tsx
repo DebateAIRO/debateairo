@@ -137,7 +137,7 @@ describe("a dig's own map", () => {
     expect(panel().textContent).toContain(newer.line);
     expect(panel().textContent).not.toContain(own[1]!.line);
     // A dig writes no story: nothing on its page waits for one.
-    // (The old line above the map, whose key went with the unused keys on 12 Nov, in its words.)
+    // (The old line above the map, whose key went with the unused keys, in its words.)
     expect(page().textContent).not.toContain("The short answer is still being written. This page updates by itself.");
   });
 

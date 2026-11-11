@@ -649,7 +649,7 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // in the module's comments is all that moved. migrate() is byte-identical.
 // The merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' comments and export lines. migrate() is byte-identical.
 // The second merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' export lines. migrate() is byte-identical.
-// Dead code removal (2026-11-12): the moderation notice repository's export line (0156) goes; nothing constructed it since 0157.
+// The moderation notice repository's export line is gone from that file: nothing constructed the repository.
 // migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, as before).
 const NATIVE_MIGRATE_MODULE_SHA256 = "de6bd3466ad612e007b2210515b71f2acbf1f5077b30f7bd01896e93f0b4d84e";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own

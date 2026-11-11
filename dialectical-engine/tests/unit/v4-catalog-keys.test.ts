@@ -355,7 +355,7 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.maps.more",
   // The owner's third round (5 Nov afternoon): the sentences that name the page behind "My questions" follow its new name
   // (MY_QUESTIONS_ANSWER_LINES below). v4.public.dig.unconfirmed, the one a page still reads (the question's old wait line
-  // went with the unused keys, 12 Nov), is on this list already. Since the fourth round its second sentence is the owner's
+  // went with the unused keys), is on this list already. Since the fourth round its second sentence is the owner's
   // (FOURTH_ROUND_ANSWER_ENDINGS below), so only its first sentence is still a draft.
   "v4.debate.askAgainNoteQuestion",
   "v4.debate.digFailedBackNote",
@@ -904,7 +904,7 @@ describe("V4 catalogue keys", () => {
 
   it("W4-6: the dig card words cover every state a dig of the new model can be in, and none names an engine word", () => {
     // A done dig's result (journey-f11) says one of the v4.result.card.* lines (V4MapTree's digNote), so the old "changed this
-    // path" and "no change" cards went with the unused keys (12 Nov).
+    // path" and "no change" cards went with the unused keys.
     const cards = ["WAITING", "RUNNING", "PAUSED", "FAILED", "DONE", "REWRITING", "REWRITE_FAILED"]
       .map((state) => `v4.rewrite.digCard.${state}`);
     expect(cards.filter((key) => !(key in catalog))).toEqual([]);
@@ -935,7 +935,7 @@ const REVIEW_LINES: Readonly<Record<string, string>> = Object.freeze({
   "v4.report.publicToo": "This question is public, so your report will be public too.",
   "v4.reportWait.digsRest": "Digging opens again when your report is written.",
   // The short break's words, which the waiting card's state words say (v4.state.*; the old v4.debate.state.* copies went
-  // with the unused keys, 12 Nov).
+  // with the unused keys).
   "v4.state.SHORT_BREAK": "Taking a short break · continues about {time}",
   "v4.state.SHORT_BREAK.noTime": "Taking a short break",
   // map-f16: the approved N14 sentence (the report's own), then r2-11 A's line.
@@ -1352,8 +1352,8 @@ describe("the owner's 3 Nov screen review", () => {
     expect(catalog["v4.money.pausedReady"]).toBe("Your new month has started.");
   });
 
-  // wait-f3 / map-f3's three "This takes a while." lines (the question's and the report's waits) went with the unused keys
-  // (12 Nov): no page read them. No V4 line promises an unmeasured time: tests/unit/v4-state-words.test.ts checks every line.
+  // wait-f3 / map-f3's three "This takes a while." lines (the question's and the report's waits) went with the unused keys,
+  // because no page read them. No V4 line promises an unmeasured time: tests/unit/v4-state-words.test.ts checks every line.
 
   it("wait-f20: 'Paused' is the month wall's word only", () => {
     const paused = Object.entries(catalog).filter(([, value]) => /\bpaused\b/iu.test(value)).map(([key]) => key).sort();
